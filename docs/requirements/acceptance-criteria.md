@@ -96,6 +96,60 @@ ST [Clément] Pelliculage 2JO
 **Then** the line is highlighted as error
 **And** error message shows "Station 'UnknownStation' not found"
 
+### AC-JOB-004b: DSL Syntax Examples
+
+The following examples demonstrate valid and invalid DSL syntax:
+
+**Internal Tasks (Station-based):**
+```
+[Komori] 60                    → Station=Komori, Setup=0, Run=60
+[Komori] 20+40                 → Station=Komori, Setup=20, Run=40
+[Komori] 20+40 "vernis"        → Station=Komori, Setup=20, Run=40, Comment="vernis"
+[Heidelberg CD102] 30+90       → Station with spaces in name
+[Massicot] 15                  → Simple cutting task
+```
+
+**Outsourced Tasks (Provider-based):**
+```
+ST [Clément] Pelliculage 2JO   → Provider=Clément, Action=Pelliculage, Duration=2 open days
+ST [ArtDorure] Dorure 3JO      → Provider=ArtDorure, Action=Dorure, Duration=3 open days
+ST [Reliure Express] Reliure 5JO "urgence"  → With comment
+```
+
+**Edge Cases:**
+```
+[Komori] 0+30                  → Zero setup time (valid)
+[Komori] 30+0                  → INVALID: Run time cannot be zero
+ST [Clément] Pelliculage 0JO   → INVALID: Duration cannot be zero
+[Komori]60                     → INVALID: Space required before duration
+ST[Clément] Pelliculage 2JO    → INVALID: Space required after ST
+```
+
+**Multi-line Examples:**
+```
+[Komori G37] 20+180 "tirage principal"
+[Massicot] 15
+ST [Clément] Pelliculage 2JO
+[Plieuse] 45
+[Massicot] 10 "coupe finale"
+```
+
+**Empty Lines and Comments:**
+```
+[Komori] 60
+
+[Massicot] 15                  → Empty line is ignored
+
+# This is a comment            → FUTURE: Comment lines (not yet supported)
+```
+
+**Error Recovery:**
+```
+[Komori] 20+40
+[INVALID SYNTAX
+[Massicot] 15                  → Parser continues, marks line 2 as error
+```
+
 ### AC-JOB-005: Job Dependencies
 **Given** Job A exists and is completed
 **When** the user sets Job B to require Job A

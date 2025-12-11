@@ -290,4 +290,45 @@ Every comment MUST have an author and timestamp recorded.
 
 ---
 
+## Quick Reference: Validation Rules Summary
+
+The following table provides a quick reference for validation rules, their corresponding conflict types, and severities:
+
+| Rule ID | Description | Conflict Type | Severity | Blocking? |
+|---------|-------------|---------------|----------|-----------|
+| VAL-001.1 | Station exists and is Available | AvailabilityConflict | High | Yes |
+| VAL-001.2 | No station double-booking | StationConflict | High | Yes |
+| VAL-001.3 | Group capacity not exceeded | GroupCapacityConflict | High | Yes |
+| VAL-001.4 | Task sequence respected | PrecedenceConflict | Medium | Soft* |
+| VAL-001.5 | Job dependencies satisfied | PrecedenceConflict | High | Yes |
+| VAL-001.6 | Approval gates cleared (BAT) | ApprovalGateConflict | High | Yes |
+| VAL-001.7 | Approval gates cleared (Plates) | ApprovalGateConflict | Medium | Warning |
+| VAL-001.8 | Workshop exit date achievable | DeadlineConflict | Medium | Warning |
+| BR-ASSIGN-002 | Within operating hours | AvailabilityConflict | High | Yes |
+| BR-ASSIGN-004 | Not in the past | — | High | Yes |
+
+*Soft blocking: Can be bypassed with Alt-key during drag
+
+### Conflict Type Definitions
+
+| Conflict Type | Description | Visual Indicator |
+|---------------|-------------|------------------|
+| StationConflict | Station double-booked (overlapping assignments) | Red highlight on both tiles |
+| GroupCapacityConflict | Station group MaxConcurrent exceeded | Yellow/orange time slot |
+| PrecedenceConflict | Task sequence violated within job | Red halo on violating tile |
+| ApprovalGateConflict | BAT or Plates approval not satisfied | Tile grayed out / blocked |
+| AvailabilityConflict | Outside station operating hours | Gray hatched overlay |
+| DeadlineConflict | Task completion exceeds workshopExitDate | Job in "Late Jobs" panel |
+
+### Validation Timing
+
+| Event | Validation Scope | Response Time |
+|-------|------------------|---------------|
+| Drag over grid | Real-time preview | < 10ms |
+| Drop on grid | Full validation | < 100ms |
+| Station schedule change | Affected assignments | Background |
+| Approval gate change | Job's tasks | Background |
+
+---
+
 This document defines the core invariants that must be maintained by the system. Implementation details may vary, but these rules must always be enforced.
