@@ -28,6 +28,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.4] - 2025-12-11
+
+### Added
+- `@flux/schedule-validator` package - isomorphic schedule validation
+- Time utility functions:
+  - `rangesOverlap` - time range overlap detection
+  - `calculateInternalEndTime` - internal task duration calculation
+  - `calculateOutsourcedEndTime` - outsourced task duration calculation
+  - `getMaxConcurrent` - concurrent range counting
+- Six conflict validators:
+  - `validateStationConflict` - station double-booking detection
+  - `validateGroupCapacity` - MaxConcurrent limit enforcement
+  - `validatePrecedence` - task sequence order with bypass support
+  - `validateApprovalGates` - BAT/Plates status checking
+  - `validateAvailability` - operating hours validation
+  - `validateDeadline` - workshop exit date validation
+- Main validation functions:
+  - `validateAssignment` - full validation with all conflicts
+  - `validateAssignments` - batch validation
+  - `isValidAssignment` - quick boolean check
+- Comprehensive test suite (29 tests)
+
+---
+
 ## [0.0.3] - 2025-12-11
 
 ### Added
@@ -86,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 <!-- Release links will be added as releases are created -->
-[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/org/flux-scheduler/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/org/flux-scheduler/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/org/flux-scheduler/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/org/flux-scheduler/releases/tag/v0.0.1

@@ -33,6 +33,19 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/validator:
+    dependencies:
+      '@flux/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.2)
+
 packages:
 
   '@esbuild/aix-ppc64@0.21.5':

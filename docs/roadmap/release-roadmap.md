@@ -71,11 +71,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Vitest testing framework setup
 - [x] Shared types package structure (@flux/types)
 
-### v0.0.4 - Shared Package: @flux/schedule-validator
-- [ ] Package initialization with npm/pnpm workspace
-- [ ] Core TypeScript types (Station, Job, Task, Assignment)
-- [ ] Basic package build configuration
-- [ ] Package publishing setup (private registry or npm)
+### v0.0.4 - Shared Package: @flux/schedule-validator ✅
+- [x] Package initialization with pnpm workspace
+- [x] Time utilities (overlap detection, duration calculation)
+- [x] Six conflict validators (Station, Group, Precedence, Approval, Availability, Deadline)
+- [x] Main validation function and exports
+- [x] Comprehensive unit tests (29 tests)
 
 ### v0.0.5 - Frontend Project Foundation
 - [ ] Vite + React 19 + TypeScript setup
