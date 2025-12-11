@@ -53,23 +53,23 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ## Milestone 0: Infrastructure & Foundation (v0.0.x)
 
-### v0.0.1 - Development Environment
-- [ ] Docker Compose setup for local development
-- [ ] MariaDB 10.11 container configuration
-- [ ] Redis 7 container configuration
-- [ ] Shared network configuration
+### v0.0.1 - Development Environment ✅
+- [x] Docker Compose setup for local development
+- [x] MariaDB 10.11 container configuration
+- [x] Redis 7 container configuration
+- [x] Shared network configuration
 
-### v0.0.2 - PHP/Symfony Project Foundation
-- [ ] Symfony 7 project initialization
-- [ ] Monorepo structure (services as bundles initially)
-- [ ] Doctrine ORM configuration
-- [ ] Environment configuration (.env structure)
+### v0.0.2 - PHP/Symfony Project Foundation ✅
+- [x] Symfony 7 project initialization
+- [x] Monorepo structure (services as bundles initially)
+- [x] Doctrine ORM configuration
+- [x] Environment configuration (.env structure)
 
-### v0.0.3 - Node.js Project Foundation
-- [ ] Node.js + TypeScript project setup
-- [ ] ESLint + Prettier configuration
-- [ ] Jest testing framework setup
-- [ ] Shared types package structure
+### v0.0.3 - Node.js Project Foundation ✅
+- [x] Node.js + TypeScript project setup
+- [x] ESLint + Prettier configuration
+- [x] Vitest testing framework setup
+- [x] Shared types package structure (@flux/types)
 
 ### v0.0.4 - Shared Package: @flux/schedule-validator
 - [ ] Package initialization with npm/pnpm workspace

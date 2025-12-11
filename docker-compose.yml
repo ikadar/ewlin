@@ -1,7 +1,22 @@
 # Flux Print Shop Scheduling System - Development Environment
-# v0.0.2 - PHP/Symfony Project Foundation
+# v0.0.3 - Node.js Project Foundation
 
 services:
+  # ===========================================
+  # Node.js (TypeScript Packages)
+  # ===========================================
+  node:
+    build:
+      context: ./docker/node
+      dockerfile: Dockerfile
+    container_name: flux-node
+    restart: unless-stopped
+    volumes:
+      - ./services/node:/app:cached
+    working_dir: /app
+    networks:
+      - flux-network
+
   # ===========================================
   # PHP-FPM (Symfony API)
   # ===========================================

@@ -21,12 +21,51 @@ docker compose ps
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
+| `node` | ewlin-node (built) | — | TypeScript packages |
 | `php` | ewlin-php (built) | 9000 (internal) | Symfony PHP-FPM |
 | `nginx` | nginx:alpine | 8080 | Web server |
 | `mariadb` | mariadb:10.11 | 3306 | Primary database |
 | `redis` | redis:7-alpine | 6379 | Cache and session storage |
 
 ## Container Details
+
+### Node.js (TypeScript Packages)
+
+- **Image:** `ewlin-node` (built from `docker/node/Dockerfile`)
+- **Container name:** `flux-node`
+- **Node.js version:** 22 LTS
+- **Package manager:** pnpm 9.x
+- **Purpose:** TypeScript development for shared packages and validation service
+
+**Enter the container:**
+```bash
+docker compose exec node sh
+```
+
+**Install dependencies:**
+```bash
+docker compose exec node pnpm install
+```
+
+**Build all packages:**
+```bash
+docker compose exec node pnpm build
+```
+
+**Run tests:**
+```bash
+docker compose exec node pnpm test
+```
+
+**Check linting:**
+```bash
+docker compose exec node pnpm lint
+```
+
+**Format code:**
+```bash
+docker compose exec node pnpm format
+```
 
 ### PHP-FPM (Symfony)
 
@@ -198,6 +237,8 @@ docker/
 │       └── 01-init.sql    # Database initialization script
 ├── nginx/
 │   └── default.conf       # Nginx configuration for Symfony
+├── node/
+│   └── Dockerfile         # Node.js 22 LTS image
 └── php/
     └── Dockerfile         # PHP 8.3 FPM image
 ```
