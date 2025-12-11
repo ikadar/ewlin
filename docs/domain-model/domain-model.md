@@ -163,25 +163,34 @@ This domain model describes the core entities, value objects, and aggregates for
 
 ### ScheduleException
 - **Fields:**
-  - `Date` (date)
-  - `Type` (Closed, ModifiedHours)
-  - `TimeSlots` (collection of TimeSlot, for ModifiedHours)
+  - `Id` (string)
+  - `Date` (ISO date string)
+  - `Schedule` (DaySchedule, defines operating state for this date)
   - `Reason` (string, optional)
 - **Rules:**
   - Overrides the regular operating schedule for that date.
+  - Use `Schedule.isOperating = false` for closed days.
+  - Use `Schedule.isOperating = true` with custom slots for modified hours.
 
 ### SimilarityCriterion
 - **Fields:**
+  - `Id` (string)
   - `Name` (string, e.g., "Same paper type")
-  - `Code` (string, for matching logic)
+  - `FieldPath` (string, Job field path for comparison, e.g., "paperType")
 - **Rules:**
   - Used to determine visual indicators between consecutive tiles.
+  - FieldPath references a field on Job entity for comparison logic.
 
 ### TaskAssignment
 - **Fields:**
-  - `StationId` (or ProviderId for outsourced)
-  - `ScheduledStart` (DateTime)
-  - `ScheduledEnd` (DateTime)
+  - `Id` (string)
+  - `TaskId` (reference to Task)
+  - `TargetId` (StationId or ProviderId)
+  - `IsOutsourced` (boolean)
+  - `ScheduledStart` (ISO timestamp)
+  - `ScheduledEnd` (ISO timestamp)
+  - `CreatedAt` (ISO timestamp)
+  - `UpdatedAt` (ISO timestamp)
 - **Rules:**
   - ScheduledEnd = ScheduledStart + Task duration (accounting for operating schedule gaps).
 
@@ -346,3 +355,29 @@ This domain model describes the core entities, value objects, and aggregates for
    - Schedule changes don't modify core job/task definitions.
 
 This design ensures clear boundaries, minimal coupling between aggregates, and efficient validation of complex constraints.
+
+---
+
+## Implementation Notes
+
+### Current Implementation Status (@flux/types)
+
+The following notes document differences between this domain model and the current `@flux/types` implementation:
+
+| Entity | Domain Model Field | Implementation Status |
+|--------|-------------------|----------------------|
+| Station | `Capacity` | Not implemented (assumed 1) |
+| StationGroup | `IsOutsourcedProviderGroup` | Not implemented (inferred from provider) |
+| OutsourcedProvider | `Status` | Not implemented (assumed Active) |
+
+These fields may be added in future milestones as needed.
+
+### Timestamp Fields
+
+All entities in the implementation include `createdAt` and `updatedAt` timestamps for audit purposes. This is consistent with the types defined in `@flux/types`.
+
+### Type Guards
+
+The implementation includes type guard functions for runtime type checking:
+- `isInternalTask(task)` - Check if task is internal
+- `isOutsourcedTask(task)` - Check if task is outsourced

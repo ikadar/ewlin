@@ -90,6 +90,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit test jobs (Vitest)
 - [x] Docker image build jobs (ghcr.io)
 
+### v0.0.7 - CI Fixes ✅
+- [x] CI workflow fixes (build before test, PHP env setup)
+- [x] ESLint error fixes in frontend and validator
+- [x] ESLint config updates (ignore config files)
+- [x] Branch consolidation (all releases on main)
+
 ---
 
 ## Milestone 1: Core Domain MVP (v0.1.x)
@@ -219,46 +225,48 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ## Milestone 2: Scheduling Core (v0.2.x)
 
-### Phase 2A: Shared Validation Package
+### Phase 2A: Shared Validation Package ✅ (Completed in v0.0.4)
 
-#### v0.2.0 - Core Validation Types
-- [ ] ScheduleSnapshot type definition
-- [ ] ProposedAssignment type
-- [ ] ValidationResult type
-- [ ] ScheduleConflict types (all 6 types)
+> **Note:** This phase was completed ahead of schedule in v0.0.4. The `@flux/schedule-validator` package is fully functional with all 6 validators and 29 tests.
 
-#### v0.2.1 - Station Conflict Validation
-- [ ] Station double-booking check
-- [ ] Time overlap calculation utilities
-- [ ] Unit tests with 100% coverage
+#### v0.2.0 - Core Validation Types ✅ (Done in v0.0.4)
+- [x] ScheduleSnapshot type definition → `@flux/types`
+- [x] ProposedAssignment type → `@flux/types`
+- [x] ValidationResult type → `@flux/types`
+- [x] ScheduleConflict types (all 6 types) → `@flux/types`
 
-#### v0.2.2 - Group Capacity Validation
-- [ ] Concurrent task counting
-- [ ] Group capacity check
-- [ ] Unit tests
+#### v0.2.1 - Station Conflict Validation ✅ (Done in v0.0.4)
+- [x] Station double-booking check → `validators/station.ts`
+- [x] Time overlap calculation utilities → `utils/time.ts`
+- [x] Unit tests with 100% coverage
 
-#### v0.2.3 - Precedence Validation
-- [ ] Task sequence order check
-- [ ] Within-job precedence logic
-- [ ] Bypass flag support (Alt key)
-- [ ] Unit tests
+#### v0.2.2 - Group Capacity Validation ✅ (Done in v0.0.4)
+- [x] Concurrent task counting → `utils/time.ts`
+- [x] Group capacity check → `validators/group.ts`
+- [x] Unit tests
 
-#### v0.2.4 - Approval Gate Validation
-- [ ] BAT status check
-- [ ] Plates status check (for printing tasks)
-- [ ] Unit tests
+#### v0.2.3 - Precedence Validation ✅ (Done in v0.0.4)
+- [x] Task sequence order check → `validators/precedence.ts`
+- [x] Within-job precedence logic
+- [x] Bypass flag support (Alt key)
+- [x] Unit tests
 
-#### v0.2.5 - Availability Validation
-- [ ] Operating schedule check
-- [ ] Schedule exception check
-- [ ] Duration stretching calculation
-- [ ] Unit tests
+#### v0.2.4 - Approval Gate Validation ✅ (Done in v0.0.4)
+- [x] BAT status check → `validators/approval.ts`
+- [x] Plates status check (for printing tasks)
+- [x] Unit tests
 
-#### v0.2.6 - Package Build & Publish
-- [ ] Browser build (ES modules)
-- [ ] Node.js build (CommonJS + ESM)
-- [ ] Type declarations
-- [ ] Package publishing
+#### v0.2.5 - Availability Validation ✅ (Done in v0.0.4)
+- [x] Operating schedule check → `validators/availability.ts`
+- [x] Schedule exception check
+- [x] Duration stretching calculation (simplified for MVP)
+- [x] Unit tests
+
+#### v0.2.6 - Package Build & Publish ✅ (Done in v0.0.4)
+- [x] Browser build (ES modules)
+- [x] Node.js build (CommonJS + ESM)
+- [x] Type declarations
+- [x] Package integrated in workspace
 
 ### Phase 2B: Validation Service (Node.js) — see [ADR-010](../architecture/decision-records.md#adr-010--isomorphic-validation-service-nodejs)
 
