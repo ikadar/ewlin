@@ -1,7 +1,9 @@
 import type { ScheduleSnapshot } from '../../types';
 import {
-  generateOperators,
-  generateEquipment,
+  generateStations,
+  generateProviders,
+  generateCategories,
+  generateAllGroups,
   generateJobs,
   generateAssignments,
 } from '../generators';
@@ -9,34 +11,53 @@ import {
 let cachedSnapshot: ScheduleSnapshot | null = null;
 
 export function generateMockSnapshot(startDate: Date = new Date()): ScheduleSnapshot {
-  // Generate equipment first (operators need equipment IDs for skills)
-  const equipment = generateEquipment(15, startDate);
-  const equipmentIds = equipment.map((e) => e.id);
+  // Generate station infrastructure
+  const categories = generateCategories();
+  const groups = generateAllGroups();
+  const stations = generateStations();
+  const providers = generateProviders();
 
-  // Generate operators with skills for the equipment
-  const operators = generateOperators(20, equipmentIds, startDate);
+  // Generate jobs (includes tasks)
+  const jobsData = generateJobs(12, startDate);
+  const jobs = jobsData.map((j) => j.job);
 
-  // Generate jobs and tasks
-  const jobsWithTasks = generateJobs(12, startDate);
-  const jobs = jobsWithTasks.map((j) => j.job);
-  const tasks = jobsWithTasks.flatMap((j) => j.tasks);
-
-  // Generate assignments for assigned/executing tasks
+  // Generate assignments for assigned tasks
   const assignments = generateAssignments({
-    tasks,
-    operators,
-    equipment,
+    jobs,
+    stations,
+    providers,
     startDate,
   });
 
+  // Detect late jobs (simplified logic)
+  const lateJobs = jobs
+    .filter(job => {
+      if (job.status === 'Completed' || job.status === 'Cancelled') return false;
+      const deadline = new Date(job.workshopExitDate);
+      // Simple check: if deadline is within 3 days and not fully scheduled
+      const now = new Date();
+      const daysUntilDeadline = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      return daysUntilDeadline < 3 && !job.fullyScheduled;
+    })
+    .map(job => ({
+      jobId: job.id,
+      reference: job.reference,
+      workshopExitDate: job.workshopExitDate,
+      expectedCompletion: new Date(new Date(job.workshopExitDate).getTime() + 24 * 60 * 60 * 1000).toISOString(),
+      delayHours: 24,
+    }));
+
   return {
-    assignments,
-    operators,
-    equipment,
-    tasks,
-    jobs,
     snapshotVersion: 1,
     generatedAt: new Date().toISOString(),
+    stations,
+    providers,
+    categories,
+    groups,
+    jobs,
+    assignments,
+    conflicts: [], // No conflicts in mock data initially
+    lateJobs,
   };
 }
 

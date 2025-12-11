@@ -49,11 +49,11 @@ export function TaskBlock({
     switch (task.status) {
       case 'Assigned':
         return 'bg-blue-500';
-      case 'Executing':
+      case 'InProgress':
         return 'bg-green-500';
       case 'Completed':
         return 'bg-gray-400';
-      case 'Failed':
+      case 'Cancelled':
         return 'bg-red-500';
       default:
         return 'bg-blue-400';
@@ -68,6 +68,20 @@ export function TaskBlock({
         assignment,
       })
     );
+  };
+
+  const getTaskLabel = () => {
+    if (task.type === 'internal') {
+      return task.stationName ?? 'Internal';
+    }
+    return task.providerName ?? task.actionType ?? 'Outsourced';
+  };
+
+  const getTaskDuration = () => {
+    if (task.type === 'internal') {
+      return task.totalMinutes;
+    }
+    return (task.durationOpenDays ?? 0) * 8 * 60; // Convert days to minutes for display
   };
 
   // Only render if within visible bounds
@@ -86,11 +100,12 @@ export function TaskBlock({
       style={{
         left: `${Math.max(left, 0)}px`,
         width: `${width}px`,
+        backgroundColor: job?.color,
       }}
-      title={`${job?.name ?? 'Unknown Job'} - ${task.type} (${task.duration}min)`}
+      title={`${job?.reference ?? 'Unknown Job'} - ${getTaskLabel()} (${getTaskDuration()}min)`}
     >
-      <div className="font-medium truncate">{job?.name}</div>
-      <div className="truncate opacity-80">{task.type}</div>
+      <div className="font-medium truncate">{job?.reference}</div>
+      <div className="truncate opacity-80">{getTaskLabel()}</div>
     </div>
   );
 }

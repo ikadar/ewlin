@@ -1,12 +1,11 @@
-import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { setActivePanel } from '../../store/uiSlice';
-import { Card, CardHeader, CardTitle, CardContent } from '../common/Card';
+import { Card, CardHeader, CardContent } from '../common/Card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../common/Tabs';
 import { Button } from '../common/Button';
-import { OperatorList } from './OperatorList';
-import { EquipmentList } from './EquipmentList';
+import { StationList } from './StationList';
+import { ProviderList } from './ProviderList';
 import { JobList } from './JobList';
 import { Plus } from 'lucide-react';
 
@@ -19,7 +18,7 @@ export function CrudPanel({ className }: CrudPanelProps) {
   const dispatch = useAppDispatch();
 
   const handleTabChange = (value: string) => {
-    dispatch(setActivePanel(value as 'operators' | 'equipment' | 'jobs'));
+    dispatch(setActivePanel(value as 'stations' | 'providers' | 'jobs'));
   };
 
   return (
@@ -32,8 +31,8 @@ export function CrudPanel({ className }: CrudPanelProps) {
         <CardHeader className="py-2 px-4 border-b">
           <div className="flex items-center justify-between">
             <TabsList>
-              <TabsTrigger value="operators">Operators</TabsTrigger>
-              <TabsTrigger value="equipment">Equipment</TabsTrigger>
+              <TabsTrigger value="stations">Stations</TabsTrigger>
+              <TabsTrigger value="providers">Providers</TabsTrigger>
               <TabsTrigger value="jobs">Jobs</TabsTrigger>
             </TabsList>
             <Button size="sm" variant="outline">
@@ -44,11 +43,11 @@ export function CrudPanel({ className }: CrudPanelProps) {
         </CardHeader>
 
         <CardContent className="flex-1 overflow-hidden p-0">
-          <TabsContent value="operators" className="h-full m-0">
-            <OperatorList className="h-full" />
+          <TabsContent value="stations" className="h-full m-0">
+            <StationList className="h-full" />
           </TabsContent>
-          <TabsContent value="equipment" className="h-full m-0">
-            <EquipmentList className="h-full" />
+          <TabsContent value="providers" className="h-full m-0">
+            <ProviderList className="h-full" />
           </TabsContent>
           <TabsContent value="jobs" className="h-full m-0">
             <JobList className="h-full" />

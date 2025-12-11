@@ -30,22 +30,21 @@ export function TaskDetailPanel({ className }: TaskDetailPanelProps) {
   }
 
   const { task, assignment } = selectedTask;
-  const job = snapshot?.jobs.find((j) => j.id === task.jobId);
-  const operator = assignment?.operatorId
-    ? snapshot?.operators.find((o) => o.id === assignment.operatorId)
+  const job = snapshot?.jobs.find((j) => j.tasks.some((t) => t.id === task.id));
+  const station = task.stationId
+    ? snapshot?.stations.find((s) => s.id === task.stationId)
     : null;
-  const equipment = assignment?.equipmentId
-    ? snapshot?.equipment.find((e) => e.id === assignment.equipmentId)
+  const provider = task.providerId
+    ? snapshot?.providers.find((p) => p.id === task.providerId)
     : null;
 
   const getStatusVariant = () => {
     switch (task.status) {
       case 'Completed':
         return 'success';
-      case 'Failed':
       case 'Cancelled':
         return 'destructive';
-      case 'Executing':
+      case 'InProgress':
         return 'default';
       default:
         return 'secondary';
@@ -54,6 +53,23 @@ export function TaskDetailPanel({ className }: TaskDetailPanelProps) {
 
   const handleClose = () => {
     dispatch(setSelectedTask(null));
+  };
+
+  const getTaskLabel = () => {
+    if (task.type === 'internal') {
+      return task.stationName ?? 'Internal Task';
+    }
+    return task.providerName ?? task.actionType ?? 'Outsourced Task';
+  };
+
+  const getTaskDuration = () => {
+    if (task.type === 'internal') {
+      if (task.setupMinutes > 0) {
+        return `${task.setupMinutes}+${task.runMinutes}m (total: ${task.totalMinutes}m)`;
+      }
+      return `${task.totalMinutes}m`;
+    }
+    return `${task.durationOpenDays ?? 0} open days`;
   };
 
   return (
@@ -68,22 +84,59 @@ export function TaskDetailPanel({ className }: TaskDetailPanelProps) {
         {/* Task Info */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="font-medium">{task.type}</span>
+            <span className="font-medium">{getTaskLabel()}</span>
             <Badge variant={getStatusVariant()}>{task.status}</Badge>
           </div>
-          <div className="text-sm text-muted-foreground">Duration: {task.duration} minutes</div>
+          <div className="text-sm text-muted-foreground">Duration: {getTaskDuration()}</div>
+          {task.comment && (
+            <div className="text-sm text-muted-foreground mt-1">Note: {task.comment}</div>
+          )}
+          <div className="text-xs text-muted-foreground mt-2 font-mono">
+            DSL: {task.rawInput}
+          </div>
         </div>
+
+        {/* Station/Provider Info */}
+        {station && (
+          <div className="border-t pt-3">
+            <h4 className="text-sm font-medium mb-1">Station</h4>
+            <div className="text-sm">
+              <div>{station.name}</div>
+              <div className="text-muted-foreground">
+                Status: {station.status} | Capacity: {station.capacity}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {provider && (
+          <div className="border-t pt-3">
+            <h4 className="text-sm font-medium mb-1">Provider</h4>
+            <div className="text-sm">
+              <div>{provider.name}</div>
+              <div className="text-muted-foreground">
+                Action: {task.actionType}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Job Info */}
         {job && (
           <div className="border-t pt-3">
             <h4 className="text-sm font-medium mb-1">Job</h4>
             <div className="text-sm">
-              <div>{job.name}</div>
+              <div className="font-medium">{job.reference}</div>
+              <div className="text-muted-foreground">{job.client}</div>
               <div className="text-muted-foreground truncate">{job.description}</div>
               <div className="text-muted-foreground">
-                Deadline: {format(new Date(job.deadline), 'MMM d, yyyy HH:mm')}
+                Exit: {format(new Date(job.workshopExitDate), 'MMM d, yyyy')}
               </div>
+              {job.paperType && (
+                <div className="text-muted-foreground">
+                  Paper: {job.paperType} {job.paperFormat}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -101,38 +154,29 @@ export function TaskDetailPanel({ className }: TaskDetailPanelProps) {
                 <span className="text-muted-foreground">End: </span>
                 {format(new Date(assignment.scheduledEnd), 'MMM d, HH:mm')}
               </div>
-              {operator && (
-                <div>
-                  <span className="text-muted-foreground">Operator: </span>
-                  {operator.name}
-                </div>
-              )}
-              {equipment && (
-                <div>
-                  <span className="text-muted-foreground">Equipment: </span>
-                  {equipment.name}
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* Dependencies */}
-        {task.dependencies.length > 0 && (
+        {/* Job Dependencies */}
+        {job && job.dependencies.length > 0 && (
           <div className="border-t pt-3">
-            <h4 className="text-sm font-medium mb-1">Dependencies</h4>
+            <h4 className="text-sm font-medium mb-1">Job Dependencies</h4>
             <div className="space-y-1">
-              {task.dependencies.map((depId) => {
-                const depTask = snapshot?.tasks.find((t) => t.id === depId);
+              {job.dependencies.map((dep) => {
+                const depJob = snapshot?.jobs.find((j) => j.id === dep.dependsOnJobId);
                 return (
-                  <div key={depId} className="text-sm flex items-center gap-2">
+                  <div key={dep.dependsOnJobId} className="text-sm flex items-center gap-2">
                     <div
                       className={cn(
                         'w-2 h-2 rounded-full',
-                        depTask?.status === 'Completed' ? 'bg-green-500' : 'bg-yellow-500'
+                        depJob?.status === 'Completed' ? 'bg-green-500' : 'bg-yellow-500'
                       )}
                     />
-                    <span>{depTask?.type ?? 'Unknown'}</span>
+                    <span>{depJob?.reference ?? 'Unknown'}</span>
+                    <span className="text-muted-foreground text-xs">
+                      (task #{dep.dependsOnTaskSequence})
+                    </span>
                   </div>
                 );
               })}

@@ -1,11 +1,14 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import type { GridViewType, SelectedTask } from '../types';
+import type { SelectedTask } from '../types';
+
+// Grid can show stations or providers as columns
+export type GridViewType = 'stations' | 'providers';
 
 interface UiState {
   gridView: GridViewType;
   selectedTask: SelectedTask | null;
-  activePanel: 'operators' | 'equipment' | 'jobs' | null;
+  activePanel: 'stations' | 'providers' | 'jobs' | null;
   isDragging: boolean;
   draggedTaskId: string | null;
   timeRange: {
@@ -16,7 +19,7 @@ interface UiState {
 }
 
 const initialState: UiState = {
-  gridView: 'equipment',
+  gridView: 'stations',
   selectedTask: null,
   activePanel: 'jobs',
   isDragging: false,
@@ -38,7 +41,7 @@ const uiSlice = createSlice({
     setSelectedTask: (state, action: PayloadAction<SelectedTask | null>) => {
       state.selectedTask = action.payload;
     },
-    setActivePanel: (state, action: PayloadAction<'operators' | 'equipment' | 'jobs' | null>) => {
+    setActivePanel: (state, action: PayloadAction<'stations' | 'providers' | 'jobs' | null>) => {
       state.activePanel = action.payload;
     },
     setIsDragging: (state, action: PayloadAction<boolean>) => {
