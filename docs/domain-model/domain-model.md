@@ -210,6 +210,54 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Description` (string)
   - `Severity` (High, Medium, Low)
 
+### ScheduleSnapshot
+- **Fields:**
+  - `Version` (integer, for optimistic locking)
+  - `GeneratedAt` (ISO timestamp)
+  - `Stations` (collection of Station)
+  - `Categories` (collection of StationCategory)
+  - `Groups` (collection of StationGroup)
+  - `Providers` (collection of OutsourcedProvider)
+  - `Jobs` (collection of Job)
+  - `Tasks` (collection of Task)
+  - `Assignments` (collection of TaskAssignment)
+  - `Conflicts` (collection of ScheduleConflict)
+  - `LateJobs` (collection of LateJob)
+- **Rules:**
+  - Complete read-only view of schedule state for frontend rendering.
+  - Used by client-side validation to check constraints during drag.
+  - Version increments on each schedule modification for optimistic locking.
+
+### LateJob
+- **Fields:**
+  - `JobId` (reference to Job)
+  - `Deadline` (ISO date string, workshopExitDate)
+  - `ExpectedCompletion` (ISO date string)
+  - `DelayDays` (integer, number of days late)
+- **Rules:**
+  - Generated when job's last task completes after workshopExitDate.
+  - Displayed in "Late Jobs" panel in UI.
+
+### ProposedAssignment
+- **Fields:**
+  - `TaskId` (reference to Task)
+  - `TargetId` (StationId or ProviderId)
+  - `IsOutsourced` (boolean)
+  - `ScheduledStart` (ISO timestamp)
+  - `BypassPrecedence` (boolean, optional, Alt-key held)
+- **Rules:**
+  - Input to validation functions before assignment is persisted.
+  - BypassPrecedence allows precedence rule to be ignored with warning.
+
+### ValidationResult
+- **Fields:**
+  - `Valid` (boolean)
+  - `Conflicts` (collection of ScheduleConflict)
+  - `SuggestedStart` (ISO timestamp, optional)
+- **Rules:**
+  - Returned by validateAssignment function.
+  - SuggestedStart provided when precedence conflict can be auto-corrected.
+
 ### JobStatus
 - **Allowed values:** Draft, Planned, InProgress, Delayed, Completed, Cancelled
 - Represents the lifecycle state of a Job.
@@ -362,15 +410,17 @@ This design ensures clear boundaries, minimal coupling between aggregates, and e
 
 ### Current Implementation Status (@flux/types)
 
-The following notes document differences between this domain model and the current `@flux/types` implementation:
+As of v0.0.7, the `@flux/types` package is fully aligned with this domain model. All documented fields are implemented:
 
-| Entity | Domain Model Field | Implementation Status |
-|--------|-------------------|----------------------|
-| Station | `Capacity` | Not implemented (assumed 1) |
-| StationGroup | `IsOutsourcedProviderGroup` | Not implemented (inferred from provider) |
-| OutsourcedProvider | `Status` | Not implemented (assumed Active) |
-
-These fields may be added in future milestones as needed.
+| Entity | Field | Status |
+|--------|-------|--------|
+| Station | `capacity` | ✅ Implemented |
+| StationGroup | `isOutsourcedProviderGroup` | ✅ Implemented |
+| OutsourcedProvider | `status` (ProviderStatus) | ✅ Implemented |
+| ScheduleSnapshot | Full structure | ✅ Implemented |
+| LateJob | Full structure | ✅ Implemented |
+| ProposedAssignment | Full structure | ✅ Implemented |
+| ValidationResult | Full structure | ✅ Implemented |
 
 ### Timestamp Fields
 

@@ -67,6 +67,8 @@ export interface StationGroup {
   name: string;
   /** Maximum concurrent tasks across all stations in group (null = unlimited) */
   maxConcurrent: number | null;
+  /** Whether this group belongs to an outsourced provider (always unlimited capacity) */
+  isOutsourcedProviderGroup: boolean;
 }
 
 /** A physical machine or workstation */
@@ -76,16 +78,23 @@ export interface Station {
   status: StationStatus;
   categoryId: string;
   groupId: string;
+  /** Number of concurrent tasks this station can handle (typically 1) */
+  capacity: number;
   /** Default operating schedule */
   operatingSchedule: OperatingSchedule;
   /** Schedule exceptions (holidays, special closures) */
   exceptions: ScheduleException[];
 }
 
+/** Status of an outsourced provider */
+export type ProviderStatus = 'Active' | 'Inactive';
+
 /** An external company that performs specific tasks */
 export interface OutsourcedProvider {
   id: string;
   name: string;
+  /** Provider status (only Active providers can receive new tasks) */
+  status: ProviderStatus;
   /** Types of work this provider can perform */
   supportedActionTypes: string[];
   /** Associated station group (always unlimited capacity) */

@@ -14,6 +14,7 @@ export type {
   StationCategory,
   StationGroup,
   Station,
+  ProviderStatus,
   OutsourcedProvider,
 } from './station.js';
 

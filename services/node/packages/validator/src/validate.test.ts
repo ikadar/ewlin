@@ -14,6 +14,7 @@ function createTestSnapshot(): ScheduleSnapshot {
         status: 'Available',
         categoryId: 'cat-1',
         groupId: 'group-1',
+        capacity: 1,
         operatingSchedule: {
           monday: { isOperating: true, slots: [{ start: '06:00', end: '22:00' }] },
           tuesday: { isOperating: true, slots: [{ start: '06:00', end: '22:00' }] },
@@ -31,6 +32,7 @@ function createTestSnapshot(): ScheduleSnapshot {
         status: 'Available',
         categoryId: 'cat-2',
         groupId: 'group-1',
+        capacity: 1,
         operatingSchedule: {
           monday: { isOperating: true, slots: [{ start: '06:00', end: '22:00' }] },
           tuesday: { isOperating: true, slots: [{ start: '06:00', end: '22:00' }] },
@@ -47,7 +49,7 @@ function createTestSnapshot(): ScheduleSnapshot {
       { id: 'cat-1', name: 'Offset', similarityCriteria: [] },
       { id: 'cat-2', name: 'Finishing', similarityCriteria: [] },
     ],
-    groups: [{ id: 'group-1', name: 'Main Group', maxConcurrent: 2 }],
+    groups: [{ id: 'group-1', name: 'Main Group', maxConcurrent: 2, isOutsourcedProviderGroup: false }],
     providers: [],
     jobs: [
       {
