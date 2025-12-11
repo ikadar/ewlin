@@ -8,15 +8,16 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Architecture Components
 
-| Component | Technology | Description |
-|-----------|------------|-------------|
-| **Frontend** | React 19 + TypeScript | Scheduling UI with drag & drop |
-| **Validation Service** | Node.js + TypeScript | Isomorphic validation (client + server) |
-| **Station Management** | PHP/Symfony | Stations, categories, groups, providers |
-| **Job Management** | PHP/Symfony | Jobs, tasks, approval gates |
-| **Assignment Service** | PHP/Symfony | Schedule orchestration |
-| **Scheduling View** | PHP/Symfony | Read models, snapshots |
-| **Shared Package** | TypeScript | `@flux/schedule-validator` |
+| Component | Technology | Description | ADR |
+|-----------|------------|-------------|-----|
+| **Frontend** | React 19 + TypeScript | Scheduling UI with drag & drop | |
+| **Validation Service** | Node.js + TypeScript | Isomorphic validation (client + server) | [ADR-010](../architecture/decision-records.md#adr-010--isomorphic-validation-service-nodejs) |
+| **Station Management** | PHP/Symfony | Stations, categories, groups, providers | |
+| **Job Management** | PHP/Symfony | Jobs, tasks, approval gates | |
+| **Assignment Service** | PHP/Symfony | Schedule orchestration | |
+| **Scheduling View** | PHP/Symfony | Read models, snapshots | |
+| **Shared Package** | TypeScript | `@flux/schedule-validator` | [ADR-010](../architecture/decision-records.md#adr-010--isomorphic-validation-service-nodejs) |
+| **DSL Parser** | TypeScript + Lezer | Task DSL parsing & highlighting | [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl) |
 
 ### Infrastructure
 
@@ -164,12 +165,19 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Duration value object (setupMinutes, runMinutes, durationOpenDays)
 - [ ] Internal vs Outsourced task types
 
-#### v0.1.11 - DSL Parsing
-- [ ] DSL parser implementation
+#### v0.1.11 - DSL Parser with Lezer (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
+- [ ] Lezer grammar definition (`task-dsl.grammar`)
+- [ ] Grammar compilation and parser generation
 - [ ] Internal task syntax: [Station] setup+run "comment"
 - [ ] Outsourced task syntax: ST [Provider] ActionType duration "comment"
-- [ ] POST /api/v1/dsl/parse endpoint
+- [ ] Error recovery for partial parsing
+- [ ] `@flux/task-dsl-parser` package setup
+
+#### v0.1.11b - DSL Integration
+- [ ] POST /api/v1/dsl/parse endpoint (uses Lezer parser)
 - [ ] Parse error reporting with line numbers
+- [ ] CodeMirror 6 language extension
+- [ ] Syntax highlighting for task DSL
 
 #### v0.1.12 - DSL Autocomplete
 - [ ] GET /api/v1/dsl/autocomplete endpoint
@@ -250,7 +258,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Type declarations
 - [ ] Package publishing
 
-### Phase 2B: Validation Service (Node.js)
+### Phase 2B: Validation Service (Node.js) — see [ADR-010](../architecture/decision-records.md#adr-010--isomorphic-validation-service-nodejs)
 
 #### v0.2.7 - Express/Fastify Server Setup
 - [ ] HTTP server initialization
