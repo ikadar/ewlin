@@ -67,7 +67,7 @@ The goal is to provide:
 {
   "stationId": "string",
   "exceptionDate": "YYYY-MM-DD",
-  "type": "Closed|Modified",
+  "type": "Closed|ModifiedHours",
   "modifiedSlots": [{"start": "HH:MM", "end": "HH:MM"}],
   "reason": "string",
   "addedAt": "ISO-8601-timestamp"
