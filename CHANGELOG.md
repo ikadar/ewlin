@@ -28,6 +28,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.7] - 2025-12-11
+
+### Fixed
+- CI workflow: build packages before running tests (inter-package dependencies)
+- ESLint errors in frontend and validator packages:
+  - Added explicit return types to React components
+  - Replaced non-null assertions with proper guard clauses
+  - Fixed template literal type expressions
+  - Fixed unused variable warnings with underscore prefix convention
+  - Fixed redundant type union in `ProofApprovalGate`
+- ESLint configuration: ignore config files (vite.config.ts, eslint.config.js, etc.)
+- PHP lint job: skip Composer auto-scripts in CI environment
+
+### Changed
+- Merged `v0.0.1-development-environment` branch into `main`
+- All releases now properly tracked on `main` branch
+
+---
+
 ## [0.0.6] - 2025-12-11
 
 ### Added
@@ -149,7 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 <!-- Release links will be added as releases are created -->
-[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.6...HEAD
+[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/org/flux-scheduler/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/org/flux-scheduler/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/org/flux-scheduler/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/org/flux-scheduler/compare/v0.0.3...v0.0.4
