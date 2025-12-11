@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 vendor/
+.pnpm-store/
 
 # Build outputs
 dist/
@@ -44,8 +45,8 @@ Thumbs.db
 # Obsidian
 .obsidian/
 
-# PHP
-/var/
+# PHP / Symfony
+/services/api/var/
 /.phpunit.result.cache
 
 # Testing
