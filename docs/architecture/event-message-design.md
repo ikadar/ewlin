@@ -237,8 +237,8 @@ The goal is to provide:
 ```json
 {
   "jobId": "string",
-  "previousStatus": "Draft|Planned|InProgress|Completed|Cancelled",
-  "newStatus": "Draft|Planned|InProgress|Completed|Cancelled",
+  "previousStatus": "Draft|Planned|InProgress|Delayed|Completed|Cancelled",
+  "newStatus": "Draft|Planned|InProgress|Delayed|Completed|Cancelled",
   "changedAt": "ISO-8601-timestamp"
 }
 ```

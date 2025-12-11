@@ -223,8 +223,8 @@ This domain model describes the core entities, value objects, and aggregates for
 ### ProofStatus (Special Values)
 - `ProofSentAt` can be:
   - A DateTime (actual date sent)
-  - "AwaitingFile" (waiting for client to provide file)
-  - "NoProofRequired" (no proof needed for this job)
+  - `AwaitingFile` (waiting for client to provide file)
+  - `NoProofRequired` (no proof needed for this job)
 
 ---
 
