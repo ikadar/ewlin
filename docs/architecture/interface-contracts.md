@@ -1,6 +1,6 @@
-# Interface Contracts – Operations Research System
+# Interface Contracts – Flux Print Shop Scheduling System
 
-This document defines **service-to-service interface contracts** for the Equipment → Operator → Job → Task assignment and validation workflow.
+This document defines **service-to-service interface contracts** for the Station → Job → Task assignment and validation workflow.
 
 The goal is to provide **stable, technology-agnostic API contracts** that describe the operations each service exposes to other services.
 
@@ -11,31 +11,114 @@ Interfaces are described in:
 
 ---
 
-## 1. Resource Management Service – Public Interface
+## 1. Station Management Service – Public Interface
 
-### 1.1 RegisterOperator
-**Purpose:** Add a new operator to the system with skills and availability.
+### 1.1 RegisterStation
+**Purpose:** Add a new station to the system with operating schedule.
 
 **Preconditions**
-- Operator name must be unique
-- Skill levels must be valid (beginner|intermediate|expert)
+- Station name must be unique
+- Category must exist
+- Group must exist (or null for ungrouped)
 
 **Request**
 ```json
 {
   "name": "string",
-  "skills": [
-    {
-      "equipmentId": "string",
-      "level": "beginner|intermediate|expert",
-      "certificationDate": "YYYY-MM-DD"
-    }
-  ],
-  "availability": [
-    {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
-    }
+  "categoryId": "string",
+  "groupId": "string | null",
+  "capacity": 1,
+  "operatingSchedule": {
+    "weeklyPattern": [
+      {
+        "dayOfWeek": 0,
+        "timeSlots": [
+          {"start": "HH:MM", "end": "HH:MM"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Response**
+```json
+{
+  "stationId": "string",
+  "name": "string",
+  "status": "Available",
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Station aggregate created in Available state
+- Domain event `StationRegistered` emitted
+- Operating schedule stored
+
+**Error responses**
+- `STATION_NAME_EXISTS` – Name already in use
+- `CATEGORY_NOT_FOUND` – Category does not exist
+- `GROUP_NOT_FOUND` – Group does not exist
+
+### 1.2 UpdateOperatingSchedule
+**Purpose:** Modify station's weekly operating schedule.
+
+**Preconditions**
+- Station exists
+- Station is not Decommissioned
+
+**Request**
+```json
+{
+  "stationId": "string",
+  "operatingSchedule": {
+    "weeklyPattern": [
+      {
+        "dayOfWeek": 0,
+        "timeSlots": [
+          {"start": "HH:MM", "end": "HH:MM"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Response**
+```json
+{
+  "status": "updated",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Operating schedule updated in Station aggregate
+- Domain event `StationScheduleChanged` emitted
+- Integration event published for revalidation
+
+**Error responses**
+- `STATION_NOT_FOUND` – Station does not exist
+- `STATION_DECOMMISSIONED` – Station is decommissioned
+- `INVALID_TIME_SLOTS` – Time slots overlap or invalid format
+
+### 1.3 AddScheduleException
+**Purpose:** Add a one-off schedule exception (holiday, maintenance).
+
+**Preconditions**
+- Station exists
+- Date is in the future or today
+
+**Request**
+```json
+{
+  "stationId": "string",
+  "date": "YYYY-MM-DD",
+  "type": "Closed | ModifiedHours",
+  "reason": "string",
+  "modifiedSlots": [
+    {"start": "HH:MM", "end": "HH:MM"}
   ]
 }
 ```
@@ -43,39 +126,116 @@ Interfaces are described in:
 **Response**
 ```json
 {
-  "operatorId": "string",
-  "status": "active",
+  "exceptionId": "string",
   "createdAt": "ISO-8601-timestamp"
 }
 ```
 
 **Postconditions**
-- Operator aggregate created in Active state
-- Domain event `OperatorRegistered` emitted
-- Availability slots stored without overlap
+- ScheduleException added to Station aggregate
+- Domain event `ScheduleExceptionAdded` emitted
+- Affected assignments flagged for revalidation
 
 **Error responses**
-- `OPERATOR_NAME_EXISTS` – Name already in use
-- `INVALID_SKILL_LEVEL` – Unknown skill level
-- `AVAILABILITY_OVERLAP` – Time slots overlap
+- `STATION_NOT_FOUND` – Station does not exist
+- `EXCEPTION_DATE_PAST` – Date is in the past
+- `MODIFIED_SLOTS_REQUIRED` – ModifiedHours type requires slots
 
-### 1.2 UpdateOperatorAvailability
-**Purpose:** Modify operator's availability schedule.
+### 1.4 GetStationAvailability
+**Purpose:** Query station availability for a time range.
 
 **Preconditions**
-- Operator exists
-- New availability slots don't overlap
-- Operator is Active
+- Station exists
 
 **Request**
 ```json
 {
-  "operatorId": "string",
-  "availability": [
+  "stationId": "string",
+  "startDate": "YYYY-MM-DD",
+  "endDate": "YYYY-MM-DD"
+}
+```
+
+**Response**
+```json
+{
+  "stationId": "string",
+  "name": "string",
+  "status": "Available | InUse | Maintenance | Decommissioned",
+  "categoryId": "string",
+  "groupId": "string | null",
+  "availableSlots": [
     {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
+      "date": "YYYY-MM-DD",
+      "slots": [
+        {"start": "HH:MM", "end": "HH:MM"}
+      ]
     }
+  ],
+  "exceptions": [
+    {
+      "date": "YYYY-MM-DD",
+      "type": "Closed | ModifiedHours",
+      "reason": "string"
+    }
+  ]
+}
+```
+
+**Postconditions**
+- None — this operation is read-only
+
+**Error responses**
+- `STATION_NOT_FOUND` – Station does not exist
+
+---
+
+## 2. Station Category Service – Public Interface
+
+### 2.1 CreateCategory
+**Purpose:** Create a station category with similarity criteria.
+
+**Preconditions**
+- Category name must be unique
+
+**Request**
+```json
+{
+  "name": "string",
+  "similarityCriteria": [
+    {"code": "string", "name": "string"}
+  ]
+}
+```
+
+**Response**
+```json
+{
+  "categoryId": "string",
+  "name": "string",
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- StationCategory aggregate created
+- Domain event `CategoryCreated` emitted
+
+**Error responses**
+- `CATEGORY_NAME_EXISTS` – Name already in use
+
+### 2.2 UpdateSimilarityCriteria
+**Purpose:** Update the similarity criteria for a category.
+
+**Preconditions**
+- Category exists
+
+**Request**
+```json
+{
+  "categoryId": "string",
+  "similarityCriteria": [
+    {"code": "string", "name": "string"}
   ]
 }
 ```
@@ -89,47 +249,78 @@ Interfaces are described in:
 ```
 
 **Postconditions**
-- Availability updated in Operator aggregate
-- Domain event `OperatorAvailabilityChanged` emitted
-- Integration event published for revalidation
+- Similarity criteria updated
+- Domain event `CategoryCriteriaUpdated` emitted
 
 **Error responses**
-- `OPERATOR_NOT_FOUND` – Operator does not exist
-- `AVAILABILITY_OVERLAP` – Time slots overlap
-- `OPERATOR_INACTIVE` – Operator is deactivated
+- `CATEGORY_NOT_FOUND` – Category does not exist
 
-### 1.3 CheckOperatorAvailability
-**Purpose:** Query operator availability and skills.
+---
+
+## 3. Station Group Service – Public Interface
+
+### 3.1 CreateGroup
+**Purpose:** Create a station group with concurrency limits.
 
 **Preconditions**
-- Operator exists
+- Group name must be unique
 
 **Request**
 ```json
 {
-  "operatorId": "string",
-  "start": "ISO-8601-datetime",
-  "end": "ISO-8601-datetime"
+  "name": "string",
+  "maxConcurrent": "integer | null"
 }
 ```
 
 **Response**
 ```json
 {
-  "operatorId": "string",
+  "groupId": "string",
   "name": "string",
-  "status": "active|inactive",
-  "availableSlots": [
+  "maxConcurrent": "integer | null",
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- StationGroup aggregate created
+- Domain event `GroupCreated` emitted
+
+**Error responses**
+- `GROUP_NAME_EXISTS` – Name already in use
+- `INVALID_MAX_CONCURRENT` – Value must be positive or null
+
+### 3.2 CheckGroupCapacity
+**Purpose:** Check if group has capacity at a given time.
+
+**Preconditions**
+- Group exists
+
+**Request**
+```json
+{
+  "groupId": "string",
+  "timeSlot": {
+    "start": "ISO-8601-datetime",
+    "end": "ISO-8601-datetime"
+  }
+}
+```
+
+**Response**
+```json
+{
+  "groupId": "string",
+  "maxConcurrent": "integer | null",
+  "currentConcurrent": "integer",
+  "hasCapacity": "boolean",
+  "assignments": [
     {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
-    }
-  ],
-  "skills": [
-    {
-      "equipmentId": "string",
-      "equipmentName": "string",
-      "level": "beginner|intermediate|expert"
+      "taskId": "string",
+      "stationId": "string",
+      "scheduledStart": "ISO-8601-datetime",
+      "scheduledEnd": "ISO-8601-datetime"
     }
   ]
 }
@@ -139,57 +330,100 @@ Interfaces are described in:
 - None — this operation is read-only
 
 **Error responses**
-- `OPERATOR_NOT_FOUND` – Operator does not exist
+- `GROUP_NOT_FOUND` – Group does not exist
 
-### 1.4 RegisterEquipment
-**Purpose:** Add new equipment to the resource pool.
+---
+
+## 4. Outsourced Provider Service – Public Interface
+
+### 4.1 RegisterProvider
+**Purpose:** Add an external provider to the system.
 
 **Preconditions**
-- Equipment name must be unique
-- At least one supported task type
+- Provider name must be unique
+- At least one supported action type
 
 **Request**
 ```json
 {
   "name": "string",
-  "supportedTaskTypes": ["type1", "type2"],
-  "location": "string"
+  "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"]
 }
 ```
 
 **Response**
 ```json
 {
-  "equipmentId": "string",
-  "status": "available",
-  "registeredAt": "ISO-8601-timestamp"
+  "providerId": "string",
+  "name": "string",
+  "groupId": "string",
+  "status": "Active",
+  "createdAt": "ISO-8601-timestamp"
 }
 ```
 
 **Postconditions**
-- Equipment aggregate created in Available state
-- Domain event `EquipmentRegistered` emitted
+- OutsourcedProvider aggregate created in Active state
+- Auto-generated StationGroup created (unlimited capacity)
+- Domain event `ProviderRegistered` emitted
 
 **Error responses**
-- `EQUIPMENT_NAME_EXISTS` – Name already in use
-- `NO_TASK_TYPES` – No supported task types provided
+- `PROVIDER_NAME_EXISTS` – Name already in use
+- `NO_ACTION_TYPES` – No supported action types provided
 
----
-
-## 2. Job Management Service – Public Interface
-
-### 2.1 CreateJob
-**Purpose:** Create a new production job with deadline.
+### 4.2 GetProviderDetails
+**Purpose:** Retrieve provider with supported action types.
 
 **Preconditions**
-- Deadline must be in the future
+- Provider exists
 
 **Request**
 ```json
 {
+  "providerId": "string"
+}
+```
+
+**Response**
+```json
+{
+  "providerId": "string",
   "name": "string",
+  "status": "Active | Inactive",
+  "supportedActionTypes": ["string"],
+  "groupId": "string"
+}
+```
+
+**Postconditions**
+- None — this operation is read-only
+
+**Error responses**
+- `PROVIDER_NOT_FOUND` – Provider does not exist
+
+---
+
+## 5. Job Management Service – Public Interface
+
+### 5.1 CreateJob
+**Purpose:** Create a new print job with tasks from DSL.
+
+**Preconditions**
+- Workshop exit date must be in the future
+- DSL must be valid (if provided)
+
+**Request**
+```json
+{
+  "reference": "string",
+  "client": "string",
   "description": "string",
-  "deadline": "ISO-8601-datetime"
+  "workshopExitDate": "ISO-8601-datetime",
+  "paperType": "string | null",
+  "paperFormat": "string | null",
+  "paperPurchaseStatus": "InStock | ToOrder | Ordered | Received",
+  "notes": "string",
+  "tasksDSL": "string"
 }
 ```
 
@@ -197,72 +431,122 @@ Interfaces are described in:
 ```json
 {
   "jobId": "string",
-  "status": "draft",
+  "reference": "string",
+  "status": "Draft",
+  "fullyScheduled": false,
+  "tasks": [
+    {
+      "taskId": "string",
+      "sequenceOrder": 1,
+      "type": "internal | outsourced",
+      "stationId": "string | null",
+      "providerId": "string | null",
+      "setupMinutes": 0,
+      "runMinutes": 60,
+      "durationOpenDays": "integer | null",
+      "comment": "string | null",
+      "status": "Defined"
+    }
+  ],
   "createdAt": "ISO-8601-timestamp"
 }
 ```
 
 **Postconditions**
 - Job aggregate created in Draft state
+- Tasks created from DSL parsing
 - Domain event `JobCreated` emitted
 
 **Error responses**
-- `DEADLINE_IN_PAST` – Deadline is not in future
+- `DEADLINE_IN_PAST` – Workshop exit date is not in future
+- `DSL_PARSE_ERROR` – DSL syntax error (includes line and message)
+- `STATION_NOT_FOUND` – Station referenced in DSL not found
+- `PROVIDER_NOT_FOUND` – Provider referenced in DSL not found
 
-### 2.2 AddTaskToJob
-**Purpose:** Add a task to an existing job.
+### 5.2 UpdateJobDetails
+**Purpose:** Update job metadata (not tasks).
 
 **Preconditions**
 - Job exists
-- Job is in Draft state
-- Task type is valid
-- Duration is positive
+- Job is not Cancelled or Completed
 
 **Request**
 ```json
 {
   "jobId": "string",
-  "name": "string",
-  "type": "string",
-  "duration": 120,
-  "requiresOperator": true,
-  "requiresEquipment": true,
-  "equipmentType": "string"
+  "reference": "string",
+  "client": "string",
+  "description": "string",
+  "workshopExitDate": "ISO-8601-datetime",
+  "paperType": "string | null",
+  "paperFormat": "string | null",
+  "notes": "string"
 }
 ```
 
 **Response**
 ```json
 {
-  "taskId": "string",
-  "addedAt": "ISO-8601-timestamp"
+  "status": "updated",
+  "updatedAt": "ISO-8601-timestamp"
 }
 ```
 
 **Postconditions**
-- Task added to Job aggregate
-- Domain event `TaskAddedToJob` emitted
+- Job aggregate updated
+- Domain event `JobUpdated` emitted
+- If deadline changed, deadline conflicts recalculated
 
 **Error responses**
 - `JOB_NOT_FOUND` – Job does not exist
-- `JOB_INVALID_STATE` – Job is not in Draft state
-- `INVALID_DURATION` – Duration must be positive
+- `JOB_INVALID_STATE` – Job is Cancelled or Completed
 
-### 2.3 SetTaskDependency
-**Purpose:** Define dependency between tasks.
+### 5.3 ReorderTasks
+**Purpose:** Change the sequence order of tasks within a job.
 
 **Preconditions**
-- Both tasks exist
-- Tasks belong to same job
-- No circular dependency created
-- Job is in Draft or Planned state
+- Job exists
+- All task IDs belong to the job
+- Job is not Completed or Cancelled
 
 **Request**
 ```json
 {
-  "fromTaskId": "string",
-  "toTaskId": "string",
-  "dependencyType": "FinishToStart"
+  "jobId": "string",
+  "taskOrder": ["taskId1", "taskId2", "taskId3"]
+}
+```
+
+**Response**
+```json
+{
+  "status": "reordered",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Task sequence updated
+- Domain event `TasksReordered` emitted
+- Existing assignments revalidated for precedence
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `TASK_NOT_IN_JOB` – Task ID not part of this job
+- `JOB_INVALID_STATE` – Job is Completed or Cancelled
+
+### 5.4 SetJobDependency
+**Purpose:** Define that one job depends on another job.
+
+**Preconditions**
+- Both jobs exist
+- No circular dependency created
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "requiredJobId": "string"
 }
 ```
 
@@ -275,18 +559,139 @@ Interfaces are described in:
 ```
 
 **Postconditions**
-- Dependency added to Job aggregate
-- DAG validated for cycles
-- Domain event `TaskDependencySet` emitted
+- Job dependency added
+- Domain event `JobDependencySet` emitted
 
 **Error responses**
-- `TASK_NOT_FOUND` – One or both tasks don't exist
-- `DIFFERENT_JOBS` – Tasks belong to different jobs
+- `JOB_NOT_FOUND` – One or both jobs don't exist
 - `CIRCULAR_DEPENDENCY` – Would create a cycle
-- `JOB_INVALID_STATE` – Job is not in Draft/Planned state
 
-### 2.4 GetJobDetails
-**Purpose:** Retrieve job with tasks and dependencies.
+### 5.5 UpdateProofStatus
+**Purpose:** Update BAT (Bon à Tirer) approval status.
+
+**Preconditions**
+- Job exists
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "proofSentAt": "ISO-8601-datetime | AwaitingFile | NoProofRequired",
+  "proofApprovedAt": "ISO-8601-datetime | null"
+}
+```
+
+**Response**
+```json
+{
+  "status": "updated",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Proof status updated
+- Domain event `ProofStatusChanged` emitted
+- If proof approved, blocked tasks become schedulable
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `INVALID_PROOF_STATE` – Cannot approve without sending first
+
+### 5.6 UpdatePlatesStatus
+**Purpose:** Update plates preparation status.
+
+**Preconditions**
+- Job exists
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "platesStatus": "Todo | Done"
+}
+```
+
+**Response**
+```json
+{
+  "status": "updated",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Plates status updated
+- Domain event `PlatesStatusChanged` emitted
+- If plates done, printing tasks become schedulable
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+
+### 5.7 UpdatePaperStatus
+**Purpose:** Update paper procurement status.
+
+**Preconditions**
+- Job exists
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "paperPurchaseStatus": "InStock | ToOrder | Ordered | Received"
+}
+```
+
+**Response**
+```json
+{
+  "paperPurchaseStatus": "string",
+  "paperOrderedAt": "ISO-8601-timestamp | null",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Paper status updated
+- If changed to Ordered, paperOrderedAt set
+- Domain event `PaperStatusChanged` emitted
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+
+### 5.8 AddComment
+**Purpose:** Add a timestamped comment to a job.
+
+**Preconditions**
+- Job exists
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "content": "string"
+}
+```
+
+**Response**
+```json
+{
+  "author": "string",
+  "timestamp": "ISO-8601-timestamp",
+  "content": "string"
+}
+```
+
+**Postconditions**
+- Comment added to job
+- Domain event `CommentAdded` emitted
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `EMPTY_CONTENT` – Comment content is empty
+
+### 5.9 GetJobDetails
+**Purpose:** Retrieve job with tasks and status.
 
 **Preconditions**
 - Job exists
@@ -302,28 +707,45 @@ Interfaces are described in:
 ```json
 {
   "jobId": "string",
-  "name": "string",
-  "status": "draft|planned|inprogress|delayed|completed|cancelled",
-  "deadline": "ISO-8601-datetime",
+  "reference": "string",
+  "client": "string",
+  "description": "string",
+  "status": "Draft | Planned | InProgress | Delayed | Completed | Cancelled",
+  "workshopExitDate": "ISO-8601-datetime",
+  "fullyScheduled": "boolean",
+  "paperType": "string | null",
+  "paperFormat": "string | null",
+  "paperPurchaseStatus": "InStock | ToOrder | Ordered | Received",
+  "paperOrderedAt": "ISO-8601-timestamp | null",
+  "proofSentAt": "ISO-8601-datetime | AwaitingFile | NoProofRequired | null",
+  "proofApprovedAt": "ISO-8601-datetime | null",
+  "platesStatus": "Todo | Done",
   "tasks": [
     {
       "taskId": "string",
-      "name": "string",
-      "type": "string",
-      "duration": 120,
-      "status": "defined|ready|assigned|executing|completed|failed|cancelled",
-      "requiresOperator": true,
-      "requiresEquipment": true
+      "sequenceOrder": 1,
+      "type": "internal | outsourced",
+      "stationId": "string | null",
+      "stationName": "string | null",
+      "providerId": "string | null",
+      "providerName": "string | null",
+      "actionType": "string | null",
+      "setupMinutes": 0,
+      "runMinutes": 60,
+      "totalMinutes": 60,
+      "durationOpenDays": "integer | null",
+      "comment": "string | null",
+      "status": "Defined | Ready | Assigned | Completed | Cancelled"
     }
   ],
-  "dependencies": [
+  "dependencies": ["jobId1", "jobId2"],
+  "comments": [
     {
-      "fromTaskId": "string",
-      "toTaskId": "string",
-      "type": "FinishToStart"
+      "author": "string",
+      "timestamp": "ISO-8601-timestamp",
+      "content": "string"
     }
-  ],
-  "criticalPath": ["taskId1", "taskId2", "taskId3"]
+  ]
 }
 ```
 
@@ -335,33 +757,127 @@ Interfaces are described in:
 
 ---
 
-## 3. Assignment & Validation Service – Public Interface
+## 6. Assignment & Validation Service – Public Interface
 
-### 3.1 AssignResourcesCommand
-**Purpose:** Assign operator and equipment to a task with scheduled timing.
+### 6.1 AssignTask
+**Purpose:** Assign a task to a station/provider with scheduled timing.
 
 **Preconditions**
-- Task exists and is in Ready state
-- Operator has required skills for equipment
-- Resources available at scheduled time
+- Task exists
+- Station/Provider available at scheduled time
+- Approval gates satisfied (BAT, Plates)
+- Predecessor tasks scheduled (precedence check)
 - No scheduling conflicts
-- Dependencies satisfied
 
 **Request**
 ```json
 {
   "taskId": "string",
-  "operatorId": "string",
-  "equipmentId": "string",
+  "stationId": "string",
   "scheduledStart": "ISO-8601-datetime"
+}
+```
+
+**Response (Valid)**
+```json
+{
+  "taskId": "string",
+  "assignment": {
+    "stationId": "string",
+    "scheduledStart": "ISO-8601-datetime",
+    "scheduledEnd": "ISO-8601-datetime"
+  },
+  "status": "Assigned",
+  "validationResult": {
+    "valid": true,
+    "conflicts": []
+  }
+}
+```
+
+**Response (Invalid)**
+```json
+{
+  "taskId": "string",
+  "validationResult": {
+    "valid": false,
+    "conflicts": [
+      {
+        "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+        "description": "string",
+        "affectedTaskIds": ["taskId1", "taskId2"],
+        "severity": "High | Medium | Low"
+      }
+    ]
+  }
+}
+```
+
+**Postconditions**
+- If valid: Assignment created, task status → Assigned
+- Domain event `TaskAssigned` emitted
+- Integration event published
+
+**Error responses**
+- `TASK_NOT_FOUND` – Task does not exist
+- `STATION_NOT_FOUND` – Station does not exist
+- `STATION_MISMATCH` – Task cannot be assigned to this station
+
+### 6.2 RecallTask
+**Purpose:** Remove task assignment (recall tile from schedule).
+
+**Preconditions**
+- Task has an assignment
+
+**Request**
+```json
+{
+  "taskId": "string"
 }
 ```
 
 **Response**
 ```json
 {
-  "assignmentId": "string",
-  "scheduledEnd": "ISO-8601-datetime",
+  "taskId": "string",
+  "status": "Ready",
+  "recalledAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Assignment removed
+- Task status → Ready
+- Domain event `TaskRecalled` emitted
+
+**Error responses**
+- `TASK_NOT_FOUND` – Task does not exist
+- `TASK_NOT_ASSIGNED` – Task has no assignment
+
+### 6.3 RescheduleTask
+**Purpose:** Change timing of existing task assignment.
+
+**Preconditions**
+- Assignment exists
+- New time doesn't create conflicts
+- Precedence still satisfied
+
+**Request**
+```json
+{
+  "taskId": "string",
+  "newScheduledStart": "ISO-8601-datetime"
+}
+```
+
+**Response**
+```json
+{
+  "status": "rescheduled",
+  "assignment": {
+    "scheduledStart": "ISO-8601-datetime",
+    "scheduledEnd": "ISO-8601-datetime"
+  },
   "validationResult": {
     "valid": true,
     "conflicts": []
@@ -370,56 +886,58 @@ Interfaces are described in:
 ```
 
 **Postconditions**
-- ValidatedAssignment created in Schedule aggregate
-- Task scheduled with calculated end time
-- Domain event `TaskAssigned` emitted
-- Integration event `Assignment.TaskScheduled` published
+- Assignment updated with new timing
+- Domain event `TaskRescheduled` emitted
+- Successor tasks revalidated
 
 **Error responses**
 - `TASK_NOT_FOUND` – Task does not exist
-- `TASK_NOT_READY` – Task is not in Ready state
-- `SKILL_MISMATCH` – Operator lacks required skills
-- `RESOURCE_UNAVAILABLE` – Resource not available at time
-- `SCHEDULING_CONFLICT` – Double-booking detected
-- `DEPENDENCY_VIOLATION` – Prerequisites not complete
+- `TASK_NOT_ASSIGNED` – Task has no assignment
 
-### 3.2 RescheduleTask
-**Purpose:** Change timing of existing task assignment.
+### 6.4 ValidateProposedAssignment
+**Purpose:** Validate a proposed assignment without saving (for drag preview).
 
 **Preconditions**
-- Assignment exists
-- New time doesn't create conflicts
-- Dependencies still satisfied
+- Task exists
 
 **Request**
 ```json
 {
   "taskId": "string",
-  "newScheduledStart": "ISO-8601-datetime",
-  "reason": "string"
+  "stationId": "string",
+  "scheduledStart": "ISO-8601-datetime"
 }
 ```
 
 **Response**
 ```json
 {
-  "status": "rescheduled",
-  "newScheduledEnd": "ISO-8601-datetime",
-  "rescheduledAt": "ISO-8601-timestamp"
+  "valid": "boolean",
+  "conflicts": [
+    {
+      "type": "string",
+      "description": "string",
+      "affectedTaskIds": ["string"],
+      "severity": "High | Medium | Low"
+    }
+  ],
+  "warnings": [
+    {
+      "type": "DeadlineRisk",
+      "description": "Only 4 hours buffer before workshop exit date"
+    }
+  ]
 }
 ```
 
 **Postconditions**
-- Assignment updated with new timing
-- Domain event `TaskRescheduled` emitted
-- Dependent tasks revalidated
+- None — this operation is read-only
 
 **Error responses**
-- `ASSIGNMENT_NOT_FOUND` – No assignment for task
-- `SCHEDULING_CONFLICT` – New time creates conflict
-- `DEPENDENCY_VIOLATION` – Would violate dependencies
+- `TASK_NOT_FOUND` – Task does not exist
+- `STATION_NOT_FOUND` – Station does not exist
 
-### 3.3 ValidateSchedule
+### 6.5 ValidateScheduleScope
 **Purpose:** Perform full validation of schedule scope.
 
 **Preconditions**
@@ -440,14 +958,21 @@ Interfaces are described in:
 ```json
 {
   "validationId": "string",
-  "status": "valid|conflicts_found",
+  "status": "valid | conflicts_found",
   "conflicts": [
     {
-      "type": "ResourceConflict|AvailabilityConflict|DependencyConflict|DeadlineConflict|SkillConflict",
-      "severity": "high|medium|low",
-      "affectedTasks": ["task1", "task2"],
-      "description": "string",
-      "suggestedResolution": "string"
+      "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+      "severity": "High | Medium | Low",
+      "affectedTaskIds": ["task1", "task2"],
+      "description": "string"
+    }
+  ],
+  "lateJobs": [
+    {
+      "jobId": "string",
+      "workshopExitDate": "ISO-8601-datetime",
+      "expectedCompletion": "ISO-8601-datetime",
+      "delayHours": "integer"
     }
   ],
   "validatedAt": "ISO-8601-timestamp"
@@ -463,153 +988,379 @@ Interfaces are described in:
 
 ---
 
-## 4. Execution Tracking Service – Public Interface
+## 7. Scheduling View Service – Public Interface
 
-### 4.1 StartTaskExecution
-**Purpose:** Record actual task start by operator.
+### 7.1 GetScheduleSnapshot
+**Purpose:** Get complete schedule snapshot for UI rendering.
 
 **Preconditions**
-- Task is assigned
-- Operator matches assignment
-- Current time within allowed window
+- None
 
 **Request**
 ```json
 {
-  "taskId": "string",
-  "operatorId": "string",
-  "actualStartTime": "ISO-8601-datetime"
+  "startDate": "YYYY-MM-DD",
+  "endDate": "YYYY-MM-DD"
 }
 ```
 
 **Response**
 ```json
 {
-  "executionId": "string",
-  "startVarianceMinutes": -5,
-  "status": "executing"
+  "snapshotVersion": "integer",
+  "generatedAt": "ISO-8601-timestamp",
+  "stations": [
+    {
+      "stationId": "string",
+      "name": "string",
+      "categoryId": "string",
+      "groupId": "string | null",
+      "status": "Available | InUse | Maintenance | Decommissioned"
+    }
+  ],
+  "providers": [
+    {
+      "providerId": "string",
+      "name": "string",
+      "status": "Active | Inactive",
+      "groupId": "string"
+    }
+  ],
+  "categories": [
+    {
+      "categoryId": "string",
+      "name": "string",
+      "similarityCriteria": [
+        {"code": "string", "name": "string"}
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "groupId": "string",
+      "name": "string",
+      "maxConcurrent": "integer | null",
+      "isOutsourcedProviderGroup": "boolean"
+    }
+  ],
+  "jobs": [
+    {
+      "jobId": "string",
+      "reference": "string",
+      "client": "string",
+      "color": "#RRGGBB",
+      "workshopExitDate": "ISO-8601-datetime",
+      "status": "string",
+      "tasks": [...]
+    }
+  ],
+  "assignments": [
+    {
+      "taskId": "string",
+      "jobId": "string",
+      "stationId": "string",
+      "scheduledStart": "ISO-8601-datetime",
+      "scheduledEnd": "ISO-8601-datetime"
+    }
+  ],
+  "conflicts": [
+    {
+      "type": "string",
+      "affectedTaskIds": ["string"],
+      "description": "string",
+      "severity": "string"
+    }
+  ],
+  "lateJobs": [
+    {
+      "jobId": "string",
+      "reference": "string",
+      "workshopExitDate": "ISO-8601-datetime",
+      "expectedCompletion": "ISO-8601-datetime",
+      "delayHours": "integer"
+    }
+  ]
 }
 ```
 
 **Postconditions**
-- TaskExecution created
-- Actual start time recorded
-- Domain event `TaskStarted` emitted
-- Integration event published
+- None — this operation is read-only
 
 **Error responses**
-- `TASK_NOT_ASSIGNED` – Task has no assignment
-- `OPERATOR_MISMATCH` – Wrong operator for task
-- `OUTSIDE_TIME_WINDOW` – Too early or too late
-
-### 4.2 CompleteTaskExecution
-**Purpose:** Record task completion with quality results.
-
-**Preconditions**
-- Task execution was started
-- Operator matches executor
-- Quality check results valid
-
-**Request**
-```json
-{
-  "taskId": "string",
-  "operatorId": "string",
-  "actualEndTime": "ISO-8601-datetime",
-  "qualityCheckResults": {
-    "passed": true,
-    "checks": [
-      {
-        "checkType": "string",
-        "result": "pass|fail",
-        "notes": "string"
-      }
-    ]
-  }
-}
-```
-
-**Response**
-```json
-{
-  "status": "completed",
-  "durationVarianceMinutes": 10,
-  "completedAt": "ISO-8601-timestamp"
-}
-```
-
-**Postconditions**
-- Execution marked complete
-- Quality results stored
-- Domain event `TaskCompleted` emitted
-- Job progress updated
-
-**Error responses**
-- `EXECUTION_NOT_FOUND` – Task not started
-- `OPERATOR_MISMATCH` – Wrong operator
-- `ALREADY_COMPLETED` – Task already complete
+- None — always returns snapshot
 
 ---
 
-## 5. Common Types
+## 8. DSL Parsing Service – Public Interface
+
+### 8.1 ParseDSL
+**Purpose:** Parse DSL text into structured tasks (for validation during input).
+
+**Preconditions**
+- None
+
+**Request**
+```json
+{
+  "dsl": "[Komori] 20+40 \"vernis\"\n[Massicot] 15\nST [Clément] Pelliculage 2JO"
+}
+```
+
+**Response (Valid)**
+```json
+{
+  "valid": true,
+  "tasks": [
+    {
+      "type": "internal",
+      "stationId": "string",
+      "stationName": "string",
+      "setupMinutes": 20,
+      "runMinutes": 40,
+      "totalMinutes": 60,
+      "comment": "vernis",
+      "rawInput": "[Komori] 20+40 \"vernis\""
+    },
+    {
+      "type": "internal",
+      "stationId": "string",
+      "stationName": "string",
+      "setupMinutes": 0,
+      "runMinutes": 15,
+      "totalMinutes": 15,
+      "comment": null,
+      "rawInput": "[Massicot] 15"
+    },
+    {
+      "type": "outsourced",
+      "providerId": "string",
+      "providerName": "string",
+      "actionType": "Pelliculage",
+      "durationOpenDays": 2,
+      "comment": null,
+      "rawInput": "ST [Clément] Pelliculage 2JO"
+    }
+  ],
+  "errors": []
+}
+```
+
+**Response (With Errors)**
+```json
+{
+  "valid": false,
+  "tasks": [...],
+  "errors": [
+    {
+      "line": 2,
+      "message": "Station 'UnknownStation' not found",
+      "rawInput": "[UnknownStation] 20+40"
+    }
+  ]
+}
+```
+
+**Postconditions**
+- None — this operation is read-only
+
+**Error responses**
+- None — errors returned in response body
+
+### 8.2 GetAutocompleteSuggestions
+**Purpose:** Get autocomplete suggestions for DSL input.
+
+**Preconditions**
+- None
+
+**Request**
+```json
+{
+  "prefix": "Kom",
+  "context": "station | provider"
+}
+```
+
+**Response**
+```json
+{
+  "suggestions": [
+    {"value": "Komori", "label": "Komori G37"},
+    {"value": "Komori_XL", "label": "Komori XL 106"}
+  ]
+}
+```
+
+**Postconditions**
+- None — this operation is read-only
+
+**Error responses**
+- None — always returns suggestions (may be empty)
+
+---
+
+## 9. Business Calendar Service – Public Interface
+
+### 9.1 CalculateOpenDays
+**Purpose:** Calculate end date from start date plus open days.
+
+**Preconditions**
+- None
+
+**Request**
+```json
+{
+  "fromDate": "YYYY-MM-DD",
+  "openDays": "integer"
+}
+```
+
+**Response**
+```json
+{
+  "fromDate": "YYYY-MM-DD",
+  "openDays": "integer",
+  "resultDate": "YYYY-MM-DD",
+  "explanation": "Dec 13 (Fri) + 2 open days = Dec 17 (Tue), skipping Dec 14-15 (weekend)"
+}
+```
+
+**Postconditions**
+- None — this operation is read-only
+
+**Error responses**
+- `INVALID_DAYS` – Open days must be positive
+
+### 9.2 CountOpenDaysBetween
+**Purpose:** Count open days between two dates.
+
+**Preconditions**
+- None
+
+**Request**
+```json
+{
+  "fromDate": "YYYY-MM-DD",
+  "toDate": "YYYY-MM-DD"
+}
+```
+
+**Response**
+```json
+{
+  "fromDate": "YYYY-MM-DD",
+  "toDate": "YYYY-MM-DD",
+  "openDays": "integer"
+}
+```
+
+**Postconditions**
+- None — this operation is read-only
+
+**Error responses**
+- `INVALID_DATE_RANGE` – toDate must be after fromDate
+
+---
+
+## 10. Common Types
 
 ### TimeSlot
 ```json
 {
-  "start": "ISO-8601-datetime",
-  "end": "ISO-8601-datetime"
+  "start": "HH:MM | ISO-8601-datetime",
+  "end": "HH:MM | ISO-8601-datetime"
 }
 ```
 
-### Duration
+### OperatingSchedule
 ```json
 {
-  "value": 120,
-  "unit": "minutes"
+  "weeklyPattern": [
+    {
+      "dayOfWeek": "0-6",
+      "timeSlots": [TimeSlot]
+    }
+  ]
 }
 ```
 
-### SkillLevel
+### ScheduleException
 ```json
 {
-  "level": "beginner|intermediate|expert"
+  "date": "YYYY-MM-DD",
+  "type": "Closed | ModifiedHours",
+  "reason": "string",
+  "modifiedSlots": [TimeSlot]
 }
 ```
 
 ### TaskStatus
 ```json
 {
-  "status": "defined|ready|assigned|executing|completed|failed|cancelled"
+  "status": "Defined | Ready | Assigned | Completed | Cancelled"
+}
+```
+
+### JobStatus
+```json
+{
+  "status": "Draft | Planned | InProgress | Delayed | Completed | Cancelled"
+}
+```
+
+### StationStatus
+```json
+{
+  "status": "Available | InUse | Maintenance | Decommissioned"
 }
 ```
 
 ### ConflictType
 ```json
 {
-  "type": "ResourceConflict|AvailabilityConflict|DependencyConflict|DeadlineConflict|SkillConflict"
+  "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict"
+}
+```
+
+### SimilarityCriterion
+```json
+{
+  "code": "paper_type | paper_size | paper_weight | inking",
+  "name": "string"
 }
 ```
 
 ---
 
-## 6. Common Error Format
+## 11. Common Error Format
 
 All services return errors using a uniform schema:
 
 ```json
 {
-  "errorCode": "string",
-  "message": "string",
-  "details": {
-    "field": "additional context"
+  "error": {
+    "code": "string",
+    "message": "string",
+    "details": {
+      "field": "additional context"
+    }
   },
   "timestamp": "ISO-8601-timestamp"
 }
 ```
 
+### Standard Error Codes
+| Code | Description |
+|------|-------------|
+| `VALIDATION_ERROR` | Input validation failed |
+| `NOT_FOUND` | Resource not found |
+| `CONFLICT` | Operation would create conflict |
+| `CIRCULAR_DEPENDENCY` | Dependency would create cycle |
+| `APPROVAL_GATE_BLOCKED` | Approval gate not satisfied |
+| `INTERNAL_ERROR` | Unexpected server error |
+
 ---
 
-## 7. Versioning Rules
+## 12. Versioning Rules
 
 - API version included in header: `API-Version: 1.0`
 - Breaking changes increment major version
@@ -619,7 +1370,7 @@ All services return errors using a uniform schema:
 
 ---
 
-## 8. Security & Access Control
+## 13. Security & Access Control
 
 ### Authentication
 - All services require JWT bearer tokens
@@ -628,7 +1379,7 @@ All services return errors using a uniform schema:
 
 ### Authorization
 - Role-based access control (RBAC)
-- Roles: `scheduler`, `manager`, `operator`, `admin`
+- Roles: `scheduler`, `manager`, `admin`
 - Operation-level permissions defined per role
 
 ### Rate Limiting
@@ -638,7 +1389,7 @@ All services return errors using a uniform schema:
 
 ---
 
-## 9. Performance Expectations
+## 14. Performance Expectations
 
 ### Response Times
 - Read operations: < 200ms p95
@@ -656,10 +1407,11 @@ All services return errors using a uniform schema:
 
 ---
 
-## 10. Notes
+## 15. Notes
 
 - These contracts are **technology-neutral** — implementation may use REST, gRPC, or message commands
 - All contracts must match the **domain vocabulary** and **aggregate behaviour**
 - They complement (but do not replace) the **integration event** definitions
 - Security tokens and correlation IDs required but not shown in examples
 - All datetime values in UTC unless specified otherwise
+- The **Validation Service** is implemented in Node.js as an isomorphic package (`@flux/schedule-validator`) for client-side preview and server-side validation
