@@ -238,9 +238,10 @@ Before accepting an assignment, the system MUST verify:
 The system MUST detect and report all types of conflicts:
 - Station conflicts (double-booking)
 - Group capacity conflicts (exceeds MaxConcurrent)
-- Dependency conflicts (wrong order)
-- Deadline conflicts (cannot meet workshopExitDate)
+- Precedence conflicts (wrong task sequence order)
 - Approval gate conflicts (gates not satisfied)
+- Availability conflicts (outside station operating hours)
+- Deadline conflicts (cannot meet workshopExitDate)
 
 **VAL-003 – Validation on change**
 Any change to station availability, schedule exceptions, or task definitions MUST trigger revalidation of affected assignments.

@@ -188,7 +188,7 @@ Tasks are polymorphic (internal or outsourced).
 - **validationStatus**: Valid | Invalid
 
 ### ScheduleConflict (Value Object)
-- **type**: StationConflict | GroupCapacityConflict | DependencyConflict | DeadlineConflict | ApprovalGateConflict
+- **type**: StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict
 - **affectedTaskIds** (list of string)
 - **description** (string)
 - **severity**: High | Medium | Low

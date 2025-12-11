@@ -256,9 +256,10 @@ TRIGGER: Station availability change / Task modification / New assignment
 3. Conflict types to detect:
    - StationConflict: double-booking
    - GroupCapacityConflict: exceeds MaxConcurrent
-   - DependencyConflict: wrong sequence order
-   - DeadlineConflict: exceeds workshopExitDate
+   - PrecedenceConflict: wrong sequence order
    - ApprovalGateConflict: gates not satisfied
+   - AvailabilityConflict: outside station operating hours
+   - DeadlineConflict: exceeds workshopExitDate
 
 4. Publish events:
    - ConflictDetected (for each conflict)

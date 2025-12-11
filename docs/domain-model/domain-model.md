@@ -195,7 +195,7 @@ This domain model describes the core entities, value objects, and aggregates for
 
 ### ScheduleConflict
 - **Fields:**
-  - `Type` (enum: StationConflict, GroupCapacityConflict, DependencyConflict, DeadlineConflict, ApprovalGateConflict)
+  - `Type` (enum: StationConflict, GroupCapacityConflict, PrecedenceConflict, ApprovalGateConflict, AvailabilityConflict, DeadlineConflict)
   - `AffectedTaskIds` (collection)
   - `Description` (string)
   - `Severity` (High, Medium, Low)

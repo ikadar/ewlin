@@ -236,9 +236,10 @@ This document defines the core domain terms used in the **print shop scheduling*
 - **Types:**
   - `StationConflict` – station double-booked
   - `GroupCapacityConflict` – station group max concurrent exceeded
-  - `DependencyConflict` – task scheduled before dependencies complete
-  - `DeadlineConflict` – task completion exceeds job workshop exit date
+  - `PrecedenceConflict` – task scheduled before predecessor task completes
   - `ApprovalGateConflict` – approval gate not satisfied
+  - `AvailabilityConflict` – task scheduled outside station operating hours
+  - `DeadlineConflict` – task completion exceeds job workshop exit date
 - **Related terms:** Schedule, Assignment, Validation.
 
 ---
