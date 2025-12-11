@@ -29,6 +29,16 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '*.config.js',
+      '*.config.ts',
+      '**/eslint.config.js',
+      '**/vite.config.ts',
+      '**/vitest.config.ts',
+      '**/postcss.config.js',
+    ],
   }
 );

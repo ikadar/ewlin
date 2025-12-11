@@ -55,7 +55,8 @@ export function validateAvailability(
   }
 
   const proposedStart = parseTimestamp(proposed.scheduledStart);
-  const proposedEnd = calculateEndTime(task, proposedStart);
+  // End time calculated for future use when full duration validation is implemented
+  const _proposedEnd = calculateEndTime(task, proposedStart);
 
   // Check if start time is within operating hours
   const startCheck = checkWithinOperatingHours(proposedStart, station, snapshot);
@@ -89,7 +90,7 @@ interface OperatingHoursCheck {
 function checkWithinOperatingHours(
   timestamp: Date,
   station: Station,
-  snapshot: ScheduleSnapshot
+  _snapshot: ScheduleSnapshot
 ): OperatingHoursCheck {
   const dateStr = timestamp.toISOString().split('T')[0];
 

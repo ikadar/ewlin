@@ -27,7 +27,7 @@ export interface JobComment {
 /** Approval gate status for BAT (proof) */
 export interface ProofApprovalGate {
   /** Date proof sent (ISO string) or special status */
-  sentAt: string | ProofSentStatus | null;
+  sentAt: ProofSentStatus | (string & {}) | null;
   /** Date proof approved (ISO string) or null */
   approvedAt: string | null;
 }

@@ -3,12 +3,7 @@
  * Checks that station group MaxConcurrent is not exceeded.
  */
 
-import type {
-  ScheduleSnapshot,
-  ScheduleConflict,
-  ProposedAssignment,
-  TaskAssignment,
-} from '@flux/types';
+import type { ScheduleSnapshot, ScheduleConflict, ProposedAssignment } from '@flux/types';
 import { parseTimestamp, getMaxConcurrent, type TimeRange } from '../utils/time.js';
 import { findStation, findGroup, getGroupAssignments, findTask } from '../utils/helpers.js';
 import { calculateEndTime } from './shared.js';
@@ -68,7 +63,7 @@ export function validateGroupCapacity(
   if (maxConcurrent > group.maxConcurrent) {
     return {
       type: 'GroupCapacityConflict',
-      message: `Group "${group.name}" capacity (${group.maxConcurrent}) would be exceeded`,
+      message: `Group "${group.name}" capacity (${String(group.maxConcurrent)}) would be exceeded`,
       taskId: proposed.taskId,
       targetId: proposed.targetId,
       details: {

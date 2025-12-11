@@ -10,7 +10,7 @@ import type { ScheduleSnapshot } from '@flux/types';
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({
-    baseUrl: import.meta.env.VITE_API_URL ?? '/api/v1',
+    baseUrl: import.meta.env.VITE_API_URL || '/api/v1',
   }),
   tagTypes: ['Schedule', 'Job', 'Station'],
   endpoints: (builder) => ({
@@ -18,7 +18,7 @@ export const api = createApi({
      * Fetch the current schedule snapshot.
      * Contains all stations, jobs, tasks, and assignments.
      */
-    getSnapshot: builder.query<ScheduleSnapshot, void>({
+    getSnapshot: builder.query<ScheduleSnapshot, undefined>({
       query: () => '/schedule/snapshot',
       providesTags: ['Schedule'],
     }),

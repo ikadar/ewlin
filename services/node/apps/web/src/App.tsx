@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import { useAppSelector, useAppDispatch } from './app/hooks';
 import { toggleLeftPanel, toggleRightPanel } from './app/uiSlice';
 
-function App() {
+function App(): ReactNode {
   const dispatch = useAppDispatch();
   const panels = useAppSelector((state) => state.ui.panels);
 

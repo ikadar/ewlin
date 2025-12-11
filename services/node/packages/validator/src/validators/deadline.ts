@@ -39,7 +39,7 @@ export function validateDeadline(
 
     return {
       type: 'DeadlineConflict',
-      message: `Task completion would exceed workshop exit date by ${delayDays} day(s)`,
+      message: `Task completion would exceed workshop exit date by ${String(delayDays)} day(s)`,
       taskId: proposed.taskId,
       details: {
         jobId: job.id,

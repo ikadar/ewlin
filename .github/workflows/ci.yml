@@ -191,6 +191,11 @@ jobs:
           restore-keys: |
             composer-${{ runner.os }}-
 
+      - name: Create .env file
+        run: |
+          echo "APP_ENV=test" > .env
+          cat .env.dev >> .env
+
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 

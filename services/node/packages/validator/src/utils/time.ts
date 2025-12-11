@@ -89,7 +89,7 @@ export function getMaxConcurrent(ranges: TimeRange[]): number {
   if (ranges.length === 0) return 0;
 
   // Collect all start and end events
-  const events: Array<{ time: Date; type: 'start' | 'end' }> = [];
+  const events: { time: Date; type: 'start' | 'end' }[] = [];
   for (const range of ranges) {
     events.push({ time: range.start, type: 'start' });
     events.push({ time: range.end, type: 'end' });
