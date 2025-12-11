@@ -34,6 +34,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - **Working state**: System remains functional after each release
 - **Vertical slices**: Features delivered end-to-end (DB → API → UI)
 - **Mock-first frontend**: UI development continues with mock data
+- **Git workflow**: See [Git Release Strategy](../architecture/git-release-strategy.md) for branching, tagging, and versioning conventions
 
 ---
 
