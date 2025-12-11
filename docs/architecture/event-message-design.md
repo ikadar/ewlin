@@ -293,7 +293,7 @@ The goal is to provide:
 ```json
 {
   "scheduleId": "string",
-  "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict",
+  "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
   "affectedTaskIds": ["task-001", "task-002"],
   "stationId": "string",
   "description": "string",
@@ -417,7 +417,7 @@ Consumed by: **Scheduling View Service**
   "eventType": "Assignment.ConflictDetected",
   "occurredAt": "ISO-8601-timestamp",
   "data": {
-    "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict",
+    "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
     "affectedTaskIds": ["task-001", "task-002"],
     "stationId": "string",
     "description": "string",

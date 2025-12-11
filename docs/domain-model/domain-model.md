@@ -83,6 +83,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Tasks` (ordered collection of Task entities)
   - `Comments` (collection of Comment value objects)
   - `Status` (Draft, Planned, InProgress, Delayed, Completed, Cancelled)
+  - `Color` (hex string, e.g., "#3B82F6", assigned at creation)
   - `CreatedAt` (DateTime)
 
 ### Task (Entity within Job Aggregate)

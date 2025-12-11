@@ -321,12 +321,19 @@ ST [Clément] Pelliculage 2JO
 
 | Element | Purpose |
 |---------|---------|
-| Job color | Random per job, consistent across tiles |
+| Job color | Assigned at job creation, consistent across all tiles |
 | Setup section | Lighter shade of job color |
 | Run section | Full job color |
 | Precedence violation | Red halo |
 | Group capacity exceeded | Yellow/orange highlight |
 | Unavailability overlay | Gray hatched pattern |
+
+#### Job Color Assignment
+- Colors are assigned automatically when a job is created
+- Uses a predefined palette of 12 visually distinct colors
+- Colors cycle deterministically based on job creation order
+- Palette selected for accessibility (colorblind-friendly)
+- Color stored in Job.Color field as hex string (e.g., "#3B82F6")
 
 ### 9.2 Time Grid
 

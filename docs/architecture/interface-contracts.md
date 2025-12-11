@@ -1296,7 +1296,7 @@ Interfaces are described in:
 ### TaskStatus
 ```json
 {
-  "status": "Defined | Ready | Assigned | Completed | Cancelled"
+  "status": "Defined | Ready | Assigned | Executing | Completed | Failed | Cancelled"
 }
 ```
 
@@ -1310,7 +1310,7 @@ Interfaces are described in:
 ### StationStatus
 ```json
 {
-  "status": "Available | InUse | Maintenance | Decommissioned"
+  "status": "Available | InUse | Maintenance | OutOfService"
 }
 ```
 

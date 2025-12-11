@@ -92,6 +92,15 @@ A Job can ONLY be marked as `Completed` when ALL its tasks are completed.
 **BR-JOB-005 – Job cancellation cascades to tasks**
 When a Job is cancelled, all its incomplete tasks MUST also be cancelled.
 
+**BR-JOB-005b – Job Delayed status trigger**
+A Job in `InProgress` status transitions to `Delayed` when:
+- The scheduled completion time of the last task exceeds the workshopExitDate
+- This is detected automatically by the system when:
+  - A task is assigned that causes the job to become late
+  - The schedule is recalculated and the job is found to be late
+- The transition is automatic (not manual user action)
+- A `Delayed` job can return to `InProgress` if tasks are rescheduled to meet the deadline
+
 **BR-JOB-006 – Job dependencies are job-level only**
 Job dependencies (requiredJobs) apply at the job level - a job cannot start until all required jobs are completed.
 

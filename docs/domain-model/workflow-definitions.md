@@ -271,9 +271,9 @@ TRIGGER: Station availability change / Task modification / New assignment
 # 9. End-to-End Business Workflow
 
 ```
-StationCreated
-→ StationCategoryCreated
+StationCategoryCreated
 → StationGroupCreated
+→ StationCreated
 → ProviderCreated (optional)
 → JobCreated
 → TasksDefinedFromDSL

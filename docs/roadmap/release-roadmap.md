@@ -78,7 +78,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### v0.0.5 - Frontend Project Foundation
 - [ ] Vite + React 19 + TypeScript setup
-- [ ] Tailwind CSS 4 integration
+- [ ] Tailwind CSS 3.4+ integration
 - [ ] Redux Toolkit configuration
 - [ ] Basic folder structure
 
@@ -223,7 +223,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] ScheduleSnapshot type definition
 - [ ] ProposedAssignment type
 - [ ] ValidationResult type
-- [ ] ScheduleConflict types (all 5 types)
+- [ ] ScheduleConflict types (all 6 types)
 
 #### v0.2.1 - Station Conflict Validation
 - [ ] Station double-booking check
