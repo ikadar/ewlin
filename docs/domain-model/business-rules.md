@@ -1,168 +1,291 @@
-# Business Rules & Domain Invariants – Operations Research System
+# Business Rules & Domain Invariants – Flux Print Shop Scheduling System
 
-This document captures core business rules and invariants for the **Equipment → Operator → Job → Task** assignment and validation process.
+This document captures core business rules and invariants for the **print shop scheduling** domain.
 These rules are technology-agnostic and must hold regardless of implementation.
 
 ---
 
-## Operator
+## Station
 
-**BR-OPERATOR-001 – Operator must have a unique identifier**  
-Every Operator MUST have a unique ID that cannot be changed once created.
+**BR-STATION-001 – Station must have a unique identifier**
+Every Station MUST have a unique ID that cannot be changed once created.
 
-**BR-OPERATOR-002 – Operator availability must not overlap**  
-An Operator's availability time slots MUST NOT overlap with each other.
+**BR-STATION-002 – Station must belong to a category**
+Every Station MUST be assigned to exactly one StationCategory.
 
-**BR-OPERATOR-003 – Operator can only work during availability**  
-An Operator can ONLY be scheduled for tasks within their defined availability periods.
+**BR-STATION-003 – Station must belong to a group**
+Every Station MUST be assigned to exactly one StationGroup.
 
-**BR-OPERATOR-004 – One task at a time**  
-An Operator CANNOT be assigned to multiple tasks that overlap in time.
+**BR-STATION-004 – Station operating schedule required**
+Every Station MUST have a defined operating schedule (weekly pattern).
 
-**BR-OPERATOR-005 – Skill requirements**  
-An Operator can ONLY be assigned to equipment they have skills for.
+**BR-STATION-005 – Operating schedule slots cannot overlap**
+A Station's operating schedule time slots MUST NOT overlap within the same day.
 
-**BR-OPERATOR-006 – Active status for assignments**  
-Only Operators with status `Active` can be assigned to new tasks.
+**BR-STATION-006 – One task at a time for capacity-1 stations**
+A Station with capacity=1 CANNOT be assigned to multiple tasks that overlap in time.
+
+**BR-STATION-007 – Available status for assignments**
+Only Stations with status `Available` can be assigned to new tasks (not `Maintenance` or `OutOfService`).
+
+**BR-STATION-008 – Schedule exceptions override regular schedule**
+A ScheduleException for a specific date MUST override the regular operating schedule for that date.
 
 ---
 
-## Equipment
+## Station Category
 
-**BR-EQUIPMENT-001 – Equipment must have supported task types**  
-Every Equipment MUST define at least one supported task type.
+**BR-CATEGORY-001 – Category must have similarity criteria**
+Every StationCategory SHOULD define at least one similarity criterion for visual indicators.
 
-**BR-EQUIPMENT-002 – Exclusive assignment**  
-Equipment CANNOT be assigned to multiple tasks that overlap in time.
+**BR-CATEGORY-002 – Similarity criteria must be unique within category**
+A StationCategory CANNOT have duplicate similarity criteria codes.
 
-**BR-EQUIPMENT-003 – Task type compatibility**  
-Equipment can ONLY be assigned to tasks whose type is in the equipment's supported task types list.
+---
 
-**BR-EQUIPMENT-004 – Available status for assignments**  
-Only Equipment with status `Available` can be assigned to new tasks (not `Maintenance` or `OutOfService`).
+## Station Group
 
-**BR-EQUIPMENT-005 – Equipment maintenance conflicts**  
-When Equipment enters maintenance, all affected future assignments MUST be flagged as conflicts.
+**BR-GROUP-001 – Group must have max concurrent defined**
+Every StationGroup MUST have a MaxConcurrent value (integer or unlimited).
+
+**BR-GROUP-002 – Group capacity enforcement**
+At any point in time, the number of active tasks on stations in a group CANNOT exceed MaxConcurrent.
+
+**BR-GROUP-003 – Outsourced provider groups are unlimited**
+StationGroups marked as `IsOutsourcedProviderGroup` MUST have unlimited capacity.
+
+**BR-GROUP-004 – All stations must have a group**
+There MUST NOT be any station without a group assignment.
+
+---
+
+## Outsourced Provider
+
+**BR-PROVIDER-001 – Provider must have unique identifier**
+Every OutsourcedProvider MUST have a unique ID.
+
+**BR-PROVIDER-002 – Provider creates own station group**
+When an OutsourcedProvider is created, a corresponding StationGroup with unlimited capacity MUST be created automatically.
+
+**BR-PROVIDER-003 – Provider has unlimited capacity**
+OutsourcedProviders CAN have multiple overlapping tasks (no capacity limit).
+
+**BR-PROVIDER-004 – Provider duration in open days**
+Outsourced task durations MUST be specified in open days (JO), not minutes.
 
 ---
 
 ## Job
 
-**BR-JOB-001 – Job must have a deadline**  
-Every Job MUST have a defined deadline by which all tasks must be completed.
+**BR-JOB-001 – Job must have a workshop exit date**
+Every Job MUST have a defined workshopExitDate by which all tasks must be completed.
 
-**BR-JOB-002 – Job must contain tasks**  
+**BR-JOB-002 – Job must contain tasks**
 A Job MUST contain at least one Task to be valid for scheduling.
 
-**BR-JOB-003 – Job completion requires all tasks completed**  
+**BR-JOB-003 – Job reference can be manipulated**
+The Job reference field CAN be modified by users to manage order lines and parts.
+
+**BR-JOB-004 – Job completion requires all tasks completed**
 A Job can ONLY be marked as `Completed` when ALL its tasks are completed.
 
-**BR-JOB-004 – Job cancellation cascades**  
+**BR-JOB-005 – Job cancellation cascades to tasks**
 When a Job is cancelled, all its incomplete tasks MUST also be cancelled.
 
-**BR-JOB-005 – Job deadline immutability**  
-Once a Job is in `InProgress` status, its deadline CANNOT be moved earlier (only later with proper approval).
+**BR-JOB-006 – Job dependencies are job-level only**
+Job dependencies (requiredJobs) apply at the job level - a job cannot start until all required jobs are completed.
+
+**BR-JOB-007 – Required jobs must exist**
+Every JobId in requiredJobs MUST reference an existing job.
+
+**BR-JOB-008 – No circular job dependencies**
+Job dependencies MUST NOT form cycles.
 
 ---
 
 ## Task
 
-**BR-TASK-001 – Task must belong to exactly one job**  
+**BR-TASK-001 – Task must belong to exactly one job**
 Every Task MUST belong to exactly one Job and cannot exist independently.
 
-**BR-TASK-002 – Task duration must be positive**  
-Task duration MUST be greater than zero minutes.
+**BR-TASK-002 – Task duration must be positive**
+For internal tasks: setup + run minutes MUST be greater than zero.
+For outsourced tasks: durationOpenDays MUST be greater than zero.
 
-**BR-TASK-003 – Resource requirements consistency**  
-If a Task requires equipment (`requires_equipment = true`), it MUST have equipment assigned before execution.
-If a Task requires operator (`requires_operator = true`), it MUST have an operator assigned before execution.
+**BR-TASK-003 – Tasks follow linear sequence**
+Tasks within a job MUST follow a single straight sequence (Task N depends on Task N-1).
 
-**BR-TASK-004 – Task dependencies form DAG**  
-Task dependencies MUST form a Directed Acyclic Graph - no circular dependencies allowed.
+**BR-TASK-004 – Internal task must reference valid station**
+An internal task MUST reference a Station that exists in the system.
 
-**BR-TASK-005 – Dependency completion before start**  
-A Task can ONLY start after ALL its required tasks (dependencies) have been completed.
+**BR-TASK-005 – Outsourced task must reference valid provider**
+An outsourced task MUST reference an OutsourcedProvider that exists in the system.
 
-**BR-TASK-006 – Task type definition**  
-Every Task MUST have a defined type that determines equipment compatibility.
+**BR-TASK-006 – Task DSL must be parseable**
+The raw DSL input for a task MUST parse correctly according to the DSL specification.
+
+**BR-TASK-007 – Previous task must complete first**
+A Task can ONLY start after its predecessor task (if any) has been completed.
+
+---
+
+## Approval Gates
+
+**BR-GATE-001 – BAT approval before scheduling**
+Tasks CANNOT be scheduled until the job's proof is approved (`proofApprovedAt` is set) OR `proofSentAt` is "NoProofRequired".
+
+**BR-GATE-002 – Plates approval before printing**
+Printing tasks on offset stations CANNOT start until the job's `platesStatus` is "Done".
+
+**BR-GATE-003 – AwaitingFile blocks BAT**
+When `proofSentAt` is "AwaitingFile", the job is waiting for client file and scheduling is blocked.
+
+---
+
+## Paper Procurement
+
+**BR-PAPER-001 – Paper status progression**
+PaperPurchaseStatus MUST follow the progression: InStock | ToOrder → Ordered → Received.
+
+**BR-PAPER-002 – Order timestamp on status change**
+When PaperPurchaseStatus changes to "Ordered", `paperOrderedAt` MUST be set to current timestamp.
+
+**BR-PAPER-003 – Paper required before production**
+Production tasks SHOULD NOT start until paper status is "InStock" or "Received".
 
 ---
 
 ## Assignment & Schedule
 
-**BR-ASSIGN-001 – Valid resource assignment**  
-An assignment is valid ONLY if all resource requirements (operator, equipment) are satisfied according to task specifications.
+**BR-ASSIGN-001 – Valid station assignment**
+An assignment is valid ONLY if the referenced station exists and is Available.
 
-**BR-ASSIGN-002 – Skill validation for equipment operation**  
-When a Task requires both operator and equipment, the assigned operator MUST have the skill for the assigned equipment.
+**BR-ASSIGN-002 – Operating hours compliance**
+Tasks MUST be scheduled only during station operating hours.
 
-**BR-ASSIGN-003 – Schedule time calculation**  
-`scheduled_end` MUST equal `scheduled_start` plus task `duration`.
+**BR-ASSIGN-003 – Schedule time calculation**
+For internal tasks: `scheduledEnd` = `scheduledStart` + task duration (stretched across non-operating periods).
+For outsourced tasks: `scheduledEnd` = `scheduledStart` + (durationOpenDays × business calendar).
 
-**BR-ASSIGN-004 – No retrospective scheduling**  
+**BR-ASSIGN-004 – No retrospective scheduling**
 Tasks CANNOT be scheduled to start in the past (relative to current system time).
 
-**BR-ASSIGN-005 – Assignment immutability after start**  
-Once a Task has started execution, its operator and equipment assignments CANNOT be changed.
+**BR-ASSIGN-005 – Assignment immutability after start**
+Once a Task has started execution, its station assignment CANNOT be changed.
+
+**BR-ASSIGN-006 – Tile snaps to 30-minute grid**
+Task scheduling in the UI MUST snap to 30-minute intervals.
+
+---
+
+## Schedule Constraints
+
+**BR-SCHED-001 – No station double-booking**
+The system MUST prevent any state where a station (capacity=1) has overlapping task assignments.
+
+**BR-SCHED-002 – Group capacity enforcement**
+The system MUST prevent any state where station group concurrent task count exceeds MaxConcurrent.
+
+**BR-SCHED-003 – Task sequence enforcement**
+The system MUST prevent scheduling a task before its predecessor task completes.
+
+**BR-SCHED-004 – Job dependency enforcement**
+The system MUST prevent starting a job's tasks before all required jobs are completed.
+
+**BR-SCHED-005 – Deadline enforcement**
+The system MUST warn when scheduled task completion exceeds the job's workshopExitDate.
+
+**BR-SCHED-006 – Approval gate enforcement**
+The system MUST prevent scheduling tasks when required approval gates are not satisfied.
 
 ---
 
 ## Cross-Entity Invariants
 
-**INV-001 – Temporal consistency**  
-All datetime values must be consistent: task.scheduled_end ≤ job.deadline, availability.start < availability.end, etc.
+**INV-001 – Temporal consistency**
+All datetime values must be consistent: task.scheduledEnd ≤ job.workshopExitDate, operatingSchedule.start < operatingSchedule.end, etc.
 
-**INV-002 – Resource conflict prevention**  
-The system MUST prevent any state where an operator or equipment is double-booked.
+**INV-002 – Station conflict prevention**
+The system MUST prevent any state where a station is double-booked.
 
-**INV-003 – Dependency chain integrity**  
-The completion time of the last task in any dependency chain MUST NOT exceed the job deadline.
+**INV-003 – Group capacity prevention**
+The system MUST prevent any state where a station group exceeds its MaxConcurrent limit.
 
-**INV-004 – State transition consistency**  
+**INV-004 – Task sequence integrity**
+Task completion times within a job MUST respect the sequential order.
+
+**INV-005 – State transition consistency**
 All entities MUST follow their defined state machines; invalid transitions are not allowed.
 
-**INV-005 – Referential integrity**  
-All references between entities (operator_id, equipment_id, job_id, task_id) MUST point to existing, valid entities.
+**INV-006 – Referential integrity**
+All references between entities (stationId, providerId, jobId, taskId) MUST point to existing, valid entities.
 
 ---
 
 ## Validation Rules
 
-**VAL-001 – Complete assignment validation**  
-Before marking an assignment as valid, the system MUST verify:
-- All resource requirements are met
+**VAL-001 – Complete assignment validation**
+Before accepting an assignment, the system MUST verify:
+- Station exists and is Available
 - No scheduling conflicts exist
-- Operator has required skills
-- Equipment supports task type
-- Dependencies are satisfied
-- Job deadline can be met
+- Group capacity is not exceeded
+- Task sequence is respected
+- Job dependencies are satisfied
+- Approval gates are cleared
+- Workshop exit date can be met
 
-**VAL-002 – Conflict detection**  
+**VAL-002 – Conflict detection**
 The system MUST detect and report all types of conflicts:
-- Resource conflicts (double-booking)
-- Availability conflicts (outside working hours)
+- Station conflicts (double-booking)
+- Group capacity conflicts (exceeds MaxConcurrent)
 - Dependency conflicts (wrong order)
-- Deadline conflicts (cannot meet deadline)
-- Skill conflicts (missing qualifications)
+- Deadline conflicts (cannot meet workshopExitDate)
+- Approval gate conflicts (gates not satisfied)
 
-**VAL-003 – Validation on change**  
-Any change to operator availability, equipment status, or task dependencies MUST trigger revalidation of affected assignments.
+**VAL-003 – Validation on change**
+Any change to station availability, schedule exceptions, or task definitions MUST trigger revalidation of affected assignments.
 
 ---
 
-## Business Policies (Configurable)
+## UI Behavior Rules
 
-**POL-001 – Skill level requirements**  
-Whether specific skill levels (beginner/intermediate/expert) are required for certain task types (configurable per deployment).
+**UI-001 – Precedence safeguard during drag**
+If a tile drag would violate precedence rules, the UI MUST snap to the nearest valid timeslot.
 
-**POL-002 – Buffer time between tasks**  
-Whether to enforce minimum buffer time between consecutive tasks for the same resource (configurable).
+**UI-002 – Alt-key bypass**
+Holding Alt during drag MUST bypass the precedence safeguard (allowing violation with warning).
 
-**POL-003 – Overtime allowance**  
-Whether operators can be scheduled beyond their normal availability for critical tasks (requires special approval).
+**UI-003 – Precedence violation visual**
+Tiles that break precedence rules MUST be shown with a red halo effect.
 
-**POL-004 – Partial assignment**  
-Whether tasks can be partially assigned (e.g., operator assigned but equipment pending) or require complete assignment.
+**UI-004 – Recall tile behavior**
+Recalling a tile MUST remove the assignment entirely (tile returns to unscheduled state).
+
+**UI-005 – Similarity indicators**
+Similarity circles between tiles MUST reflect the actual matching criteria from the station category.
+
+---
+
+## Business Calendar Rules
+
+**CAL-001 – Open days definition (MVP)**
+An open day is Monday through Friday.
+
+**CAL-002 – Open days definition (Future)**
+An open day is Monday through Friday, excluding French public holidays.
+
+**CAL-003 – Outsourced duration calculation**
+Outsourced task duration in open days MUST be calculated using the business calendar.
+
+---
+
+## Comments & Audit
+
+**COM-001 – Comment immutability**
+Once a comment is added to a job, it CANNOT be edited or deleted.
+
+**COM-002 – Comment author and timestamp**
+Every comment MUST have an author and timestamp recorded.
 
 ---
 

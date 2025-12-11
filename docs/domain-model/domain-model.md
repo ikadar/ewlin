@@ -1,130 +1,201 @@
-# Domain Model – Operations Research System
+# Domain Model – Flux Print Shop Scheduling System
 
-This domain model describes the core entities, value objects, and aggregates involved in the **Equipment → Operator → Job → Task** assignment and validation process.
+This domain model describes the core entities, value objects, and aggregates for the **print shop scheduling** system.
+
+---
 
 ## Aggregates and Root Entities
 
-### Operator (Aggregate Root)
-- **Identifier:** `OperatorId`
+### Station (Aggregate Root)
+- **Identifier:** `StationId`
 - **Responsibilities:**
-  - Represents a worker who can operate equipment and perform tasks.
-  - Manages their own availability schedule and equipment skills.
-  - Ensures no double-booking of the operator's time.
+  - Represents a physical machine or workstation in the print shop.
+  - Manages its operating schedule (when it's available for work).
+  - Belongs to exactly one station category and one station group.
+  - Tracks capacity (typically 1 for internal stations).
 - **Key attributes:**
-  - `OperatorId` (value object)
+  - `StationId` (value object)
   - `Name`
-  - `AvailabilitySlots` (collection of TimeSlot value objects)
-  - `Skills` (collection of EquipmentSkill value objects)
-  - `Status` (Active, Inactive)
-
-### Equipment (Aggregate Root)
-- **Identifier:** `EquipmentId`
-- **Responsibilities:**
-  - Represents a physical machine or tool used in manufacturing.
-  - Defines which task types it can perform.
-  - Ensures exclusive assignment (one task at a time).
-- **Key attributes:**
-  - `EquipmentId` (value object)
-  - `Name`
-  - `SupportedTaskTypes` (collection of TaskType value objects)
+  - `CategoryId` (reference to StationCategory)
+  - `GroupId` (reference to StationGroup)
+  - `Capacity` (integer, typically 1)
+  - `OperatingSchedule` (value object)
+  - `ScheduleExceptions` (collection of ScheduleException value objects)
   - `Status` (Available, InUse, Maintenance, OutOfService)
+
+### StationCategory (Aggregate Root)
+- **Identifier:** `StationCategoryId`
+- **Responsibilities:**
+  - Classifies stations by type of work performed.
+  - Defines similarity criteria for time-saving indicators.
+- **Key attributes:**
+  - `StationCategoryId` (value object)
+  - `Name` (e.g., "Offset Printing Press", "Finishing")
+  - `SimilarityCriteria` (collection of SimilarityCriterion value objects)
+
+### StationGroup (Aggregate Root)
+- **Identifier:** `StationGroupId`
+- **Responsibilities:**
+  - Groups stations with a shared concurrency limit.
+  - Enforces maximum simultaneous running station count.
+- **Key attributes:**
+  - `StationGroupId` (value object)
+  - `Name`
+  - `MaxConcurrent` (integer, null for unlimited)
+  - `IsOutsourcedProviderGroup` (boolean)
+
+### OutsourcedProvider (Aggregate Root)
+- **Identifier:** `ProviderId`
+- **Responsibilities:**
+  - Represents an external company that performs outsourced tasks.
+  - Acts as a special station with unlimited capacity.
+  - Has its own station group with unlimited concurrency.
+- **Key attributes:**
+  - `ProviderId` (value object)
+  - `Name`
+  - `SupportedActionTypes` (collection of strings)
+  - `StationGroupId` (its own dedicated group)
+  - `Status` (Active, Inactive)
 
 ### Job (Aggregate Root)
 - **Identifier:** `JobId`
 - **Responsibilities:**
-  - Represents a complete manufacturing order with a deadline.
-  - Contains and manages the lifecycle of its tasks.
-  - Validates task dependencies form a valid DAG.
-  - Ensures all tasks complete before the job deadline.
+  - Represents a complete print order with deadline.
+  - Contains and manages its sequential tasks.
+  - Tracks approval gates (BAT, Plates).
+  - Manages job-level dependencies on other jobs.
 - **Key attributes:**
   - `JobId` (value object)
-  - `Name`
-  - `Deadline` (DateTime)
-  - `Tasks` (collection of Task entities)
+  - `Reference` (user-manipulated order reference)
+  - `Client` (customer name)
+  - `Description` (product description)
+  - `Notes` (free-form comments)
+  - `WorkshopExitDate` (deadline for leaving factory)
+  - `FullyScheduled` (boolean, computed)
+  - `PaperPurchaseStatus` (enum: InStock, ToOrder, Ordered, Received)
+  - `PaperOrderedAt` (DateTime, nullable)
+  - `PaperType` (string, e.g., "CB300")
+  - `PaperFormat` (string, e.g., "63x88")
+  - `ProofSentAt` (DateTime or special value: AwaitingFile, NoProofRequired)
+  - `ProofApprovedAt` (DateTime, nullable)
+  - `PlatesStatus` (enum: Todo, Done)
+  - `RequiredJobIds` (collection of JobId references)
+  - `Tasks` (ordered collection of Task entities)
+  - `Comments` (collection of Comment value objects)
   - `Status` (Draft, Planned, InProgress, Delayed, Completed, Cancelled)
   - `CreatedAt` (DateTime)
 
 ### Task (Entity within Job Aggregate)
 - **Identifier:** `TaskId`
 - **Responsibilities:**
-  - Represents a specific manufacturing operation within a job.
-  - Maintains its dependencies on other tasks.
-  - Tracks its resource assignments and schedule.
-- **Key attributes:**
+  - Represents a specific production operation within a job.
+  - Can be internal (on a station) or outsourced (to a provider).
+  - Tracks its assignment and schedule.
+- **Key attributes (common):**
   - `TaskId` (value object)
-  - `Type` (TaskType value object)
-  - `Duration` (Duration value object)
-  - `RequiresOperator` (boolean)
-  - `RequiresEquipment` (boolean)
-  - `RequiredTaskIds` (collection of TaskId references)
+  - `SequenceOrder` (integer, position in job's task list)
+  - `Comment` (string, nullable)
+  - `RawDSLInput` (original DSL line for reference)
   - `Assignment` (TaskAssignment value object, nullable)
+  - `Status` (Defined, Ready, Assigned, Executing, Completed, Failed, Cancelled)
+- **Key attributes (internal task):**
+  - `Type`: 'internal'
+  - `StationId` (reference to Station)
+  - `SetupMinutes` (integer, 0 if not specified)
+  - `RunMinutes` (integer)
+  - `TotalMinutes` (computed: SetupMinutes + RunMinutes)
+- **Key attributes (outsourced task):**
+  - `Type`: 'outsourced'
+  - `ProviderId` (reference to OutsourcedProvider)
+  - `ActionType` (string, e.g., "Pelliculage")
+  - `DurationOpenDays` (integer)
 
 ### Schedule (Aggregate Root)
 - **Identifier:** `ScheduleId`
 - **Responsibilities:**
   - Represents the master schedule containing all assignments.
-  - Validates no resource conflicts exist.
+  - Validates no station conflicts exist.
+  - Validates station group capacity limits.
   - Ensures all constraints are satisfied.
   - Provides conflict detection and resolution information.
 - **Key attributes:**
   - `ScheduleId` (value object)
+  - `Name` (string)
+  - `IsProd` (boolean, only one can be true) — *Future*
   - `Assignments` (collection of validated assignments)
   - `ConflictReports` (collection of ScheduleConflict value objects)
   - `LastValidatedAt` (DateTime)
   - `Version` (for optimistic locking)
+  - `CreatedAt` (DateTime)
 
 ---
 
 ## Value Objects
 
-### OperatorId / EquipmentId / JobId / TaskId / ScheduleId
+### StationId / StationCategoryId / StationGroupId / ProviderId / JobId / TaskId / ScheduleId
 - **Fields:**
   - `Value` (UUID or string)
 - **Rules:**
   - Immutable once created.
 
+### OperatingSchedule
+- **Fields:**
+  - `WeeklyPattern` (collection of DaySchedule)
+- **Rules:**
+  - Defines recurring weekly availability pattern.
+  - DaySchedule specifies available time slots for each day of week.
+
+### DaySchedule
+- **Fields:**
+  - `DayOfWeek` (Monday-Sunday)
+  - `TimeSlots` (collection of TimeSlot)
+- **Rules:**
+  - Time slots cannot overlap within same day.
+
 ### TimeSlot
 - **Fields:**
-  - `StartTime` (DateTime)
-  - `EndTime` (DateTime)
+  - `StartTime` (time of day)
+  - `EndTime` (time of day)
 - **Rules:**
   - StartTime must be before EndTime.
-  - Represents operator availability periods.
+  - Can span midnight (e.g., 22:00-06:00).
 
-### EquipmentSkill
+### ScheduleException
 - **Fields:**
-  - `EquipmentId` (reference)
-  - `SkillLevel` (enum: Beginner, Intermediate, Expert)
+  - `Date` (date)
+  - `Type` (Closed, ModifiedHours)
+  - `TimeSlots` (collection of TimeSlot, for ModifiedHours)
+  - `Reason` (string, optional)
 - **Rules:**
-  - Skill level determines operator capability for equipment.
+  - Overrides the regular operating schedule for that date.
 
-### TaskType
+### SimilarityCriterion
 - **Fields:**
-  - `Code` (string)
-  - `Description` (string)
+  - `Name` (string, e.g., "Same paper type")
+  - `Code` (string, for matching logic)
 - **Rules:**
-  - Defines the category of work to be performed.
-
-### Duration
-- **Fields:**
-  - `Minutes` (integer)
-- **Rules:**
-  - Must be positive (> 0).
+  - Used to determine visual indicators between consecutive tiles.
 
 ### TaskAssignment
 - **Fields:**
-  - `AssignedOperatorId` (nullable)
-  - `AssignedEquipmentId` (nullable)
+  - `StationId` (or ProviderId for outsourced)
   - `ScheduledStart` (DateTime)
   - `ScheduledEnd` (DateTime)
 - **Rules:**
-  - If task requires operator, AssignedOperatorId must be set.
-  - If task requires equipment, AssignedEquipmentId must be set.
-  - ScheduledEnd = ScheduledStart + Task.Duration.
+  - ScheduledEnd = ScheduledStart + Task duration (accounting for operating schedule gaps).
+
+### Comment
+- **Fields:**
+  - `Author` (string)
+  - `Timestamp` (DateTime)
+  - `Content` (string)
+- **Rules:**
+  - Immutable once created.
+  - Simple thread, no replies (MVP).
 
 ### ScheduleConflict
 - **Fields:**
-  - `Type` (enum: ResourceConflict, AvailabilityConflict, DependencyConflict, DeadlineConflict, SkillConflict)
+  - `Type` (enum: StationConflict, GroupCapacityConflict, DependencyConflict, DeadlineConflict, ApprovalGateConflict)
   - `AffectedTaskIds` (collection)
   - `Description` (string)
   - `Severity` (High, Medium, Low)
@@ -133,17 +204,27 @@ This domain model describes the core entities, value objects, and aggregates inv
 - **Allowed values:** Draft, Planned, InProgress, Delayed, Completed, Cancelled
 - Represents the lifecycle state of a Job.
 
-### EquipmentStatus
+### StationStatus
 - **Allowed values:** Available, InUse, Maintenance, OutOfService
-- Represents the operational state of Equipment.
+- Represents the operational state of a Station.
 
 ### TaskStatus
 - **Allowed values:** Defined, Ready, Assigned, Executing, Completed, Failed, Cancelled
 - Represents the lifecycle state of a Task within a Job.
 
-### OperatorStatus
-- **Allowed values:** Active, Inactive, Deactivated
-- Represents the availability state of an Operator.
+### PaperPurchaseStatus
+- **Allowed values:** InStock, ToOrder, Ordered, Received
+- Represents the paper procurement state for a Job.
+
+### PlatesStatus
+- **Allowed values:** Todo, Done
+- Represents the plates preparation approval gate.
+
+### ProofStatus (Special Values)
+- `ProofSentAt` can be:
+  - A DateTime (actual date sent)
+  - "AwaitingFile" (waiting for client to provide file)
+  - "NoProofRequired" (no proof needed for this job)
 
 ---
 
@@ -151,84 +232,116 @@ This domain model describes the core entities, value objects, and aggregates inv
 
 ### Within Aggregates
 
-- A **Job** owns its **Tasks** completely - tasks cannot exist without a job.
-- **Tasks** within a job must have unique IDs.
-- Task dependencies must form a Directed Acyclic Graph (no circular dependencies).
-- All tasks in a job must complete before the job deadline.
+- A **Job** owns its **Tasks** completely — tasks cannot exist without a job.
+- **Tasks** within a job are ordered (sequence) and must have unique IDs.
+- Tasks within a job follow a single straight sequence (linear dependencies).
+- All tasks in a job must complete before the job workshop exit date.
 
 ### Between Aggregates
 
-- An **Operator** can be referenced by many **TaskAssignments** but cannot have overlapping assignments.
-- **Equipment** can be referenced by many **TaskAssignments** but cannot have overlapping assignments.
-- A **Task** (within Job) references **Operators** and **Equipment** by ID only.
-- **Schedule** references Jobs, Tasks, Operators, and Equipment by ID to maintain aggregate boundaries.
+- A **Station** belongs to exactly one **StationCategory**.
+- A **Station** belongs to exactly one **StationGroup**.
+- An **OutsourcedProvider** has its own dedicated **StationGroup** with unlimited capacity.
+- A **Task** (within Job) references **Station** or **OutsourcedProvider** by ID only.
+- A **Job** can reference other **Jobs** as prerequisites (requiredJobIds).
+- **Schedule** references Jobs, Tasks, Stations, and Providers by ID to maintain aggregate boundaries.
 
 ### Business Invariants
 
-1. **No Double Booking:**
-   - An operator cannot be assigned to overlapping tasks.
-   - Equipment cannot be assigned to overlapping tasks.
+1. **No Station Double Booking:**
+   - A station cannot be assigned to overlapping tasks.
 
-2. **Skill Requirements:**
-   - If a task requires both operator and equipment, the operator must have the skill for that equipment.
+2. **Station Group Capacity:**
+   - At any time, the number of active tasks on stations in a group cannot exceed MaxConcurrent.
+   - Outsourced provider groups have unlimited capacity.
 
-3. **Availability Constraints:**
-   - Operators can only be scheduled within their availability slots.
+3. **Task Sequencing:**
+   - Within a job, tasks must be executed in sequence order.
+   - Task N cannot start before Task N-1 completes.
 
-4. **Dependency Ordering:**
-   - A task can only start after all its required tasks have completed.
+4. **Job Dependencies:**
+   - A job cannot start until all required jobs are completed.
 
-5. **Deadline Constraints:**
-   - All tasks must complete before their job's deadline.
+5. **Approval Gates:**
+   - Tasks requiring BAT cannot start until proof is approved (or marked NoProofRequired).
+   - Tasks requiring plates cannot start until plates are Done.
+
+6. **Deadline Constraints:**
+   - All tasks must complete before the job's workshop exit date.
+
+7. **Operating Schedule Compliance:**
+   - Tasks are only scheduled during station operating hours.
+   - Tasks spanning non-operating periods are stretched accordingly.
 
 ---
 
 ## Domain Events
 
-### Operator Events
-- `OperatorCreated`
-- `OperatorAvailabilityChanged`
-- `OperatorSkillAdded`
-- `OperatorDeactivated`
+### Station Events
+- `StationCreated`
+- `StationScheduleUpdated`
+- `StationExceptionAdded`
+- `StationStatusChanged`
 
-### Equipment Events
-- `EquipmentCreated`
-- `EquipmentMaintenanceScheduled`
-- `EquipmentStatusChanged`
+### StationCategory Events
+- `StationCategoryCreated`
+- `SimilarityCriteriaUpdated`
+
+### StationGroup Events
+- `StationGroupCreated`
+- `MaxConcurrentUpdated`
 
 ### Job Events
 - `JobCreated`
 - `TaskAddedToJob`
-- `TaskDependencySet`
-- `JobScheduled`
+- `TaskRemovedFromJob`
+- `TasksReordered`
+- `JobDependencyAdded`
+- `ApprovalGateUpdated`
+- `PaperStatusChanged`
+- `CommentAdded`
+- `JobPlanned`
+- `JobStarted`
 - `JobCompleted`
+- `JobDelayed`
+- `JobCancelled`
 
 ### Schedule Events
+- `ScheduleCreated`
 - `TaskAssigned`
-- `AssignmentValidated`
+- `TaskUnassigned`
+- `TaskRescheduled`
 - `ConflictDetected`
-- `ScheduleOptimized`
+- `ScheduleValidated`
 
 ---
 
 ## Aggregate Design Rationale
 
-1. **Operator as Aggregate Root:**
-   - Operators manage their own availability and skills.
-   - Changes to operator properties don't cascade to other aggregates.
+1. **Station as Aggregate Root:**
+   - Stations manage their own operating schedules and exceptions.
+   - Changes to station configuration don't cascade to other aggregates.
 
-2. **Equipment as Aggregate Root:**
-   - Equipment has its own lifecycle (maintenance, status).
-   - Equipment configuration is independent of jobs or operators.
+2. **StationCategory as Aggregate Root:**
+   - Categories are independent reference data.
+   - Similarity criteria may be updated independently.
 
-3. **Job as Aggregate Root containing Tasks:**
+3. **StationGroup as Aggregate Root:**
+   - Groups enforce capacity across multiple stations.
+   - Concurrency limits are managed at group level.
+
+4. **OutsourcedProvider as Aggregate Root:**
+   - Providers have their own lifecycle.
+   - Each provider creates its own station group automatically.
+
+5. **Job as Aggregate Root containing Tasks:**
    - Tasks are meaningless without their parent job.
    - Job deadline affects all contained tasks.
-   - Task dependencies are job-internal concerns.
+   - Task sequencing is a job-internal concern.
 
-4. **Schedule as Separate Aggregate:**
+6. **Schedule as Separate Aggregate:**
    - Schedule validation requires cross-aggregate data.
    - Conflicts and assignments need centralized management.
-   - Schedule changes don't modify the core job/task definitions.
+   - Schedule changes don't modify core job/task definitions.
 
 This design ensures clear boundaries, minimal coupling between aggregates, and efficient validation of complex constraints.

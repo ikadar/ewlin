@@ -1,134 +1,257 @@
-# Domain Open Questions (Operations Research System)
+# Domain Open Questions – Flux Print Shop Scheduling System
 
-This document collects **unresolved or partially clarified domain questions** that must be answered before completing the domain model, workflows, or implementation.  
-It is intentionally concise and structured for iterative refinement and AI‑assisted completion.
-
----
-
-## 1. Operator Management
-
-- Can operators have different availability schedules per week, or is it a fixed pattern?
-- How far in advance can operators modify their availability?
-- Are there different operator roles/levels with different permissions?
-- Can operators work on multiple equipment simultaneously if tasks allow it?
-- How is operator training/certification tracked and validated?
+This document collects **unresolved or partially clarified domain questions** that should be answered before completing the domain model, workflows, or implementation.
+It is intentionally concise and structured for iterative refinement.
 
 ---
 
-## 2. Equipment Management
+## 1. Station Management
 
-- What defines equipment maintenance windows—calendar schedule or usage hours?
-- Can equipment have reduced capacity during certain periods (not just available/unavailable)?
-- Are there equipment groups where any member can fulfill a task requirement?
-- How is equipment location tracked if distributed across facilities?
-- What happens to assignments when equipment unexpectedly breaks down?
+### Resolved ✓
+- ✓ Stations have categories with similarity criteria
+- ✓ Stations belong to groups with capacity limits
+- ✓ All stations must belong to exactly one group
+- ✓ Operating schedules support recurring weekly patterns + exceptions
+
+### Open Questions
+- Can stations have different operating schedules per week (e.g., seasonal)?
+- How is station maintenance scheduled—separate from schedule exceptions?
+- Should stations support reduced capacity (e.g., 50% during certain periods)?
+- How are backup/substitute stations handled?
+- Can a station belong to multiple categories (e.g., hybrid machines)?
+
+---
+
+## 2. Outsourced Providers
+
+### Resolved ✓
+- ✓ Each provider has unlimited capacity (own group with no limit)
+- ✓ Provider tasks use open days (JO) for duration
+- ✓ Providers have supported action types (Pelliculage, Dorure, etc.)
+
+### Open Questions
+- Can providers have limited capacity in the future?
+- Should providers have their own business calendar (different holidays)?
+- How are provider lead times communicated and updated?
+- Can a provider handle multiple concurrent jobs from same client?
+- How is provider cost tracked (for reporting/optimization)?
 
 ---
 
 ## 3. Task Definition
 
-- Can task duration vary based on operator skill level?
+### Resolved ✓
+- ✓ Tasks are defined using DSL syntax
+- ✓ Internal tasks: `[Station] setup+run "comment"`
+- ✓ Outsourced tasks: `ST [Provider] ActionType duration "comment"`
+- ✓ Station names with spaces use underscores
+- ✓ Comments can appear anywhere with quotes
+
+### Open Questions
+- Can a single task span multiple stations (parallel processing)?
 - Are there task templates for common operations?
-- Can a task be split across multiple operators (shift handover)?
-- What defines task type compatibility—exact match or hierarchical categories?
-- Can tasks have alternative equipment options with different durations?
+- Can task duration vary based on job complexity or quantity?
+- Should tasks support optional vs. required classification?
+- Can the same task be split across multiple time slots (interruption)?
 
 ---
 
-## 4. Task Dependencies
+## 4. Job Dependencies
 
-- Can dependencies be conditional (if Task A succeeds, do B; if fails, do C)?
-- Are there different types of dependencies (finish-to-start, start-to-start, etc.)?
-- Can external events trigger task readiness?
-- How are dependency cycles prevented during planning?
-- Can dependencies span across different jobs?
+### Resolved ✓
+- ✓ Dependencies are at job level only (not task level)
+- ✓ Circular dependencies are prevented
+- ✓ Dependent job cannot start until prerequisites complete
+
+### Open Questions
+- Can dependencies be conditional (if Job A succeeds, do B; if fails, do C)?
+- Are there different types of dependencies (finish-to-start, start-to-start)?
+- Can external events trigger job readiness (e.g., customer approval)?
+- Should dependencies span across different clients' jobs?
 
 ---
 
 ## 5. Scheduling Constraints
 
+### Resolved ✓
+- ✓ 30-minute snap grid for scheduling
+- ✓ Precedence within job must be respected (unless Alt bypass)
+- ✓ Station unavailability stretches task duration
+- ✓ Group capacity limits concurrent tasks
+
+### Open Questions
 - Is there a minimum/maximum time gap required between consecutive tasks?
-- How are operator break times handled in scheduling?
-- Can tasks be scheduled outside normal working hours with approval?
+- Can tasks be scheduled outside normal operating hours with approval?
 - Are there facility-wide constraints (max concurrent operations)?
-- How is travel time between equipment locations calculated?
+- How is travel time between outsourced provider and shop handled?
+- Should the system warn about "tight" schedules (no buffer)?
 
 ---
 
-## 6. Assignment Rules
+## 6. Approval Gates
 
-- Can assignments be provisional/tentative before confirmation?
-- Who can override skill requirements in emergencies?
-- Are there preferred operator-equipment pairings to optimize for?
-- Can the system suggest alternative assignments automatically?
-- How are assignment priorities determined when resources are scarce?
+### Resolved ✓
+- ✓ BAT (Proof): Must be sent and approved before scheduling
+- ✓ BAT can be marked "NoProofRequired" to bypass
+- ✓ Plates: Must be "Done" before printing tasks
+- ✓ Paper status tracked: InStock, ToOrder, Ordered, Received
+
+### Open Questions
+- Can certain task types proceed without BAT approval?
+- Is there an automatic timeout for BAT approval?
+- Should the system notify when BAT is pending too long?
+- Are there other approval gates beyond BAT and Plates?
+- Can paper be partially received (e.g., 50% of order)?
 
 ---
 
 ## 7. Validation & Conflicts
 
+### Resolved ✓
+- ✓ Real-time validation during drag (< 10ms)
+- ✓ Server-side authoritative validation
+- ✓ Conflict types: Station, GroupCapacity, Precedence, ApprovalGate, Availability
+
+### Open Questions
 - What is the escalation path for unresolvable conflicts?
 - Are some validation rules warnings vs. hard blocks?
 - Can certain users override specific validation rules?
 - How often should the system re-validate existing schedules?
-- What triggers automatic re-scheduling attempts?
+- Should the system suggest optimal conflict resolution?
 
 ---
 
-## 8. Performance & Optimization
+## 8. Similarity Indicators
 
-- Should the system optimize for deadline adherence, resource utilization, or cost?
-- Are there SLAs for different job types or customers?
-- How is overtime cost calculated and approved?
-- Can jobs have different priority levels affecting scheduling?
-- What KPIs need to be tracked and reported?
+### Resolved ✓
+- ✓ Visual circles between consecutive tiles
+- ✓ Filled = matching criterion, Hollow = non-matching
+- ✓ Criteria defined per station category
 
----
-
-## 9. Integration Questions
-
-- Which external systems need real-time schedule updates?
-- How are operator time tracking systems integrated?
-- Is there an existing ERP/MES system to sync with?
-- What format should schedule exports use (Gantt, Calendar, etc.)?
-- Are there mobile apps for operators to view assignments?
+### Open Questions
+- How are similarity criteria values populated per job?
+- Should similarity influence scheduling suggestions?
+- Can similarity be used to optimize station utilization?
+- Are there composite criteria (e.g., "same paper" = type + size)?
 
 ---
 
-## 10. Business Policy Questions
+## 9. UI/UX Questions
 
-- Can operators see other operators' schedules?
-- Are there union rules affecting scheduling?
-- How far in advance must schedules be published?
-- Can operators swap assignments between themselves?
-- What audit trail is required for schedule changes?
+### Resolved ✓
+- ✓ Vertical time axis (time flows downward)
+- ✓ 3-panel layout (Left: Jobs, Center: Grid, Right: Late jobs)
+- ✓ Alt-key bypasses precedence safeguard
+- ✓ Recall removes only the specific task assignment
+
+### Open Questions
+- Should the grid support zoom levels (day/week/month)?
+- Can users customize column order and width?
+- Is there a "compact view" for high-density schedules?
+- Should tiles show progress during execution?
+- How are very long tasks (multi-day) displayed?
+
+---
+
+## 10. Performance Requirements
+
+### Resolved ✓
+- ✓ Drag feedback < 10ms
+- ✓ Grid render (100 tiles) < 100ms
+- ✓ Initial load < 2s
+
+### Open Questions
+- What is the expected maximum number of concurrent jobs?
+- How many stations should the system support?
+- What is the maximum time range to display (2 weeks, 1 month)?
+- Should the system support offline mode?
 
 ---
 
 ## 11. Questions Blocking Implementation
 
-These questions must be resolved before implementation can begin:
+These questions should be resolved before implementation can begin:
 
-1. **Is operator overtime allowed, and what are the approval rules?**
-2. **Can a single task require multiple operators working together?**
-3. **Are partial task completions tracked (e.g., 50% done at shift end)?**
-4. **What is the granularity of time slots (minutes, hours, shifts)?**
-5. **Must all tasks in a job use the same facility/location?**
-6. **Can equipment be reserved for future maintenance windows?**
-7. **How are skill levels verified—certification, testing, or supervisor approval?**
-8. **Is there a concept of "setup time" between different task types on equipment?**
-9. **Can jobs be paused/suspended and later resumed?**
-10. **What happens to the schedule when a job is cancelled mid-execution?**
+1. **How are similarity criteria values assigned to jobs?**
+   - Who enters this data?
+   - Is it part of job creation or separate workflow?
+
+2. **What happens when station schedule changes with existing assignments?**
+   - Auto-reschedule?
+   - Flag as conflict?
+   - Notify user?
+
+3. **Can outsourced tasks start on any day or only on business days?**
+   - If starting Saturday, does the 2JO count from Monday?
+
+4. **How is job color assigned?**
+   - Random per job?
+   - User-selectable?
+   - Based on client or job type?
+
+5. **What is the granularity of paper status tracking?**
+   - Per job?
+   - Per paper type?
+   - Per quantity?
+
+6. **How are comments attributed?**
+   - Anonymous?
+   - Logged-in user?
+   - System-generated?
+
+7. **What happens to assignments when a job is cancelled?**
+   - Auto-recall all tasks?
+   - Keep for historical reference?
+
+8. **Is there a concept of "rush" or "priority" jobs?**
+   - Visual indicator?
+   - Affects conflict resolution?
 
 ---
 
-## 12. Future Considerations
+## 12. Post-MVP Considerations
 
-- Will the system need to support multiple facilities/plants?
-- Are there plans for automated schedule optimization?
-- Will predictive maintenance affect equipment availability?
-- Should the system learn from historical data to improve estimates?
-- Are there regulatory compliance requirements for scheduling?
+### Schedule Branching
+- Multiple schedule versions for what-if analysis
+- PROD designation for active schedule
+- Branch comparison views
+
+### Automation/Optimization
+- Auto-scheduling suggestions
+- Conflict resolution recommendations
+- Utilization optimization
+
+### Reporting
+- Job completion analytics
+- Station utilization reports
+- Late job trends
+
+### Integration
+- ERP/MES integration for job import
+- Customer portal for order tracking
+- Mobile app for shop floor updates
+
+### Multi-User
+- Concurrent editing support
+- User role permissions
+- Change audit trail
+
+---
+
+## 13. Recently Resolved Questions
+
+Questions that were open but have been resolved through discussion:
+
+| Question | Resolution | Date |
+|----------|------------|------|
+| Time axis orientation | Vertical (time flows down) | Initial design |
+| Operator management | Removed from scope | Initial design |
+| Station names with spaces | Use underscores in DSL | Q&A session |
+| Outsourced provider capacity | Unlimited (own group) | Q&A session |
+| DSL specification | Separate document created | Q&A session |
+| Job dependency level | Job-level only | Q&A session |
+| Deadline field name | `workshopExitDate` | Q&A session |
+| Schedule branching | Post-MVP | Q&A session |
 
 ---
 
