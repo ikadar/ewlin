@@ -78,11 +78,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Main validation function and exports
 - [x] Comprehensive unit tests (29 tests)
 
-### v0.0.5 - Frontend Project Foundation
-- [ ] Vite + React 19 + TypeScript setup
-- [ ] Tailwind CSS 3.4+ integration
-- [ ] Redux Toolkit configuration
-- [ ] Basic folder structure
+### v0.0.5 - Frontend Project Foundation ✅
+- [x] Vite 7 + React 19 + TypeScript setup
+- [x] Tailwind CSS 4 integration with custom theme
+- [x] Redux Toolkit with RTK Query configuration
+- [x] Feature-based folder structure
 
 ### v0.0.6 - CI/CD Pipeline Foundation
 - [ ] GitHub Actions / GitLab CI setup

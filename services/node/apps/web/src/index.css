@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+
+/* Custom theme configuration for Flux Scheduler */
+@theme {
+  /* Colors - based on the scheduling UI design */
+  --color-flux-primary: #3b82f6;
+  --color-flux-primary-hover: #2563eb;
+  --color-flux-secondary: #64748b;
+  --color-flux-success: #22c55e;
+  --color-flux-warning: #f59e0b;
+  --color-flux-danger: #ef4444;
+
+  /* Background colors */
+  --color-flux-bg-main: #f8fafc;
+  --color-flux-bg-panel: #ffffff;
+  --color-flux-bg-grid: #f1f5f9;
+
+  /* Border colors */
+  --color-flux-border: #e2e8f0;
+  --color-flux-border-dark: #cbd5e1;
+
+  /* Text colors */
+  --color-flux-text: #1e293b;
+  --color-flux-text-muted: #64748b;
+  --color-flux-text-light: #94a3b8;
+
+  /* Spacing for grid */
+  --spacing-grid-row: 48px;
+  --spacing-grid-col: 200px;
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Base styles */
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-flux-bg-main text-flux-text font-sans;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+}
+
+/* Component layer for reusable patterns */
+@layer components {
+  /* Panel styles */
+  .panel {
+    @apply bg-flux-bg-panel border border-flux-border rounded-lg shadow-sm;
+  }
+
+  /* Button base */
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-flux-primary text-white hover:bg-flux-primary-hover;
+  }
+
+  .btn-secondary {
+    @apply bg-flux-secondary text-white hover:bg-slate-600;
+  }
+}
