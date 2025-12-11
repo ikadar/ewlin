@@ -21,10 +21,53 @@ docker compose ps
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
+| `php` | ewlin-php (built) | 9000 (internal) | Symfony PHP-FPM |
+| `nginx` | nginx:alpine | 8080 | Web server |
 | `mariadb` | mariadb:10.11 | 3306 | Primary database |
 | `redis` | redis:7-alpine | 6379 | Cache and session storage |
 
 ## Container Details
+
+### PHP-FPM (Symfony)
+
+- **Image:** `ewlin-php` (built from `docker/php/Dockerfile`)
+- **Container name:** `flux-php`
+- **Port:** 9000 (internal, accessed via nginx)
+- **PHP version:** 8.3
+- **Extensions:** pdo_mysql, redis, intl, opcache, mbstring, zip
+- **Health check:** php-fpm-healthcheck
+
+**Run Symfony console:**
+```bash
+docker compose exec php bin/console --version
+```
+
+**Install Composer dependencies:**
+```bash
+docker compose exec php composer install
+```
+
+**Clear Symfony cache:**
+```bash
+docker compose exec php bin/console cache:clear
+```
+
+### Nginx
+
+- **Image:** `nginx:alpine`
+- **Container name:** `flux-nginx`
+- **Port:** 8080 (configurable via `NGINX_PORT`)
+- **Configuration:** `docker/nginx/default.conf`
+- **Health check:** HTTP request to `/health`
+
+**Test health endpoint:**
+```bash
+curl http://localhost:8080/health
+# Expected: OK
+
+curl http://localhost:8080/health/details
+# Expected: JSON with service status
+```
 
 ### MariaDB
 
@@ -150,9 +193,13 @@ docker compose up -d
 ```
 docker/
 ├── README.md              # This file
-└── mariadb/
-    └── init/
-        └── 01-init.sql    # Database initialization script
+├── mariadb/
+│   └── init/
+│       └── 01-init.sql    # Database initialization script
+├── nginx/
+│   └── default.conf       # Nginx configuration for Symfony
+└── php/
+    └── Dockerfile         # PHP 8.3 FPM image
 ```
 
 ## Environment Variables
@@ -167,19 +214,21 @@ See `.env.example` for all available configuration options.
 | `MARIADB_PASSWORD` | — | Application user password |
 | `MARIADB_PORT` | `3306` | Host port mapping |
 | `REDIS_PORT` | `6379` | Host port mapping |
+| `NGINX_PORT` | `8080` | Web server port |
+| `APP_ENV` | `dev` | Symfony environment |
+| `APP_SECRET` | — | Symfony secret key |
 
 ## Network
 
 All services are connected via the `flux-network` bridge network. Services can communicate using their service names:
 
+- PHP-FPM: `php:9000`
+- Nginx: `nginx:80`
 - MariaDB: `mariadb:3306`
 - Redis: `redis:6379`
 
-From PHP/Node.js containers (future):
-```php
-$dsn = 'mysql:host=mariadb;port=3306;dbname=flux_scheduler';
+From Symfony (configured in docker-compose.yml):
 ```
-
-```javascript
-const redis = new Redis({ host: 'redis', port: 6379 });
+DATABASE_URL=mysql://flux_user:password@mariadb:3306/flux_scheduler?serverVersion=10.11.0-MariaDB
+REDIS_URL=redis://redis:6379
 ```
