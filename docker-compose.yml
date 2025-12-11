@@ -1,0 +1,62 @@
+# Flux Print Shop Scheduling System - Development Environment
+# v0.0.1 - Development Environment Setup
+
+services:
+  # ===========================================
+  # MariaDB Database
+  # ===========================================
+  mariadb:
+    image: mariadb:10.11
+    container_name: flux-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    ports:
+      - "${MARIADB_PORT:-3306}:3306"
+    volumes:
+      - flux-mariadb-data:/var/lib/mysql
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - flux-network
+
+  # ===========================================
+  # Redis Cache
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: flux-redis
+    restart: unless-stopped
+    command: redis-server --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - flux-network
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  flux-network:
+    name: flux-network
+    driver: bridge
+
+# ===========================================
+# Volumes
+# ===========================================
+volumes:
+  flux-mariadb-data:
+    name: flux-mariadb-data

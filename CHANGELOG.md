@@ -28,11 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Version History
+## [0.0.1] - 2025-12-11
 
-*No releases yet. First release will be v0.0.1 (Development Environment).*
+### Added
+- Docker Compose configuration for local development
+- MariaDB 10.11+ container with health checks and persistent volume
+- Redis 7+ container with health checks and LRU eviction
+- Shared Docker network (`flux-network`) for service communication
+- Environment variable templates (`.env.example`)
+- Docker setup documentation (`docker/README.md`)
+- Project README with quick start guide
 
 ---
 
 <!-- Release links will be added as releases are created -->
-[Unreleased]: https://github.com/org/flux-scheduler/compare/main...HEAD
+[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/org/flux-scheduler/releases/tag/v0.0.1
