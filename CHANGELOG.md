@@ -28,6 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.6] - 2025-12-11
+
+### Added
+- GitHub Actions CI/CD pipeline foundation
+- CI workflow (`.github/workflows/ci.yml`):
+  - `lint-node` - ESLint for all Node.js packages
+  - `typecheck-node` - TypeScript compilation check
+  - `test-node` - Vitest unit tests
+  - `build-frontend` - Vite production build with artifact upload
+  - `lint-php` - PHPStan analysis (optional)
+  - `ci-success` - Summary job for branch protection
+- Docker build workflow (`.github/workflows/docker.yml`):
+  - `build-node` - Node.js service image
+  - `build-php` - PHP-FPM service image
+  - GitHub Container Registry (ghcr.io) integration
+  - Docker layer caching with GitHub Actions cache
+- pnpm and Composer dependency caching
+- Concurrency control for workflow runs
+
+---
+
 ## [0.0.5] - 2025-12-11
 
 ### Added
@@ -128,7 +149,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 <!-- Release links will be added as releases are created -->
-[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/org/flux-scheduler/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/org/flux-scheduler/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/org/flux-scheduler/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/org/flux-scheduler/compare/v0.0.2...v0.0.3

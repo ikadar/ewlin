@@ -84,11 +84,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Redux Toolkit with RTK Query configuration
 - [x] Feature-based folder structure
 
-### v0.0.6 - CI/CD Pipeline Foundation
-- [ ] GitHub Actions / GitLab CI setup
-- [ ] Lint and type check jobs
-- [ ] Unit test jobs
-- [ ] Docker image build jobs
+### v0.0.6 - CI/CD Pipeline Foundation ✅
+- [x] GitHub Actions workflows (ci.yml, docker.yml)
+- [x] Lint and type check jobs (ESLint, TypeScript)
+- [x] Unit test jobs (Vitest)
+- [x] Docker image build jobs (ghcr.io)
 
 ---
 
