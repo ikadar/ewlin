@@ -1,6 +1,6 @@
-# Aggregate / Service / Repository Design – Operations Research System
+# Aggregate / Service / Repository Design – Flux Print Shop Scheduling System
 
-This document defines **aggregate structures**, their **invariants**, and the supporting **services** and **repositories** for the Equipment → Operator → Job → Task assignment and validation domain.
+This document defines **aggregate structures**, their **invariants**, and the supporting **services** and **repositories** for the Station → Job → Task assignment and scheduling domain.
 
 It is a *technology‑agnostic* design reference used during Solution Design & Architecture.
 
@@ -8,244 +8,267 @@ It is a *technology‑agnostic* design reference used during Solution Design & A
 
 ## 1. Aggregates Overview
 
-### 1.1 Operator Aggregate
+### 1.1 Station Aggregate
 
-**Purpose**  
-Represents a human resource who can operate equipment and be assigned to tasks, maintaining their skills, certifications, and availability schedule.
+**Purpose**
+Represents a physical station (machine) that can be assigned tasks, maintaining its operating schedule, status, and availability.
 
-**Invariants**  
-- An operator must have at least one availability slot to be Active
-- Availability slots cannot overlap for the same operator
-- Skill levels must be one of: beginner, intermediate, expert
-- An operator cannot be deactivated while assigned to executing tasks
+**Invariants**
+- A station must belong to exactly one category
+- A station must belong to exactly one group
+- Operating schedule time slots cannot overlap within the same day
+- Schedule exceptions cannot overlap for the same date
+- Status transitions must follow: Available ↔ InUse, Available → Maintenance → Available
 
-**Entities and Value Objects**  
-- **Aggregate Root:** Operator
-- **Entities:** None (skills and availability are value objects)
-- **Value Objects:** OperatorSkill, TimeSlot
+**Entities and Value Objects**
+- **Aggregate Root:** Station
+- **Entities:** None (schedule and exceptions are value objects)
+- **Value Objects:** OperatingSchedule, DaySchedule, TimeSlot, ScheduleException
 
-**Creation Rules**  
-- An operator is created in `Active` state with a unique name
-- Initial availability can be empty but must be set before assignment
-- Skills are optional at creation
+**Creation Rules**
+- A station is created in `Available` state with a unique name
+- Must specify category and group at creation
+- Operating schedule defaults to empty (always unavailable until configured)
 
-**State Transitions (Behaviour)**  
-- `RegisterOperator`
-- `UpdateAvailability`
-- `AddEquipmentSkill`
-- `RemoveEquipmentSkill` 
-- `DeactivateOperator` (only if no active assignments)
-- `ReactivateOperator`
+**State Transitions (Behaviour)**
+- `RegisterStation`
+- `UpdateOperatingSchedule`
+- `AddScheduleException`
+- `RemoveScheduleException`
+- `ChangeStatus` (Available/InUse/Maintenance/OutOfService)
 
-**Events**  
-- `OperatorRegistered`
-- `OperatorAvailabilityChanged`
-- `OperatorSkillAdded`
-- `OperatorSkillRemoved`
-- `OperatorDeactivated`
-- `OperatorReactivated`
+**Events**
+- `StationRegistered`
+- `OperatingScheduleUpdated`
+- `ScheduleExceptionAdded`
+- `ScheduleExceptionRemoved`
+- `StationStatusChanged`
 
-**Boundaries and External Interaction**  
-- Only the OperatorRepository may load/save Operators
-- External systems may query skills and availability but cannot modify directly
+**Boundaries and External Interaction**
+- Only the StationRepository may load/save Stations
 - Assignment validation happens outside this aggregate
+- External systems may query availability but cannot modify directly
 
 ---
 
-### 1.2 Equipment Aggregate
+### 1.2 StationCategory Aggregate
 
-**Purpose**  
-Represents a physical resource that can be assigned to tasks, tracking its operational status, supported task types, and maintenance schedule.
+**Purpose**
+Represents a category of stations with similarity criteria used for time-saving indicators.
 
 **Invariants**
-- Equipment must support at least one task type
-- Status transitions must follow the state machine:
-  - Available ↔ InUse (task assignment/completion)
-  - Available → Maintenance → Available (scheduled maintenance)
-  - InUse → Maintenance (emergency maintenance)
-  - Any → OutOfService (permanent/long-term unavailability)
-- Equipment cannot be scheduled for maintenance while InUse (except emergency)
-- Maintenance windows cannot overlap
+- Category name must be unique
+- Similarity criteria codes must be unique within the category
 
-**Entities and Value Objects**  
-- **Aggregate Root:** Equipment
-- **Entities:** MaintenanceWindow (tracked separately but referenced)
-- **Value Objects:** Location
+**Entities and Value Objects**
+- **Aggregate Root:** StationCategory
+- **Entities:** None
+- **Value Objects:** SimilarityCriterion
 
-**Creation Rules**  
-- Equipment is created in `Available` state
-- Must specify supported task types at creation
-- Location is optional
+**Creation Rules**
+- Created with a unique name
+- Similarity criteria can be added at creation or later
 
-**State Transitions (Behaviour)**  
-- `RegisterEquipment`
-- `ScheduleMaintenance` (only if Available)
-- `StartMaintenance`
-- `CompleteMaintenance`
-- `ReportBreakdown` (transitions to OutOfService)
-- `RepairEquipment` (returns to Available)
-- `UpdateLocation`
+**State Transitions (Behaviour)**
+- `CreateCategory`
+- `AddSimilarityCriterion`
+- `RemoveSimilarityCriterion`
+- `RenameCategory`
 
-**Events**  
-- `EquipmentRegistered`
-- `MaintenanceScheduled`
-- `MaintenanceStarted`
-- `MaintenanceCompleted`
-- `EquipmentBreakdownReported`
-- `EquipmentRepaired`
-- `EquipmentLocationUpdated`
+**Events**
+- `StationCategoryCreated`
+- `SimilarityCriterionAdded`
+- `SimilarityCriterionRemoved`
 
-**Boundaries and External Interaction**  
-- Only EquipmentRepository persists Equipment
-- Maintenance scheduling requires coordination with Assignment Service
-- Status changes trigger revalidation of affected assignments
+**Boundaries and External Interaction**
+- Only StationCategoryRepository persists categories
+- Stations reference categories by ID
+- Scheduling View uses criteria for similarity calculations
 
 ---
 
-### 1.3 Job Aggregate
+### 1.3 StationGroup Aggregate
 
-**Purpose**  
-Represents a production job containing multiple tasks with dependencies, managing the overall workflow and deadline constraints.
+**Purpose**
+Represents a logical grouping of stations with capacity constraints.
 
 **Invariants**
-- A job must contain at least one task
-- Task dependencies must form a directed acyclic graph (no cycles)
-- Job deadline must be after all task durations on critical path
-- Status progression: Draft → Planned → InProgress ↔ Delayed → Completed | Cancelled
-- Tasks can only be added in Draft state
-- Dependencies can only be set in Draft/Planned states
-- Job can be cancelled from Draft, Planned, InProgress, or Delayed states
+- Group name must be unique
+- maxConcurrent must be positive integer or null (unlimited)
+- If isOutsourcedProviderGroup is true, maxConcurrent must be null
 
-**Entities and Value Objects**  
+**Entities and Value Objects**
+- **Aggregate Root:** StationGroup
+- **Entities:** None
+- **Value Objects:** None
+
+**Creation Rules**
+- Created with unique name and maxConcurrent setting
+- isOutsourcedProviderGroup defaults to false
+
+**State Transitions (Behaviour)**
+- `CreateGroup`
+- `UpdateMaxConcurrent`
+- `RenameGroup`
+
+**Events**
+- `StationGroupCreated`
+- `GroupCapacityUpdated`
+
+**Boundaries and External Interaction**
+- Only StationGroupRepository persists groups
+- Stations reference groups by ID
+- Assignment validation checks group capacity
+
+---
+
+### 1.4 OutsourcedProvider Aggregate
+
+**Purpose**
+Represents an external provider for outsourced tasks, with its own implicit station group.
+
+**Invariants**
+- Provider name must be unique
+- Each provider automatically has its own station group with unlimited capacity
+- supportedActionTypes must not be empty
+
+**Entities and Value Objects**
+- **Aggregate Root:** OutsourcedProvider
+- **Entities:** None
+- **Value Objects:** None
+
+**Creation Rules**
+- Created with unique name and supported action types
+- Automatically creates associated station group with unlimited capacity
+
+**State Transitions (Behaviour)**
+- `RegisterProvider`
+- `AddSupportedActionType`
+- `RemoveSupportedActionType`
+- `UpdateProviderStatus` (Active/Inactive)
+
+**Events**
+- `ProviderRegistered`
+- `ProviderActionTypesUpdated`
+- `ProviderStatusChanged`
+
+**Boundaries and External Interaction**
+- Only OutsourcedProviderRepository persists providers
+- Tasks reference providers by ID
+- Calendar service calculates open-day durations
+
+---
+
+### 1.5 Job Aggregate
+
+**Purpose**
+Represents a print job containing multiple tasks, managing deadlines, approval gates, and workflow.
+
+**Invariants**
+- A job must have a reference, client, description, and workshopExitDate
+- Tasks must be ordered by sequenceOrder
+- Task sequence must form valid chain (no gaps)
+- Circular job dependencies are not allowed
+- Status progression: Draft → Planned → InProgress → Completed | Cancelled
+- Tasks can only be added/reordered in Draft state
+- BAT must be approved (or NoProofRequired) before tasks can be scheduled
+- Plates must be Done before printing tasks can be scheduled
+
+**Entities and Value Objects**
 - **Aggregate Root:** Job
-- **Entities:** Task (within aggregate boundary)
-- **Value Objects:** Duration, TaskDependency
+- **Entities:** Task (within aggregate boundary), Comment
+- **Value Objects:** Duration
 
-**Creation Rules**  
-- Job is created in `Draft` state with name and deadline
-- Tasks are added incrementally
-- Dependencies are validated for cycles on each addition
+**Creation Rules**
+- Job is created in `Draft` status with required fields
+- Tasks are parsed from DSL and added incrementally
+- requiredJobIds validated for cycles on each addition
 
-**State Transitions (Behaviour)**  
+**State Transitions (Behaviour)**
 - `CreateJob`
 - `AddTask` (only in Draft)
 - `RemoveTask` (only in Draft)
-- `SetTaskDependency`
-- `RemoveTaskDependency`
-- `PlanJob` (validates completeness)
-- `StartJob` (when first task starts)
-- `CompleteJob` (when all tasks complete)
-- `DelayJob` (when deadline at risk)
-- `CancelJob` (cancels job and cascades to tasks)
+- `ReorderTasks`
+- `UpdateProofStatus` (proofSentAt, proofApprovedAt)
+- `UpdatePlatesStatus`
+- `UpdatePaperStatus`
+- `AddJobDependency`
+- `RemoveJobDependency`
+- `AddComment`
+- `PlanJob` (Draft → Planned)
+- `StartJob` (Planned → InProgress, when first task starts)
+- `CompleteJob` (InProgress → Completed, when all tasks complete)
+- `CancelJob` (any → Cancelled)
 
 **Events**
 - `JobCreated`
 - `TaskAddedToJob`
 - `TaskRemovedFromJob`
-- `TaskDependencySet`
-- `TaskDependencyRemoved`
+- `TasksReordered`
+- `ProofStatusUpdated`
+- `PlatesStatusUpdated`
+- `PaperStatusUpdated`
+- `JobDependencyAdded`
+- `JobDependencyRemoved`
+- `CommentAdded`
 - `JobPlanned`
 - `JobStarted`
 - `JobCompleted`
-- `JobDelayed`
 - `JobCancelled`
 
-**Boundaries and External Interaction**  
+**Boundaries and External Interaction**
 - Only JobRepository loads/saves Jobs
-- Task assignment happens in separate Assignment aggregate
-- Critical path calculation is internal to aggregate
+- Task assignment happens in separate Schedule aggregate
+- DSL parsing provides structured task input
 
 ---
 
-### 1.4 Schedule Aggregate
+### 1.6 Schedule Aggregate
 
-**Purpose**  
+**Purpose**
 Represents the master schedule containing all task assignments with their timings, maintaining consistency and detecting conflicts.
 
-**Invariants**  
-- No resource (operator/equipment) can be double-booked
-- Task assignments must respect operator skills for equipment
-- Dependent tasks cannot start before prerequisites complete
-- All assignments must fit within resource availability windows
-- Scheduled end time = scheduled start time + task duration
+**Invariants**
+- No station can be double-booked (except providers with unlimited capacity)
+- Station group capacity limits must be respected
+- Task assignments must respect station operating schedules
+- Dependent tasks cannot start before prerequisites complete (unless explicitly bypassed)
+- All tasks within a job must be scheduled in sequence order
+- scheduledEnd = scheduledStart + task duration (considering operating schedule)
 
-**Entities and Value Objects**  
+**Entities and Value Objects**
 - **Aggregate Root:** Schedule
 - **Entities:** None (assignments are value objects)
-- **Value Objects:** ValidatedAssignment, ScheduleConflict, TimeRange
+- **Value Objects:** TaskAssignment, ScheduleConflict, ValidationResult
 
-**Creation Rules**  
+**Creation Rules**
 - Schedule is created empty or from a previous version
 - Assignments are added and validated incrementally
-- Version number increments on each change
+- Version number increments on each change (for optimistic locking)
 
-**State Transitions (Behaviour)**  
+**State Transitions (Behaviour)**
 - `CreateSchedule`
 - `AssignTask` (validates all constraints)
-- `UnassignTask`
-- `RescheduleTask`
+- `UnassignTask` (recall)
+- `RescheduleTask` (move to different time/station)
+- `SwapTaskPositions` (swap two consecutive tasks)
 - `ValidateSchedule` (full revalidation)
-- `PublishSchedule` (locks version)
-- `CreateNewVersion` (for updates)
 
-**Events**  
+**Events**
 - `ScheduleCreated`
 - `TaskAssigned`
 - `TaskUnassigned`
 - `TaskRescheduled`
+- `TasksSwapped`
 - `ConflictDetected`
-- `ScheduleValidated`
-- `SchedulePublished`
+- `ConflictResolved`
+- `ScheduleUpdated`
 
-**Boundaries and External Interaction**  
+**Boundaries and External Interaction**
 - Only ScheduleRepository persists Schedules
-- Requires read access to Job, Operator, Equipment aggregates
-- Publishes events for downstream execution tracking
-
----
-
-### 1.5 TaskExecution Aggregate
-
-**Purpose**  
-Tracks the actual execution of assigned tasks, capturing real-time progress, variances, and quality results.
-
-**Invariants**  
-- Execution can only start for Assigned tasks
-- Actual start must be within ±15 minutes of scheduled start (configurable)
-- Task cannot be completed without being started
-- Quality checks are immutable once recorded
-
-**Entities and Value Objects**  
-- **Aggregate Root:** TaskExecution
-- **Entities:** None
-- **Value Objects:** ActualTiming, ExecutionVariance, QualityCheckResult
-
-**Creation Rules**  
-- Created when task is assigned
-- References task ID and assignment details
-- Initial state is `Pending`
-
-**State Transitions (Behaviour)**  
-- `CreateExecution` (from assignment)
-- `StartExecution` (with actual start time)
-- `RecordProgress` (optional progress updates)
-- `RecordQualityCheck`
-- `CompleteExecution` (with actual end time)
-- `AbortExecution` (for failures)
-
-**Events**  
-- `ExecutionCreated`
-- `TaskStarted`
-- `ProgressRecorded`
-- `QualityCheckRecorded`
-- `TaskCompleted`
-- `TaskAborted`
-- `VarianceDetected`
-
-**Boundaries and External Interaction**  
-- Only TaskExecutionRepository manages executions
-- Triggers job state updates via events
-- May integrate with external time tracking systems
+- Requires read access to Job, Station aggregates
+- Publishes events for downstream view generation
+- MVP: Single schedule (branching is post-MVP)
 
 ---
 
@@ -253,24 +276,38 @@ Tracks the actual execution of assigned tasks, capturing real-time progress, var
 
 ### SchedulingService
 Responsible for:
-- Complex scheduling algorithms
-- Optimization of resource allocation
-- Critical path calculations
-- Conflict resolution strategies
+- Complex scheduling operations spanning multiple assignments
+- End time calculations considering operating schedules
+- Precedence safeguard logic (snap to valid position)
+- Alt-key bypass handling for forced placements
 
 ### ValidationService
 Responsible for:
 - Cross-aggregate validation rules
-- Dependency graph analysis
-- Availability checking across time ranges
-- Skill matching validation
+- Station availability checking
+- Group capacity checking
+- Approval gate checking
+- Precedence checking
 
-### NotificationService
+### SimilarityService
 Responsible for:
-- Assignment notifications to operators
-- Conflict alerts to schedulers
-- Deadline warnings
-- Status change notifications
+- Calculating similarity indicators between consecutive tiles
+- Comparing job attributes against category criteria
+- Generating filled/hollow circle data for UI
+
+### BusinessCalendarService
+Responsible for:
+- Open day calculations for outsourced tasks
+- Weekend exclusion (MVP)
+- French holiday exclusion (future)
+- Per-provider calendar support (future)
+
+### DSLParsingService
+Responsible for:
+- Parsing task DSL syntax
+- Validating station/provider references
+- Providing autocomplete suggestions
+- Reporting parse errors with positions
 
 ---
 
@@ -278,35 +315,48 @@ Responsible for:
 
 Each aggregate exposes one repository interface:
 
-### OperatorRepository
-- `save(Operator $operator)`
-- `get(OperatorId $id)`
-- `findBySkill(EquipmentId $equipmentId, SkillLevel $minLevel)`
-- `findAvailableBetween(DateTime $start, DateTime $end)`
+### StationRepository
+- `save(Station $station)`
+- `get(StationId $id)`
+- `findByName(string $name)`
+- `findByCategory(StationCategoryId $categoryId)`
+- `findByGroup(StationGroupId $groupId)`
+- `findAll()`
 
-### EquipmentRepository
-- `save(Equipment $equipment)`
-- `get(EquipmentId $id)`
-- `findByTaskType(TaskType $type)`
-- `findAvailableBetween(DateTime $start, DateTime $end)`
+### StationCategoryRepository
+- `save(StationCategory $category)`
+- `get(StationCategoryId $id)`
+- `findByName(string $name)`
+- `findAll()`
+
+### StationGroupRepository
+- `save(StationGroup $group)`
+- `get(StationGroupId $id)`
+- `findByName(string $name)`
+- `findAll()`
+
+### OutsourcedProviderRepository
+- `save(OutsourcedProvider $provider)`
+- `get(ProviderId $id)`
+- `findByName(string $name)`
+- `findByActionType(string $actionType)`
+- `findAll()`
 
 ### JobRepository
 - `save(Job $job)`
 - `get(JobId $id)`
+- `findByReference(string $reference)`
 - `findByStatus(JobStatus $status)`
-- `findByDeadlineBefore(DateTime $deadline)`
+- `findByWorkshopExitDateBefore(DateTime $date)`
+- `findWithPagination(int $page, int $limit, ?string $search)`
 
 ### ScheduleRepository
 - `save(Schedule $schedule)`
 - `get(ScheduleId $id)`
-- `getCurrentVersion()`
-- `findConflictsForResource(ResourceId $id, TimeRange $range)`
-
-### TaskExecutionRepository
-- `save(TaskExecution $execution)`
-- `get(TaskId $taskId)`
-- `findByStatus(ExecutionStatus $status)`
-- `findWithVarianceAbove(int $thresholdMinutes)`
+- `getCurrentSchedule()`
+- `findAssignmentsForStation(StationId $id, DateRange $range)`
+- `findAssignmentsForJob(JobId $id)`
+- `findConflicts()`
 
 Repositories are defined at the **domain/interface level**, not as infrastructure implementations.
 
@@ -324,10 +374,16 @@ Repositories are defined at the **domain/interface level**, not as infrastructur
 - Process managers for complex workflows
 - Compensating actions for failures
 
+### Examples
+- When a task is assigned: Job aggregate task status update via event
+- When station schedule changes: Existing assignments revalidated asynchronously
+- When approval gate updates: Affected assignments flagged for review
+
 ### Read Model Consistency
 - CQRS pattern for complex queries
 - Eventually consistent projections
 - Separate optimization for read vs write
+- Schedule snapshot generation on events
 
 ---
 
@@ -335,6 +391,7 @@ Repositories are defined at the **domain/interface level**, not as infrastructur
 
 ### Optimistic Locking
 - Version field on Schedule aggregate
+- snapshotVersion in read models
 - Conflict detection on concurrent updates
 - Retry strategies for conflicts
 
@@ -342,13 +399,20 @@ Repositories are defined at the **domain/interface level**, not as infrastructur
 - Keep aggregates small for less contention
 - Job aggregate includes tasks but not assignments
 - Schedule aggregate uses versioning for updates
+- Station aggregate is relatively static
+
+### Conflict Resolution
+- UI shows conflicts in real-time
+- User resolves conflicts manually
+- No automatic conflict resolution in MVP
 
 ---
 
 ## 6. Notes
 
-- Aggregates are designed for high concurrency environments
+- Aggregates are designed for a single-user scheduling environment initially
 - Each aggregate maintains strong consistency internally
 - Cross-aggregate workflows use domain events and eventual consistency
 - The Schedule aggregate is the central coordination point for assignments
-- Execution tracking is separate to avoid impacting planning performance
+- Similarity calculations happen in read model, not during writes
+- Task execution tracking is out of scope for MVP (future: separate aggregate)

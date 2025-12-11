@@ -11,10 +11,10 @@ interface JobListProps {
 
 export function JobList({ onSelect, selectedId, className }: JobListProps) {
   const jobs = useAppSelector((state) => state.schedule.snapshot?.jobs ?? []);
-  const tasks = useAppSelector((state) => state.schedule.snapshot?.tasks ?? []);
 
   const columns = [
-    { key: 'name', header: 'Name', className: 'w-28' },
+    { key: 'reference', header: 'Ref', className: 'w-24' },
+    { key: 'client', header: 'Client', className: 'w-32' },
     {
       key: 'status',
       header: 'Status',
@@ -23,17 +23,14 @@ export function JobList({ onSelect, selectedId, className }: JobListProps) {
     },
     {
       key: 'deadline',
-      header: 'Deadline',
-      render: (job: Job) => format(new Date(job.deadline), 'MMM d'),
+      header: 'Exit Date',
+      render: (job: Job) => format(new Date(job.workshopExitDate), 'MMM d'),
       className: 'w-20',
     },
     {
       key: 'tasks',
       header: 'Tasks',
-      render: (job: Job) => {
-        const jobTasks = tasks.filter((t) => t.jobId === job.id);
-        return <span>{jobTasks.length}</span>;
-      },
+      render: (job: Job) => <span>{job.tasks.length}</span>,
       className: 'w-16 text-center',
     },
   ];

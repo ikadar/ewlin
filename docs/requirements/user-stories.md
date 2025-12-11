@@ -1,6 +1,6 @@
-# User Stories – Operations Research System
+# User Stories – Flux Print Shop Scheduling System
 
-This file contains user stories for the Equipment → Operator → Job → Task assignment and validation flow.
+This file contains user stories for the print shop scheduling system.
 
 Each story follows the standard format:
 
@@ -8,468 +8,329 @@ Each story follows the standard format:
 
 ---
 
-## 1. Operator Management
+## Station Management
 
-### US-OP-001 – Register new operator
-**As a** production manager  
-**I want** to register a new operator in the system  
-**So that** they can be assigned to tasks once properly trained and available.
+### US-STATION-001: Register a Station
+> As a **production manager**, I want to **register a new station** (e.g., Komori press, Massicot), so that **I can assign tasks to it**.
 
-**Acceptance criteria:**
-- Manager can enter operator name and basic information
-- Manager can define initial availability schedule
-- Manager can assign equipment skills with proficiency levels
-- System validates no duplicate operator names
-- Operator is created in Active status by default
+**Acceptance Criteria:**
+- Station has a unique name
+- Station belongs to a category
+- Station belongs to a group
+- Operating schedule can be defined
 
----
+### US-STATION-002: Configure Station Operating Schedule
+> As a **production manager**, I want to **define a station's weekly operating schedule**, so that **tasks are only scheduled during available hours**.
 
-### US-OP-002 – Update operator availability
-**As an** operator  
-**I want** to update my availability schedule  
-**So that** I'm only assigned to tasks when I'm actually available to work.
+**Acceptance Criteria:**
+- Can define time slots for each day of week
+- System prevents scheduling outside operating hours
+- Tasks overlapping non-operating periods are stretched appropriately
 
-**Acceptance criteria:**
-- Operator can view current availability slots
-- Operator can add new availability periods
-- Operator can remove future availability (with notice period)
-- System prevents overlapping availability periods
-- Changes trigger re-validation of affected assignments
+### US-STATION-003: Add Schedule Exception
+> As a **production manager**, I want to **add a one-off schedule exception** (holiday, special maintenance), so that **the schedule reflects reality**.
 
----
+**Acceptance Criteria:**
+- Can mark a date as closed
+- Can define modified hours for a date
+- Exception overrides regular schedule
 
-### US-OP-003 – Add equipment certification
-**As a** training coordinator  
-**I want** to certify an operator for new equipment  
-**So that** they can be assigned to more types of tasks.
+### US-STATION-004: Configure Station Category
+> As a **production manager**, I want to **create station categories with similarity criteria**, so that **I can see time-saving indicators between consecutive jobs**.
 
-**Acceptance criteria:**
-- Coordinator can select operator and equipment
-- Skill level can be set (beginner/intermediate/expert)
-- Certification date is recorded
-- Operator immediately becomes eligible for relevant tasks
-- Historical skill progression is maintained
+**Acceptance Criteria:**
+- Category has a name
+- Category has similarity criteria (e.g., same paper type, same paper size)
+- Indicators appear between tiles on the scheduling grid
 
----
+### US-STATION-005: Configure Station Group
+> As a **production manager**, I want to **create station groups with concurrency limits**, so that **the system enforces capacity constraints**.
 
-## 2. Equipment Management
-
-### US-EQ-001 – Register new equipment
-**As an** operations manager  
-**I want** to add new equipment to the system  
-**So that** it can be assigned to production tasks.
-
-**Acceptance criteria:**
-- Manager can enter equipment name and identifier
-- Manager can specify supported task types
-- Equipment location can be recorded
-- Initial status is set to Available
-- Equipment appears in assignment options immediately
+**Acceptance Criteria:**
+- Group has a name
+- Group has max concurrent value (or unlimited)
+- System prevents exceeding group capacity
 
 ---
 
-### US-EQ-002 – Schedule equipment maintenance
-**As a** maintenance planner  
-**I want** to schedule preventive maintenance for equipment  
-**So that** production planning knows when equipment is unavailable.
+## Outsourced Provider Management
 
-**Acceptance criteria:**
-- Planner can select equipment and maintenance window
-- System checks for conflicting assignments
-- Affected tasks are flagged for reassignment
-- Maintenance history is tracked
-- Notifications sent to affected operators
+### US-PROVIDER-001: Register an Outsourced Provider
+> As a **production manager**, I want to **register an external provider** (e.g., Clément for pelliculage), so that **I can schedule outsourced tasks**.
 
----
+**Acceptance Criteria:**
+- Provider has a unique name
+- Provider has supported action types
+- Provider has unlimited capacity
+- Provider appears as a column in the scheduling grid
 
-### US-EQ-003 – Report equipment breakdown
-**As an** operator  
-**I want** to report equipment failure during operation  
-**So that** repairs can be scheduled and tasks can be reassigned.
+### US-PROVIDER-002: Schedule Outsourced Task
+> As a **scheduler**, I want to **assign a task to an outsourced provider**, so that **external work is tracked in my schedule**.
 
-**Acceptance criteria:**
-- Operator can quickly flag equipment as broken
-- Current task is marked as interrupted
-- Equipment status changes to OutOfService
-- Maintenance team is notified
-- System suggests alternative equipment if available
+**Acceptance Criteria:**
+- Task duration is specified in open days (JO)
+- Multiple tasks can overlap on the same provider
+- Calendar calculates end date using business days
 
 ---
 
-## 3. Job Planning
+## Job Management
 
-### US-JOB-001 – Create production job
-**As a** production planner  
-**I want** to create a new job with deadline  
-**So that** work can be scheduled and tracked to completion.
+### US-JOB-001: Create a New Job
+> As a **scheduler**, I want to **create a new print job**, so that **I can track an order through production**.
 
-**Acceptance criteria:**
-- Planner can enter job name and description
-- Deadline must be specified
+**Acceptance Criteria:**
+- Job has reference, client, description
+- Job has workshop exit date (deadline)
+- Job can have paper specifications (type, format)
 - Job starts in Draft status
-- Job ID is generated automatically
-- Job appears in planning dashboard
+
+### US-JOB-002: Define Tasks Using DSL
+> As a **scheduler**, I want to **define tasks using a simple text syntax**, so that **I can quickly enter action sequences**.
+
+**Acceptance Criteria:**
+- Textarea accepts DSL syntax
+- Autocomplete suggests station names
+- Syntax errors are highlighted
+- Tasks are parsed into structured data
+
+### US-JOB-003: Reorder Tasks
+> As a **scheduler**, I want to **reorder tasks within a job**, so that **the production sequence is correct**.
+
+**Acceptance Criteria:**
+- Tasks can be dragged to reorder
+- Sequence order is saved
+- Existing assignments are revalidated
+
+### US-JOB-004: Set Job Dependencies
+> As a **scheduler**, I want to **specify that a job depends on another job**, so that **linked orders are processed in the right sequence**.
+
+**Acceptance Criteria:**
+- Can select required jobs from a list
+- Circular dependencies are prevented
+- Dependent job cannot start until prerequisites complete
+
+### US-JOB-005: Add Comment to Job
+> As a **production manager**, I want to **add timestamped comments to a job**, so that **communication is logged**.
+
+**Acceptance Criteria:**
+- Comment includes author and timestamp
+- Comments are immutable
+- Comments are displayed as a thread
 
 ---
 
-### US-JOB-002 – Add tasks to job
-**As a** production planner  
-**I want** to add tasks to a job  
-**So that** all required work steps are defined.
+## Approval Gates
 
-**Acceptance criteria:**
-- Planner can add multiple tasks to a job
-- Each task has type, duration, and resource requirements
-- Task order/dependencies can be specified
-- System validates task types are valid
-- Duration must be positive
+### US-GATE-001: Track BAT (Proof) Approval
+> As a **scheduler**, I want to **track proof approval status**, so that **I know when a job is ready for production**.
 
----
+**Acceptance Criteria:**
+- Can mark proof as "Awaiting File", "Sent", or "No Proof Required"
+- Can record proof approval date
+- Tasks are blocked until proof approved (or not required)
 
-### US-JOB-003 – Define task dependencies
-**As a** production planner  
-**I want** to specify task dependencies  
-**So that** work is performed in the correct sequence.
+### US-GATE-002: Track Plates Approval
+> As a **scheduler**, I want to **track plates preparation status**, so that **printing tasks wait for plates to be ready**.
 
-**Acceptance criteria:**
-- Planner can link tasks in predecessor/successor relationships
-- Multiple dependencies per task are allowed
-- System prevents circular dependencies
-- Dependency graph is visualized
-- Critical path is calculated automatically
+**Acceptance Criteria:**
+- Can mark plates as Todo or Done
+- Printing tasks are blocked until plates Done
 
----
+### US-GATE-003: Track Paper Procurement
+> As a **scheduler**, I want to **track paper purchase status**, so that **I know if material is available**.
 
-## 4. Scheduling Grid Interface
-
-> **Note:** The Scheduling Grid is the **primary interface** for production scheduling. See [scheduling-ui-design.md](scheduling-ui-design.md) for detailed UI specifications.
-
-### US-GRID-001 – View equipment scheduling grid
-**As a** production scheduler
-**I want** to see a time × equipment grid showing all scheduled tasks
-**So that** I can visualize equipment utilization and plan assignments effectively.
-
-**Acceptance criteria:**
-- Grid displays equipment as rows (Y-axis) and time as columns (X-axis)
-- Each scheduled task appears as a block on the appropriate equipment row
-- Task blocks show: task name, job reference, assigned operator
-- Equipment status is visible (Available/InUse/Maintenance/OutOfService)
-- Maintenance windows are visually distinct (grayed/striped)
-- Time scale is configurable (15min/30min/1hr/4hr granularity)
-- Grid supports Day/Week/Month views
-- Can navigate to specific dates quickly
+**Acceptance Criteria:**
+- Can set status: InStock, ToOrder, Ordered, Received
+- System records timestamp when paper ordered
+- Production tasks should wait for paper
 
 ---
 
-### US-GRID-002 – View operator scheduling grid
-**As a** production scheduler
-**I want** to see a time × operator grid showing all operator assignments
-**So that** I can balance workload and see operator utilization.
+## Scheduling
 
-**Acceptance criteria:**
-- Grid displays operators as rows (Y-axis) and time as columns (X-axis)
-- Each assigned task appears as a block on the appropriate operator row
-- Task blocks show: task name, assigned equipment
-- Operator availability is visible (available slots vs. unavailable periods)
-- Operator status and skill badges are visible
-- Can switch between Equipment and Operator views easily
+### US-SCHED-001: View Scheduling Grid
+> As a **scheduler**, I want to **see a grid with stations as columns and time as vertical axis**, so that **I have an overview of the schedule**.
 
----
+**Acceptance Criteria:**
+- Stations appear as columns
+- Time flows downward
+- Tiles represent scheduled tasks
+- Grid snaps to 30-minute intervals
 
-### US-GRID-003 – Drag task to schedule
-**As a** production scheduler
-**I want** to drag an unassigned task onto the scheduling grid
-**So that** I can quickly schedule tasks to specific equipment and time slots.
+### US-SCHED-002: Drag and Drop Assignment
+> As a **scheduler**, I want to **drag a task from the job panel to the scheduling grid**, so that **I can assign it to a station and time slot**.
 
-**Acceptance criteria:**
-- Unassigned tasks panel is visible alongside the grid
-- Tasks can be dragged from the panel onto the grid
-- Valid drop zones are highlighted during drag (compatible equipment)
-- Invalid zones are marked red (incompatible or conflicting)
-- Dropping a task creates an assignment at the target time/equipment
-- If task requires operator, operator assignment dialog opens after drop
-- Real-time validation occurs during drag (before drop)
+**Acceptance Criteria:**
+- Dragging shows real-time validation feedback
+- Drop creates assignment if valid
+- Invalid drops show conflict information
+- Tile appears on grid after successful drop
 
----
+### US-SCHED-003: Reschedule Task
+> As a **scheduler**, I want to **drag a tile to a different position on the grid**, so that **I can adjust the schedule**.
 
-### US-GRID-004 – Move scheduled task
-**As a** production scheduler
-**I want** to drag a scheduled task to a different time or equipment
-**So that** I can adjust the schedule as priorities change.
+**Acceptance Criteria:**
+- Tile can be moved within same station (time change)
+- Tile can be moved to different station
+- Validation runs on new position
 
-**Acceptance criteria:**
-- Horizontal drag changes the scheduled time
-- Vertical drag changes the assigned equipment
-- Dependency constraints are shown during drag (earliest possible start)
-- Conflicts are highlighted in real-time during drag
-- Movement can be cancelled by pressing Escape
-- Undo is available after move (Ctrl+Z)
-- Option to cascade-move dependent tasks
+### US-SCHED-004: Recall Tile
+> As a **scheduler**, I want to **recall a scheduled task back to unscheduled state**, so that **I can free up the time slot**.
 
----
+**Acceptance Criteria:**
+- Scheduled tasks appear faded in left panel
+- "Recall" button appears on hover
+- Recall removes assignment only for that task
+- Sibling tasks remain scheduled
 
-### US-GRID-005 – Resize task duration
-**As a** production scheduler
-**I want** to resize a task block by dragging its edge
-**So that** I can adjust task duration directly on the grid.
+### US-SCHED-005: Swap Tile Positions
+> As a **scheduler**, I want to **swap a tile with an adjacent tile**, so that **I can quickly reorder without redragging**.
 
-**Acceptance criteria:**
-- Task blocks have resize handles on left/right edges
-- Dragging the edge changes the task duration
-- System validates: no overlap with next task, deadline compliance
-- Minimum duration is enforced (cannot resize below minimum)
-- Duration change updates the task definition
+**Acceptance Criteria:**
+- Tile has swap up/down shortcuts
+- Swap validates constraints
+- Both tiles update positions
+
+### US-SCHED-006: View Station Unavailability
+> As a **scheduler**, I want to **see when stations are unavailable**, so that **I avoid scheduling during those times**.
+
+**Acceptance Criteria:**
+- Unavailable periods shown as overlay
+- Tiles stretch across unavailability
+- Different visual appearance for unavailable portion
 
 ---
 
-### US-GRID-006 – View task details from grid
-**As a** production scheduler
-**I want** to click on a task block to see its details
-**So that** I can review and modify assignment details.
+## Conflict Detection
 
-**Acceptance criteria:**
-- Single click selects the task (highlights it)
-- Double click or Enter opens task detail panel
-- Right-click opens context menu with quick actions
-- Task detail panel shows: job info, schedule, resources, dependencies
-- Can edit assignment from the detail panel
-- Can navigate to parent job from the panel
+### US-CONFLICT-001: Detect Station Conflicts
+> As a **scheduler**, I want to **see when a station is double-booked**, so that **I can resolve the conflict**.
 
----
+**Acceptance Criteria:**
+- System detects overlapping assignments
+- Conflict appears in conflicts list
+- Affected tiles are highlighted
 
-### US-GRID-007 – Resolve scheduling conflicts
-**As a** production scheduler
-**I want** to see and resolve conflicts directly on the grid
-**So that** I can fix issues without leaving the scheduling interface.
+### US-CONFLICT-002: Detect Group Capacity Conflicts
+> As a **scheduler**, I want to **see when station group capacity is exceeded**, so that **I can reduce concurrent tasks**.
 
-**Acceptance criteria:**
-- Conflicting tasks are visually marked (red border)
-- Clicking a conflict opens conflict resolution panel
-- Panel shows conflict type and affected resources
-- System suggests resolutions (alternative times, equipment, operators)
-- One-click to apply suggested resolution
-- Manual resolution option available
+**Acceptance Criteria:**
+- System tracks concurrent tasks per group
+- Warning when max concurrent exceeded
+- Affected time slots are highlighted
 
----
+### US-CONFLICT-003: Detect Precedence Violations
+> As a **scheduler**, I want to **see when task sequence is violated**, so that **I can fix the order**.
 
-### US-GRID-008 – Multi-select and bulk operations
-**As a** production scheduler
-**I want** to select multiple tasks and perform bulk operations
-**So that** I can make large schedule changes efficiently.
+**Acceptance Criteria:**
+- Tiles violating precedence have red halo
+- Precedence violations listed in right panel
+- Drag-and-drop snaps to valid position (unless Alt held)
 
-**Acceptance criteria:**
-- Ctrl+Click adds/removes tasks from selection
-- Drag to create selection rectangle
-- Ctrl+A selects all visible tasks
-- Bulk move: drag selection to shift all tasks by same offset
-- Bulk unassign: remove all selected from schedule
-- Bulk delete (with confirmation)
+### US-CONFLICT-004: View Late Jobs
+> As a **scheduler**, I want to **see jobs that will miss their deadline**, so that **I can prioritize them**.
+
+**Acceptance Criteria:**
+- Late jobs listed in right panel
+- Shows job reference and delay amount
+- Links to job details
 
 ---
 
-### US-GRID-009 – Filter and search the grid
-**As a** production scheduler
-**I want** to filter the grid by various criteria
-**So that** I can focus on specific jobs, equipment, or time periods.
+## Navigation and Filtering
 
-**Acceptance criteria:**
-- Filter by: Job, Equipment type, Operator, Task status
-- Search by: Task name, Job name, Operator name
-- Filters apply instantly without page reload
-- Active filters are clearly indicated
-- Can save filter presets
-- Clear all filters with one action
+### US-NAV-001: Filter Jobs
+> As a **scheduler**, I want to **filter jobs by reference, client, or description**, so that **I can find specific jobs quickly**.
 
----
+**Acceptance Criteria:**
+- Text input filters jobs list
+- Filter updates in real-time
+- Clear button resets filter
 
-### US-GRID-010 – Real-time schedule updates
-**As a** production scheduler
-**I want** to see schedule changes from other users in real-time
-**So that** I always work with the latest information.
+### US-NAV-002: Jump to Date
+> As a **scheduler**, I want to **jump to a specific date/time on the grid**, so that **I can navigate to future or past schedules**.
 
-**Acceptance criteria:**
-- Changes by other users appear within 2 seconds
-- Visual indicator when external change occurs
-- Notification if viewing a task that was modified
-- Conflict detection considers real-time state
-- Version conflict handling when editing same task
+**Acceptance Criteria:**
+- Dropdown allows date/time selection
+- Grid scrolls to selected time
+- "Today" button jumps to current time
 
----
+### US-NAV-003: Navigate Station Columns
+> As a **scheduler**, I want to **navigate horizontally across station columns**, so that **I can see all stations**.
 
-## 5. Assignment & Validation
-
-### US-ASSIGN-001 – Assign operator to task
-**As a** production scheduler
-**I want** to assign qualified operators to tasks
-**So that** work can be executed on schedule.
-
-**Acceptance criteria:**
-- Scheduler sees only qualified operators for each task
-- Operator availability is clearly shown
-- Conflicts are highlighted before confirmation
-- Assignment can be saved as tentative or confirmed
-- Operator receives notification of assignment
+**Acceptance Criteria:**
+- Horizontal scroll reveals more columns
+- Keyboard shortcut for column navigation
+- Column headers remain visible
 
 ---
 
-### US-ASSIGN-002 – Assign equipment to task
-**As a** production scheduler
-**I want** to assign compatible equipment to tasks
-**So that** operators have the required tools to complete work.
+## Similarity Indicators
 
-**Acceptance criteria:**
-- Only equipment supporting task type is shown
-- Equipment availability is displayed
-- Current location/status is visible
-- Conflicts prevent assignment
-- Equipment schedule is updated immediately
+### US-SIM-001: View Similarity Indicators
+> As a **scheduler**, I want to **see which criteria match between consecutive jobs**, so that **I can optimize setup time**.
 
----
-
-### US-ASSIGN-003 – Validate complete schedule
-**As a** production scheduler
-**I want** to validate all assignments before publishing
-**So that** I can fix conflicts before they impact production.
-
-**Acceptance criteria:**
-- Single action validates entire schedule
-- All constraint violations are listed
-- Conflicts are categorized by type
-- Suggestions provided where possible
-- Validation results can be exported
+**Acceptance Criteria:**
+- Circles appear between consecutive tiles
+- Filled circle = matching criterion
+- Hollow circle = non-matching criterion
+- Number of circles = criteria in station category
 
 ---
 
-## 6. Execution Monitoring
+## Schedule Management (Future)
 
-### US-EXEC-001 – View my task assignments
-**As an** operator  
-**I want** to see my assigned tasks  
-**So that** I know what work to perform and when.
+### US-BRANCH-001: Create Schedule Branch
+> As a **scheduler**, I want to **create a branch of the current schedule**, so that **I can experiment with changes**.
 
-**Acceptance criteria:**
-- Operator sees personal task calendar
-- Task details include equipment and location
-- Dependencies and deadlines are shown
-- Mobile-friendly view available
-- Can acknowledge task assignments
+*Post-MVP Feature*
 
----
+**Acceptance Criteria:**
+- "Branch" button creates duplicate schedule
+- New schedule has name and optional comments
+- Can edit branch independently
 
-### US-EXEC-002 – Mark task as started
-**As an** operator  
-**I want** to mark a task as started  
-**So that** actual progress is tracked against the plan.
+### US-BRANCH-002: List and Open Schedules
+> As a **scheduler**, I want to **see all schedule branches and open any of them**, so that **I can compare alternatives**.
 
-**Acceptance criteria:**
-- Operator can start task at scheduled time
-- Early/late starts are allowed with reason
-- System records actual start time
-- Task status updates to Executing
-- Dependencies are checked
+*Post-MVP Feature*
 
----
+**Acceptance Criteria:**
+- Schedule list shows all branches
+- Click opens schedule
+- Can create branch from any schedule
 
-### US-EXEC-003 – Complete task
-**As an** operator  
-**I want** to mark a task as completed  
-**So that** dependent tasks can proceed and progress is tracked.
+### US-BRANCH-003: Designate PROD Schedule
+> As a **production manager**, I want to **designate one schedule as PROD**, so that **everyone knows which is the official plan**.
 
-**Acceptance criteria:**
-- Operator can mark task complete
-- Actual duration is recorded
-- Quality checkpoints can be confirmed
-- Dependent tasks become Ready
-- Job progress is updated automatically
+*Post-MVP Feature*
+
+**Acceptance Criteria:**
+- Only one schedule can be PROD
+- Dropdown to set PROD status
+- Visual indicator for PROD schedule
 
 ---
 
-## 7. Schedule Management
+## Reporting
 
-### US-SCHED-001 – Handle scheduling conflicts
-**As a** production scheduler  
-**I want** to resolve scheduling conflicts  
-**So that** production continues with minimal disruption.
+### US-REPORT-001: View Job Status
+> As a **production manager**, I want to **see the status of all tasks in a job**, so that **I can track progress**.
 
-**Acceptance criteria:**
-- Conflicts are detected automatically
-- Alternative assignments are suggested
-- Impact analysis shows affected tasks
-- Bulk reassignment is possible
-- Resolution history is tracked
+**Acceptance Criteria:**
+- Right panel shows task list for selected job
+- Each task shows status and scheduled time
+- Unscheduled tasks are clearly marked
 
----
+### US-REPORT-002: View Late Jobs Summary
+> As a **production manager**, I want to **see a summary of all late jobs**, so that **I can take action**.
 
-### US-SCHED-002 – View resource utilization
-**As a** production manager  
-**I want** to see resource utilization reports  
-**So that** I can optimize capacity and identify bottlenecks.
-
-**Acceptance criteria:**
-- Utilization shown by operator and equipment
-- Time period is configurable
-- Underutilized resources are highlighted
-- Overtime usage is tracked
-- Reports can be exported
+**Acceptance Criteria:**
+- Late jobs listed in right panel
+- Shows deadline and expected completion
+- Shows delay duration
 
 ---
 
-### US-SCHED-003 – Reschedule delayed job
-**As a** production scheduler  
-**I want** to reschedule a delayed job  
-**So that** we can still meet customer commitments.
-
-**Acceptance criteria:**
-- Scheduler can adjust task timings
-- System recalculates dependencies
-- New conflicts are identified
-- Deadline impact is shown
-- Affected operators are notified
-
----
-
-## 8. Reporting & Analytics
-
-### US-REPORT-001 – Generate schedule Gantt chart
-**As a** production manager  
-**I want** to view schedules as Gantt charts  
-**So that** I can visualize workload and dependencies.
-
-**Acceptance criteria:**
-- Gantt shows all jobs and tasks
-- Dependencies are visualized
-- Resource assignments are color-coded
-- Critical path is highlighted
-- Chart can be filtered and exported
-
----
-
-### US-REPORT-002 – Track job completion status
-**As a** customer service representative  
-**I want** to check job completion status  
-**So that** I can update customers on their orders.
-
-**Acceptance criteria:**
-- Rep can search jobs by ID or customer
-- Current status and progress percentage shown
-- Estimated completion is calculated
-- Delay reasons are visible
-- History of status changes available
-
----
-
-### US-REPORT-003 – Analyze schedule performance
-**As an** operations director  
-**I want** to analyze scheduling KPIs  
-**So that** I can improve planning accuracy and efficiency.
-
-**Acceptance criteria:**
-- On-time completion rate by job type
-- Average schedule vs actual variance
-- Resource utilization trends
-- Bottleneck identification
-- Exportable dashboard data
-
----
-
-These user stories cover the main user journeys in the Operations Research system and should be refined based on specific implementation requirements.
+This document contains the user stories for the Flux print shop scheduling system. Stories are prioritized with core scheduling functionality first, followed by supporting features.

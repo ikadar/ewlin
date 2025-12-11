@@ -1,366 +1,358 @@
-# Acceptance Criteria – Operations Research System
+# Acceptance Criteria – Flux Print Shop Scheduling System
 
-This file contains **acceptance criteria** for the Equipment → Operator → Job → Task assignment and validation flow.
+This file contains **acceptance criteria** for the print shop scheduling system.
 
 Acceptance criteria define **exact conditions** that must be met for a user story or feature to be considered complete.
 
-They are precise, testable, and implementation‑agnostic.
+They are precise, testable, and implementation-agnostic.
 
 ---
 
-## 1. Operator Management
+## Station Management
 
-### AC-OP-001 – Register new operator
-- Production manager can enter operator name and unique identifier.
-- System validates operator name is not duplicate.
-- Manager can define initial availability slots with start/end times.
-- Manager can assign equipment skills with proficiency levels (beginner/intermediate/expert).
-- On successful creation:
-  - Operator is saved with status `Active`.
-  - Unique operator ID is generated.
-  - Confirmation message is shown.
+### AC-STATION-001: Station Registration
+**Given** the user is on the station management screen
+**When** they create a new station with name "Komori G37"
+**Then** the station is created with a unique ID
+**And** the station must have a category assigned
+**And** the station must have a group assigned
+**And** the station appears in the scheduling grid as a column
 
-### AC-OP-002 – Update operator availability
-- Operator can view current availability slots in chronological order.
-- Operator can add new availability periods:
-  - Start time must be before end time.
-  - No overlap with existing slots allowed.
-- Operator can remove future availability slots.
-- On successful update:
-  - Changes are persisted immediately.
-  - Affected task assignments are flagged for revalidation.
-  - Timestamp of change is recorded.
+### AC-STATION-002: Operating Schedule Definition
+**Given** a station exists
+**When** the user defines operating hours as "Monday-Friday 06:00-00:00 and 00:00-05:00"
+**Then** the station shows as available during those hours
+**And** scheduling outside those hours is blocked
+**And** tasks that span non-operating periods are stretched accordingly
 
-### AC-OP-003 – Add equipment certification
-- Training coordinator can select operator from active operators list.
-- Coordinator can select equipment from available equipment.
-- Skill level must be specified (beginner/intermediate/expert).
-- On successful certification:
-  - Skill is added to operator profile.
-  - Certification date is recorded.
-  - Operator immediately eligible for relevant task types.
-  - Skill history is maintained for audit.
+### AC-STATION-003: Schedule Exception
+**Given** a station has a regular operating schedule
+**When** the user adds an exception for "2025-12-25" as "Closed"
+**Then** the station shows as unavailable for that entire day
+**And** scheduled tasks on that day are flagged as conflicts
 
----
+### AC-STATION-004: Station Category with Similarity Criteria
+**Given** the user creates a category "Offset Printing Press"
+**When** they add similarity criteria ["Same paper type", "Same paper size", "Same inking"]
+**Then** stations in this category show similarity indicators between consecutive tiles
+**And** the number of circles matches the number of criteria (3)
 
-## 2. Equipment Management
-
-### AC-EQ-001 – Register new equipment
-- Operations manager can enter equipment name and identifier.
-- Manager must specify at least one supported task type.
-- Equipment location can be optionally recorded.
-- On successful creation:
-  - Equipment is saved with status `Available`.
-  - Unique equipment ID is generated.
-  - Equipment appears in assignment options immediately.
-
-### AC-EQ-002 – Schedule equipment maintenance
-- Maintenance planner can select equipment and maintenance window.
-- System displays conflicting task assignments if any.
-- Planner must confirm rescheduling of affected tasks.
-- On successful scheduling:
-  - Equipment status changes to `Maintenance` for the period.
-  - Affected tasks are marked for reassignment.
-  - Notifications sent to affected operators.
-  - Maintenance record is created.
-
-### AC-EQ-003 – Report equipment breakdown
-- Operator can select currently assigned equipment.
-- Breakdown reason/description is optional.
-- On successful reporting:
-  - Equipment status immediately changes to `OutOfService`.
-  - Current task is marked as `Failed`.
-  - System suggests alternative equipment if available.
-  - Maintenance team is notified within 5 minutes.
+### AC-STATION-005: Station Group Capacity
+**Given** a station group "Offset Presses" with MaxConcurrent = 2
+**When** 3 tasks are scheduled on stations in this group at the same time
+**Then** the system detects a group capacity conflict
+**And** the affected time slots are visually highlighted
 
 ---
 
-## 3. Job Planning
+## Outsourced Provider Management
 
-### AC-JOB-001 – Create production job
-- Production planner can enter job name (required).
-- Planner must specify deadline date and time.
-- Job description is optional.
-- On successful creation:
-  - Job is saved with status `Draft`.
-  - Unique job ID is auto-generated.
-  - Job appears in planning dashboard.
-  - Creation timestamp is recorded.
+### AC-PROVIDER-001: Provider Registration
+**Given** the user registers provider "Clément" with action types ["Pelliculage", "Dorure"]
+**Then** the provider is created with its own station group (unlimited capacity)
+**And** the provider appears as a column in the scheduling grid
 
-### AC-JOB-002 – Add tasks to job
-- Planner can add multiple tasks to a job in `Draft` status.
-- Each task requires:
-  - Task type (from predefined list).
-  - Duration in minutes (positive integer).
-  - Operator requirement (yes/no).
-  - Equipment requirement (yes/no).
-- On successful addition:
-  - Tasks are saved with unique IDs.
-  - Task count is updated on job.
-  - Tasks appear in job detail view.
+### AC-PROVIDER-002: Outsourced Task Duration
+**Given** an outsourced task with duration "2JO" (2 open days)
+**When** scheduled starting Friday
+**Then** the scheduledEnd is Tuesday (skipping Saturday and Sunday)
 
-### AC-JOB-003 – Define task dependencies
-- Planner can link tasks within same job.
-- System prevents circular dependencies.
-- Multiple dependencies per task allowed.
-- On successful dependency creation:
-  - Dependency graph is updated.
-  - Critical path is recalculated.
-  - DAG validation passes.
-  - Visual dependency graph is available.
+### AC-PROVIDER-003: Unlimited Provider Capacity
+**Given** a provider with unlimited capacity
+**When** multiple tasks are scheduled on the same time slot
+**Then** no capacity conflict is detected
+**And** the column splits into subcolumns to show overlapping tasks
 
 ---
 
-## 4. Scheduling Grid Interface
+## Job Management
 
-> **Reference:** See [scheduling-ui-design.md](scheduling-ui-design.md) for full UI specifications.
+### AC-JOB-001: Job Creation
+**Given** the user creates a job with reference "45113 A", client "Fibois Grand Est"
+**And** workshop exit date "2025-12-15"
+**Then** the job is created in Draft status
+**And** the job appears in the left panel job list
 
-### AC-GRID-001 – Equipment grid view
-- Grid displays with time on X-axis and equipment on Y-axis.
-- All scheduled tasks appear as colored blocks on their assigned equipment row.
-- Each task block displays: task name, job reference, assigned operator name.
-- Equipment rows show current status (Available/InUse/Maintenance/OutOfService).
-- Maintenance windows appear as distinct visual blocks (gray/striped).
-- Time scale options: 15min, 30min, 1hr, 4hr granularity.
-- View range options: Day, Week, Month.
-- "Today" marker is clearly visible.
-- Grid loads in < 500ms with up to 500 visible tasks.
+### AC-JOB-002: Task DSL Parsing
+**Given** the user enters:
+```
+[Komori] 20+40 "vernis"
+[Massicot] 15
+ST [Clément] Pelliculage 2JO
+```
+**Then** 3 tasks are created:
+- Task 1: Station=Komori, Setup=20, Run=40, Comment="vernis"
+- Task 2: Station=Massicot, Setup=0, Run=15
+- Task 3: Outsourced, Provider=Clément, ActionType=Pelliculage, Duration=2JO
 
-### AC-GRID-002 – Operator grid view
-- Grid displays with time on X-axis and operators on Y-axis.
-- All scheduled tasks appear as colored blocks on their assigned operator row.
-- Each task block displays: task name, assigned equipment.
-- Operator availability is visible (open slots vs. unavailable periods).
-- Operator status and skill badges are shown in row header.
-- Toggle between Equipment and Operator views in < 300ms.
+### AC-JOB-003: DSL Autocomplete
+**Given** the user types "[" in the task textarea
+**Then** a dropdown appears with available station names
+**Given** the user types "ST [" in the textarea
+**Then** a dropdown appears with available provider names
 
-### AC-GRID-003 – Drag task from unassigned list
-- Unassigned tasks panel is visible alongside the grid.
-- Panel shows: task name, job, duration, resource requirements, deadline.
-- Dragging a task from panel shows ghost element following cursor.
-- Valid drop zones (compatible equipment rows) are highlighted green.
-- Invalid drop zones (incompatible or conflicting) are highlighted red.
-- Dropping on valid zone creates assignment immediately.
-- System validates: equipment compatibility, availability, dependencies.
-- If task requires operator: assignment dialog opens after drop.
-- Validation feedback appears within 200ms of drop.
+### AC-JOB-004: DSL Validation Error
+**Given** the user enters "[UnknownStation] 20+40"
+**Then** the line is highlighted as error
+**And** error message shows "Station 'UnknownStation' not found"
 
-### AC-GRID-004 – Move task on grid
-- Clicking and dragging a task block initiates move.
-- Horizontal drag preview shows new start/end time.
-- Vertical drag preview shows new equipment assignment.
-- Dependency constraints shown (earliest start time indicator).
-- Conflicts highlighted in real-time during drag.
-- Releasing completes the move if valid.
-- Pressing Escape cancels the move.
-- Ctrl+Z undoes the last move.
-- Option to cascade-move dependent tasks is available.
+### AC-JOB-004b: DSL Syntax Examples
 
-### AC-GRID-005 – Resize task
-- Resize handles appear on task block edges on hover.
-- Dragging left edge changes start time.
-- Dragging right edge changes end time/duration.
-- Minimum duration enforced (visual feedback if too small).
-- Validation during resize: no overlap, deadline compliance.
-- Duration change updates task definition.
+The following examples demonstrate valid and invalid DSL syntax:
 
-### AC-GRID-006 – Task interaction
-- Single click selects task (visual highlight).
-- Double click opens task detail panel.
-- Right-click opens context menu with:
-  - Edit Details
-  - Change Operator
-  - Change Equipment
-  - Unassign
-  - View Job
-  - View Dependencies
-- Detail panel shows: job info, schedule, resources, dependencies.
-- Can edit assignment from detail panel.
+**Internal Tasks (Station-based):**
+```
+[Komori] 60                    → Station=Komori, Setup=0, Run=60
+[Komori] 20+40                 → Station=Komori, Setup=20, Run=40
+[Komori] 20+40 "vernis"        → Station=Komori, Setup=20, Run=40, Comment="vernis"
+[Heidelberg CD102] 30+90       → Station with spaces in name
+[Massicot] 15                  → Simple cutting task
+```
 
-### AC-GRID-007 – Conflict visualization and resolution
-- Tasks with conflicts have red border.
-- Conflict icon appears on task block.
-- Clicking conflict opens resolution panel.
-- Panel shows:
-  - Conflict type (ResourceConflict, AvailabilityConflict, etc.)
-  - Affected resources and time period.
-  - Up to 3 suggested resolutions.
-- Each suggestion can be applied with one click.
-- Manual resolution option available.
+**Outsourced Tasks (Provider-based):**
+```
+ST [Clément] Pelliculage 2JO   → Provider=Clément, Action=Pelliculage, Duration=2 open days
+ST [ArtDorure] Dorure 3JO      → Provider=ArtDorure, Action=Dorure, Duration=3 open days
+ST [Reliure Express] Reliure 5JO "urgence"  → With comment
+```
 
-### AC-GRID-008 – Multi-select operations
-- Ctrl+Click adds/removes task from selection.
-- Drag creates selection rectangle on empty area.
-- Ctrl+A selects all visible tasks.
-- Selected tasks have distinct visual state.
-- Bulk move: dragging selection moves all by same offset.
-- Bulk unassign: menu option removes all from schedule.
-- Bulk actions require confirmation for > 5 tasks.
+**Edge Cases:**
+```
+[Komori] 0+30                  → Zero setup time (valid)
+[Komori] 30+0                  → INVALID: Run time cannot be zero
+ST [Clément] Pelliculage 0JO   → INVALID: Duration cannot be zero
+[Komori]60                     → INVALID: Space required before duration
+ST[Clément] Pelliculage 2JO    → INVALID: Space required after ST
+```
 
-### AC-GRID-009 – Filtering and search
-- Filter dropdown for: Job, Equipment type, Operator, Task status.
-- Search box for: task name, job name, operator name.
-- Filters apply instantly (< 100ms).
-- Active filters shown as chips/badges.
-- Filter preset can be saved and named.
-- "Clear all" button resets all filters.
+**Multi-line Examples:**
+```
+[Komori G37] 20+180 "tirage principal"
+[Massicot] 15
+ST [Clément] Pelliculage 2JO
+[Plieuse] 45
+[Massicot] 10 "coupe finale"
+```
 
-### AC-GRID-010 – Real-time updates
-- Schedule changes from other users appear within 2 seconds.
-- Changed tasks flash briefly to indicate update.
-- Notification appears if currently selected task was modified.
-- Concurrent edit conflict shows warning dialog.
-- "Refresh" option available to force sync.
+**Empty Lines and Comments:**
+```
+[Komori] 60
 
-### AC-GRID-011 – Keyboard navigation
-- Arrow keys navigate between tasks.
-- Enter opens task details.
-- Delete unassigns selected task.
-- Ctrl+Z / Ctrl+Y for undo/redo.
-- ? shows keyboard shortcuts help.
-- Tab moves focus through interactive elements.
+[Massicot] 15                  → Empty line is ignored
 
-### AC-GRID-012 – Performance requirements
-- Initial load: < 500ms
-- Drag start response: < 50ms
-- Validation feedback: < 200ms
-- View toggle: < 300ms
-- Scroll/pan: 60 FPS
-- Supports 500+ visible tasks without degradation.
+# This is a comment            → FUTURE: Comment lines (not yet supported)
+```
+
+**Error Recovery:**
+```
+[Komori] 20+40
+[INVALID SYNTAX
+[Massicot] 15                  → Parser continues, marks line 2 as error
+```
+
+### AC-JOB-005: Job Dependencies
+**Given** Job A exists and is completed
+**When** the user sets Job B to require Job A
+**Then** Job B's tasks cannot be scheduled until Job A is completed
+
+### AC-JOB-006: Circular Dependency Prevention
+**Given** Job A requires Job B
+**When** the user tries to set Job B to require Job A
+**Then** the system rejects with error "Circular dependency detected"
 
 ---
 
-## 5. Assignment & Validation
+## Approval Gates
 
-### AC-ASSIGN-001 – Assign operator to task
-- Scheduler sees only operators with required skills.
-- Operator availability for task duration is displayed.
-- Conflicts are highlighted in red before confirmation.
-- On successful assignment:
-  - Operator is linked to task.
-  - Operator's schedule is updated.
-  - Task state changes to `Assigned`.
-  - Operator receives notification.
+### AC-GATE-001: BAT Blocking
+**Given** a job with proofSentAt = null
+**When** the user tries to schedule tasks
+**Then** scheduling is blocked with message "Proof not sent"
 
-### AC-ASSIGN-002 – Assign equipment to task
-- Only equipment supporting task type is shown.
-- Equipment availability status is clearly visible.
-- Current equipment location is displayed.
-- On successful assignment:
-  - Equipment is linked to task.
-  - Equipment schedule is blocked for task duration.
-  - Conflicts are prevented by validation.
+### AC-GATE-002: BAT Bypass
+**Given** a job with proofSentAt = "NoProofRequired"
+**Then** tasks can be scheduled without proof approval
 
-### AC-ASSIGN-003 – Validate complete schedule
-- Scheduler can trigger validation with single action.
-- System checks all assignments in < 5 seconds.
-- Validation report includes:
-  - Resource conflicts count and details.
-  - Availability violations.
-  - Dependency violations.
-  - Deadline risks.
-- Report can be exported as PDF or CSV.
+### AC-GATE-003: Plates Blocking
+**Given** a job with platesStatus = "Todo"
+**When** the user tries to schedule a printing task on an offset station
+**Then** scheduling shows warning "Plates not ready"
+
+### AC-GATE-004: Paper Status Timestamp
+**Given** a job with paperPurchaseStatus = "ToOrder"
+**When** the user changes status to "Ordered"
+**Then** paperOrderedAt is automatically set to current timestamp
 
 ---
 
-## 6. Execution Monitoring
+## Scheduling
 
-### AC-EXEC-001 – View my task assignments
-- Operator sees personal task list for next 7 days by default.
-- Each task shows:
-  - Task name and job reference.
-  - Scheduled start/end time.
-  - Required equipment and location.
-  - Dependencies status.
-- View is mobile-responsive.
-- Operator can acknowledge assignments.
+### AC-SCHED-001: Vertical Time Axis
+**Given** the scheduling grid is displayed
+**Then** time flows vertically downward
+**And** earlier times are at the top
+**And** stations appear as columns
 
-### AC-EXEC-002 – Mark task as started
-- Operator can start task within ±15 minutes of scheduled time.
-- Early/late start requires reason selection.
-- On successful start:
-  - Task status changes to `Executing`.
-  - Actual start time is recorded.
-  - Job progress percentage updates.
-  - Dependent tasks are notified.
+### AC-SCHED-002: Snap Grid
+**Given** the user drags a tile on the grid
+**When** they release at any position
+**Then** the tile snaps to the nearest 30-minute boundary
 
-### AC-EXEC-003 – Complete task
-- Operator can mark executing task as complete.
-- Completion requires confirmation.
-- Optional quality checkpoints can be recorded.
-- On successful completion:
-  - Task status changes to `Completed`.
-  - Actual end time is recorded.
-  - Duration variance is calculated.
-  - Dependent tasks become `Ready`.
+### AC-SCHED-003: Drag and Drop Assignment
+**Given** an unscheduled task in the left panel
+**When** the user drags it to the grid at Komori column, 09:00
+**Then** an assignment is created with scheduledStart = 09:00
+**And** scheduledEnd = scheduledStart + task duration
+**And** the tile appears on the grid
 
----
+### AC-SCHED-004: Real-time Validation During Drag
+**Given** the user is dragging a task over the grid
+**Then** valid drop zones are highlighted
+**And** invalid zones show a red indicator
+**And** feedback updates in <10ms
 
-## 7. Schedule Management
+### AC-SCHED-005: Precedence Safeguard
+**Given** Task 2 must follow Task 1
+**When** the user drags Task 2 to a time before Task 1's end
+**Then** the drop snaps to the earliest valid time after Task 1
 
-### AC-SCHED-001 – Handle scheduling conflicts
-- Conflicts are detected within 2 seconds of change.
-- System suggests up to 3 alternative assignments.
-- Impact analysis shows:
-  - Number of affected tasks.
-  - Deadline impact assessment.
-  - Resource utilization changes.
-- Bulk reassignment supports up to 20 tasks at once.
+### AC-SCHED-006: Alt Key Bypass
+**Given** the user holds Alt while dragging
+**When** they drop a tile in a position that violates precedence
+**Then** the drop is allowed
+**And** the tile shows a red halo indicating violation
 
-### AC-SCHED-002 – View resource utilization
-- Manager can view utilization for any date range.
-- Report shows:
-  - Operator utilization percentage.
-  - Equipment utilization percentage.
-  - Overtime hours highlighted.
-  - Idle time identification.
-- Data refreshes every 5 minutes.
-- Export supports Excel and PDF formats.
+### AC-SCHED-007: Recall Tile
+**Given** a task is scheduled (tile on grid)
+**And** the same task appears faded in the left panel
+**When** the user hovers over the faded tile
+**Then** a "Recall" button appears
+**When** the user clicks "Recall"
+**Then** the assignment is removed
+**And** the tile disappears from the grid
+**And** the tile in the left panel becomes full opacity
 
-### AC-SCHED-003 – Reschedule delayed job
-- Scheduler can adjust task timings by drag-drop.
-- System recalculates all dependencies in real-time.
-- New conflicts are highlighted immediately.
-- On successful rescheduling:
-  - All affected tasks are updated.
-  - Notifications sent to affected operators.
-  - Audit trail records changes.
-  - New timeline is locked.
+### AC-SCHED-008: Selective Recall
+**Given** tasks T1, T2, T3 are scheduled consecutively
+**When** the user recalls T2
+**Then** only T2 is unscheduled
+**And** T1 and T3 remain scheduled in their positions
+
+### AC-SCHED-009: Swap Tile Position
+**Given** tiles A and B are consecutive on a station
+**When** the user clicks the "swap down" button on tile A
+**Then** tile A moves to B's position
+**And** tile B moves to A's former position
+**And** both scheduledStart/End are updated
 
 ---
 
-## 8. Reporting & Analytics
+## Conflict Detection
 
-### AC-REPORT-001 – Generate schedule Gantt chart
-- Manager can generate Gantt for any date range.
-- Chart displays:
-  - All jobs and tasks in timeline.
-  - Dependencies as connecting lines.
-  - Resource assignments by color.
-  - Critical path in red highlight.
-- Chart supports zoom and pan.
-- Export formats include PNG, PDF, SVG.
+### AC-CONFLICT-001: Station Double-Booking
+**Given** Task A is scheduled on Komori 09:00-10:00
+**When** Task B is scheduled on Komori 09:30-10:30
+**Then** a StationConflict is detected
+**And** both tiles are highlighted
+**And** conflict appears in right panel
 
-### AC-REPORT-002 – Track job completion status
-- CSR can search jobs by ID or customer reference.
-- Status display includes:
-  - Current completion percentage.
-  - Estimated completion time.
-  - Delay reasons if any.
-  - Last update timestamp.
-- Status refreshes every 30 seconds.
-- History shows last 10 status changes.
+### AC-CONFLICT-002: Group Capacity Exceeded
+**Given** group "Offset Presses" has MaxConcurrent = 2
+**And** Station1 and Station2 are in this group
+**When** 3 tasks are scheduled simultaneously on these stations
+**Then** a GroupCapacityConflict is detected
+**And** the time slot is highlighted in yellow/orange
 
-### AC-REPORT-003 – Analyze schedule performance
-- Director can view KPIs for any period.
-- Metrics include:
-  - On-time completion rate by job type.
-  - Schedule vs actual variance (mean/median).
-  - Resource utilization trends.
-  - Top 5 bottleneck resources.
-- Data can be filtered by multiple criteria.
-- Dashboard refreshes daily at midnight.
+### AC-CONFLICT-003: Precedence Violation Visual
+**Given** Task 2 is scheduled before Task 1 (violating sequence)
+**Then** Task 2's tile shows a red halo effect
+**And** the violation appears in the right panel under "Precedence Violations"
+
+### AC-CONFLICT-004: Late Job Detection
+**Given** a job with workshopExitDate = 2025-12-15
+**When** the last task is scheduled to complete on 2025-12-17
+**Then** the job appears in the "Late Jobs" section of the right panel
+**And** the delay amount (2 days) is displayed
 
 ---
 
-This document should be refined based on specific implementation requirements and technical constraints.
+## Station Unavailability
+
+### AC-UNAVAIL-001: Visual Overlay
+**Given** a station is unavailable 12:00-13:00 (lunch break)
+**Then** the time slot shows a gray hatched overlay
+
+### AC-UNAVAIL-002: Task Stretching
+**Given** a 60-minute task starts at 11:30
+**And** the station is unavailable 12:00-13:00
+**Then** the tile stretches from 11:30 to 14:00 (30min + break + 30min)
+**And** the unavailable portion has different visual appearance
+
+---
+
+## Similarity Indicators
+
+### AC-SIM-001: Indicator Display
+**Given** category "Offset Printing Press" has 4 similarity criteria
+**And** tiles A and B are consecutive on a station in this category
+**When** Job A and Job B share 2 matching criteria
+**Then** 2 filled circles and 2 hollow circles appear between the tiles
+
+### AC-SIM-002: Indicator Position
+**Given** similarity circles between tiles A and B
+**Then** the circles are positioned vertically between the tiles
+**And** they overlap both tiles equally
+
+---
+
+## Navigation
+
+### AC-NAV-001: Job Filter
+**Given** jobs with references "45113", "45114", "45200"
+**When** the user types "451" in the filter
+**Then** only "45113" and "45114" are shown
+**And** "45200" is hidden
+
+### AC-NAV-002: Jump to Date
+**Given** the current view shows December 10
+**When** the user selects "December 20" from the dropdown
+**Then** the grid scrolls to show December 20
+
+### AC-NAV-003: Today Button
+**When** the user clicks the "Today" button
+**Then** the grid scrolls to show the current date and time
+
+---
+
+## Job Creation Modal
+
+### AC-MODAL-001: Required Fields
+**Given** the job creation modal is open
+**When** the user tries to save without reference, client, description, or workshopExitDate
+**Then** validation errors are shown for missing required fields
+
+### AC-MODAL-002: DSL Textarea
+**Given** the job creation modal is open
+**Then** a textarea is shown for task definition
+**And** it supports DSL syntax
+**And** autocomplete activates on "[" and "ST ["
+
+---
+
+## Performance
+
+### AC-PERF-001: Drag Feedback
+**Given** the user is dragging a tile
+**Then** validation feedback appears in <10ms
+
+### AC-PERF-002: Grid Render
+**Given** 100 tiles are scheduled
+**Then** the grid renders in <100ms
+
+### AC-PERF-003: Initial Load
+**Given** a schedule with typical data
+**Then** initial page load completes in <2s
+
+---
+
+This document defines the acceptance criteria that must be satisfied for the Flux print shop scheduling system features to be considered complete.

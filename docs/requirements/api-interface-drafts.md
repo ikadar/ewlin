@@ -1,6 +1,6 @@
-# API / Interface Drafts – Operations Research System
+# API / Interface Drafts – Flux Print Shop Scheduling System
 
-This document defines **high-level API/interface contracts** for the Equipment → Operator → Job → Task assignment and validation domain.
+This document defines **high-level API/interface contracts** for the print shop scheduling system.
 
 These drafts are:
 - **technology-agnostic** (no specific framework implied),
@@ -9,311 +9,423 @@ These drafts are:
 
 ---
 
-## 1. Operator API
+## 1. Station Management API
 
-### 1.1 Create Operator
-- **Method:** `POST`
-- **Path:** `/api/v1/operators`
-- **Description:** Register a new operator in the system.
+### POST /api/v1/stations
+Create a new station.
 
-**Request body (JSON):**
+**Request:**
 ```json
 {
-  "name": "string",
-  "availability": [
+  "name": "Komori G37",
+  "categoryId": "cat-offset-press",
+  "groupId": "grp-offset",
+  "capacity": 1,
+  "operatingSchedule": {
+    "weeklyPattern": [
+      {
+        "dayOfWeek": 0,
+        "timeSlots": [
+          {"start": "00:00", "end": "05:00"},
+          {"start": "06:00", "end": "24:00"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Response (201):**
+```json
+{
+  "stationId": "station-123",
+  "name": "Komori G37",
+  "categoryId": "cat-offset-press",
+  "groupId": "grp-offset",
+  "capacity": 1,
+  "status": "Available",
+  "createdAt": "2025-12-11T10:00:00Z"
+}
+```
+
+### GET /api/v1/stations
+List all stations.
+
+**Response (200):**
+```json
+{
+  "items": [
     {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
-    }
-  ],
-  "skills": [
-    {
-      "equipmentId": "string",
-      "level": "beginner|intermediate|expert"
-    }
-  ]
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "operatorId": "string",
-  "status": "Active",  // Active|Inactive|Deactivated
-  "createdAt": "ISO-8601-timestamp"
-}
-```
-
-**Error cases:**
-- `400 Bad Request` – validation failed (e.g., overlapping availability).
-- `409 Conflict` – operator name already exists.
-
----
-
-### 1.2 Update Operator Availability
-- **Method:** `PUT`
-- **Path:** `/api/v1/operators/{operatorId}/availability`
-- **Description:** Update operator's availability schedule.
-
-**Request body (JSON):**
-```json
-{
-  "availability": [
-    {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
-    }
-  ]
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "operatorId": "string",
-  "updatedAt": "ISO-8601-timestamp",
-  "affectedAssignments": 3
-}
-```
-
----
-
-### 1.3 Add Equipment Skill
-- **Method:** `POST`
-- **Path:** `/api/v1/operators/{operatorId}/skills`
-- **Description:** Add or update equipment certification.
-
-**Request body (JSON):**
-```json
-{
-  "equipmentId": "string",
-  "level": "beginner|intermediate|expert",
-  "certificationDate": "YYYY-MM-DD"
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "skillId": "string",
-  "addedAt": "ISO-8601-timestamp"
-}
-```
-
----
-
-## 2. Equipment API
-
-### 2.1 Create Equipment
-- **Method:** `POST`
-- **Path:** `/api/v1/equipment`
-- **Description:** Register new equipment.
-
-**Request body (JSON):**
-```json
-{
-  "name": "string",
-  "supportedTaskTypes": ["type1", "type2"],
-  "location": "string"
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "equipmentId": "string",
-  "status": "Available",  // Available|InUse|Maintenance|OutOfService
-  "createdAt": "ISO-8601-timestamp"
-}
-```
-
----
-
-### 2.2 Schedule Maintenance
-- **Method:** `POST`
-- **Path:** `/api/v1/equipment/{equipmentId}/maintenance`
-- **Description:** Schedule equipment maintenance window.
-
-**Request body (JSON):**
-```json
-{
-  "start": "ISO-8601-datetime",
-  "end": "ISO-8601-datetime",
-  "description": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "maintenanceId": "string",
-  "status": "Scheduled",
-  "conflictingTasks": [
-    {
-      "taskId": "string",
-      "jobId": "string",
-      "scheduledStart": "ISO-8601-datetime"
+      "stationId": "station-123",
+      "name": "Komori G37",
+      "categoryId": "cat-offset-press",
+      "groupId": "grp-offset",
+      "status": "Available"
     }
   ]
 }
 ```
 
----
+### POST /api/v1/stations/{stationId}/exceptions
+Add a schedule exception.
 
-## 3. Job API
-
-### 3.1 Create Job
-- **Method:** `POST`
-- **Path:** `/api/v1/jobs`
-- **Description:** Create a new production job.
-
-**Request body (JSON):**
+**Request:**
 ```json
 {
-  "name": "string",
-  "description": "string",
-  "deadline": "ISO-8601-datetime"
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "jobId": "string",
-  "status": "Draft",  // Draft|Planned|InProgress|Delayed|Completed|Cancelled
-  "createdAt": "ISO-8601-timestamp"
+  "date": "2025-12-25",
+  "type": "Closed",
+  "reason": "Christmas holiday"
 }
 ```
 
 ---
 
-### 3.2 Add Task to Job
-- **Method:** `POST`
-- **Path:** `/api/v1/jobs/{jobId}/tasks`
-- **Description:** Add a task to an existing job.
+## 2. Station Category API
 
-**Request body (JSON):**
+### POST /api/v1/station-categories
+Create a station category.
+
+**Request:**
 ```json
 {
-  "type": "string",
-  "duration": 120,
-  "requiresOperator": true,
-  "requiresEquipment": true,
-  "dependencies": ["task1", "task2"]
+  "name": "Offset Printing Press",
+  "similarityCriteria": [
+    {"code": "paper_type", "name": "Same paper type"},
+    {"code": "paper_size", "name": "Same paper size"},
+    {"code": "paper_weight", "name": "Same paper weight"},
+    {"code": "inking", "name": "Same inking"}
+  ]
 }
 ```
 
-**Response (201 Created):**
+**Response (201):**
 ```json
 {
-  "taskId": "string",
-  "status": "Defined",  // Defined|Ready|Assigned|Executing|Completed|Failed|Cancelled
-  "criticalPath": false
+  "categoryId": "cat-offset-press",
+  "name": "Offset Printing Press",
+  "similarityCriteria": [...],
+  "createdAt": "2025-12-11T10:00:00Z"
 }
 ```
-
-**Error cases:**
-- `400 Bad Request` – circular dependency detected.
-- `409 Conflict` – job not in Draft status.
 
 ---
 
-### 3.3 Get Job with Tasks
-- **Method:** `GET`
-- **Path:** `/api/v1/jobs/{jobId}`
-- **Description:** Get job details including all tasks.
+## 3. Station Group API
 
-**Response (200 OK):**
+### POST /api/v1/station-groups
+Create a station group.
+
+**Request:**
 ```json
 {
-  "jobId": "string",
-  "name": "string",
-  "deadline": "ISO-8601-datetime",
-  "status": "Planned",
+  "name": "Offset Presses",
+  "maxConcurrent": 2
+}
+```
+
+**Response (201):**
+```json
+{
+  "groupId": "grp-offset",
+  "name": "Offset Presses",
+  "maxConcurrent": 2,
+  "isOutsourcedProviderGroup": false,
+  "createdAt": "2025-12-11T10:00:00Z"
+}
+```
+
+---
+
+## 4. Outsourced Provider API
+
+### POST /api/v1/providers
+Create an outsourced provider.
+
+**Request:**
+```json
+{
+  "name": "Clément",
+  "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"]
+}
+```
+
+**Response (201):**
+```json
+{
+  "providerId": "prov-clement",
+  "name": "Clément",
+  "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"],
+  "groupId": "grp-prov-clement",
+  "status": "Active",
+  "createdAt": "2025-12-11T10:00:00Z"
+}
+```
+
+---
+
+## 5. Job Management API
+
+### POST /api/v1/jobs
+Create a new job.
+
+**Request:**
+```json
+{
+  "reference": "45113 A",
+  "client": "Fibois Grand Est",
+  "description": "Cartes de voeux - 9,9 x 21 cm - off 350g - 350 ex",
+  "workshopExitDate": "2025-12-15T17:00:00Z",
+  "paperType": "CB300",
+  "paperFormat": "63x88",
+  "paperPurchaseStatus": "InStock",
+  "notes": "",
+  "tasksDSL": "[Komori] 20+40 \"vernis\"\n[Massicot] 15\nST [Clément] Pelliculage 2JO"
+}
+```
+
+**Response (201):**
+```json
+{
+  "jobId": "job-456",
+  "reference": "45113 A",
+  "client": "Fibois Grand Est",
+  "description": "Cartes de voeux...",
+  "workshopExitDate": "2025-12-15T17:00:00Z",
+  "status": "Draft",
+  "fullyScheduled": false,
   "tasks": [
     {
-      "taskId": "string",
-      "type": "string",
-      "duration": 120,
-      "status": "Ready",  // Defined|Ready|Assigned|Executing|Completed|Failed|Cancelled
-      "assignment": {
-        "operatorId": "string",
-        "equipmentId": "string",
-        "scheduledStart": "ISO-8601-datetime",
-        "scheduledEnd": "ISO-8601-datetime"
-      },
-      "dependencies": ["task1", "task2"]
+      "taskId": "task-001",
+      "sequenceOrder": 1,
+      "type": "internal",
+      "stationId": "station-komori",
+      "setupMinutes": 20,
+      "runMinutes": 40,
+      "comment": "vernis",
+      "status": "Defined"
+    },
+    {
+      "taskId": "task-002",
+      "sequenceOrder": 2,
+      "type": "internal",
+      "stationId": "station-massicot",
+      "setupMinutes": 0,
+      "runMinutes": 15,
+      "status": "Defined"
+    },
+    {
+      "taskId": "task-003",
+      "sequenceOrder": 3,
+      "type": "outsourced",
+      "providerId": "prov-clement",
+      "actionType": "Pelliculage",
+      "durationOpenDays": 2,
+      "status": "Defined"
     }
   ],
-  "criticalPath": ["task1", "task3", "task5"]
+  "createdAt": "2025-12-11T10:00:00Z"
+}
+```
+
+### GET /api/v1/jobs
+List jobs with filtering.
+
+**Query Parameters:**
+- `status`: Filter by status
+- `search`: Search in reference, client, description
+- `page`, `limit`: Pagination
+
+**Response (200):**
+```json
+{
+  "items": [...],
+  "total": 150,
+  "page": 1,
+  "limit": 20
+}
+```
+
+### PUT /api/v1/jobs/{jobId}
+Update job details.
+
+### PUT /api/v1/jobs/{jobId}/proof
+Update BAT status.
+
+**Request:**
+```json
+{
+  "proofSentAt": "2025-12-11T14:00:00Z"
+}
+```
+Or:
+```json
+{
+  "proofSentAt": "NoProofRequired"
+}
+```
+Or:
+```json
+{
+  "proofApprovedAt": "2025-12-12T09:00:00Z"
+}
+```
+
+### PUT /api/v1/jobs/{jobId}/plates
+Update plates status.
+
+**Request:**
+```json
+{
+  "platesStatus": "Done"
+}
+```
+
+### PUT /api/v1/jobs/{jobId}/paper
+Update paper procurement status.
+
+**Request:**
+```json
+{
+  "paperPurchaseStatus": "Ordered"
+}
+```
+
+**Response (200):**
+```json
+{
+  "paperPurchaseStatus": "Ordered",
+  "paperOrderedAt": "2025-12-11T10:30:00Z"
+}
+```
+
+### POST /api/v1/jobs/{jobId}/dependencies
+Add job dependency.
+
+**Request:**
+```json
+{
+  "requiredJobId": "job-123"
+}
+```
+
+### POST /api/v1/jobs/{jobId}/comments
+Add comment to job.
+
+**Request:**
+```json
+{
+  "content": "Client confirmed color specs"
+}
+```
+
+**Response (201):**
+```json
+{
+  "author": "user@example.com",
+  "timestamp": "2025-12-11T10:00:00Z",
+  "content": "Client confirmed color specs"
 }
 ```
 
 ---
 
-## 4. Assignment API
+## 6. Task Management API
 
-### 4.1 Assign Resources to Task
-- **Method:** `POST`
-- **Path:** `/api/v1/tasks/{taskId}/assignments`
-- **Description:** Assign operator and/or equipment to a task.
+### PUT /api/v1/jobs/{jobId}/tasks/reorder
+Reorder tasks within a job.
 
-**Request body (JSON):**
+**Request:**
 ```json
 {
-  "operatorId": "string",
-  "equipmentId": "string"
+  "taskOrder": ["task-002", "task-001", "task-003"]
 }
 ```
 
-**Response (200 OK):**
+### PUT /api/v1/tasks/{taskId}
+Update task details.
+
+---
+
+## 7. Assignment / Scheduling API
+
+### POST /api/v1/tasks/{taskId}/assign
+Create or update task assignment.
+
+**Request:**
 ```json
 {
-  "assignmentId": "string",
-  "taskId": "string",
+  "stationId": "station-komori",
+  "scheduledStart": "2025-12-12T09:00:00Z"
+}
+```
+
+**Response (201) - Valid:**
+```json
+{
+  "taskId": "task-001",
+  "assignment": {
+    "stationId": "station-komori",
+    "scheduledStart": "2025-12-12T09:00:00Z",
+    "scheduledEnd": "2025-12-12T10:00:00Z"
+  },
   "status": "Assigned",
-  "validationPassed": true
+  "validationResult": {
+    "valid": true,
+    "conflicts": []
+  }
 }
 ```
 
-**Error cases:**
-- `400 Bad Request` – validation failed (skill mismatch, etc.).
-- `409 Conflict` – resource already assigned for this time.
-
----
-
-### 4.2 Schedule Task
-- **Method:** `POST`
-- **Path:** `/api/v1/tasks/{taskId}/schedule`
-- **Description:** Set specific start time for a task.
-
-**Request body (JSON):**
+**Response (200) - Invalid:**
 ```json
 {
-  "scheduledStart": "ISO-8601-datetime"
+  "taskId": "task-001",
+  "validationResult": {
+    "valid": false,
+    "conflicts": [
+      {
+        "type": "StationConflict",
+        "description": "Station Komori already booked 09:00-10:30",
+        "affectedTaskIds": ["task-001", "task-existing"],
+        "severity": "High"
+      }
+    ]
+  }
 }
 ```
 
-**Response (200 OK):**
+### DELETE /api/v1/tasks/{taskId}/assign
+Remove task assignment (recall tile).
+
+**Response (200):**
 ```json
 {
-  "taskId": "string",
-  "scheduledStart": "ISO-8601-datetime",
-  "scheduledEnd": "ISO-8601-datetime",
-  "conflicts": []
+  "taskId": "task-001",
+  "status": "Ready"
 }
 ```
 
-**Error cases:**
-- `409 Conflict` – scheduling conflicts detected.
+### POST /api/v1/assignments/validate
+Validate a proposed assignment without saving.
+
+**Request:**
 ```json
 {
-  "error": "SchedulingConflict",
-  "conflicts": [
+  "taskId": "task-001",
+  "stationId": "station-komori",
+  "scheduledStart": "2025-12-12T09:00:00Z"
+}
+```
+
+**Response (200):**
+```json
+{
+  "valid": true,
+  "conflicts": [],
+  "warnings": [
     {
-      "type": "OperatorUnavailable",
-      "operatorId": "string",
-      "conflictingTask": "string"
+      "type": "DeadlineRisk",
+      "description": "Only 4 hours buffer before workshop exit date"
     }
   ]
 }
@@ -321,343 +433,220 @@ These drafts are:
 
 ---
 
-### 4.3 Validate Schedule
-- **Method:** `POST`
-- **Path:** `/api/v1/schedules/validate`
-- **Description:** Validate entire schedule or subset.
+## 8. Schedule Snapshot API
 
-**Request body (JSON):**
+### GET /api/v1/schedule/snapshot
+Get complete schedule snapshot for UI rendering.
+
+**Query Parameters:**
+- `startDate`: Start of time range
+- `endDate`: End of time range
+
+**Response (200):**
 ```json
 {
-  "jobIds": ["job1", "job2"],
-  "startDate": "YYYY-MM-DD",
-  "endDate": "YYYY-MM-DD"
+  "snapshotVersion": 42,
+  "generatedAt": "2025-12-11T10:00:00Z",
+  "stations": [
+    {
+      "stationId": "station-komori",
+      "name": "Komori G37",
+      "categoryId": "cat-offset-press",
+      "groupId": "grp-offset",
+      "status": "Available"
+    }
+  ],
+  "providers": [...],
+  "categories": [...],
+  "groups": [...],
+  "jobs": [
+    {
+      "jobId": "job-456",
+      "reference": "45113 A",
+      "client": "Fibois Grand Est",
+      "color": "#3B82F6",
+      "workshopExitDate": "2025-12-15T17:00:00Z",
+      "tasks": [...]
+    }
+  ],
+  "assignments": [
+    {
+      "taskId": "task-001",
+      "jobId": "job-456",
+      "stationId": "station-komori",
+      "scheduledStart": "2025-12-12T09:00:00Z",
+      "scheduledEnd": "2025-12-12T10:00:00Z"
+    }
+  ],
+  "conflicts": [
+    {
+      "type": "StationConflict",
+      "affectedTaskIds": ["task-x", "task-y"],
+      "description": "...",
+      "severity": "High"
+    }
+  ],
+  "lateJobs": [
+    {
+      "jobId": "job-789",
+      "reference": "45120",
+      "workshopExitDate": "2025-12-14T17:00:00Z",
+      "expectedCompletion": "2025-12-16T11:00:00Z",
+      "delayHours": 42
+    }
+  ]
 }
 ```
 
-**Response (200 OK):**
+---
+
+## 9. DSL Parsing API
+
+### POST /api/v1/dsl/parse
+Parse DSL text into structured tasks (for validation during input).
+
+**Request:**
+```json
+{
+  "dsl": "[Komori] 20+40 \"vernis\"\n[Massicot] 15"
+}
+```
+
+**Response (200) - Valid:**
+```json
+{
+  "valid": true,
+  "tasks": [
+    {
+      "type": "internal",
+      "stationId": "station-komori",
+      "stationName": "Komori",
+      "setupMinutes": 20,
+      "runMinutes": 40,
+      "comment": "vernis",
+      "rawInput": "[Komori] 20+40 \"vernis\""
+    },
+    {
+      "type": "internal",
+      "stationId": "station-massicot",
+      "stationName": "Massicot",
+      "setupMinutes": 0,
+      "runMinutes": 15,
+      "comment": null,
+      "rawInput": "[Massicot] 15"
+    }
+  ],
+  "errors": []
+}
+```
+
+**Response (200) - With Errors:**
 ```json
 {
   "valid": false,
-  "conflicts": [
+  "tasks": [...],
+  "errors": [
     {
-      "type": "ResourceConflict",
-      "resource": "operator-123",
-      "tasks": ["task1", "task2"],
-      "overlapStart": "ISO-8601-datetime",
-      "overlapEnd": "ISO-8601-datetime"
-    },
-    {
-      "type": "DependencyViolation",
-      "task": "task3",
-      "dependsOn": "task2",
-      "issue": "task3 scheduled before task2 completion"
-    }
-  ],
-  "validatedAt": "ISO-8601-timestamp"
-}
-```
-
----
-
-## 5. Execution API
-
-### 5.1 Start Task
-- **Method:** `POST`
-- **Path:** `/api/v1/tasks/{taskId}/start`
-- **Description:** Mark task as started.
-
-**Request body (JSON):**
-```json
-{
-  "actualStartTime": "ISO-8601-datetime",
-  "startReason": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "taskId": "string",
-  "status": "Executing",  // Defined|Ready|Assigned|Executing|Completed|Failed|Cancelled
-  "actualStartTime": "ISO-8601-datetime"
-}
-```
-
----
-
-### 5.2 Complete Task
-- **Method:** `POST`
-- **Path:** `/api/v1/tasks/{taskId}/complete`
-- **Description:** Mark task as completed.
-
-**Request body (JSON):**
-```json
-{
-  "actualEndTime": "ISO-8601-datetime",
-  "qualityChecks": [
-    {
-      "checkType": "string",
-      "passed": true,
-      "notes": "string"
+      "line": 2,
+      "message": "Station 'UnknownStation' not found",
+      "rawInput": "[UnknownStation] 20+40"
     }
   ]
 }
 ```
 
-**Response (200 OK):**
+### GET /api/v1/dsl/autocomplete
+Get autocomplete suggestions.
+
+**Query Parameters:**
+- `prefix`: Current input prefix
+- `context`: "station" or "provider"
+
+**Response (200):**
 ```json
 {
-  "taskId": "string",
-  "status": "Completed",  // Defined|Ready|Assigned|Executing|Completed|Failed|Cancelled
-  "durationVariance": -5,
-  "readyTasks": ["task4", "task5"]
-}
-```
-
----
-
-## 6. Schedule Snapshot API
-
-### 6.1 Get Schedule Snapshot
-- **Method:** `GET`
-- **Path:** `/api/v1/schedule/snapshot`
-- **Query params:** `timeRange` (ISO-8601 date range, e.g., `2025-01-20/2025-02-03`)
-- **Description:** Get complete snapshot of schedule data for client-side validation cache.
-
-**Response (200 OK):**
-```json
-{
-  "assignments": [
-    {
-      "id": "string",
-      "taskId": "string",
-      "operatorId": "string | null",
-      "equipmentId": "string | null",
-      "scheduledStart": "ISO-8601-datetime",
-      "scheduledEnd": "ISO-8601-datetime"
-    }
-  ],
-  "operators": [
-    {
-      "id": "string",
-      "name": "string",
-      "status": "Active",  // Active|Inactive|Deactivated
-      "availability": [
-        { "start": "ISO-8601-datetime", "end": "ISO-8601-datetime" }
-      ],
-      "skills": [
-        { "equipmentId": "string", "level": "intermediate" }  // beginner|intermediate|expert
-      ]
-    }
-  ],
-  "equipment": [
-    {
-      "id": "string",
-      "name": "string",
-      "status": "Available",  // Available|InUse|Maintenance|OutOfService
-      "supportedTaskTypes": ["CNC", "Milling"],
-      "location": "string",
-      "maintenanceWindows": [
-        { "start": "ISO-8601-datetime", "end": "ISO-8601-datetime" }
-      ]
-    }
-  ],
-  "tasks": [
-    {
-      "id": "string",
-      "jobId": "string",
-      "type": "CNC",
-      "duration": 120,  // minutes
-      "requiresOperator": true,
-      "requiresEquipment": true,
-      "dependencies": ["task1", "task2"],
-      "status": "Ready"  // Defined|Ready|Assigned|Executing|Completed|Failed|Cancelled
-    }
-  ],
-  "jobs": [
-    {
-      "id": "string",
-      "name": "string",
-      "description": "string",
-      "deadline": "ISO-8601-datetime",
-      "status": "Planned"  // Draft|Planned|InProgress|Delayed|Completed|Cancelled
-    }
-  ],
-  "snapshotVersion": 12345,
-  "generatedAt": "ISO-8601-timestamp"
-}
-```
-
-**Notes:**
-- This endpoint is used by the frontend for client-side validation caching
-- Expected response size: 50-200KB for typical deployments (<100 operators, <500 tasks)
-- Cache TTL recommendation: 30-60 seconds
-- The `snapshotVersion` can be used for optimistic locking / conflict detection
-
----
-
-## 7. Reporting API
-
-### 7.1 Get Schedule Gantt Data
-- **Method:** `GET`
-- **Path:** `/api/v1/reports/gantt`
-- **Query params:** `startDate`, `endDate`, `jobIds[]`
-- **Description:** Get data for Gantt chart visualization.
-
-**Response (200 OK):**
-```json
-{
-  "jobs": [
-    {
-      "jobId": "string",
-      "name": "string",
-      "deadline": "ISO-8601-datetime",
-      "tasks": [
-        {
-          "taskId": "string",
-          "name": "string",
-          "start": "ISO-8601-datetime",
-          "end": "ISO-8601-datetime",
-          "dependencies": ["task1"],
-          "criticalPath": true,
-          "assignedOperator": "string",
-          "assignedEquipment": "string"
-        }
-      ]
-    }
-  ],
-  "generatedAt": "ISO-8601-timestamp"
-}
-```
-
----
-
-### 7.2 Get Resource Utilization
-- **Method:** `GET`
-- **Path:** `/api/v1/reports/utilization`
-- **Query params:** `startDate`, `endDate`, `resourceType`
-- **Description:** Get resource utilization metrics.
-
-**Response (200 OK):**
-```json
-{
-  "period": {
-    "start": "YYYY-MM-DD",
-    "end": "YYYY-MM-DD"
-  },
-  "operators": [
-    {
-      "operatorId": "string",
-      "name": "string",
-      "totalAvailableHours": 160,
-      "scheduledHours": 120,
-      "utilizationPercent": 75,
-      "overtimeHours": 0
-    }
-  ],
-  "equipment": [
-    {
-      "equipmentId": "string",
-      "name": "string",
-      "totalAvailableHours": 168,
-      "scheduledHours": 140,
-      "utilizationPercent": 83.3,
-      "maintenanceHours": 8
-    }
+  "suggestions": [
+    {"value": "Komori", "label": "Komori G37"},
+    {"value": "Komori_XL", "label": "Komori XL 106"}
   ]
 }
 ```
 
 ---
 
-## Common Error Response Format
+## 10. Business Calendar API
 
-All error responses follow this structure:
+### GET /api/v1/calendar/open-days
+Calculate open days between dates.
 
+**Query Parameters:**
+- `from`: Start date
+- `days`: Number of open days to add
+
+**Response (200):**
+```json
+{
+  "from": "2025-12-13",
+  "days": 2,
+  "result": "2025-12-17",
+  "explanation": "Dec 13 (Fri) + 2 open days = Dec 17 (Tue), skipping Dec 14-15 (weekend)"
+}
+```
+
+---
+
+## 11. Error Responses
+
+### Standard Error Format
 ```json
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Human-readable error message",
-    "details": [
-      {
-        "field": "scheduledStart",
-        "issue": "Must be in the future"
-      }
-    ],
-    "timestamp": "ISO-8601-timestamp",
-    "traceId": "uuid-for-debugging"
+    "message": "Station not found",
+    "details": {
+      "field": "stationId",
+      "value": "unknown-station"
+    }
   }
 }
 ```
 
+### Error Codes
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `VALIDATION_ERROR` | 400 | Input validation failed |
+| `NOT_FOUND` | 404 | Resource not found |
+| `CONFLICT` | 409 | Operation would create conflict |
+| `CIRCULAR_DEPENDENCY` | 400 | Dependency would create cycle |
+| `APPROVAL_GATE_BLOCKED` | 400 | Approval gate not satisfied |
+| `INTERNAL_ERROR` | 500 | Unexpected server error |
+
 ---
 
-## Pagination
+## 12. WebSocket Events (Future)
 
-List endpoints support standard pagination:
+For real-time updates:
 
-**Query parameters:**
-- `page` (default: 1)
-- `pageSize` (default: 20, max: 100)
-- `sortBy` (field name)
-- `sortOrder` (asc|desc)
-
-**Response includes:**
 ```json
+// Schedule updated
 {
-  "data": [...],
-  "pagination": {
-    "page": 1,
-    "pageSize": 20,
-    "totalItems": 150,
-    "totalPages": 8
-  }
-}
-```
-
----
-
-## Authentication
-
-All endpoints require authentication via Bearer token:
-
-```
-Authorization: Bearer <token>
-```
-
-Token payload should include:
-- User ID
-- Roles/permissions
-- Expiration time
-
----
-
-## Webhooks
-
-The system can send webhooks for major events:
-
-**Event types:**
-- `task.assigned`
-- `task.started`
-- `task.completed`
-- `schedule.conflict`
-- `job.delayed`
-
-**Webhook payload:**
-```json
-{
-  "eventType": "task.assigned",
-  "timestamp": "ISO-8601-timestamp",
+  "type": "schedule.updated",
   "data": {
-    "taskId": "string",
-    "operatorId": "string",
-    "equipmentId": "string"
+    "snapshotVersion": 43,
+    "changedTaskIds": ["task-001", "task-002"]
+  }
+}
+
+// Conflict detected
+{
+  "type": "conflict.detected",
+  "data": {
+    "type": "StationConflict",
+    "affectedTaskIds": ["task-001", "task-002"]
   }
 }
 ```
 
 ---
 
-This document serves as a starting point for API implementation and should be refined based on specific technical requirements and constraints.
+This document defines the API contracts for the Flux print shop scheduling system. Implementation may add additional endpoints, query parameters, or response fields as needed.

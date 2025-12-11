@@ -1,56 +1,37 @@
-# Workflow & State-Transition Definitions – Operations Research System
+# Workflow & State-Transition Definitions – Flux Print Shop Scheduling System
 
-This document provides **text-based workflow and lifecycle definitions** for the Equipment → Operator → Job → Task assignment and validation domain.  
+This document provides **text-based workflow and lifecycle definitions** for the print shop scheduling domain.
 These replace UML/activity/state diagrams and are optimized for AI processing and small-team collaboration.
 
 ---
 
-# 1. Operator Workflow
+# 1. Station Workflow
 
-## State Machine: Operator
-
-```
-STATE MACHINE: Operator
-Initial: Active
-
-Active → Inactive         (when operator is temporarily unavailable)
-Inactive → Active         (when operator returns to work)
-Active → Deactivated     (when operator permanently leaves)
-Inactive → Deactivated   (when inactive operator is removed)
-```
-
-### Notes
-- Only **Active** operators can be assigned to new tasks.
-- **Inactive** preserves history but prevents new assignments.
-- **Deactivated** is terminal state for audit trail.
-
----
-
-# 2. Equipment Workflow
-
-## State Machine: Equipment
+## State Machine: Station
 
 ```
-STATE MACHINE: Equipment
+STATE MACHINE: Station
 Initial: Available
 
-Available → InUse        (when assigned to a task)
-InUse → Available        (when task completes)
-Available → Maintenance  (scheduled or urgent maintenance)
-InUse → Maintenance      (emergency maintenance, affects current task)
-Maintenance → Available  (maintenance completed)
-Available → OutOfService (permanent or long-term unavailability)
-Maintenance → OutOfService (major failure during maintenance)
+Available → InUse           (when task execution starts on station)
+InUse → Available           (when task completes)
+Available → Maintenance     (scheduled or urgent maintenance)
+InUse → Maintenance         (emergency maintenance, affects current task)
+Maintenance → Available     (maintenance completed)
+Available → OutOfService    (permanent or long-term unavailability)
+Maintenance → OutOfService  (major failure during maintenance)
+OutOfService → Available    (repaired and restored)
 ```
 
 ### Notes
-- **InUse** equipment cannot be assigned to other tasks.
-- Transition to **Maintenance** triggers conflict detection.
+- **InUse** stations cannot be assigned to other tasks (capacity=1).
+- Transition to **Maintenance** triggers conflict detection for scheduled tasks.
 - **OutOfService** requires manual intervention to return.
+- Outsourced providers don't use this state machine (always available with unlimited capacity).
 
 ---
 
-# 3. Job Workflow
+# 2. Job Workflow
 
 ## State Machine: Job
 
@@ -58,7 +39,7 @@ Maintenance → OutOfService (major failure during maintenance)
 STATE MACHINE: Job
 Initial: Draft
 
-Draft → Planned          (when all tasks defined with dependencies)
+Draft → Planned          (when all tasks defined and approval gates acceptable)
 Planned → InProgress     (when first task starts)
 InProgress → Completed   (when all tasks complete)
 InProgress → Delayed     (when deadline at risk)
@@ -67,16 +48,18 @@ Delayed → Completed      (completed despite delay)
 Draft → Cancelled        (early cancellation)
 Planned → Cancelled      (before execution)
 InProgress → Cancelled   (abort during execution)
+Delayed → Cancelled      (abort during delay)
 ```
 
 ### Notes
-- **Planned** requires valid task dependency graph (DAG).
+- **Planned** requires at least one task defined.
 - **InProgress** triggered by first task assignment execution.
 - **Delayed** is warning state, not terminal.
+- Cancellation cascades to all tasks.
 
 ---
 
-# 4. Task Workflow (within Job)
+# 3. Task Workflow (within Job)
 
 ## State Machine: Task
 
@@ -84,12 +67,13 @@ InProgress → Cancelled   (abort during execution)
 STATE MACHINE: Task
 Initial: Defined
 
-Defined → Ready          (when all dependencies completed)
-Ready → Assigned         (when resources allocated)
-Assigned → Executing     (when scheduled time arrives)
+Defined → Ready          (when previous task completed, or first task with approval gates cleared)
+Ready → Assigned         (when scheduled on station with time slot)
+Assigned → Executing     (when scheduled time arrives and work begins)
 Executing → Completed    (normal completion)
 Executing → Failed       (execution problem)
 Failed → Ready           (retry after fixing issue)
+Assigned → Ready         (unassign / recall tile)
 Defined → Cancelled      (job cancellation cascade)
 Ready → Cancelled        (job cancellation cascade)
 Assigned → Cancelled     (job cancellation cascade)
@@ -97,76 +81,150 @@ Executing → Cancelled    (job cancellation during execution)
 ```
 
 ### Notes
-- **Ready** means dependencies satisfied but no resources yet.
-- **Assigned** means resources allocated but not started.
+- **Ready** means previous task completed and approval gates satisfied.
+- **Assigned** means scheduled with specific time slot on station.
 - **Failed** tasks can be retried by returning to Ready.
+- Recalling a tile moves from Assigned back to Ready.
 
 ---
 
-# 5. Assignment Process Workflow
+# 4. Approval Gate Workflows
 
-## Process: Task Assignment
+## Process: BAT (Proof) Approval
 
 ```
-PROCESS: Task Assignment
+PROCESS: BAT Approval
 
-1. Check task is in Ready state (dependencies completed)
-2. Identify resource requirements:
-   a) requires_operator → find available operators
-   b) requires_equipment → find compatible equipment
-3. For each candidate assignment:
-   a) Validate operator skills match equipment
-   b) Check operator availability covers task duration
-   c) Check no scheduling conflicts
-   d) Verify job deadline can still be met
-4. If valid assignment found:
-   a) Create TaskAssignment with scheduled_start and scheduled_end
+1. Job created with proofSentAt = null
+2. User actions:
+   a) Set proofSentAt = "AwaitingFile" → waiting for client file
+   b) Set proofSentAt = "NoProofRequired" → bypass proof, tasks can be scheduled
+   c) Set proofSentAt = <datetime> → proof sent to client
+3. If proof sent, wait for client response:
+   a) Client approves → set proofApprovedAt = <datetime>
+   b) Client requests changes → send revised proof (update proofSentAt)
+4. When proofApprovedAt is set (or proofSentAt = "NoProofRequired"):
+   → Tasks can be scheduled
+```
+
+## Process: Plates Approval
+
+```
+PROCESS: Plates Approval
+
+1. Job created with platesStatus = "Todo"
+2. Plates preparation work happens (external to system)
+3. User marks platesStatus = "Done"
+4. When platesStatus = "Done":
+   → Printing tasks on offset stations can proceed
+```
+
+---
+
+# 5. Paper Procurement Workflow
+
+## Process: Paper Procurement
+
+```
+PROCESS: Paper Procurement
+
+1. Job created with paperPurchaseStatus:
+   a) "InStock" → paper already available, proceed immediately
+   b) "ToOrder" → paper needs to be ordered
+
+2. If "ToOrder":
+   a) User places order externally
+   b) User updates status to "Ordered"
+   c) System records paperOrderedAt = now()
+
+3. When paper arrives:
+   a) User updates status to "Received"
+
+4. Production should wait until:
+   → paperPurchaseStatus = "InStock" OR "Received"
+```
+
+---
+
+# 6. Task Assignment Workflow
+
+## Process: Task Assignment (Internal Task)
+
+```
+PROCESS: Task Assignment (Internal)
+
+1. Check task is in Ready state (previous task completed)
+2. Check approval gates:
+   a) proofApprovedAt is set OR proofSentAt = "NoProofRequired"
+   b) platesStatus = "Done" (if printing task)
+3. Check station:
+   a) Station exists and is Available
+   b) No conflicting assignments at proposed time
+   c) Station group has capacity
+4. Check job dependencies:
+   a) All required jobs are completed
+5. If all valid:
+   a) Create TaskAssignment with scheduledStart and scheduledEnd
    b) Update task state → Assigned
-   c) Reserve operator/equipment time slots for the scheduled period
-   d) Publish TaskAssigned event with timing information
-5. If no valid assignment:
+   c) Reserve station time slot
+   d) Publish TaskAssigned event
+6. If validation fails:
    a) Report conflicts
    b) Task remains in Ready state
 ```
 
-### Notes
-- Assignment is atomic - either complete or rollback.
-- Partial assignments not allowed in base workflow.
+## Process: Task Assignment (Outsourced Task)
+
+```
+PROCESS: Task Assignment (Outsourced)
+
+1. Check task is in Ready state
+2. Check approval gates
+3. Check provider:
+   a) Provider exists and is Active
+   b) Provider supports the action type
+   c) (No capacity check - unlimited)
+4. Calculate scheduledEnd using business calendar:
+   a) scheduledEnd = scheduledStart + durationOpenDays (business days)
+5. Create assignment and update state
+```
 
 ---
 
-# 6. Validation Workflow
+# 7. Scheduling Validation Workflow
 
 ## Process: Assignment Validation
 
 ```
 PROCESS: Assignment Validation
 
-1. Receive validation request with proposed assignments
+1. Receive validation request with proposed assignment
 2. Load current schedule state
-3. For each assignment, validate:
-   
-   [Resource Validation]
-   - Operator exists and is Active
-   - Equipment exists and is Available
-   - Task type matches equipment capabilities
-   
-   [Skill Validation]
-   - If task needs both operator and equipment:
-     → Operator has skill for assigned equipment
-   
+3. Validate:
+
+   [Station Validation]
+   - Station exists and is Available
+   - Station capacity not exceeded
+
+   [Group Validation]
+   - Station group MaxConcurrent not exceeded at proposed time
+
    [Time Validation]
-   - Scheduled time within operator availability
-   - No operator double-booking
-   - No equipment double-booking
-   
-   [Dependency Validation]
-   - All required tasks completed before start
-   - No circular dependencies
-   
+   - Scheduled time within station operating hours
+   - Task stretched correctly across non-operating periods
+   - No station double-booking
+
+   [Sequence Validation]
+   - Previous task in job completed (or this is first task)
+   - All required jobs completed
+
+   [Gate Validation]
+   - Proof approved or not required
+   - Plates done (for printing tasks)
+
    [Deadline Validation]
-   - Task completes before job deadline
-   
+   - Task completes before job workshopExitDate
+
 4. Return validation result:
    - Valid → proceed with assignment
    - Invalid → list all conflicts found
@@ -174,51 +232,58 @@ PROCESS: Assignment Validation
 
 ---
 
-# 7. Schedule Management Workflow
+# 8. Schedule Conflict Detection Workflow
 
-## Process: Schedule Update
+## Process: Conflict Detection
 
 ```
-PROCESS: Schedule Update
+PROCESS: Conflict Detection
 
-TRIGGER: Resource availability change / Task modification / New assignment
+TRIGGER: Station availability change / Task modification / New assignment
 
 1. Identify affected tasks:
-   a) Tasks assigned to changed resource
-   b) Tasks dependent on modified task
-   c) Tasks in same job as modified task
+   a) Tasks assigned to changed station
+   b) Tasks in same station group
+   c) Tasks in same job (sequence dependencies)
+   d) Tasks in dependent jobs
 
 2. For each affected task:
    a) Re-validate current assignment
    b) If invalid:
-      - Mark conflict
-      - Optionally suggest alternatives
+      - Create ScheduleConflict
+      - Mark task assignment as invalid
 
-3. Cascade checks:
-   a) Check job deadline still achievable
-   b) Update critical path if needed
-   c) Notify affected operators
+3. Conflict types to detect:
+   - StationConflict: double-booking
+   - GroupCapacityConflict: exceeds MaxConcurrent
+   - PrecedenceConflict: wrong sequence order
+   - ApprovalGateConflict: gates not satisfied
+   - AvailabilityConflict: outside station operating hours
+   - DeadlineConflict: exceeds workshopExitDate
 
 4. Publish events:
+   - ConflictDetected (for each conflict)
    - ScheduleUpdated
-   - ConflictDetected (if any)
-   - JobAtRisk (if deadline threatened)
 ```
 
 ---
 
-# 8. End-to-End Business Workflow
+# 9. End-to-End Business Workflow
 
 ```
-OperatorCreated
-→ EquipmentCreated
+StationCategoryCreated
+→ StationGroupCreated
+→ StationCreated
+→ ProviderCreated (optional)
 → JobCreated
-→ TasksAddedToJob
-→ DependenciesSet
+→ TasksDefinedFromDSL
+→ ProofSent (or NoProofRequired)
+→ ProofApproved
+→ PlatesDone
+→ PaperReceived
 → JobPlanned
 → TaskReady
-→ ResourcesAssigned
-→ AssignmentValidated
+→ TaskAssigned (tile placed)
 → TaskExecuting
 → TaskCompleted
 → AllTasksCompleted
@@ -227,101 +292,148 @@ OperatorCreated
 
 ---
 
-# 9. Domain Events (for integration)
+# 10. Domain Events (for integration)
 
 ```
-// Resource Events
-OperatorCreated
-OperatorActivated
-OperatorDeactivated
-OperatorAvailabilityChanged
-OperatorSkillAdded
+// Station Events
+StationCreated
+StationScheduleUpdated
+StationExceptionAdded
+StationStatusChanged
 
-EquipmentCreated
-EquipmentStatusChanged
-EquipmentMaintenanceScheduled
-EquipmentMaintenanceCompleted
+// Category & Group Events
+StationCategoryCreated
+StationGroupCreated
+MaxConcurrentUpdated
 
-// Job & Task Events
+// Provider Events
+ProviderCreated
+ProviderStatusChanged
+
+// Job Events
 JobCreated
+JobUpdated
 JobPlanned
 JobStarted
 JobCompleted
 JobCancelled
 JobDelayed
 
-TaskCreated
-TaskDependencyAdded
+// Task Events
+TaskAddedToJob
+TaskRemovedFromJob
+TasksReordered
 TaskReady
 TaskAssigned
+TaskUnassigned
 TaskStarted
 TaskCompleted
 TaskFailed
 TaskCancelled
 
-// Assignment & Schedule Events
-AssignmentProposed
-AssignmentValidated
-AssignmentRejected
-ConflictDetected
+// Approval Gate Events
+ProofSent
+ProofApproved
+PlatesCompleted
+PaperStatusChanged
+
+// Comment Events
+CommentAdded
+
+// Schedule Events
+ScheduleCreated
 ScheduleUpdated
-ScheduleOptimized
+ConflictDetected
+ConflictResolved
 
 // Alert Events
 DeadlineAtRisk
-ResourceConflict
-DependencyViolation
+GroupCapacityExceeded
 ```
 
 ---
 
-# 10. Conflict Resolution Workflow
+# 11. Tile Interaction Workflow (UI)
 
-## Process: Conflict Resolution
+## Process: Drag and Drop Assignment
 
 ```
-PROCESS: Conflict Resolution
+PROCESS: Drag and Drop Assignment
 
-TRIGGER: ConflictDetected event
+1. User starts dragging task from left panel (unscheduled) or center grid (reschedule)
+2. During drag:
+   a) System validates proposed drop location in real-time (<10ms)
+   b) Valid locations highlighted
+   c) Invalid locations shown with red indicator
+   d) If precedence violation detected:
+      → Snap to nearest valid timeslot (safeguard)
+      → Unless Alt key held (bypass safeguard)
+3. On drop:
+   a) Server validates assignment (authoritative)
+   b) If valid: create/update assignment
+   c) If invalid: show conflict resolution panel
+4. Assignment created:
+   a) Tile appears on grid at scheduled position
+   b) Tile in left panel becomes semi-transparent with "recall" button
+```
 
-1. Categorize conflict:
-   - ResourceConflict → overlapping assignments
-   - AvailabilityConflict → outside working hours
-   - DependencyConflict → wrong execution order
-   - DeadlineConflict → cannot meet deadline
-   - SkillConflict → missing qualifications
+## Process: Recall Tile
 
-2. Resolution strategies:
-   
-   [ResourceConflict]
-   - Find alternative operator/equipment
-   - Reschedule one of conflicting tasks
-   - Split task if allowed by policy
-   
-   [AvailabilityConflict]
-   - Find alternative operator
-   - Negotiate overtime (if policy allows)
-   - Reschedule to available time
-   
-   [DependencyConflict]
-   - Reorder task execution
-   - Fast-track prerequisite tasks
-   
-   [DeadlineConflict]
-   - Add resources (parallel execution)
-   - Negotiate deadline extension
-   - Reduce task scope if possible
+```
+PROCESS: Recall Tile
 
-3. Apply resolution:
-   - Update assignments
-   - Re-validate entire schedule
-   - Notify affected parties
+1. User hovers over semi-transparent tile in left panel
+2. "Recall" button appears
+3. User clicks "Recall"
+4. System removes assignment:
+   a) Task status changes from Assigned to Ready
+   b) Tile disappears from center grid
+   c) Tile in left panel becomes fully opaque (unscheduled)
+   d) Only this tile is recalled (not siblings)
+5. Station time slot is freed
+```
 
-4. If unresolvable:
-   - Escalate to human planner
-   - Mark job as "at risk"
+## Process: Swap Position
+
+```
+PROCESS: Swap Position
+
+1. User clicks swap shortcut on tile (up or down arrow)
+2. System swaps with adjacent tile:
+   a) Validates swap doesn't violate constraints
+   b) Updates scheduledStart/End for both tiles
+   c) Re-validates schedule
+3. If swap would violate constraints:
+   a) Show warning
+   b) Require confirmation or cancel
 ```
 
 ---
 
-This document defines the complete workflow and state transitions for the Operations Research system. Implementation should enforce these state machines and processes while allowing for configuration of specific policies.
+# 12. Similarity Indicators Workflow
+
+## Process: Display Similarity Indicators
+
+```
+PROCESS: Display Similarity Indicators
+
+1. For each station column:
+   a) Get ordered list of tiles (by scheduledStart)
+   b) For each consecutive pair of tiles:
+      - Get jobs for both tiles
+      - Get station category
+      - For each similarity criterion in category:
+        - Compare job attributes (paperType, paperFormat, etc.)
+        - If match: add filled circle indicator
+        - If no match: add hollow circle indicator
+      - Position indicators between the two tiles
+
+2. Visual representation:
+   - Circles displayed vertically between tiles
+   - Equal overlap on both tiles
+   - Number of circles = number of criteria in category
+```
+
+---
+
+This document defines the complete workflow and state transitions for the Flux print shop scheduling system. Implementation should enforce these state machines and processes while allowing for configuration of specific policies.

@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { format, addDays, startOfDay, eachDayOfInterval, eachHourOfInterval, addHours } from 'date-fns';
+import { format, eachDayOfInterval } from 'date-fns';
 import { cn } from '../../lib/utils';
 import { useAppSelector } from '../../store/hooks';
 import { TaskBlock } from './TaskBlock';
-import type { Assignment, Equipment, Operator } from '../../types';
+import type { Assignment, Station, OutsourcedProvider, Task, Job } from '../../types';
 
 interface SchedulingGridProps {
   className?: string;
@@ -22,9 +22,9 @@ export function SchedulingGrid({ className }: SchedulingGridProps) {
     const hours = Array.from({ length: 12 }, (_, i) => i + 6); // 6:00 - 17:00
 
     const resources =
-      gridView === 'equipment'
-        ? (snapshot?.equipment ?? [])
-        : (snapshot?.operators ?? []);
+      gridView === 'stations'
+        ? (snapshot?.stations ?? [])
+        : (snapshot?.providers ?? []);
 
     return { days, hours, resources };
   }, [timeRange, gridView, snapshot]);
@@ -35,8 +35,17 @@ export function SchedulingGrid({ className }: SchedulingGridProps) {
     const map = new Map<string, Assignment[]>();
 
     for (const assignment of snapshot.assignments) {
-      const resourceId =
-        gridView === 'equipment' ? assignment.equipmentId : assignment.operatorId;
+      // Find the task to determine which station it belongs to
+      let task: Task | undefined;
+      for (const job of snapshot.jobs) {
+        task = job.tasks.find((t) => t.id === assignment.taskId);
+        if (task) break;
+      }
+
+      if (!task) continue;
+
+      // In station view, group by station; in provider view, group by provider
+      const resourceId = gridView === 'stations' ? assignment.stationId : task.providerId;
       if (!resourceId) continue;
 
       if (!map.has(resourceId)) {
@@ -47,6 +56,16 @@ export function SchedulingGrid({ className }: SchedulingGridProps) {
 
     return map;
   }, [snapshot, gridView]);
+
+  // Helper to find task by assignment
+  const findTaskAndJob = (assignment: Assignment): { task: Task; job: Job } | null => {
+    if (!snapshot) return null;
+    for (const job of snapshot.jobs) {
+      const task = job.tasks.find((t) => t.id === assignment.taskId);
+      if (task) return { task, job };
+    }
+    return null;
+  };
 
   if (!snapshot) {
     return (
@@ -61,7 +80,7 @@ export function SchedulingGrid({ className }: SchedulingGridProps) {
       {/* Header with time axis */}
       <div className="flex border-b bg-muted/30">
         <div className="w-48 flex-shrink-0 border-r p-2 font-medium">
-          {gridView === 'equipment' ? 'Equipment' : 'Operator'}
+          {gridView === 'stations' ? 'Station' : 'Provider'}
         </div>
         <div className="flex-1 overflow-x-auto">
           <div className="flex">
@@ -100,6 +119,7 @@ export function SchedulingGrid({ className }: SchedulingGridProps) {
             days={days}
             hours={hours}
             gridView={gridView}
+            findTaskAndJob={findTaskAndJob}
           />
         ))}
       </div>
@@ -108,20 +128,19 @@ export function SchedulingGrid({ className }: SchedulingGridProps) {
 }
 
 interface ResourceRowProps {
-  resource: Equipment | Operator;
+  resource: Station | OutsourcedProvider;
   assignments: Assignment[];
   days: Date[];
   hours: number[];
-  gridView: 'equipment' | 'operator';
+  gridView: 'stations' | 'providers';
+  findTaskAndJob: (assignment: Assignment) => { task: Task; job: Job } | null;
 }
 
-function ResourceRow({ resource, assignments, days, hours, gridView }: ResourceRowProps) {
-  const snapshot = useAppSelector((state) => state.schedule.snapshot);
-
-  const isEquipment = (r: Equipment | Operator): r is Equipment => 'supportedTaskTypes' in r;
+function ResourceRow({ resource, assignments, days, hours, gridView, findTaskAndJob }: ResourceRowProps) {
+  const isStation = (r: Station | OutsourcedProvider): r is Station => 'categoryId' in r;
 
   const statusColor = useMemo(() => {
-    if (isEquipment(resource)) {
+    if (isStation(resource)) {
       switch (resource.status) {
         case 'Available':
           return 'bg-green-50';
@@ -131,6 +150,8 @@ function ResourceRow({ resource, assignments, days, hours, gridView }: ResourceR
           return 'bg-yellow-50';
         case 'OutOfService':
           return 'bg-red-50';
+        default:
+          return '';
       }
     } else {
       switch (resource.status) {
@@ -138,11 +159,18 @@ function ResourceRow({ resource, assignments, days, hours, gridView }: ResourceR
           return 'bg-green-50';
         case 'Inactive':
           return 'bg-yellow-50';
-        case 'Deactivated':
-          return 'bg-red-50';
+        default:
+          return '';
       }
     }
   }, [resource]);
+
+  const getSubtitle = () => {
+    if (isStation(resource)) {
+      return `Capacity: ${resource.capacity}`;
+    }
+    return `${resource.supportedActionTypes.length} actions`;
+  };
 
   return (
     <div className="flex border-b hover:bg-muted/20">
@@ -156,7 +184,7 @@ function ResourceRow({ resource, assignments, days, hours, gridView }: ResourceR
         <div className="flex-1 truncate">
           <div className="font-medium text-sm truncate">{resource.name}</div>
           <div className="text-xs text-muted-foreground">
-            {isEquipment(resource) ? resource.location : `${resource.skills.length} skills`}
+            {getSubtitle()}
           </div>
         </div>
       </div>
@@ -182,17 +210,15 @@ function ResourceRow({ resource, assignments, days, hours, gridView }: ResourceR
 
         {/* Task blocks */}
         {assignments.map((assignment) => {
-          const task = snapshot?.tasks.find((t) => t.id === assignment.taskId);
-          const job = task ? snapshot?.jobs.find((j) => j.id === task.jobId) : undefined;
-
-          if (!task) return null;
+          const result = findTaskAndJob(assignment);
+          if (!result) return null;
 
           return (
             <TaskBlock
               key={assignment.id}
               assignment={assignment}
-              task={task}
-              job={job}
+              task={result.task}
+              job={result.job}
               startDate={new Date(days[0])}
               hourWidth={60}
               startHour={hours[0]}

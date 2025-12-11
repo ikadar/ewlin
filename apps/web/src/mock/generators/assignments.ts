@@ -1,84 +1,102 @@
 import { faker } from '@faker-js/faker';
-import { addMinutes, addHours, startOfDay, addDays, isWithinInterval, parseISO } from 'date-fns';
-import type { Assignment, Task, Operator, Equipment, TimeSlot } from '../../types';
+import { addMinutes, addHours, startOfDay, addDays } from 'date-fns';
+import type { Assignment, Task, Station, OutsourcedProvider, Job } from '../../types';
 
 interface AssignmentGeneratorInput {
-  tasks: Task[];
-  operators: Operator[];
-  equipment: Equipment[];
+  jobs: Job[];
+  stations: Station[];
+  providers: OutsourcedProvider[];
   startDate: Date;
 }
 
 export function generateAssignments({
-  tasks,
-  operators,
-  equipment,
+  jobs,
+  stations,
+  providers,
   startDate,
 }: AssignmentGeneratorInput): Assignment[] {
   const assignments: Assignment[] = [];
-  const occupiedSlots: Map<string, TimeSlot[]> = new Map();
 
-  // Filter assignable tasks
-  const assignableTasks = tasks.filter(
-    (t) => t.status === 'Assigned' || t.status === 'Executing'
-  );
-
-  // Sort by dependencies (tasks with no dependencies first)
-  const sortedTasks = [...assignableTasks].sort(
-    (a, b) => a.dependencies.length - b.dependencies.length
-  );
-
-  for (const task of sortedTasks) {
-    // Find available operator if required
-    let operatorId: string | null = null;
-    if (task.requiresOperator) {
-      const availableOperators = operators.filter(
-        (op) => op.status === 'Active' && op.skills.length > 0
-      );
-      if (availableOperators.length > 0) {
-        operatorId = faker.helpers.arrayElement(availableOperators).id;
-      }
+  // Collect all tasks from jobs
+  const allTasks: Array<{ task: Task; job: Job }> = [];
+  for (const job of jobs) {
+    for (const task of job.tasks) {
+      allTasks.push({ task, job });
     }
+  }
 
-    // Find available equipment if required
-    let equipmentId: string | null = null;
-    if (task.requiresEquipment) {
-      const compatibleEquipment = equipment.filter(
-        (eq) =>
-          (eq.status === 'Available' || eq.status === 'InUse') &&
-          eq.supportedTaskTypes.some((t) => t === task.type || task.type.includes(t))
+  // Filter assignable tasks (only those with Assigned status)
+  const assignableTasks = allTasks.filter(
+    ({ task }) => task.status === 'Assigned'
+  );
+
+  // Sort by sequence order within jobs
+  const sortedTasks = [...assignableTasks].sort(
+    (a, b) => a.task.sequenceOrder - b.task.sequenceOrder
+  );
+
+  // Track occupied time slots per station
+  const stationSchedules: Map<string, Array<{ start: Date; end: Date }>> = new Map();
+
+  for (const { task, job } of sortedTasks) {
+    let stationId: string;
+    let scheduledStart: Date;
+    let scheduledEnd: Date;
+
+    if (task.type === 'internal' && task.stationId) {
+      // Internal task: assign to its station
+      const station = stations.find(s => s.id === task.stationId);
+      if (!station) continue;
+
+      stationId = station.id;
+
+      // Find next available slot for this station
+      const existingSlots = stationSchedules.get(stationId) || [];
+
+      // Generate a start time that doesn't overlap
+      const dayOffset = faker.number.int({ min: 0, max: 10 });
+      const hourOffset = faker.number.int({ min: 6, max: 16 });
+      scheduledStart = addHours(
+        startOfDay(addDays(startDate, dayOffset)),
+        hourOffset
       );
-      if (compatibleEquipment.length > 0) {
-        equipmentId = faker.helpers.arrayElement(compatibleEquipment).id;
-      } else {
-        // Fallback to any available equipment
-        const anyEquipment = equipment.filter(
-          (eq) => eq.status === 'Available' || eq.status === 'InUse'
-        );
-        if (anyEquipment.length > 0) {
-          equipmentId = faker.helpers.arrayElement(anyEquipment).id;
+
+      // Avoid conflicts by shifting if needed
+      for (const slot of existingSlots) {
+        if (scheduledStart >= slot.start && scheduledStart < slot.end) {
+          scheduledStart = slot.end;
         }
       }
+
+      scheduledEnd = addMinutes(scheduledStart, task.totalMinutes);
+
+      // Record the slot
+      existingSlots.push({ start: scheduledStart, end: scheduledEnd });
+      stationSchedules.set(stationId, existingSlots);
+
+    } else if (task.type === 'outsourced' && task.providerId) {
+      // Outsourced task: assign to provider
+      const provider = providers.find(p => p.id === task.providerId);
+      if (!provider) continue;
+
+      stationId = provider.id; // Use provider ID as station ID for scheduling
+
+      // Outsourced tasks span multiple days
+      const dayOffset = faker.number.int({ min: 0, max: 7 });
+      scheduledStart = startOfDay(addDays(startDate, dayOffset));
+      // Duration is in open days, convert to calendar days (rough approximation)
+      const calendarDays = Math.ceil((task.durationOpenDays || 1) * 1.4); // Account for weekends
+      scheduledEnd = addDays(scheduledStart, calendarDays);
+
+    } else {
+      continue;
     }
-
-    // Skip if we can't assign required resources
-    if (task.requiresOperator && !operatorId) continue;
-    if (task.requiresEquipment && !equipmentId) continue;
-
-    // Generate a random start time within the schedule window
-    const dayOffset = faker.number.int({ min: 0, max: 10 });
-    const hourOffset = faker.number.int({ min: 6, max: 16 });
-    const scheduledStart = addHours(
-      startOfDay(addDays(startDate, dayOffset)),
-      hourOffset
-    );
-    const scheduledEnd = addMinutes(scheduledStart, task.duration);
 
     assignments.push({
       id: faker.string.uuid(),
       taskId: task.id,
-      operatorId,
-      equipmentId,
+      jobId: job.id,
+      stationId,
       scheduledStart: scheduledStart.toISOString(),
       scheduledEnd: scheduledEnd.toISOString(),
     });

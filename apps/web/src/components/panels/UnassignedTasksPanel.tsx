@@ -21,29 +21,25 @@ export function UnassignedTasksPanel({ className }: UnassignedTasksPanelProps) {
 
     // Get tasks that are not assigned (no assignment record)
     const assignedTaskIds = new Set(snapshot.assignments.map((a) => a.taskId));
-    const unassignedTasks = snapshot.tasks.filter(
-      (t) =>
-        !assignedTaskIds.has(t.id) &&
-        t.status !== 'Completed' &&
-        t.status !== 'Cancelled' &&
-        t.status !== 'Failed'
-    );
 
-    // Group by job
-    const jobMap = new Map<string, { job: Job; tasks: Task[] }>();
+    // Collect unassigned tasks grouped by job
+    const jobsWithUnassigned: { job: Job; tasks: Task[] }[] = [];
 
-    for (const task of unassignedTasks) {
-      const job = snapshot.jobs.find((j) => j.id === task.jobId);
-      if (!job) continue;
+    for (const job of snapshot.jobs) {
+      const unassignedTasks = job.tasks.filter(
+        (t) =>
+          !assignedTaskIds.has(t.id) &&
+          t.status !== 'Completed' &&
+          t.status !== 'Cancelled'
+      );
 
-      if (!jobMap.has(job.id)) {
-        jobMap.set(job.id, { job, tasks: [] });
+      if (unassignedTasks.length > 0) {
+        jobsWithUnassigned.push({ job, tasks: unassignedTasks });
       }
-      jobMap.get(job.id)!.tasks.push(task);
     }
 
-    return Array.from(jobMap.values()).sort(
-      (a, b) => new Date(a.job.deadline).getTime() - new Date(b.job.deadline).getTime()
+    return jobsWithUnassigned.sort(
+      (a, b) => new Date(a.job.workshopExitDate).getTime() - new Date(b.job.workshopExitDate).getTime()
     );
   }, [snapshot]);
 
@@ -54,6 +50,20 @@ export function UnassignedTasksPanel({ className }: UnassignedTasksPanelProps) {
         task,
       })
     );
+  };
+
+  const getTaskLabel = (task: Task) => {
+    if (task.type === 'internal') {
+      return task.stationName ?? 'Internal';
+    }
+    return task.providerName ?? task.actionType ?? 'Outsourced';
+  };
+
+  const getTaskDuration = (task: Task) => {
+    if (task.type === 'internal') {
+      return `${task.totalMinutes}m`;
+    }
+    return `${task.durationOpenDays ?? 0}d`;
   };
 
   return (
@@ -71,9 +81,9 @@ export function UnassignedTasksPanel({ className }: UnassignedTasksPanelProps) {
             {unassignedTasksByJob.map(({ job, tasks }) => (
               <div key={job.id} className="p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm">{job.name}</span>
+                  <span className="font-medium text-sm">{job.reference}</span>
                   <Badge variant="outline" className="text-xs">
-                    {format(new Date(job.deadline), 'MMM d')}
+                    {format(new Date(job.workshopExitDate), 'MMM d')}
                   </Badge>
                 </div>
                 <div className="space-y-1">
@@ -93,9 +103,9 @@ export function UnassignedTasksPanel({ className }: UnassignedTasksPanelProps) {
                           task.status === 'Ready' ? 'bg-green-500' : 'bg-yellow-500'
                         )}
                       />
-                      <span className="flex-1 truncate">{task.type}</span>
+                      <span className="flex-1 truncate">{getTaskLabel(task)}</span>
                       <span className="text-muted-foreground text-xs">
-                        {task.duration}m
+                        {getTaskDuration(task)}
                       </span>
                     </div>
                   ))}

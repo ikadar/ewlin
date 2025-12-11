@@ -1,6 +1,6 @@
-# Event & Message Design Specification – Operations Research System
+# Event & Message Design Specification – Flux Print Shop Scheduling System
 
-This document defines **domain events**, **integration events**, and **message schemas** used across the Equipment → Operator → Job → Task assignment and validation workflow.
+This document defines **domain events**, **integration events**, and **message schemas** used across the Station → Job → Task assignment and scheduling workflow.
 
 The goal is to provide:
 - a consistent event naming strategy,
@@ -21,177 +21,296 @@ The goal is to provide:
 - Describe something that **other services must react to**.
 - Are published outside the bounded context.
 - Format: **<Context>.<EventName>**, e.g.:
-  - `ResourceManagement.OperatorAvailabilityChanged`
+  - `StationManagement.StationScheduleUpdated`
   - `JobManagement.TaskAddedToJob`
-  - `Assignment.TaskScheduled`
+  - `Assignment.TaskAssigned`
 
 ---
 
 ## 2. Domain Events (Internal)
 
-### OperatorRegistered
-**Purpose:** Indicates that a new operator has been added to the system.  
-**Trigger:** Emitted when the Operator aggregate is created.
+### StationRegistered
+**Purpose:** Indicates that a new station has been added to the system.
+**Trigger:** Emitted when the Station aggregate is created.
 ```json
 {
-  "operatorId": "string",
+  "stationId": "string",
   "name": "string",
+  "categoryId": "string",
+  "groupId": "string",
   "registeredAt": "ISO-8601-timestamp"
 }
 ```
 
-### OperatorAvailabilityChanged
-**Purpose:** Signals that an operator's availability schedule has been modified.  
-**Trigger:** Emitted when availability slots are added, removed, or updated.
+### OperatingScheduleUpdated
+**Purpose:** Signals that a station's operating schedule has been modified.
+**Trigger:** Emitted when weekly schedule patterns are updated.
 ```json
 {
-  "operatorId": "string",
-  "availability": [
+  "stationId": "string",
+  "weeklyPattern": [
     {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
+      "dayOfWeek": 0,
+      "timeSlots": [
+        {"start": "HH:MM", "end": "HH:MM"}
+      ]
     }
   ],
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+### ScheduleExceptionAdded
+**Purpose:** Indicates a one-off schedule exception (holiday, maintenance).
+**Trigger:** Emitted when an exception is added to a station.
+```json
+{
+  "stationId": "string",
+  "exceptionDate": "YYYY-MM-DD",
+  "type": "Closed|ModifiedHours",
+  "modifiedSlots": [{"start": "HH:MM", "end": "HH:MM"}],
+  "reason": "string",
+  "addedAt": "ISO-8601-timestamp"
+}
+```
+
+### StationStatusChanged
+**Purpose:** Signals station status transition.
+**Trigger:** Emitted when station availability changes.
+```json
+{
+  "stationId": "string",
+  "previousStatus": "Available|InUse|Maintenance|OutOfService",
+  "newStatus": "Available|InUse|Maintenance|OutOfService",
+  "reason": "string",
   "changedAt": "ISO-8601-timestamp"
 }
 ```
 
-### OperatorSkillAdded
-**Purpose:** Represents that an operator has gained certification for equipment.  
-**Trigger:** Emitted when a new skill is added to operator profile.
+### StationCategoryCreated
+**Purpose:** Indicates a new station category has been defined.
+**Trigger:** Emitted when category is created.
 ```json
 {
-  "operatorId": "string",
-  "equipmentId": "string",
-  "level": "beginner|intermediate|expert",
-  "certificationDate": "YYYY-MM-DD"
+  "categoryId": "string",
+  "name": "string",
+  "similarityCriteria": [
+    {"code": "string", "name": "string"}
+  ],
+  "createdAt": "ISO-8601-timestamp"
 }
 ```
 
-### EquipmentRegistered
-**Purpose:** Indicates that new equipment has been added to the resource pool.  
-**Trigger:** Emitted when the Equipment aggregate is created.
+### StationGroupCreated
+**Purpose:** Indicates a new station group has been defined.
+**Trigger:** Emitted when group is created.
 ```json
 {
-  "equipmentId": "string",
+  "groupId": "string",
   "name": "string",
-  "supportedTaskTypes": ["type1", "type2"],
+  "maxConcurrent": 2,
+  "isOutsourcedProviderGroup": false,
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+### ProviderRegistered
+**Purpose:** Indicates an outsourced provider has been added.
+**Trigger:** Emitted when provider is registered.
+```json
+{
+  "providerId": "string",
+  "name": "string",
+  "supportedActionTypes": ["Pelliculage", "Dorure"],
+  "groupId": "string",
   "registeredAt": "ISO-8601-timestamp"
 }
 ```
 
-### MaintenanceScheduled
-**Purpose:** Signals that equipment maintenance has been planned.  
-**Trigger:** Emitted when maintenance window is set on equipment.
-```json
-{
-  "equipmentId": "string",
-  "maintenanceId": "string",
-  "start": "ISO-8601-datetime",
-  "end": "ISO-8601-datetime",
-  "scheduledAt": "ISO-8601-timestamp"
-}
-```
-
 ### JobCreated
-**Purpose:** Represents that a production job has been defined.  
+**Purpose:** Represents that a print job has been created.
 **Trigger:** Emitted when the Job aggregate is created.
 ```json
 {
   "jobId": "string",
-  "name": "string",
-  "deadline": "ISO-8601-datetime",
+  "reference": "string",
+  "client": "string",
+  "description": "string",
+  "workshopExitDate": "ISO-8601-datetime",
+  "status": "Draft",
   "createdAt": "ISO-8601-timestamp"
 }
 ```
 
 ### TaskAddedToJob
-**Purpose:** Indicates that a task has been added to a job.  
-**Trigger:** Emitted when task is added to job aggregate.
+**Purpose:** Indicates that a task has been added to a job.
+**Trigger:** Emitted when task is added to job aggregate (from DSL parsing).
 ```json
 {
   "jobId": "string",
   "taskId": "string",
-  "type": "string",
-  "duration": 120,
-  "requiresOperator": true,
-  "requiresEquipment": true,
+  "sequenceOrder": 1,
+  "type": "internal|outsourced",
+  "stationId": "string",
+  "providerId": "string",
+  "setupMinutes": 20,
+  "runMinutes": 40,
+  "durationOpenDays": 2,
+  "actionType": "string",
+  "comment": "string",
   "addedAt": "ISO-8601-timestamp"
 }
 ```
 
-### TaskDependencySet
-**Purpose:** Signals that a dependency between tasks has been established.  
-**Trigger:** Emitted when task dependency is created.
+### TasksReordered
+**Purpose:** Signals that tasks within a job have been reordered.
+**Trigger:** Emitted when task sequence is changed.
 ```json
 {
   "jobId": "string",
-  "fromTaskId": "string",
-  "toTaskId": "string",
-  "dependencyType": "FinishToStart",
-  "setAt": "ISO-8601-timestamp"
+  "newOrder": ["task-001", "task-002", "task-003"],
+  "reorderedAt": "ISO-8601-timestamp"
+}
+```
+
+### ProofStatusUpdated
+**Purpose:** Indicates BAT (proof) status has changed.
+**Trigger:** Emitted when proof is sent, approved, or marked as not required.
+```json
+{
+  "jobId": "string",
+  "proofSentAt": "ISO-8601-timestamp|NoProofRequired|null",
+  "proofApprovedAt": "ISO-8601-timestamp|null",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+### PlatesStatusUpdated
+**Purpose:** Indicates plates preparation status has changed.
+**Trigger:** Emitted when plates status is updated.
+```json
+{
+  "jobId": "string",
+  "platesStatus": "Todo|Done",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+### PaperStatusUpdated
+**Purpose:** Indicates paper procurement status has changed.
+**Trigger:** Emitted when paper status is updated.
+```json
+{
+  "jobId": "string",
+  "paperPurchaseStatus": "InStock|ToOrder|Ordered|Received",
+  "paperOrderedAt": "ISO-8601-timestamp|null",
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+### JobDependencyAdded
+**Purpose:** Signals that a job dependency has been established.
+**Trigger:** Emitted when job dependency is created.
+```json
+{
+  "jobId": "string",
+  "requiredJobId": "string",
+  "addedAt": "ISO-8601-timestamp"
+}
+```
+
+### CommentAdded
+**Purpose:** Indicates a comment has been added to a job.
+**Trigger:** Emitted when comment is created.
+```json
+{
+  "jobId": "string",
+  "author": "string",
+  "content": "string",
+  "timestamp": "ISO-8601-timestamp"
+}
+```
+
+### JobStatusChanged
+**Purpose:** Indicates job status transition.
+**Trigger:** Emitted when job moves between states.
+```json
+{
+  "jobId": "string",
+  "previousStatus": "Draft|Planned|InProgress|Delayed|Completed|Cancelled",
+  "newStatus": "Draft|Planned|InProgress|Delayed|Completed|Cancelled",
+  "changedAt": "ISO-8601-timestamp"
 }
 ```
 
 ### TaskAssigned
-**Purpose:** Indicates that resources have been assigned to a task with specific timing.  
+**Purpose:** Indicates that a task has been assigned to a station with timing.
 **Trigger:** Emitted when task assignment is created in Schedule aggregate.
 ```json
 {
   "taskId": "string",
-  "operatorId": "string",
-  "equipmentId": "string",
+  "jobId": "string",
+  "stationId": "string",
+  "providerId": "string",
   "scheduledStart": "ISO-8601-datetime",
   "scheduledEnd": "ISO-8601-datetime",
   "assignedAt": "ISO-8601-timestamp"
 }
 ```
 
-### TaskStarted
-**Purpose:** Represents that task execution has begun.  
-**Trigger:** Emitted when operator starts executing a task.
-```json
-{
-  "taskId": "string",
-  "operatorId": "string",
-  "actualStartTime": "ISO-8601-datetime",
-  "varianceMinutes": -5
-}
-```
-
-### TaskCompleted
-**Purpose:** Indicates that task execution has finished successfully.
-**Trigger:** Emitted when task execution is marked complete.
-```json
-{
-  "taskId": "string",
-  "actualEndTime": "ISO-8601-datetime",
-  "durationVarianceMinutes": 10,
-  "qualityChecksPassed": true
-}
-```
-
-### TaskCancelled
-**Purpose:** Indicates that a task has been cancelled.
-**Trigger:** Emitted when task is cancelled (typically due to job cancellation).
+### TaskUnassigned
+**Purpose:** Indicates that a task has been recalled (unassigned).
+**Trigger:** Emitted when task assignment is removed.
 ```json
 {
   "taskId": "string",
   "jobId": "string",
-  "reason": "JobCancelled|ManualCancellation",
-  "cancelledAt": "ISO-8601-timestamp"
+  "previousStationId": "string",
+  "unassignedAt": "ISO-8601-timestamp"
 }
 ```
 
-### JobCancelled
-**Purpose:** Indicates that a job has been cancelled.
-**Trigger:** Emitted when job is cancelled, cascading to all tasks.
+### TaskRescheduled
+**Purpose:** Indicates that a task has been moved to a new time or station.
+**Trigger:** Emitted when existing assignment is modified.
 ```json
 {
+  "taskId": "string",
   "jobId": "string",
-  "reason": "string",
-  "affectedTaskIds": ["task1", "task2"],
-  "cancelledAt": "ISO-8601-timestamp"
+  "previousStationId": "string",
+  "newStationId": "string",
+  "previousStart": "ISO-8601-datetime",
+  "newStart": "ISO-8601-datetime",
+  "previousEnd": "ISO-8601-datetime",
+  "newEnd": "ISO-8601-datetime",
+  "rescheduledAt": "ISO-8601-timestamp"
+}
+```
+
+### ConflictDetected
+**Purpose:** Alerts that scheduling conflicts have been identified.
+**Trigger:** Emitted during validation when constraints are violated.
+```json
+{
+  "scheduleId": "string",
+  "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
+  "affectedTaskIds": ["task-001", "task-002"],
+  "stationId": "string",
+  "description": "string",
+  "severity": "High|Medium|Low",
+  "detectedAt": "ISO-8601-timestamp"
+}
+```
+
+### ScheduleUpdated
+**Purpose:** Signals that the schedule has been modified.
+**Trigger:** Emitted after any assignment change.
+```json
+{
+  "scheduleId": "string",
+  "version": 42,
+  "changedTaskIds": ["task-001", "task-002"],
+  "updatedAt": "ISO-8601-timestamp"
 }
 ```
 
@@ -199,21 +318,21 @@ The goal is to provide:
 
 ## 3. Integration Events (Public)
 
-### ResourceManagement.OperatorAvailabilityChanged
-Published by: **Resource Management Service**  
-Consumed by: **Assignment & Validation Service**
+### StationManagement.StationScheduleUpdated
+Published by: **Station Management Service**
+Consumed by: **Assignment Service**, **Scheduling View Service**
 
-**Purpose:** Notifies that operator availability has changed, requiring schedule revalidation.  
+**Purpose:** Notifies that station availability has changed, requiring schedule revalidation.
 **Trigger:** Domain event wrapped for external consumption.
 ```json
 {
   "eventId": "uuid",
-  "eventType": "ResourceManagement.OperatorAvailabilityChanged",
+  "eventType": "StationManagement.StationScheduleUpdated",
   "occurredAt": "ISO-8601-timestamp",
   "data": {
-    "operatorId": "string",
-    "previousAvailability": [...],
-    "newAvailability": [...],
+    "stationId": "string",
+    "stationName": "string",
+    "changeType": "ScheduleUpdated|ExceptionAdded|StatusChanged",
     "affectedPeriod": {
       "start": "ISO-8601-datetime",
       "end": "ISO-8601-datetime"
@@ -222,33 +341,12 @@ Consumed by: **Assignment & Validation Service**
 }
 ```
 
-### ResourceManagement.EquipmentStatusChanged
-Published by: **Resource Management Service**  
-Consumed by: **Assignment & Validation Service**
-
-**Purpose:** Signals equipment status change that may affect assignments.  
-**Trigger:** Equipment breakdown, maintenance start/end.
-```json
-{
-  "eventId": "uuid",
-  "eventType": "ResourceManagement.EquipmentStatusChanged",
-  "occurredAt": "ISO-8601-timestamp",
-  "data": {
-    "equipmentId": "string",
-    "previousStatus": "Available",
-    "newStatus": "OutOfService",
-    "reason": "Breakdown",
-    "estimatedReturnToService": "ISO-8601-datetime"
-  }
-}
-```
-
 ### JobManagement.TaskStructureChanged
-Published by: **Job Management Service**  
-Consumed by: **Assignment & Validation Service**
+Published by: **Job Management Service**
+Consumed by: **Assignment Service**, **Scheduling View Service**
 
-**Purpose:** Notifies that job/task structure has changed, affecting scheduling.  
-**Trigger:** Task added, removed, or dependencies changed.
+**Purpose:** Notifies that job/task structure has changed, affecting scheduling.
+**Trigger:** Task added, removed, or reordered.
 ```json
 {
   "eventId": "uuid",
@@ -256,19 +354,40 @@ Consumed by: **Assignment & Validation Service**
   "occurredAt": "ISO-8601-timestamp",
   "data": {
     "jobId": "string",
-    "changeType": "TaskAdded|TaskRemoved|DependencyChanged",
-    "affectedTaskIds": ["task1", "task2"],
-    "criticalPathChanged": true
+    "jobReference": "string",
+    "changeType": "TaskAdded|TaskRemoved|TasksReordered",
+    "affectedTaskIds": ["task-001", "task-002"]
+  }
+}
+```
+
+### JobManagement.ApprovalGateChanged
+Published by: **Job Management Service**
+Consumed by: **Assignment Service**
+
+**Purpose:** Notifies that an approval gate status has changed.
+**Trigger:** Proof or plates status updated.
+```json
+{
+  "eventId": "uuid",
+  "eventType": "JobManagement.ApprovalGateChanged",
+  "occurredAt": "ISO-8601-timestamp",
+  "data": {
+    "jobId": "string",
+    "gateType": "Proof|Plates",
+    "previousState": "string",
+    "newState": "string",
+    "isBlocking": false
   }
 }
 ```
 
 ### Assignment.TaskScheduled
-Published by: **Assignment & Validation Service**  
-Consumed by: **Execution Tracking Service**, **Scheduling View Service**
+Published by: **Assignment Service**
+Consumed by: **Scheduling View Service**, **Job Management Service**
 
-**Purpose:** Broadcasts that a task has been scheduled with resources and timing.  
-**Trigger:** Successful task assignment and scheduling.
+**Purpose:** Broadcasts that a task has been scheduled with station and timing.
+**Trigger:** Successful task assignment.
 ```json
 {
   "eventId": "uuid",
@@ -277,66 +396,52 @@ Consumed by: **Execution Tracking Service**, **Scheduling View Service**
   "data": {
     "taskId": "string",
     "jobId": "string",
-    "operatorId": "string",
-    "operatorName": "string",
-    "equipmentId": "string",
-    "equipmentName": "string",
+    "jobReference": "string",
+    "stationId": "string",
+    "stationName": "string",
     "scheduledStart": "ISO-8601-datetime",
-    "scheduledEnd": "ISO-8601-datetime",
-    "location": "string"
+    "scheduledEnd": "ISO-8601-datetime"
   }
 }
 ```
 
 ### Assignment.ConflictDetected
-Published by: **Assignment & Validation Service**  
-Consumed by: **Scheduling View Service**, **Notification Service**
+Published by: **Assignment Service**
+Consumed by: **Scheduling View Service**
 
-**Purpose:** Alerts that scheduling conflicts have been identified.  
-**Trigger:** Validation detects resource conflicts or constraint violations.
+**Purpose:** Alerts that scheduling conflicts have been identified.
+**Trigger:** Validation detects conflicts.
 ```json
 {
   "eventId": "uuid",
   "eventType": "Assignment.ConflictDetected",
   "occurredAt": "ISO-8601-timestamp",
   "data": {
-    "conflictType": "ResourceConflict|AvailabilityConflict|DependencyConflict|DeadlineConflict|SkillConflict",
-    "affectedTaskIds": ["task1", "task2"],
-    "resourceId": "string",
-    "conflictPeriod": {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
-    },
-    "severity": "High|Medium|Low",
-    "suggestedResolution": "string"
+    "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
+    "affectedTaskIds": ["task-001", "task-002"],
+    "stationId": "string",
+    "description": "string",
+    "severity": "High|Medium|Low"
   }
 }
 ```
 
-### Execution.TaskProgressUpdate
-Published by: **Execution Tracking Service**  
-Consumed by: **Job Management Service**, **Scheduling View Service**
+### Assignment.ScheduleSnapshotUpdated
+Published by: **Assignment Service**
+Consumed by: **Scheduling View Service**
 
-**Purpose:** Provides real-time updates on task execution progress.  
-**Trigger:** Task started, progress recorded, or completed.
+**Purpose:** Signals that a new schedule snapshot is available.
+**Trigger:** Any schedule modification.
 ```json
 {
   "eventId": "uuid",
-  "eventType": "Execution.TaskProgressUpdate",
+  "eventType": "Assignment.ScheduleSnapshotUpdated",
   "occurredAt": "ISO-8601-timestamp",
   "data": {
-    "taskId": "string",
-    "jobId": "string",
-    "status": "Started|InProgress|Completed|Failed",
-    "progressPercent": 75,
-    "actualTiming": {
-      "start": "ISO-8601-datetime",
-      "end": "ISO-8601-datetime"
-    },
-    "variance": {
-      "startVarianceMinutes": -5,
-      "durationVarianceMinutes": 10
-    }
+    "snapshotVersion": 43,
+    "changedTaskIds": ["task-001", "task-002"],
+    "hasNewConflicts": true,
+    "lateJobCount": 2
   }
 }
 ```
@@ -347,69 +452,81 @@ Consumed by: **Job Management Service**, **Scheduling View Service**
 
 While events describe facts about what already happened, command messages express intent: they tell a service to perform an action.
 
-### AssignResourcesCommand
-**Purpose:** Instructs the Assignment Service to assign operator and equipment to a task.  
-**Expected Outcome:** Valid assignment created with scheduled times.  
-**Failure Conditions:** Resource unavailable, skill mismatch, scheduling conflict.
+### AssignTaskCommand
+**Purpose:** Instructs the Assignment Service to assign a task to a station.
+**Expected Outcome:** Valid assignment created with scheduled times.
+**Failure Conditions:** Station unavailable, group capacity exceeded, approval gate blocked.
 
 ```json
 {
-  "commandType": "AssignResources",
+  "commandType": "AssignTask",
   "taskId": "string",
-  "operatorId": "string",
-  "equipmentId": "string",
+  "stationId": "string",
   "scheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false,
   "requestedBy": "string",
   "requestedAt": "ISO-8601-timestamp"
 }
 ```
 
 ### RescheduleTaskCommand
-**Purpose:** Instructs the Assignment Service to change task timing.  
-**Expected Outcome:** Task rescheduled with new start/end times.  
-**Failure Conditions:** New time creates conflicts, violates dependencies.
+**Purpose:** Instructs the Assignment Service to move a task to a different time/station.
+**Expected Outcome:** Task rescheduled with new start/end times.
+**Failure Conditions:** New position creates conflicts.
 
 ```json
 {
   "commandType": "RescheduleTask",
   "taskId": "string",
+  "newStationId": "string",
   "newScheduledStart": "ISO-8601-datetime",
-  "reason": "string",
+  "bypassPrecedence": false,
   "requestedBy": "string",
   "requestedAt": "ISO-8601-timestamp"
 }
 ```
 
-### ValidateScheduleCommand
-**Purpose:** Triggers full validation of current schedule.  
-**Expected Outcome:** Validation report with conflicts identified.  
-**Failure Conditions:** None (always produces report).
+### UnassignTaskCommand
+**Purpose:** Instructs the Assignment Service to recall a task (remove assignment).
+**Expected Outcome:** Task assignment removed, task returns to unscheduled state.
+**Failure Conditions:** None (always succeeds for existing assignments).
 
 ```json
 {
-  "commandType": "ValidateSchedule",
-  "scope": {
-    "jobIds": ["job1", "job2"],
-    "startDate": "YYYY-MM-DD",
-    "endDate": "YYYY-MM-DD"
-  },
+  "commandType": "UnassignTask",
+  "taskId": "string",
+  "requestedBy": "string",
   "requestedAt": "ISO-8601-timestamp"
 }
 ```
 
-### StartTaskExecutionCommand
-**Purpose:** Records actual task start by operator.  
-**Expected Outcome:** Task execution started and tracked.  
-**Failure Conditions:** Task not assigned, wrong operator, outside time window.
+### SwapTasksCommand
+**Purpose:** Instructs the Assignment Service to swap two consecutive tasks.
+**Expected Outcome:** Both tasks swap positions, times recalculated.
+**Failure Conditions:** Tasks not consecutive, swap creates conflicts.
 
 ```json
 {
-  "commandType": "StartTaskExecution",
+  "commandType": "SwapTasks",
+  "taskId1": "string",
+  "taskId2": "string",
+  "requestedBy": "string",
+  "requestedAt": "ISO-8601-timestamp"
+}
+```
+
+### ValidateAssignmentCommand
+**Purpose:** Validates a proposed assignment without persisting.
+**Expected Outcome:** Validation result with conflicts and warnings.
+**Failure Conditions:** None (always produces result).
+
+```json
+{
+  "commandType": "ValidateAssignment",
   "taskId": "string",
-  "operatorId": "string",
-  "actualStartTime": "ISO-8601-datetime",
-  "startReason": "OnTime|Early|Late",
-  "delayReason": "string"
+  "stationId": "string",
+  "scheduledStart": "ISO-8601-datetime",
+  "requestedAt": "ISO-8601-timestamp"
 }
 ```
 
@@ -459,9 +576,9 @@ For aggregates using event sourcing:
 - `TaskAssignmentAdded`
 - `TaskAssignmentRemoved`
 - `TaskRescheduled`
+- `TasksSwapped`
 - `ConflictDetected`
 - `ConflictResolved`
-- `SchedulePublished`
 
 These events form the event stream that can rebuild schedule state.
 
@@ -477,11 +594,49 @@ Failed event processing:
 
 ---
 
-## 9. Notes
+## 9. Real-Time Updates (Future)
+
+For WebSocket-based real-time updates:
+
+```json
+// Schedule updated notification
+{
+  "type": "schedule.updated",
+  "data": {
+    "snapshotVersion": 43,
+    "changedTaskIds": ["task-001", "task-002"]
+  }
+}
+
+// Conflict detected notification
+{
+  "type": "conflict.detected",
+  "data": {
+    "type": "StationConflict",
+    "affectedTaskIds": ["task-001", "task-002"],
+    "description": "Station Komori already booked 09:00-10:30"
+  }
+}
+
+// Late job notification
+{
+  "type": "latejob.detected",
+  "data": {
+    "jobId": "job-789",
+    "reference": "45120",
+    "delayHours": 42
+  }
+}
+```
+
+---
+
+## 10. Notes
 
 - Domain events MUST NOT leak internal implementation details
 - Integration events SHOULD be stable over time and backward compatible
 - All timestamps use ISO-8601 format in UTC
-- Resource IDs in events should include human-readable names where possible
+- IDs in events should include human-readable names where helpful
 - Events are technology-agnostic (Kafka, RabbitMQ, Symfony Messenger, etc.)
 - The Assignment.TaskScheduled event is the most critical for system coordination
+- Conflict events enable real-time UI updates for schedulers

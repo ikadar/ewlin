@@ -3,19 +3,19 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type {
   ScheduleSnapshot,
   Assignment,
-  Operator,
-  Equipment,
+  Station,
+  StationCategory,
+  StationGroup,
+  OutsourcedProvider,
   Job,
-  Task,
   ProposedAssignment,
   ValidationResult,
-  CreateOperatorDto,
-  UpdateOperatorDto,
-  CreateEquipmentDto,
-  UpdateEquipmentDto,
+  CreateStationDto,
+  UpdateStationDto,
+  CreateProviderDto,
+  UpdateProviderDto,
   CreateJobDto,
   UpdateJobDto,
-  CreateTaskDto,
 } from '../types';
 import { api } from '../services/api';
 
@@ -63,48 +63,48 @@ export const deleteAssignment = createAsyncThunk(
   }
 );
 
-// Operator CRUD
-export const createOperator = createAsyncThunk(
-  'schedule/createOperator',
-  async (data: CreateOperatorDto) => {
-    return await api.createOperator(data);
+// Station CRUD
+export const createStation = createAsyncThunk(
+  'schedule/createStation',
+  async (data: CreateStationDto) => {
+    return await api.createStation(data);
   }
 );
 
-export const updateOperator = createAsyncThunk(
-  'schedule/updateOperator',
-  async ({ id, data }: { id: string; data: UpdateOperatorDto }) => {
-    return await api.updateOperator(id, data);
+export const updateStation = createAsyncThunk(
+  'schedule/updateStation',
+  async ({ id, data }: { id: string; data: UpdateStationDto }) => {
+    return await api.updateStation(id, data);
   }
 );
 
-export const deleteOperator = createAsyncThunk(
-  'schedule/deleteOperator',
+export const deleteStation = createAsyncThunk(
+  'schedule/deleteStation',
   async (id: string) => {
-    await api.deleteOperator(id);
+    await api.deleteStation(id);
     return id;
   }
 );
 
-// Equipment CRUD
-export const createEquipment = createAsyncThunk(
-  'schedule/createEquipment',
-  async (data: CreateEquipmentDto) => {
-    return await api.createEquipment(data);
+// Provider CRUD
+export const createProvider = createAsyncThunk(
+  'schedule/createProvider',
+  async (data: CreateProviderDto) => {
+    return await api.createProvider(data);
   }
 );
 
-export const updateEquipment = createAsyncThunk(
-  'schedule/updateEquipment',
-  async ({ id, data }: { id: string; data: UpdateEquipmentDto }) => {
-    return await api.updateEquipment(id, data);
+export const updateProvider = createAsyncThunk(
+  'schedule/updateProvider',
+  async ({ id, data }: { id: string; data: UpdateProviderDto }) => {
+    return await api.updateProvider(id, data);
   }
 );
 
-export const deleteEquipment = createAsyncThunk(
-  'schedule/deleteEquipment',
+export const deleteProvider = createAsyncThunk(
+  'schedule/deleteProvider',
   async (id: string) => {
-    await api.deleteEquipment(id);
+    await api.deleteProvider(id);
     return id;
   }
 );
@@ -129,13 +129,6 @@ export const deleteJob = createAsyncThunk(
   async (id: string) => {
     await api.deleteJob(id);
     return id;
-  }
-);
-
-export const addTaskToJob = createAsyncThunk(
-  'schedule/addTaskToJob',
-  async ({ jobId, task }: { jobId: string; task: CreateTaskDto }) => {
-    return await api.addTaskToJob(jobId, task);
   }
 );
 
@@ -193,54 +186,54 @@ const scheduleSlice = createSlice({
           state.snapshot.snapshotVersion++;
         }
       })
-      // Operator CRUD
-      .addCase(createOperator.fulfilled, (state, action) => {
+      // Station CRUD
+      .addCase(createStation.fulfilled, (state, action) => {
         if (state.snapshot) {
-          state.snapshot.operators.push(action.payload);
+          state.snapshot.stations.push(action.payload);
           state.snapshot.snapshotVersion++;
         }
       })
-      .addCase(updateOperator.fulfilled, (state, action) => {
+      .addCase(updateStation.fulfilled, (state, action) => {
         if (state.snapshot) {
-          const index = state.snapshot.operators.findIndex(
-            (o) => o.id === action.payload.id
+          const index = state.snapshot.stations.findIndex(
+            (s) => s.id === action.payload.id
           );
           if (index !== -1) {
-            state.snapshot.operators[index] = action.payload;
+            state.snapshot.stations[index] = action.payload;
             state.snapshot.snapshotVersion++;
           }
         }
       })
-      .addCase(deleteOperator.fulfilled, (state, action) => {
+      .addCase(deleteStation.fulfilled, (state, action) => {
         if (state.snapshot) {
-          state.snapshot.operators = state.snapshot.operators.filter(
-            (o) => o.id !== action.payload
+          state.snapshot.stations = state.snapshot.stations.filter(
+            (s) => s.id !== action.payload
           );
           state.snapshot.snapshotVersion++;
         }
       })
-      // Equipment CRUD
-      .addCase(createEquipment.fulfilled, (state, action) => {
+      // Provider CRUD
+      .addCase(createProvider.fulfilled, (state, action) => {
         if (state.snapshot) {
-          state.snapshot.equipment.push(action.payload);
+          state.snapshot.providers.push(action.payload);
           state.snapshot.snapshotVersion++;
         }
       })
-      .addCase(updateEquipment.fulfilled, (state, action) => {
+      .addCase(updateProvider.fulfilled, (state, action) => {
         if (state.snapshot) {
-          const index = state.snapshot.equipment.findIndex(
-            (e) => e.id === action.payload.id
+          const index = state.snapshot.providers.findIndex(
+            (p) => p.id === action.payload.id
           );
           if (index !== -1) {
-            state.snapshot.equipment[index] = action.payload;
+            state.snapshot.providers[index] = action.payload;
             state.snapshot.snapshotVersion++;
           }
         }
       })
-      .addCase(deleteEquipment.fulfilled, (state, action) => {
+      .addCase(deleteProvider.fulfilled, (state, action) => {
         if (state.snapshot) {
-          state.snapshot.equipment = state.snapshot.equipment.filter(
-            (e) => e.id !== action.payload
+          state.snapshot.providers = state.snapshot.providers.filter(
+            (p) => p.id !== action.payload
           );
           state.snapshot.snapshotVersion++;
         }
@@ -268,13 +261,6 @@ const scheduleSlice = createSlice({
           state.snapshot.jobs = state.snapshot.jobs.filter(
             (j) => j.id !== action.payload
           );
-          state.snapshot.snapshotVersion++;
-        }
-      })
-      // Add task
-      .addCase(addTaskToJob.fulfilled, (state, action) => {
-        if (state.snapshot) {
-          state.snapshot.tasks.push(action.payload);
           state.snapshot.snapshotVersion++;
         }
       });
