@@ -165,14 +165,20 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit tests (24 tests)
 - [x] Integration tests (31 tests)
 
-#### v0.1.6 - Outsourced Provider Entity
-- [ ] OutsourcedProvider entity and repository
-- [ ] supportedActionTypes field
-- [ ] latestDepartureTime field (HH:MM, default "14:00")
-- [ ] receptionTime field (HH:MM, default "09:00")
-- [ ] Auto-create station group with unlimited capacity
-- [ ] POST /api/v1/providers endpoint
-- [ ] PUT /api/v1/providers/{id} endpoint
+#### v0.1.6 - Outsourced Provider Entity ✅
+- [x] OutsourcedProvider entity and repository
+- [x] ProviderStatus enum (Active, Inactive)
+- [x] supportedActionTypes field (JSON array with deduplication)
+- [x] latestDepartureTime field (HH:MM, default "14:00")
+- [x] receptionTime field (HH:MM, default "09:00")
+- [x] Auto-create station group with unlimited capacity (BR-PROVIDER-002, BR-PROVIDER-003)
+- [x] POST /api/v1/providers endpoint
+- [x] GET /api/v1/providers endpoint (list with filters)
+- [x] GET /api/v1/providers/{id} endpoint
+- [x] PUT /api/v1/providers/{id} endpoint
+- [x] DELETE /api/v1/providers/{id} endpoint
+- [x] Unit tests (31 tests)
+- [x] Integration tests (34 tests)
 
 #### v0.1.7 - Station Domain Events
 - [ ] StationRegistered event
