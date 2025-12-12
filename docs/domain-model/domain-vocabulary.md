@@ -163,8 +163,9 @@ This document defines the core domain terms used in the **print shop scheduling*
   - Job reference and description
   - Start/end time
   - Similarity circles (between consecutive tiles)
-  - Random job color
+  - Job color (randomly assigned; dependent jobs use shades of same color)
   - Downtime overlay (distinct visual appearance for portions spanning station downtime)
+  - Completion checkbox (manually toggled; does not affect precedence validation)
 - **Related terms:** Assignment, SchedulingGrid.
 
 ---

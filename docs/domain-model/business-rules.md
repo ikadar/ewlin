@@ -123,6 +123,12 @@ Every JobId in requiredJobs MUST reference an existing job.
 **BR-JOB-008 – No circular job dependencies**
 Job dependencies MUST NOT form cycles.
 
+**BR-JOB-009 – Job color assignment**
+Job color MUST be randomly assigned at creation. Dependent jobs (via requiredJobIds) SHOULD use shades of the same base color for visual grouping.
+
+**BR-JOB-010 – Cancelled job assignment handling**
+When a Job is cancelled, task assignments scheduled in the future MUST be recalled (removed). Task assignments scheduled in the past MUST remain for historical reference.
+
 ---
 
 ## Task
@@ -204,6 +210,15 @@ Once a Task has started execution, its station assignment CANNOT be changed.
 
 **BR-ASSIGN-006 – Tile snaps to 30-minute grid**
 Task scheduling in the UI MUST snap to 30-minute intervals.
+
+**BR-ASSIGN-007 – Task completion is manual**
+Task completion (IsCompleted) MUST be manually toggled via UI checkbox. Tasks in the past are NOT automatically marked as completed.
+
+**BR-ASSIGN-008 – Completion does not affect precedence**
+The IsCompleted flag is for tracking purposes only and DOES NOT affect precedence validation. Precedence rules assume scheduled tasks will happen as defined.
+
+**BR-ASSIGN-009 – Tile insertion pushes subsequent tiles**
+When a tile is inserted at a position occupied by existing tiles, subsequent tiles on the same station MUST be pushed down (later in time). Tiles CANNOT overlap on capacity-1 stations.
 
 ---
 

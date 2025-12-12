@@ -83,7 +83,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Tasks` (ordered collection of Task entities)
   - `Comments` (collection of Comment value objects)
   - `Status` (Draft, Planned, InProgress, Delayed, Completed, Cancelled)
-  - `Color` (hex string, e.g., "#3B82F6", assigned at creation)
+  - `Color` (hex string, e.g., "#3B82F6", randomly assigned at creation; dependent jobs use shades of the same color)
   - `CreatedAt` (DateTime)
 
 ### Task (Entity within Job Aggregate)
@@ -207,10 +207,14 @@ This domain model describes the core entities, value objects, and aggregates for
   - `IsOutsourced` (boolean)
   - `ScheduledStart` (ISO timestamp)
   - `ScheduledEnd` (ISO timestamp)
+  - `IsCompleted` (boolean, default false)
+  - `CompletedAt` (ISO timestamp, nullable)
   - `CreatedAt` (ISO timestamp)
   - `UpdatedAt` (ISO timestamp)
 - **Rules:**
   - ScheduledEnd = ScheduledStart + Task duration (accounting for operating schedule gaps).
+  - IsCompleted is manually toggled via UI checkbox; does not affect precedence validation.
+  - Tasks in the past are NOT automatically marked as completed.
 
 ### MaintenanceBlock — *Post-MVP*
 - **Extends:** StationTimeBlock

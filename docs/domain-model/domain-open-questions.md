@@ -142,54 +142,17 @@ It is intentionally concise and structured for iterative refinement.
 
 ---
 
-## 11. Questions Blocking Implementation
+## 11. Implementation Decisions
 
-These questions should be resolved before implementation can begin:
-
-1. **How are similarity criteria values assigned to jobs?**
-   - Who enters this data?
-   See my answer above. If not clear, ask away. I feel this similarity criteria stuff isn't clear for you.
-   - Is it part of job creation or separate workflow?
-   It is part of job creation
-
-2. **What happens when station schedule changes with existing assignments?**
-   - Auto-reschedule?
-   - Flag as conflict?
-   - Notify user?
-   In the MVP we don't allow schedule changes with existing assignments. I want to clarify that in the MVP we allow the user to create a schedule that violates precedence requirements but we inform him of his violations through the visual cues that have been specified. The user cannot make two tiles overlap unless the station capacity allows for it so when a tile is inserted somewhere it "pushes down" the subsequent tiles of the station. Basically I can insert tiles between others, not over others.
-
-3. **Can outsourced tasks start on any day or only on business days?**
-   - If starting Saturday, does the 2JO count from Monday?
-   Only on business day.
-
-4. **How is job color assigned?**
-   - Random per job?
-   - User-selectable?
-   - Based on client or job type?
-   Random per job with mutually dependant jobs appearing as shades of one another.
-
-5. **What is the granularity of paper status tracking?**
-   - Per job?
-   - Per paper type?
-   - Per quantity?
-   Per job.
-
-6. **How are comments attributed?**
-   - Anonymous?
-   - Logged-in user?
-   - System-generated?
-   For MVP, anonymous (we will handle auth right AFTER the MVP is shipped)
-
-7. **What happens to assignments when a job is cancelled?**
-   - Auto-recall all tasks?
-   - Keep for historical reference?
-   All tiles in the future are recalled but the tiles in the past remain.
-   A side note : Each tile should have a checkbox that is checked when the task is completed. We shoud not assume that tasks in the past are always completed. This doesn't bear any impact on precedence rules which DO assume that scheduled tasks happen as defined. Please ask away if this is not 100% clear.
-
-8. **Is there a concept of "rush" or "priority" jobs?**
-   - Visual indicator?
-   - Affects conflict resolution?
-   Not in MVP.
+### Resolved ✓
+- ✓ Similarity criteria: Assigned during job creation via Job fields
+- ✓ Station schedule change: MVP doesn't allow with existing assignments; tiles push down (no overlap)
+- ✓ Outsourced task start: Business days only
+- ✓ Job color: Random per job; dependent jobs use shades of same color
+- ✓ Paper status granularity: Per job
+- ✓ Comments attribution: Anonymous (MVP); auth post-MVP
+- ✓ Cancelled job: Future tiles recalled, past remain; task completion checkbox on tiles
+- ✓ Rush/priority jobs: Not in MVP
 
 ---
 
@@ -283,6 +246,15 @@ Questions that were open but have been resolved through discussion:
 | Max stations | MVP dozens, up to 100 later | 2025-12-12 |
 | Time range display | Dynamic (jobs completed within last 14 days) | 2025-12-12 |
 | Offline mode | Not supported | 2025-12-12 |
+| Similarity criteria assignment | During job creation via Job fields | 2025-12-12 |
+| Station schedule change with assignments | MVP doesn't allow; tiles push down | 2025-12-12 |
+| Outsourced task start day | Business days only | 2025-12-12 |
+| Job color assignment | Random per job; dependent jobs use shades | 2025-12-12 |
+| Paper status granularity | Per job | 2025-12-12 |
+| Comments attribution | Anonymous (MVP); auth post-MVP | 2025-12-12 |
+| Cancelled job assignments | Future tiles recalled, past remain | 2025-12-12 |
+| Task completion checkbox | On tiles; doesn't affect precedence rules | 2025-12-12 |
+| Rush/priority jobs | Not in MVP | 2025-12-12 |
 
 ---
 
