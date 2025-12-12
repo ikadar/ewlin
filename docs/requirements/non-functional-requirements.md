@@ -125,6 +125,12 @@ Non-functional requirements specify the quality attributes and constraints that 
 - Handle 100,000 tasks per month
 - Store 2 years of historical data online
 
+### NFR-SCAL-004 – Flux Print Shop Specific Limits
+- Support ~300 concurrent (non-completed) jobs
+- Support up to 100 stations (MVP: dozens)
+- Display time range: dynamic (jobs completed within last 14 days visible)
+- Support unlimited outsourced provider capacity
+
 ---
 
 ## 6. Compatibility Requirements

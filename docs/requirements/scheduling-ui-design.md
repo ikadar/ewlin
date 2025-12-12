@@ -143,6 +143,7 @@ Each tile represents a scheduled task assignment:
 - Start time
 - End time
 - Setup/run visual differentiation
+- Completion checkbox (manually toggled; does not affect precedence validation)
 
 #### Tile Styling
 - Random job color (consistent per job)
@@ -237,6 +238,19 @@ Within a tile:
 | Alt+Drag | Allow placement (bypass safeguard) |
 | Tile violates precedence (after placement) | Red halo effect |
 
+**Note:** In MVP, precedence violations are allowed with visual warning only — no hard blocks prevent the user from creating the assignment.
+
+### 5.5 Tile Insertion Behavior
+
+When inserting a tile at a position occupied by existing tiles:
+
+| Station Type | Behavior |
+|--------------|----------|
+| Capacity-1 | Tiles CANNOT overlap. Subsequent tiles are pushed down (later in time) automatically. |
+| Capacity > 1 | Tiles CAN overlap up to the station's capacity limit. |
+
+Tiles are inserted **between** existing tiles, not **over** them.
+
 ---
 
 ## 6. Navigation
@@ -329,9 +343,9 @@ ST [Clément] Pelliculage 2JO
 | Unavailability overlay | Gray hatched pattern |
 
 #### Job Color Assignment
-- Colors are assigned automatically when a job is created
+- Colors are assigned **randomly** when a job is created
 - Uses a predefined palette of 12 visually distinct colors
-- Colors cycle deterministically based on job creation order
+- **Dependent jobs** (via requiredJobIds) use **shades of the same base color** for visual grouping
 - Palette selected for accessibility (colorblind-friendly)
 - Color stored in Job.Color field as hex string (e.g., "#3B82F6")
 

@@ -71,6 +71,9 @@ Each story follows the standard format:
 - Task duration is specified in open days (JO)
 - Multiple tasks can overlap on the same provider
 - Calendar calculates end date using business days
+- Latest departure time determines if current day counts as first business day
+- Reception time determines when completed work returns from provider
+- Outsourced tasks can only start on business days
 
 ---
 
@@ -114,9 +117,18 @@ Each story follows the standard format:
 > As a **production manager**, I want to **add timestamped comments to a job**, so that **communication is logged**.
 
 **Acceptance Criteria:**
-- Comment includes author and timestamp
+- Comment includes timestamp (MVP: author is anonymous; post-MVP: logged-in user)
 - Comments are immutable
 - Comments are displayed as a thread
+
+### US-JOB-006: Cancel a Job
+> As a **scheduler**, I want to **cancel a job**, so that **it is removed from active scheduling**.
+
+**Acceptance Criteria:**
+- Job status changes to Cancelled
+- Future task assignments are automatically recalled (removed)
+- Past task assignments remain for historical reference
+- All incomplete tasks are marked as Cancelled
 
 ---
 
@@ -166,6 +178,9 @@ Each story follows the standard format:
 - Drop creates assignment if valid
 - Invalid drops show conflict information
 - Tile appears on grid after successful drop
+- On capacity-1 stations: inserting between tiles pushes subsequent tiles down
+- On capacity > 1 stations: tiles can overlap up to capacity limit
+- Precedence violations are allowed with visual warning (not blocked)
 
 ### US-SCHED-003: Reschedule Task
 > As a **scheduler**, I want to **drag a tile to a different position on the grid**, so that **I can adjust the schedule**.
@@ -199,6 +214,16 @@ Each story follows the standard format:
 - Unavailable periods shown as overlay
 - Tiles stretch across unavailability
 - Different visual appearance for unavailable portion
+
+### US-SCHED-007: Mark Task as Completed
+> As a **scheduler**, I want to **mark a scheduled task as completed via checkbox**, so that **I can track actual progress**.
+
+**Acceptance Criteria:**
+- Checkbox appears on each tile
+- Completion is manually toggled (not automatic based on time)
+- Completed tasks remain on grid for reference
+- Completion status does NOT affect precedence validation
+- Tasks in the past are NOT automatically marked as completed
 
 ---
 
