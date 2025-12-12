@@ -25,16 +25,10 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Each provider has unlimited capacity (own group with no limit)
 - ✓ Provider tasks use open days (JO) for duration
 - ✓ Providers have supported action types (Pelliculage, Dorure, etc.)
-
-### Open Questions
-- Can providers have limited capacity in the future?
-No.
-- Should providers have their own business calendar (different holidays)?
-Not in MVP but mark for future improvement.
-- Can a provider handle multiple concurrent jobs from same client?
-Yes.
-- How is provider cost tracked (for reporting/optimization)?
-Irrelevant, scheduling is not related to costs at all.
+- ✓ Limited capacity in future: Not supported (providers always unlimited)
+- ✓ Provider-specific business calendars: Not in MVP, future improvement
+- ✓ Multiple concurrent jobs from same client: Supported
+- ✓ Cost tracking: Out of scope (scheduling is not related to costs)
 
 ---
 
@@ -301,6 +295,10 @@ Questions that were open but have been resolved through discussion:
 | Station reduced capacity | Not supported | 2025-12-12 |
 | Backup/substitute stations | Out of scope | 2025-12-12 |
 | Multiple categories per station | Not supported | 2025-12-12 |
+| Provider limited capacity | Not supported (always unlimited) | 2025-12-12 |
+| Provider-specific business calendars | Not in MVP, future improvement | 2025-12-12 |
+| Multiple concurrent jobs from same client | Supported | 2025-12-12 |
+| Cost tracking | Out of scope | 2025-12-12 |
 
 ---
 
