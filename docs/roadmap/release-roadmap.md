@@ -139,11 +139,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit tests (66 tests for value objects)
 - [x] Integration tests (10 tests for schedule API)
 
-#### v0.1.3 - Schedule Exceptions
-- [ ] ScheduleException value object
-- [ ] POST /api/v1/stations/{id}/exceptions endpoint
-- [ ] GET /api/v1/stations/{id}/exceptions endpoint
-- [ ] Exception override logic
+#### v0.1.3 - Schedule Exceptions ✅
+- [x] ScheduleException value object
+- [x] POST /api/v1/stations/{id}/exceptions endpoint
+- [x] GET /api/v1/stations/{id}/exceptions endpoint
+- [x] Exception override logic
 
 #### v0.1.4 - Station Category Entity
 - [ ] StationCategory entity and repository
