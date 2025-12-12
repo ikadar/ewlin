@@ -181,7 +181,21 @@ This domain model describes the core entities, value objects, and aggregates for
   - Used to determine visual indicators between consecutive tiles.
   - FieldPath references a field on Job entity for comparison logic.
 
+### StationTimeBlock (Abstract Concept)
+- **Definition:** An abstract representation of any time period during which a station is occupied.
+- **Subtypes:**
+  - `TaskAssignment` – station occupied by production work
+  - `MaintenanceBlock` – station occupied by scheduled maintenance (*Post-MVP*)
+- **Common Fields:**
+  - `StationId` (reference to Station)
+  - `ScheduledStart` (ISO timestamp)
+  - `ScheduledEnd` (ISO timestamp)
+- **Rules:**
+  - Both subtypes block station availability during their scheduled period.
+  - Used for unified station availability calculations.
+
 ### TaskAssignment
+- **Extends:** StationTimeBlock
 - **Fields:**
   - `Id` (string)
   - `TaskId` (reference to Task)
@@ -193,6 +207,22 @@ This domain model describes the core entities, value objects, and aggregates for
   - `UpdatedAt` (ISO timestamp)
 - **Rules:**
   - ScheduledEnd = ScheduledStart + Task duration (accounting for operating schedule gaps).
+
+### MaintenanceBlock — *Post-MVP*
+- **Extends:** StationTimeBlock
+- **Fields:**
+  - `Id` (string)
+  - `StationId` (reference to Station)
+  - `ScheduledStart` (ISO timestamp)
+  - `ScheduledEnd` (ISO timestamp)
+  - `Reason` (string, optional)
+  - `Status` (Scheduled, InProgress, Completed, Cancelled)
+  - `CreatedAt` (ISO timestamp)
+  - `UpdatedAt` (ISO timestamp)
+- **Rules:**
+  - Blocks station availability during scheduled period.
+  - Not associated with any Job or Task.
+  - Cannot overlap with TaskAssignments on the same station.
 
 ### Comment
 - **Fields:**

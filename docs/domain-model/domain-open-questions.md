@@ -16,9 +16,6 @@ It is intentionally concise and structured for iterative refinement.
 ### Open Questions
 - Can stations have different operating schedules per week (e.g., seasonal)?
 Not in MVP but mark for future improvement.
-- How is station maintenance scheduled—separate from schedule exceptions?
-Station maintenance will be treated like a job but is NOT a job per se.
-I say it is like a job because it will have a station and a duration and a deadline like a job but I also say it is NOT a job because it won't have a client for example.
 - Should stations support reduced capacity (e.g., 50% during certain periods)?
 No.
 - How are backup/substitute stations handled?
@@ -315,6 +312,7 @@ Questions that were open but have been resolved through discussion:
 | Job dependency level | Job-level only | Q&A session |
 | Deadline field name | `workshopExitDate` | Q&A session |
 | Schedule branching | Post-MVP | Q&A session |
+| Station maintenance scheduling | MaintenanceBlock entity (like TaskAssignment), Post-MVP | 2025-12-12 |
 
 ---
 

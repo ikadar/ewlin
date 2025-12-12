@@ -33,6 +33,19 @@ A ScheduleException for a specific date MUST override the regular operating sche
 
 ---
 
+## Maintenance Block — *Post-MVP*
+
+**BR-MAINT-001 – Maintenance blocks station availability**
+A MaintenanceBlock MUST prevent task assignments during its scheduled period on the same station.
+
+**BR-MAINT-002 – No overlap with task assignments**
+A MaintenanceBlock CANNOT overlap with existing TaskAssignments on the same station.
+
+**BR-MAINT-003 – Maintenance is independent of jobs**
+A MaintenanceBlock is NOT associated with any Job or Task; it exists independently as a station time block.
+
+---
+
 ## Station Category
 
 **BR-CATEGORY-001 – Category must have similarity criteria**

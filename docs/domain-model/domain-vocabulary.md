@@ -262,3 +262,24 @@ This document defines the core domain terms used in the **print shop scheduling*
   - Similarity indicators between tiles
   - 30-minute snap grid
 - **Related terms:** Tile, Station, Assignment.
+
+---
+
+## StationTimeBlock
+
+- **Definition:** An abstract concept representing any time period during which a station is occupied or unavailable.
+- **Notes:** Both production work (TaskAssignment) and maintenance periods (MaintenanceBlock) are types of StationTimeBlock. This abstraction allows unified handling of station availability.
+- **Subtypes:**
+  - **TaskAssignment** – station occupied by production work
+  - **MaintenanceBlock** – station occupied by scheduled maintenance
+- **Related terms:** TaskAssignment, MaintenanceBlock, Station.
+
+---
+
+## MaintenanceBlock
+
+- **Definition:** A scheduled maintenance period that blocks a station's availability.
+- **Notes:** Conceptually similar to TaskAssignment (both represent "station occupied during time period"), but MaintenanceBlock is not associated with a Job or Task. Has station, duration, and optional reason, but no client, approval gates, or paper status.
+- **Typical fields:** station, scheduled start, scheduled end, reason (optional), status.
+- **MVP Status:** Post-MVP feature.
+- **Related terms:** StationTimeBlock, TaskAssignment, Station, OperatingSchedule.
