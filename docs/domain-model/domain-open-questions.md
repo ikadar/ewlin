@@ -95,16 +95,10 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Real-time validation during drag (< 10ms)
 - ✓ Server-side authoritative validation
 - ✓ Conflict types: Station, GroupCapacity, Precedence, ApprovalGate, Availability
-
-### Open Questions
-- What is the escalation path for unresolvable conflicts?
-No path. The user receives the information through the UI and makes his decision with it. Unresolvable conflicts are a business matter that is solved outside of the scheduling system : calling a client to postpone a deadline, outsourcing a traditionnaly in-house action, etc.
-- Can certain users override specific validation rules?
-No.
-- How often should the system re-validate existing schedules?
-Anytime a change is made to the schedule or to a job definition (for example a deadline modification or the addition of a new action).
-- Should the system suggest optimal conflict resolution?
-No.
+- ✓ Escalation path: None (user resolves outside system)
+- ✓ Override validation rules: Not supported
+- ✓ Re-validation: On any schedule or job definition change
+- ✓ Optimal resolution suggestions: Not supported
 
 ---
 
@@ -291,6 +285,10 @@ Questions that were open but have been resolved through discussion:
 | BAT pending notifications | Not in MVP | 2025-12-12 |
 | Additional approval gates | Not in MVP | 2025-12-12 |
 | Partial paper reception | Not supported (all or nothing) | 2025-12-12 |
+| Conflict escalation path | None (user resolves outside system) | 2025-12-12 |
+| Override validation rules | Not supported | 2025-12-12 |
+| Re-validation frequency | On any schedule or job change | 2025-12-12 |
+| Optimal resolution suggestions | Not supported | 2025-12-12 |
 
 ---
 
