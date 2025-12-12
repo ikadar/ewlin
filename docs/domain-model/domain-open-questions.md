@@ -12,16 +12,10 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Stations belong to groups with capacity limits
 - ✓ All stations must belong to exactly one group
 - ✓ Operating schedules support recurring weekly patterns + exceptions
-
-### Open Questions
-- Can stations have different operating schedules per week (e.g., seasonal)?
-Not in MVP but mark for future improvement.
-- Should stations support reduced capacity (e.g., 50% during certain periods)?
-No.
-- How are backup/substitute stations handled?
-They are not and will never be.
-- Can a station belong to multiple categories (e.g., hybrid machines)?
-No.
+- ✓ Seasonal schedules: Not in MVP, future improvement
+- ✓ Reduced capacity (50%): Not supported
+- ✓ Backup/substitute stations: Not supported (out of scope)
+- ✓ Multiple categories per station: Not supported
 
 ---
 
@@ -303,6 +297,10 @@ Questions that were open but have been resolved through discussion:
 | Job dependency types | Finish-to-start only; no start-to-start or finish-to-finish | 2025-12-12 |
 | Validation warnings vs blocks | MVP: visual warnings only, no hard blocks | 2025-12-12 |
 | Similarity criteria values | fieldPath on Job entity; already implemented in SimilarityCriterion | 2025-12-12 |
+| Station seasonal schedules | Not in MVP, future improvement | 2025-12-12 |
+| Station reduced capacity | Not supported | 2025-12-12 |
+| Backup/substitute stations | Out of scope | 2025-12-12 |
+| Multiple categories per station | Not supported | 2025-12-12 |
 
 ---
 
