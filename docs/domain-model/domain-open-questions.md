@@ -66,18 +66,11 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Precedence within job must be respected (unless Alt bypass)
 - ✓ Station unavailability stretches task duration
 - ✓ Group capacity limits concurrent tasks
-
-### Open Questions
-- Is there a minimum/maximum time gap required between consecutive tasks?
-No.
-- Can tasks be scheduled outside normal operating hours with approval?
-No. However in the UI we will allow the user to easily modify the station downtime start and finish hours but NOT in the MVP.
-- Are there facility-wide constraints (max concurrent operations)?
-No.
-- How is travel time between outsourced provider and shop handled?
-See the answer I gave you above about how outsourced tasks are described.
-- Should the system warn about "tight" schedules (no buffer)?
-No.
+- ✓ Min/max gap between tasks: Not required
+- ✓ Schedule outside operating hours: Not supported (future: UI for modifying downtime)
+- ✓ Facility-wide constraints: Not supported
+- ✓ Provider travel time: Handled via LatestDepartureTime/ReceptionTime
+- ✓ Tight schedule warnings: Not supported
 
 ---
 
@@ -295,6 +288,11 @@ Questions that were open but have been resolved through discussion:
 | Conditional dependencies | Not supported (no success/failure concept) | 2025-12-12 |
 | External event triggers | Not supported (approval gates before scheduling) | 2025-12-12 |
 | Cross-client dependencies | Not supported | 2025-12-12 |
+| Min/max gap between tasks | Not required | 2025-12-12 |
+| Schedule outside operating hours | Not supported (future: UI modification) | 2025-12-12 |
+| Facility-wide constraints | Not supported | 2025-12-12 |
+| Provider travel time | Handled via LatestDepartureTime/ReceptionTime | 2025-12-12 |
+| Tight schedule warnings | Not supported | 2025-12-12 |
 
 ---
 
