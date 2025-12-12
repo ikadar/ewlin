@@ -66,7 +66,7 @@ Interfaces are described in:
 
 **Preconditions**
 - Station exists
-- Station is not Decommissioned
+- Station is not OutOfService
 
 **Request**
 ```json
@@ -100,7 +100,7 @@ Interfaces are described in:
 
 **Error responses**
 - `STATION_NOT_FOUND` – Station does not exist
-- `STATION_DECOMMISSIONED` – Station is decommissioned
+- `STATION_OUT_OF_SERVICE` – Station is out of service
 - `INVALID_TIME_SLOTS` – Time slots overlap or invalid format
 
 ### 1.3 AddScheduleException
@@ -161,7 +161,7 @@ Interfaces are described in:
 {
   "stationId": "string",
   "name": "string",
-  "status": "Available | InUse | Maintenance | Decommissioned",
+  "status": "Available | InUse | Maintenance | OutOfService",
   "categoryId": "string",
   "groupId": "string | null",
   "availableSlots": [
@@ -1105,7 +1105,7 @@ Interfaces are described in:
       "name": "string",
       "categoryId": "string",
       "groupId": "string | null",
-      "status": "Available | InUse | Maintenance | Decommissioned"
+      "status": "Available | InUse | Maintenance | OutOfService"
     }
   ],
   "providers": [

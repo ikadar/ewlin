@@ -18,7 +18,14 @@ Represents a physical station (machine) that can be assigned tasks, maintaining 
 - A station must belong to exactly one group
 - Operating schedule time slots cannot overlap within the same day
 - Schedule exceptions cannot overlap for the same date
-- Status transitions must follow: Available ↔ InUse, Available → Maintenance → Available
+- Status transitions must follow the complete state machine:
+  - Available ↔ InUse (task execution starts/completes)
+  - Available → Maintenance (scheduled maintenance)
+  - InUse → Maintenance (emergency maintenance)
+  - Maintenance → Available (maintenance completed)
+  - Available → OutOfService (long-term unavailability)
+  - Maintenance → OutOfService (major failure)
+  - OutOfService → Available (repaired and restored)
 
 **Entities and Value Objects**
 - **Aggregate Root:** Station
