@@ -145,11 +145,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] GET /api/v1/stations/{id}/exceptions endpoint
 - [x] Exception override logic
 
-#### v0.1.4 - Station Category Entity
-- [ ] StationCategory entity and repository
-- [ ] SimilarityCriterion value object
-- [ ] POST /api/v1/station-categories endpoint
-- [ ] Category listing on stations
+#### v0.1.4 - Station Category Entity ✅
+- [x] StationCategory entity and repository
+- [x] SimilarityCriterion value object
+- [x] POST /api/v1/station-categories endpoint
+- [x] GET /api/v1/station-categories endpoint (list with search)
+- [x] GET /api/v1/station-categories/{id} endpoint
+- [x] PUT /api/v1/station-categories/{id} endpoint
+- [x] DELETE /api/v1/station-categories/{id} endpoint
+- [x] Similarity criteria JSON storage
+- [x] Unit tests (53 tests for entity + value object)
+- [x] Integration tests (30 tests for API)
 
 #### v0.1.5 - Station Group Entity
 - [ ] StationGroup entity and repository
