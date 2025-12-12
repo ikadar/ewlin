@@ -1,0 +1,9 @@
+[submodule "services/php-api"]
+	path = services/php-api
+	url = git@github.com:ikadar/ewlin-php-api.git
+[submodule "packages/types"]
+	path = packages/types
+	url = git@github.com:ikadar/ewlin-types.git
+[submodule "packages/validator"]
+	path = packages/validator
+	url = git@github.com:ikadar/ewlin-validator.git

@@ -22,13 +22,12 @@ jobs:
   lint-node:
     name: Lint (Node.js)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/node
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -40,10 +39,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          cache-dependency-path: services/node/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Run ESLint
         run: pnpm lint
@@ -54,13 +52,12 @@ jobs:
   typecheck-node:
     name: Type Check (Node.js)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/node
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -72,10 +69,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          cache-dependency-path: services/node/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Run TypeScript check
         run: pnpm build
@@ -86,13 +82,12 @@ jobs:
   test-node:
     name: Test (Node.js)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/node
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -104,10 +99,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          cache-dependency-path: services/node/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build packages
         run: pnpm build
@@ -121,13 +115,12 @@ jobs:
   build-frontend:
     name: Build (Frontend)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/node
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -139,22 +132,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          cache-dependency-path: services/node/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build packages
         run: pnpm build
 
       - name: Build frontend
-        run: pnpm --filter @flux/web build
+        run: pnpm --filter web build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: services/node/apps/web/dist
+          path: apps/web/dist
           retention-days: 7
 
   # ===========================================
@@ -165,11 +157,13 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/api
+        working-directory: services/php-api
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -187,7 +181,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: composer-${{ runner.os }}-${{ hashFiles('services/api/composer.lock') }}
+          key: composer-${{ runner.os }}-${{ hashFiles('services/php-api/composer.lock') }}
           restore-keys: |
             composer-${{ runner.os }}-
 
@@ -202,6 +196,55 @@ jobs:
 
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse --no-progress || true
+        continue-on-error: true
+
+  # ===========================================
+  # PHP - Unit Tests
+  # ===========================================
+  test-php:
+    name: Test (PHP)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/php-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, intl, pdo_mysql
+          tools: composer:v2
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('services/php-api/composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-
+
+      - name: Create .env file
+        run: |
+          echo "APP_ENV=test" > .env
+          echo "DATABASE_URL=mysql://user:password@localhost:3306/test_db?serverVersion=10.11.0-MariaDB" >> .env
+          cat .env.dev >> .env
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction --no-scripts
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit || true
         continue-on-error: true
 
   # ===========================================

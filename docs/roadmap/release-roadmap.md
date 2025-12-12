@@ -96,6 +96,16 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] ESLint config updates (ignore config files)
 - [x] Branch consolidation (all releases on main)
 
+### v0.0.8 - Repository Structure (Git Submodules)
+- [ ] Convert monorepo to git submodule structure
+- [ ] Create `ewlin-php-api` repository (PHP/Symfony backend)
+- [ ] Create `ewlin-types` repository (@flux/types package)
+- [ ] Create `ewlin-validator` repository (@flux/schedule-validator package)
+- [ ] Restructure directories (`services/api` → `services/php-api`, `services/node/packages/*` → `packages/*`)
+- [ ] Update pnpm workspace configuration
+- [ ] Update CI/CD pipelines for new structure
+- [ ] Update documentation paths
+
 ---
 
 ## Milestone 1: Core Domain MVP (v0.1.x)
