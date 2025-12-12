@@ -81,18 +81,11 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ BAT can be marked "NoProofRequired" to bypass
 - ✓ Plates: Must be "Done" before printing tasks
 - ✓ Paper status tracked: InStock, ToOrder, Ordered, Received
-
-### Open Questions
-- Can certain task types proceed without BAT approval?
-Only if the job is configured with "Pas de BAT" (or "Sans BAT", I don't remember which terminology I used but you get the idea)
-- Is there an automatic timeout for BAT approval?
-No
-- Should the system notify when BAT is pending too long?
-Not in MVP.
-- Are there other approval gates beyond BAT and Plates?
-Not in MVP.
-- Can paper be partially received (e.g., 50% of order)?
-No. Until all the paper is received we treat is as none of the paper is received.
+- ✓ Tasks without BAT: Only if job configured "NoProofRequired"
+- ✓ Automatic BAT timeout: Not supported
+- ✓ BAT pending notifications: Not in MVP
+- ✓ Additional approval gates: Not in MVP
+- ✓ Partial paper reception: Not supported (all or nothing)
 
 ---
 
@@ -293,6 +286,11 @@ Questions that were open but have been resolved through discussion:
 | Facility-wide constraints | Not supported | 2025-12-12 |
 | Provider travel time | Handled via LatestDepartureTime/ReceptionTime | 2025-12-12 |
 | Tight schedule warnings | Not supported | 2025-12-12 |
+| Tasks without BAT | Only if job configured "NoProofRequired" | 2025-12-12 |
+| Automatic BAT timeout | Not supported | 2025-12-12 |
+| BAT pending notifications | Not in MVP | 2025-12-12 |
+| Additional approval gates | Not in MVP | 2025-12-12 |
+| Partial paper reception | Not supported (all or nothing) | 2025-12-12 |
 
 ---
 
