@@ -118,7 +118,6 @@ export function SchedulingGrid({ className }: SchedulingGridProps) {
             assignments={assignmentsByResource.get(resource.id) ?? []}
             days={days}
             hours={hours}
-            gridView={gridView}
             findTaskAndJob={findTaskAndJob}
           />
         ))}
@@ -132,11 +131,10 @@ interface ResourceRowProps {
   assignments: Assignment[];
   days: Date[];
   hours: number[];
-  gridView: 'stations' | 'providers';
   findTaskAndJob: (assignment: Assignment) => { task: Task; job: Job } | null;
 }
 
-function ResourceRow({ resource, assignments, days, hours, gridView, findTaskAndJob }: ResourceRowProps) {
+function ResourceRow({ resource, assignments, days, hours, findTaskAndJob }: ResourceRowProps) {
   const isStation = (r: Station | OutsourcedProvider): r is Station => 'categoryId' in r;
 
   const statusColor = useMemo(() => {

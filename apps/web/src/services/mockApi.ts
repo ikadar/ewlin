@@ -54,6 +54,7 @@ export const mockApi = {
   },
 
   // Snapshot
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getSnapshot: async (_timeRange: string): Promise<ScheduleSnapshot> => {
     await simulateLatency();
     await maybeThrowError();
@@ -157,7 +158,8 @@ export const mockApi = {
     });
   },
 
-  validateAssignment: async (proposed: ProposedAssignment): Promise<ValidationResult> => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  validateAssignment: async (_proposed: ProposedAssignment): Promise<ValidationResult> => {
     await simulateLatency();
     await maybeThrowError();
 

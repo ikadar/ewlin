@@ -3,11 +3,6 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type {
   ScheduleSnapshot,
   Assignment,
-  Station,
-  StationCategory,
-  StationGroup,
-  OutsourcedProvider,
-  Job,
   ProposedAssignment,
   ValidationResult,
   CreateStationDto,

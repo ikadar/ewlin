@@ -31,7 +31,7 @@ function Tabs({ value, onValueChange, children, className }: TabsProps) {
   );
 }
 
-interface TabsListProps extends React.HTMLAttributes<HTMLDivElement> {}
+type TabsListProps = React.HTMLAttributes<HTMLDivElement>;
 
 const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
   ({ className, ...props }, ref) => (

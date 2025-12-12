@@ -4,7 +4,6 @@ import type {
   StationGroup,
   OutsourcedProvider,
   OperatingSchedule,
-  SimilarityCriterion,
 } from '../../types';
 
 // Default operating schedule: Monday-Friday, 6:00-12:00 and 13:00-17:00 (with lunch break)
