@@ -43,6 +43,7 @@ This is not a final database schema — it is an early conceptual reference.
 ### SimilarityCriterion (Value Object)
 - **code** (string, e.g., "paper_type", "paper_size", "paper_weight", "inking")
 - **name** (string, e.g., "Same paper type")
+- **fieldPath** (string, path to Job property for comparison, e.g., "paperType")
 
 ---
 
@@ -61,6 +62,8 @@ This is not a final database schema — it is an early conceptual reference.
 - **providerId** (string)
 - **name** (string)
 - **supportedActionTypes** (list of string, e.g., ["Pelliculage", "Dorure", "Reliure"])
+- **latestDepartureTime** (time, HH:MM, e.g., "14:00") — latest time by which work must be sent for that day to count as first business day
+- **receptionTime** (time, HH:MM, e.g., "09:00") — time when completed work returns from provider
 - **groupId** (string, reference to auto-created StationGroup)
 - **status**: Active | Inactive
 - **createdAt** (datetime)
@@ -97,6 +100,7 @@ This is not a final database schema — it is an early conceptual reference.
 - **notes** (string, free-form notes)
 - **workshopExitDate** (datetime, deadline for leaving factory)
 - **fullyScheduled** (boolean, computed: all tasks have assignments)
+- **color** (string, hex color code, e.g., "#3B82F6") — randomly assigned at creation; dependent jobs use shades of required job's color
 - **paperPurchaseStatus**: InStock | ToOrder | Ordered | Received
 - **paperOrderedAt** (datetime | null)
 - **paperType** (string, e.g., "CB300")
@@ -158,6 +162,12 @@ Tasks are polymorphic (internal or outsourced).
 - **stationId** (string, for internal) | **providerId** (string, for outsourced)
 - **scheduledStart** (datetime)
 - **scheduledEnd** (datetime)
+- **isCompleted** (boolean, default false) — manually toggled via UI checkbox; does NOT affect precedence validation
+- **completedAt** (datetime | null) — set when isCompleted becomes true, cleared when false
+
+**Notes:**
+- Tasks are NOT automatically marked as completed when time passes
+- IsCompleted is purely for tracking purposes; precedence rules always use scheduled times
 
 ---
 

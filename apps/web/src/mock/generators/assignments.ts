@@ -99,6 +99,8 @@ export function generateAssignments({
       stationId,
       scheduledStart: scheduledStart.toISOString(),
       scheduledEnd: scheduledEnd.toISOString(),
+      isCompleted: false,
+      completedAt: null,
     });
   }
 

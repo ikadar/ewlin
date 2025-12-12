@@ -203,10 +203,13 @@ Interfaces are described in:
 {
   "name": "string",
   "similarityCriteria": [
-    {"code": "string", "name": "string"}
+    {"code": "string", "name": "string", "fieldPath": "string"}
   ]
 }
 ```
+
+**Notes:**
+- `fieldPath`: Path to Job property for similarity comparison (e.g., "paperType")
 
 **Response**
 ```json
@@ -347,7 +350,9 @@ Interfaces are described in:
 ```json
 {
   "name": "string",
-  "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"]
+  "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"],
+  "latestDepartureTime": "HH:MM",
+  "receptionTime": "HH:MM"
 }
 ```
 
@@ -356,11 +361,17 @@ Interfaces are described in:
 {
   "providerId": "string",
   "name": "string",
+  "latestDepartureTime": "HH:MM",
+  "receptionTime": "HH:MM",
   "groupId": "string",
   "status": "Active",
   "createdAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `latestDepartureTime`: Cutoff time for same-day work submission (default: "14:00")
+- `receptionTime`: Time when completed work returns from provider (default: "09:00")
 
 **Postconditions**
 - OutsourcedProvider aggregate created in Active state
@@ -434,6 +445,7 @@ Interfaces are described in:
   "reference": "string",
   "status": "Draft",
   "fullyScheduled": false,
+  "color": "#RRGGBB",
   "tasks": [
     {
       "taskId": "string",
@@ -451,6 +463,9 @@ Interfaces are described in:
   "createdAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `color`: Randomly assigned from predefined palette; dependent jobs use shades of required job's color
 
 **Postconditions**
 - Job aggregate created in Draft state
@@ -690,7 +705,82 @@ Interfaces are described in:
 - `JOB_NOT_FOUND` – Job does not exist
 - `EMPTY_CONTENT` – Comment content is empty
 
-### 5.9 GetJobDetails
+### 5.9 CancelJob
+**Purpose:** Cancel a job and handle its assignments appropriately.
+
+**Preconditions**
+- Job exists
+- Job is not already Completed or Cancelled
+
+**Request**
+```json
+{
+  "jobId": "string"
+}
+```
+
+**Response**
+```json
+{
+  "jobId": "string",
+  "status": "Cancelled",
+  "recalledTaskIds": ["task-002", "task-003"],
+  "preservedTaskIds": ["task-001"],
+  "cancelledAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Job status changes to Cancelled
+- All task statuses change to Cancelled
+- Future task assignments are recalled (removed)
+- Past task assignments remain for historical reference
+- Domain event `JobCancelled` emitted
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `JOB_INVALID_STATE` – Job is already Completed or Cancelled
+
+### 5.10 ToggleTaskCompletion
+**Purpose:** Toggle task completion status (manual tracking).
+
+**Preconditions**
+- Task exists
+- Task is Assigned or Executing
+
+**Request**
+```json
+{
+  "taskId": "string",
+  "isCompleted": true
+}
+```
+
+**Response**
+```json
+{
+  "taskId": "string",
+  "isCompleted": true,
+  "completedAt": "ISO-8601-timestamp | null"
+}
+```
+
+**Postconditions**
+- Task isCompleted flag updated
+- Task completedAt set (if true) or cleared (if false)
+- Domain event `TaskCompletionToggled` emitted
+- Precedence validation is NOT affected
+
+**Notes**
+- Completion is purely for tracking purposes
+- Tasks are NOT automatically marked completed based on time
+- This does NOT change the task status (remains Assigned/Executing)
+
+**Error responses**
+- `TASK_NOT_FOUND` – Task does not exist
+- `TASK_NOT_ASSIGNED` – Task must be Assigned or Executing to toggle completion
+
+### 5.11 GetJobDetails
 **Purpose:** Retrieve job with tasks and status.
 
 **Preconditions**

@@ -54,8 +54,33 @@ Delayed → Cancelled      (abort during delay)
 ### Notes
 - **Planned** requires at least one task defined.
 - **InProgress** triggered by first task assignment execution.
-- **Delayed** is warning state, not terminal.
+- **Delayed** is warning state, not terminal. Transition to Delayed is automatic when scheduled completion exceeds workshopExitDate.
+- **Delayed → InProgress** transition is automatic when tasks are rescheduled to meet the deadline.
 - Cancellation cascades to all tasks.
+
+## Process: Job Cancellation
+
+```
+PROCESS: Job Cancellation
+
+1. User requests job cancellation
+2. System changes job status to Cancelled
+3. For each task in the job:
+   a) If task has assignment scheduled in the FUTURE:
+      → Remove assignment (recall tile)
+      → Task status changes to Cancelled
+   b) If task has assignment scheduled in the PAST:
+      → Assignment REMAINS for historical reference
+      → Task status changes to Cancelled
+   c) If task is unassigned:
+      → Task status changes to Cancelled
+4. Publish JobCancelled event
+```
+
+### Notes
+- Past assignments are preserved for reporting and historical accuracy
+- Future assignments are automatically recalled to free up station time
+- "Past" is determined by scheduledStart relative to current system time
 
 ---
 
@@ -85,6 +110,7 @@ Executing → Cancelled    (job cancellation during execution)
 - **Assigned** means scheduled with specific time slot on station.
 - **Failed** tasks can be retried by returning to Ready.
 - Recalling a tile moves from Assigned back to Ready.
+- **IsCompleted** is a separate tracking flag (not a state). Tasks can be marked completed via UI checkbox regardless of their state. This does NOT affect precedence validation.
 
 ---
 
@@ -185,9 +211,46 @@ PROCESS: Task Assignment (Outsourced)
    b) Provider supports the action type
    c) (No capacity check - unlimited)
 4. Calculate scheduledEnd using business calendar:
-   a) scheduledEnd = scheduledStart + durationOpenDays (business days)
+   a) Check scheduledStart against provider's LatestDepartureTime:
+      - If scheduledStart <= LatestDepartureTime: effectiveStartDay = scheduledStart date
+      - If scheduledStart > LatestDepartureTime: effectiveStartDay = next business day
+   b) Calculate end day: effectiveStartDay + durationOpenDays (business days)
+   c) scheduledEnd = end day at provider's ReceptionTime
 5. Create assignment and update state
 ```
+
+### Notes (Outsourced Timing)
+- **LatestDepartureTime**: Time by which work must be sent for that day to count as first business day (e.g., 14:00)
+- **ReceptionTime**: Time when completed work returns from provider (e.g., 09:00)
+- Example: Task scheduled at 15:00 on Monday with LatestDepartureTime=14:00 and 2JO → work leaves Tuesday, returns Thursday at ReceptionTime
+
+---
+
+# 6b. Task Completion Workflow
+
+## Process: Mark Task as Completed
+
+```
+PROCESS: Mark Task as Completed
+
+1. User toggles completion checkbox on tile
+2. System updates task:
+   a) Set IsCompleted = true
+   b) Set CompletedAt = current timestamp
+3. UI updates:
+   a) Tile shows completion indicator
+4. Precedence validation:
+   a) IsCompleted does NOT affect precedence calculations
+   b) Schedule continues to use scheduled times, not completion status
+5. User can toggle off:
+   a) Set IsCompleted = false
+   b) Set CompletedAt = null
+```
+
+### Notes
+- Completion is purely for tracking purposes
+- Tasks in the past are NOT automatically marked as completed
+- Precedence rules always use scheduled times, assuming tasks will happen as planned
 
 ---
 
@@ -371,11 +434,44 @@ PROCESS: Drag and Drop Assignment
 3. On drop:
    a) Server validates assignment (authoritative)
    b) If valid: create/update assignment
-   c) If invalid: show conflict resolution panel
+   c) If invalid: show conflict resolution panel (MVP: visual warning only, no hard block)
 4. Assignment created:
    a) Tile appears on grid at scheduled position
    b) Tile in left panel becomes semi-transparent with "recall" button
 ```
+
+## Process: Tile Insertion (Push-Down Behavior)
+
+```
+PROCESS: Tile Insertion
+
+1. User drops tile at position on a station
+2. System checks station capacity:
+
+   [Capacity-1 Station]:
+   a) Tiles CANNOT overlap on same station
+   b) If dropped position overlaps existing tiles:
+      → Insert new tile at dropped position
+      → Push ALL subsequent tiles down (later in time)
+      → Recalculate scheduledStart/End for all affected tiles
+   c) Gap handling:
+      → If dropped into empty slot, no push needed
+      → If dropped between tiles, subsequent tiles push down
+
+   [Capacity > 1 Station (or Provider)]:
+   a) Tiles CAN overlap up to capacity limit
+   b) If capacity allows: place tile at dropped position
+   c) If capacity exceeded: show conflict warning
+
+3. After insertion:
+   a) Revalidate all affected tiles for precedence
+   b) Show visual warnings for any new violations
+```
+
+### Notes (Tile Insertion)
+- MVP validation is warnings-only; no hard blocks prevent user from creating assignments
+- Push-down ensures no overlap on capacity-1 stations
+- Users can intentionally create precedence violations (Alt+drag) but will see visual warnings
 
 ## Process: Recall Tile
 
@@ -423,9 +519,12 @@ PROCESS: Display Similarity Indicators
       - Get jobs for both tiles
       - Get station category
       - For each similarity criterion in category:
-        - Compare job attributes (paperType, paperFormat, etc.)
-        - If match: add filled circle indicator
-        - If no match: add hollow circle indicator
+        - Read criterion's fieldPath (e.g., "paperType")
+        - Get value from Job A at fieldPath
+        - Get value from Job B at fieldPath
+        - Compare values:
+          → If values match: add filled circle (●)
+          → If values differ: add hollow circle (○)
       - Position indicators between the two tiles
 
 2. Visual representation:
@@ -433,6 +532,11 @@ PROCESS: Display Similarity Indicators
    - Equal overlap on both tiles
    - Number of circles = number of criteria in category
 ```
+
+### Notes (Similarity Comparison)
+- Each SimilarityCriterion has a `fieldPath` that references a Job property
+- Example: criterion with `fieldPath="paperType"` compares `job1.paperType` vs `job2.paperType`
+- If Job A has `paperType="CB 300g"` and Job B has `paperType="CB 135g"` → hollow circle (not matching)
 
 ---
 

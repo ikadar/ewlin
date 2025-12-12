@@ -366,22 +366,29 @@ sequenceDiagram
 
 **Sequence:**
 1. Scheduler drags outsourced task (e.g., "Pelliculage 2JO") to provider column.
-2. Scheduler drops at Friday 09:00.
-3. **Frontend** sends `AssignTask(taskId, providerId, scheduledStart)`.
-4. **Assignment Service** queries **Business Calendar Service**:
-   - Calculate end date: Friday + 2 open days = Tuesday
-   - Excludes Saturday, Sunday
-5. Assignment Service validates:
+2. Scheduler drops at Monday 15:00.
+3. **Frontend** sends `AssignTask(taskId, providerId, scheduledStart=15:00)`.
+4. **Assignment Service** checks provider's `latestDepartureTime` (e.g., 14:00):
+   - Since 15:00 > 14:00, effective start day = Tuesday (next business day)
+5. Assignment Service queries **Business Calendar Service**:
+   - Calculate end date: Tuesday + 2 open days = Thursday
+   - Excludes weekends
+6. Assignment Service sets `scheduledEnd` = Thursday at provider's `receptionTime` (e.g., 09:00).
+7. Assignment Service validates:
    - Provider supports action type
    - No blocking dependencies
-6. Assignment Service creates assignment:
-   - `scheduledStart` = Friday 09:00
-   - `scheduledEnd` = Tuesday 09:00 (2 open days later)
-7. Assignment Service emits `TaskAssigned`.
-8. Grid shows tile spanning Friday to Tuesday (with weekend gap indication).
+8. Assignment Service creates assignment:
+   - `scheduledStart` = Monday 15:00
+   - `scheduledEnd` = Thursday 09:00
+9. Assignment Service emits `TaskAssigned`.
+10. Grid shows tile spanning Monday to Thursday.
+
+**Provider Timing Fields:**
+- `latestDepartureTime`: Cutoff for same-day work submission (default: 14:00)
+- `receptionTime`: When completed work returns (default: 09:00)
 
 **Outcome:**
-Outsourced task scheduled with business calendar duration.
+Outsourced task scheduled with business calendar duration, respecting provider timing.
 
 ```mermaid
 sequenceDiagram
@@ -390,14 +397,17 @@ sequenceDiagram
     participant Calendar as Business Calendar Service
     participant View as Scheduling View Service
 
-    Scheduler->>Assignment: AssignTask(taskId, providerId,<br>scheduledStart=Friday 09:00)
-    Assignment->>Calendar: CalculateEndDate<br>(Friday, 2 open days)
-    Calendar-->>Assignment: Tuesday 09:00<br>(skipped Sat, Sun)
+    Scheduler->>Assignment: AssignTask(taskId, providerId,<br>scheduledStart=Monday 15:00)
+    Assignment->>Assignment: Check latestDepartureTime<br>(14:00)
+    Assignment->>Assignment: 15:00 > 14:00<br>→ effective start = Tuesday
+    Assignment->>Calendar: CalculateEndDate<br>(Tuesday, 2 open days)
+    Calendar-->>Assignment: Thursday
+    Assignment->>Assignment: Set scheduledEnd =<br>Thursday at receptionTime (09:00)
     Assignment->>Assignment: Validate provider<br>supports action type
-    Assignment->>Assignment: Create assignment<br>scheduledEnd = Tuesday
+    Assignment->>Assignment: Create assignment
     Assignment-->>Assignment: TaskAssigned<br>(domain event)
     Assignment-->>View: Assignment.TaskScheduled
-    View->>View: Show tile Friday→Tuesday<br>with weekend gap
+    View->>View: Show tile Mon 15:00→Thu 09:00
 ```
 
 ---
@@ -452,6 +462,175 @@ sequenceDiagram
     end
     Assignment->>Assignment: Process change<br>Clear conflicts
     Assignment-->>View: Updated snapshot
+```
+
+---
+
+## 9. Task Completion Toggle
+
+**Trigger:** Scheduler manually marks a task as completed via checkbox.
+
+**Participants:**
+- Production Scheduler (user)
+- Assignment Service
+- Scheduling View Service
+
+**Sequence:**
+1. Scheduler clicks completion checkbox on a tile.
+2. **Frontend** sends `ToggleTaskCompletion(taskId, isCompleted=true)` to **Assignment Service**.
+3. Assignment Service updates assignment:
+   - Sets `isCompleted = true`
+   - Sets `completedAt = now()`
+4. Assignment Service emits domain event `TaskCompletionToggled`.
+5. **Scheduling View Service** updates tile visual:
+   - Shows completion indicator
+6. **Precedence validation is NOT affected** — schedule continues using scheduled times.
+
+**Important Notes:**
+- Tasks are NOT automatically marked completed when time passes
+- Completion is purely for tracking purposes
+- Precedence rules always assume tasks will happen as scheduled
+
+**Outcome:**
+Task marked as completed for tracking, visual indicator shown.
+
+```mermaid
+sequenceDiagram
+    participant Scheduler
+    participant Frontend
+    participant Assignment as Assignment Service
+    participant View as Scheduling View Service
+
+    Scheduler->>Frontend: Click completion checkbox
+    Frontend->>Assignment: ToggleTaskCompletion<br>(taskId, isCompleted=true)
+    Assignment->>Assignment: Set isCompleted = true<br>Set completedAt = now()
+    Assignment-->>Assignment: TaskCompletionToggled<br>(domain event)
+    Assignment-->>View: Updated assignment
+    View->>View: Show completion indicator
+    Note over Assignment: Precedence validation<br>NOT affected
+```
+
+---
+
+## 10. Job Cancellation
+
+**Trigger:** User cancels a job.
+
+**Participants:**
+- Production Planner (user)
+- Job Management Service
+- Assignment Service
+- Scheduling View Service
+
+**Sequence:**
+1. Planner requests job cancellation.
+2. **Job Management Service** validates:
+   - Job exists
+   - Job is not already Completed or Cancelled
+3. Job Service processes cancellation:
+   - Changes job status to Cancelled
+   - Changes all task statuses to Cancelled
+4. Job Service evaluates each task's assignment:
+   - **Future assignments** (scheduledStart > now): Recall (remove) assignment
+   - **Past assignments** (scheduledStart < now): Preserve for historical reference
+5. Job Service emits domain event `JobCancelled`:
+   - Includes `recalledTaskIds` (future assignments removed)
+   - Includes `preservedTaskIds` (past assignments kept)
+6. **Assignment Service** processes recalls:
+   - Removes future TaskAssignments from Schedule
+   - Frees station time slots
+7. **Scheduling View Service** updates:
+   - Removes future tiles from grid
+   - Past tiles remain (grayed out or marked as cancelled)
+   - Job removed from active list
+
+**Outcome:**
+Job cancelled, future assignments freed, past assignments preserved for history.
+
+```mermaid
+sequenceDiagram
+    participant Planner
+    participant Job as Job Management Service
+    participant Assignment as Assignment Service
+    participant View as Scheduling View Service
+
+    Planner->>Job: CancelJob(jobId)
+    Job->>Job: Validate job exists<br>Check not Completed/Cancelled
+    Job->>Job: Set status = Cancelled<br>Set all tasks = Cancelled
+    Job->>Job: Evaluate each task assignment
+    loop For each task
+        alt scheduledStart > now
+            Job->>Job: Mark for recall
+        else scheduledStart < now
+            Job->>Job: Mark for preservation
+        end
+    end
+    Job-->>Job: JobCancelled<br>(recalledTaskIds, preservedTaskIds)
+    Job-->>Assignment: Recall future assignments
+    Assignment->>Assignment: Remove TaskAssignments<br>Free station time slots
+    Job-->>View: Job cancelled notification
+    View->>View: Remove future tiles<br>Gray out past tiles<br>Update job list
+```
+
+---
+
+## 11. Tile Insertion with Push-Down
+
+**Trigger:** Scheduler inserts a tile between existing tiles on a capacity-1 station.
+
+**Participants:**
+- Production Scheduler (user)
+- Assignment Service
+- Scheduling View Service
+
+**Sequence:**
+1. Scheduler drags task tile to position between existing tiles A and B on a capacity-1 station.
+2. **Frontend** sends `AssignTask(taskId, stationId, scheduledStart)`.
+3. **Assignment Service** checks station capacity:
+   - Capacity = 1 → tiles CANNOT overlap
+4. Assignment Service detects overlap with existing tiles.
+5. Assignment Service performs push-down:
+   - Insert new tile at dropped position
+   - Push tile B (and all subsequent tiles) later in time
+   - Recalculate scheduledStart/End for all affected tiles
+6. Assignment Service validates:
+   - Check precedence for all affected tiles (may create warnings)
+   - No station double-booking (guaranteed by push-down)
+7. Assignment Service creates/updates assignments:
+   - New tile assignment
+   - Updated times for pushed tiles
+8. Assignment Service emits domain events:
+   - `TaskAssigned` (for new tile)
+   - `TaskRescheduled` (for each pushed tile)
+9. **Scheduling View Service** updates grid:
+   - Shows new tile at insertion point
+   - Shows pushed tiles at new positions
+   - May show precedence warnings (red halo) for affected tiles
+
+**Capacity > 1 Behaviour:**
+- Tiles CAN overlap up to capacity limit
+- No push-down occurs
+- If capacity exceeded, show conflict warning
+
+**Outcome:**
+Tile inserted, subsequent tiles pushed down, no overlap on capacity-1 station.
+
+```mermaid
+sequenceDiagram
+    participant Scheduler
+    participant Assignment as Assignment Service
+    participant View as Scheduling View Service
+
+    Scheduler->>Assignment: AssignTask(taskId, stationId,<br>scheduledStart between A and B)
+    Assignment->>Assignment: Check station capacity = 1
+    Assignment->>Assignment: Detect overlap with tile B
+    Assignment->>Assignment: Push-down: Move B later
+    Assignment->>Assignment: Recalculate times for<br>B and subsequent tiles
+    Assignment->>Assignment: Validate precedence<br>(may create warnings)
+    Assignment-->>Assignment: TaskAssigned (new tile)
+    Assignment-->>Assignment: TaskRescheduled (each pushed tile)
+    Assignment-->>View: Schedule updated
+    View->>View: Show new tile at position<br>Show pushed tiles at new times<br>Show any precedence warnings
 ```
 
 ---

@@ -93,6 +93,8 @@ export const mockApi = {
       stationId: proposed.stationId,
       scheduledStart: proposed.scheduledStart,
       scheduledEnd: addMinutes(new Date(proposed.scheduledStart), duration).toISOString(),
+      isCompleted: false,
+      completedAt: null,
     };
 
     updateMockSnapshot((s) => ({
@@ -392,6 +394,8 @@ export const mockApi = {
       id: faker.string.uuid(),
       name: data.name,
       supportedActionTypes: data.supportedActionTypes,
+      latestDepartureTime: '14:00',
+      receptionTime: '09:00',
       groupId,
       status: 'Active',
     };

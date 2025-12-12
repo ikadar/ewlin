@@ -20,11 +20,24 @@ This document defines the core domain terms used in the **print shop scheduling*
 - **Examples:** "Offset Printing Press", "Finishing", "Cutting", "Binding"
 - **Notes:** Each category defines a list of similarity criteria that can reduce setup time between consecutive jobs.
 - **Similarity Criteria Examples:**
-  - Same paper type
-  - Same paper size
-  - Same paper weight
-  - Same inking
-- **Related terms:** Station, TimeSavingSimilarity.
+  - Same paper type (fieldPath: "paperType")
+  - Same paper size (fieldPath: "paperFormat")
+  - Same paper weight (fieldPath: "paperWeight")
+  - Same inking (fieldPath: "inking")
+- **Related terms:** Station, SimilarityCriterion, TimeSavingSimilarity.
+
+---
+
+## SimilarityCriterion
+
+- **Definition:** A single criterion used to compare consecutive jobs on the same station for potential time savings.
+- **Fields:**
+  - `code`: Unique identifier within category (lowercase, underscores)
+  - `name`: Human-readable display name (e.g., "Same paper type")
+  - `fieldPath`: Path to a Job property for comparison (e.g., "paperType")
+- **Notes:** The criterion's `fieldPath` references a property on the Job entity. When comparing consecutive tasks, the system checks if the jobs' values at that fieldPath match.
+- **Example:** A criterion with `fieldPath="paperType"` compares `job1.paperType` vs `job2.paperType`. If Job A has `paperType="CB 300g"` and Job B has `paperType="CB 135g"`, the criterion is NOT fulfilled (hollow circle).
+- **Related terms:** StationCategory, TimeSavingSimilarity, Job.
 
 ---
 
@@ -144,13 +157,15 @@ This document defines the core domain terms used in the **print shop scheduling*
 ## Tile
 
 - **Definition:** The visual representation of an assignment on the scheduling grid UI.
-- **Notes:** Tiles are dragged and dropped to create/modify assignments. Shows setup/run differentiation, job reference, time, and similarity indicators.
+- **Notes:** Tiles are dragged and dropped to create/modify assignments. Shows setup/run differentiation, job reference, time, and similarity indicators. In MVP, tasks spanning station downtime appear as a single continuous tile. When inserted between existing tiles on capacity-1 stations, subsequent tiles are pushed down automatically.
 - **Visual elements:**
   - Setup/run duration sections
   - Job reference and description
   - Start/end time
   - Similarity circles (between consecutive tiles)
-  - Random job color
+  - Job color (randomly assigned; dependent jobs use shades of same color)
+  - Downtime overlay (distinct visual appearance for portions spanning station downtime)
+  - Completion checkbox (manually toggled; does not affect precedence validation)
 - **Related terms:** Assignment, SchedulingGrid.
 
 ---
@@ -188,8 +203,9 @@ This document defines the core domain terms used in the **print shop scheduling*
   - Same paper weight
   - Same inking
 - **Visual representation:** Filled or hollow circles displayed between consecutive tiles.
+- **Comparison mechanism:** The system reads the `fieldPath` value from each consecutive job and compares them. If values match → filled circle; if not → hollow circle.
 - **Notes:** MVP shows visual indicators only; no automatic optimization.
-- **Related terms:** StationCategory, Tile.
+- **Related terms:** StationCategory, SimilarityCriterion, Tile.
 
 ---
 
@@ -200,7 +216,25 @@ This document defines the core domain terms used in the **print shop scheduling*
   - Monday through Friday (MVP)
   - Excludes French public holidays (future)
 - **Notation:** `2JO` means 2 open days.
-- **Related terms:** OutsourcedProvider, Task (outsourced).
+- **Related terms:** OutsourcedProvider, Task (outsourced), LatestDepartureTime.
+
+---
+
+## LatestDepartureTime
+
+- **Definition:** The latest time of day by which work must be sent to an outsourced provider for that day to count as the first business day of the lead time.
+- **Example:** If LatestDepartureTime is 14:00 and an outsourced task is scheduled to start at 15:00 on Monday, the lead time (DurationOpenDays) starts counting from Tuesday, not Monday.
+- **Notes:** This is about when the outsourced task starts, not about when the previous task completes.
+- **Related terms:** OutsourcedProvider, Task (outsourced), OpenDay, ReceptionTime.
+
+---
+
+## ReceptionTime
+
+- **Definition:** The time of day when completed work is received back from the outsourced provider after the lead time has elapsed.
+- **Example:** If lead time is 2JO, work sent Monday before LatestDepartureTime will be received back on Wednesday at ReceptionTime.
+- **Notes:** Used to calculate the actual end time of an outsourced task.
+- **Related terms:** OutsourcedProvider, Task (outsourced), OpenDay, LatestDepartureTime.
 
 ---
 
@@ -224,8 +258,11 @@ This document defines the core domain terms used in the **print shop scheduling*
 
 ## JobDependency
 
-- **Definition:** A relationship indicating that one job must complete before another job can begin.
-- **Notes:** Job-level only (not task-level cross-job dependencies).
+- **Definition:** A finish-to-start relationship indicating that one job must complete before another job can begin.
+- **Notes:**
+  - Job-level only (not task-level cross-job dependencies).
+  - Strictly finish-to-start: the first task of the dependent job cannot start until the last task of all required jobs are completed.
+  - No other dependency types (start-to-start, finish-to-finish) are supported.
 - **Related terms:** Job, requiredJobs field.
 
 ---
@@ -258,7 +295,30 @@ This document defines the core domain terms used in the **print shop scheduling*
 - **Notes:** Time flows downward. Station columns are ordered by configuration.
 - **Key features:**
   - Drag-and-drop tile placement
+  - Tile insertion pushes subsequent tiles down (no overlap on capacity-1 stations)
   - Visual unavailability overlay
   - Similarity indicators between tiles
   - 30-minute snap grid
+  - Precedence violations allowed with visual warning (red halo)
 - **Related terms:** Tile, Station, Assignment.
+
+---
+
+## StationTimeBlock
+
+- **Definition:** An abstract concept representing any time period during which a station is occupied or unavailable.
+- **Notes:** Both production work (TaskAssignment) and maintenance periods (MaintenanceBlock) are types of StationTimeBlock. This abstraction allows unified handling of station availability.
+- **Subtypes:**
+  - **TaskAssignment** – station occupied by production work
+  - **MaintenanceBlock** – station occupied by scheduled maintenance
+- **Related terms:** TaskAssignment, MaintenanceBlock, Station.
+
+---
+
+## MaintenanceBlock
+
+- **Definition:** A scheduled maintenance period that blocks a station's availability.
+- **Notes:** Conceptually similar to TaskAssignment (both represent "station occupied during time period"), but MaintenanceBlock is not associated with a Job or Task. Has station, duration, and optional reason, but no client, approval gates, or paper status.
+- **Typical fields:** station, scheduled start, scheduled end, reason (optional), status.
+- **MVP Status:** Post-MVP feature.
+- **Related terms:** StationTimeBlock, TaskAssignment, Station, OperatingSchedule.

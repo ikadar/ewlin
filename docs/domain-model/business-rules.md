@@ -33,6 +33,19 @@ A ScheduleException for a specific date MUST override the regular operating sche
 
 ---
 
+## Maintenance Block — *Post-MVP*
+
+**BR-MAINT-001 – Maintenance blocks station availability**
+A MaintenanceBlock MUST prevent task assignments during its scheduled period on the same station.
+
+**BR-MAINT-002 – No overlap with task assignments**
+A MaintenanceBlock CANNOT overlap with existing TaskAssignments on the same station.
+
+**BR-MAINT-003 – Maintenance is independent of jobs**
+A MaintenanceBlock is NOT associated with any Job or Task; it exists independently as a station time block.
+
+---
+
 ## Station Category
 
 **BR-CATEGORY-001 – Category must have similarity criteria**
@@ -101,14 +114,20 @@ A Job in `InProgress` status transitions to `Delayed` when:
 - The transition is automatic (not manual user action)
 - A `Delayed` job can return to `InProgress` if tasks are rescheduled to meet the deadline
 
-**BR-JOB-006 – Job dependencies are job-level only**
-Job dependencies (requiredJobs) apply at the job level - a job cannot start until all required jobs are completed.
+**BR-JOB-006 – Job dependencies are finish-to-start only**
+Job dependencies (requiredJobs) are strictly finish-to-start: the first task of the dependent job cannot start until the last task of all required jobs are completed. No other dependency types (start-to-start, finish-to-finish) are supported.
 
 **BR-JOB-007 – Required jobs must exist**
 Every JobId in requiredJobs MUST reference an existing job.
 
 **BR-JOB-008 – No circular job dependencies**
 Job dependencies MUST NOT form cycles.
+
+**BR-JOB-009 – Job color assignment**
+Job color MUST be randomly assigned at creation. Dependent jobs (via requiredJobIds) SHOULD use shades of the same base color for visual grouping.
+
+**BR-JOB-010 – Cancelled job assignment handling**
+When a Job is cancelled, task assignments scheduled in the future MUST be recalled (removed). Task assignments scheduled in the past MUST remain for historical reference.
 
 ---
 
@@ -135,6 +154,12 @@ The raw DSL input for a task MUST parse correctly according to the DSL specifica
 
 **BR-TASK-007 – Previous task must complete first**
 A Task can ONLY start after its predecessor task (if any) has been completed.
+
+**BR-TASK-008 – Outsourced task departure time**
+For outsourced tasks, if the task is scheduled to start after its LatestDepartureTime, the first business day of the lead time (DurationOpenDays) begins the following business day.
+
+**BR-TASK-009 – Outsourced task end time calculation**
+The end time of an outsourced task is calculated as: the ReceptionTime on the business day that is DurationOpenDays after the effective start day (considering LatestDepartureTime).
 
 ---
 
@@ -174,7 +199,8 @@ Tasks MUST be scheduled only during station operating hours.
 
 **BR-ASSIGN-003 – Schedule time calculation**
 For internal tasks: `scheduledEnd` = `scheduledStart` + task duration (stretched across non-operating periods).
-For outsourced tasks: `scheduledEnd` = `scheduledStart` + (durationOpenDays × business calendar).
+For outsourced tasks: `scheduledEnd` = `scheduledStart` + (durationOpenDays × business calendar), considering LatestDepartureTime and ReceptionTime.
+Tasks spanning station downtime are displayed as a single continuous tile with downtime portions having distinct visual appearance (MVP). Task interruption/splitting is Post-MVP.
 
 **BR-ASSIGN-004 – No retrospective scheduling**
 Tasks CANNOT be scheduled to start in the past (relative to current system time).
@@ -184,6 +210,17 @@ Once a Task has started execution, its station assignment CANNOT be changed.
 
 **BR-ASSIGN-006 – Tile snaps to 30-minute grid**
 Task scheduling in the UI MUST snap to 30-minute intervals.
+
+**BR-ASSIGN-007 – Task completion is manual**
+Task completion (IsCompleted) MUST be manually toggled via UI checkbox. Tasks in the past are NOT automatically marked as completed.
+
+**BR-ASSIGN-008 – Completion does not affect precedence**
+The IsCompleted flag is for tracking purposes only and DOES NOT affect precedence validation. Precedence rules assume scheduled tasks will happen as defined.
+
+**BR-ASSIGN-009 – Tile insertion behavior**
+Tiles are inserted between existing tiles, not over them:
+- On capacity-1 stations: Tiles CANNOT overlap. When a tile is inserted, subsequent tiles on the same station are automatically pushed down (later in time).
+- On stations with capacity > 1: Multiple tiles CAN overlap up to the station's capacity limit.
 
 ---
 
@@ -300,6 +337,14 @@ Every comment MUST have an author and timestamp recorded.
 ---
 
 ## Quick Reference: Validation Rules Summary
+
+### MVP Validation Behavior
+
+In MVP, all validation rules result in **visual warnings only** — no hard blocks prevent the user from making assignments. The system shows visual cues (red halo, late jobs panel, similarity indicators, etc.) but allows the user to proceed with any scheduling decision. Hard blocking behavior may be introduced post-MVP.
+
+The "Blocking?" column in the table below indicates the **intended severity** for future consideration, not MVP behavior.
+
+### Validation Rules Table
 
 The following table provides a quick reference for validation rules, their corresponding conflict types, and severities:
 

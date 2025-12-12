@@ -83,7 +83,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Tasks` (ordered collection of Task entities)
   - `Comments` (collection of Comment value objects)
   - `Status` (Draft, Planned, InProgress, Delayed, Completed, Cancelled)
-  - `Color` (hex string, e.g., "#3B82F6", assigned at creation)
+  - `Color` (hex string, e.g., "#3B82F6", randomly assigned at creation; dependent jobs use shades of the same color)
   - `CreatedAt` (DateTime)
 
 ### Task (Entity within Job Aggregate)
@@ -109,7 +109,9 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Type`: 'outsourced'
   - `ProviderId` (reference to OutsourcedProvider)
   - `ActionType` (string, e.g., "Pelliculage")
-  - `DurationOpenDays` (integer)
+  - `DurationOpenDays` (integer) — lead time in business days
+  - `LatestDepartureTime` (time, e.g., "14:00") — latest time to send work to provider for that day to count as first business day
+  - `ReceptionTime` (time, e.g., "10:00") — time when completed work is received back from provider
 
 ### Schedule (Aggregate Root)
 - **Identifier:** `ScheduleId`
@@ -174,14 +176,30 @@ This domain model describes the core entities, value objects, and aggregates for
 
 ### SimilarityCriterion
 - **Fields:**
-  - `Id` (string)
-  - `Name` (string, e.g., "Same paper type")
+  - `Code` (string, unique within category, lowercase with underscores, e.g., "paper_type")
+  - `Name` (string, human-readable, e.g., "Same paper type")
   - `FieldPath` (string, Job field path for comparison, e.g., "paperType")
 - **Rules:**
   - Used to determine visual indicators between consecutive tiles.
-  - FieldPath references a field on Job entity for comparison logic.
+  - FieldPath references a property on the Job entity.
+  - When comparing consecutive tasks, the system reads the FieldPath value from each job and checks equality.
+  - Match → filled circle; no match → hollow circle.
+
+### StationTimeBlock (Abstract Concept)
+- **Definition:** An abstract representation of any time period during which a station is occupied.
+- **Subtypes:**
+  - `TaskAssignment` – station occupied by production work
+  - `MaintenanceBlock` – station occupied by scheduled maintenance (*Post-MVP*)
+- **Common Fields:**
+  - `StationId` (reference to Station)
+  - `ScheduledStart` (ISO timestamp)
+  - `ScheduledEnd` (ISO timestamp)
+- **Rules:**
+  - Both subtypes block station availability during their scheduled period.
+  - Used for unified station availability calculations.
 
 ### TaskAssignment
+- **Extends:** StationTimeBlock
 - **Fields:**
   - `Id` (string)
   - `TaskId` (reference to Task)
@@ -189,10 +207,30 @@ This domain model describes the core entities, value objects, and aggregates for
   - `IsOutsourced` (boolean)
   - `ScheduledStart` (ISO timestamp)
   - `ScheduledEnd` (ISO timestamp)
+  - `IsCompleted` (boolean, default false)
+  - `CompletedAt` (ISO timestamp, nullable)
   - `CreatedAt` (ISO timestamp)
   - `UpdatedAt` (ISO timestamp)
 - **Rules:**
   - ScheduledEnd = ScheduledStart + Task duration (accounting for operating schedule gaps).
+  - IsCompleted is manually toggled via UI checkbox; does not affect precedence validation.
+  - Tasks in the past are NOT automatically marked as completed.
+
+### MaintenanceBlock — *Post-MVP*
+- **Extends:** StationTimeBlock
+- **Fields:**
+  - `Id` (string)
+  - `StationId` (reference to Station)
+  - `ScheduledStart` (ISO timestamp)
+  - `ScheduledEnd` (ISO timestamp)
+  - `Reason` (string, optional)
+  - `Status` (Scheduled, InProgress, Completed, Cancelled)
+  - `CreatedAt` (ISO timestamp)
+  - `UpdatedAt` (ISO timestamp)
+- **Rules:**
+  - Blocks station availability during scheduled period.
+  - Not associated with any Job or Task.
+  - Cannot overlap with TaskAssignments on the same station.
 
 ### Comment
 - **Fields:**

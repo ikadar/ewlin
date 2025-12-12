@@ -12,19 +12,10 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Stations belong to groups with capacity limits
 - ✓ All stations must belong to exactly one group
 - ✓ Operating schedules support recurring weekly patterns + exceptions
-
-### Open Questions
-- Can stations have different operating schedules per week (e.g., seasonal)?
-Not in MVP but mark for future improvement.
-- How is station maintenance scheduled—separate from schedule exceptions?
-Station maintenance will be treated like a job but is NOT a job per se.
-I say it is like a job because it will have a station and a duration and a deadline like a job but I also say it is NOT a job because it won't have a client for example.
-- Should stations support reduced capacity (e.g., 50% during certain periods)?
-No.
-- How are backup/substitute stations handled?
-They are not and will never be.
-- Can a station belong to multiple categories (e.g., hybrid machines)?
-No.
+- ✓ Seasonal schedules: Not in MVP, future improvement
+- ✓ Reduced capacity (50%): Not supported
+- ✓ Backup/substitute stations: Not supported (out of scope)
+- ✓ Multiple categories per station: Not supported
 
 ---
 
@@ -34,23 +25,10 @@ No.
 - ✓ Each provider has unlimited capacity (own group with no limit)
 - ✓ Provider tasks use open days (JO) for duration
 - ✓ Providers have supported action types (Pelliculage, Dorure, etc.)
-
-### Open Questions
-- Can providers have limited capacity in the future?
-No.
-- Should providers have their own business calendar (different holidays)?
-Not in MVP but mark for future improvement.
-- How are provider lead times communicated and updated?
-Actually outsourced tasks have slightly more attributes that in-house tasks.
-When I send a job to a provider, I need to specify for the outsourced task :
-• A latest departure time : the latest time in a given day at which the previous task has to be completed in order for the following day to count as a business day contributing toward the provider's actual work time.
-• A lead time in business days : the number of business days the provider will take to complete the task
-• A reception time : the latest time at which I will receive the completed task's output from the provider.
-IMPORTANT : if anything above here is not PERFECTLY clear, please ask away.
-- Can a provider handle multiple concurrent jobs from same client?
-Yes.
-- How is provider cost tracked (for reporting/optimization)?
-Irrelevant, scheduling is not related to costs at all.
+- ✓ Limited capacity in future: Not supported (providers always unlimited)
+- ✓ Provider-specific business calendars: Not in MVP, future improvement
+- ✓ Multiple concurrent jobs from same client: Supported
+- ✓ Cost tracking: Out of scope (scheduling is not related to costs)
 
 ---
 
@@ -62,18 +40,10 @@ Irrelevant, scheduling is not related to costs at all.
 - ✓ Outsourced tasks: `ST [Provider] ActionType duration "comment"`
 - ✓ Station names with spaces use underscores
 - ✓ Comments can appear anywhere with quotes
-
-### Open Questions
-- Can a single task span multiple stations (parallel processing)?
-No.
-- Are there task templates for common operations?
-No.
-- Can task duration vary based on job complexity or quantity?
-I don't understand why you ask since we have clearly stated that task durations are provided directly by the user. Explain the confusion (i.e. WHY you are asking this).
-- Should tasks support optional vs. required classification?
-No, all tasks are required.
-- Can the same task be split across multiple time slots (interruption)?
-Not in MVP but later yes. However in MVP a task can span across a station downtime in which case it should appear as a single continuous block with its real completion time updated to account for the station downtime and the timeslots that happen while a station is in downtime have a different visual aspect compared to the uptime timeslots for the task tile.
+- ✓ Single task spanning multiple stations: Not supported
+- ✓ Task templates: Not supported
+- ✓ Task duration: User-provided, not calculated from complexity
+- ✓ Optional tasks: Not supported (all tasks are required)
 
 ---
 
@@ -83,16 +53,9 @@ Not in MVP but later yes. However in MVP a task can span across a station downti
 - ✓ Dependencies are at job level only (not task level)
 - ✓ Circular dependencies are prevented
 - ✓ Dependent job cannot start until prerequisites complete
-
-### Open Questions
-- Can dependencies be conditional (if Job A succeeds, do B; if fails, do C)?
-No. There is not definition of success in the domain and there will not be. At worst a task will be late IRL and its duration will be updated manually if that is the case.
-- Are there different types of dependencies (finish-to-start, start-to-start)?
-No. If job B requires job A it means the first task of job B cannot start until the last task of job A is completed.
-- Can external events trigger job readiness (e.g., customer approval)?
-No. The approval gates that are present in the domain happen BEFORE the scheduling starts (BAT et and plaques). Is this perfectly clear for you ?
-- Should dependencies span across different clients' jobs?
-No. The client is irrelevant to job dependency definition other than perhaps in the UI where the "required job" might start by showing the client's current jobs before listing the other ones.
+- ✓ Conditional dependencies: Not supported (no success/failure concept)
+- ✓ External event triggers: Not supported (approval gates happen before scheduling)
+- ✓ Cross-client dependencies: Not supported (client irrelevant to dependencies)
 
 ---
 
@@ -103,18 +66,11 @@ No. The client is irrelevant to job dependency definition other than perhaps in 
 - ✓ Precedence within job must be respected (unless Alt bypass)
 - ✓ Station unavailability stretches task duration
 - ✓ Group capacity limits concurrent tasks
-
-### Open Questions
-- Is there a minimum/maximum time gap required between consecutive tasks?
-No.
-- Can tasks be scheduled outside normal operating hours with approval?
-No. However in the UI we will allow the user to easily modify the station downtime start and finish hours but NOT in the MVP.
-- Are there facility-wide constraints (max concurrent operations)?
-No.
-- How is travel time between outsourced provider and shop handled?
-See the answer I gave you above about how outsourced tasks are described.
-- Should the system warn about "tight" schedules (no buffer)?
-No.
+- ✓ Min/max gap between tasks: Not required
+- ✓ Schedule outside operating hours: Not supported (future: UI for modifying downtime)
+- ✓ Facility-wide constraints: Not supported
+- ✓ Provider travel time: Handled via LatestDepartureTime/ReceptionTime
+- ✓ Tight schedule warnings: Not supported
 
 ---
 
@@ -125,18 +81,11 @@ No.
 - ✓ BAT can be marked "NoProofRequired" to bypass
 - ✓ Plates: Must be "Done" before printing tasks
 - ✓ Paper status tracked: InStock, ToOrder, Ordered, Received
-
-### Open Questions
-- Can certain task types proceed without BAT approval?
-Only if the job is configured with "Pas de BAT" (or "Sans BAT", I don't remember which terminology I used but you get the idea)
-- Is there an automatic timeout for BAT approval?
-No
-- Should the system notify when BAT is pending too long?
-Not in MVP.
-- Are there other approval gates beyond BAT and Plates?
-Not in MVP.
-- Can paper be partially received (e.g., 50% of order)?
-No. Until all the paper is received we treat is as none of the paper is received.
+- ✓ Tasks without BAT: Only if job configured "NoProofRequired"
+- ✓ Automatic BAT timeout: Not supported
+- ✓ BAT pending notifications: Not in MVP
+- ✓ Additional approval gates: Not in MVP
+- ✓ Partial paper reception: Not supported (all or nothing)
 
 ---
 
@@ -146,18 +95,10 @@ No. Until all the paper is received we treat is as none of the paper is received
 - ✓ Real-time validation during drag (< 10ms)
 - ✓ Server-side authoritative validation
 - ✓ Conflict types: Station, GroupCapacity, Precedence, ApprovalGate, Availability
-
-### Open Questions
-- What is the escalation path for unresolvable conflicts?
-No path. The user receives the information through the UI and makes his decision with it. Unresolvable conflicts are a business matter that is solved outside of the scheduling system : calling a client to postpone a deadline, outsourcing a traditionnaly in-house action, etc.
-- Are some validation rules warnings vs. hard blocks?
-In MVP there are only warnings that we have already defined as visual cues (and from which you can derive the corresponding constraints).
-- Can certain users override specific validation rules?
-No.
-- How often should the system re-validate existing schedules?
-Anytime a change is made to the schedule or to a job definition (for example a deadline modification or the addition of a new action).
-- Should the system suggest optimal conflict resolution?
-No.
+- ✓ Escalation path: None (user resolves outside system)
+- ✓ Override validation rules: Not supported
+- ✓ Re-validation: On any schedule or job definition change
+- ✓ Optimal resolution suggestions: Not supported
 
 ---
 
@@ -167,16 +108,9 @@ No.
 - ✓ Visual circles between consecutive tiles
 - ✓ Filled = matching criterion, Hollow = non-matching
 - ✓ Criteria defined per station category
-
-### Open Questions
-- How are similarity criteria values populated per job?
-The jobs have assigned properties. The similarity criteria values are simply a subset from the job's defined properties. For example if I say the paper weight, type and size are the similarity criteria for the offset printing station, then a job that has CB 300g 63x88cm paper and another one that has CB 135g 63x88cm and have their printing tasks back to back will have 2 out of the 3 simililarity criteria fullfilled. Please ask away if this is not 100% clear.
-- Should similarity influence scheduling suggestions?
-There are not scheduling suggestions.
-- Can similarity be used to optimize station utilization?
-It is only a visual cue provided to the user. Basically if the user sees a lot of fullfilled similarity criteria that are met here and there he know he has some leeway in his schedule and is likely to diminish the likelihood of the schedule not being met IRL.
-- Are there composite criteria (e.g., "same paper" = type + size)?
-No. Each criteria is separate and unique. What you call composite criteria is actually handled as more than one criteria.
+- ✓ Scheduling suggestions: Not supported (no auto-scheduling)
+- ✓ Utilization optimization: Not supported (visual cue only)
+- ✓ Composite criteria: Not supported (each criterion separate)
 
 ---
 
@@ -187,18 +121,11 @@ No. Each criteria is separate and unique. What you call composite criteria is ac
 - ✓ 3-panel layout (Left: Jobs, Center: Grid, Right: Late jobs)
 - ✓ Alt-key bypasses precedence safeguard
 - ✓ Recall removes only the specific task assignment
-
-### Open Questions
-- Should the grid support zoom levels (day/week/month)?
-Not in MVP but clearly, in the near future, yes.
-- Can users customize column order and width?
-Not in MVP but otherwise yes.
-- Is there a "compact view" for high-density schedules?
-Not in MVP but otherwise yes.
-- Should tiles show progress during execution?
-No.
-- How are very long tasks (multi-day) displayed?
-Same as the other tasks.
+- ✓ Zoom levels (day/week/month): Not in MVP, future improvement
+- ✓ Customize column order/width: Not in MVP, future improvement
+- ✓ Compact view: Not in MVP, future improvement
+- ✓ Progress during execution: Not supported
+- ✓ Multi-day tasks display: Same as other tasks
 
 ---
 
@@ -208,67 +135,24 @@ Same as the other tasks.
 - ✓ Drag feedback < 10ms
 - ✓ Grid render (100 tiles) < 100ms
 - ✓ Initial load < 2s
-
-### Open Questions
-- What is the expected maximum number of concurrent jobs?
-If we are talking about non-completed jobs, let's say maximum 300. Otherwise much more but it depends on the overall time span that is accessible through the user interface.
-- How many stations should the system support?
-For MVP a few dozens. Up to one hundred later.
-- What is the maximum time range to display (2 weeks, 1 month)?
-I suggest the following : we display a timeframe that is dynamic as in it show all the tasks of jobs that have not had all their tasks marked as done (see below) earlier that 14 days ago.
-- Should the system support offline mode?
-No.
+- ✓ Max concurrent jobs: ~300 non-completed
+- ✓ Max stations: MVP dozens, up to 100 later
+- ✓ Time range: Dynamic (jobs completed within last 14 days)
+- ✓ Offline mode: Not supported
 
 ---
 
-## 11. Questions Blocking Implementation
+## 11. Implementation Decisions
 
-These questions should be resolved before implementation can begin:
-
-1. **How are similarity criteria values assigned to jobs?**
-   - Who enters this data?
-   See my answer above. If not clear, ask away. I feel this similarity criteria stuff isn't clear for you.
-   - Is it part of job creation or separate workflow?
-   It is part of job creation
-
-2. **What happens when station schedule changes with existing assignments?**
-   - Auto-reschedule?
-   - Flag as conflict?
-   - Notify user?
-   In the MVP we don't allow schedule changes with existing assignments. I want to clarify that in the MVP we allow the user to create a schedule that violates precedence requirements but we inform him of his violations through the visual cues that have been specified. The user cannot make two tiles overlap unless the station capacity allows for it so when a tile is inserted somewhere it "pushes down" the subsequent tiles of the station. Basically I can insert tiles between others, not over others.
-
-3. **Can outsourced tasks start on any day or only on business days?**
-   - If starting Saturday, does the 2JO count from Monday?
-   Only on business day.
-
-4. **How is job color assigned?**
-   - Random per job?
-   - User-selectable?
-   - Based on client or job type?
-   Random per job with mutually dependant jobs appearing as shades of one another.
-
-5. **What is the granularity of paper status tracking?**
-   - Per job?
-   - Per paper type?
-   - Per quantity?
-   Per job.
-
-6. **How are comments attributed?**
-   - Anonymous?
-   - Logged-in user?
-   - System-generated?
-   For MVP, anonymous (we will handle auth right AFTER the MVP is shipped)
-
-7. **What happens to assignments when a job is cancelled?**
-   - Auto-recall all tasks?
-   - Keep for historical reference?
-   All tiles in the future are recalled but the tiles in the past remain.
-   A side note : Each tile should have a checkbox that is checked when the task is completed. We shoud not assume that tasks in the past are always completed. This doesn't bear any impact on precedence rules which DO assume that scheduled tasks happen as defined. Please ask away if this is not 100% clear.
-
-8. **Is there a concept of "rush" or "priority" jobs?**
-   - Visual indicator?
-   - Affects conflict resolution?
-   Not in MVP.
+### Resolved ✓
+- ✓ Similarity criteria: Assigned during job creation via Job fields
+- ✓ Station schedule change: MVP doesn't allow with existing assignments; tiles push down (no overlap)
+- ✓ Outsourced task start: Business days only
+- ✓ Job color: Random per job; dependent jobs use shades of same color
+- ✓ Paper status granularity: Per job
+- ✓ Comments attribution: Anonymous (MVP); auth post-MVP
+- ✓ Cancelled job: Future tiles recalled, past remain; task completion checkbox on tiles
+- ✓ Rush/priority jobs: Not in MVP
 
 ---
 
@@ -315,6 +199,62 @@ Questions that were open but have been resolved through discussion:
 | Job dependency level | Job-level only | Q&A session |
 | Deadline field name | `workshopExitDate` | Q&A session |
 | Schedule branching | Post-MVP | Q&A session |
+| Station maintenance scheduling | MaintenanceBlock entity (like TaskAssignment), Post-MVP | 2025-12-12 |
+| Outsourced task lead times | Added LatestDepartureTime and ReceptionTime to OutsourcedDuration | 2025-12-12 |
+| Task interruption/splitting | Post-MVP; MVP shows single tile with downtime visual distinction | 2025-12-12 |
+| Job dependency types | Finish-to-start only; no start-to-start or finish-to-finish | 2025-12-12 |
+| Validation warnings vs blocks | MVP: visual warnings only, no hard blocks | 2025-12-12 |
+| Similarity criteria values | fieldPath on Job entity; already implemented in SimilarityCriterion | 2025-12-12 |
+| Station seasonal schedules | Not in MVP, future improvement | 2025-12-12 |
+| Station reduced capacity | Not supported | 2025-12-12 |
+| Backup/substitute stations | Out of scope | 2025-12-12 |
+| Multiple categories per station | Not supported | 2025-12-12 |
+| Provider limited capacity | Not supported (always unlimited) | 2025-12-12 |
+| Provider-specific business calendars | Not in MVP, future improvement | 2025-12-12 |
+| Multiple concurrent jobs from same client | Supported | 2025-12-12 |
+| Cost tracking | Out of scope | 2025-12-12 |
+| Task spanning multiple stations | Not supported | 2025-12-12 |
+| Task templates | Not supported | 2025-12-12 |
+| Task duration calculation | User-provided, not calculated | 2025-12-12 |
+| Optional tasks | Not supported (all required) | 2025-12-12 |
+| Conditional dependencies | Not supported (no success/failure concept) | 2025-12-12 |
+| External event triggers | Not supported (approval gates before scheduling) | 2025-12-12 |
+| Cross-client dependencies | Not supported | 2025-12-12 |
+| Min/max gap between tasks | Not required | 2025-12-12 |
+| Schedule outside operating hours | Not supported (future: UI modification) | 2025-12-12 |
+| Facility-wide constraints | Not supported | 2025-12-12 |
+| Provider travel time | Handled via LatestDepartureTime/ReceptionTime | 2025-12-12 |
+| Tight schedule warnings | Not supported | 2025-12-12 |
+| Tasks without BAT | Only if job configured "NoProofRequired" | 2025-12-12 |
+| Automatic BAT timeout | Not supported | 2025-12-12 |
+| BAT pending notifications | Not in MVP | 2025-12-12 |
+| Additional approval gates | Not in MVP | 2025-12-12 |
+| Partial paper reception | Not supported (all or nothing) | 2025-12-12 |
+| Conflict escalation path | None (user resolves outside system) | 2025-12-12 |
+| Override validation rules | Not supported | 2025-12-12 |
+| Re-validation frequency | On any schedule or job change | 2025-12-12 |
+| Optimal resolution suggestions | Not supported | 2025-12-12 |
+| Similarity scheduling suggestions | Not supported (no auto-scheduling) | 2025-12-12 |
+| Similarity utilization optimization | Not supported (visual cue only) | 2025-12-12 |
+| Composite similarity criteria | Not supported (each criterion separate) | 2025-12-12 |
+| Grid zoom levels | Not in MVP, future improvement | 2025-12-12 |
+| Customize column order/width | Not in MVP, future improvement | 2025-12-12 |
+| Compact view | Not in MVP, future improvement | 2025-12-12 |
+| Progress during execution | Not supported | 2025-12-12 |
+| Multi-day tasks display | Same as other tasks | 2025-12-12 |
+| Max concurrent jobs | ~300 non-completed | 2025-12-12 |
+| Max stations | MVP dozens, up to 100 later | 2025-12-12 |
+| Time range display | Dynamic (jobs completed within last 14 days) | 2025-12-12 |
+| Offline mode | Not supported | 2025-12-12 |
+| Similarity criteria assignment | During job creation via Job fields | 2025-12-12 |
+| Station schedule change with assignments | MVP doesn't allow; tiles push down | 2025-12-12 |
+| Outsourced task start day | Business days only | 2025-12-12 |
+| Job color assignment | Random per job; dependent jobs use shades | 2025-12-12 |
+| Paper status granularity | Per job | 2025-12-12 |
+| Comments attribution | Anonymous (MVP); auth post-MVP | 2025-12-12 |
+| Cancelled job assignments | Future tiles recalled, past remain | 2025-12-12 |
+| Task completion checkbox | On tiles; doesn't affect precedence rules | 2025-12-12 |
+| Rush/priority jobs | Not in MVP | 2025-12-12 |
 
 ---
 
