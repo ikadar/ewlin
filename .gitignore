@@ -39,8 +39,10 @@ Thumbs.db
 .cache/
 *.cache
 
-# Claude Code
-.claude/
+# Claude Code - settings are private, commands are shared
+.claude/settings*.json
+.claude/statsig/
+.claude/todos/
 
 # Obsidian
 .obsidian/
