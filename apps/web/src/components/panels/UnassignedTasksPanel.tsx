@@ -43,11 +43,12 @@ export function UnassignedTasksPanel({ className }: UnassignedTasksPanelProps) {
     );
   }, [snapshot]);
 
-  const handleTaskClick = (task: Task) => {
+  const handleTaskClick = (task: Task, job: Job) => {
     dispatch(
       setSelectedTask({
         taskId: task.id,
         task,
+        job,
       })
     );
   };
@@ -90,7 +91,7 @@ export function UnassignedTasksPanel({ className }: UnassignedTasksPanelProps) {
                   {tasks.map((task) => (
                     <div
                       key={task.id}
-                      onClick={() => handleTaskClick(task)}
+                      onClick={() => handleTaskClick(task, job)}
                       className={cn(
                         'flex items-center gap-2 p-2 rounded cursor-pointer text-sm',
                         'hover:bg-muted transition-colors',

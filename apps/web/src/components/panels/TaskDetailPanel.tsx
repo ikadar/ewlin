@@ -43,8 +43,9 @@ export function TaskDetailPanel({ className }: TaskDetailPanelProps) {
       case 'Completed':
         return 'success';
       case 'Cancelled':
+      case 'Failed':
         return 'destructive';
-      case 'InProgress':
+      case 'Executing':
         return 'default';
       default:
         return 'secondary';
@@ -163,10 +164,10 @@ export function TaskDetailPanel({ className }: TaskDetailPanelProps) {
           <div className="border-t pt-3">
             <h4 className="text-sm font-medium mb-1">Job Dependencies</h4>
             <div className="space-y-1">
-              {job.dependencies.map((dep) => {
-                const depJob = snapshot?.jobs.find((j) => j.id === dep.dependsOnJobId);
+              {job.dependencies.map((depJobId) => {
+                const depJob = snapshot?.jobs.find((j) => j.id === depJobId);
                 return (
-                  <div key={dep.dependsOnJobId} className="text-sm flex items-center gap-2">
+                  <div key={depJobId} className="text-sm flex items-center gap-2">
                     <div
                       className={cn(
                         'w-2 h-2 rounded-full',
@@ -174,9 +175,6 @@ export function TaskDetailPanel({ className }: TaskDetailPanelProps) {
                       )}
                     />
                     <span>{depJob?.reference ?? 'Unknown'}</span>
-                    <span className="text-muted-foreground text-xs">
-                      (task #{dep.dependsOnTaskSequence})
-                    </span>
                   </div>
                 );
               })}

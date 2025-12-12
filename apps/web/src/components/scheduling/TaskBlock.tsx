@@ -49,11 +49,12 @@ export function TaskBlock({
     switch (task.status) {
       case 'Assigned':
         return 'bg-blue-500';
-      case 'InProgress':
+      case 'Executing':
         return 'bg-green-500';
       case 'Completed':
         return 'bg-gray-400';
       case 'Cancelled':
+      case 'Failed':
         return 'bg-red-500';
       default:
         return 'bg-blue-400';
@@ -65,6 +66,7 @@ export function TaskBlock({
       setSelectedTask({
         taskId: task.id,
         task,
+        job,
         assignment,
       })
     );

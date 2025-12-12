@@ -3,10 +3,10 @@
 // ============================================
 
 // Status enums
-export type StationStatus = 'Available' | 'InUse' | 'Maintenance' | 'Decommissioned';
+export type StationStatus = 'Available' | 'InUse' | 'Maintenance' | 'OutOfService';
 export type ProviderStatus = 'Active' | 'Inactive';
 export type JobStatus = 'Draft' | 'Planned' | 'InProgress' | 'Delayed' | 'Completed' | 'Cancelled';
-export type TaskStatus = 'Defined' | 'Ready' | 'Assigned' | 'Completed' | 'Cancelled';
+export type TaskStatus = 'Defined' | 'Ready' | 'Assigned' | 'Executing' | 'Completed' | 'Failed' | 'Cancelled';
 export type TaskType = 'internal' | 'outsourced';
 export type PaperPurchaseStatus = 'InStock' | 'ToOrder' | 'Ordered' | 'Received';
 export type PlatesStatus = 'Todo' | 'Done';
@@ -227,7 +227,7 @@ export interface AutocompleteSuggestion {
 export interface SelectedTask {
   taskId: string;
   task: Task;
-  job: Job;
+  job?: Job;
   assignment?: Assignment;
 }
 
