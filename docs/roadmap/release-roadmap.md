@@ -166,8 +166,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 #### v0.1.6 - Outsourced Provider Entity
 - [ ] OutsourcedProvider entity and repository
 - [ ] supportedActionTypes field
+- [ ] latestDepartureTime field (HH:MM, default "14:00")
+- [ ] receptionTime field (HH:MM, default "09:00")
 - [ ] Auto-create station group with unlimited capacity
 - [ ] POST /api/v1/providers endpoint
+- [ ] PUT /api/v1/providers/{id} endpoint
 
 #### v0.1.7 - Station Domain Events
 - [ ] StationRegistered event
@@ -180,8 +183,9 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 #### v0.1.8 - Job Entity
 - [ ] Job entity and repository
-- [ ] JobStatus enum (Draft/Planned/InProgress/Completed/Cancelled)
+- [ ] JobStatus enum (Draft/Planned/InProgress/Delayed/Completed/Cancelled)
 - [ ] workshopExitDate field
+- [ ] color field (random hex from palette, dependent jobs use shades)
 - [ ] Database migration
 
 #### v0.1.9 - Job API Endpoints
@@ -243,7 +247,15 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] JobCreated event
 - [ ] TaskAddedToJob event
 - [ ] ApprovalGateUpdated event
+- [ ] JobCancelled event (with recalledTaskIds, preservedTaskIds)
 - [ ] Event publishing via Messenger
+
+#### v0.1.18 - Job Cancellation
+- [ ] DELETE /api/v1/jobs/{id} endpoint (or POST /api/v1/jobs/{id}/cancel)
+- [ ] Recall future task assignments (scheduledStart > now)
+- [ ] Preserve past task assignments (historical reference)
+- [ ] All task statuses → Cancelled
+- [ ] Unit tests for cancellation logic
 
 ---
 
@@ -316,7 +328,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 #### v0.2.10 - Schedule Aggregate
 - [ ] Schedule entity (aggregate root)
-- [ ] TaskAssignment value object
+- [ ] TaskAssignment value object (with isCompleted, completedAt fields)
 - [ ] Schedule repository
 - [ ] Database migration
 
@@ -330,6 +342,8 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Calculate scheduledEnd considering operating schedule
 - [ ] Handle task stretching across unavailable periods
 - [ ] Business calendar integration for outsourced tasks
+- [ ] LatestDepartureTime handling (if drop > departure, start = next business day)
+- [ ] ReceptionTime handling (scheduledEnd = receptionTime on completion day)
 
 #### v0.2.13 - Unassign (Recall) Task
 - [ ] DELETE /api/v1/tasks/{taskId}/assign endpoint
@@ -356,8 +370,16 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] TaskAssigned event
 - [ ] TaskUnassigned event
 - [ ] TaskRescheduled event
+- [ ] TaskCompletionToggled event
 - [ ] ConflictDetected event
 - [ ] ScheduleUpdated event
+
+#### v0.2.18 - Task Completion Toggle
+- [ ] PUT /api/v1/tasks/{taskId}/completion endpoint
+- [ ] Toggle isCompleted flag (manual, not time-based)
+- [ ] Set/clear completedAt timestamp
+- [ ] Completion does NOT affect precedence validation
+- [ ] Unit tests
 
 ---
 
@@ -414,6 +436,8 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Setup vs run sections
 - [ ] Job reference and description
 - [ ] Start/end time display
+- [ ] Completion checkbox (manual toggle, not time-based)
+- [ ] Completion indicator visual
 
 #### v0.3.8 - Center Panel - Similarity Indicators
 - [ ] Circles between consecutive tiles
@@ -452,8 +476,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 #### v0.3.14 - Drop Handling
 - [ ] Create assignment on valid drop
-- [ ] Show conflict panel on invalid
+- [ ] Show conflict panel on invalid (warnings only in MVP, no hard blocks)
 - [ ] Optimistic update
+- [ ] Tile insertion with push-down (capacity-1 stations)
+- [ ] Tile overlap allowed (capacity > 1 stations)
 
 ### Phase 3D: Backend API Integration
 
@@ -643,3 +669,4 @@ Scheduling View ◄──────── All domain events
 - Backend services can start as a monolith and split later
 - The order can be adjusted based on business priorities
 - Schedule branching and optimization are clearly post-MVP
+- **MVP Validation Behavior:** All validation rules result in visual warnings only — no hard blocks prevent scheduling decisions. Hard blocking behavior may be introduced post-MVP.
