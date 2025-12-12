@@ -176,12 +176,14 @@ This domain model describes the core entities, value objects, and aggregates for
 
 ### SimilarityCriterion
 - **Fields:**
-  - `Id` (string)
-  - `Name` (string, e.g., "Same paper type")
+  - `Code` (string, unique within category, lowercase with underscores, e.g., "paper_type")
+  - `Name` (string, human-readable, e.g., "Same paper type")
   - `FieldPath` (string, Job field path for comparison, e.g., "paperType")
 - **Rules:**
   - Used to determine visual indicators between consecutive tiles.
-  - FieldPath references a field on Job entity for comparison logic.
+  - FieldPath references a property on the Job entity.
+  - When comparing consecutive tasks, the system reads the FieldPath value from each job and checks equality.
+  - Match → filled circle; no match → hollow circle.
 
 ### StationTimeBlock (Abstract Concept)
 - **Definition:** An abstract representation of any time period during which a station is occupied.

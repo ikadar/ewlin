@@ -20,11 +20,24 @@ This document defines the core domain terms used in the **print shop scheduling*
 - **Examples:** "Offset Printing Press", "Finishing", "Cutting", "Binding"
 - **Notes:** Each category defines a list of similarity criteria that can reduce setup time between consecutive jobs.
 - **Similarity Criteria Examples:**
-  - Same paper type
-  - Same paper size
-  - Same paper weight
-  - Same inking
-- **Related terms:** Station, TimeSavingSimilarity.
+  - Same paper type (fieldPath: "paperType")
+  - Same paper size (fieldPath: "paperFormat")
+  - Same paper weight (fieldPath: "paperWeight")
+  - Same inking (fieldPath: "inking")
+- **Related terms:** Station, SimilarityCriterion, TimeSavingSimilarity.
+
+---
+
+## SimilarityCriterion
+
+- **Definition:** A single criterion used to compare consecutive jobs on the same station for potential time savings.
+- **Fields:**
+  - `code`: Unique identifier within category (lowercase, underscores)
+  - `name`: Human-readable display name (e.g., "Same paper type")
+  - `fieldPath`: Path to a Job property for comparison (e.g., "paperType")
+- **Notes:** The criterion's `fieldPath` references a property on the Job entity. When comparing consecutive tasks, the system checks if the jobs' values at that fieldPath match.
+- **Example:** A criterion with `fieldPath="paperType"` compares `job1.paperType` vs `job2.paperType`. If Job A has `paperType="CB 300g"` and Job B has `paperType="CB 135g"`, the criterion is NOT fulfilled (hollow circle).
+- **Related terms:** StationCategory, TimeSavingSimilarity, Job.
 
 ---
 
@@ -189,8 +202,9 @@ This document defines the core domain terms used in the **print shop scheduling*
   - Same paper weight
   - Same inking
 - **Visual representation:** Filled or hollow circles displayed between consecutive tiles.
+- **Comparison mechanism:** The system reads the `fieldPath` value from each consecutive job and compares them. If values match → filled circle; if not → hollow circle.
 - **Notes:** MVP shows visual indicators only; no automatic optimization.
-- **Related terms:** StationCategory, Tile.
+- **Related terms:** StationCategory, SimilarityCriterion, Tile.
 
 ---
 

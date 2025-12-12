@@ -153,8 +153,6 @@ No.
 - ✓ Criteria defined per station category
 
 ### Open Questions
-- How are similarity criteria values populated per job?
-The jobs have assigned properties. The similarity criteria values are simply a subset from the job's defined properties. For example if I say the paper weight, type and size are the similarity criteria for the offset printing station, then a job that has CB 300g 63x88cm paper and another one that has CB 135g 63x88cm and have their printing tasks back to back will have 2 out of the 3 simililarity criteria fullfilled. Please ask away if this is not 100% clear.
 - Should similarity influence scheduling suggestions?
 There are not scheduling suggestions.
 - Can similarity be used to optimize station utilization?
@@ -304,6 +302,7 @@ Questions that were open but have been resolved through discussion:
 | Task interruption/splitting | Post-MVP; MVP shows single tile with downtime visual distinction | 2025-12-12 |
 | Job dependency types | Finish-to-start only; no start-to-start or finish-to-finish | 2025-12-12 |
 | Validation warnings vs blocks | MVP: visual warnings only, no hard blocks | 2025-12-12 |
+| Similarity criteria values | fieldPath on Job entity; already implemented in SimilarityCriterion | 2025-12-12 |
 
 ---
 
