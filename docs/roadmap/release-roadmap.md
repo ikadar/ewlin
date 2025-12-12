@@ -129,11 +129,15 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] OpenAPI documentation (Swagger UI at /api/doc)
 - [x] Integration tests (16 test cases)
 
-#### v0.1.2 - Operating Schedule
-- [ ] OperatingSchedule, DaySchedule, TimeSlot value objects
-- [ ] Weekly pattern management on Station
-- [ ] PUT /api/v1/stations/{id}/schedule endpoint
-- [ ] Time slot overlap validation
+#### v0.1.2 - Operating Schedule ✅
+- [x] OperatingSchedule, DaySchedule, TimeSlot value objects
+- [x] Weekly pattern management on Station
+- [x] PUT /api/v1/stations/{id}/schedule endpoint
+- [x] Time slot overlap validation
+- [x] Factory methods: defaultWeekday(), extended(), twentyFourSeven()
+- [x] PHPStan level 8 configuration
+- [x] Unit tests (66 tests for value objects)
+- [x] Integration tests (10 tests for schedule API)
 
 #### v0.1.3 - Schedule Exceptions
 - [ ] ScheduleException value object
