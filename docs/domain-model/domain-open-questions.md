@@ -75,8 +75,6 @@ No, all tasks are required.
 ### Open Questions
 - Can dependencies be conditional (if Job A succeeds, do B; if fails, do C)?
 No. There is not definition of success in the domain and there will not be. At worst a task will be late IRL and its duration will be updated manually if that is the case.
-- Are there different types of dependencies (finish-to-start, start-to-start)?
-No. If job B requires job A it means the first task of job B cannot start until the last task of job A is completed.
 - Can external events trigger job readiness (e.g., customer approval)?
 No. The approval gates that are present in the domain happen BEFORE the scheduling starts (BAT et and plaques). Is this perfectly clear for you ?
 - Should dependencies span across different clients' jobs?
@@ -306,6 +304,7 @@ Questions that were open but have been resolved through discussion:
 | Station maintenance scheduling | MaintenanceBlock entity (like TaskAssignment), Post-MVP | 2025-12-12 |
 | Outsourced task lead times | Added LatestDepartureTime and ReceptionTime to OutsourcedDuration | 2025-12-12 |
 | Task interruption/splitting | Post-MVP; MVP shows single tile with downtime visual distinction | 2025-12-12 |
+| Job dependency types | Finish-to-start only; no start-to-start or finish-to-finish | 2025-12-12 |
 
 ---
 

@@ -243,8 +243,11 @@ This document defines the core domain terms used in the **print shop scheduling*
 
 ## JobDependency
 
-- **Definition:** A relationship indicating that one job must complete before another job can begin.
-- **Notes:** Job-level only (not task-level cross-job dependencies).
+- **Definition:** A finish-to-start relationship indicating that one job must complete before another job can begin.
+- **Notes:**
+  - Job-level only (not task-level cross-job dependencies).
+  - Strictly finish-to-start: the first task of the dependent job cannot start until the last task of all required jobs are completed.
+  - No other dependency types (start-to-start, finish-to-finish) are supported.
 - **Related terms:** Job, requiredJobs field.
 
 ---

@@ -114,8 +114,8 @@ A Job in `InProgress` status transitions to `Delayed` when:
 - The transition is automatic (not manual user action)
 - A `Delayed` job can return to `InProgress` if tasks are rescheduled to meet the deadline
 
-**BR-JOB-006 – Job dependencies are job-level only**
-Job dependencies (requiredJobs) apply at the job level - a job cannot start until all required jobs are completed.
+**BR-JOB-006 – Job dependencies are finish-to-start only**
+Job dependencies (requiredJobs) are strictly finish-to-start: the first task of the dependent job cannot start until the last task of all required jobs are completed. No other dependency types (start-to-start, finish-to-finish) are supported.
 
 **BR-JOB-007 – Required jobs must exist**
 Every JobId in requiredJobs MUST reference an existing job.
