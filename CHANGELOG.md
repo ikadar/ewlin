@@ -9,22 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Project documentation structure
-- Domain model definitions (Station, Job, Task, Assignment)
-- Architecture decision records (ADR-001 through ADR-012)
-- Release roadmap with milestones M0-M4
-- API interface drafts
-- Business rules and workflow definitions
-- Task DSL specification
-- Git release strategy
+---
 
-### Documentation
-- Domain vocabulary and business rules
-- Sequence diagrams for key flows
-- Interface contracts
-- Service boundaries
-- Scheduling UI design specification
+## [0.0.8] - 2025-12-12
+
+### Changed
+- **BREAKING**: Converted from monorepo to host application with git submodules
+- Directory structure changes:
+  - `services/api` → `services/php-api` (submodule)
+  - `services/node/packages/types` → `packages/types` (submodule)
+  - `services/node/packages/validator` → `packages/validator` (submodule)
+- Removed `services/node` directory (packages moved to root `packages/`)
+
+### Added
+- Git submodules for independent package development:
+  - `ewlin-php-api` - PHP/Symfony backend
+  - `ewlin-types` - Shared TypeScript types (@flux/types)
+  - `ewlin-validator` - Schedule validation (@flux/schedule-validator)
+- Root `package.json` for pnpm workspace orchestration
+- Root `tsconfig.base.json` for shared TypeScript configuration
+- Root `pnpm-workspace.yaml` for package management
+- Release documentation for v0.0.8
+
+### Updated
+- CI/CD workflows to checkout submodules recursively
+- Path references throughout the project
+
+### Migration Guide
+```bash
+# Fresh clone (requires --recursive flag)
+git clone --recursive git@github.com:ikadar/ewlin.git
+
+# Existing clone
+git pull
+git submodule update --init --recursive
+```
 
 ---
 
