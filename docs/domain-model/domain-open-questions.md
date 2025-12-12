@@ -258,4 +258,27 @@ Questions that were open but have been resolved through discussion:
 
 ---
 
+## 14. Open Questions (Pending Resolution)
+
+Questions identified during specification review that require design decisions:
+
+### OQ-001: Job Color Shade Algorithm for Dependent Jobs
+**Context:** BR-JOB-009 states "Dependent jobs (via requiredJobIds) SHOULD use shades of the same base color for visual grouping."
+
+**Unresolved:**
+- How should shades be calculated? (lighter? darker? both?)
+- What if a job depends on multiple jobs with different colors?
+- What is the maximum depth of color shading (chain of dependencies)?
+- Should the algorithm ensure sufficient contrast for accessibility?
+
+**Options to consider:**
+1. Always use lighter shades of the first required job's color
+2. Use a specific lightness adjustment formula (e.g., HSL +10% lightness per dependency level)
+3. Use a predefined palette of shades for each base color
+4. Ignore color inheritance for multi-parent dependencies (use random color)
+
+**Impact:** UI/UX design, accessibility, frontend implementation
+
+---
+
 This file should be continuously updated as the team learns more about the domain and resolves these questions.

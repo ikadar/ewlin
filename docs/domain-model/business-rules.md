@@ -54,6 +54,12 @@ Every StationCategory SHOULD define at least one similarity criterion for visual
 **BR-CATEGORY-002 – Similarity criteria must be unique within category**
 A StationCategory CANNOT have duplicate similarity criteria codes.
 
+**BR-CATEGORY-003 – Similarity null value handling**
+When comparing Job properties via fieldPath for similarity indicators:
+- If both jobs have null/undefined values for the field → treated as matching (filled circle)
+- If one job has null/undefined and the other has a value → treated as non-matching (hollow circle)
+- If both jobs have the same non-null value → treated as matching (filled circle)
+
 ---
 
 ## Station Group
@@ -63,6 +69,12 @@ Every StationGroup MUST have a MaxConcurrent value (integer or unlimited).
 
 **BR-GROUP-002 – Group capacity enforcement**
 At any point in time, the number of active tasks on stations in a group CANNOT exceed MaxConcurrent.
+
+**BR-GROUP-002b – Active task definition for capacity**
+A task is considered "active" for group capacity purposes when: scheduledStart ≤ current_time < scheduledEnd. Tasks are counted based on their scheduled times, regardless of their completion status (IsCompleted flag).
+
+**BR-GROUP-002c – Capacity boundary behavior**
+Capacity is evaluated at each point in time. A task assignment is valid if, for every moment between scheduledStart and scheduledEnd, the group capacity would not be exceeded. The count includes the proposed task.
 
 **BR-GROUP-003 – Outsourced provider groups are unlimited**
 StationGroups marked as `IsOutsourcedProviderGroup` MUST have unlimited capacity.
@@ -129,6 +141,9 @@ Job color MUST be randomly assigned at creation. Dependent jobs (via requiredJob
 **BR-JOB-010 – Cancelled job assignment handling**
 When a Job is cancelled, task assignments scheduled in the future MUST be recalled (removed). Task assignments scheduled in the past MUST remain for historical reference.
 
+**BR-JOB-010b – Future assignment definition for cancellation**
+A task assignment is considered "future" if scheduledStart > current system time at the moment of cancellation. A task assignment is considered "past" if scheduledStart ≤ current system time.
+
 ---
 
 ## Task
@@ -158,6 +173,9 @@ A Task can ONLY start after its predecessor task (if any) has been completed.
 **BR-TASK-008 – Outsourced task departure time**
 For outsourced tasks, if the task is scheduled to start after its LatestDepartureTime, the first business day of the lead time (DurationOpenDays) begins the following business day.
 
+**BR-TASK-008b – Outsourced task Friday edge case**
+If an outsourced task is scheduled on Friday after LatestDepartureTime, the effective start day is the following Monday (or next business day if Monday is a holiday). Example: Task scheduled at 15:00 on Friday with LatestDepartureTime=14:00 and 2JO duration → effective start is Monday, work returns Wednesday at ReceptionTime.
+
 **BR-TASK-009 – Outsourced task end time calculation**
 The end time of an outsourced task is calculated as: the ReceptionTime on the business day that is DurationOpenDays after the effective start day (considering LatestDepartureTime).
 
@@ -180,6 +198,10 @@ When `proofSentAt` is "AwaitingFile", the job is waiting for client file and sch
 
 **BR-PAPER-001 – Paper status progression**
 PaperPurchaseStatus MUST follow the progression: InStock | ToOrder → Ordered → Received.
+- InStock: Paper available, no progression needed
+- ToOrder → Ordered: When order is placed
+- Ordered → Received: When paper arrives
+Backward transitions (e.g., Ordered → ToOrder) are NOT permitted. If an order is cancelled, a new job or manual correction is needed.
 
 **BR-PAPER-002 – Order timestamp on status change**
 When PaperPurchaseStatus changes to "Ordered", `paperOrderedAt` MUST be set to current timestamp.
@@ -201,6 +223,19 @@ Tasks MUST be scheduled only during station operating hours.
 For internal tasks: `scheduledEnd` = `scheduledStart` + task duration (stretched across non-operating periods).
 For outsourced tasks: `scheduledEnd` = `scheduledStart` + (durationOpenDays × business calendar), considering LatestDepartureTime and ReceptionTime.
 Tasks spanning station downtime are displayed as a single continuous tile with downtime portions having distinct visual appearance (MVP). Task interruption/splitting is Post-MVP.
+
+**BR-ASSIGN-003b – Task stretching algorithm (internal tasks)**
+When calculating scheduledEnd for an internal task:
+1. Start from scheduledStart with remaining work = task totalMinutes
+2. While remaining work > 0:
+   a. Find current operating slot (or next if currently in downtime)
+   b. Calculate available time until slot end
+   c. Subtract min(available, remaining) from remaining work
+   d. If remaining > 0, advance to next operating slot
+3. scheduledEnd = end of final work period
+Example: Task starts at 16:00 (2h before close at 18:00), totalMinutes=180 (3h)
+→ Works 2h (16:00-18:00), overnight gap, works 1h (08:00-09:00 next day)
+→ scheduledEnd = 09:00 next day
 
 **BR-ASSIGN-004 – No retrospective scheduling**
 Tasks CANNOT be scheduled to start in the past (relative to current system time).
@@ -243,6 +278,14 @@ The system MUST warn when scheduled task completion exceeds the job's workshopEx
 
 **BR-SCHED-006 – Approval gate enforcement**
 The system MUST prevent scheduling tasks when required approval gates are not satisfied.
+
+**BR-SCHED-007 – Schedule version increment**
+The Schedule.Version MUST increment on any assignment state change:
+- TaskAssigned (new assignment created)
+- TaskUnassigned (assignment removed/recalled)
+- TaskRescheduled (assignment times modified)
+- TaskCompletionToggled (IsCompleted changed)
+Version is used for optimistic locking to detect concurrent modifications.
 
 ---
 

@@ -159,7 +159,10 @@ Tasks are polymorphic (internal or outsourced).
 
 ## 8. TaskAssignment (Value Object)
 
-- **stationId** (string, for internal) | **providerId** (string, for outsourced)
+- **id** (string)
+- **taskId** (string, reference to Task)
+- **targetId** (string, StationId for internal or ProviderId for outsourced)
+- **isOutsourced** (boolean)
 - **scheduledStart** (datetime)
 - **scheduledEnd** (datetime)
 - **isCompleted** (boolean, default false) — manually toggled via UI checkbox; does NOT affect precedence validation
