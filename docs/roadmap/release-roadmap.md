@@ -120,12 +120,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Database migration
 - [x] Unit tests for Station (50 tests, 88 assertions)
 
-#### v0.1.1 - Station API Endpoints
-- [ ] POST /api/v1/stations (create)
-- [ ] GET /api/v1/stations (list)
-- [ ] GET /api/v1/stations/{id} (get)
-- [ ] PUT /api/v1/stations/{id} (update)
-- [ ] OpenAPI documentation
+#### v0.1.1 - Station API Endpoints ✅
+- [x] POST /api/v1/stations (create)
+- [x] GET /api/v1/stations (list with pagination and filters)
+- [x] GET /api/v1/stations/{id} (get)
+- [x] PUT /api/v1/stations/{id} (update)
+- [x] DELETE /api/v1/stations/{id} (delete)
+- [x] OpenAPI documentation (Swagger UI at /api/doc)
+- [x] Integration tests (16 test cases)
 
 #### v0.1.2 - Operating Schedule
 - [ ] OperatingSchedule, DaySchedule, TimeSlot value objects
