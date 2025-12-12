@@ -136,8 +136,6 @@ No. Until all the paper is received we treat is as none of the paper is received
 ### Open Questions
 - What is the escalation path for unresolvable conflicts?
 No path. The user receives the information through the UI and makes his decision with it. Unresolvable conflicts are a business matter that is solved outside of the scheduling system : calling a client to postpone a deadline, outsourcing a traditionnaly in-house action, etc.
-- Are some validation rules warnings vs. hard blocks?
-In MVP there are only warnings that we have already defined as visual cues (and from which you can derive the corresponding constraints).
 - Can certain users override specific validation rules?
 No.
 - How often should the system re-validate existing schedules?
@@ -305,6 +303,7 @@ Questions that were open but have been resolved through discussion:
 | Outsourced task lead times | Added LatestDepartureTime and ReceptionTime to OutsourcedDuration | 2025-12-12 |
 | Task interruption/splitting | Post-MVP; MVP shows single tile with downtime visual distinction | 2025-12-12 |
 | Job dependency types | Finish-to-start only; no start-to-start or finish-to-finish | 2025-12-12 |
+| Validation warnings vs blocks | MVP: visual warnings only, no hard blocks | 2025-12-12 |
 
 ---
 

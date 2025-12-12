@@ -321,6 +321,14 @@ Every comment MUST have an author and timestamp recorded.
 
 ## Quick Reference: Validation Rules Summary
 
+### MVP Validation Behavior
+
+In MVP, all validation rules result in **visual warnings only** — no hard blocks prevent the user from making assignments. The system shows visual cues (red halo, late jobs panel, similarity indicators, etc.) but allows the user to proceed with any scheduling decision. Hard blocking behavior may be introduced post-MVP.
+
+The "Blocking?" column in the table below indicates the **intended severity** for future consideration, not MVP behavior.
+
+### Validation Rules Table
+
 The following table provides a quick reference for validation rules, their corresponding conflict types, and severities:
 
 | Rule ID | Description | Conflict Type | Severity | Blocking? |
