@@ -108,14 +108,9 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Visual circles between consecutive tiles
 - ✓ Filled = matching criterion, Hollow = non-matching
 - ✓ Criteria defined per station category
-
-### Open Questions
-- Should similarity influence scheduling suggestions?
-There are not scheduling suggestions.
-- Can similarity be used to optimize station utilization?
-It is only a visual cue provided to the user. Basically if the user sees a lot of fullfilled similarity criteria that are met here and there he know he has some leeway in his schedule and is likely to diminish the likelihood of the schedule not being met IRL.
-- Are there composite criteria (e.g., "same paper" = type + size)?
-No. Each criteria is separate and unique. What you call composite criteria is actually handled as more than one criteria.
+- ✓ Scheduling suggestions: Not supported (no auto-scheduling)
+- ✓ Utilization optimization: Not supported (visual cue only)
+- ✓ Composite criteria: Not supported (each criterion separate)
 
 ---
 
@@ -289,6 +284,9 @@ Questions that were open but have been resolved through discussion:
 | Override validation rules | Not supported | 2025-12-12 |
 | Re-validation frequency | On any schedule or job change | 2025-12-12 |
 | Optimal resolution suggestions | Not supported | 2025-12-12 |
+| Similarity scheduling suggestions | Not supported (no auto-scheduling) | 2025-12-12 |
+| Similarity utilization optimization | Not supported (visual cue only) | 2025-12-12 |
+| Composite similarity criteria | Not supported (each criterion separate) | 2025-12-12 |
 
 ---
 
