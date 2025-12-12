@@ -198,12 +198,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 1B: Job Management Service
 
-#### v0.1.9 - Job Entity
-- [ ] Job entity and repository
-- [ ] JobStatus enum (Draft/Planned/InProgress/Delayed/Completed/Cancelled)
-- [ ] workshopExitDate field
-- [ ] color field (random hex from palette, dependent jobs use shades)
-- [ ] Database migration
+#### v0.1.9 - Job Entity ✅
+- [x] Job entity and repository
+- [x] JobStatus enum (Draft/Planned/InProgress/Delayed/Completed/Cancelled)
+- [x] workshopExitDate field
+- [x] color field (random hex from palette)
+- [x] Database migration
 
 #### v0.1.10 - Job API Endpoints
 - [ ] POST /api/v1/jobs (create with DSL)
