@@ -62,8 +62,6 @@ No.
 I don't understand why you ask since we have clearly stated that task durations are provided directly by the user. Explain the confusion (i.e. WHY you are asking this).
 - Should tasks support optional vs. required classification?
 No, all tasks are required.
-- Can the same task be split across multiple time slots (interruption)?
-Not in MVP but later yes. However in MVP a task can span across a station downtime in which case it should appear as a single continuous block with its real completion time updated to account for the station downtime and the timeslots that happen while a station is in downtime have a different visual aspect compared to the uptime timeslots for the task tile.
 
 ---
 
@@ -307,6 +305,7 @@ Questions that were open but have been resolved through discussion:
 | Schedule branching | Post-MVP | Q&A session |
 | Station maintenance scheduling | MaintenanceBlock entity (like TaskAssignment), Post-MVP | 2025-12-12 |
 | Outsourced task lead times | Added LatestDepartureTime and ReceptionTime to OutsourcedDuration | 2025-12-12 |
+| Task interruption/splitting | Post-MVP; MVP shows single tile with downtime visual distinction | 2025-12-12 |
 
 ---
 

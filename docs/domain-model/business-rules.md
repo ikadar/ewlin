@@ -193,7 +193,8 @@ Tasks MUST be scheduled only during station operating hours.
 
 **BR-ASSIGN-003 – Schedule time calculation**
 For internal tasks: `scheduledEnd` = `scheduledStart` + task duration (stretched across non-operating periods).
-For outsourced tasks: `scheduledEnd` = `scheduledStart` + (durationOpenDays × business calendar).
+For outsourced tasks: `scheduledEnd` = `scheduledStart` + (durationOpenDays × business calendar), considering LatestDepartureTime and ReceptionTime.
+Tasks spanning station downtime are displayed as a single continuous tile with downtime portions having distinct visual appearance (MVP). Task interruption/splitting is Post-MVP.
 
 **BR-ASSIGN-004 – No retrospective scheduling**
 Tasks CANNOT be scheduled to start in the past (relative to current system time).
