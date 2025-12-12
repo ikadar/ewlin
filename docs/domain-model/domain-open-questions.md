@@ -135,16 +135,10 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Drag feedback < 10ms
 - ✓ Grid render (100 tiles) < 100ms
 - ✓ Initial load < 2s
-
-### Open Questions
-- What is the expected maximum number of concurrent jobs?
-If we are talking about non-completed jobs, let's say maximum 300. Otherwise much more but it depends on the overall time span that is accessible through the user interface.
-- How many stations should the system support?
-For MVP a few dozens. Up to one hundred later.
-- What is the maximum time range to display (2 weeks, 1 month)?
-I suggest the following : we display a timeframe that is dynamic as in it show all the tasks of jobs that have not had all their tasks marked as done (see below) earlier that 14 days ago.
-- Should the system support offline mode?
-No.
+- ✓ Max concurrent jobs: ~300 non-completed
+- ✓ Max stations: MVP dozens, up to 100 later
+- ✓ Time range: Dynamic (jobs completed within last 14 days)
+- ✓ Offline mode: Not supported
 
 ---
 
@@ -285,6 +279,10 @@ Questions that were open but have been resolved through discussion:
 | Compact view | Not in MVP, future improvement | 2025-12-12 |
 | Progress during execution | Not supported | 2025-12-12 |
 | Multi-day tasks display | Same as other tasks | 2025-12-12 |
+| Max concurrent jobs | ~300 non-completed | 2025-12-12 |
+| Max stations | MVP dozens, up to 100 later | 2025-12-12 |
+| Time range display | Dynamic (jobs completed within last 14 days) | 2025-12-12 |
+| Offline mode | Not supported | 2025-12-12 |
 
 ---
 
