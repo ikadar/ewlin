@@ -180,12 +180,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit tests (31 tests)
 - [x] Integration tests (34 tests)
 
-#### v0.1.7 - Station Domain Events
-- [ ] StationRegistered event
-- [ ] OperatingScheduleUpdated event
-- [ ] ScheduleExceptionAdded event
-- [ ] StationStatusChanged event
-- [ ] Symfony Messenger configuration
+#### v0.1.7 - Station Domain Events ✅
+- [x] StationRegistered event
+- [x] OperatingScheduleUpdated event
+- [x] ScheduleExceptionAdded event
+- [x] StationStatusChanged event
+- [x] Symfony Messenger configuration
 
 ### Submodule CI/CD Setup
 
