@@ -4,7 +4,7 @@ A scheduling system for print shop production management, enabling efficient tas
 
 ## Project Status
 
-**Current Version:** v0.0.1 (Development Environment)
+**Current Version:** v0.1.1 (Station API Endpoints)
 
 See [Release Roadmap](docs/roadmap/release-roadmap.md) for planned features.
 
@@ -117,6 +117,21 @@ docker compose down -v && docker compose up -d
 |---------|------|
 | MariaDB | 3306 |
 | Redis | 6379 |
+
+## CI/CD
+
+### GitHub Actions Secrets
+
+The CI workflow requires a Personal Access Token to access private submodules.
+
+| Secret | Purpose | Expiration |
+|--------|---------|------------|
+| `SUBMODULES_PAT` | Access to private submodule repos (types, validator, php-api) | **2026-03-12** |
+
+**Token renewal:** When the token expires, create a new Fine-grained PAT with:
+- Repository access: `ewlin`, `ewlin-types`, `ewlin-validator`, `ewlin-php-api`
+- Permissions: Contents (Read-only)
+- Update the `SUBMODULES_PAT` secret in repository settings
 
 ## Contributing
 
