@@ -96,15 +96,15 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] ESLint config updates (ignore config files)
 - [x] Branch consolidation (all releases on main)
 
-### v0.0.8 - Repository Structure (Git Submodules)
-- [ ] Convert monorepo to git submodule structure
-- [ ] Create `ewlin-php-api` repository (PHP/Symfony backend)
-- [ ] Create `ewlin-types` repository (@flux/types package)
-- [ ] Create `ewlin-validator` repository (@flux/schedule-validator package)
-- [ ] Restructure directories (`services/api` → `services/php-api`, `services/node/packages/*` → `packages/*`)
-- [ ] Update pnpm workspace configuration
-- [ ] Update CI/CD pipelines for new structure
-- [ ] Update documentation paths
+### v0.0.8 - Repository Structure (Git Submodules) ✅
+- [x] Convert monorepo to git submodule structure
+- [x] Create `ewlin-php-api` repository (PHP/Symfony backend)
+- [x] Create `ewlin-types` repository (@flux/types package)
+- [x] Create `ewlin-validator` repository (@flux/schedule-validator package)
+- [x] Restructure directories (`services/api` → `services/php-api`, `services/node/packages/*` → `packages/*`)
+- [x] Update pnpm workspace configuration
+- [x] Update CI/CD pipelines for new structure
+- [x] Update documentation paths
 
 ---
 
@@ -112,11 +112,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 1A: Station Management Service
 
-#### v0.1.0 - Station Entity
-- [ ] Station entity and repository
-- [ ] StationStatus enum (Available/InUse/Maintenance/OutOfService)
-- [ ] Database migration
-- [ ] Unit tests for Station
+#### v0.1.0 - Station Entity ✅
+- [x] Station entity and repository
+- [x] StationStatus enum (Active/Inactive/OutOfService/Maintenance)
+- [x] StationCategory stub entity
+- [x] StationGroup stub entity with maxConcurrent
+- [x] Database migration
+- [x] Unit tests for Station (50 tests, 88 assertions)
 
 #### v0.1.1 - Station API Endpoints
 - [ ] POST /api/v1/stations (create)
