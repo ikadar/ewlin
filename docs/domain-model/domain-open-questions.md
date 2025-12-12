@@ -40,16 +40,10 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Outsourced tasks: `ST [Provider] ActionType duration "comment"`
 - ✓ Station names with spaces use underscores
 - ✓ Comments can appear anywhere with quotes
-
-### Open Questions
-- Can a single task span multiple stations (parallel processing)?
-No.
-- Are there task templates for common operations?
-No.
-- Can task duration vary based on job complexity or quantity?
-I don't understand why you ask since we have clearly stated that task durations are provided directly by the user. Explain the confusion (i.e. WHY you are asking this).
-- Should tasks support optional vs. required classification?
-No, all tasks are required.
+- ✓ Single task spanning multiple stations: Not supported
+- ✓ Task templates: Not supported
+- ✓ Task duration: User-provided, not calculated from complexity
+- ✓ Optional tasks: Not supported (all tasks are required)
 
 ---
 
@@ -299,6 +293,10 @@ Questions that were open but have been resolved through discussion:
 | Provider-specific business calendars | Not in MVP, future improvement | 2025-12-12 |
 | Multiple concurrent jobs from same client | Supported | 2025-12-12 |
 | Cost tracking | Out of scope | 2025-12-12 |
+| Task spanning multiple stations | Not supported | 2025-12-12 |
+| Task templates | Not supported | 2025-12-12 |
+| Task duration calculation | User-provided, not calculated | 2025-12-12 |
+| Optional tasks | Not supported (all required) | 2025-12-12 |
 
 ---
 
