@@ -217,8 +217,10 @@ Task completion (IsCompleted) MUST be manually toggled via UI checkbox. Tasks in
 **BR-ASSIGN-008 – Completion does not affect precedence**
 The IsCompleted flag is for tracking purposes only and DOES NOT affect precedence validation. Precedence rules assume scheduled tasks will happen as defined.
 
-**BR-ASSIGN-009 – Tile insertion pushes subsequent tiles**
-When a tile is inserted at a position occupied by existing tiles, subsequent tiles on the same station MUST be pushed down (later in time). Tiles CANNOT overlap on capacity-1 stations.
+**BR-ASSIGN-009 – Tile insertion behavior**
+Tiles are inserted between existing tiles, not over them:
+- On capacity-1 stations: Tiles CANNOT overlap. When a tile is inserted, subsequent tiles on the same station are automatically pushed down (later in time).
+- On stations with capacity > 1: Multiple tiles CAN overlap up to the station's capacity limit.
 
 ---
 

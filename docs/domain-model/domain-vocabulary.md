@@ -157,7 +157,7 @@ This document defines the core domain terms used in the **print shop scheduling*
 ## Tile
 
 - **Definition:** The visual representation of an assignment on the scheduling grid UI.
-- **Notes:** Tiles are dragged and dropped to create/modify assignments. Shows setup/run differentiation, job reference, time, and similarity indicators. In MVP, tasks spanning station downtime appear as a single continuous tile.
+- **Notes:** Tiles are dragged and dropped to create/modify assignments. Shows setup/run differentiation, job reference, time, and similarity indicators. In MVP, tasks spanning station downtime appear as a single continuous tile. When inserted between existing tiles on capacity-1 stations, subsequent tiles are pushed down automatically.
 - **Visual elements:**
   - Setup/run duration sections
   - Job reference and description
@@ -295,9 +295,11 @@ This document defines the core domain terms used in the **print shop scheduling*
 - **Notes:** Time flows downward. Station columns are ordered by configuration.
 - **Key features:**
   - Drag-and-drop tile placement
+  - Tile insertion pushes subsequent tiles down (no overlap on capacity-1 stations)
   - Visual unavailability overlay
   - Similarity indicators between tiles
   - 30-minute snap grid
+  - Precedence violations allowed with visual warning (red halo)
 - **Related terms:** Tile, Station, Assignment.
 
 ---
