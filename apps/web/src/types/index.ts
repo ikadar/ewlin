@@ -51,6 +51,8 @@ export interface ScheduleException {
 export interface SimilarityCriterion {
   code: string;
   name: string;
+  /** Field path on Job to compare (e.g., "paperType") */
+  fieldPath: string;
 }
 
 // Station category (e.g., "Offset Printing Press")
@@ -85,6 +87,10 @@ export interface OutsourcedProvider {
   id: string;
   name: string;
   supportedActionTypes: string[];
+  /** Latest time by which work must be sent for that day to count as first business day (HH:MM) */
+  latestDepartureTime: string;
+  /** Time when completed work is received back from provider (HH:MM) */
+  receptionTime: string;
   groupId: string;
   status: ProviderStatus;
 }
@@ -155,6 +161,10 @@ export interface Assignment {
   stationId: string; // Station or Provider ID
   scheduledStart: string; // ISO-8601 datetime
   scheduledEnd: string;   // ISO-8601 datetime
+  /** Whether task is manually marked as completed (does NOT affect precedence validation) */
+  isCompleted: boolean;
+  /** Timestamp when task was marked completed (ISO), null if not completed */
+  completedAt: string | null;
 }
 
 // Schedule conflict
