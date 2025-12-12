@@ -205,12 +205,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] color field (random hex from palette)
 - [x] Database migration
 
-#### v0.1.10 - Job API Endpoints
-- [ ] POST /api/v1/jobs (create with DSL)
-- [ ] GET /api/v1/jobs (list with pagination and search)
-- [ ] GET /api/v1/jobs/{id} (get with tasks)
-- [ ] PUT /api/v1/jobs/{id} (update)
-- [ ] OpenAPI documentation
+#### v0.1.10 - Job API Endpoints ✅
+- [x] POST /api/v1/jobs (create)
+- [x] GET /api/v1/jobs (list with pagination and search)
+- [x] GET /api/v1/jobs/{id} (get)
+- [x] PUT /api/v1/jobs/{id} (update)
+- [x] DELETE /api/v1/jobs/{id} (delete)
+- [x] OpenAPI documentation
 
 #### v0.1.11 - Task Entity
 - [ ] Task entity (within Job aggregate)
