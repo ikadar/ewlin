@@ -90,13 +90,16 @@ Create a station category.
 {
   "name": "Offset Printing Press",
   "similarityCriteria": [
-    {"code": "paper_type", "name": "Same paper type"},
-    {"code": "paper_size", "name": "Same paper size"},
-    {"code": "paper_weight", "name": "Same paper weight"},
-    {"code": "inking", "name": "Same inking"}
+    {"code": "paper_type", "name": "Same paper type", "fieldPath": "paperType"},
+    {"code": "paper_size", "name": "Same paper size", "fieldPath": "paperFormat"},
+    {"code": "paper_weight", "name": "Same paper weight", "fieldPath": "paperWeight"},
+    {"code": "inking", "name": "Same inking", "fieldPath": "inking"}
   ]
 }
 ```
+
+**Notes:**
+- `fieldPath`: Path to Job property for comparison (e.g., "paperType" compares job.paperType values)
 
 **Response (201):**
 ```json
@@ -145,7 +148,9 @@ Create an outsourced provider.
 ```json
 {
   "name": "Clément",
-  "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"]
+  "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"],
+  "latestDepartureTime": "14:00",
+  "receptionTime": "09:00"
 }
 ```
 
@@ -155,11 +160,17 @@ Create an outsourced provider.
   "providerId": "prov-clement",
   "name": "Clément",
   "supportedActionTypes": ["Pelliculage", "Dorure", "Reliure"],
+  "latestDepartureTime": "14:00",
+  "receptionTime": "09:00",
   "groupId": "grp-prov-clement",
   "status": "Active",
   "createdAt": "2025-12-11T10:00:00Z"
 }
 ```
+
+**Notes:**
+- `latestDepartureTime`: Latest time by which work must be sent for that day to count as first business day (default: "14:00")
+- `receptionTime`: Time when completed work returns from provider (default: "09:00")
 
 ---
 
@@ -193,6 +204,7 @@ Create a new job.
   "workshopExitDate": "2025-12-15T17:00:00Z",
   "status": "Draft",
   "fullyScheduled": false,
+  "color": "#3B82F6",
   "tasks": [
     {
       "taskId": "task-001",
@@ -327,6 +339,26 @@ Add comment to job.
 }
 ```
 
+### POST /api/v1/jobs/{jobId}/cancel
+Cancel a job.
+
+**Request:** None (empty body)
+
+**Response (200):**
+```json
+{
+  "jobId": "job-456",
+  "status": "Cancelled",
+  "recalledAssignments": ["task-002", "task-003"],
+  "preservedAssignments": ["task-001"],
+  "cancelledAt": "2025-12-11T10:00:00Z"
+}
+```
+
+**Notes:**
+- `recalledAssignments`: Tasks with future assignments that were automatically removed
+- `preservedAssignments`: Tasks with past assignments that remain for historical reference
+
 ---
 
 ## 6. Task Management API
@@ -343,6 +375,30 @@ Reorder tasks within a job.
 
 ### PUT /api/v1/tasks/{taskId}
 Update task details.
+
+### PUT /api/v1/tasks/{taskId}/completion
+Toggle task completion status.
+
+**Request:**
+```json
+{
+  "isCompleted": true
+}
+```
+
+**Response (200):**
+```json
+{
+  "taskId": "task-001",
+  "isCompleted": true,
+  "completedAt": "2025-12-11T10:00:00Z"
+}
+```
+
+**Notes:**
+- `isCompleted`: Boolean flag for tracking purposes only
+- `completedAt`: Set when isCompleted becomes true, cleared when false
+- Does NOT affect precedence validation
 
 ---
 
@@ -475,7 +531,9 @@ Get complete schedule snapshot for UI rendering.
       "jobId": "job-456",
       "stationId": "station-komori",
       "scheduledStart": "2025-12-12T09:00:00Z",
-      "scheduledEnd": "2025-12-12T10:00:00Z"
+      "scheduledEnd": "2025-12-12T10:00:00Z",
+      "isCompleted": false,
+      "completedAt": null
     }
   ],
   "conflicts": [

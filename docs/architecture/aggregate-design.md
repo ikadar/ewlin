@@ -63,7 +63,7 @@ Represents a category of stations with similarity criteria used for time-saving 
 **Entities and Value Objects**
 - **Aggregate Root:** StationCategory
 - **Entities:** None
-- **Value Objects:** SimilarityCriterion
+- **Value Objects:** SimilarityCriterion (includes code, name, and fieldPath for Job property comparison)
 
 **Creation Rules**
 - Created with a unique name
@@ -131,6 +131,8 @@ Represents an external provider for outsourced tasks, with its own implicit stat
 - Provider name must be unique
 - Each provider automatically has its own station group with unlimited capacity
 - supportedActionTypes must not be empty
+- latestDepartureTime must be valid HH:MM format
+- receptionTime must be valid HH:MM format
 
 **Entities and Value Objects**
 - **Aggregate Root:** OutsourcedProvider
@@ -140,6 +142,12 @@ Represents an external provider for outsourced tasks, with its own implicit stat
 **Creation Rules**
 - Created with unique name and supported action types
 - Automatically creates associated station group with unlimited capacity
+- latestDepartureTime defaults to "14:00" if not specified
+- receptionTime defaults to "09:00" if not specified
+
+**Timing Fields**
+- `latestDepartureTime`: Time by which work must be sent for that day to count as first business day
+- `receptionTime`: Time when completed work returns from provider
 
 **State Transitions (Behaviour)**
 - `RegisterProvider`
@@ -183,6 +191,12 @@ Represents a print job containing multiple tasks, managing deadlines, approval g
 - Job is created in `Draft` status with required fields
 - Tasks are parsed from DSL and added incrementally
 - requiredJobIds validated for cycles on each addition
+- Color is randomly assigned from predefined palette
+- Dependent jobs (via requiredJobIds) use shades of the same base color
+
+**Color Assignment**
+- `color`: Hex color code randomly assigned at creation
+- Dependent jobs use shades of required job's color for visual grouping
 
 **State Transitions (Behaviour)**
 - `CreateJob`
@@ -199,6 +213,12 @@ Represents a print job containing multiple tasks, managing deadlines, approval g
 - `StartJob` (Planned → InProgress, when first task starts)
 - `CompleteJob` (InProgress → Completed, when all tasks complete)
 - `CancelJob` (any → Cancelled)
+
+**Cancellation Behaviour**
+- When cancelled, all tasks status change to Cancelled
+- Future task assignments (scheduledStart > now) are automatically recalled (removed)
+- Past task assignments (scheduledStart < now) remain for historical reference
+- JobCancelled event includes recalledTaskIds and preservedTaskIds
 
 **Events**
 - `JobCreated`
@@ -239,7 +259,7 @@ Represents the master schedule containing all task assignments with their timing
 **Entities and Value Objects**
 - **Aggregate Root:** Schedule
 - **Entities:** None (assignments are value objects)
-- **Value Objects:** TaskAssignment, ScheduleConflict, ValidationResult
+- **Value Objects:** TaskAssignment (includes isCompleted, completedAt), ScheduleConflict, ValidationResult
 
 **Creation Rules**
 - Schedule is created empty or from a previous version
@@ -252,7 +272,13 @@ Represents the master schedule containing all task assignments with their timing
 - `UnassignTask` (recall)
 - `RescheduleTask` (move to different time/station)
 - `SwapTaskPositions` (swap two consecutive tasks)
+- `ToggleTaskCompletion` (manually toggle isCompleted flag)
 - `ValidateSchedule` (full revalidation)
+
+**Task Completion**
+- `isCompleted`: Manually toggled via UI checkbox, does NOT affect precedence validation
+- `completedAt`: Set when isCompleted becomes true, cleared when false
+- Tasks are NOT automatically marked completed based on time
 
 **Events**
 - `ScheduleCreated`
@@ -260,6 +286,7 @@ Represents the master schedule containing all task assignments with their timing
 - `TaskUnassigned`
 - `TaskRescheduled`
 - `TasksSwapped`
+- `TaskCompletionToggled`
 - `ConflictDetected`
 - `ConflictResolved`
 - `ScheduleUpdated`

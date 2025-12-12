@@ -95,11 +95,14 @@ The goal is to provide:
   "categoryId": "string",
   "name": "string",
   "similarityCriteria": [
-    {"code": "string", "name": "string"}
+    {"code": "string", "name": "string", "fieldPath": "string"}
   ],
   "createdAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `fieldPath`: References a Job property for similarity comparison (e.g., "paperType")
 
 ### StationGroupCreated
 **Purpose:** Indicates a new station group has been defined.
@@ -122,10 +125,16 @@ The goal is to provide:
   "providerId": "string",
   "name": "string",
   "supportedActionTypes": ["Pelliculage", "Dorure"],
+  "latestDepartureTime": "HH:MM",
+  "receptionTime": "HH:MM",
   "groupId": "string",
   "registeredAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `latestDepartureTime`: Cutoff time for same-day work submission
+- `receptionTime`: Time when completed work returns from provider
 
 ### JobCreated
 **Purpose:** Represents that a print job has been created.
@@ -137,10 +146,14 @@ The goal is to provide:
   "client": "string",
   "description": "string",
   "workshopExitDate": "ISO-8601-datetime",
+  "color": "#RRGGBB",
   "status": "Draft",
   "createdAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `color`: Randomly assigned from predefined palette; dependent jobs use shades of required job's color
 
 ### TaskAddedToJob
 **Purpose:** Indicates that a task has been added to a job.
@@ -242,6 +255,39 @@ The goal is to provide:
   "changedAt": "ISO-8601-timestamp"
 }
 ```
+
+### JobCancelled
+**Purpose:** Indicates a job has been cancelled with assignment handling details.
+**Trigger:** Emitted when job cancellation is processed.
+```json
+{
+  "jobId": "string",
+  "recalledTaskIds": ["task-002", "task-003"],
+  "preservedTaskIds": ["task-001"],
+  "cancelledAt": "ISO-8601-timestamp"
+}
+```
+
+**Notes:**
+- `recalledTaskIds`: Tasks with future assignments that were automatically removed
+- `preservedTaskIds`: Tasks with past assignments that remain for historical reference
+
+### TaskCompletionToggled
+**Purpose:** Indicates task completion status has been manually toggled.
+**Trigger:** Emitted when user toggles completion checkbox on tile.
+```json
+{
+  "taskId": "string",
+  "jobId": "string",
+  "isCompleted": true,
+  "completedAt": "ISO-8601-timestamp|null",
+  "toggledAt": "ISO-8601-timestamp"
+}
+```
+
+**Notes:**
+- Completion is manually controlled, NOT automatic based on time
+- Does NOT affect precedence validation
 
 ### TaskAssigned
 **Purpose:** Indicates that a task has been assigned to a station with timing.

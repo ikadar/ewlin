@@ -33,9 +33,19 @@ They are precise, testable, and implementation-agnostic.
 
 ### AC-STATION-004: Station Category with Similarity Criteria
 **Given** the user creates a category "Offset Printing Press"
-**When** they add similarity criteria ["Same paper type", "Same paper size", "Same inking"]
+**When** they add similarity criteria with fieldPaths:
+  - {code: "paper_type", name: "Same paper type", fieldPath: "paperType"}
+  - {code: "paper_size", name: "Same paper size", fieldPath: "paperFormat"}
+  - {code: "inking", name: "Same inking", fieldPath: "inking"}
 **Then** stations in this category show similarity indicators between consecutive tiles
 **And** the number of circles matches the number of criteria (3)
+**And** each criterion compares the Job's property at the specified fieldPath
+
+### AC-STATION-006: Similarity Criterion Comparison
+**Given** Job A has paperType="CB 300g" and Job B has paperType="CB 135g"
+**And** a similarity criterion with fieldPath="paperType"
+**When** tiles for Job A and Job B are consecutive on the same station
+**Then** the circle for this criterion is hollow (○) indicating no match
 
 ### AC-STATION-005: Station Group Capacity
 **Given** a station group "Offset Presses" with MaxConcurrent = 2
@@ -54,8 +64,20 @@ They are precise, testable, and implementation-agnostic.
 
 ### AC-PROVIDER-002: Outsourced Task Duration
 **Given** an outsourced task with duration "2JO" (2 open days)
-**When** scheduled starting Friday
-**Then** the scheduledEnd is Tuesday (skipping Saturday and Sunday)
+**When** scheduled starting Friday before LatestDepartureTime
+**Then** the scheduledEnd is Tuesday at ReceptionTime (skipping Saturday and Sunday)
+
+### AC-PROVIDER-004: LatestDepartureTime Handling
+**Given** a provider with LatestDepartureTime = 14:00
+**And** an outsourced task with duration "2JO"
+**When** scheduled starting Monday at 15:00 (after LatestDepartureTime)
+**Then** the effective start day is Tuesday
+**And** the scheduledEnd is Thursday at ReceptionTime
+
+### AC-PROVIDER-005: ReceptionTime Handling
+**Given** a provider with ReceptionTime = 09:00
+**And** an outsourced task completing on Wednesday
+**Then** the scheduledEnd time is Wednesday 09:00
 
 ### AC-PROVIDER-003: Unlimited Provider Capacity
 **Given** a provider with unlimited capacity
@@ -160,6 +182,25 @@ ST [Clément] Pelliculage 2JO
 **When** the user tries to set Job B to require Job A
 **Then** the system rejects with error "Circular dependency detected"
 
+### AC-JOB-007: Job Cancellation
+**Given** a job with tasks scheduled in the past and future
+**When** the user cancels the job
+**Then** the job status changes to Cancelled
+**And** all tasks status changes to Cancelled
+**And** future task assignments are automatically recalled (removed from grid)
+**And** past task assignments remain for historical reference
+
+### AC-JOB-008: Job Color Assignment
+**Given** a new job is created
+**Then** a random color is assigned from a predefined palette
+**And** the color is stored in the job record
+**And** all tiles for this job use this color
+
+### AC-JOB-009: Dependent Job Color
+**Given** Job B is created with Job A as a dependency (requiredJobId)
+**Then** Job B receives a shade of Job A's base color
+**And** the color relationship is visually apparent on the grid
+
 ---
 
 ## Approval Gates
@@ -244,6 +285,40 @@ ST [Clément] Pelliculage 2JO
 **Then** tile A moves to B's position
 **And** tile B moves to A's former position
 **And** both scheduledStart/End are updated
+
+### AC-SCHED-010: Task Completion Checkbox
+**Given** a task is scheduled and displayed as a tile on the grid
+**Then** a completion checkbox appears on the tile
+**When** the user checks the checkbox
+**Then** IsCompleted is set to true
+**And** CompletedAt is set to current timestamp
+**And** the tile shows a completion indicator
+**And** precedence validation is NOT affected by this action
+
+### AC-SCHED-011: Completion Does Not Auto-Set
+**Given** a task is scheduled for a time in the past
+**When** the current time passes the task's scheduledEnd
+**Then** the task is NOT automatically marked as completed
+**And** IsCompleted remains false until manually toggled
+
+### AC-SCHED-012: Tile Insertion Push-Down (Capacity-1)
+**Given** tiles A and B are scheduled consecutively on a capacity-1 station
+**When** the user drops a new tile C between A and B
+**Then** tile C is inserted at the dropped position
+**And** tile B (and all subsequent tiles) are pushed down (later in time)
+**And** no tiles overlap on the station
+
+### AC-SCHED-013: Tile Insertion Overlap (Capacity > 1)
+**Given** a provider with unlimited capacity
+**When** the user schedules multiple tasks at the same time
+**Then** tiles CAN overlap on the same column
+**And** no push-down occurs
+
+### AC-SCHED-014: MVP Validation Warnings Only
+**Given** a scheduling operation would violate constraints
+**Then** the system shows visual warnings (red halo, late jobs panel)
+**But** the operation is NOT blocked (user can proceed)
+**And** the user can create schedules with violations
 
 ---
 
