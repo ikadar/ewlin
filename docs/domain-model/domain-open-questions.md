@@ -121,18 +121,11 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ 3-panel layout (Left: Jobs, Center: Grid, Right: Late jobs)
 - ✓ Alt-key bypasses precedence safeguard
 - ✓ Recall removes only the specific task assignment
-
-### Open Questions
-- Should the grid support zoom levels (day/week/month)?
-Not in MVP but clearly, in the near future, yes.
-- Can users customize column order and width?
-Not in MVP but otherwise yes.
-- Is there a "compact view" for high-density schedules?
-Not in MVP but otherwise yes.
-- Should tiles show progress during execution?
-No.
-- How are very long tasks (multi-day) displayed?
-Same as the other tasks.
+- ✓ Zoom levels (day/week/month): Not in MVP, future improvement
+- ✓ Customize column order/width: Not in MVP, future improvement
+- ✓ Compact view: Not in MVP, future improvement
+- ✓ Progress during execution: Not supported
+- ✓ Multi-day tasks display: Same as other tasks
 
 ---
 
@@ -287,6 +280,11 @@ Questions that were open but have been resolved through discussion:
 | Similarity scheduling suggestions | Not supported (no auto-scheduling) | 2025-12-12 |
 | Similarity utilization optimization | Not supported (visual cue only) | 2025-12-12 |
 | Composite similarity criteria | Not supported (each criterion separate) | 2025-12-12 |
+| Grid zoom levels | Not in MVP, future improvement | 2025-12-12 |
+| Customize column order/width | Not in MVP, future improvement | 2025-12-12 |
+| Compact view | Not in MVP, future improvement | 2025-12-12 |
+| Progress during execution | Not supported | 2025-12-12 |
+| Multi-day tasks display | Same as other tasks | 2025-12-12 |
 
 ---
 
