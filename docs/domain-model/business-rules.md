@@ -149,6 +149,12 @@ The raw DSL input for a task MUST parse correctly according to the DSL specifica
 **BR-TASK-007 – Previous task must complete first**
 A Task can ONLY start after its predecessor task (if any) has been completed.
 
+**BR-TASK-008 – Outsourced task departure time**
+For outsourced tasks, if the task is scheduled to start after its LatestDepartureTime, the first business day of the lead time (DurationOpenDays) begins the following business day.
+
+**BR-TASK-009 – Outsourced task end time calculation**
+The end time of an outsourced task is calculated as: the ReceptionTime on the business day that is DurationOpenDays after the effective start day (considering LatestDepartureTime).
+
 ---
 
 ## Approval Gates

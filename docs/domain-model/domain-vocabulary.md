@@ -200,7 +200,25 @@ This document defines the core domain terms used in the **print shop scheduling*
   - Monday through Friday (MVP)
   - Excludes French public holidays (future)
 - **Notation:** `2JO` means 2 open days.
-- **Related terms:** OutsourcedProvider, Task (outsourced).
+- **Related terms:** OutsourcedProvider, Task (outsourced), LatestDepartureTime.
+
+---
+
+## LatestDepartureTime
+
+- **Definition:** The latest time of day by which work must be sent to an outsourced provider for that day to count as the first business day of the lead time.
+- **Example:** If LatestDepartureTime is 14:00 and an outsourced task is scheduled to start at 15:00 on Monday, the lead time (DurationOpenDays) starts counting from Tuesday, not Monday.
+- **Notes:** This is about when the outsourced task starts, not about when the previous task completes.
+- **Related terms:** OutsourcedProvider, Task (outsourced), OpenDay, ReceptionTime.
+
+---
+
+## ReceptionTime
+
+- **Definition:** The time of day when completed work is received back from the outsourced provider after the lead time has elapsed.
+- **Example:** If lead time is 2JO, work sent Monday before LatestDepartureTime will be received back on Wednesday at ReceptionTime.
+- **Notes:** Used to calculate the actual end time of an outsourced task.
+- **Related terms:** OutsourcedProvider, Task (outsourced), OpenDay, LatestDepartureTime.
 
 ---
 

@@ -37,13 +37,6 @@ No.
 No.
 - Should providers have their own business calendar (different holidays)?
 Not in MVP but mark for future improvement.
-- How are provider lead times communicated and updated?
-Actually outsourced tasks have slightly more attributes that in-house tasks.
-When I send a job to a provider, I need to specify for the outsourced task :
-• A latest departure time : the latest time in a given day at which the previous task has to be completed in order for the following day to count as a business day contributing toward the provider's actual work time.
-• A lead time in business days : the number of business days the provider will take to complete the task
-• A reception time : the latest time at which I will receive the completed task's output from the provider.
-IMPORTANT : if anything above here is not PERFECTLY clear, please ask away.
 - Can a provider handle multiple concurrent jobs from same client?
 Yes.
 - How is provider cost tracked (for reporting/optimization)?
@@ -313,6 +306,7 @@ Questions that were open but have been resolved through discussion:
 | Deadline field name | `workshopExitDate` | Q&A session |
 | Schedule branching | Post-MVP | Q&A session |
 | Station maintenance scheduling | MaintenanceBlock entity (like TaskAssignment), Post-MVP | 2025-12-12 |
+| Outsourced task lead times | Added LatestDepartureTime and ReceptionTime to OutsourcedDuration | 2025-12-12 |
 
 ---
 

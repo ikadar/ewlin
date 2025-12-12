@@ -109,7 +109,9 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Type`: 'outsourced'
   - `ProviderId` (reference to OutsourcedProvider)
   - `ActionType` (string, e.g., "Pelliculage")
-  - `DurationOpenDays` (integer)
+  - `DurationOpenDays` (integer) — lead time in business days
+  - `LatestDepartureTime` (time, e.g., "14:00") — latest time to send work to provider for that day to count as first business day
+  - `ReceptionTime` (time, e.g., "10:00") — time when completed work is received back from provider
 
 ### Schedule (Aggregate Root)
 - **Identifier:** `ScheduleId`
