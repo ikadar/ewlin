@@ -189,14 +189,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Submodule CI/CD Setup
 
-#### v0.1.8 - Submodule CI/CD Pipelines
-- [ ] `ewlin-php-api`: GitHub Actions workflow (PHPStan, PHPUnit)
-- [ ] `ewlin-php-api`: Branch protection rules (require PR, require CI pass)
-- [ ] `ewlin-validator`: GitHub Actions workflow (ESLint, TypeScript, Vitest)
-- [ ] `ewlin-validator`: Branch protection rules
-- [ ] `ewlin-types`: GitHub Actions workflow (TypeScript build)
-- [ ] `ewlin-types`: Branch protection rules
-- [ ] Documentation: Submodule contribution workflow
+#### v0.1.8 - Submodule CI/CD Pipelines ✅
+- [x] `ewlin-php-api`: GitHub Actions workflow (PHPStan, PHPUnit)
+- [x] `ewlin-validator`: GitHub Actions workflow (TypeScript build, Vitest)
+- [x] `ewlin-types`: GitHub Actions workflow (TypeScript build)
+- [x] Documentation: Submodule contribution workflow
+- [ ] Branch protection rules (manual configuration required)
 
 ### Phase 1B: Job Management Service
 
