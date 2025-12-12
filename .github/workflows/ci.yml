@@ -194,6 +194,7 @@ jobs:
         run: |
           echo "APP_ENV=dev" > .env
           echo "DATABASE_URL=sqlite:///%kernel.project_dir%/var/data.db" >> .env
+          echo "DEFAULT_URI=http://localhost" >> .env
           cat .env.dev >> .env
 
       - name: Install dependencies
