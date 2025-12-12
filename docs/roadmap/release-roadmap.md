@@ -157,11 +157,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit tests (53 tests for entity + value object)
 - [x] Integration tests (30 tests for API)
 
-#### v0.1.5 - Station Group Entity
-- [ ] StationGroup entity and repository
-- [ ] maxConcurrent field
-- [ ] POST /api/v1/station-groups endpoint
-- [ ] Group capacity validation (stub)
+#### v0.1.5 - Station Group Entity ✅
+- [x] StationGroup entity expanded from stub (description, isOutsourcedProviderGroup, timestamps)
+- [x] Full CRUD API endpoints (POST, GET, PUT, DELETE)
+- [x] maxConcurrent field with validation
+- [x] Provider group business rules (BR-GROUP-003)
+- [x] Unit tests (24 tests)
+- [x] Integration tests (31 tests)
 
 #### v0.1.6 - Outsourced Provider Entity
 - [ ] OutsourcedProvider entity and repository
