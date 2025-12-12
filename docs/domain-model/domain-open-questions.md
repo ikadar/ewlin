@@ -53,14 +53,9 @@ It is intentionally concise and structured for iterative refinement.
 - ✓ Dependencies are at job level only (not task level)
 - ✓ Circular dependencies are prevented
 - ✓ Dependent job cannot start until prerequisites complete
-
-### Open Questions
-- Can dependencies be conditional (if Job A succeeds, do B; if fails, do C)?
-No. There is not definition of success in the domain and there will not be. At worst a task will be late IRL and its duration will be updated manually if that is the case.
-- Can external events trigger job readiness (e.g., customer approval)?
-No. The approval gates that are present in the domain happen BEFORE the scheduling starts (BAT et and plaques). Is this perfectly clear for you ?
-- Should dependencies span across different clients' jobs?
-No. The client is irrelevant to job dependency definition other than perhaps in the UI where the "required job" might start by showing the client's current jobs before listing the other ones.
+- ✓ Conditional dependencies: Not supported (no success/failure concept)
+- ✓ External event triggers: Not supported (approval gates happen before scheduling)
+- ✓ Cross-client dependencies: Not supported (client irrelevant to dependencies)
 
 ---
 
@@ -297,6 +292,9 @@ Questions that were open but have been resolved through discussion:
 | Task templates | Not supported | 2025-12-12 |
 | Task duration calculation | User-provided, not calculated | 2025-12-12 |
 | Optional tasks | Not supported (all required) | 2025-12-12 |
+| Conditional dependencies | Not supported (no success/failure concept) | 2025-12-12 |
+| External event triggers | Not supported (approval gates before scheduling) | 2025-12-12 |
+| Cross-client dependencies | Not supported | 2025-12-12 |
 
 ---
 
