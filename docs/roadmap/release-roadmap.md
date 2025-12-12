@@ -179,29 +179,40 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] StationStatusChanged event
 - [ ] Symfony Messenger configuration
 
+### Submodule CI/CD Setup
+
+#### v0.1.8 - Submodule CI/CD Pipelines
+- [ ] `ewlin-php-api`: GitHub Actions workflow (PHPStan, PHPUnit)
+- [ ] `ewlin-php-api`: Branch protection rules (require PR, require CI pass)
+- [ ] `ewlin-validator`: GitHub Actions workflow (ESLint, TypeScript, Vitest)
+- [ ] `ewlin-validator`: Branch protection rules
+- [ ] `ewlin-types`: GitHub Actions workflow (TypeScript build)
+- [ ] `ewlin-types`: Branch protection rules
+- [ ] Documentation: Submodule contribution workflow
+
 ### Phase 1B: Job Management Service
 
-#### v0.1.8 - Job Entity
+#### v0.1.9 - Job Entity
 - [ ] Job entity and repository
 - [ ] JobStatus enum (Draft/Planned/InProgress/Delayed/Completed/Cancelled)
 - [ ] workshopExitDate field
 - [ ] color field (random hex from palette, dependent jobs use shades)
 - [ ] Database migration
 
-#### v0.1.9 - Job API Endpoints
+#### v0.1.10 - Job API Endpoints
 - [ ] POST /api/v1/jobs (create with DSL)
 - [ ] GET /api/v1/jobs (list with pagination and search)
 - [ ] GET /api/v1/jobs/{id} (get with tasks)
 - [ ] PUT /api/v1/jobs/{id} (update)
 - [ ] OpenAPI documentation
 
-#### v0.1.10 - Task Entity
+#### v0.1.11 - Task Entity
 - [ ] Task entity (within Job aggregate)
 - [ ] TaskStatus enum (Defined/Ready/Assigned/Completed/Cancelled)
 - [ ] Duration value object (setupMinutes, runMinutes, durationOpenDays)
 - [ ] Internal vs Outsourced task types
 
-#### v0.1.11 - DSL Parser with Lezer (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
+#### v0.1.12 - DSL Parser with Lezer (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
 - [ ] Lezer grammar definition (`task-dsl.grammar`)
 - [ ] Grammar compilation and parser generation
 - [ ] Internal task syntax: [Station] setup+run "comment"
@@ -209,48 +220,48 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Error recovery for partial parsing
 - [ ] `@flux/task-dsl-parser` package setup
 
-#### v0.1.11b - DSL Integration
+#### v0.1.12b - DSL Integration
 - [ ] POST /api/v1/dsl/parse endpoint (uses Lezer parser)
 - [ ] Parse error reporting with line numbers
 - [ ] CodeMirror 6 language extension
 - [ ] Syntax highlighting for task DSL
 
-#### v0.1.12 - DSL Autocomplete
+#### v0.1.13 - DSL Autocomplete
 - [ ] GET /api/v1/dsl/autocomplete endpoint
 - [ ] Station name suggestions
 - [ ] Provider name suggestions
 - [ ] Action type suggestions
 
-#### v0.1.13 - Approval Gates
+#### v0.1.14 - Approval Gates
 - [ ] proofSentAt, proofApprovedAt fields on Job
 - [ ] platesStatus field on Job
 - [ ] PUT /api/v1/jobs/{id}/proof endpoint
 - [ ] PUT /api/v1/jobs/{id}/plates endpoint
 
-#### v0.1.14 - Paper Procurement
+#### v0.1.15 - Paper Procurement
 - [ ] paperPurchaseStatus field on Job
 - [ ] paperOrderedAt automatic timestamp
 - [ ] PUT /api/v1/jobs/{id}/paper endpoint
 
-#### v0.1.15 - Job Dependencies
+#### v0.1.16 - Job Dependencies
 - [ ] requiredJobIds field on Job
 - [ ] POST /api/v1/jobs/{id}/dependencies endpoint
 - [ ] Circular dependency detection
 - [ ] Dependency listing
 
-#### v0.1.16 - Job Comments
+#### v0.1.17 - Job Comments
 - [ ] Comment entity (within Job aggregate)
 - [ ] POST /api/v1/jobs/{id}/comments endpoint
 - [ ] Comment listing (threaded in future)
 
-#### v0.1.17 - Job Domain Events
+#### v0.1.18 - Job Domain Events
 - [ ] JobCreated event
 - [ ] TaskAddedToJob event
 - [ ] ApprovalGateUpdated event
 - [ ] JobCancelled event (with recalledTaskIds, preservedTaskIds)
 - [ ] Event publishing via Messenger
 
-#### v0.1.18 - Job Cancellation
+#### v0.1.19 - Job Cancellation
 - [ ] DELETE /api/v1/jobs/{id} endpoint (or POST /api/v1/jobs/{id}/cancel)
 - [ ] Recall future task assignments (scheduledStart > now)
 - [ ] Preserve past task assignments (historical reference)
