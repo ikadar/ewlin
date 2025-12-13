@@ -14,7 +14,7 @@ Interfaces are described in:
 ## 1. Station Management Service – Public Interface
 
 ### 1.1 RegisterStation
-> **IC-STATION-001**
+#### IC-STATION-001
 
 **Purpose:** Add a new station to the system with operating schedule.
 
@@ -64,7 +64,7 @@ Interfaces are described in:
 - `GROUP_NOT_FOUND` – Group does not exist
 
 ### 1.2 UpdateOperatingSchedule
-> **IC-STATION-002**
+#### IC-STATION-002
 
 **Purpose:** Modify station's weekly operating schedule.
 
@@ -108,7 +108,7 @@ Interfaces are described in:
 - `INVALID_TIME_SLOTS` – Time slots overlap or invalid format
 
 ### 1.3 AddScheduleException
-> **IC-STATION-003**
+#### IC-STATION-003
 
 **Purpose:** Add a one-off schedule exception (holiday, maintenance).
 
@@ -148,7 +148,7 @@ Interfaces are described in:
 - `MODIFIED_SLOTS_REQUIRED` – ModifiedHours type requires slots
 
 ### 1.4 GetStationAvailability
-> **IC-STATION-004**
+#### IC-STATION-004
 
 **Purpose:** Query station availability for a time range.
 
@@ -201,7 +201,7 @@ Interfaces are described in:
 ## 2. Station Category Service – Public Interface
 
 ### 2.1 CreateCategory
-> **IC-CATEGORY-001**
+#### IC-CATEGORY-001
 
 **Purpose:** Create a station category with similarity criteria.
 
@@ -238,7 +238,7 @@ Interfaces are described in:
 - `CATEGORY_NAME_EXISTS` – Name already in use
 
 ### 2.2 UpdateSimilarityCriteria
-> **IC-CATEGORY-002**
+#### IC-CATEGORY-002
 
 **Purpose:** Update the similarity criteria for a category.
 
@@ -275,7 +275,7 @@ Interfaces are described in:
 ## 3. Station Group Service – Public Interface
 
 ### 3.1 CreateGroup
-> **IC-GROUP-001**
+#### IC-GROUP-001
 
 **Purpose:** Create a station group with concurrency limits.
 
@@ -309,7 +309,7 @@ Interfaces are described in:
 - `INVALID_MAX_CONCURRENT` – Value must be positive or null
 
 ### 3.2 CheckGroupCapacity
-> **IC-GROUP-002**
+#### IC-GROUP-002
 
 **Purpose:** Check if group has capacity at a given time.
 
@@ -356,7 +356,7 @@ Interfaces are described in:
 ## 4. Outsourced Provider Service – Public Interface
 
 ### 4.1 RegisterProvider
-> **IC-PROVIDER-001**
+#### IC-PROVIDER-001
 
 **Purpose:** Add an external provider to the system.
 
@@ -401,7 +401,7 @@ Interfaces are described in:
 - `NO_ACTION_TYPES` – No supported action types provided
 
 ### 4.2 GetProviderDetails
-> **IC-PROVIDER-002**
+#### IC-PROVIDER-002
 
 **Purpose:** Retrieve provider with supported action types.
 
@@ -437,7 +437,7 @@ Interfaces are described in:
 ## 5. Job Management Service – Public Interface
 
 ### 5.1 CreateJob
-> **IC-JOB-001**
+#### IC-JOB-001
 
 **Purpose:** Create a new print job with tasks from DSL.
 
@@ -501,7 +501,7 @@ Interfaces are described in:
 - `PROVIDER_NOT_FOUND` – Provider referenced in DSL not found
 
 ### 5.2 UpdateJobDetails
-> **IC-JOB-002**
+#### IC-JOB-002
 
 **Purpose:** Update job metadata (not tasks).
 
@@ -541,7 +541,7 @@ Interfaces are described in:
 - `JOB_INVALID_STATE` – Job is Cancelled or Completed
 
 ### 5.3 ReorderTasks
-> **IC-JOB-003**
+#### IC-JOB-003
 
 **Purpose:** Change the sequence order of tasks within a job.
 
@@ -577,7 +577,7 @@ Interfaces are described in:
 - `JOB_INVALID_STATE` – Job is Completed or Cancelled
 
 ### 5.4 SetJobDependency
-> **IC-JOB-004**
+#### IC-JOB-004
 
 **Purpose:** Define that one job depends on another job.
 
@@ -610,7 +610,7 @@ Interfaces are described in:
 - `CIRCULAR_DEPENDENCY` – Would create a cycle
 
 ### 5.5 UpdateProofStatus
-> **IC-JOB-005**
+#### IC-JOB-005
 
 **Purpose:** Update BAT (Bon à Tirer) approval status.
 
@@ -644,7 +644,7 @@ Interfaces are described in:
 - `INVALID_PROOF_STATE` – Cannot approve without sending first
 
 ### 5.6 UpdatePlatesStatus
-> **IC-JOB-006**
+#### IC-JOB-006
 
 **Purpose:** Update plates preparation status.
 
@@ -676,7 +676,7 @@ Interfaces are described in:
 - `JOB_NOT_FOUND` – Job does not exist
 
 ### 5.7 UpdatePaperStatus
-> **IC-JOB-007**
+#### IC-JOB-007
 
 **Purpose:** Update paper procurement status.
 
@@ -709,7 +709,7 @@ Interfaces are described in:
 - `JOB_NOT_FOUND` – Job does not exist
 
 ### 5.8 AddComment
-> **IC-JOB-008**
+#### IC-JOB-008
 
 **Purpose:** Add a timestamped comment to a job.
 
@@ -742,7 +742,7 @@ Interfaces are described in:
 - `EMPTY_CONTENT` – Comment content is empty
 
 ### 5.9 CancelJob
-> **IC-JOB-009**
+#### IC-JOB-009
 
 **Purpose:** Cancel a job and handle its assignments appropriately.
 
@@ -780,7 +780,7 @@ Interfaces are described in:
 - `JOB_INVALID_STATE` – Job is already Completed or Cancelled
 
 ### 5.10 ToggleTaskCompletion
-> **IC-JOB-010**
+#### IC-JOB-010
 
 **Purpose:** Toggle task completion status (manual tracking).
 
@@ -821,7 +821,7 @@ Interfaces are described in:
 - `TASK_NOT_ASSIGNED` – Task must be Assigned or Executing to toggle completion
 
 ### 5.11 GetJobDetails
-> **IC-JOB-011**
+#### IC-JOB-011
 
 **Purpose:** Retrieve job with tasks and status.
 
@@ -892,7 +892,7 @@ Interfaces are described in:
 ## 6. Assignment & Validation Service – Public Interface
 
 ### 6.1 AssignTask
-> **IC-ASSIGN-001**
+#### IC-ASSIGN-001
 
 **Purpose:** Assign a task to a station/provider with scheduled timing.
 
@@ -958,7 +958,7 @@ Interfaces are described in:
 - `STATION_MISMATCH` – Task cannot be assigned to this station
 
 ### 6.2 RecallTask
-> **IC-ASSIGN-002**
+#### IC-ASSIGN-002
 
 **Purpose:** Remove task assignment (recall tile from schedule).
 
@@ -991,7 +991,7 @@ Interfaces are described in:
 - `TASK_NOT_ASSIGNED` – Task has no assignment
 
 ### 6.3 RescheduleTask
-> **IC-ASSIGN-003**
+#### IC-ASSIGN-003
 
 **Purpose:** Change timing of existing task assignment.
 
@@ -1033,7 +1033,7 @@ Interfaces are described in:
 - `TASK_NOT_ASSIGNED` – Task has no assignment
 
 ### 6.4 ValidateProposedAssignment
-> **IC-ASSIGN-004**
+#### IC-ASSIGN-004
 
 **Purpose:** Validate a proposed assignment without saving (for drag preview).
 
@@ -1078,7 +1078,7 @@ Interfaces are described in:
 - `STATION_NOT_FOUND` – Station does not exist
 
 ### 6.5 ValidateScheduleScope
-> **IC-ASSIGN-005**
+#### IC-ASSIGN-005
 
 **Purpose:** Perform full validation of schedule scope.
 
@@ -1133,7 +1133,7 @@ Interfaces are described in:
 ## 7. Scheduling View Service – Public Interface
 
 ### 7.1 GetScheduleSnapshot
-> **IC-VIEW-001**
+#### IC-VIEW-001
 
 **Purpose:** Get complete schedule snapshot for UI rendering.
 
@@ -1333,7 +1333,7 @@ fetches suggestions from these endpoints.
 ## 9. Business Calendar Service – Public Interface
 
 ### 9.1 CalculateOpenDays
-> **IC-CAL-001**
+#### IC-CAL-001
 
 **Purpose:** Calculate end date from start date plus open days.
 
@@ -1365,7 +1365,7 @@ fetches suggestions from these endpoints.
 - `INVALID_DAYS` – Open days must be positive
 
 ### 9.2 CountOpenDaysBetween
-> **IC-CAL-002**
+#### IC-CAL-002
 
 **Purpose:** Count open days between two dates.
 

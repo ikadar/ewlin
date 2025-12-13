@@ -7,7 +7,7 @@ This domain model describes the core entities, value objects, and aggregates for
 ## Aggregates and Root Entities
 
 ### Station (Aggregate Root)
-> **DM-AGG-STATION-001**
+#### DM-AGG-STATION-001
 
 - **Identifier:** `StationId`
 - **Responsibilities:**
@@ -26,7 +26,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Status` (Available, InUse, Maintenance, OutOfService)
 
 ### StationCategory (Aggregate Root)
-> **DM-AGG-CATEGORY-001**
+#### DM-AGG-CATEGORY-001
 
 - **Identifier:** `StationCategoryId`
 - **Responsibilities:**
@@ -38,7 +38,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `SimilarityCriteria` (collection of SimilarityCriterion value objects)
 
 ### StationGroup (Aggregate Root)
-> **DM-AGG-GROUP-001**
+#### DM-AGG-GROUP-001
 
 - **Identifier:** `StationGroupId`
 - **Responsibilities:**
@@ -51,7 +51,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `IsOutsourcedProviderGroup` (boolean)
 
 ### OutsourcedProvider (Aggregate Root)
-> **DM-AGG-PROVIDER-001**
+#### DM-AGG-PROVIDER-001
 
 - **Identifier:** `ProviderId`
 - **Responsibilities:**
@@ -66,7 +66,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Status` (Active, Inactive)
 
 ### Job (Aggregate Root)
-> **DM-AGG-JOB-001**
+#### DM-AGG-JOB-001
 
 - **Identifier:** `JobId`
 - **Responsibilities:**
@@ -97,7 +97,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `CreatedAt` (DateTime)
 
 ### Task (Entity within Job Aggregate)
-> **DM-ENT-TASK-001**
+#### DM-ENT-TASK-001
 
 - **Identifier:** `TaskId`
 - **Responsibilities:**
@@ -126,7 +126,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `ReceptionTime` (time, e.g., "10:00") — time when completed work is received back from provider
 
 ### Schedule (Aggregate Root)
-> **DM-AGG-SCHEDULE-001**
+#### DM-AGG-SCHEDULE-001
 
 - **Identifier:** `ScheduleId`
 - **Responsibilities:**
@@ -156,7 +156,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Immutable once created.
 
 ### OperatingSchedule
-> **DM-VO-SCHEDULE-001**
+#### DM-VO-SCHEDULE-001
 
 - **Fields:**
   - `WeeklyPattern` (collection of DaySchedule)
@@ -165,7 +165,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - DaySchedule specifies available time slots for each day of week.
 
 ### DaySchedule
-> **DM-VO-SCHEDULE-002**
+#### DM-VO-SCHEDULE-002
 
 - **Fields:**
   - `DayOfWeek` (Monday-Sunday)
@@ -174,7 +174,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Time slots cannot overlap within same day.
 
 ### TimeSlot
-> **DM-VO-SCHEDULE-003**
+#### DM-VO-SCHEDULE-003
 
 - **Fields:**
   - `StartTime` (time of day)
@@ -184,7 +184,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Can span midnight (e.g., 22:00-06:00).
 
 ### ScheduleException
-> **DM-VO-SCHEDULE-004**
+#### DM-VO-SCHEDULE-004
 
 - **Fields:**
   - `Id` (string)
@@ -197,7 +197,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Use `Schedule.isOperating = true` with custom slots for modified hours.
 
 ### SimilarityCriterion
-> **DM-VO-CATEGORY-001**
+#### DM-VO-CATEGORY-001
 
 - **Fields:**
   - `Code` (string, unique within category, lowercase with underscores, e.g., "paper_type")
@@ -210,7 +210,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Match → filled circle; no match → hollow circle.
 
 ### StationTimeBlock (Abstract Concept)
-> **DM-VO-ASSIGN-001**
+#### DM-VO-ASSIGN-001
 
 - **Definition:** An abstract representation of any time period during which a station is occupied.
 - **Subtypes:**
@@ -225,7 +225,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Used for unified station availability calculations.
 
 ### TaskAssignment
-> **DM-VO-ASSIGN-002**
+#### DM-VO-ASSIGN-002
 
 - **Extends:** StationTimeBlock
 - **Fields:**
@@ -245,7 +245,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Tasks in the past are NOT automatically marked as completed.
 
 ### MaintenanceBlock — *Post-MVP*
-> **DM-VO-ASSIGN-003**
+#### DM-VO-ASSIGN-003
 
 - **Extends:** StationTimeBlock
 - **Fields:**
@@ -263,7 +263,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Cannot overlap with TaskAssignments on the same station.
 
 ### Comment
-> **DM-VO-JOB-001**
+#### DM-VO-JOB-001
 
 - **Fields:**
   - `Author` (string)
@@ -274,7 +274,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Simple thread, no replies (MVP).
 
 ### ScheduleConflict
-> **DM-VO-CONFLICT-001**
+#### DM-VO-CONFLICT-001
 
 - **Fields:**
   - `Type` (enum: StationConflict, GroupCapacityConflict, PrecedenceConflict, ApprovalGateConflict, AvailabilityConflict, DeadlineConflict)
@@ -283,7 +283,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Severity` (High, Medium, Low)
 
 ### ScheduleSnapshot
-> **DM-VO-VIEW-001**
+#### DM-VO-VIEW-001
 
 - **Fields:**
   - `Version` (integer, for optimistic locking)
@@ -303,7 +303,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Version increments on each schedule modification for optimistic locking.
 
 ### LateJob
-> **DM-VO-VIEW-002**
+#### DM-VO-VIEW-002
 
 - **Fields:**
   - `JobId` (reference to Job)
@@ -315,7 +315,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - Displayed in "Late Jobs" panel in UI.
 
 ### ProposedAssignment
-> **DM-VO-VALID-001**
+#### DM-VO-VALID-001
 
 - **Fields:**
   - `TaskId` (reference to Task)
@@ -328,7 +328,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - BypassPrecedence allows precedence rule to be ignored with warning.
 
 ### ValidationResult
-> **DM-VO-VALID-002**
+#### DM-VO-VALID-002
 
 - **Fields:**
   - `Valid` (boolean)
@@ -339,37 +339,37 @@ This domain model describes the core entities, value objects, and aggregates for
   - SuggestedStart provided when precedence conflict can be auto-corrected.
 
 ### JobStatus
-> **DM-ENUM-JOB-001**
+#### DM-ENUM-JOB-001
 
 - **Allowed values:** Draft, Planned, InProgress, Delayed, Completed, Cancelled
 - Represents the lifecycle state of a Job.
 
 ### StationStatus
-> **DM-ENUM-STATION-001**
+#### DM-ENUM-STATION-001
 
 - **Allowed values:** Available, InUse, Maintenance, OutOfService
 - Represents the operational state of a Station.
 
 ### TaskStatus
-> **DM-ENUM-TASK-001**
+#### DM-ENUM-TASK-001
 
 - **Allowed values:** Defined, Ready, Assigned, Executing, Completed, Failed, Cancelled
 - Represents the lifecycle state of a Task within a Job.
 
 ### PaperPurchaseStatus
-> **DM-ENUM-PAPER-001**
+#### DM-ENUM-PAPER-001
 
 - **Allowed values:** InStock, ToOrder, Ordered, Received
 - Represents the paper procurement state for a Job.
 
 ### PlatesStatus
-> **DM-ENUM-GATE-001**
+#### DM-ENUM-GATE-001
 
 - **Allowed values:** Todo, Done
 - Represents the plates preparation approval gate.
 
 ### ProofStatus (Special Values)
-> **DM-ENUM-GATE-002**
+#### DM-ENUM-GATE-002
 
 - `ProofSentAt` can be:
   - A DateTime (actual date sent)

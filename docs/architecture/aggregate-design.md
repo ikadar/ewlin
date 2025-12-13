@@ -9,7 +9,7 @@ It is a *technology‑agnostic* design reference used during Solution Design & A
 ## 1. Aggregates Overview
 
 ### 1.1 Station Aggregate
-> **AGG-STATION-001**
+#### AGG-STATION-001
 
 **Purpose**
 Represents a physical station (machine) that can be assigned tasks, maintaining its operating schedule, status, and availability.
@@ -60,7 +60,7 @@ Represents a physical station (machine) that can be assigned tasks, maintaining 
 ---
 
 ### 1.2 StationCategory Aggregate
-> **AGG-CATEGORY-001**
+#### AGG-CATEGORY-001
 
 **Purpose**
 Represents a category of stations with similarity criteria used for time-saving indicators.
@@ -97,7 +97,7 @@ Represents a category of stations with similarity criteria used for time-saving 
 ---
 
 ### 1.3 StationGroup Aggregate
-> **AGG-GROUP-001**
+#### AGG-GROUP-001
 
 **Purpose**
 Represents a logical grouping of stations with capacity constraints.
@@ -133,7 +133,7 @@ Represents a logical grouping of stations with capacity constraints.
 ---
 
 ### 1.4 OutsourcedProvider Aggregate
-> **AGG-PROVIDER-001**
+#### AGG-PROVIDER-001
 
 **Purpose**
 Represents an external provider for outsourced tasks, with its own implicit station group.
@@ -179,7 +179,7 @@ Represents an external provider for outsourced tasks, with its own implicit stat
 ---
 
 ### 1.5 Job Aggregate
-> **AGG-JOB-001**
+#### AGG-JOB-001
 
 **Purpose**
 Represents a print job containing multiple tasks, managing deadlines, approval gates, and workflow.
@@ -256,7 +256,7 @@ Represents a print job containing multiple tasks, managing deadlines, approval g
 ---
 
 ### 1.6 Schedule Aggregate
-> **AGG-SCHEDULE-001**
+#### AGG-SCHEDULE-001
 
 **Purpose**
 Represents the master schedule containing all task assignments with their timings, maintaining consistency and detecting conflicts.

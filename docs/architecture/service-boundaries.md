@@ -10,7 +10,7 @@ The goal is to translate the **bounded contexts** from the domain model into con
 ## 1. Services Overview
 
 ### 1.1 Station Management Service
-> **SB-STATION-001**
+#### SB-STATION-001
 
 **Purpose:**
 Manage all stations (physical machines), station categories, station groups, and outsourced providers including their operating schedules and availability.
@@ -57,7 +57,7 @@ Station management is a foundational capability that other services depend on. I
 ---
 
 ### 1.2 Job Management Service
-> **SB-JOB-001**
+#### SB-JOB-001
 
 **Purpose:**
 Define and manage print jobs with their constituent tasks, approval gates, and dependencies.
@@ -105,7 +105,7 @@ Job planning and task structuring is independent of station availability and ass
 ---
 
 ### 1.3 Assignment Service
-> **SB-ASSIGN-001**
+#### SB-ASSIGN-001
 
 **Purpose:**
 Orchestrate task assignments, manage schedule state, and coordinate validation.
@@ -148,7 +148,7 @@ Orchestrate task assignments, manage schedule state, and coordinate validation.
 ---
 
 ### 1.4 Validation Service (Node.js) — Isomorphic
-> **SB-VALID-001**
+#### SB-VALID-001
 
 **Purpose:**
 Provide **isomorphic schedule validation** that runs identically on client (browser) and server (Node.js). This enables real-time validation feedback in the UI while maintaining server-side authority.
@@ -203,7 +203,7 @@ interface ValidationResult {
 ---
 
 ### 1.5 Scheduling View Service (Read Model)
-> **SB-VIEW-001**
+#### SB-VIEW-001
 
 **Purpose:**
 Provide read-optimized views and queries for scheduling visualization and reporting.
@@ -242,7 +242,7 @@ Read models have fundamentally different access patterns and performance require
 ---
 
 ### 1.6 DSL Parsing Service
-> **SB-DSL-001**
+#### SB-DSL-001
 
 **Purpose:**
 Parse and validate task DSL syntax for job creation.
@@ -275,7 +275,7 @@ Parse and validate task DSL syntax for job creation.
 ---
 
 ### 1.7 Business Calendar Service
-> **SB-CAL-001**
+#### SB-CAL-001
 
 **Purpose:**
 Calculate business days (open days) for outsourced task duration.

@@ -11,6 +11,8 @@ Each story follows the standard format:
 ## Station Management
 
 ### US-STATION-001: Register a Station
+> **References:** [BR-STATION-001](../domain-model/business-rules.md#br-station-001), [BR-STATION-002](../domain-model/business-rules.md#br-station-002), [BR-STATION-003](../domain-model/business-rules.md#br-station-003)
+
 > As a **production manager**, I want to **register a new station** (e.g., Komori press, Massicot), so that **I can assign tasks to it**.
 
 **Acceptance Criteria:**
@@ -20,6 +22,8 @@ Each story follows the standard format:
 - Operating schedule can be defined
 
 ### US-STATION-002: Configure Station Operating Schedule
+> **References:** [BR-STATION-004](../domain-model/business-rules.md#br-station-004), [BR-STATION-005](../domain-model/business-rules.md#br-station-005)
+
 > As a **production manager**, I want to **define a station's weekly operating schedule**, so that **tasks are only scheduled during available hours**.
 
 **Acceptance Criteria:**
@@ -28,6 +32,8 @@ Each story follows the standard format:
 - Tasks overlapping non-operating periods are stretched appropriately
 
 ### US-STATION-003: Add Schedule Exception
+> **References:** [BR-STATION-008](../domain-model/business-rules.md#br-station-008)
+
 > As a **production manager**, I want to **add a one-off schedule exception** (holiday, special maintenance), so that **the schedule reflects reality**.
 
 **Acceptance Criteria:**
@@ -36,6 +42,8 @@ Each story follows the standard format:
 - Exception overrides regular schedule
 
 ### US-STATION-004: Configure Station Category
+> **References:** [BR-CATEGORY-001](../domain-model/business-rules.md#br-category-001), [BR-CATEGORY-002](../domain-model/business-rules.md#br-category-002)
+
 > As a **production manager**, I want to **create station categories with similarity criteria**, so that **I can see time-saving indicators between consecutive jobs**.
 
 **Acceptance Criteria:**
@@ -44,6 +52,8 @@ Each story follows the standard format:
 - Indicators appear between tiles on the scheduling grid
 
 ### US-STATION-005: Configure Station Group
+> **References:** [BR-GROUP-001](../domain-model/business-rules.md#br-group-001), [BR-GROUP-002](../domain-model/business-rules.md#br-group-002)
+
 > As a **production manager**, I want to **create station groups with concurrency limits**, so that **the system enforces capacity constraints**.
 
 **Acceptance Criteria:**

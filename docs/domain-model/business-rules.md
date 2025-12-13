@@ -7,54 +7,82 @@ These rules are technology-agnostic and must hold regardless of implementation.
 
 ## Station
 
-**BR-STATION-001 – Station must have a unique identifier**
+#### BR-STATION-001
+**Station must have a unique identifier**
+
 Every Station MUST have a unique ID that cannot be changed once created.
 
-**BR-STATION-002 – Station must belong to a category**
+#### BR-STATION-002
+**Station must belong to a category**
+
 Every Station MUST be assigned to exactly one StationCategory.
 
-**BR-STATION-003 – Station must belong to a group**
+#### BR-STATION-003
+**Station must belong to a group**
+
 Every Station MUST be assigned to exactly one StationGroup.
 
-**BR-STATION-004 – Station operating schedule required**
+#### BR-STATION-004
+**Station operating schedule required**
+
 Every Station MUST have a defined operating schedule (weekly pattern).
 
-**BR-STATION-005 – Operating schedule slots cannot overlap**
+#### BR-STATION-005
+**Operating schedule slots cannot overlap**
+
 A Station's operating schedule time slots MUST NOT overlap within the same day.
 
-**BR-STATION-006 – One task at a time for capacity-1 stations**
+#### BR-STATION-006
+**One task at a time for capacity-1 stations**
+
 A Station with capacity=1 CANNOT be assigned to multiple tasks that overlap in time.
 
-**BR-STATION-007 – Available status for assignments**
+#### BR-STATION-007
+**Available status for assignments**
+
 Only Stations with status `Available` can be assigned to new tasks (not `Maintenance` or `OutOfService`).
 
-**BR-STATION-008 – Schedule exceptions override regular schedule**
+#### BR-STATION-008
+**Schedule exceptions override regular schedule**
+
 A ScheduleException for a specific date MUST override the regular operating schedule for that date.
 
 ---
 
 ## Maintenance Block — *Post-MVP*
 
-**BR-MAINT-001 – Maintenance blocks station availability**
+#### BR-MAINT-001
+**Maintenance blocks station availability**
+
 A MaintenanceBlock MUST prevent task assignments during its scheduled period on the same station.
 
-**BR-MAINT-002 – No overlap with task assignments**
+#### BR-MAINT-002
+**No overlap with task assignments**
+
 A MaintenanceBlock CANNOT overlap with existing TaskAssignments on the same station.
 
-**BR-MAINT-003 – Maintenance is independent of jobs**
+#### BR-MAINT-003
+**Maintenance is independent of jobs**
+
 A MaintenanceBlock is NOT associated with any Job or Task; it exists independently as a station time block.
 
 ---
 
 ## Station Category
 
-**BR-CATEGORY-001 – Category must have similarity criteria**
+#### BR-CATEGORY-001
+**Category must have similarity criteria**
+
 Every StationCategory SHOULD define at least one similarity criterion for visual indicators.
 
-**BR-CATEGORY-002 – Similarity criteria must be unique within category**
+#### BR-CATEGORY-002
+**Similarity criteria must be unique within category**
+
 A StationCategory CANNOT have duplicate similarity criteria codes.
 
-**BR-CATEGORY-003 – Similarity null value handling**
+#### BR-CATEGORY-003
+**Similarity null value handling**
+
 When comparing Job properties via fieldPath for similarity indicators:
 - If both jobs have null/undefined values for the field → treated as matching (filled circle)
 - If one job has null/undefined and the other has a value → treated as non-matching (hollow circle)
@@ -64,60 +92,92 @@ When comparing Job properties via fieldPath for similarity indicators:
 
 ## Station Group
 
-**BR-GROUP-001 – Group must have max concurrent defined**
+#### BR-GROUP-001
+**Group must have max concurrent defined**
+
 Every StationGroup MUST have a MaxConcurrent value (integer or unlimited).
 
-**BR-GROUP-002 – Group capacity enforcement**
+#### BR-GROUP-002
+**Group capacity enforcement**
+
 At any point in time, the number of active tasks on stations in a group CANNOT exceed MaxConcurrent.
 
-**BR-GROUP-002b – Active task definition for capacity**
+#### BR-GROUP-002b
+**Active task definition for capacity**
+
 A task is considered "active" for group capacity purposes when: scheduledStart ≤ current_time < scheduledEnd. Tasks are counted based on their scheduled times, regardless of their completion status (IsCompleted flag).
 
-**BR-GROUP-002c – Capacity boundary behavior**
+#### BR-GROUP-002c
+**Capacity boundary behavior**
+
 Capacity is evaluated at each point in time. A task assignment is valid if, for every moment between scheduledStart and scheduledEnd, the group capacity would not be exceeded. The count includes the proposed task.
 
-**BR-GROUP-003 – Outsourced provider groups are unlimited**
+#### BR-GROUP-003
+**Outsourced provider groups are unlimited**
+
 StationGroups marked as `IsOutsourcedProviderGroup` MUST have unlimited capacity.
 
-**BR-GROUP-004 – All stations must have a group**
+#### BR-GROUP-004
+**All stations must have a group**
+
 There MUST NOT be any station without a group assignment.
 
 ---
 
 ## Outsourced Provider
 
-**BR-PROVIDER-001 – Provider must have unique identifier**
+#### BR-PROVIDER-001
+**Provider must have unique identifier**
+
 Every OutsourcedProvider MUST have a unique ID.
 
-**BR-PROVIDER-002 – Provider creates own station group**
+#### BR-PROVIDER-002
+**Provider creates own station group**
+
 When an OutsourcedProvider is created, a corresponding StationGroup with unlimited capacity MUST be created automatically.
 
-**BR-PROVIDER-003 – Provider has unlimited capacity**
+#### BR-PROVIDER-003
+**Provider has unlimited capacity**
+
 OutsourcedProviders CAN have multiple overlapping tasks (no capacity limit).
 
-**BR-PROVIDER-004 – Provider duration in open days**
+#### BR-PROVIDER-004
+**Provider duration in open days**
+
 Outsourced task durations MUST be specified in open days (JO), not minutes.
 
 ---
 
 ## Job
 
-**BR-JOB-001 – Job must have a workshop exit date**
+#### BR-JOB-001
+**Job must have a workshop exit date**
+
 Every Job MUST have a defined workshopExitDate by which all tasks must be completed.
 
-**BR-JOB-002 – Job must contain tasks**
+#### BR-JOB-002
+**Job must contain tasks**
+
 A Job MUST contain at least one Task to be valid for scheduling.
 
-**BR-JOB-003 – Job reference can be manipulated**
+#### BR-JOB-003
+**Job reference can be manipulated**
+
 The Job reference field CAN be modified by users to manage order lines and parts.
 
-**BR-JOB-004 – Job completion requires all tasks completed**
+#### BR-JOB-004
+**Job completion requires all tasks completed**
+
 A Job can ONLY be marked as `Completed` when ALL its tasks are completed.
 
-**BR-JOB-005 – Job cancellation cascades to tasks**
+#### BR-JOB-005
+**Job cancellation cascades to tasks**
+
 When a Job is cancelled, all its incomplete tasks MUST also be cancelled.
 
-**BR-JOB-005b – Job Delayed status trigger**
+#### BR-JOB-005b
+**Job Delayed status trigger**
+
 A Job in `InProgress` status transitions to `Delayed` when:
 - The scheduled completion time of the last task exceeds the workshopExitDate
 - This is detected automatically by the system when:
@@ -126,105 +186,157 @@ A Job in `InProgress` status transitions to `Delayed` when:
 - The transition is automatic (not manual user action)
 - A `Delayed` job can return to `InProgress` if tasks are rescheduled to meet the deadline
 
-**BR-JOB-006 – Job dependencies are finish-to-start only**
+#### BR-JOB-006
+**Job dependencies are finish-to-start only**
+
 Job dependencies (requiredJobs) are strictly finish-to-start: the first task of the dependent job cannot start until the last task of all required jobs are completed. No other dependency types (start-to-start, finish-to-finish) are supported.
 
-**BR-JOB-007 – Required jobs must exist**
+#### BR-JOB-007
+**Required jobs must exist**
+
 Every JobId in requiredJobs MUST reference an existing job.
 
-**BR-JOB-008 – No circular job dependencies**
+#### BR-JOB-008
+**No circular job dependencies**
+
 Job dependencies MUST NOT form cycles.
 
-**BR-JOB-009 – Job color assignment**
+#### BR-JOB-009
+**Job color assignment**
+
 Job color MUST be randomly assigned at creation. Dependent jobs (via requiredJobIds) SHOULD use shades of the same base color for visual grouping.
 
-**BR-JOB-010 – Cancelled job assignment handling**
+#### BR-JOB-010
+**Cancelled job assignment handling**
+
 When a Job is cancelled, task assignments scheduled in the future MUST be recalled (removed). Task assignments scheduled in the past MUST remain for historical reference.
 
-**BR-JOB-010b – Future assignment definition for cancellation**
+#### BR-JOB-010b
+**Future assignment definition for cancellation**
+
 A task assignment is considered "future" if scheduledStart > current system time at the moment of cancellation. A task assignment is considered "past" if scheduledStart ≤ current system time.
 
 ---
 
 ## Task
 
-**BR-TASK-001 – Task must belong to exactly one job**
+#### BR-TASK-001
+**Task must belong to exactly one job**
+
 Every Task MUST belong to exactly one Job and cannot exist independently.
 
-**BR-TASK-002 – Task duration must be positive**
+#### BR-TASK-002
+**Task duration must be positive**
+
 For internal tasks: setup + run minutes MUST be greater than zero.
 For outsourced tasks: durationOpenDays MUST be greater than zero.
 
-**BR-TASK-003 – Tasks follow linear sequence**
+#### BR-TASK-003
+**Tasks follow linear sequence**
+
 Tasks within a job MUST follow a single straight sequence (Task N depends on Task N-1).
 
-**BR-TASK-004 – Internal task must reference valid station**
+#### BR-TASK-004
+**Internal task must reference valid station**
+
 An internal task MUST reference a Station that exists in the system.
 
-**BR-TASK-005 – Outsourced task must reference valid provider**
+#### BR-TASK-005
+**Outsourced task must reference valid provider**
+
 An outsourced task MUST reference an OutsourcedProvider that exists in the system.
 
-**BR-TASK-006 – Task DSL must be parseable**
+#### BR-TASK-006
+**Task DSL must be parseable**
+
 The raw DSL input for a task MUST parse correctly according to the DSL specification.
 
-**BR-TASK-007 – Previous task must complete first**
+#### BR-TASK-007
+**Previous task must complete first**
+
 A Task can ONLY start after its predecessor task (if any) has been completed.
 
-**BR-TASK-008 – Outsourced task departure time**
+#### BR-TASK-008
+**Outsourced task departure time**
+
 For outsourced tasks, if the task is scheduled to start after its LatestDepartureTime, the first business day of the lead time (DurationOpenDays) begins the following business day.
 
-**BR-TASK-008b – Outsourced task Friday edge case**
+#### BR-TASK-008b
+**Outsourced task Friday edge case**
+
 If an outsourced task is scheduled on Friday after LatestDepartureTime, the effective start day is the following Monday (or next business day if Monday is a holiday). Example: Task scheduled at 15:00 on Friday with LatestDepartureTime=14:00 and 2JO duration → effective start is Monday, work returns Wednesday at ReceptionTime.
 
-**BR-TASK-009 – Outsourced task end time calculation**
+#### BR-TASK-009
+**Outsourced task end time calculation**
+
 The end time of an outsourced task is calculated as: the ReceptionTime on the business day that is DurationOpenDays after the effective start day (considering LatestDepartureTime).
 
 ---
 
 ## Approval Gates
 
-**BR-GATE-001 – BAT approval before scheduling**
+#### BR-GATE-001
+**BAT approval before scheduling**
+
 Tasks CANNOT be scheduled until the job's proof is approved (`proofApprovedAt` is set) OR `proofSentAt` is "NoProofRequired".
 
-**BR-GATE-002 – Plates approval before printing**
+#### BR-GATE-002
+**Plates approval before printing**
+
 Printing tasks on offset stations CANNOT start until the job's `platesStatus` is "Done".
 
-**BR-GATE-003 – AwaitingFile blocks BAT**
+#### BR-GATE-003
+**AwaitingFile blocks BAT**
+
 When `proofSentAt` is "AwaitingFile", the job is waiting for client file and scheduling is blocked.
 
 ---
 
 ## Paper Procurement
 
-**BR-PAPER-001 – Paper status progression**
+#### BR-PAPER-001
+**Paper status progression**
+
 PaperPurchaseStatus MUST follow the progression: InStock | ToOrder → Ordered → Received.
 - InStock: Paper available, no progression needed
 - ToOrder → Ordered: When order is placed
 - Ordered → Received: When paper arrives
 Backward transitions (e.g., Ordered → ToOrder) are NOT permitted. If an order is cancelled, a new job or manual correction is needed.
 
-**BR-PAPER-002 – Order timestamp on status change**
+#### BR-PAPER-002
+**Order timestamp on status change**
+
 When PaperPurchaseStatus changes to "Ordered", `paperOrderedAt` MUST be set to current timestamp.
 
-**BR-PAPER-003 – Paper required before production**
+#### BR-PAPER-003
+**Paper required before production**
+
 Production tasks SHOULD NOT start until paper status is "InStock" or "Received".
 
 ---
 
 ## Assignment & Schedule
 
-**BR-ASSIGN-001 – Valid station assignment**
+#### BR-ASSIGN-001
+**Valid station assignment**
+
 An assignment is valid ONLY if the referenced station exists and is Available.
 
-**BR-ASSIGN-002 – Operating hours compliance**
+#### BR-ASSIGN-002
+**Operating hours compliance**
+
 Tasks MUST be scheduled only during station operating hours.
 
-**BR-ASSIGN-003 – Schedule time calculation**
+#### BR-ASSIGN-003
+**Schedule time calculation**
+
 For internal tasks: `scheduledEnd` = `scheduledStart` + task duration (stretched across non-operating periods).
 For outsourced tasks: `scheduledEnd` = `scheduledStart` + (durationOpenDays × business calendar), considering LatestDepartureTime and ReceptionTime.
 Tasks spanning station downtime are displayed as a single continuous tile with downtime portions having distinct visual appearance (MVP). Task interruption/splitting is Post-MVP.
 
-**BR-ASSIGN-003b – Task stretching algorithm (internal tasks)**
+#### BR-ASSIGN-003b
+**Task stretching algorithm (internal tasks)**
+
 When calculating scheduledEnd for an internal task:
 1. Start from scheduledStart with remaining work = task totalMinutes
 2. While remaining work > 0:
@@ -237,22 +349,34 @@ Example: Task starts at 16:00 (2h before close at 18:00), totalMinutes=180 (3h)
 → Works 2h (16:00-18:00), overnight gap, works 1h (08:00-09:00 next day)
 → scheduledEnd = 09:00 next day
 
-**BR-ASSIGN-004 – No retrospective scheduling**
+#### BR-ASSIGN-004
+**No retrospective scheduling**
+
 Tasks CANNOT be scheduled to start in the past (relative to current system time).
 
-**BR-ASSIGN-005 – Assignment immutability after start**
+#### BR-ASSIGN-005
+**Assignment immutability after start**
+
 Once a Task has started execution, its station assignment CANNOT be changed.
 
-**BR-ASSIGN-006 – Tile snaps to 30-minute grid**
+#### BR-ASSIGN-006
+**Tile snaps to 30-minute grid**
+
 Task scheduling in the UI MUST snap to 30-minute intervals.
 
-**BR-ASSIGN-007 – Task completion is manual**
+#### BR-ASSIGN-007
+**Task completion is manual**
+
 Task completion (IsCompleted) MUST be manually toggled via UI checkbox. Tasks in the past are NOT automatically marked as completed.
 
-**BR-ASSIGN-008 – Completion does not affect precedence**
+#### BR-ASSIGN-008
+**Completion does not affect precedence**
+
 The IsCompleted flag is for tracking purposes only and DOES NOT affect precedence validation. Precedence rules assume scheduled tasks will happen as defined.
 
-**BR-ASSIGN-009 – Tile insertion behavior**
+#### BR-ASSIGN-009
+**Tile insertion behavior**
+
 Tiles are inserted between existing tiles, not over them:
 - On capacity-1 stations: Tiles CANNOT overlap. When a tile is inserted, subsequent tiles on the same station are automatically pushed down (later in time).
 - On stations with capacity > 1: Multiple tiles CAN overlap up to the station's capacity limit.
@@ -261,25 +385,39 @@ Tiles are inserted between existing tiles, not over them:
 
 ## Schedule Constraints
 
-**BR-SCHED-001 – No station double-booking**
+#### BR-SCHED-001
+**No station double-booking**
+
 The system MUST prevent any state where a station (capacity=1) has overlapping task assignments.
 
-**BR-SCHED-002 – Group capacity enforcement**
+#### BR-SCHED-002
+**Group capacity enforcement**
+
 The system MUST prevent any state where station group concurrent task count exceeds MaxConcurrent.
 
-**BR-SCHED-003 – Task sequence enforcement**
+#### BR-SCHED-003
+**Task sequence enforcement**
+
 The system MUST prevent scheduling a task before its predecessor task completes.
 
-**BR-SCHED-004 – Job dependency enforcement**
+#### BR-SCHED-004
+**Job dependency enforcement**
+
 The system MUST prevent starting a job's tasks before all required jobs are completed.
 
-**BR-SCHED-005 – Deadline enforcement**
+#### BR-SCHED-005
+**Deadline enforcement**
+
 The system MUST warn when scheduled task completion exceeds the job's workshopExitDate.
 
-**BR-SCHED-006 – Approval gate enforcement**
+#### BR-SCHED-006
+**Approval gate enforcement**
+
 The system MUST prevent scheduling tasks when required approval gates are not satisfied.
 
-**BR-SCHED-007 – Schedule version increment**
+#### BR-SCHED-007
+**Schedule version increment**
+
 The Schedule.Version MUST increment on any assignment state change:
 - TaskAssigned (new assignment created)
 - TaskUnassigned (assignment removed/recalled)
@@ -291,29 +429,43 @@ Version is used for optimistic locking to detect concurrent modifications.
 
 ## Cross-Entity Invariants
 
-**INV-001 – Temporal consistency**
+#### INV-001
+**Temporal consistency**
+
 All datetime values must be consistent: task.scheduledEnd ≤ job.workshopExitDate, operatingSchedule.start < operatingSchedule.end, etc.
 
-**INV-002 – Station conflict prevention**
+#### INV-002
+**Station conflict prevention**
+
 The system MUST prevent any state where a station is double-booked.
 
-**INV-003 – Group capacity prevention**
+#### INV-003
+**Group capacity prevention**
+
 The system MUST prevent any state where a station group exceeds its MaxConcurrent limit.
 
-**INV-004 – Task sequence integrity**
+#### INV-004
+**Task sequence integrity**
+
 Task completion times within a job MUST respect the sequential order.
 
-**INV-005 – State transition consistency**
+#### INV-005
+**State transition consistency**
+
 All entities MUST follow their defined state machines; invalid transitions are not allowed.
 
-**INV-006 – Referential integrity**
+#### INV-006
+**Referential integrity**
+
 All references between entities (stationId, providerId, jobId, taskId) MUST point to existing, valid entities.
 
 ---
 
 ## Validation Rules
 
-**VAL-001 – Complete assignment validation**
+#### VAL-001
+**Complete assignment validation**
+
 Before accepting an assignment, the system MUST verify:
 - Station exists and is Available
 - No scheduling conflicts exist
@@ -323,7 +475,9 @@ Before accepting an assignment, the system MUST verify:
 - Approval gates are cleared
 - Workshop exit date can be met
 
-**VAL-002 – Conflict detection**
+#### VAL-002
+**Conflict detection**
+
 The system MUST detect and report all types of conflicts:
 - Station conflicts (double-booking)
 - Group capacity conflicts (exceeds MaxConcurrent)
@@ -332,49 +486,71 @@ The system MUST detect and report all types of conflicts:
 - Availability conflicts (outside station operating hours)
 - Deadline conflicts (cannot meet workshopExitDate)
 
-**VAL-003 – Validation on change**
+#### VAL-003
+**Validation on change**
+
 Any change to station availability, schedule exceptions, or task definitions MUST trigger revalidation of affected assignments.
 
 ---
 
 ## UI Behavior Rules
 
-**UI-001 – Precedence safeguard during drag**
+#### UI-001
+**Precedence safeguard during drag**
+
 If a tile drag would violate precedence rules, the UI MUST snap to the nearest valid timeslot.
 
-**UI-002 – Alt-key bypass**
+#### UI-002
+**Alt-key bypass**
+
 Holding Alt during drag MUST bypass the precedence safeguard (allowing violation with warning).
 
-**UI-003 – Precedence violation visual**
+#### UI-003
+**Precedence violation visual**
+
 Tiles that break precedence rules MUST be shown with a red halo effect.
 
-**UI-004 – Recall tile behavior**
+#### UI-004
+**Recall tile behavior**
+
 Recalling a tile MUST remove the assignment entirely (tile returns to unscheduled state).
 
-**UI-005 – Similarity indicators**
+#### UI-005
+**Similarity indicators**
+
 Similarity circles between tiles MUST reflect the actual matching criteria from the station category.
 
 ---
 
 ## Business Calendar Rules
 
-**CAL-001 – Open days definition (MVP)**
+#### CAL-001
+**Open days definition (MVP)**
+
 An open day is Monday through Friday.
 
-**CAL-002 – Open days definition (Future)**
+#### CAL-002
+**Open days definition (Future)**
+
 An open day is Monday through Friday, excluding French public holidays.
 
-**CAL-003 – Outsourced duration calculation**
+#### CAL-003
+**Outsourced duration calculation**
+
 Outsourced task duration in open days MUST be calculated using the business calendar.
 
 ---
 
 ## Comments & Audit
 
-**COM-001 – Comment immutability**
+#### COM-001
+**Comment immutability**
+
 Once a comment is added to a job, it CANNOT be edited or deleted.
 
-**COM-002 – Comment author and timestamp**
+#### COM-002
+**Comment author and timestamp**
+
 Every comment MUST have an author and timestamp recorded.
 
 ---

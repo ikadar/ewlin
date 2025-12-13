@@ -12,7 +12,7 @@ These drafts are:
 ## 1. Station Management API
 
 ### POST /api/v1/stations
-> **API-STATION-001**
+#### API-STATION-001
 
 Create a new station.
 
@@ -51,7 +51,7 @@ Create a new station.
 ```
 
 ### GET /api/v1/stations
-> **API-STATION-002**
+#### API-STATION-002
 
 List all stations.
 
@@ -71,7 +71,7 @@ List all stations.
 ```
 
 ### POST /api/v1/stations/{stationId}/exceptions
-> **API-STATION-003**
+#### API-STATION-003
 
 Add a schedule exception.
 
@@ -89,7 +89,7 @@ Add a schedule exception.
 ## 2. Station Category API
 
 ### POST /api/v1/station-categories
-> **API-CATEGORY-001**
+#### API-CATEGORY-001
 
 Create a station category.
 
@@ -124,7 +124,7 @@ Create a station category.
 ## 3. Station Group API
 
 ### POST /api/v1/station-groups
-> **API-GROUP-001**
+#### API-GROUP-001
 
 Create a station group.
 
@@ -152,7 +152,7 @@ Create a station group.
 ## 4. Outsourced Provider API
 
 ### POST /api/v1/providers
-> **API-PROVIDER-001**
+#### API-PROVIDER-001
 
 Create an outsourced provider.
 
@@ -189,7 +189,7 @@ Create an outsourced provider.
 ## 5. Job Management API
 
 ### POST /api/v1/jobs
-> **API-JOB-001**
+#### API-JOB-001
 
 Create a new job.
 
@@ -254,7 +254,7 @@ Create a new job.
 ```
 
 ### GET /api/v1/jobs
-> **API-JOB-002**
+#### API-JOB-002
 
 List jobs with filtering.
 
@@ -274,12 +274,12 @@ List jobs with filtering.
 ```
 
 ### PUT /api/v1/jobs/{jobId}
-> **API-JOB-003**
+#### API-JOB-003
 
 Update job details.
 
 ### PUT /api/v1/jobs/{jobId}/proof
-> **API-JOB-004**
+#### API-JOB-004
 
 Update BAT status.
 
@@ -303,7 +303,7 @@ Or:
 ```
 
 ### PUT /api/v1/jobs/{jobId}/plates
-> **API-JOB-005**
+#### API-JOB-005
 
 Update plates status.
 
@@ -315,7 +315,7 @@ Update plates status.
 ```
 
 ### PUT /api/v1/jobs/{jobId}/paper
-> **API-JOB-006**
+#### API-JOB-006
 
 Update paper procurement status.
 
@@ -335,7 +335,7 @@ Update paper procurement status.
 ```
 
 ### POST /api/v1/jobs/{jobId}/dependencies
-> **API-JOB-007**
+#### API-JOB-007
 
 Add job dependency.
 
@@ -347,7 +347,7 @@ Add job dependency.
 ```
 
 ### POST /api/v1/jobs/{jobId}/comments
-> **API-JOB-008**
+#### API-JOB-008
 
 Add comment to job.
 
@@ -368,7 +368,7 @@ Add comment to job.
 ```
 
 ### POST /api/v1/jobs/{jobId}/cancel
-> **API-JOB-009**
+#### API-JOB-009
 
 Cancel a job.
 
@@ -394,7 +394,7 @@ Cancel a job.
 ## 6. Task Management API
 
 ### PUT /api/v1/jobs/{jobId}/tasks/reorder
-> **API-TASK-001**
+#### API-TASK-001
 
 Reorder tasks within a job.
 
@@ -406,12 +406,12 @@ Reorder tasks within a job.
 ```
 
 ### PUT /api/v1/tasks/{taskId}
-> **API-TASK-002**
+#### API-TASK-002
 
 Update task details.
 
 ### PUT /api/v1/tasks/{taskId}/completion
-> **API-TASK-003**
+#### API-TASK-003
 
 Toggle task completion status.
 
@@ -441,7 +441,7 @@ Toggle task completion status.
 ## 7. Assignment / Scheduling API
 
 ### POST /api/v1/tasks/{taskId}/assign
-> **API-ASSIGN-001**
+#### API-ASSIGN-001
 
 Create or update task assignment.
 
@@ -489,7 +489,7 @@ Create or update task assignment.
 ```
 
 ### DELETE /api/v1/tasks/{taskId}/assign
-> **API-ASSIGN-002**
+#### API-ASSIGN-002
 
 Remove task assignment (recall tile).
 
@@ -502,7 +502,7 @@ Remove task assignment (recall tile).
 ```
 
 ### POST /api/v1/assignments/validate
-> **API-ASSIGN-003**
+#### API-ASSIGN-003
 
 Validate a proposed assignment without saving.
 
@@ -534,7 +534,7 @@ Validate a proposed assignment without saving.
 ## 8. Schedule Snapshot API
 
 ### GET /api/v1/schedule/snapshot
-> **API-SNAPSHOT-001**
+#### API-SNAPSHOT-001
 
 Get complete schedule snapshot for UI rendering.
 
@@ -664,7 +664,7 @@ the server performs semantic validation and creates Task entities.
 These endpoints provide entity lists for the client-side autocomplete UI.
 
 #### GET /api/v1/stations/names
-> **API-DSL-001**
+##### API-DSL-001
 
 Get station names for autocomplete.
 
@@ -682,7 +682,7 @@ Get station names for autocomplete.
 ```
 
 #### GET /api/v1/providers/names
-> **API-DSL-002**
+##### API-DSL-002
 
 Get provider names for autocomplete.
 
@@ -700,7 +700,7 @@ Get provider names for autocomplete.
 ```
 
 #### GET /api/v1/providers/action-types
-> **API-DSL-003**
+##### API-DSL-003
 
 Get all action types across providers.
 
@@ -716,7 +716,7 @@ Get all action types across providers.
 ## 10. Business Calendar API
 
 ### GET /api/v1/calendar/open-days
-> **API-CAL-001**
+#### API-CAL-001
 
 Calculate open days between dates.
 
