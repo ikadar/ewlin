@@ -66,6 +66,8 @@ Each story follows the standard format:
 ## Outsourced Provider Management
 
 ### US-PROVIDER-001: Register an Outsourced Provider
+> **References:** [BR-PROVIDER-001](../domain-model/business-rules.md#br-provider-001), [BR-PROVIDER-002](../domain-model/business-rules.md#br-provider-002), [BR-PROVIDER-003](../domain-model/business-rules.md#br-provider-003)
+
 > As a **production manager**, I want to **register an external provider** (e.g., Clément for pelliculage), so that **I can schedule outsourced tasks**.
 
 **Acceptance Criteria:**
@@ -75,6 +77,8 @@ Each story follows the standard format:
 - Provider appears as a column in the scheduling grid
 
 ### US-PROVIDER-002: Schedule Outsourced Task
+> **References:** [BR-PROVIDER-004](../domain-model/business-rules.md#br-provider-004), [BR-TASK-008](../domain-model/business-rules.md#br-task-008), [BR-TASK-009](../domain-model/business-rules.md#br-task-009), [CAL-001](../domain-model/business-rules.md#cal-001)
+
 > As a **scheduler**, I want to **assign a task to an outsourced provider**, so that **external work is tracked in my schedule**.
 
 **Acceptance Criteria:**
@@ -90,6 +94,8 @@ Each story follows the standard format:
 ## Job Management
 
 ### US-JOB-001: Create a New Job
+> **References:** [BR-JOB-001](../domain-model/business-rules.md#br-job-001), [BR-JOB-002](../domain-model/business-rules.md#br-job-002), [BR-JOB-003](../domain-model/business-rules.md#br-job-003)
+
 > As a **scheduler**, I want to **create a new print job**, so that **I can track an order through production**.
 
 **Acceptance Criteria:**
@@ -99,6 +105,8 @@ Each story follows the standard format:
 - Job starts in Draft status
 
 ### US-JOB-002: Define Tasks Using DSL
+> **References:** [BR-TASK-006](../domain-model/business-rules.md#br-task-006)
+
 > As a **scheduler**, I want to **define tasks using a simple text syntax**, so that **I can quickly enter action sequences**.
 
 **Acceptance Criteria:**
@@ -108,6 +116,8 @@ Each story follows the standard format:
 - Tasks are parsed into structured data
 
 ### US-JOB-003: Reorder Tasks
+> **References:** [BR-TASK-003](../domain-model/business-rules.md#br-task-003)
+
 > As a **scheduler**, I want to **reorder tasks within a job**, so that **the production sequence is correct**.
 
 **Acceptance Criteria:**
@@ -116,6 +126,8 @@ Each story follows the standard format:
 - Existing assignments are revalidated
 
 ### US-JOB-004: Set Job Dependencies
+> **References:** [BR-JOB-006](../domain-model/business-rules.md#br-job-006), [BR-JOB-007](../domain-model/business-rules.md#br-job-007), [BR-JOB-008](../domain-model/business-rules.md#br-job-008)
+
 > As a **scheduler**, I want to **specify that a job depends on another job**, so that **linked orders are processed in the right sequence**.
 
 **Acceptance Criteria:**
@@ -124,6 +136,8 @@ Each story follows the standard format:
 - Dependent job cannot start until prerequisites complete
 
 ### US-JOB-005: Add Comment to Job
+> **References:** [COM-001](../domain-model/business-rules.md#com-001), [COM-002](../domain-model/business-rules.md#com-002)
+
 > As a **production manager**, I want to **add timestamped comments to a job**, so that **communication is logged**.
 
 **Acceptance Criteria:**
@@ -132,6 +146,8 @@ Each story follows the standard format:
 - Comments are displayed as a thread
 
 ### US-JOB-006: Cancel a Job
+> **References:** [BR-JOB-005](../domain-model/business-rules.md#br-job-005), [BR-JOB-010](../domain-model/business-rules.md#br-job-010), [BR-JOB-010b](../domain-model/business-rules.md#br-job-010b)
+
 > As a **scheduler**, I want to **cancel a job**, so that **it is removed from active scheduling**.
 
 **Acceptance Criteria:**
@@ -145,6 +161,8 @@ Each story follows the standard format:
 ## Approval Gates
 
 ### US-GATE-001: Track BAT (Proof) Approval
+> **References:** [BR-GATE-001](../domain-model/business-rules.md#br-gate-001), [BR-GATE-003](../domain-model/business-rules.md#br-gate-003)
+
 > As a **scheduler**, I want to **track proof approval status**, so that **I know when a job is ready for production**.
 
 **Acceptance Criteria:**
@@ -153,6 +171,8 @@ Each story follows the standard format:
 - Tasks are blocked until proof approved (or not required)
 
 ### US-GATE-002: Track Plates Approval
+> **References:** [BR-GATE-002](../domain-model/business-rules.md#br-gate-002)
+
 > As a **scheduler**, I want to **track plates preparation status**, so that **printing tasks wait for plates to be ready**.
 
 **Acceptance Criteria:**
@@ -160,6 +180,8 @@ Each story follows the standard format:
 - Printing tasks are blocked until plates Done
 
 ### US-GATE-003: Track Paper Procurement
+> **References:** [BR-PAPER-001](../domain-model/business-rules.md#br-paper-001), [BR-PAPER-002](../domain-model/business-rules.md#br-paper-002), [BR-PAPER-003](../domain-model/business-rules.md#br-paper-003)
+
 > As a **scheduler**, I want to **track paper purchase status**, so that **I know if material is available**.
 
 **Acceptance Criteria:**
@@ -172,6 +194,8 @@ Each story follows the standard format:
 ## Scheduling
 
 ### US-SCHED-001: View Scheduling Grid
+> **References:** [BR-ASSIGN-006](../domain-model/business-rules.md#br-assign-006)
+
 > As a **scheduler**, I want to **see a grid with stations as columns and time as vertical axis**, so that **I have an overview of the schedule**.
 
 **Acceptance Criteria:**
@@ -181,6 +205,8 @@ Each story follows the standard format:
 - Grid snaps to 30-minute intervals
 
 ### US-SCHED-002: Drag and Drop Assignment
+> **References:** [BR-ASSIGN-009](../domain-model/business-rules.md#br-assign-009), [UI-001](../domain-model/business-rules.md#ui-001), [UI-002](../domain-model/business-rules.md#ui-002), [VAL-001](../domain-model/business-rules.md#val-001)
+
 > As a **scheduler**, I want to **drag a task from the job panel to the scheduling grid**, so that **I can assign it to a station and time slot**.
 
 **Acceptance Criteria:**
@@ -193,6 +219,8 @@ Each story follows the standard format:
 - Precedence violations are allowed with visual warning (not blocked)
 
 ### US-SCHED-003: Reschedule Task
+> **References:** [BR-ASSIGN-005](../domain-model/business-rules.md#br-assign-005)
+
 > As a **scheduler**, I want to **drag a tile to a different position on the grid**, so that **I can adjust the schedule**.
 
 **Acceptance Criteria:**
@@ -201,6 +229,8 @@ Each story follows the standard format:
 - Validation runs on new position
 
 ### US-SCHED-004: Recall Tile
+> **References:** [UI-004](../domain-model/business-rules.md#ui-004)
+
 > As a **scheduler**, I want to **recall a scheduled task back to unscheduled state**, so that **I can free up the time slot**.
 
 **Acceptance Criteria:**
@@ -210,6 +240,8 @@ Each story follows the standard format:
 - Sibling tasks remain scheduled
 
 ### US-SCHED-005: Swap Tile Positions
+> **References:** [BR-SCHED-003](../domain-model/business-rules.md#br-sched-003)
+
 > As a **scheduler**, I want to **swap a tile with an adjacent tile**, so that **I can quickly reorder without redragging**.
 
 **Acceptance Criteria:**
@@ -218,6 +250,8 @@ Each story follows the standard format:
 - Both tiles update positions
 
 ### US-SCHED-006: View Station Unavailability
+> **References:** [BR-ASSIGN-002](../domain-model/business-rules.md#br-assign-002), [BR-STATION-008](../domain-model/business-rules.md#br-station-008)
+
 > As a **scheduler**, I want to **see when stations are unavailable**, so that **I avoid scheduling during those times**.
 
 **Acceptance Criteria:**
@@ -226,6 +260,8 @@ Each story follows the standard format:
 - Different visual appearance for unavailable portion
 
 ### US-SCHED-007: Mark Task as Completed
+> **References:** [BR-ASSIGN-007](../domain-model/business-rules.md#br-assign-007), [BR-ASSIGN-008](../domain-model/business-rules.md#br-assign-008)
+
 > As a **scheduler**, I want to **mark a scheduled task as completed via checkbox**, so that **I can track actual progress**.
 
 **Acceptance Criteria:**
@@ -240,6 +276,8 @@ Each story follows the standard format:
 ## Conflict Detection
 
 ### US-CONFLICT-001: Detect Station Conflicts
+> **References:** [BR-SCHED-001](../domain-model/business-rules.md#br-sched-001), [VAL-002](../domain-model/business-rules.md#val-002)
+
 > As a **scheduler**, I want to **see when a station is double-booked**, so that **I can resolve the conflict**.
 
 **Acceptance Criteria:**
@@ -248,6 +286,8 @@ Each story follows the standard format:
 - Affected tiles are highlighted
 
 ### US-CONFLICT-002: Detect Group Capacity Conflicts
+> **References:** [BR-SCHED-002](../domain-model/business-rules.md#br-sched-002), [BR-GROUP-002](../domain-model/business-rules.md#br-group-002)
+
 > As a **scheduler**, I want to **see when station group capacity is exceeded**, so that **I can reduce concurrent tasks**.
 
 **Acceptance Criteria:**
@@ -256,6 +296,8 @@ Each story follows the standard format:
 - Affected time slots are highlighted
 
 ### US-CONFLICT-003: Detect Precedence Violations
+> **References:** [BR-SCHED-003](../domain-model/business-rules.md#br-sched-003), [UI-001](../domain-model/business-rules.md#ui-001), [UI-003](../domain-model/business-rules.md#ui-003)
+
 > As a **scheduler**, I want to **see when task sequence is violated**, so that **I can fix the order**.
 
 **Acceptance Criteria:**
@@ -264,6 +306,8 @@ Each story follows the standard format:
 - Drag-and-drop snaps to valid position (unless Alt held)
 
 ### US-CONFLICT-004: View Late Jobs
+> **References:** [BR-SCHED-005](../domain-model/business-rules.md#br-sched-005), [BR-JOB-005b](../domain-model/business-rules.md#br-job-005b)
+
 > As a **scheduler**, I want to **see jobs that will miss their deadline**, so that **I can prioritize them**.
 
 **Acceptance Criteria:**
@@ -304,6 +348,8 @@ Each story follows the standard format:
 ## Similarity Indicators
 
 ### US-SIM-001: View Similarity Indicators
+> **References:** [BR-CATEGORY-001](../domain-model/business-rules.md#br-category-001), [BR-CATEGORY-003](../domain-model/business-rules.md#br-category-003), [UI-005](../domain-model/business-rules.md#ui-005)
+
 > As a **scheduler**, I want to **see which criteria match between consecutive jobs**, so that **I can optimize setup time**.
 
 **Acceptance Criteria:**
@@ -359,6 +405,8 @@ Each story follows the standard format:
 - Unscheduled tasks are clearly marked
 
 ### US-REPORT-002: View Late Jobs Summary
+> **References:** [BR-SCHED-005](../domain-model/business-rules.md#br-sched-005)
+
 > As a **production manager**, I want to **see a summary of all late jobs**, so that **I can take action**.
 
 **Acceptance Criteria:**
