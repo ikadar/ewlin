@@ -8,6 +8,7 @@ These replace UML/activity/state diagrams and are optimized for AI processing an
 # 1. Station Workflow
 
 ## State Machine: Station
+> **WF-STATION-SM-001**
 
 ```
 STATE MACHINE: Station
@@ -34,6 +35,7 @@ OutOfService → Available    (repaired and restored)
 # 2. Job Workflow
 
 ## State Machine: Job
+> **WF-JOB-SM-001**
 
 ```
 STATE MACHINE: Job
@@ -59,6 +61,7 @@ Delayed → Cancelled      (abort during delay)
 - Cancellation cascades to all tasks.
 
 ## Process: Job Cancellation
+> **WF-JOB-PROC-001**
 
 ```
 PROCESS: Job Cancellation
@@ -87,6 +90,7 @@ PROCESS: Job Cancellation
 # 3. Task Workflow (within Job)
 
 ## State Machine: Task
+> **WF-TASK-SM-001**
 
 ```
 STATE MACHINE: Task
@@ -117,6 +121,7 @@ Executing → Cancelled    (job cancellation during execution)
 # 4. Approval Gate Workflows
 
 ## Process: BAT (Proof) Approval
+> **WF-GATE-PROC-001**
 
 ```
 PROCESS: BAT Approval
@@ -134,6 +139,7 @@ PROCESS: BAT Approval
 ```
 
 ## Process: Plates Approval
+> **WF-GATE-PROC-002**
 
 ```
 PROCESS: Plates Approval
@@ -150,6 +156,7 @@ PROCESS: Plates Approval
 # 5. Paper Procurement Workflow
 
 ## Process: Paper Procurement
+> **WF-PAPER-PROC-001**
 
 ```
 PROCESS: Paper Procurement
@@ -175,6 +182,7 @@ PROCESS: Paper Procurement
 # 6. Task Assignment Workflow
 
 ## Process: Task Assignment (Internal Task)
+> **WF-ASSIGN-PROC-001**
 
 ```
 PROCESS: Task Assignment (Internal)
@@ -200,6 +208,7 @@ PROCESS: Task Assignment (Internal)
 ```
 
 ## Process: Task Assignment (Outsourced Task)
+> **WF-ASSIGN-PROC-002**
 
 ```
 PROCESS: Task Assignment (Outsourced)
@@ -229,6 +238,7 @@ PROCESS: Task Assignment (Outsourced)
 # 6b. Task Completion Workflow
 
 ## Process: Mark Task as Completed
+> **WF-ASSIGN-PROC-003**
 
 ```
 PROCESS: Mark Task as Completed
@@ -257,6 +267,7 @@ PROCESS: Mark Task as Completed
 # 7. Scheduling Validation Workflow
 
 ## Process: Assignment Validation
+> **WF-VALID-PROC-001**
 
 ```
 PROCESS: Assignment Validation
@@ -298,6 +309,7 @@ PROCESS: Assignment Validation
 # 8. Schedule Conflict Detection Workflow
 
 ## Process: Conflict Detection
+> **WF-CONFLICT-PROC-001**
 
 ```
 PROCESS: Conflict Detection
@@ -419,6 +431,7 @@ GroupCapacityExceeded
 # 11. Tile Interaction Workflow (UI)
 
 ## Process: Drag and Drop Assignment
+> **WF-UI-PROC-001**
 
 ```
 PROCESS: Drag and Drop Assignment
@@ -441,6 +454,7 @@ PROCESS: Drag and Drop Assignment
 ```
 
 ## Process: Tile Insertion (Push-Down Behavior)
+> **WF-UI-PROC-002**
 
 ```
 PROCESS: Tile Insertion
@@ -474,6 +488,7 @@ PROCESS: Tile Insertion
 - Users can intentionally create precedence violations (Alt+drag) but will see visual warnings
 
 ## Process: Recall Tile
+> **WF-UI-PROC-003**
 
 ```
 PROCESS: Recall Tile
@@ -490,6 +505,7 @@ PROCESS: Recall Tile
 ```
 
 ## Process: Swap Position
+> **WF-UI-PROC-004**
 
 ```
 PROCESS: Swap Position
@@ -509,6 +525,7 @@ PROCESS: Swap Position
 # 12. Similarity Indicators Workflow
 
 ## Process: Display Similarity Indicators
+> **WF-SIM-PROC-001**
 
 ```
 PROCESS: Display Similarity Indicators
