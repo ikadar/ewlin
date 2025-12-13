@@ -222,12 +222,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Database migration for tasks table
 - [x] Unit tests (94 new tests)
 
-#### v0.1.12 - Job Creation with DSL (Server-Side)
-- [ ] Extend POST /api/v1/jobs to accept `tasksDsl` field
-- [ ] Semantic validation (station/provider existence check)
-- [ ] Task entity creation from parsed DSL
-- [ ] Validation error response with line numbers
-- [ ] `rawDsl` field preserved on Task entities
+#### v0.1.12 - Job Creation with DSL (Server-Side) ✅
+- [x] Extend POST /api/v1/jobs to accept `tasksDsl` field
+- [x] Semantic validation (station/provider existence check)
+- [x] Task entity creation from parsed DSL
+- [x] Validation error response with line numbers
+- [x] `rawDsl` field preserved on Task entities
 
 #### v0.1.13 - Autocomplete Data Endpoints
 - [ ] GET /api/v1/stations/names - Station name list for autocomplete
