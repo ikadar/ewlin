@@ -241,10 +241,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] PUT /api/v1/jobs/{id}/proof endpoint
 - [x] PUT /api/v1/jobs/{id}/plates endpoint
 
-#### v0.1.15 - Paper Procurement
-- [ ] paperPurchaseStatus field on Job
-- [ ] paperOrderedAt automatic timestamp
-- [ ] PUT /api/v1/jobs/{id}/paper endpoint
+#### v0.1.15 - Paper Procurement ✅
+- [x] paperPurchaseStatus field on Job (PaperPurchaseStatus enum: InStock/ToOrder/Ordered/Received)
+- [x] paperOrderedAt automatic timestamp (auto-set when status → Ordered)
+- [x] PUT /api/v1/jobs/{id}/paper endpoint
 
 #### v0.1.16 - Job Dependencies
 - [ ] requiredJobIds field on Job
