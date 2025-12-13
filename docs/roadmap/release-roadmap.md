@@ -213,11 +213,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] DELETE /api/v1/jobs/{id} (delete)
 - [x] OpenAPI documentation
 
-#### v0.1.11 - Task Entity
-- [ ] Task entity (within Job aggregate)
-- [ ] TaskStatus enum (Defined/Ready/Assigned/Completed/Cancelled)
-- [ ] Duration value object (setupMinutes, runMinutes, durationOpenDays)
-- [ ] Internal vs Outsourced task types
+#### v0.1.11 - Task Entity ✅
+- [x] Task entity (within Job aggregate)
+- [x] TaskStatus enum (Defined/Ready/Assigned/Completed/Cancelled)
+- [x] TaskType enum (Internal/Outsourced)
+- [x] Duration value object (setupMinutes, runMinutes, durationOpenDays)
+- [x] Job-Task bidirectional relationship with addInternalTask(), addOutsourcedTask()
+- [x] Database migration for tasks table
+- [x] Unit tests (94 new tests)
 
 #### v0.1.12 - DSL Parser with Lezer (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
 - [ ] Lezer grammar definition (`task-dsl.grammar`)
