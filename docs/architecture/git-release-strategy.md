@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Git Release Strategy – Flux Print Shop Scheduling System
 
 This document defines the **Git branching model**, **tagging conventions**, and **release workflow** for the Flux Print Shop Scheduling System.

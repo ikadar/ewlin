@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - domain
+---
+
 # Domain Model – Flux Print Shop Scheduling System
 
 This domain model describes the core entities, value objects, and aggregates for the **print shop scheduling** system.

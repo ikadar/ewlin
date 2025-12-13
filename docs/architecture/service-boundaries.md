@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Service Boundaries – Flux Print Shop Scheduling System
 
 This document defines the **service boundaries** for the Flux print shop scheduling system that handles

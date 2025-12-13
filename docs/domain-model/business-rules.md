@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - domain
+---
+
 # Business Rules & Domain Invariants – Flux Print Shop Scheduling System
 
 This document captures core business rules and invariants for the **print shop scheduling** domain.

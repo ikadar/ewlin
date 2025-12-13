@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Sequence Design — Flux Print Shop Scheduling System
 
 This document provides both **textual** and **Mermaid‑based** sequence specifications for key interactions in the Station → Job → Task assignment and scheduling workflow.

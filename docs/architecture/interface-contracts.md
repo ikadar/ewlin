@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Interface Contracts – Flux Print Shop Scheduling System
 
 This document defines **service-to-service interface contracts** for the Station → Job → Task assignment and validation workflow.

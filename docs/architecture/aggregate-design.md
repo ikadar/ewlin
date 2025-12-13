@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Aggregate / Service / Repository Design – Flux Print Shop Scheduling System
 
 This document defines **aggregate structures**, their **invariants**, and the supporting **services** and **repositories** for the Station → Job → Task assignment and scheduling domain.

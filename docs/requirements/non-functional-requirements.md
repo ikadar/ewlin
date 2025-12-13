@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - requirements
+---
+
 # Non-Functional Requirements – Operations Research System
 
 This document defines the non-functional requirements for the Equipment → Operator → Job → Task assignment and validation system.

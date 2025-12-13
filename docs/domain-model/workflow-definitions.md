@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - domain
+---
+
 # Workflow & State-Transition Definitions – Flux Print Shop Scheduling System
 
 This document provides **text-based workflow and lifecycle definitions** for the print shop scheduling domain.

@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - domain
+---
+
 # Domain Vocabulary – Flux Print Shop Scheduling System
 
 This document defines the core domain terms used in the **print shop scheduling** domain for the Flux system.

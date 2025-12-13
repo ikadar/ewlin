@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - requirements
+---
+
 # API / Interface Drafts – Flux Print Shop Scheduling System
 
 This document defines **high-level API/interface contracts** for the print shop scheduling system.

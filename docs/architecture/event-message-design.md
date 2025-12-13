@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Event & Message Design Specification – Flux Print Shop Scheduling System
 
 This document defines **domain events**, **integration events**, and **message schemas** used across the Station → Job → Task assignment and scheduling workflow.

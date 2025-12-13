@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Project Structure — Operations Research System
 
 This document defines the **repository structure** using a host application with git submodules.

@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - requirements
+---
+
 # Acceptance Criteria – Flux Print Shop Scheduling System
 
 This file contains **acceptance criteria** for the print shop scheduling system.
