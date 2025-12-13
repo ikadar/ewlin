@@ -222,18 +222,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Database migration for tasks table
 - [x] Unit tests (94 new tests)
 
-#### v0.1.12 - DSL Parser (Client-Side) (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
-- [ ] `@flux/task-dsl-parser` package setup
-- [ ] Lezer grammar definition (`task-dsl.grammar`)
-- [ ] Grammar compilation and parser generation
-- [ ] Internal task syntax: [Station] setup+run "comment"
-- [ ] Outsourced task syntax: ST [Provider] ActionType duration "comment"
-- [ ] Error recovery for partial parsing
-- [ ] CodeMirror 6 language extension
-- [ ] Syntax highlighting for task DSL
-- [ ] Real-time parse error display
-
-#### v0.1.12b - Job Creation with DSL (Server-Side)
+#### v0.1.12 - Job Creation with DSL (Server-Side)
 - [ ] Extend POST /api/v1/jobs to accept `tasksDsl` field
 - [ ] Semantic validation (station/provider existence check)
 - [ ] Task entity creation from parsed DSL
@@ -526,11 +515,24 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Reschedule via API
 - [ ] Server validation response handling
 
-#### v0.3.18 - Job Creation Modal
+### Phase 3E: DSL Editor
+
+#### v0.3.18 - DSL Parser Package (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
+- [ ] `@flux/task-dsl-parser` package setup
+- [ ] Lezer grammar definition (`task-dsl.grammar`)
+- [ ] Grammar compilation and parser generation
+- [ ] Internal task syntax: [Station] setup+run "comment"
+- [ ] Outsourced task syntax: ST [Provider] ActionType duration "comment"
+- [ ] Error recovery for partial parsing
+- [ ] CodeMirror 6 language extension
+- [ ] Syntax highlighting for task DSL
+- [ ] Real-time parse error display
+
+#### v0.3.19 - Job Creation Modal
 - [ ] Modal component
 - [ ] Required fields (reference, client, description, workshopExitDate)
-- [ ] DSL textarea with syntax highlighting
-- [ ] Autocomplete integration
+- [ ] DSL textarea with syntax highlighting (uses v0.3.18)
+- [ ] Autocomplete integration (uses v0.1.13 endpoints)
 - [ ] Validation and submission
 
 ---
