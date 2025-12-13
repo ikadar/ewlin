@@ -51,26 +51,45 @@ Amikor release implementálást kérek, **mindig** kövesd ezt a workflow-t:
 - `docs/releases/v{VERSION}-*.md` - státusz: Released, checkboxok ✅
 - `services/php-api/CHANGELOG.md` - új verzió hozzáadása
 
-### 6. Git műveletek
+### 6. Git műveletek (PHP API - PR workflow)
+
+**FONTOS: Mindig PR-on keresztül merge-elj, SOHA ne commitolj közvetlenül main-re!**
+
 ```bash
 # PHP API repo (services/php-api/)
-git add -A
-git commit -m "v{VERSION} - {Title}"
-git push origin main
-git tag -a v{VERSION} -m "v{VERSION} - {Title}"
-git push origin v{VERSION}
-gh release create v{VERSION} --title "v{VERSION} - {Title}" --notes "..."
 
-# Monorepo (ewlin/)
-git add docs/ services/php-api
-git commit -m "docs: Update for v{VERSION} release"
-git push origin main
+# 1. Feature branch létrehozása
+git checkout -b feature/v{VERSION}-{kebab-case-name}
+
+# 2. Commit és push
+git add -A
+git commit -m "feat: {Short description}"
+git push -u origin feature/v{VERSION}-{kebab-case-name}
+
+# 3. PR létrehozása
+gh pr create --title "v{VERSION} - {Title}" --body "..."
+
+# 4. VÁRD MEG a CI ZÖLD STÁTUSZT és a PR MERGE-ÖT!
+
+# 5. Merge után: checkout main és pull
+git checkout main
+git pull origin main
+
+# 6. Tag és release létrehozása
 git tag -a v{VERSION} -m "v{VERSION} - {Title}"
 git push origin v{VERSION}
 gh release create v{VERSION} --title "v{VERSION} - {Title}" --notes "..."
 ```
 
-### 7. CI ellenőrzés
+### 7. Git műveletek (Monorepo - dokumentáció)
+```bash
+# Monorepo (ewlin/) - ez mehet közvetlenül main-re
+git add docs/ services/php-api
+git commit -m "docs: Update for v{VERSION} release"
+git push origin main
+```
+
+### 8. CI ellenőrzés
 - Ellenőrizd a GitHub Actions státuszát
 - Ha fail, javítsd és ismételd a git műveleteket
 
