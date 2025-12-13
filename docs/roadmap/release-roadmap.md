@@ -235,11 +235,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] GET /api/v1/providers/action-types - Action type list for autocomplete
 - [x] Lightweight responses optimized for autocomplete UI
 
-#### v0.1.14 - Approval Gates
-- [ ] proofSentAt, proofApprovedAt fields on Job
-- [ ] platesStatus field on Job
-- [ ] PUT /api/v1/jobs/{id}/proof endpoint
-- [ ] PUT /api/v1/jobs/{id}/plates endpoint
+#### v0.1.14 - Approval Gates ✅
+- [x] proofSentAt, proofApprovedAt fields on Job
+- [x] platesStatus field on Job (PlatesStatus enum: Todo/Done)
+- [x] PUT /api/v1/jobs/{id}/proof endpoint
+- [x] PUT /api/v1/jobs/{id}/plates endpoint
 
 #### v0.1.15 - Paper Procurement
 - [ ] paperPurchaseStatus field on Job
