@@ -541,4 +541,64 @@ ST [Clément] Pelliculage 2JO
 
 ---
 
+## Reporting
+
+### AC-REPORT-001: Job Task Status View
+> **References:** [US-REPORT-001](user-stories.md#us-report-001)
+
+**Given** a job is selected in the left panel
+**When** the user views the job details
+**Then** the right panel shows a list of all tasks in the job
+**And** each task displays its current status (Defined, Ready, Assigned, Executing, Completed, Failed, Cancelled)
+**And** each task displays its scheduled time (if assigned)
+**And** unscheduled tasks are visually distinct from scheduled tasks
+
+### AC-REPORT-002: Late Jobs Summary
+> **References:** [US-REPORT-002](user-stories.md#us-report-002), [BR-SCHED-005](../domain-model/business-rules.md#br-sched-005)
+
+**Given** there are jobs where the last task's scheduledEnd exceeds the job's workshopExitDate
+**When** the user views the late jobs panel
+**Then** a list of late jobs is displayed
+**And** each entry shows the job reference, deadline, expected completion, and delay duration
+**And** clicking a late job navigates to its details
+
+---
+
+## Schedule Management (Future)
+
+### AC-BRANCH-001: Create Schedule Branch
+> **References:** [US-BRANCH-001](user-stories.md#us-branch-001)
+
+*Post-MVP Feature*
+
+**Given** the user is viewing the current schedule
+**When** they click the "Branch" button
+**Then** a copy of the current schedule is created
+**And** the user can provide a name and optional comments for the branch
+**And** the new branch opens for editing independently
+
+### AC-BRANCH-002: List and Open Schedule Branches
+> **References:** [US-BRANCH-002](user-stories.md#us-branch-002)
+
+*Post-MVP Feature*
+
+**Given** multiple schedule branches exist
+**When** the user opens the schedule list
+**Then** all branches are displayed with their names and creation dates
+**And** clicking a branch opens it for viewing/editing
+**And** the user can create a new branch from any existing branch
+
+### AC-BRANCH-003: Designate PROD Schedule
+> **References:** [US-BRANCH-003](user-stories.md#us-branch-003)
+
+*Post-MVP Feature*
+
+**Given** multiple schedule branches exist
+**When** the user designates a branch as "PROD"
+**Then** that branch is marked as the official production schedule
+**And** only one branch can be PROD at a time
+**And** a visual indicator clearly shows which branch is PROD
+
+---
+
 This document defines the acceptance criteria that must be satisfied for the Flux print shop scheduling system features to be considered complete.
