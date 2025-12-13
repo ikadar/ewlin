@@ -229,11 +229,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Validation error response with line numbers
 - [x] `rawDsl` field preserved on Task entities
 
-#### v0.1.13 - Autocomplete Data Endpoints
-- [ ] GET /api/v1/stations/names - Station name list for autocomplete
-- [ ] GET /api/v1/providers/names - Provider name list for autocomplete
-- [ ] GET /api/v1/providers/action-types - Action type list for autocomplete
-- [ ] Lightweight responses optimized for autocomplete UI
+#### v0.1.13 - Autocomplete Data Endpoints ✅
+- [x] GET /api/v1/stations/names - Station name list for autocomplete
+- [x] GET /api/v1/providers/names - Provider name list for autocomplete
+- [x] GET /api/v1/providers/action-types - Action type list for autocomplete
+- [x] Lightweight responses optimized for autocomplete UI
 
 #### v0.1.14 - Approval Gates
 - [ ] proofSentAt, proofApprovedAt fields on Job
