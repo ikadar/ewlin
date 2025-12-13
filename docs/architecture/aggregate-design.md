@@ -10,6 +10,7 @@ It is a *technology‑agnostic* design reference used during Solution Design & A
 
 ### 1.1 Station Aggregate
 #### AGG-STATION-001
+> **References:** [DM-AGG-STATION-001](../domain-model/domain-model.md#dm-agg-station-001), [BR-STATION-001](../domain-model/business-rules.md#br-station-001), [BR-STATION-002](../domain-model/business-rules.md#br-station-002), [BR-STATION-003](../domain-model/business-rules.md#br-station-003), [BR-STATION-004](../domain-model/business-rules.md#br-station-004)
 
 **Purpose**
 Represents a physical station (machine) that can be assigned tasks, maintaining its operating schedule, status, and availability.
@@ -61,6 +62,7 @@ Represents a physical station (machine) that can be assigned tasks, maintaining 
 
 ### 1.2 StationCategory Aggregate
 #### AGG-CATEGORY-001
+> **References:** [DM-AGG-CATEGORY-001](../domain-model/domain-model.md#dm-agg-category-001), [BR-CATEGORY-001](../domain-model/business-rules.md#br-category-001), [BR-CATEGORY-002](../domain-model/business-rules.md#br-category-002), [BR-CATEGORY-003](../domain-model/business-rules.md#br-category-003)
 
 **Purpose**
 Represents a category of stations with similarity criteria used for time-saving indicators.
@@ -98,6 +100,7 @@ Represents a category of stations with similarity criteria used for time-saving 
 
 ### 1.3 StationGroup Aggregate
 #### AGG-GROUP-001
+> **References:** [DM-AGG-GROUP-001](../domain-model/domain-model.md#dm-agg-group-001), [BR-GROUP-001](../domain-model/business-rules.md#br-group-001), [BR-GROUP-002](../domain-model/business-rules.md#br-group-002)
 
 **Purpose**
 Represents a logical grouping of stations with capacity constraints.
@@ -134,6 +137,7 @@ Represents a logical grouping of stations with capacity constraints.
 
 ### 1.4 OutsourcedProvider Aggregate
 #### AGG-PROVIDER-001
+> **References:** [DM-AGG-PROVIDER-001](../domain-model/domain-model.md#dm-agg-provider-001), [BR-PROVIDER-001](../domain-model/business-rules.md#br-provider-001), [BR-PROVIDER-002](../domain-model/business-rules.md#br-provider-002), [BR-PROVIDER-003](../domain-model/business-rules.md#br-provider-003), [BR-PROVIDER-004](../domain-model/business-rules.md#br-provider-004)
 
 **Purpose**
 Represents an external provider for outsourced tasks, with its own implicit station group.
@@ -180,6 +184,7 @@ Represents an external provider for outsourced tasks, with its own implicit stat
 
 ### 1.5 Job Aggregate
 #### AGG-JOB-001
+> **References:** [DM-AGG-JOB-001](../domain-model/domain-model.md#dm-agg-job-001), [DM-ENT-TASK-001](../domain-model/domain-model.md#dm-ent-task-001), [BR-JOB-001](../domain-model/business-rules.md#br-job-001), [BR-JOB-002](../domain-model/business-rules.md#br-job-002), [BR-TASK-001](../domain-model/business-rules.md#br-task-001)
 
 **Purpose**
 Represents a print job containing multiple tasks, managing deadlines, approval gates, and workflow.
@@ -257,6 +262,7 @@ Represents a print job containing multiple tasks, managing deadlines, approval g
 
 ### 1.6 Schedule Aggregate
 #### AGG-SCHEDULE-001
+> **References:** [DM-AGG-SCHEDULE-001](../domain-model/domain-model.md#dm-agg-schedule-001), [BR-SCHED-001](../domain-model/business-rules.md#br-sched-001), [BR-SCHED-002](../domain-model/business-rules.md#br-sched-002), [BR-ASSIGN-001](../domain-model/business-rules.md#br-assign-001)
 
 **Purpose**
 Represents the master schedule containing all task assignments with their timings, maintaining consistency and detecting conflicts.
