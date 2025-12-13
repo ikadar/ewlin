@@ -65,6 +65,9 @@ gh release create v{VERSION} --title "v{VERSION} - {Title}" --notes "..."
 git add docs/ services/php-api
 git commit -m "docs: Update for v{VERSION} release"
 git push origin main
+git tag -a v{VERSION} -m "v{VERSION} - {Title}"
+git push origin v{VERSION}
+gh release create v{VERSION} --title "v{VERSION} - {Title}" --notes "..."
 ```
 
 ### 7. CI ellenőrzés
