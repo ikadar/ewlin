@@ -1181,66 +1181,36 @@ Interfaces are described in:
 
 ---
 
-## 8. DSL Parsing Service – Public Interface
+## 8. DSL Support – Architecture Note
 
-### 8.1 ParseDSL
-**Purpose:** Parse DSL text into structured tasks (for validation during input).
+> **Important:** DSL syntax parsing is performed **client-side** using Lezer (see ADR-011).
+> The server does NOT parse DSL syntax. Instead, it performs:
+> 1. **Semantic validation** — checking that referenced stations/providers exist
+> 2. **Task entity creation** — creating Task entities from validated DSL input
+> 3. **Autocomplete data** — providing entity lists for client-side autocomplete UI
 
-**Preconditions**
-- None
+### 8.1 Job Creation with DSL (via Job Management Service)
 
-**Request**
+DSL-based task creation is handled through the existing `CreateJob` operation
+with an optional `tasksDsl` field. See Section 5.1 CreateJob.
+
+**Extended Request (with DSL)**
 ```json
 {
-  "dsl": "[Komori] 20+40 \"vernis\"\n[Massicot] 15\nST [Clément] Pelliculage 2JO"
+  "reference": "JOB-2024-001",
+  "client": "Acme Corp",
+  "description": "Catalog 500pcs",
+  "workshopExitDate": "2025-01-15",
+  "tasksDsl": "[Komori] 20+40 \"vernis\"\n[Massicot] 15\nST [Clément] Pelliculage 2JO"
 }
 ```
 
-**Response (Valid)**
+**Semantic Validation Errors (400)**
 ```json
 {
-  "valid": true,
-  "tasks": [
-    {
-      "type": "internal",
-      "stationId": "string",
-      "stationName": "string",
-      "setupMinutes": 20,
-      "runMinutes": 40,
-      "totalMinutes": 60,
-      "comment": "vernis",
-      "rawInput": "[Komori] 20+40 \"vernis\""
-    },
-    {
-      "type": "internal",
-      "stationId": "string",
-      "stationName": "string",
-      "setupMinutes": 0,
-      "runMinutes": 15,
-      "totalMinutes": 15,
-      "comment": null,
-      "rawInput": "[Massicot] 15"
-    },
-    {
-      "type": "outsourced",
-      "providerId": "string",
-      "providerName": "string",
-      "actionType": "Pelliculage",
-      "durationOpenDays": 2,
-      "comment": null,
-      "rawInput": "ST [Clément] Pelliculage 2JO"
-    }
-  ],
-  "errors": []
-}
-```
-
-**Response (With Errors)**
-```json
-{
-  "valid": false,
-  "tasks": [...],
-  "errors": [
+  "error": "validation_error",
+  "message": "DSL contains invalid references",
+  "details": [
     {
       "line": 2,
       "message": "Station 'UnknownStation' not found",
@@ -1250,41 +1220,59 @@ Interfaces are described in:
 }
 ```
 
-**Postconditions**
-- None — this operation is read-only
+### 8.2 Autocomplete Data Endpoints
 
-**Error responses**
-- None — errors returned in response body
+These endpoints provide entity lists for the client-side autocomplete UI.
+The client uses Lezer for context detection (station vs provider), then
+fetches suggestions from these endpoints.
 
-### 8.2 GetAutocompleteSuggestions
-**Purpose:** Get autocomplete suggestions for DSL input.
+#### GetStationNames
+**Purpose:** Get station names for DSL autocomplete.
 
-**Preconditions**
-- None
-
-**Request**
-```json
-{
-  "prefix": "Kom",
-  "context": "station | provider"
-}
-```
+**Request:** `GET /api/v1/stations/names?search={prefix}`
 
 **Response**
 ```json
 {
-  "suggestions": [
-    {"value": "Komori", "label": "Komori G37"},
-    {"value": "Komori_XL", "label": "Komori XL 106"}
+  "items": [
+    {"id": "station-uuid-1", "name": "Komori", "displayName": "Komori G37"},
+    {"id": "station-uuid-2", "name": "Komori XL", "displayName": "Komori XL 106"}
   ]
 }
 ```
 
+#### GetProviderNames
+**Purpose:** Get provider names for DSL autocomplete.
+
+**Request:** `GET /api/v1/providers/names?search={prefix}`
+
+**Response**
+```json
+{
+  "items": [
+    {"id": "provider-uuid-1", "name": "Clément"},
+    {"id": "provider-uuid-2", "name": "ABC Finishing"}
+  ]
+}
+```
+
+#### GetActionTypes
+**Purpose:** Get action types for DSL autocomplete.
+
+**Request:** `GET /api/v1/providers/action-types`
+
+**Response**
+```json
+{
+  "items": ["Pelliculage", "Dorure", "Vernis UV", "Découpe"]
+}
+```
+
 **Postconditions**
-- None — this operation is read-only
+- None — these operations are read-only
 
 **Error responses**
-- None — always returns suggestions (may be empty)
+- None — always returns results (may be empty)
 
 ---
 

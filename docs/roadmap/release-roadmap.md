@@ -222,25 +222,29 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Database migration for tasks table
 - [x] Unit tests (94 new tests)
 
-#### v0.1.12 - DSL Parser with Lezer (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
+#### v0.1.12 - DSL Parser (Client-Side) (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
+- [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition (`task-dsl.grammar`)
 - [ ] Grammar compilation and parser generation
 - [ ] Internal task syntax: [Station] setup+run "comment"
 - [ ] Outsourced task syntax: ST [Provider] ActionType duration "comment"
 - [ ] Error recovery for partial parsing
-- [ ] `@flux/task-dsl-parser` package setup
-
-#### v0.1.12b - DSL Integration
-- [ ] POST /api/v1/dsl/parse endpoint (uses Lezer parser)
-- [ ] Parse error reporting with line numbers
 - [ ] CodeMirror 6 language extension
 - [ ] Syntax highlighting for task DSL
+- [ ] Real-time parse error display
 
-#### v0.1.13 - DSL Autocomplete
-- [ ] GET /api/v1/dsl/autocomplete endpoint
-- [ ] Station name suggestions
-- [ ] Provider name suggestions
-- [ ] Action type suggestions
+#### v0.1.12b - Job Creation with DSL (Server-Side)
+- [ ] Extend POST /api/v1/jobs to accept `tasksDsl` field
+- [ ] Semantic validation (station/provider existence check)
+- [ ] Task entity creation from parsed DSL
+- [ ] Validation error response with line numbers
+- [ ] `rawDsl` field preserved on Task entities
+
+#### v0.1.13 - Autocomplete Data Endpoints
+- [ ] GET /api/v1/stations/names - Station name list for autocomplete
+- [ ] GET /api/v1/providers/names - Provider name list for autocomplete
+- [ ] GET /api/v1/providers/action-types - Action type list for autocomplete
+- [ ] Lightweight responses optimized for autocomplete UI
 
 #### v0.1.14 - Approval Gates
 - [ ] proofSentAt, proofApprovedAt fields on Job

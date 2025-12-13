@@ -600,14 +600,14 @@ packages/
 
 **Integration Points:**
 - **Job Creation Modal**: CodeMirror 6 editor with DSL highlighting
-- **Job Management Service**: Server-side validation using same parser
-- **Autocomplete**: Station/provider names from Station Management Service
+- **Job Management Service**: Server-side semantic validation (entity existence checks, not syntax parsing)
+- **Autocomplete**: Station/provider names from dedicated API endpoints (`/stations/names`, `/providers/names`)
 
 ### Consequences
 
 **Positive:**
 - Real-time syntax highlighting and error feedback
-- Consistent parsing on client and server (isomorphic)
+- Client-side parsing with server-side semantic validation (clear separation of concerns)
 - Excellent user experience with autocomplete
 - Easy to extend grammar as DSL evolves
 - Small bundle size (~15KB)

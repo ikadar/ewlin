@@ -558,52 +558,54 @@ Get complete schedule snapshot for UI rendering.
 
 ---
 
-## 9. DSL Parsing API
+## 9. DSL Support API
 
-### POST /api/v1/dsl/parse
-Parse DSL text into structured tasks (for validation during input).
+> **Architecture Note:** DSL syntax parsing happens client-side using Lezer (see ADR-011).
+> The server performs semantic validation (entity existence) and Task entity creation.
 
-**Request:**
+### Job Creation with DSL
+
+The `POST /api/v1/jobs` endpoint accepts an optional `tasksDsl` field. When provided,
+the server performs semantic validation and creates Task entities.
+
+**Request (extended):**
 ```json
 {
-  "dsl": "[Komori] 20+40 \"vernis\"\n[Massicot] 15"
+  "reference": "JOB-2024-001",
+  "client": "Acme Corp",
+  "description": "Catalog 500pcs",
+  "workshopExitDate": "2025-01-15",
+  "tasksDsl": "[Komori] 20+40 \"vernis\"\n[Massicot] 15\nST [Clément] Pelliculage 2JO"
 }
 ```
 
-**Response (200) - Valid:**
+**Response (201) - Valid:**
 ```json
 {
-  "valid": true,
+  "id": "job-uuid",
+  "reference": "JOB-2024-001",
   "tasks": [
     {
-      "type": "internal",
-      "stationId": "station-komori",
-      "stationName": "Komori",
+      "id": "task-1-uuid",
+      "sequenceOrder": 1,
+      "taskType": "internal",
+      "stationId": "station-komori-uuid",
       "setupMinutes": 20,
       "runMinutes": 40,
       "comment": "vernis",
-      "rawInput": "[Komori] 20+40 \"vernis\""
+      "rawDsl": "[Komori] 20+40 \"vernis\""
     },
-    {
-      "type": "internal",
-      "stationId": "station-massicot",
-      "stationName": "Massicot",
-      "setupMinutes": 0,
-      "runMinutes": 15,
-      "comment": null,
-      "rawInput": "[Massicot] 15"
-    }
-  ],
-  "errors": []
+    ...
+  ]
 }
 ```
 
-**Response (200) - With Errors:**
+**Response (400) - Semantic Validation Error:**
 ```json
 {
-  "valid": false,
-  "tasks": [...],
-  "errors": [
+  "error": "validation_error",
+  "message": "DSL contains invalid references",
+  "details": [
     {
       "line": 2,
       "message": "Station 'UnknownStation' not found",
@@ -613,20 +615,49 @@ Parse DSL text into structured tasks (for validation during input).
 }
 ```
 
-### GET /api/v1/dsl/autocomplete
-Get autocomplete suggestions.
+### Autocomplete Data Endpoints
+
+These endpoints provide entity lists for the client-side autocomplete UI.
+
+#### GET /api/v1/stations/names
+Get station names for autocomplete.
 
 **Query Parameters:**
-- `prefix`: Current input prefix
-- `context`: "station" or "provider"
+- `search` (optional): Filter by name prefix
 
 **Response (200):**
 ```json
 {
-  "suggestions": [
-    {"value": "Komori", "label": "Komori G37"},
-    {"value": "Komori_XL", "label": "Komori XL 106"}
+  "items": [
+    {"id": "station-uuid-1", "name": "Komori", "displayName": "Komori G37"},
+    {"id": "station-uuid-2", "name": "Komori XL", "displayName": "Komori XL 106"}
   ]
+}
+```
+
+#### GET /api/v1/providers/names
+Get provider names for autocomplete.
+
+**Query Parameters:**
+- `search` (optional): Filter by name prefix
+
+**Response (200):**
+```json
+{
+  "items": [
+    {"id": "provider-uuid-1", "name": "Clément"},
+    {"id": "provider-uuid-2", "name": "ABC Finishing"}
+  ]
+}
+```
+
+#### GET /api/v1/providers/action-types
+Get all action types across providers.
+
+**Response (200):**
+```json
+{
+  "items": ["Pelliculage", "Dorure", "Vernis UV", "Découpe"]
 }
 ```
 
