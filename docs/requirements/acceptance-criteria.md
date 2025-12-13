@@ -526,16 +526,20 @@ ST [Clément] Pelliculage 2JO
 ## Performance
 
 ### AC-PERF-001: Drag Feedback
-> **References:** [VAL-001](../domain-model/business-rules.md#val-001)
+> **References:** [US-PERF-001](user-stories.md#us-perf-001), [VAL-001](../domain-model/business-rules.md#val-001)
 
 **Given** the user is dragging a tile
 **Then** validation feedback appears in <10ms
 
 ### AC-PERF-002: Grid Render
+> **References:** [US-PERF-001](user-stories.md#us-perf-001)
+
 **Given** 100 tiles are scheduled
 **Then** the grid renders in <100ms
 
 ### AC-PERF-003: Initial Load
+> **References:** [US-PERF-001](user-stories.md#us-perf-001)
+
 **Given** a schedule with typical data
 **Then** initial page load completes in <2s
 

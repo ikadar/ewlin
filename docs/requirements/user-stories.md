@@ -458,4 +458,19 @@ Each story follows the standard format:
 
 ---
 
+## Performance
+
+### Responsive Scheduling Interface
+#### US-PERF-001
+> **References:** [VAL-001](../domain-model/business-rules.md#val-001)
+
+> As a **scheduler**, I want **the scheduling interface to respond quickly**, so that **I can work efficiently without waiting**.
+
+**Acceptance Criteria:**
+- Drag feedback appears in <10ms
+- Grid renders in <100ms with 100 tiles
+- Initial page load completes in <2s
+
+---
+
 This document contains the user stories for the Flux print shop scheduling system. Stories are prioritized with core scheduling functionality first, followed by supporting features.
