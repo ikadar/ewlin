@@ -351,11 +351,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Schedule repository
 - [x] Database migration
 
-#### v0.2.11 - Assignment API Endpoints
-- [ ] POST /api/v1/tasks/{taskId}/assign (create assignment)
-- [ ] Validation Service integration (HTTP client)
-- [ ] Assignment persistence on validation success
-- [ ] Error handling for validation failures
+#### v0.2.11 - Assignment API Endpoints ✅
+- [x] POST /api/v1/tasks/{taskId}/assign (create assignment)
+- [x] Validation Service integration (HTTP client)
+- [x] Assignment persistence on validation success
+- [x] Error handling for validation failures
 
 #### v0.2.12 - End Time Calculation
 - [ ] Calculate scheduledEnd considering operating schedule
