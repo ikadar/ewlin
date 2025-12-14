@@ -411,12 +411,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 > **Reference:** [UX/UI Specification](../ux-ui/00-overview.md)
 
-#### v0.3.2 - Layout Components
-- [ ] Header with navigation
-- [ ] Main page 3-column layout (Left Panel / Center Grid / Right Panel)
-- [ ] Responsive breakpoints
-- [ ] Panel collapse/expand toggles
-- [ ] Mock data factories for Storybook stories and unit tests
+#### v0.3.2 - Layout Components ✅
+- [x] Header with navigation
+- [x] Main page 3-column layout (Left Panel / Center Grid / Right Panel)
+- [x] Responsive breakpoints
+- [x] Panel collapse/expand toggles
+- [x] Mock data factories for Storybook stories and unit tests
+- [x] Vitest + Testing Library configured (73 unit tests)
 
 #### v0.3.3 - Left Panel - Jobs List
 - [ ] Job list component

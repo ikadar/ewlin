@@ -15,7 +15,11 @@ interface UiState {
     start: string;
     end: string;
   };
-  sidebarCollapsed: boolean;
+  // Panel collapse state
+  leftPanelCollapsed: boolean;
+  rightPanelCollapsed: boolean;
+  // Selected job for left panel context
+  selectedJobId: string | null;
 }
 
 const initialState: UiState = {
@@ -28,7 +32,9 @@ const initialState: UiState = {
     start: new Date().toISOString().split('T')[0],
     end: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   },
-  sidebarCollapsed: false,
+  leftPanelCollapsed: false,
+  rightPanelCollapsed: false,
+  selectedJobId: null,
 };
 
 const uiSlice = createSlice({
@@ -53,8 +59,20 @@ const uiSlice = createSlice({
     setTimeRange: (state, action: PayloadAction<{ start: string; end: string }>) => {
       state.timeRange = action.payload;
     },
-    toggleSidebar: (state) => {
-      state.sidebarCollapsed = !state.sidebarCollapsed;
+    toggleLeftPanel: (state) => {
+      state.leftPanelCollapsed = !state.leftPanelCollapsed;
+    },
+    toggleRightPanel: (state) => {
+      state.rightPanelCollapsed = !state.rightPanelCollapsed;
+    },
+    setLeftPanelCollapsed: (state, action: PayloadAction<boolean>) => {
+      state.leftPanelCollapsed = action.payload;
+    },
+    setRightPanelCollapsed: (state, action: PayloadAction<boolean>) => {
+      state.rightPanelCollapsed = action.payload;
+    },
+    setSelectedJobId: (state, action: PayloadAction<string | null>) => {
+      state.selectedJobId = action.payload;
     },
   },
 });
@@ -66,6 +84,10 @@ export const {
   setIsDragging,
   setDraggedTaskId,
   setTimeRange,
-  toggleSidebar,
+  toggleLeftPanel,
+  toggleRightPanel,
+  setLeftPanelCollapsed,
+  setRightPanelCollapsed,
+  setSelectedJobId,
 } = uiSlice.actions;
 export const uiReducer = uiSlice.reducer;
