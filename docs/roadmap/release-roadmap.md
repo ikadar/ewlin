@@ -345,11 +345,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 2C: Assignment Service (PHP)
 
-#### v0.2.10 - Schedule Aggregate
-- [ ] Schedule entity (aggregate root)
-- [ ] TaskAssignment value object (with isCompleted, completedAt fields)
-- [ ] Schedule repository
-- [ ] Database migration
+#### v0.2.10 - Schedule Aggregate ✅
+- [x] Schedule entity (aggregate root)
+- [x] TaskAssignment value object (with isCompleted, completedAt fields)
+- [x] Schedule repository
+- [x] Database migration
 
 #### v0.2.11 - Assignment API Endpoints
 - [ ] POST /api/v1/tasks/{taskId}/assign (create assignment)
