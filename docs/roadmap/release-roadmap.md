@@ -393,12 +393,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] ConflictDetected event
 - [x] ScheduleUpdated event
 
-#### v0.2.18 - Task Completion Toggle
-- [ ] PUT /api/v1/tasks/{taskId}/completion endpoint
-- [ ] Toggle isCompleted flag (manual, not time-based)
-- [ ] Set/clear completedAt timestamp
-- [ ] Completion does NOT affect precedence validation
-- [ ] Unit tests
+#### v0.2.18 - Task Completion Toggle ✅
+- [x] PUT /api/v1/tasks/{taskId}/completion endpoint
+- [x] Toggle isCompleted flag (manual, not time-based)
+- [x] Set/clear completedAt timestamp
+- [x] Completion does NOT affect precedence validation
+- [x] Unit tests
 
 ---
 
