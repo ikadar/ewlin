@@ -364,10 +364,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] LatestDepartureTime handling (if drop > departure, start = next business day)
 - [x] ReceptionTime handling (scheduledEnd = receptionTime on completion day)
 
-#### v0.2.13 - Unassign (Recall) Task
-- [ ] DELETE /api/v1/tasks/{taskId}/assign endpoint
-- [ ] Task status update to 'Ready'
-- [ ] Event publishing
+#### v0.2.13 - Unassign (Recall) Task ✅
+- [x] DELETE /api/v1/tasks/{taskId}/assign endpoint
+- [x] Task status update to 'Ready'
+- [x] Event publishing
 
 #### v0.2.14 - Reschedule Task
 - [ ] PUT /api/v1/tasks/{taskId}/assign endpoint
