@@ -380,10 +380,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] snapshotVersion for optimistic locking
 - [x] Conflict and late job inclusion
 
-#### v0.2.16 - Business Calendar
-- [ ] Open day calculation utility
-- [ ] Weekend exclusion (MVP)
-- [ ] GET /api/v1/calendar/open-days endpoint
+#### v0.2.16 - Business Calendar ✅
+- [x] Open day calculation utility
+- [x] Weekend exclusion (MVP)
+- [x] GET /api/v1/calendar/open-days endpoint
 
 #### v0.2.17 - Assignment Domain Events
 - [ ] TaskAssigned event
