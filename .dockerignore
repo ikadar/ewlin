@@ -1,0 +1,41 @@
+# Docker build ignore file for Flux monorepo
+# Used when building validation-service from monorepo root context
+
+# Node modules (will be installed in container)
+**/node_modules/
+
+# Built artifacts (will be built in container)
+**/dist/
+**/*.tsbuildinfo
+
+# Test files
+**/tests/
+**/*.test.ts
+**/vitest.config.ts
+**/__tests__/
+
+# Development files
+**/.git/
+**/.gitignore
+**/README.md
+**/CHANGELOG.md
+**/*.md
+
+# IDE
+**/.vscode/
+**/.idea/
+
+# Docker files (don't need to copy these into the build)
+**/Dockerfile
+**/.dockerignore
+docker/
+
+# Services not needed for validation-service build
+services/php-api/
+apps/
+docs/
+
+# Environment files
+.env
+.env.*
+!.env.example

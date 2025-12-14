@@ -21,7 +21,8 @@ docker compose ps
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
-| `node` | ewlin-node (built) | — | TypeScript packages |
+| `validation-service` | flux-validation-service (built) | 3001 | Schedule validation API |
+| `node` | ewlin-node (built) | — | TypeScript packages (dev) |
 | `php` | ewlin-php (built) | 9000 (internal) | Symfony PHP-FPM |
 | `nginx` | nginx:alpine | 8080 | Web server |
 | `mariadb` | mariadb:10.11 | 3306 | Primary database |
@@ -29,7 +30,42 @@ docker compose ps
 
 ## Container Details
 
-### Node.js (TypeScript Packages)
+### Validation Service (Schedule Validation API)
+
+- **Image:** `ewlin-validation-service` (built from monorepo root context)
+- **Dockerfile:** `services/validation-service/Dockerfile`
+- **Container name:** `flux-validation-service`
+- **Port:** 3001 (configurable via `VALIDATION_SERVICE_PORT`)
+- **Node.js version:** 22 LTS
+- **Health check:** HTTP GET `/health`
+- **Purpose:** Exposes `@flux/schedule-validator` as REST API for PHP Assignment Service
+- **Image size:** ~280MB (multi-stage build with Alpine)
+
+**Test health endpoint:**
+```bash
+curl http://localhost:3001/health
+# Expected: {"status":"ok","timestamp":"...","service":"validation-service","version":"0.2.9"}
+```
+
+**Test validation endpoint:**
+```bash
+curl -X POST http://localhost:3001/validate \
+  -H "Content-Type: application/json" \
+  -d '{"proposed":{...},"snapshot":{...}}'
+```
+
+**View logs:**
+```bash
+docker compose logs -f validation-service
+```
+
+**Rebuild after code changes:**
+```bash
+docker compose build validation-service
+docker compose up -d validation-service
+```
+
+### Node.js (TypeScript Packages - Development)
 
 - **Image:** `ewlin-node` (built from `docker/node/Dockerfile`)
 - **Container name:** `flux-node`
@@ -249,6 +285,7 @@ See `.env.example` for all available configuration options.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `VALIDATION_SERVICE_PORT` | `3001` | Validation service port |
 | `MARIADB_ROOT_PASSWORD` | — | Root password (required) |
 | `MARIADB_DATABASE` | `flux_scheduler` | Database name |
 | `MARIADB_USER` | `flux_user` | Application user |
@@ -263,6 +300,7 @@ See `.env.example` for all available configuration options.
 
 All services are connected via the `flux-network` bridge network. Services can communicate using their service names:
 
+- Validation Service: `validation-service:3001`
 - PHP-FPM: `php:9000`
 - Nginx: `nginx:80`
 - MariaDB: `mariadb:3306`
@@ -272,4 +310,5 @@ From Symfony (configured in docker-compose.yml):
 ```
 DATABASE_URL=mysql://flux_user:password@mariadb:3306/flux_scheduler?serverVersion=10.11.0-MariaDB
 REDIS_URL=redis://redis:6379
+VALIDATION_SERVICE_URL=http://validation-service:3001
 ```

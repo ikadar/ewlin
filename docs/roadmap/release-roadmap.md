@@ -337,11 +337,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Response formatting
 - [x] Performance logging (< 50ms target)
 
-#### v0.2.9 - Validation Service Docker
-- [ ] Dockerfile for Node.js service
-- [ ] Docker Compose integration
-- [ ] Environment configuration
-- [ ] Health check configuration
+#### v0.2.9 - Validation Service Docker ✅
+- [x] Dockerfile for Node.js service
+- [x] Docker Compose integration
+- [x] Environment configuration
+- [x] Health check configuration
 
 ### Phase 2C: Assignment Service (PHP)
 

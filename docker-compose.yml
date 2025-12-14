@@ -1,9 +1,9 @@
 # Flux Print Shop Scheduling System - Development Environment
-# v0.0.3 - Node.js Project Foundation
+# v0.2.9 - Validation Service Docker
 
 services:
   # ===========================================
-  # Node.js (TypeScript Packages)
+  # Node.js (TypeScript Packages - Development)
   # ===========================================
   node:
     build:
@@ -14,6 +14,29 @@ services:
     volumes:
       - ./services/node:/app:cached
     working_dir: /app
+    networks:
+      - flux-network
+
+  # ===========================================
+  # Validation Service (Node.js HTTP API)
+  # ===========================================
+  validation-service:
+    build:
+      context: .
+      dockerfile: services/validation-service/Dockerfile
+    container_name: flux-validation-service
+    restart: unless-stopped
+    ports:
+      - "${VALIDATION_SERVICE_PORT:-3001}:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - flux-network
 
