@@ -246,11 +246,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] paperOrderedAt automatic timestamp (auto-set when status → Ordered)
 - [x] PUT /api/v1/jobs/{id}/paper endpoint
 
-#### v0.1.16 - Job Dependencies
-- [ ] requiredJobIds field on Job
-- [ ] POST /api/v1/jobs/{id}/dependencies endpoint
-- [ ] Circular dependency detection
-- [ ] Dependency listing
+#### v0.1.16 - Job Dependencies ✅
+- [x] requiredJobIds field on Job
+- [x] POST /api/v1/jobs/{id}/dependencies endpoint
+- [x] Circular dependency detection
+- [x] Dependency listing
 
 #### v0.1.17 - Job Comments
 - [ ] Comment entity (within Job aggregate)
