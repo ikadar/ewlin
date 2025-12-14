@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.8] - 2025-12-14
+
+### Added
+- **Validation API Endpoint** (`services/validation-service`)
+- POST /validate endpoint for schedule validation
+- Zod schema validation for request bodies
+- Performance logging (validation time in ms)
+- 14 new tests for validation endpoint
+
+### Technical Details
+- Uses @flux/schedule-validator for validation logic
+- Zod schemas match @flux/types definitions
+- Validation time: < 1ms typical (target was < 50ms)
+
+---
+
 ## [0.2.7.1] - 2025-12-14
 
 ### Changed
@@ -220,7 +236,8 @@ git submodule update --init --recursive
 ---
 
 <!-- Release links will be added as releases are created -->
-[Unreleased]: https://github.com/ikadar/ewlin/compare/v0.2.7.1...HEAD
+[Unreleased]: https://github.com/ikadar/ewlin/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/ikadar/ewlin/compare/v0.2.7.1...v0.2.8
 [0.2.7.1]: https://github.com/ikadar/ewlin/compare/v0.2.7...v0.2.7.1
 [0.2.7]: https://github.com/ikadar/ewlin/compare/v0.0.8...v0.2.7
 [0.0.8]: https://github.com/ikadar/ewlin/compare/v0.0.7...v0.0.8

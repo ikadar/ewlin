@@ -331,11 +331,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Create `ewlin-validation-service` repository
 - [x] Convert to git submodule (consistent with php-api, types, validator)
 
-#### v0.2.8 - Validation API Endpoint
-- [ ] POST /validate endpoint
-- [ ] Request validation (Zod/Joi)
-- [ ] Response formatting
-- [ ] Performance logging (< 50ms target)
+#### v0.2.8 - Validation API Endpoint ✅
+- [x] POST /validate endpoint
+- [x] Request validation (Zod)
+- [x] Response formatting
+- [x] Performance logging (< 50ms target)
 
 #### v0.2.9 - Validation Service Docker
 - [ ] Dockerfile for Node.js service
