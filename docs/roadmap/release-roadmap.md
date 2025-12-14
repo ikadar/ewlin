@@ -369,10 +369,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Task status update to 'Ready'
 - [x] Event publishing
 
-#### v0.2.14 - Reschedule Task
-- [ ] PUT /api/v1/tasks/{taskId}/assign endpoint
-- [ ] Revalidation on reschedule
-- [ ] Event publishing
+#### v0.2.14 - Reschedule Task ✅
+- [x] PUT /api/v1/tasks/{taskId}/assign endpoint
+- [x] Revalidation on reschedule
+- [x] Event publishing
 
 #### v0.2.15 - Schedule Snapshot Endpoint
 - [ ] GET /api/v1/schedule/snapshot endpoint
