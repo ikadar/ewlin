@@ -264,12 +264,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] JobCancelled event (with recalledTaskIds, preservedTaskIds)
 - [x] Event publishing via Messenger
 
-#### v0.1.19 - Job Cancellation
-- [ ] DELETE /api/v1/jobs/{id} endpoint (or POST /api/v1/jobs/{id}/cancel)
-- [ ] Recall future task assignments (scheduledStart > now)
-- [ ] Preserve past task assignments (historical reference)
-- [ ] All task statuses → Cancelled
-- [ ] Unit tests for cancellation logic
+#### v0.1.19 - Job Cancellation ✅
+- [x] POST /api/v1/jobs/{id}/cancel endpoint
+- [x] Job.cancel() method with task cascade
+- [x] JobCancelled event with cancelledTaskIds
+- [x] All non-terminal task statuses → Cancelled
+- [x] Unit tests for cancellation logic
+- [x] Integration tests for cancel endpoint
 
 ---
 
