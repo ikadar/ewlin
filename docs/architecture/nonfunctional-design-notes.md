@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Security, Performance & Scalability Design Notes – Operations Research System
 
 This document captures **architectural decisions** related to security, performance, and scalability for the Equipment → Operator → Job → Task assignment and validation workflow.

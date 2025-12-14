@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - requirements
+---
+
 # Scheduling UI Design — Flux Print Shop Scheduling System
 
 This document defines the **primary scheduling interface** — the time-based grid where schedulers place and manage task assignments. This is the **core value-generating UI** of the application.

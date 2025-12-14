@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Submodule Contribution Workflow
 
 This document describes how to work with the Flux Print Shop Scheduling System's submodule architecture.

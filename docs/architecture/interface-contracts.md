@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Interface Contracts – Flux Print Shop Scheduling System
 
 This document defines **service-to-service interface contracts** for the Station → Job → Task assignment and validation workflow.
@@ -14,6 +20,9 @@ Interfaces are described in:
 ## 1. Station Management Service – Public Interface
 
 ### 1.1 RegisterStation
+#### IC-STATION-001
+> **References:** [API-STATION-001](../requirements/api-interface-drafts.md#api-station-001), [AC-STATION-001](../requirements/acceptance-criteria.md#ac-station-001-station-registration), [BR-STATION-001](../domain-model/business-rules.md#br-station-001), [BR-STATION-002](../domain-model/business-rules.md#br-station-002), [BR-STATION-003](../domain-model/business-rules.md#br-station-003)
+
 **Purpose:** Add a new station to the system with operating schedule.
 
 **Preconditions**
@@ -62,6 +71,9 @@ Interfaces are described in:
 - `GROUP_NOT_FOUND` – Group does not exist
 
 ### 1.2 UpdateOperatingSchedule
+#### IC-STATION-002
+> **References:** [AC-STATION-002](../requirements/acceptance-criteria.md#ac-station-002-operating-schedule-definition), [BR-STATION-004](../domain-model/business-rules.md#br-station-004), [BR-STATION-005](../domain-model/business-rules.md#br-station-005)
+
 **Purpose:** Modify station's weekly operating schedule.
 
 **Preconditions**
@@ -104,6 +116,9 @@ Interfaces are described in:
 - `INVALID_TIME_SLOTS` – Time slots overlap or invalid format
 
 ### 1.3 AddScheduleException
+#### IC-STATION-003
+> **References:** [API-STATION-003](../requirements/api-interface-drafts.md#api-station-003), [AC-STATION-003](../requirements/acceptance-criteria.md#ac-station-003-schedule-exception), [BR-STATION-008](../domain-model/business-rules.md#br-station-008)
+
 **Purpose:** Add a one-off schedule exception (holiday, maintenance).
 
 **Preconditions**
@@ -142,6 +157,9 @@ Interfaces are described in:
 - `MODIFIED_SLOTS_REQUIRED` – ModifiedHours type requires slots
 
 ### 1.4 GetStationAvailability
+#### IC-STATION-004
+> **References:** [AC-STATION-002](../requirements/acceptance-criteria.md#ac-station-002-operating-schedule-definition), [BR-STATION-004](../domain-model/business-rules.md#br-station-004)
+
 **Purpose:** Query station availability for a time range.
 
 **Preconditions**
@@ -193,6 +211,9 @@ Interfaces are described in:
 ## 2. Station Category Service – Public Interface
 
 ### 2.1 CreateCategory
+#### IC-CATEGORY-001
+> **References:** [API-CATEGORY-001](../requirements/api-interface-drafts.md#api-category-001), [AC-STATION-004](../requirements/acceptance-criteria.md#ac-station-004-station-category-with-similarity-criteria), [BR-CATEGORY-001](../domain-model/business-rules.md#br-category-001), [BR-CATEGORY-002](../domain-model/business-rules.md#br-category-002)
+
 **Purpose:** Create a station category with similarity criteria.
 
 **Preconditions**
@@ -228,6 +249,9 @@ Interfaces are described in:
 - `CATEGORY_NAME_EXISTS` – Name already in use
 
 ### 2.2 UpdateSimilarityCriteria
+#### IC-CATEGORY-002
+> **References:** [AC-STATION-006](../requirements/acceptance-criteria.md#ac-station-006-similarity-criterion-comparison), [BR-CATEGORY-003](../domain-model/business-rules.md#br-category-003)
+
 **Purpose:** Update the similarity criteria for a category.
 
 **Preconditions**
@@ -263,6 +287,9 @@ Interfaces are described in:
 ## 3. Station Group Service – Public Interface
 
 ### 3.1 CreateGroup
+#### IC-GROUP-001
+> **References:** [API-GROUP-001](../requirements/api-interface-drafts.md#api-group-001), [AC-STATION-005](../requirements/acceptance-criteria.md#ac-station-005-station-group-capacity), [BR-GROUP-001](../domain-model/business-rules.md#br-group-001), [BR-GROUP-002](../domain-model/business-rules.md#br-group-002)
+
 **Purpose:** Create a station group with concurrency limits.
 
 **Preconditions**
@@ -295,6 +322,9 @@ Interfaces are described in:
 - `INVALID_MAX_CONCURRENT` – Value must be positive or null
 
 ### 3.2 CheckGroupCapacity
+#### IC-GROUP-002
+> **References:** [AC-CONFLICT-002](../requirements/acceptance-criteria.md#ac-conflict-002-group-capacity-exceeded), [BR-SCHED-002](../domain-model/business-rules.md#br-sched-002)
+
 **Purpose:** Check if group has capacity at a given time.
 
 **Preconditions**
@@ -340,6 +370,9 @@ Interfaces are described in:
 ## 4. Outsourced Provider Service – Public Interface
 
 ### 4.1 RegisterProvider
+#### IC-PROVIDER-001
+> **References:** [API-PROVIDER-001](../requirements/api-interface-drafts.md#api-provider-001), [AC-PROVIDER-001](../requirements/acceptance-criteria.md#ac-provider-001-provider-registration), [BR-PROVIDER-001](../domain-model/business-rules.md#br-provider-001), [BR-PROVIDER-002](../domain-model/business-rules.md#br-provider-002), [BR-PROVIDER-003](../domain-model/business-rules.md#br-provider-003)
+
 **Purpose:** Add an external provider to the system.
 
 **Preconditions**
@@ -383,6 +416,9 @@ Interfaces are described in:
 - `NO_ACTION_TYPES` – No supported action types provided
 
 ### 4.2 GetProviderDetails
+#### IC-PROVIDER-002
+> **References:** [AC-PROVIDER-003](../requirements/acceptance-criteria.md#ac-provider-003-unlimited-provider-capacity), [BR-PROVIDER-002](../domain-model/business-rules.md#br-provider-002)
+
 **Purpose:** Retrieve provider with supported action types.
 
 **Preconditions**
@@ -417,6 +453,9 @@ Interfaces are described in:
 ## 5. Job Management Service – Public Interface
 
 ### 5.1 CreateJob
+#### IC-JOB-001
+> **References:** [API-JOB-001](../requirements/api-interface-drafts.md#api-job-001), [AC-JOB-001](../requirements/acceptance-criteria.md#ac-job-001-job-creation), [AC-JOB-002](../requirements/acceptance-criteria.md#ac-job-002-task-dsl-parsing), [BR-JOB-001](../domain-model/business-rules.md#br-job-001), [BR-JOB-002](../domain-model/business-rules.md#br-job-002), [BR-JOB-003](../domain-model/business-rules.md#br-job-003)
+
 **Purpose:** Create a new print job with tasks from DSL.
 
 **Preconditions**
@@ -479,6 +518,9 @@ Interfaces are described in:
 - `PROVIDER_NOT_FOUND` – Provider referenced in DSL not found
 
 ### 5.2 UpdateJobDetails
+#### IC-JOB-002
+> **References:** [API-JOB-003](../requirements/api-interface-drafts.md#api-job-003), [BR-JOB-001](../domain-model/business-rules.md#br-job-001)
+
 **Purpose:** Update job metadata (not tasks).
 
 **Preconditions**
@@ -517,6 +559,9 @@ Interfaces are described in:
 - `JOB_INVALID_STATE` – Job is Cancelled or Completed
 
 ### 5.3 ReorderTasks
+#### IC-JOB-003
+> **References:** [API-TASK-001](../requirements/api-interface-drafts.md#api-task-001), [BR-TASK-003](../domain-model/business-rules.md#br-task-003)
+
 **Purpose:** Change the sequence order of tasks within a job.
 
 **Preconditions**
@@ -551,6 +596,9 @@ Interfaces are described in:
 - `JOB_INVALID_STATE` – Job is Completed or Cancelled
 
 ### 5.4 SetJobDependency
+#### IC-JOB-004
+> **References:** [API-JOB-007](../requirements/api-interface-drafts.md#api-job-007), [AC-JOB-005](../requirements/acceptance-criteria.md#ac-job-005-job-dependencies), [AC-JOB-006](../requirements/acceptance-criteria.md#ac-job-006-circular-dependency-prevention), [BR-JOB-006](../domain-model/business-rules.md#br-job-006), [BR-JOB-008](../domain-model/business-rules.md#br-job-008)
+
 **Purpose:** Define that one job depends on another job.
 
 **Preconditions**
@@ -582,6 +630,9 @@ Interfaces are described in:
 - `CIRCULAR_DEPENDENCY` – Would create a cycle
 
 ### 5.5 UpdateProofStatus
+#### IC-JOB-005
+> **References:** [API-JOB-004](../requirements/api-interface-drafts.md#api-job-004), [AC-GATE-001](../requirements/acceptance-criteria.md#ac-gate-001-bat-blocking), [AC-GATE-002](../requirements/acceptance-criteria.md#ac-gate-002-bat-bypass), [BR-GATE-001](../domain-model/business-rules.md#br-gate-001), [BR-GATE-003](../domain-model/business-rules.md#br-gate-003)
+
 **Purpose:** Update BAT (Bon à Tirer) approval status.
 
 **Preconditions**
@@ -614,6 +665,9 @@ Interfaces are described in:
 - `INVALID_PROOF_STATE` – Cannot approve without sending first
 
 ### 5.6 UpdatePlatesStatus
+#### IC-JOB-006
+> **References:** [API-JOB-005](../requirements/api-interface-drafts.md#api-job-005), [AC-GATE-003](../requirements/acceptance-criteria.md#ac-gate-003-plates-blocking), [BR-GATE-002](../domain-model/business-rules.md#br-gate-002)
+
 **Purpose:** Update plates preparation status.
 
 **Preconditions**
@@ -644,6 +698,9 @@ Interfaces are described in:
 - `JOB_NOT_FOUND` – Job does not exist
 
 ### 5.7 UpdatePaperStatus
+#### IC-JOB-007
+> **References:** [API-JOB-006](../requirements/api-interface-drafts.md#api-job-006), [AC-GATE-004](../requirements/acceptance-criteria.md#ac-gate-004-paper-status-timestamp), [BR-PAPER-001](../domain-model/business-rules.md#br-paper-001), [BR-PAPER-002](../domain-model/business-rules.md#br-paper-002)
+
 **Purpose:** Update paper procurement status.
 
 **Preconditions**
@@ -675,6 +732,9 @@ Interfaces are described in:
 - `JOB_NOT_FOUND` – Job does not exist
 
 ### 5.8 AddComment
+#### IC-JOB-008
+> **References:** [API-JOB-008](../requirements/api-interface-drafts.md#api-job-008), [COM-001](../domain-model/business-rules.md#com-001), [COM-002](../domain-model/business-rules.md#com-002)
+
 **Purpose:** Add a timestamped comment to a job.
 
 **Preconditions**
@@ -706,6 +766,9 @@ Interfaces are described in:
 - `EMPTY_CONTENT` – Comment content is empty
 
 ### 5.9 CancelJob
+#### IC-JOB-009
+> **References:** [API-JOB-009](../requirements/api-interface-drafts.md#api-job-009), [AC-JOB-007](../requirements/acceptance-criteria.md#ac-job-007-job-cancellation), [BR-JOB-005](../domain-model/business-rules.md#br-job-005), [BR-JOB-010](../domain-model/business-rules.md#br-job-010), [BR-JOB-010b](../domain-model/business-rules.md#br-job-010b)
+
 **Purpose:** Cancel a job and handle its assignments appropriately.
 
 **Preconditions**
@@ -742,6 +805,9 @@ Interfaces are described in:
 - `JOB_INVALID_STATE` – Job is already Completed or Cancelled
 
 ### 5.10 ToggleTaskCompletion
+#### IC-JOB-010
+> **References:** [API-TASK-003](../requirements/api-interface-drafts.md#api-task-003), [AC-SCHED-010](../requirements/acceptance-criteria.md#ac-sched-010-task-completion-checkbox), [AC-SCHED-011](../requirements/acceptance-criteria.md#ac-sched-011-completion-does-not-auto-set), [BR-ASSIGN-007](../domain-model/business-rules.md#br-assign-007), [BR-ASSIGN-008](../domain-model/business-rules.md#br-assign-008)
+
 **Purpose:** Toggle task completion status (manual tracking).
 
 **Preconditions**
@@ -781,6 +847,9 @@ Interfaces are described in:
 - `TASK_NOT_ASSIGNED` – Task must be Assigned or Executing to toggle completion
 
 ### 5.11 GetJobDetails
+#### IC-JOB-011
+> **References:** [AC-JOB-001](../requirements/acceptance-criteria.md#ac-job-001-job-creation), [BR-JOB-001](../domain-model/business-rules.md#br-job-001)
+
 **Purpose:** Retrieve job with tasks and status.
 
 **Preconditions**
@@ -850,6 +919,9 @@ Interfaces are described in:
 ## 6. Assignment & Validation Service – Public Interface
 
 ### 6.1 AssignTask
+#### IC-ASSIGN-001
+> **References:** [API-ASSIGN-001](../requirements/api-interface-drafts.md#api-assign-001), [AC-SCHED-003](../requirements/acceptance-criteria.md#ac-sched-003-drag-and-drop-assignment), [BR-ASSIGN-001](../domain-model/business-rules.md#br-assign-001)
+
 **Purpose:** Assign a task to a station/provider with scheduled timing.
 
 **Preconditions**
@@ -914,6 +986,9 @@ Interfaces are described in:
 - `STATION_MISMATCH` – Task cannot be assigned to this station
 
 ### 6.2 RecallTask
+#### IC-ASSIGN-002
+> **References:** [API-ASSIGN-002](../requirements/api-interface-drafts.md#api-assign-002), [AC-SCHED-007](../requirements/acceptance-criteria.md#ac-sched-007-recall-tile), [BR-ASSIGN-005](../domain-model/business-rules.md#br-assign-005)
+
 **Purpose:** Remove task assignment (recall tile from schedule).
 
 **Preconditions**
@@ -945,6 +1020,9 @@ Interfaces are described in:
 - `TASK_NOT_ASSIGNED` – Task has no assignment
 
 ### 6.3 RescheduleTask
+#### IC-ASSIGN-003
+> **References:** [AC-SCHED-003](../requirements/acceptance-criteria.md#ac-sched-003-drag-and-drop-assignment), [BR-ASSIGN-005](../domain-model/business-rules.md#br-assign-005)
+
 **Purpose:** Change timing of existing task assignment.
 
 **Preconditions**
@@ -985,6 +1063,9 @@ Interfaces are described in:
 - `TASK_NOT_ASSIGNED` – Task has no assignment
 
 ### 6.4 ValidateProposedAssignment
+#### IC-ASSIGN-004
+> **References:** [API-ASSIGN-003](../requirements/api-interface-drafts.md#api-assign-003), [AC-SCHED-004](../requirements/acceptance-criteria.md#ac-sched-004-real-time-validation-during-drag), [VAL-001](../domain-model/business-rules.md#val-001)
+
 **Purpose:** Validate a proposed assignment without saving (for drag preview).
 
 **Preconditions**
@@ -1028,6 +1109,9 @@ Interfaces are described in:
 - `STATION_NOT_FOUND` – Station does not exist
 
 ### 6.5 ValidateScheduleScope
+#### IC-ASSIGN-005
+> **References:** [AC-CONFLICT-001](../requirements/acceptance-criteria.md#ac-conflict-001-station-double-booking), [AC-CONFLICT-002](../requirements/acceptance-criteria.md#ac-conflict-002-group-capacity-exceeded), [AC-CONFLICT-003](../requirements/acceptance-criteria.md#ac-conflict-003-precedence-violation-visual), [AC-CONFLICT-004](../requirements/acceptance-criteria.md#ac-conflict-004-late-job-detection)
+
 **Purpose:** Perform full validation of schedule scope.
 
 **Preconditions**
@@ -1081,6 +1165,9 @@ Interfaces are described in:
 ## 7. Scheduling View Service – Public Interface
 
 ### 7.1 GetScheduleSnapshot
+#### IC-VIEW-001
+> **References:** [API-SNAPSHOT-001](../requirements/api-interface-drafts.md#api-snapshot-001), [AC-SCHED-001](../requirements/acceptance-criteria.md#ac-sched-001-vertical-time-axis)
+
 **Purpose:** Get complete schedule snapshot for UI rendering.
 
 **Preconditions**
@@ -1279,6 +1366,9 @@ fetches suggestions from these endpoints.
 ## 9. Business Calendar Service – Public Interface
 
 ### 9.1 CalculateOpenDays
+#### IC-CAL-001
+> **References:** [API-CAL-001](../requirements/api-interface-drafts.md#api-cal-001), [AC-PROVIDER-002](../requirements/acceptance-criteria.md#ac-provider-002-outsourced-task-duration), [CAL-001](../domain-model/business-rules.md#cal-001)
+
 **Purpose:** Calculate end date from start date plus open days.
 
 **Preconditions**
@@ -1309,6 +1399,9 @@ fetches suggestions from these endpoints.
 - `INVALID_DAYS` – Open days must be positive
 
 ### 9.2 CountOpenDaysBetween
+#### IC-CAL-002
+> **References:** [CAL-001](../domain-model/business-rules.md#cal-001)
+
 **Purpose:** Count open days between two dates.
 
 **Preconditions**

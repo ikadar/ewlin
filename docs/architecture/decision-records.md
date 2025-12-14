@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Architecture Decision Records (ADRs) – Flux Print Shop Scheduling System
 
 This document captures **key architectural decisions** for the Flux Print Shop Scheduling System.

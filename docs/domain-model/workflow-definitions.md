@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - domain
+---
+
 # Workflow & State-Transition Definitions – Flux Print Shop Scheduling System
 
 This document provides **text-based workflow and lifecycle definitions** for the print shop scheduling domain.
@@ -8,6 +14,8 @@ These replace UML/activity/state diagrams and are optimized for AI processing an
 # 1. Station Workflow
 
 ## State Machine: Station
+#### WF-STATION-SM-001
+> **References:** [DM-ENUM-STATION-001](domain-model.md#dm-enum-station-001), [BR-STATION-004](business-rules.md#br-station-004)
 
 ```
 STATE MACHINE: Station
@@ -34,6 +42,8 @@ OutOfService → Available    (repaired and restored)
 # 2. Job Workflow
 
 ## State Machine: Job
+#### WF-JOB-SM-001
+> **References:** [DM-ENUM-JOB-001](domain-model.md#dm-enum-job-001), [BR-JOB-005](business-rules.md#br-job-005)
 
 ```
 STATE MACHINE: Job
@@ -59,6 +69,8 @@ Delayed → Cancelled      (abort during delay)
 - Cancellation cascades to all tasks.
 
 ## Process: Job Cancellation
+#### WF-JOB-PROC-001
+> **References:** [BR-JOB-010](business-rules.md#br-job-010), [BR-JOB-010b](business-rules.md#br-job-010b)
 
 ```
 PROCESS: Job Cancellation
@@ -87,6 +99,8 @@ PROCESS: Job Cancellation
 # 3. Task Workflow (within Job)
 
 ## State Machine: Task
+#### WF-TASK-SM-001
+> **References:** [DM-ENUM-TASK-001](domain-model.md#dm-enum-task-001), [BR-TASK-001](business-rules.md#br-task-001), [BR-ASSIGN-007](business-rules.md#br-assign-007)
 
 ```
 STATE MACHINE: Task
@@ -117,6 +131,8 @@ Executing → Cancelled    (job cancellation during execution)
 # 4. Approval Gate Workflows
 
 ## Process: BAT (Proof) Approval
+#### WF-GATE-PROC-001
+> **References:** [BR-GATE-001](business-rules.md#br-gate-001), [BR-GATE-003](business-rules.md#br-gate-003)
 
 ```
 PROCESS: BAT Approval
@@ -134,6 +150,8 @@ PROCESS: BAT Approval
 ```
 
 ## Process: Plates Approval
+#### WF-GATE-PROC-002
+> **References:** [BR-GATE-002](business-rules.md#br-gate-002)
 
 ```
 PROCESS: Plates Approval
@@ -150,6 +168,8 @@ PROCESS: Plates Approval
 # 5. Paper Procurement Workflow
 
 ## Process: Paper Procurement
+#### WF-PAPER-PROC-001
+> **References:** [BR-PAPER-001](business-rules.md#br-paper-001), [BR-PAPER-002](business-rules.md#br-paper-002), [BR-PAPER-003](business-rules.md#br-paper-003)
 
 ```
 PROCESS: Paper Procurement
@@ -175,6 +195,8 @@ PROCESS: Paper Procurement
 # 6. Task Assignment Workflow
 
 ## Process: Task Assignment (Internal Task)
+#### WF-ASSIGN-PROC-001
+> **References:** [BR-ASSIGN-001](business-rules.md#br-assign-001)
 
 ```
 PROCESS: Task Assignment (Internal)
@@ -200,6 +222,8 @@ PROCESS: Task Assignment (Internal)
 ```
 
 ## Process: Task Assignment (Outsourced Task)
+#### WF-ASSIGN-PROC-002
+> **References:** [BR-TASK-008](business-rules.md#br-task-008), [BR-TASK-009](business-rules.md#br-task-009), [CAL-001](business-rules.md#cal-001)
 
 ```
 PROCESS: Task Assignment (Outsourced)
@@ -229,6 +253,8 @@ PROCESS: Task Assignment (Outsourced)
 # 6b. Task Completion Workflow
 
 ## Process: Mark Task as Completed
+#### WF-ASSIGN-PROC-003
+> **References:** [BR-ASSIGN-007](business-rules.md#br-assign-007), [BR-ASSIGN-008](business-rules.md#br-assign-008)
 
 ```
 PROCESS: Mark Task as Completed
@@ -257,6 +283,8 @@ PROCESS: Mark Task as Completed
 # 7. Scheduling Validation Workflow
 
 ## Process: Assignment Validation
+#### WF-VALID-PROC-001
+> **References:** [VAL-001](business-rules.md#val-001)
 
 ```
 PROCESS: Assignment Validation
@@ -298,6 +326,8 @@ PROCESS: Assignment Validation
 # 8. Schedule Conflict Detection Workflow
 
 ## Process: Conflict Detection
+#### WF-CONFLICT-PROC-001
+> **References:** [BR-SCHED-001](business-rules.md#br-sched-001), [BR-SCHED-002](business-rules.md#br-sched-002), [BR-SCHED-003](business-rules.md#br-sched-003)
 
 ```
 PROCESS: Conflict Detection
@@ -419,6 +449,8 @@ GroupCapacityExceeded
 # 11. Tile Interaction Workflow (UI)
 
 ## Process: Drag and Drop Assignment
+#### WF-UI-PROC-001
+> **References:** [UI-001](business-rules.md#ui-001), [UI-002](business-rules.md#ui-002), [UI-003](business-rules.md#ui-003)
 
 ```
 PROCESS: Drag and Drop Assignment
@@ -441,6 +473,8 @@ PROCESS: Drag and Drop Assignment
 ```
 
 ## Process: Tile Insertion (Push-Down Behavior)
+#### WF-UI-PROC-002
+> **References:** [BR-ASSIGN-009](business-rules.md#br-assign-009), [BR-PROVIDER-003](business-rules.md#br-provider-003)
 
 ```
 PROCESS: Tile Insertion
@@ -474,6 +508,8 @@ PROCESS: Tile Insertion
 - Users can intentionally create precedence violations (Alt+drag) but will see visual warnings
 
 ## Process: Recall Tile
+#### WF-UI-PROC-003
+> **References:** [UI-004](business-rules.md#ui-004)
 
 ```
 PROCESS: Recall Tile
@@ -490,6 +526,8 @@ PROCESS: Recall Tile
 ```
 
 ## Process: Swap Position
+#### WF-UI-PROC-004
+> **References:** [BR-SCHED-003](business-rules.md#br-sched-003)
 
 ```
 PROCESS: Swap Position
@@ -509,6 +547,8 @@ PROCESS: Swap Position
 # 12. Similarity Indicators Workflow
 
 ## Process: Display Similarity Indicators
+#### WF-SIM-PROC-001
+> **References:** [BR-CATEGORY-001](business-rules.md#br-category-001), [BR-CATEGORY-003](business-rules.md#br-category-003), [UI-005](business-rules.md#ui-005)
 
 ```
 PROCESS: Display Similarity Indicators

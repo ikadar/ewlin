@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - domain
+---
+
 # Domain Open Questions – Flux Print Shop Scheduling System
 
 This document collects **unresolved or partially clarified domain questions** that should be answered before completing the domain model, workflows, or implementation.

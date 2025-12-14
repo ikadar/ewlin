@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - domain
+---
+
 # Bounded Context Map – Flux Print Shop Scheduling System
 
 This document defines the major bounded contexts involved in the **print shop scheduling** system and the relationships between them.

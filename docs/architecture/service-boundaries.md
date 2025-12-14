@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - architecture
+---
+
 # Service Boundaries – Flux Print Shop Scheduling System
 
 This document defines the **service boundaries** for the Flux print shop scheduling system that handles
@@ -10,6 +16,8 @@ The goal is to translate the **bounded contexts** from the domain model into con
 ## 1. Services Overview
 
 ### 1.1 Station Management Service
+#### SB-STATION-001
+> **References:** [AGG-STATION-001](aggregate-design.md#agg-station-001), [AGG-CATEGORY-001](aggregate-design.md#agg-category-001), [AGG-GROUP-001](aggregate-design.md#agg-group-001), [AGG-PROVIDER-001](aggregate-design.md#agg-provider-001), [IC-STATION-001](interface-contracts.md#ic-station-001)
 
 **Purpose:**
 Manage all stations (physical machines), station categories, station groups, and outsourced providers including their operating schedules and availability.
@@ -56,6 +64,8 @@ Station management is a foundational capability that other services depend on. I
 ---
 
 ### 1.2 Job Management Service
+#### SB-JOB-001
+> **References:** [AGG-JOB-001](aggregate-design.md#agg-job-001), [IC-JOB-001](interface-contracts.md#ic-job-001), [IC-JOB-003](interface-contracts.md#ic-job-003)
 
 **Purpose:**
 Define and manage print jobs with their constituent tasks, approval gates, and dependencies.
@@ -103,6 +113,8 @@ Job planning and task structuring is independent of station availability and ass
 ---
 
 ### 1.3 Assignment Service
+#### SB-ASSIGN-001
+> **References:** [AGG-SCHEDULE-001](aggregate-design.md#agg-schedule-001), [IC-ASSIGN-001](interface-contracts.md#ic-assign-001), [IC-ASSIGN-002](interface-contracts.md#ic-assign-002), [IC-ASSIGN-003](interface-contracts.md#ic-assign-003)
 
 **Purpose:**
 Orchestrate task assignments, manage schedule state, and coordinate validation.
@@ -145,6 +157,8 @@ Orchestrate task assignments, manage schedule state, and coordinate validation.
 ---
 
 ### 1.4 Validation Service (Node.js) — Isomorphic
+#### SB-VALID-001
+> **References:** [IC-ASSIGN-004](interface-contracts.md#ic-assign-004), [IC-ASSIGN-005](interface-contracts.md#ic-assign-005)
 
 **Purpose:**
 Provide **isomorphic schedule validation** that runs identically on client (browser) and server (Node.js). This enables real-time validation feedback in the UI while maintaining server-side authority.
@@ -199,6 +213,8 @@ interface ValidationResult {
 ---
 
 ### 1.5 Scheduling View Service (Read Model)
+#### SB-VIEW-001
+> **References:** [IC-VIEW-001](interface-contracts.md#ic-view-001)
 
 **Purpose:**
 Provide read-optimized views and queries for scheduling visualization and reporting.
@@ -237,6 +253,8 @@ Read models have fundamentally different access patterns and performance require
 ---
 
 ### 1.6 DSL Parsing Service
+#### SB-DSL-001
+> **References:** [API-DSL-001](../requirements/api-interface-drafts.md#api-dsl-001), [API-DSL-002](../requirements/api-interface-drafts.md#api-dsl-002), [API-DSL-003](../requirements/api-interface-drafts.md#api-dsl-003)
 
 **Purpose:**
 Parse and validate task DSL syntax for job creation.
@@ -269,6 +287,8 @@ Parse and validate task DSL syntax for job creation.
 ---
 
 ### 1.7 Business Calendar Service
+#### SB-CAL-001
+> **References:** [IC-CAL-001](interface-contracts.md#ic-cal-001), [IC-CAL-002](interface-contracts.md#ic-cal-002)
 
 **Purpose:**
 Calculate business days (open days) for outsourced task duration.

@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - requirements
+---
+
 # Initial Data Model – Flux Print Shop Scheduling System
 
 This initial data model provides a **technology‑agnostic**, early‑stage description

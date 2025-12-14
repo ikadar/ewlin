@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - requirements
+---
+
 # Task DSL Specification – Flux Print Shop Scheduling System
 
 This document defines the **Domain-Specific Language (DSL)** used to define tasks (actions) within jobs in the Flux print shop scheduling system.

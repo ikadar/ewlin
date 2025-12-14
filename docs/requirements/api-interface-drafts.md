@@ -1,3 +1,9 @@
+---
+tags:
+  - specification
+  - requirements
+---
+
 # API / Interface Drafts – Flux Print Shop Scheduling System
 
 This document defines **high-level API/interface contracts** for the print shop scheduling system.
@@ -12,6 +18,9 @@ These drafts are:
 ## 1. Station Management API
 
 ### POST /api/v1/stations
+#### API-STATION-001
+> **References:** [US-STATION-001](user-stories.md#us-station-001), [AC-STATION-001](acceptance-criteria.md#ac-station-001-station-registration)
+
 Create a new station.
 
 **Request:**
@@ -49,6 +58,9 @@ Create a new station.
 ```
 
 ### GET /api/v1/stations
+#### API-STATION-002
+> **References:** [US-STATION-001](user-stories.md#us-station-001)
+
 List all stations.
 
 **Response (200):**
@@ -67,6 +79,9 @@ List all stations.
 ```
 
 ### POST /api/v1/stations/{stationId}/exceptions
+#### API-STATION-003
+> **References:** [US-STATION-003](user-stories.md#us-station-003), [AC-STATION-003](acceptance-criteria.md#ac-station-003-schedule-exception)
+
 Add a schedule exception.
 
 **Request:**
@@ -83,6 +98,9 @@ Add a schedule exception.
 ## 2. Station Category API
 
 ### POST /api/v1/station-categories
+#### API-CATEGORY-001
+> **References:** [US-STATION-004](user-stories.md#us-station-004), [AC-STATION-004](acceptance-criteria.md#ac-station-004-station-category-with-similarity-criteria)
+
 Create a station category.
 
 **Request:**
@@ -116,6 +134,9 @@ Create a station category.
 ## 3. Station Group API
 
 ### POST /api/v1/station-groups
+#### API-GROUP-001
+> **References:** [US-STATION-005](user-stories.md#us-station-005), [AC-STATION-005](acceptance-criteria.md#ac-station-005-station-group-capacity)
+
 Create a station group.
 
 **Request:**
@@ -142,6 +163,9 @@ Create a station group.
 ## 4. Outsourced Provider API
 
 ### POST /api/v1/providers
+#### API-PROVIDER-001
+> **References:** [US-PROVIDER-001](user-stories.md#us-provider-001), [AC-PROVIDER-001](acceptance-criteria.md#ac-provider-001-provider-registration)
+
 Create an outsourced provider.
 
 **Request:**
@@ -177,6 +201,9 @@ Create an outsourced provider.
 ## 5. Job Management API
 
 ### POST /api/v1/jobs
+#### API-JOB-001
+> **References:** [US-JOB-001](user-stories.md#us-job-001), [US-JOB-002](user-stories.md#us-job-002), [AC-JOB-001](acceptance-criteria.md#ac-job-001-job-creation), [AC-JOB-002](acceptance-criteria.md#ac-job-002-task-dsl-parsing)
+
 Create a new job.
 
 **Request:**
@@ -240,6 +267,9 @@ Create a new job.
 ```
 
 ### GET /api/v1/jobs
+#### API-JOB-002
+> **References:** [US-NAV-001](user-stories.md#us-nav-001), [AC-NAV-001](acceptance-criteria.md#ac-nav-001-job-filter)
+
 List jobs with filtering.
 
 **Query Parameters:**
@@ -258,9 +288,15 @@ List jobs with filtering.
 ```
 
 ### PUT /api/v1/jobs/{jobId}
+#### API-JOB-003
+> **References:** [US-JOB-001](user-stories.md#us-job-001)
+
 Update job details.
 
 ### PUT /api/v1/jobs/{jobId}/proof
+#### API-JOB-004
+> **References:** [US-GATE-001](user-stories.md#us-gate-001), [AC-GATE-001](acceptance-criteria.md#ac-gate-001-bat-blocking), [AC-GATE-002](acceptance-criteria.md#ac-gate-002-bat-bypass)
+
 Update BAT status.
 
 **Request:**
@@ -283,6 +319,9 @@ Or:
 ```
 
 ### PUT /api/v1/jobs/{jobId}/plates
+#### API-JOB-005
+> **References:** [US-GATE-002](user-stories.md#us-gate-002), [AC-GATE-003](acceptance-criteria.md#ac-gate-003-plates-blocking)
+
 Update plates status.
 
 **Request:**
@@ -293,6 +332,9 @@ Update plates status.
 ```
 
 ### PUT /api/v1/jobs/{jobId}/paper
+#### API-JOB-006
+> **References:** [US-GATE-003](user-stories.md#us-gate-003), [AC-GATE-004](acceptance-criteria.md#ac-gate-004-paper-status-timestamp)
+
 Update paper procurement status.
 
 **Request:**
@@ -311,6 +353,9 @@ Update paper procurement status.
 ```
 
 ### POST /api/v1/jobs/{jobId}/dependencies
+#### API-JOB-007
+> **References:** [US-JOB-004](user-stories.md#us-job-004), [AC-JOB-005](acceptance-criteria.md#ac-job-005-job-dependencies), [AC-JOB-006](acceptance-criteria.md#ac-job-006-circular-dependency-prevention)
+
 Add job dependency.
 
 **Request:**
@@ -321,6 +366,9 @@ Add job dependency.
 ```
 
 ### POST /api/v1/jobs/{jobId}/comments
+#### API-JOB-008
+> **References:** [US-JOB-005](user-stories.md#us-job-005)
+
 Add comment to job.
 
 **Request:**
@@ -340,6 +388,9 @@ Add comment to job.
 ```
 
 ### POST /api/v1/jobs/{jobId}/cancel
+#### API-JOB-009
+> **References:** [US-JOB-006](user-stories.md#us-job-006), [AC-JOB-007](acceptance-criteria.md#ac-job-007-job-cancellation)
+
 Cancel a job.
 
 **Request:** None (empty body)
@@ -364,6 +415,9 @@ Cancel a job.
 ## 6. Task Management API
 
 ### PUT /api/v1/jobs/{jobId}/tasks/reorder
+#### API-TASK-001
+> **References:** [US-JOB-003](user-stories.md#us-job-003)
+
 Reorder tasks within a job.
 
 **Request:**
@@ -374,9 +428,15 @@ Reorder tasks within a job.
 ```
 
 ### PUT /api/v1/tasks/{taskId}
+#### API-TASK-002
+> **References:** [US-JOB-002](user-stories.md#us-job-002)
+
 Update task details.
 
 ### PUT /api/v1/tasks/{taskId}/completion
+#### API-TASK-003
+> **References:** [US-SCHED-007](user-stories.md#us-sched-007), [AC-SCHED-010](acceptance-criteria.md#ac-sched-010-task-completion-checkbox), [AC-SCHED-011](acceptance-criteria.md#ac-sched-011-completion-does-not-auto-set)
+
 Toggle task completion status.
 
 **Request:**
@@ -405,6 +465,9 @@ Toggle task completion status.
 ## 7. Assignment / Scheduling API
 
 ### POST /api/v1/tasks/{taskId}/assign
+#### API-ASSIGN-001
+> **References:** [US-SCHED-002](user-stories.md#us-sched-002), [US-SCHED-003](user-stories.md#us-sched-003), [AC-SCHED-003](acceptance-criteria.md#ac-sched-003-drag-and-drop-assignment)
+
 Create or update task assignment.
 
 **Request:**
@@ -451,6 +514,9 @@ Create or update task assignment.
 ```
 
 ### DELETE /api/v1/tasks/{taskId}/assign
+#### API-ASSIGN-002
+> **References:** [US-SCHED-004](user-stories.md#us-sched-004), [AC-SCHED-007](acceptance-criteria.md#ac-sched-007-recall-tile)
+
 Remove task assignment (recall tile).
 
 **Response (200):**
@@ -462,6 +528,9 @@ Remove task assignment (recall tile).
 ```
 
 ### POST /api/v1/assignments/validate
+#### API-ASSIGN-003
+> **References:** [US-SCHED-002](user-stories.md#us-sched-002), [AC-SCHED-004](acceptance-criteria.md#ac-sched-004-real-time-validation-during-drag)
+
 Validate a proposed assignment without saving.
 
 **Request:**
@@ -492,6 +561,9 @@ Validate a proposed assignment without saving.
 ## 8. Schedule Snapshot API
 
 ### GET /api/v1/schedule/snapshot
+#### API-SNAPSHOT-001
+> **References:** [US-SCHED-001](user-stories.md#us-sched-001), [US-CONFLICT-004](user-stories.md#us-conflict-004), [AC-SCHED-001](acceptance-criteria.md#ac-sched-001-vertical-time-axis), [AC-CONFLICT-004](acceptance-criteria.md#ac-conflict-004-late-job-detection)
+
 Get complete schedule snapshot for UI rendering.
 
 **Query Parameters:**
@@ -620,6 +692,9 @@ the server performs semantic validation and creates Task entities.
 These endpoints provide entity lists for the client-side autocomplete UI.
 
 #### GET /api/v1/stations/names
+##### API-DSL-001
+> **References:** [US-JOB-002](user-stories.md#us-job-002), [AC-JOB-003](acceptance-criteria.md#ac-job-003-dsl-autocomplete)
+
 Get station names for autocomplete.
 
 **Query Parameters:**
@@ -636,6 +711,9 @@ Get station names for autocomplete.
 ```
 
 #### GET /api/v1/providers/names
+##### API-DSL-002
+> **References:** [US-JOB-002](user-stories.md#us-job-002), [AC-JOB-003](acceptance-criteria.md#ac-job-003-dsl-autocomplete)
+
 Get provider names for autocomplete.
 
 **Query Parameters:**
@@ -652,6 +730,9 @@ Get provider names for autocomplete.
 ```
 
 #### GET /api/v1/providers/action-types
+##### API-DSL-003
+> **References:** [US-JOB-002](user-stories.md#us-job-002)
+
 Get all action types across providers.
 
 **Response (200):**
@@ -666,6 +747,9 @@ Get all action types across providers.
 ## 10. Business Calendar API
 
 ### GET /api/v1/calendar/open-days
+#### API-CAL-001
+> **References:** [US-PROVIDER-002](user-stories.md#us-provider-002), [AC-PROVIDER-002](acceptance-criteria.md#ac-provider-002-outsourced-task-duration)
+
 Calculate open days between dates.
 
 **Query Parameters:**
