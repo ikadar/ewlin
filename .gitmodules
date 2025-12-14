@@ -7,3 +7,6 @@
 [submodule "packages/validator"]
 	path = packages/validator
 	url = git@github.com:ikadar/ewlin-validator.git
+[submodule "services/validation-service"]
+	path = services/validation-service
+	url = git@github.com:ikadar/ewlin-validation-service.git

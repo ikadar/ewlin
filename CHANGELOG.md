@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.7.1] - 2025-12-14
+
+### Changed
+- **Validation Service** converted to git submodule (`ewlin-validation-service`)
+- Consistent with existing architecture (php-api, types, validator are all submodules)
+
+### Technical Details
+- New repository: `ikadar/ewlin-validation-service`
+- Submodule path: `services/validation-service`
+
+---
+
 ## [0.2.7] - 2025-12-14
 
 ### Added
@@ -208,7 +220,8 @@ git submodule update --init --recursive
 ---
 
 <!-- Release links will be added as releases are created -->
-[Unreleased]: https://github.com/ikadar/ewlin/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/ikadar/ewlin/compare/v0.2.7.1...HEAD
+[0.2.7.1]: https://github.com/ikadar/ewlin/compare/v0.2.7...v0.2.7.1
 [0.2.7]: https://github.com/ikadar/ewlin/compare/v0.0.8...v0.2.7
 [0.0.8]: https://github.com/ikadar/ewlin/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/ikadar/ewlin/compare/v0.0.6...v0.0.7

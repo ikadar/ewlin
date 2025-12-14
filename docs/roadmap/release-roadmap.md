@@ -327,6 +327,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Request logging
 - [x] Error handling middleware
 
+#### v0.2.7.1 - Validation Service Git Submodule ✅
+- [x] Create `ewlin-validation-service` repository
+- [x] Convert to git submodule (consistent with php-api, types, validator)
+
 #### v0.2.8 - Validation API Endpoint
 - [ ] POST /validate endpoint
 - [ ] Request validation (Zod/Joi)
