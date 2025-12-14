@@ -374,11 +374,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Revalidation on reschedule
 - [x] Event publishing
 
-#### v0.2.15 - Schedule Snapshot Endpoint
-- [ ] GET /api/v1/schedule/snapshot endpoint
-- [ ] All entities aggregation (stations, jobs, tasks, assignments)
-- [ ] snapshotVersion for optimistic locking
-- [ ] Conflict and late job inclusion
+#### v0.2.15 - Schedule Snapshot Endpoint ✅
+- [x] GET /api/v1/schedule/snapshot endpoint
+- [x] All entities aggregation (stations, jobs, tasks, assignments)
+- [x] snapshotVersion for optimistic locking
+- [x] Conflict and late job inclusion
 
 #### v0.2.16 - Business Calendar
 - [ ] Open day calculation utility
