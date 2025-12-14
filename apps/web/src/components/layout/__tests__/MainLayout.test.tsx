@@ -24,8 +24,8 @@ describe('MainLayout', () => {
     // Header should be present
     expect(screen.getByText('Flux Print Shop')).toBeInTheDocument();
 
-    // Should have panels
-    expect(screen.getByText('Jobs')).toBeInTheDocument();
+    // Should have panels (Jobs appears multiple times: panel header + JobsList header)
+    expect(screen.getAllByText('Jobs').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Schedule Health')).toBeInTheDocument();
   });
 

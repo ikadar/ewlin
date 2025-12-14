@@ -3,7 +3,6 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchSnapshot } from '../store/scheduleSlice';
 import { MainLayout } from '../components/layout';
 import { SchedulingGrid } from '../components/scheduling/SchedulingGrid';
-import { UnassignedTasksPanel } from '../components/panels/UnassignedTasksPanel';
 import { TaskDetailPanel } from '../components/panels/TaskDetailPanel';
 import { CrudPanel } from '../components/crud/CrudPanel';
 
@@ -18,12 +17,7 @@ export function SchedulingPage() {
     dispatch(fetchSnapshot(range));
   }, [dispatch, timeRange]);
 
-  // Left panel content - Jobs context (placeholder until v0.3.3)
-  const leftContent = (
-    <div className="space-y-4">
-      <UnassignedTasksPanel className="rounded-md border" />
-    </div>
-  );
+  // Left panel uses default JobsList from LeftPanel component
 
   // Center content - Scheduling Grid and CRUD Panel
   const centerContent = (
@@ -59,7 +53,6 @@ export function SchedulingPage() {
 
   return (
     <MainLayout
-      leftPanelContent={leftContent}
       centerContent={centerContent}
       rightPanelContent={rightContent}
     />

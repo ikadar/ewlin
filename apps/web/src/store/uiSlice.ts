@@ -20,6 +20,8 @@ interface UiState {
   rightPanelCollapsed: boolean;
   // Selected job for left panel context
   selectedJobId: string | null;
+  // Job filter text
+  jobFilter: string;
 }
 
 const initialState: UiState = {
@@ -35,6 +37,7 @@ const initialState: UiState = {
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   selectedJobId: null,
+  jobFilter: '',
 };
 
 const uiSlice = createSlice({
@@ -74,6 +77,9 @@ const uiSlice = createSlice({
     setSelectedJobId: (state, action: PayloadAction<string | null>) => {
       state.selectedJobId = action.payload;
     },
+    setJobFilter: (state, action: PayloadAction<string>) => {
+      state.jobFilter = action.payload;
+    },
   },
 });
 
@@ -89,5 +95,6 @@ export const {
   setLeftPanelCollapsed,
   setRightPanelCollapsed,
   setSelectedJobId,
+  setJobFilter,
 } = uiSlice.actions;
 export const uiReducer = uiSlice.reducer;

@@ -6,6 +6,7 @@ import {
   setLeftPanelCollapsed,
   setRightPanelCollapsed,
   setSelectedJobId,
+  setJobFilter,
 } from '../uiSlice';
 
 describe('uiSlice', () => {
@@ -24,6 +25,7 @@ describe('uiSlice', () => {
     leftPanelCollapsed: false,
     rightPanelCollapsed: false,
     selectedJobId: null,
+    jobFilter: '',
   };
 
   describe('toggleLeftPanel', () => {
@@ -98,6 +100,21 @@ describe('uiSlice', () => {
         setSelectedJobId(null)
       );
       expect(state.selectedJobId).toBeNull();
+    });
+  });
+
+  describe('setJobFilter', () => {
+    it('sets jobFilter to a value', () => {
+      const state = uiReducer(initialState, setJobFilter('test'));
+      expect(state.jobFilter).toBe('test');
+    });
+
+    it('sets jobFilter to empty string', () => {
+      const state = uiReducer(
+        { ...initialState, jobFilter: 'test' },
+        setJobFilter('')
+      );
+      expect(state.jobFilter).toBe('');
     });
   });
 });

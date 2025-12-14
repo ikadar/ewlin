@@ -3,6 +3,7 @@ import { cn } from '../../lib/utils';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { toggleLeftPanel } from '../../store/uiSlice';
 import { PanelHeader } from './PanelHeader';
+import { JobsList } from '../left-panel/JobsList';
 import { Briefcase, ListTodo, Calendar, Activity } from 'lucide-react';
 
 interface LeftPanelProps {
@@ -39,8 +40,8 @@ export function LeftPanel({ children, className }: LeftPanelProps) {
         {collapsed ? (
           <CollapsedContent />
         ) : (
-          <div className="h-full overflow-y-auto p-3">
-            {children || <PlaceholderContent />}
+          <div className="h-full flex flex-col">
+            {children || <DefaultContent />}
           </div>
         )}
       </div>
@@ -79,27 +80,19 @@ function CollapsedContent() {
   );
 }
 
-function PlaceholderContent() {
+function DefaultContent() {
   return (
-    <div className="space-y-4">
-      <div className="rounded-md border p-3 bg-muted/30">
-        <h3 className="text-sm font-medium mb-2">Jobs List</h3>
-        <p className="text-xs text-muted-foreground">
-          Job list component will be added in v0.3.3
-        </p>
+    <>
+      {/* Jobs List - full height for now, will be split later */}
+      <div className="flex-1 min-h-0">
+        <JobsList className="h-full" />
       </div>
-      <div className="rounded-md border p-3 bg-muted/30">
-        <h3 className="text-sm font-medium mb-2">Task List</h3>
-        <p className="text-xs text-muted-foreground">
-          Task list component will be added in v0.3.4
-        </p>
+      {/* Placeholder for future components */}
+      <div className="border-t p-2 space-y-1">
+        <div className="text-xs text-muted-foreground text-center">
+          Task List (v0.3.4)
+        </div>
       </div>
-      <div className="rounded-md border p-3 bg-muted/30">
-        <h3 className="text-sm font-medium mb-2">Status Bar</h3>
-        <p className="text-xs text-muted-foreground">
-          Status bar will be added in v0.3.5
-        </p>
-      </div>
-    </div>
+    </>
   );
 }

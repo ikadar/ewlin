@@ -419,14 +419,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Mock data factories for Storybook stories and unit tests
 - [x] Vitest + Testing Library configured (73 unit tests)
 
-#### v0.3.3 - Left Panel - Jobs List
-- [ ] Job list component
-- [ ] Job filtering by reference/client/description
-- [ ] Job selection state (highlighted background)
-- [ ] Status indicators (color-coded)
-- [ ] Late job warning indicator
-- [ ] "Add Job" button → opens modal (v0.3.19)
-- [ ] Keyboard prev/next job navigation
+#### v0.3.3 - Left Panel - Jobs List ✅
+- [x] Job list component
+- [x] Job filtering by reference/client/description
+- [x] Job selection state (highlighted background)
+- [x] Status indicators (color-coded)
+- [x] Late job warning indicator
+- [x] "Add Job" button → opens modal (v0.3.19)
+- [x] Keyboard prev/next job navigation
 
 > **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md)
 
