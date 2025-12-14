@@ -385,13 +385,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Weekend exclusion (MVP)
 - [x] GET /api/v1/calendar/open-days endpoint
 
-#### v0.2.17 - Assignment Domain Events
-- [ ] TaskAssigned event
-- [ ] TaskUnassigned event
-- [ ] TaskRescheduled event
-- [ ] TaskCompletionToggled event
-- [ ] ConflictDetected event
-- [ ] ScheduleUpdated event
+#### v0.2.17 - Assignment Domain Events ✅
+- [x] TaskAssigned event
+- [x] TaskUnassigned event
+- [x] TaskRescheduled event
+- [x] TaskCompletionToggled event
+- [x] ConflictDetected event
+- [x] ScheduleUpdated event
 
 #### v0.2.18 - Task Completion Toggle
 - [ ] PUT /api/v1/tasks/{taskId}/completion endpoint
