@@ -357,12 +357,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Assignment persistence on validation success
 - [x] Error handling for validation failures
 
-#### v0.2.12 - End Time Calculation
-- [ ] Calculate scheduledEnd considering operating schedule
-- [ ] Handle task stretching across unavailable periods
-- [ ] Business calendar integration for outsourced tasks
-- [ ] LatestDepartureTime handling (if drop > departure, start = next business day)
-- [ ] ReceptionTime handling (scheduledEnd = receptionTime on completion day)
+#### v0.2.12 - End Time Calculation ✅
+- [x] Calculate scheduledEnd considering operating schedule
+- [x] Handle task stretching across unavailable periods
+- [x] Business calendar integration for outsourced tasks
+- [x] LatestDepartureTime handling (if drop > departure, start = next business day)
+- [x] ReceptionTime handling (scheduledEnd = receptionTime on completion day)
 
 #### v0.2.13 - Unassign (Recall) Task
 - [ ] DELETE /api/v1/tasks/{taskId}/assign endpoint
