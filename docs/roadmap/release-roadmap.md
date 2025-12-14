@@ -404,77 +404,141 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ## Milestone 3: Frontend Integration (v0.3.x)
 
-### Phase 3A: Frontend Mock Data
+> **Note:** Backend API is complete (M2). Frontend development starts directly with real API integration.
+> Mock utilities for unit tests and Storybook are included in component releases as needed.
 
-#### v0.3.0 - Mock Data Generators
-- [ ] Station generator
-- [ ] Job generator with tasks
-- [ ] Assignment generator
-- [ ] Snapshot cache implementation
+### Phase 3A: Frontend Core UI
 
-#### v0.3.1 - Mock API
-- [ ] getSnapshot endpoint
-- [ ] CRUD operations (create, update, delete)
-- [ ] Configurable latency
-- [ ] TypeScript types
-
-### Phase 3B: Frontend Core UI
+> **Reference:** [UX/UI Specification](../ux-ui/00-overview.md)
 
 #### v0.3.2 - Layout Components
 - [ ] Header with navigation
-- [ ] Main page 3-column layout
+- [ ] Main page 3-column layout (Left Panel / Center Grid / Right Panel)
 - [ ] Responsive breakpoints
-- [ ] Panel collapse/expand
+- [ ] Panel collapse/expand toggles
+- [ ] Mock data factories for Storybook stories and unit tests
 
 #### v0.3.3 - Left Panel - Jobs List
 - [ ] Job list component
 - [ ] Job filtering by reference/client/description
-- [ ] Job selection state
-- [ ] Status indicators
+- [ ] Job selection state (highlighted background)
+- [ ] Status indicators (color-coded)
+- [ ] Late job warning indicator
+- [ ] "Add Job" button → opens modal (v0.3.19)
+- [ ] Keyboard prev/next job navigation
 
-#### v0.3.4 - Left Panel - Tasks List
-- [ ] Task list for selected job
-- [ ] Task mini-tiles with duration
-- [ ] Scheduled vs unscheduled appearance
-- [ ] Recall button on hover
+> **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md)
+
+#### v0.3.4 - Left Panel - Task List
+- [ ] Task list for selected job (sequence order)
+- [ ] Task mini-tiles with duration (setup+run)
+- [ ] Scheduled vs unscheduled appearance (opacity difference)
+- [ ] Single-click (scheduled) → scroll grid to tile
+- [ ] Double-click (scheduled) → recall tile
+- [ ] Hover shows "Jump to" and "Recall" buttons
+- [ ] Drag within list → reorder task sequence
+
+> **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md), [tile-recall.md](../ux-ui/01-interaction-patterns/tile-recall.md)
+
+#### v0.3.4a - Left Panel - Status Bar
+- [ ] Status bar component (shown when job selected)
+- [ ] BAT status icon (⚠ Awaiting / ○ Sent / ✓ Approved / — No proof)
+- [ ] Plates status icon (○ Todo / ✓ Done)
+- [ ] Paper status icon (InStock / ToOrder / Ordered / Received)
+- [ ] Tooltip on hover with full status text
+
+> **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md)
+
+#### v0.3.4b - Left Panel - Date Navigation Strip
+- [ ] Vertical strip beside task list
+- [ ] Day zones from today to job's departure date
+- [ ] Today highlight
+- [ ] Departure date highlight
+- [ ] Days with placed tiles highlight
+- [ ] Click day → scroll grid to that day
+- [ ] Hover 2 seconds → auto-scroll to that day
+
+> **Reference:** [date-navigation-strip.md](../ux-ui/03-navigation/date-navigation-strip.md)
 
 #### v0.3.5 - Center Panel - Time Axis
 - [ ] Vertical time axis component
 - [ ] 30-minute snap grid
-- [ ] Day/hour markers
-- [ ] "Today" marker line
+- [ ] Day/hour markers (light hour lines, bold day lines with date label)
+- [ ] "Today" marker line (colored horizontal line at current time)
+- [ ] Departure date marker for selected job (horizontal line)
+
+> **Reference:** [scheduling-grid.md](../ux-ui/05-components/scheduling-grid.md)
 
 #### v0.3.6 - Center Panel - Station Columns
-- [ ] Station column headers
-- [ ] Column scroll (horizontal)
-- [ ] Provider columns with subcolumns
-- [ ] Unavailability overlay (hatched)
+- [ ] Station column headers (sticky during vertical scroll)
+- [ ] Column scroll (horizontal with shift+wheel or trackpad)
+- [ ] Provider columns with subcolumns (unlimited capacity visual)
+- [ ] Unavailability overlay (gray hatched pattern)
+- [ ] Station ordering (configurable, stored setting)
+- [ ] Keyboard shortcut to navigate columns left/right
+
+> **Reference:** [scheduling-grid.md](../ux-ui/05-components/scheduling-grid.md)
 
 #### v0.3.7 - Center Panel - Tile Component
-- [ ] Task tile with job color
-- [ ] Setup vs run sections
-- [ ] Job reference and description
+- [ ] Task tile with job color (run section)
+- [ ] Setup section (lighter shade of job color)
+- [ ] Job reference and description (truncated if needed)
 - [ ] Start/end time display
 - [ ] Completion checkbox (manual toggle, not time-based)
-- [ ] Completion indicator visual
+- [ ] Visual states: normal, selected (border/glow), hovered, dragging (transparency)
+- [ ] Precedence violation visual (red halo effect)
+
+> **Reference:** [tile-component.md](../ux-ui/05-components/tile-component.md), [tile-states.md](../ux-ui/04-visual-feedback/tile-states.md)
+
+#### v0.3.7a - Center Panel - Tile Swap
+- [ ] Swap up/down buttons on tile (visible on hover)
+- [ ] Swap up → exchange position with tile above
+- [ ] Swap down → exchange position with tile below
+- [ ] Validation before swap (same rules as drag-drop)
+- [ ] Smooth animation on swap
+
+> **Reference:** [tile-swap.md](../ux-ui/01-interaction-patterns/tile-swap.md)
+
+#### v0.3.7b - Center Panel - Off-Screen Indicators
+- [ ] Indicators at top/bottom of station columns
+- [ ] Show tiles from selected job that are outside viewport
+- [ ] Job color mark
+- [ ] Date/time display
+- [ ] Click indicator → scroll to that tile
+- [ ] Distinct styles for preceding (N-1) and following (N+1) tasks
+
+> **Reference:** [off-screen-indicators.md](../ux-ui/03-navigation/off-screen-indicators.md)
 
 #### v0.3.8 - Center Panel - Similarity Indicators
-- [ ] Circles between consecutive tiles
-- [ ] Filled vs hollow appearance
-- [ ] Position calculation
+- [ ] Circles between consecutive tiles on same station
+- [ ] Filled circle (●) = criterion matched
+- [ ] Hollow circle (○) = criterion not matched
+- [ ] Position: vertically between tiles, centered horizontally
+- [ ] Number of circles = number of criteria in station category
 
-#### v0.3.9 - Right Panel - Late Jobs
+> **Reference:** [similarity-circles.md](../ux-ui/04-visual-feedback/similarity-circles.md)
+
+#### v0.3.9 - Right Panel - Late Jobs Section
 - [ ] Late jobs list component
-- [ ] Delay amount display
-- [ ] Link to job details
+- [ ] Job reference display
+- [ ] Deadline (workshopExitDate)
+- [ ] Expected completion (calculated from last task)
+- [ ] Delay amount (days)
+- [ ] Click entry → select job in left panel, scroll to relevant tiles
 
-#### v0.3.10 - Right Panel - Job Details
-- [ ] Task list with times
-- [ ] Approval gate status
-- [ ] Paper status
-- [ ] Comments section
+> **Reference:** [right-panel.md](../ux-ui/05-components/right-panel.md)
 
-### Phase 3C: Client-Side Validation Integration
+#### v0.3.10 - Right Panel - Violations Section
+- [ ] Violations list component
+- [ ] Precedence violation entries (task/job reference, location)
+- [ ] Group capacity exceeded entries (group name, count, time)
+- [ ] Station conflict entries (if applicable)
+- [ ] Click entry → scroll grid to affected tile/time
+- [ ] Empty state: "✓ No violations"
+
+> **Reference:** [right-panel.md](../ux-ui/05-components/right-panel.md), [conflict-indicators.md](../ux-ui/04-visual-feedback/conflict-indicators.md)
+
+### Phase 3B: Client-Side Validation & Interactions
 
 #### v0.3.11 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
@@ -484,23 +548,74 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 #### v0.3.12 - Drag & Drop Infrastructure
 - [ ] Drag infrastructure (dnd-kit)
-- [ ] Drag preview component
+- [ ] Drag preview component (tile follows cursor with transparency)
 - [ ] Drop zone detection
+- [ ] Drag sources: left panel (unscheduled) → grid, grid tile → same column only
+- [ ] Tiles cannot be dragged between columns (station is fixed)
+
+> **Reference:** [drag-drop.md](../ux-ui/01-interaction-patterns/drag-drop.md)
 
 #### v0.3.13 - Real-Time Validation During Drag
-- [ ] Validate on drag move (< 10ms)
-- [ ] Valid/invalid drop zone visualization
-- [ ] Precedence safeguard (snap to valid)
-- [ ] Alt-key bypass detection
+- [ ] Validate on drag move (< 10ms target)
+- [ ] Valid drop zone: highlighted area
+- [ ] Invalid drop zone: red indicator
+- [ ] Precedence safeguard: auto-snap to nearest valid position
+- [ ] Alt-key bypass: allow placement in violating position (shows red halo after drop)
+
+> **Reference:** [drag-drop.md](../ux-ui/01-interaction-patterns/drag-drop.md)
 
 #### v0.3.14 - Drop Handling
-- [ ] Create assignment on valid drop
+- [ ] Create assignment on valid drop (from left panel)
+- [ ] Reschedule on valid drop (from grid)
 - [ ] Show conflict panel on invalid (warnings only in MVP, no hard blocks)
-- [ ] Optimistic update
+- [ ] Optimistic UI update (tile appears immediately)
+- [ ] Server validation → rollback if rejected
 - [ ] Tile insertion with push-down (capacity-1 stations)
-- [ ] Tile overlap allowed (capacity > 1 stations)
+- [ ] Tile overlap allowed (capacity > 1 stations, provider columns)
 
-### Phase 3D: Backend API Integration
+> **Reference:** [drag-drop.md](../ux-ui/01-interaction-patterns/drag-drop.md)
+
+#### v0.3.14a - View Mode Toggle
+- [ ] Toggle button (Timeline / Sequence)
+- [ ] Timeline View: tile height proportional to duration, aligned to time axis
+- [ ] Sequence View: uniform tile height, stacked as list
+- [ ] Time axis remains visible as reference in both modes
+- [ ] Keyboard shortcut (TBD)
+
+> **Reference:** [timeline-vs-sequence.md](../ux-ui/02-view-modes/timeline-vs-sequence.md)
+
+#### v0.3.14b - Quick Placement Mode
+- [ ] Toggle activation (keyboard shortcut TBD)
+- [ ] ESC key exits mode
+- [ ] Prerequisite: job must be selected
+- [ ] Placement indicator follows cursor, snaps to gaps between tiles
+- [ ] Tooltip shows available task or "No task available"
+- [ ] Click to place task at snapped position
+- [ ] Auto-select last unscheduled task for hovered station
+- [ ] Task only available if successor is already placed (backward scheduling rule)
+- [ ] Alt+click bypasses precedence (with red halo warning)
+
+> **Reference:** [quick-placement-mode.md](../ux-ui/01-interaction-patterns/quick-placement-mode.md)
+
+#### v0.3.14c - Column Focus on Drag
+- [ ] When dragging from left panel, collapse non-target columns
+- [ ] Target column: full width
+- [ ] Other columns: thin line showing job-colored bands for tile positions
+- [ ] Smooth animation on collapse/expand
+- [ ] Columns restore on drag end or cancel
+
+> **Reference:** [column-focus-on-drag.md](../ux-ui/01-interaction-patterns/column-focus-on-drag.md)
+
+#### v0.3.14d - Backward Scheduling Navigation
+- [ ] Jump to deadline keyboard shortcut (TBD)
+- [ ] Grid scrolls so job's departure date appears at bottom of viewport
+- [ ] Works with Quick Placement Mode for rapid backward scheduling
+- [ ] Job navigation shortcuts: prev/next job (TBD)
+- [ ] Grid navigation: scroll, Page Up/Down, Today button
+
+> **Reference:** [backward-scheduling.md](../ux-ui/03-navigation/backward-scheduling.md), [job-navigation.md](../ux-ui/03-navigation/job-navigation.md), [grid-navigation.md](../ux-ui/03-navigation/grid-navigation.md)
+
+### Phase 3C: Backend API Integration
 
 #### v0.3.15 - API Client Setup
 - [ ] API client configuration
@@ -520,7 +635,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Reschedule via API
 - [ ] Server validation response handling
 
-### Phase 3E: DSL Editor
+### Phase 3D: DSL Editor
 
 #### v0.3.18 - DSL Parser Package (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
 - [ ] `@flux/task-dsl-parser` package setup
