@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.7] - 2025-12-14
+
+### Added
+- **Validation Service** (`services/validation-service/`) - new Node.js HTTP service
+- Express.js HTTP server for REST API
+- Health check endpoint (`GET /health`) returning service status
+- Request logging middleware with timing (timestamp, method, path, status, duration)
+- Error handling middleware with JSON responses
+- HttpError class for typed HTTP errors
+- 404 handler for unknown routes
+- Vitest test configuration with 21 tests
+- TypeScript configuration extending base config
+
+### Technical Details
+- Runs on port 3001 (configurable via PORT env variable)
+- Will expose `@flux/schedule-validator` as REST API (v0.2.8)
+- ESM modules with TypeScript
+- Supertest for HTTP integration testing
+
+---
+
 ## [0.0.8] - 2025-12-12
 
 ### Changed
@@ -187,8 +208,10 @@ git submodule update --init --recursive
 ---
 
 <!-- Release links will be added as releases are created -->
-[Unreleased]: https://github.com/org/flux-scheduler/compare/v0.0.7...HEAD
-[0.0.7]: https://github.com/org/flux-scheduler/compare/v0.0.6...v0.0.7
+[Unreleased]: https://github.com/ikadar/ewlin/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/ikadar/ewlin/compare/v0.0.8...v0.2.7
+[0.0.8]: https://github.com/ikadar/ewlin/compare/v0.0.7...v0.0.8
+[0.0.7]: https://github.com/ikadar/ewlin/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/org/flux-scheduler/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/org/flux-scheduler/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/org/flux-scheduler/compare/v0.0.3...v0.0.4

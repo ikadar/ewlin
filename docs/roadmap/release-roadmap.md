@@ -321,11 +321,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 2B: Validation Service (Node.js) — see [ADR-010](../architecture/decision-records.md#adr-010--isomorphic-validation-service-nodejs)
 
-#### v0.2.7 - Express/Fastify Server Setup
-- [ ] HTTP server initialization
-- [ ] Health check endpoint
-- [ ] Request logging
-- [ ] Error handling middleware
+#### v0.2.7 - Express/Fastify Server Setup ✅
+- [x] HTTP server initialization
+- [x] Health check endpoint
+- [x] Request logging
+- [x] Error handling middleware
 
 #### v0.2.8 - Validation API Endpoint
 - [ ] POST /validate endpoint
