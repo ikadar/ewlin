@@ -252,10 +252,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Circular dependency detection
 - [x] Dependency listing
 
-#### v0.1.17 - Job Comments
-- [ ] Comment entity (within Job aggregate)
-- [ ] POST /api/v1/jobs/{id}/comments endpoint
-- [ ] Comment listing (threaded in future)
+#### v0.1.17 - Job Comments ✅
+- [x] Comment entity (within Job aggregate)
+- [x] POST /api/v1/jobs/{id}/comments endpoint
+- [x] Comment listing (threaded in future)
 
 #### v0.1.18 - Job Domain Events
 - [ ] JobCreated event
