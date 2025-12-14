@@ -257,12 +257,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] POST /api/v1/jobs/{id}/comments endpoint
 - [x] Comment listing (threaded in future)
 
-#### v0.1.18 - Job Domain Events
-- [ ] JobCreated event
-- [ ] TaskAddedToJob event
-- [ ] ApprovalGateUpdated event
-- [ ] JobCancelled event (with recalledTaskIds, preservedTaskIds)
-- [ ] Event publishing via Messenger
+#### v0.1.18 - Job Domain Events ✅
+- [x] JobCreated event
+- [x] TaskAddedToJob event
+- [x] ApprovalGateUpdated event
+- [x] JobCancelled event (with recalledTaskIds, preservedTaskIds)
+- [x] Event publishing via Messenger
 
 #### v0.1.19 - Job Cancellation
 - [ ] DELETE /api/v1/jobs/{id} endpoint (or POST /api/v1/jobs/{id}/cancel)
