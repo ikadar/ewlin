@@ -441,12 +441,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 > **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md), [tile-recall.md](../ux-ui/01-interaction-patterns/tile-recall.md)
 
-#### v0.3.4a - Left Panel - Status Bar
-- [ ] Status bar component (shown when job selected)
-- [ ] BAT status icon (⚠ Awaiting / ○ Sent / ✓ Approved / — No proof)
-- [ ] Plates status icon (○ Todo / ✓ Done)
-- [ ] Paper status icon (InStock / ToOrder / Ordered / Received)
-- [ ] Tooltip on hover with full status text
+#### v0.3.4a - Left Panel - Status Bar ✅
+- [x] Status bar component (shown when job selected)
+- [x] BAT status icon (⚠ Awaiting / ○ Sent / ✓ Approved / — No proof)
+- [x] Plates status icon (○ Todo / ✓ Done)
+- [x] Paper status icon (InStock / ToOrder / Ordered / Received)
+- [x] Tooltip on hover with full status text
 
 > **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md)
 

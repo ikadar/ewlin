@@ -5,6 +5,7 @@ import { toggleLeftPanel } from '../../store/uiSlice';
 import { PanelHeader } from './PanelHeader';
 import { JobsList } from '../left-panel/JobsList';
 import { TaskList } from '../left-panel/TaskList';
+import { StatusBar } from '../left-panel/StatusBar';
 import { Briefcase, ListTodo, Calendar, Activity } from 'lucide-react';
 
 interface LeftPanelProps {
@@ -88,6 +89,8 @@ function DefaultContent() {
       <div className="h-[40%] min-h-[120px] shrink-0">
         <JobsList className="h-full" />
       </div>
+      {/* Status Bar - only shown when job selected */}
+      <StatusBar />
       {/* Task List - takes remaining space */}
       <div className="flex-1 min-h-0 border-t">
         <TaskList className="h-full" />
