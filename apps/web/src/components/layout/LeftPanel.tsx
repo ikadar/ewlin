@@ -4,6 +4,7 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { toggleLeftPanel } from '../../store/uiSlice';
 import { PanelHeader } from './PanelHeader';
 import { JobsList } from '../left-panel/JobsList';
+import { TaskList } from '../left-panel/TaskList';
 import { Briefcase, ListTodo, Calendar, Activity } from 'lucide-react';
 
 interface LeftPanelProps {
@@ -83,15 +84,13 @@ function CollapsedContent() {
 function DefaultContent() {
   return (
     <>
-      {/* Jobs List - full height for now, will be split later */}
-      <div className="flex-1 min-h-0">
+      {/* Jobs List - takes about 40% of space */}
+      <div className="h-[40%] min-h-[120px] shrink-0">
         <JobsList className="h-full" />
       </div>
-      {/* Placeholder for future components */}
-      <div className="border-t p-2 space-y-1">
-        <div className="text-xs text-muted-foreground text-center">
-          Task List (v0.3.4)
-        </div>
+      {/* Task List - takes remaining space */}
+      <div className="flex-1 min-h-0 border-t">
+        <TaskList className="h-full" />
       </div>
     </>
   );

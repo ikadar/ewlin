@@ -430,14 +430,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 > **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md)
 
-#### v0.3.4 - Left Panel - Task List
-- [ ] Task list for selected job (sequence order)
-- [ ] Task mini-tiles with duration (setup+run)
-- [ ] Scheduled vs unscheduled appearance (opacity difference)
-- [ ] Single-click (scheduled) → scroll grid to tile
-- [ ] Double-click (scheduled) → recall tile
-- [ ] Hover shows "Jump to" and "Recall" buttons
-- [ ] Drag within list → reorder task sequence
+#### v0.3.4 - Left Panel - Task List ✅
+- [x] Task list for selected job (sequence order)
+- [x] Task mini-tiles with duration (setup+run)
+- [x] Scheduled vs unscheduled appearance (opacity difference)
+- [x] Single-click (scheduled) → scroll grid to tile
+- [x] Double-click (scheduled) → recall tile
+- [x] Hover shows "Jump to" and "Recall" buttons
+- [x] Drag within list → reorder task sequence
 
 > **Reference:** [left-panel.md](../ux-ui/05-components/left-panel.md), [tile-recall.md](../ux-ui/01-interaction-patterns/tile-recall.md)
 

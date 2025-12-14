@@ -22,6 +22,12 @@ interface UiState {
   selectedJobId: string | null;
   // Job filter text
   jobFilter: string;
+  // Task scroll target (taskId to scroll to in grid)
+  scrollToTaskId: string | null;
+  // Task pending recall (taskId to unassign)
+  pendingRecallTaskId: string | null;
+  // Local task order overrides (jobId -> taskId[])
+  taskOrderOverrides: Record<string, string[]>;
 }
 
 const initialState: UiState = {
@@ -38,6 +44,9 @@ const initialState: UiState = {
   rightPanelCollapsed: false,
   selectedJobId: null,
   jobFilter: '',
+  scrollToTaskId: null,
+  pendingRecallTaskId: null,
+  taskOrderOverrides: {},
 };
 
 const uiSlice = createSlice({
@@ -80,6 +89,28 @@ const uiSlice = createSlice({
     setJobFilter: (state, action: PayloadAction<string>) => {
       state.jobFilter = action.payload;
     },
+    // Task list actions
+    scrollToTask: (state, action: PayloadAction<string>) => {
+      state.scrollToTaskId = action.payload;
+    },
+    clearScrollToTask: (state) => {
+      state.scrollToTaskId = null;
+    },
+    recallTask: (state, action: PayloadAction<string>) => {
+      state.pendingRecallTaskId = action.payload;
+    },
+    clearPendingRecall: (state) => {
+      state.pendingRecallTaskId = null;
+    },
+    reorderTasks: (
+      state,
+      action: PayloadAction<{ jobId: string; taskIds: string[] }>
+    ) => {
+      state.taskOrderOverrides[action.payload.jobId] = action.payload.taskIds;
+    },
+    clearTaskOrderOverride: (state, action: PayloadAction<string>) => {
+      delete state.taskOrderOverrides[action.payload];
+    },
   },
 });
 
@@ -96,5 +127,11 @@ export const {
   setRightPanelCollapsed,
   setSelectedJobId,
   setJobFilter,
+  scrollToTask,
+  clearScrollToTask,
+  recallTask,
+  clearPendingRecall,
+  reorderTasks,
+  clearTaskOrderOverride,
 } = uiSlice.actions;
 export const uiReducer = uiSlice.reducer;

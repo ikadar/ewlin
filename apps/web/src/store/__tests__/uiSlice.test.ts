@@ -26,6 +26,9 @@ describe('uiSlice', () => {
     rightPanelCollapsed: false,
     selectedJobId: null,
     jobFilter: '',
+    scrollToTaskId: null,
+    pendingRecallTaskId: null,
+    taskOrderOverrides: {},
   };
 
   describe('toggleLeftPanel', () => {
