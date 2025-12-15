@@ -38,23 +38,31 @@ This folder contains the documentation standards and conventions for the Flux pr
 
 ### Document Hierarchy
 
-```
-Domain Level (specifications originate here)
-├── User Stories (US)           ← What users want
-├── Acceptance Criteria (AC)    ← How to verify behavior
-└── Business Rules (BR)         ← Domain constraints/invariants
-                    ↓
-            Backend path              Frontend path
-                 ↓                         ↓
-    API Interface Drafts (API)      UX/UI Specifications (UX)
-                 ↓                         ↓
-    Interface Contracts (IC)        Design System (DS)
-                 ↓                         ↓
-    Aggregate Design (AGG)          Frontend Components
-                 ↓
-    Service Boundaries (SB)
-                 ↓
-          Backend Code
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction TB
+
+    state DomainLevel {
+        US: US - User Stories
+        AC: AC - Acceptance Criteria
+        BR: BR - Business Rules
+    }
+
+    state BackendPath {
+        API --> IC
+        IC --> AGG
+        AGG --> SB
+        SB --> BE: Code
+    }
+
+    state FrontendPath {
+        UX --> DS
+        DS --> FE: Components
+    }
+
+    DomainLevel --> BackendPath
+    DomainLevel --> FrontendPath
 ```
 
 ### Change Categories

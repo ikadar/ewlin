@@ -70,25 +70,41 @@ Each item should include a References line immediately after the ID heading:
 
 References flow from high-level to low-level documents:
 
-```
-Domain Level (specifications originate here)
-├── User Stories (US)           ← What users want
-├── Acceptance Criteria (AC)    ← How to verify behavior
-└── Business Rules (BR)         ← Domain constraints/invariants
-                    ↓
-                    ↓  Specs flow DOWN
-                    ↓
-            Backend path              Frontend path
-                 ↓                         ↓
-    API Interface Drafts (API)      UX/UI Specifications (UX)
-                 ↓                         ↓
-    Interface Contracts (IC)        Design System (DS)
-                 ↓                         ↓
-    Aggregate Design (AGG)          Frontend Components
-                 ↓
-    Service Boundaries (SB)
-                 ↓
-          Backend Code
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction TB
+
+    state DomainLevel {
+        US: User Stories (US)
+        AC: Acceptance Criteria (AC)
+        BR: Business Rules (BR)
+    }
+
+    state BackendPath {
+        API: API Interface Drafts
+        IC: Interface Contracts
+        AGG: Aggregate Design
+        SB: Service Boundaries
+        BE: Backend Code
+
+        API --> IC
+        IC --> AGG
+        AGG --> SB
+        SB --> BE
+    }
+
+    state FrontendPath {
+        UX: UX/UI Specifications
+        DS: Design System
+        FE: Frontend Components
+
+        UX --> DS
+        DS --> FE
+    }
+
+    DomainLevel --> BackendPath
+    DomainLevel --> FrontendPath
 ```
 
 Cross-cutting references:
@@ -244,18 +260,39 @@ Anchors are auto-generated from h4 headings in lowercase:
 
 Every specification should be traceable through the hierarchy:
 
-```
-US-XXX-NNN (User Story)
-    │
-    ├──▶ Referenced by: AC-XXX-NNN (Acceptance Criteria)
-    │         │
-    │         ├──▶ Constrained by: BR-XXX-NNN (Business Rules)
-    │         │
-    │         └──▶ Implemented by:
-    │               ├── Backend: API-XXX-NNN → IC-XXX-NNN → Code
-    │               └── Frontend: UX-XXX-NNN → DS-XXX-NNN → Code
-    │
-    └──▶ Test: test_AC_XXX_NNN_*
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction LR
+
+    US: US-XXX-NNN (User Story)
+    AC: AC-XXX-NNN (Acceptance Criteria)
+    BR: BR-XXX-NNN (Business Rules)
+    TEST: test_AC_XXX_NNN_*
+
+    state BackendImpl {
+        API: API-XXX-NNN
+        IC: IC-XXX-NNN
+        BE_CODE: Code
+
+        API --> IC
+        IC --> BE_CODE
+    }
+
+    state FrontendImpl {
+        UX: UX-XXX-NNN
+        DS: DS-XXX-NNN
+        FE_CODE: Code
+
+        UX --> DS
+        DS --> FE_CODE
+    }
+
+    US --> AC: referenced by
+    AC --> BR: constrained by
+    AC --> BackendImpl: implemented by
+    AC --> FrontendImpl: implemented by
+    US --> TEST: verified by
 ```
 
 ### 6.2 Verification Checklist

@@ -15,16 +15,46 @@ This document defines the strict, mandatory workflow for AI-assisted development
 
 Every development task follows this workflow:
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  1. REQUEST │ ──▶ │  2. SPEC    │ ──▶ │  3. GENERATE│ ──▶ │  4. VERIFY  │ ──▶ │  5. COMMIT  │
-│   (Human)   │     │    (AI)     │     │    (AI)     │     │   (Both)    │     │   (Both)    │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-      │                   │                   │                   │                   │
-      ▼                   ▼                   ▼                   ▼                   ▼
-  Natural            Formal specs        Generated code      Validated code      Traced commit
-  language           US, AC, BR          with @spec          passing tests       with spec refs
-  requirement        (+ approval)
+```mermaid
+---
+title: AI-Assisted Development Workflow
+---
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction LR
+
+    REQUEST: 1 REQUEST (Human)
+    SPEC: 2 SPEC (AI)
+    GENERATE: 3 GENERATE (AI)
+    VERIFY: 4 VERIFY (Both)
+    COMMIT: 5 COMMIT (Both)
+
+    [*] --> REQUEST
+    REQUEST --> SPEC
+    SPEC --> GENERATE
+    GENERATE --> VERIFY
+    VERIFY --> COMMIT
+    COMMIT --> [*]
+
+    state REQUEST {
+        R1: Natural language requirement
+    }
+
+    state SPEC {
+        S1: Formal specs<br>US, AC, BR + approval
+    }
+
+    state GENERATE {
+        G1: Code with @spec
+    }
+
+    state VERIFY {
+        V1: Validated code<br>passing tests
+    }
+
+    state COMMIT {
+        C1: Traced commit<br>with spec refs
+    }
 ```
 
 **Key Principle:** Developers communicate in **natural language**. AI converts requirements to formal specifications, which the developer reviews and approves before code generation.
@@ -126,14 +156,19 @@ Before presenting to developer, AI verifies:
 
 Verify the specification chain:
 
-```
-US-XXX-NNN
-    ↓ (referenced by)
-AC-XXX-NNN
-    ↓ (constrained by)
-BR-XXX-NNN
-    ↓ (implemented by)
-API/IC or UX/DS
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction LR
+
+    US: US-XXX-NNN
+    AC: AC-XXX-NNN
+    BR: BR-XXX-NNN
+    TECH: API/IC or UX/DS
+
+    US --> AC: referenced by
+    AC --> BR: constrained by
+    BR --> TECH: implemented by
 ```
 
 ### 3.5 STOP - Developer Approval Required
@@ -178,21 +213,31 @@ All generated code must:
 
 If generated code doesn't meet requirements:
 
-```
-1. IDENTIFY the gap
-   ├── Missing @spec annotation?
-   ├── Doesn't match AC behavior?
-   ├── Violates BR constraint?
-   └── Missing test coverage?
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction TB
 
-2. PROVIDE specific correction
-   └── "The code doesn't handle [specific case from AC].
-        Please update to [specific requirement]."
+    IDENTIFY: 1 IDENTIFY the gap
+    PROVIDE: 2 PROVIDE specific correction
+    REQUEST: 3 REQUEST regeneration
+    CHECK: Requirements met?
+    DONE: Done
 
-3. REQUEST regeneration
-   └── "Regenerate with the correction, maintaining @spec annotations."
+    [*] --> IDENTIFY
+    IDENTIFY --> PROVIDE
+    PROVIDE --> REQUEST
+    REQUEST --> CHECK
+    CHECK --> DONE: Yes
+    CHECK --> IDENTIFY: No
+    DONE --> [*]
 
-4. REPEAT until all requirements met
+    state IDENTIFY {
+        G1: Missing @spec annotation?
+        G2: Doesnt match AC behavior?
+        G3: Violates BR constraint?
+        G4: Missing test coverage?
+    }
 ```
 
 **Important:** Do NOT manually fix AI-generated code. Always request regeneration with specific corrections.
@@ -338,30 +383,33 @@ When NOT using release commands, follow the workflow manually:
 
 Maintain traceability across all levels:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        TRACEABILITY FLOW                            │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  US-XXX-NNN ◄─────────────────────────────────────────────────┐    │
-│      │                                                         │    │
-│      ▼                                                         │    │
-│  AC-XXX-NNN ◄──────────────────────────────────────────┐      │    │
-│      │                                                  │      │    │
-│      ├──────────▶ BR-XXX-NNN                           │      │    │
-│      │                │                                 │      │    │
-│      ▼                ▼                                 │      │    │
-│  API/UX-XXX-NNN ◄────┘                                 │      │    │
-│      │                                                  │      │    │
-│      ▼                                                  │      │    │
-│  Source Code ──────────────────────────────────────────┘      │    │
-│  (@spec AC-XXX-NNN, BR-XXX-NNN)                               │    │
-│      │                                                         │    │
-│      ▼                                                         │    │
-│  Test Code ───────────────────────────────────────────────────┘    │
-│  (test_AC_XXX_NNN_...)                                              │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction LR
+
+    state SpecificationLayer {
+        US: US-XXX-NNN
+        AC: AC-XXX-NNN
+        BR: BR-XXX-NNN
+        TECH: API/UX-XXX-NNN
+
+        US --> AC
+        AC --> BR
+        AC --> TECH
+        BR --> TECH
+    }
+
+    state ImplementationLayer {
+        SRC: Source Code with @spec
+        note right of TEST: Verifies AC
+        note right of SRC: Implements AC, References US
+        TEST: Test Code
+
+        TECH --> SRC
+        SRC --> TEST
+    }
+
 ```
 
 ### 8.1 Forward Traceability (Spec → Code)
@@ -420,7 +468,7 @@ From any code, you should be able to find:
 │     → Tests based on AC scenarios                                   │
 │                                                                     │
 │  4. VERIFY (Both):                                                  │
-│     □ Builds?  □ Lint?  □ Types?  □ Tests?  □ @spec present?       │
+│     □ Builds?  □ Lint?  □ Types?  □ Tests?  □ @spec present?        │
 │     → STOP: Wait for developer approval                             │
 │                                                                     │
 │  5. COMMIT (Both):                                                  │

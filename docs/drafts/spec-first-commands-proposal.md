@@ -15,11 +15,23 @@ This document outlines proposed slash commands for the spec-first AI-assisted de
 
 The commands are organized according to the 5 phases of the AI-assisted development workflow:
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  1. REQUEST │ ──▶ │  2. SPEC    │ ──▶ │  3. GENERATE│ ──▶ │  4. VERIFY  │ ──▶ │  5. COMMIT  │
-│   (Human)   │     │    (AI)     │     │    (AI)     │     │   (Both)    │     │   (Both)    │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction LR
+
+    REQUEST: 1 REQUEST (Human)
+    SPEC: 2 SPEC (AI)
+    GENERATE: 3 GENERATE (AI)
+    VERIFY: 4 VERIFY (Both)
+    COMMIT: 5 COMMIT (Both)
+
+    [*] --> REQUEST
+    REQUEST --> SPEC
+    SPEC --> GENERATE
+    GENERATE --> VERIFY
+    VERIFY --> COMMIT
+    COMMIT --> [*]
 ```
 
 **Key Principle:** Developers communicate in **natural language**. AI converts requirements to formal specifications for approval.

@@ -14,9 +14,33 @@ This document defines the spec-first development philosophy and workflow.
 
 In Spec-First Development, the **specification is the source of truth**, and code is a **generated artifact**. This is analogous to how compiled binaries are generated from source code.
 
-```
-Traditional:    Spec → Code → Code modification → Code modification → ...
-Spec-First:     Spec → Code → Spec modification → Code regeneration → ...
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction LR
+
+    state Traditional {
+        T1: Spec
+        T2: Code
+        T3: Code modification
+        T4: More modifications
+
+        T1 --> T2
+        T2 --> T3
+        T3 --> T4
+    }
+
+    state SpecFirst {
+        S1: Spec
+        S2: Code
+        S3: Spec modification
+        S4: Code regeneration
+
+        S1 --> S2
+        S2 --> S3
+        S3 --> S4
+        S4 --> S3
+    }
 ```
 
 **Core principle:** When behavior needs to change, modify the specification first, then regenerate the code. Never modify generated code directly.
@@ -41,25 +65,41 @@ Spec-First:     Spec → Code → Spec modification → Code regeneration → ..
 
 For this project, the specification hierarchy is:
 
-```
-Domain Level (specifications originate here)
-├── User Stories (US)           ← What users want
-├── Acceptance Criteria (AC)    ← How to verify behavior
-└── Business Rules (BR)         ← Domain constraints/invariants
-                    ↓
-                    ↓  Specs flow DOWN
-                    ↓
-            Backend path              Frontend path
-                 ↓                         ↓
-    API Interface Drafts (API)      UX/UI Specifications (UX)
-                 ↓                         ↓
-    Interface Contracts (IC)        Design System (DS)
-                 ↓                         ↓
-    Aggregate Design (AGG)          Frontend Components
-                 ↓
-    Service Boundaries (SB)
-                 ↓
-          Backend Code
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction TB
+
+    state DomainLevel {
+        US: User Stories (US)
+        AC: Acceptance Criteria (AC)
+        BR: Business Rules (BR)
+    }
+
+    state BackendPath {
+        API: API Interface Drafts
+        IC: Interface Contracts
+        AGG: Aggregate Design
+        SB: Service Boundaries
+        BE: Backend Code
+
+        API --> IC
+        IC --> AGG
+        AGG --> SB
+        SB --> BE
+    }
+
+    state FrontendPath {
+        UX: UX/UI Specifications
+        DS: Design System
+        FE: Frontend Components
+
+        UX --> DS
+        DS --> FE
+    }
+
+    DomainLevel --> BackendPath
+    DomainLevel --> FrontendPath
 ```
 
 ### Primary Specs for Code Generation
@@ -83,36 +123,39 @@ Domain Level (specifications originate here)
 
 ## 4. Development Workflow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  1. SPECIFY                                                     │
-│     ├── Identify or create US (user story)                      │
-│     ├── Create or modify AC (acceptance criteria)               │
-│     └── Reference relevant BR (business rules)                  │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  2. GENERATE                                                    │
-│     ├── Provide spec (AC + BR) to LLM                           │
-│     ├── LLM generates code with @spec annotations               │
-│     └── Code includes test stubs derived from AC                │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  3. VERIFY                                                      │
-│     ├── Run tests (derived from AC Given/When/Then)             │
-│     ├── Run static analysis (PHPStan level 8)                   │
-│     └── Review @spec annotations match implementation           │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-                    ┌─────────────────┐
-                    │  Tests pass?    │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              ↓                             ↓
-         YES: Commit                   NO: Go to step 1
-    (spec + code + tests)           (modify spec, not code)
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction TB
+
+    state Specify {
+        S1: Identify or create US
+        S2: Create or modify AC
+        S3: Reference relevant BR
+    }
+
+    state Generate {
+        G1: Provide spec to LLM
+        G2: LLM generates code with @spec
+        G3: Code includes test stubs
+    }
+
+    state Verify {
+        V1: Run tests
+        V2: Run static analysis
+        V3: Review @spec annotations
+    }
+
+    CHECK: Tests pass?
+    COMMIT: Commit (spec + code + tests)
+
+    [*] --> Specify
+    Specify --> Generate
+    Generate --> Verify
+    Verify --> CHECK
+    CHECK --> COMMIT: YES
+    CHECK --> Specify: NO
+    COMMIT --> [*]
 ```
 
 ---

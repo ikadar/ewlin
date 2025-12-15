@@ -14,24 +14,30 @@ This document defines the rules for managing changes to specifications and code.
 
 **All changes must originate at the domain level.** Technical specifications can only change as a consequence of domain-level changes.
 
-```
-Domain Level (change originates here)
-├── User Stories (US)      ← "We need new capability"
-├── Acceptance Criteria (AC) ← "This is how we verify it"
-└── Business Rules (BR)    ← "These constraints apply"
-        ↓
-        ↓  Changes flow DOWN
-        ↓
-Technical Level (changes as consequence)
-├── API Interface Drafts (API)
-├── Interface Contracts (IC)
-├── Aggregate Design (AGG)
-└── Service Boundaries (SB)
-        ↓
-        ↓  Changes flow DOWN
-        ↓
-Implementation Level
-└── Source Code
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction TB
+
+    state DomainLevel {
+        US: User Stories (US)
+        AC: Acceptance Criteria (AC)
+        BR: Business Rules (BR)
+    }
+
+    state TechnicalLevel {
+        API: API Interface Drafts
+        IC: Interface Contracts
+        AGG: Aggregate Design
+        SB_: Service Boundaries
+    }
+
+    state ImplementationLevel {
+        CODE: Source Code
+    }
+
+    DomainLevel --> TechnicalLevel: Changes flow DOWN
+    TechnicalLevel --> ImplementationLevel: Changes flow DOWN
 ```
 
 ---
@@ -98,33 +104,47 @@ Every technical spec change must reference its domain trigger:
 
 ## 5. Change Request Workflow
 
-```
-1. Identify need for change
-   └── Express as domain requirement (US, AC, or BR)
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+stateDiagram-v2
+    direction TB
 
-2. Create/modify domain spec
-   ├── New US if new user capability
-   ├── New/modified AC if new behavior
-   └── New/modified BR if new constraint
+    IDENTIFY: 1 Identify need
+    DOMAIN: 2 Create/modify domain spec
+    DERIVE: 3 Derive technical changes
+    GENERATE: 4 Generate/update code
+    COMMIT: 5 Commit with traceability
 
-3. Derive technical changes
+    [*] --> IDENTIFY
+    IDENTIFY --> DOMAIN
+    DOMAIN --> DERIVE
+    DERIVE --> GENERATE
+    GENERATE --> COMMIT
+    COMMIT --> [*]
 
-   Backend path:
-   ├── Update API if external interface changes
-   ├── Update IC if service contract changes
-   ├── Update AGG if entity structure changes
-   └── Update SB if service responsibility changes
+    state DOMAIN {
+        B1: New US if new capability
+        B2: New/modified AC if new behavior
+        B3: New/modified BR if new constraint
+    }
 
-   Frontend path:
-   ├── Update UX if user interface changes
-   └── Update DS if visual constraints change
+    state DERIVE {
+        state BackendPath {
+            API: Update API
+            IC: Update IC
+            AGG: Update AGG
+            SB_: Update SB
+        }
+        state FrontendPath {
+            UX: Update UX
+            DS: Update DS
+        }
+    }
 
-4. Generate/update code
-   ├── Backend: with @spec annotations pointing to AC/BR
-   └── Frontend: with @spec annotations pointing to UX/DS
-
-5. Commit with traceability
-   └── Reference domain trigger in commit message
+    state GENERATE {
+        D1: Backend @spec to AC/BR
+        D2: Frontend @spec to UX/DS
+    }
 ```
 
 ---
