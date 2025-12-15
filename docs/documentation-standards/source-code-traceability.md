@@ -124,9 +124,67 @@ public function assignTask(Task $task, Station $station): Assignment
 
 ---
 
-## 8. Maintenance
+## 8. Verification Checklist
+
+### 8.1 Before Code Review/Merge
+
+- [ ] All business logic methods have @spec annotations
+- [ ] All @spec IDs are valid (exist in `docs/`)
+- [ ] @spec IDs match the feature being implemented
+- [ ] Multiple specs listed when method implements multiple requirements
+
+### 8.2 Traceability Verification Commands
+
+**Find all @spec annotations:**
+```bash
+# PHP
+grep -rn "@spec" src/
+
+# TypeScript
+grep -rn "@spec" apps/web/src/
+```
+
+**Verify spec ID exists:**
+```bash
+# Search for spec ID in documentation
+grep -rn "AC-GATE-001" docs/
+```
+
+**Find code implementing a specific spec:**
+```bash
+grep -rn "@spec AC-GATE-001" src/
+```
+
+**Coverage check (approximate):**
+```bash
+# Count methods with @spec vs total public methods
+grep -c "@spec" src/**/*.php
+grep -c "public function" src/**/*.php
+```
+
+### 8.3 Forward Traceability (Spec → Code)
+
+For each AC, verify you can find implementing code:
+
+| Spec ID | Code Location | Test Location | Status |
+|---------|---------------|---------------|--------|
+| AC-XXX-001 | `src/path:line` | `tests/path:line` | [ ] |
+| AC-XXX-002 | `src/path:line` | `tests/path:line` | [ ] |
+
+### 8.4 Backward Traceability (Code → Spec)
+
+For each @spec annotation, verify:
+
+- [ ] Spec ID exists in documentation
+- [ ] Code behavior matches spec description
+- [ ] Test exists that verifies spec
+
+---
+
+## 9. Maintenance
 
 When specs change:
 1. Search codebase for `@spec {OLD-ID}`
 2. Update or remove annotations
 3. Verify implementation still matches spec
+4. Update tests if behavior changed

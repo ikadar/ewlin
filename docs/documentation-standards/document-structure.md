@@ -235,3 +235,83 @@ Anchors are auto-generated from h4 headings in lowercase:
 - [ ] All internal links are valid
 - [ ] IDs follow naming convention
 - [ ] YAML front matter present
+
+---
+
+## 6. Spec-to-Spec Traceability
+
+### 6.1 Traceability Chain
+
+Every specification should be traceable through the hierarchy:
+
+```
+US-XXX-NNN (User Story)
+    │
+    ├──▶ Referenced by: AC-XXX-NNN (Acceptance Criteria)
+    │         │
+    │         ├──▶ Constrained by: BR-XXX-NNN (Business Rules)
+    │         │
+    │         └──▶ Implemented by:
+    │               ├── Backend: API-XXX-NNN → IC-XXX-NNN → Code
+    │               └── Frontend: UX-XXX-NNN → DS-XXX-NNN → Code
+    │
+    └──▶ Test: test_AC_XXX_NNN_*
+```
+
+### 6.2 Verification Checklist
+
+Before any implementation, verify the spec chain:
+
+#### Domain Level
+- [ ] US exists with clear user need
+- [ ] AC exists with Given/When/Then
+- [ ] AC has `> **References:** [US-XXX-NNN]` line
+- [ ] All relevant BRs identified
+- [ ] AC references all relevant BRs
+
+#### Technical Level (Backend)
+- [ ] API spec exists if external interface
+- [ ] API spec references AC
+- [ ] IC spec exists if internal contract
+- [ ] IC spec references API or AC
+
+#### Technical Level (Frontend)
+- [ ] UX spec exists for UI components
+- [ ] UX spec references AC and/or US
+- [ ] DS tokens defined for visual elements
+- [ ] DS references UX where applicable
+
+### 6.3 Traceability Matrix Template
+
+Use this template to verify complete traceability:
+
+| US | AC | BR | Backend Spec | Frontend Spec | Code | Test |
+|----|----|----|--------------|---------------|------|------|
+| US-XXX-001 | AC-XXX-001 | BR-XXX-001 | API-XXX-001 | - | `file:line` | `test_AC_XXX_001` |
+| US-XXX-001 | AC-XXX-002 | BR-XXX-002 | - | UX-XXX-001 | `file:line` | `test_AC_XXX_002` |
+
+### 6.4 Verification Commands
+
+**Find all specs referencing a US:**
+```bash
+grep -rn "US-STATION-001" docs/
+```
+
+**Find all specs referencing an AC:**
+```bash
+grep -rn "AC-STATION-001" docs/
+```
+
+**Verify AC references US:**
+```bash
+grep -A2 "AC-STATION-001" docs/requirements/acceptance-criteria.md | grep "US-"
+```
+
+### 6.5 Common Traceability Issues
+
+| Issue | Problem | Solution |
+|-------|---------|----------|
+| AC without US reference | No user context | Add `> **References:** [US-XXX-NNN]` |
+| Technical spec without AC | No verifiable behavior | Create AC first |
+| Orphan BR | BR not referenced by any AC | Either link to AC or remove |
+| Missing tech spec | Gap between AC and code | Create API/IC or UX/DS spec |

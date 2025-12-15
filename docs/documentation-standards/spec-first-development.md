@@ -117,24 +117,64 @@ Domain Level (specifications originate here)
 
 ---
 
-## 5. Workflow Rules
+## 5. Mandatory Checklists
+
+### 5.1 Before Code Generation (SPECIFY phase)
+
+- [ ] User Story (US) exists or created
+- [ ] Acceptance Criteria (AC) exists or created
+- [ ] AC references parent US
+- [ ] All relevant Business Rules (BR) identified
+- [ ] AC references relevant BRs
+- [ ] Technical spec exists (API/IC for backend, UX/DS for frontend)
+
+### 5.2 During Code Generation (GENERATE phase)
+
+- [ ] Full spec provided to LLM (US, AC, BR, technical spec)
+- [ ] @spec annotation requirement specified in prompt
+- [ ] Test generation requirement specified in prompt
+- [ ] Output location specified
+
+### 5.3 After Code Generation (VERIFY phase)
+
+- [ ] Code compiles/builds without errors
+- [ ] Lint passes (ESLint, PHPStan)
+- [ ] Type checks pass
+- [ ] All tests pass
+- [ ] @spec annotations present on business logic
+- [ ] @spec IDs are valid (exist in specs)
+- [ ] AC Given/When/Then verified in code
+- [ ] BR constraints verified in code
+
+### 5.4 Before Commit
+
+- [ ] All VERIFY checks pass
+- [ ] Commit message includes spec references
+- [ ] Tests included in commit
+- [ ] Spec documentation up to date
+
+---
+
+## 6. Workflow Rules
 
 **DO:**
-- Start every feature with AC definition
+- Start every feature with US and AC definition
 - Include relevant BR references in the AC
 - Let LLM generate code from spec
 - Write tests that verify AC criteria
 - Commit spec and code together
+- Request regeneration for corrections (don't manually fix)
 
 **DO NOT:**
 - Modify generated code directly (modify spec instead)
 - Skip the specification step
 - Generate code without @spec annotations
 - Commit code without corresponding spec
+- Manually fix AI-generated code without regeneration
 
 ---
 
-## 6. Prompt Template for Code Generation
+## 7. Prompt Template for Code Generation
 
 When requesting code generation from LLM:
 
@@ -162,7 +202,7 @@ Include @spec annotation and PHPUnit test.
 
 ---
 
-## 7. Handling Bugs
+## 8. Handling Bugs
 
 When a bug is discovered:
 
@@ -180,7 +220,7 @@ When a bug is discovered:
 
 ---
 
-## 8. Versioning
+## 9. Versioning
 
 Specs and code are versioned together:
 
@@ -194,7 +234,7 @@ Spec: AC-GATE-001, BR-GATE-001
 
 ---
 
-## 9. When to Regenerate vs Update
+## 10. When to Regenerate vs Update
 
 | Scenario | Action |
 |----------|--------|
@@ -207,7 +247,7 @@ Spec: AC-GATE-001, BR-GATE-001
 
 ---
 
-## 10. Metrics
+## 11. Metrics
 
 Track spec-first compliance:
 

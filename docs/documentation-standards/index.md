@@ -12,6 +12,7 @@ This folder contains the documentation standards and conventions for the Flux pr
 
 | Document | Description |
 |----------|-------------|
+| [AI-Assisted Development Workflow](ai-assisted-development-workflow.md) | **Start here** - Strict step-by-step workflow for AI-assisted development |
 | [Document Structure](document-structure.md) | ID naming, cross-references, content formats, links, maintenance |
 | [Source Code Traceability](source-code-traceability.md) | @spec annotations, layer-specific references, coverage goals |
 | [Spec-First Development](spec-first-development.md) | Philosophy, workflow, prompt templates, bug handling |
