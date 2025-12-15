@@ -38,17 +38,18 @@ This folder contains the documentation standards and conventions for the Flux pr
 ### Document Hierarchy
 
 ```
-                    User Stories (US)
-                         ↓ 1:n
-                 Acceptance Criteria (AC)
-                    ↓              ↓
-            Backend path      Frontend path
-                 ↓                  ↓
-    API Interface Drafts (API)   UX/UI Specifications (UX)
-                 ↓                  ↓
-    Interface Contracts (IC)    Design System (DS)
-                 ↓                  ↓
-    Aggregate Design (AGG)      Frontend Components
+Domain Level (specifications originate here)
+├── User Stories (US)           ← What users want
+├── Acceptance Criteria (AC)    ← How to verify behavior
+└── Business Rules (BR)         ← Domain constraints/invariants
+                    ↓
+            Backend path              Frontend path
+                 ↓                         ↓
+    API Interface Drafts (API)      UX/UI Specifications (UX)
+                 ↓                         ↓
+    Interface Contracts (IC)        Design System (DS)
+                 ↓                         ↓
+    Aggregate Design (AGG)          Frontend Components
                  ↓
     Service Boundaries (SB)
                  ↓
@@ -59,8 +60,8 @@ This folder contains the documentation standards and conventions for the Flux pr
 
 | Category | Trigger Required |
 |----------|------------------|
-| A - Domain | US, AC, or BR (mandatory) |
-| B - UI/UX | DS-*, UX-*, or PO approval |
-| C - Technical | Justification in commit |
+| A - Domain (Spec-First) | US, AC, or BR (mandatory) - backend and frontend features |
+| B - Visual Polish | DS-* or PO approval - non-behavioral visual changes only |
+| C - Technical | Justification in commit - infrastructure, security, refactoring |
 
 See [Change Governance](change-governance.md) for details.

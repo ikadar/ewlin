@@ -42,21 +42,42 @@ Spec-First:     Spec → Code → Spec modification → Code regeneration → ..
 For this project, the specification hierarchy is:
 
 ```
-User Stories (US)          ← What users want (high-level intent)
-        ↓ 1:n
-Acceptance Criteria (AC)   ← How to verify (testable behaviors) ← PRIMARY SPEC
-        ↓                                                          FOR CODE GEN
-Business Rules (BR)        ← Domain constraints (invariants)
-        ↓
-API Interface Drafts (API) ← External contracts
-        ↓
-Interface Contracts (IC)   ← Internal service contracts
+Domain Level (specifications originate here)
+├── User Stories (US)           ← What users want
+├── Acceptance Criteria (AC)    ← How to verify behavior
+└── Business Rules (BR)         ← Domain constraints/invariants
+                    ↓
+                    ↓  Specs flow DOWN
+                    ↓
+            Backend path              Frontend path
+                 ↓                         ↓
+    API Interface Drafts (API)      UX/UI Specifications (UX)
+                 ↓                         ↓
+    Interface Contracts (IC)        Design System (DS)
+                 ↓                         ↓
+    Aggregate Design (AGG)          Frontend Components
+                 ↓
+    Service Boundaries (SB)
+                 ↓
+          Backend Code
 ```
 
-**AC is the primary specification for code generation** because:
+### Primary Specs for Code Generation
+
+| Path | Primary Spec | Constraints | Generated Artifact |
+|------|--------------|-------------|-------------------|
+| Backend | AC | BR | PHP code (services, entities) |
+| Frontend | UX | DS | TypeScript/React components |
+
+**AC is the primary specification for backend code generation** because:
 - Right granularity for methods/functions
 - Given/When/Then maps directly to tests
 - Links up to US (intent) and down to BR (constraints)
+
+**UX is the primary specification for frontend code generation** because:
+- Defines component behavior and states
+- Visual requirements map to styling
+- Links up to US/AC (intent) and references DS (constraints)
 
 ---
 

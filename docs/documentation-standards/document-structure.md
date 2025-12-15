@@ -71,17 +71,20 @@ Each item should include a References line immediately after the ID heading:
 References flow from high-level to low-level documents:
 
 ```
-                    User Stories (US)
-                         ↓ 1:n
-                 Acceptance Criteria (AC)
-                    ↓              ↓
-            Backend path      Frontend path
-                 ↓                  ↓
-    API Interface Drafts (API)   UX/UI Specifications (UX)
-                 ↓                  ↓
-    Interface Contracts (IC)    Design System (DS)
-                 ↓                  ↓
-    Aggregate Design (AGG)      Frontend Components
+Domain Level (specifications originate here)
+├── User Stories (US)           ← What users want
+├── Acceptance Criteria (AC)    ← How to verify behavior
+└── Business Rules (BR)         ← Domain constraints/invariants
+                    ↓
+                    ↓  Specs flow DOWN
+                    ↓
+            Backend path              Frontend path
+                 ↓                         ↓
+    API Interface Drafts (API)      UX/UI Specifications (UX)
+                 ↓                         ↓
+    Interface Contracts (IC)        Design System (DS)
+                 ↓                         ↓
+    Aggregate Design (AGG)          Frontend Components
                  ↓
     Service Boundaries (SB)
                  ↓
@@ -89,11 +92,8 @@ References flow from high-level to low-level documents:
 ```
 
 Cross-cutting references:
-- Business Rules (BR) - referenced by all levels
 - Domain Model (DM) - referenced by technical documents
 - Workflow Definitions (WF) - referenced by API and implementation docs
-- Design System (DS) - referenced by UX specs and frontend code
-- UX Specifications (UX) - referenced by frontend implementation
 
 ### 2.3 Cardinality Rules
 

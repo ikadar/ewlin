@@ -40,17 +40,29 @@ Implementation Level
 
 **NEVER** directly modify these without a domain-level trigger:
 
+### Backend Documents
+
 | Document | Requires |
 |----------|----------|
-| Interface Contracts (IC) | AC or BR change first |
 | API Interface Drafts (API) | AC or US change first |
+| Interface Contracts (IC) | AC or BR change first |
 | Aggregate Design (AGG) | BR or DM change first |
 | Service Boundaries (SB) | AGG or IC change first |
-| Source Code | AC or BR change first |
+| Backend Code | AC or BR change first |
+
+### Frontend Documents
+
+| Document | Requires |
+|----------|----------|
+| UX/UI Specifications (UX) | AC or US change first |
+| Design System (DS) | UX or BR change first |
+| Frontend Components | UX or DS change first |
 
 ---
 
 ## 3. Valid Change Triggers
+
+### Backend
 
 | Change Type | Valid Trigger | Invalid Trigger |
 |-------------|---------------|-----------------|
@@ -58,6 +70,15 @@ Implementation Level
 | Modified IC | Changed BR or AC | "Better interface design" |
 | New aggregate field | Changed DM or BR | "Database needs this" |
 | Refactored service | Changed SB justified by BR | "Cleaner architecture" |
+
+### Frontend
+
+| Change Type | Valid Trigger | Invalid Trigger |
+|-------------|---------------|-----------------|
+| New UI component | New US + AC + UX | "Users might like this" |
+| Modified UX spec | Changed AC or US | "Better user experience" |
+| New DS token | UX requirement or BR | "I prefer this color" |
+| Component refactor | UX change or tech-debt | "Cleaner code" |
 
 ---
 
@@ -87,13 +108,20 @@ Every technical spec change must reference its domain trigger:
    └── New/modified BR if new constraint
 
 3. Derive technical changes
+
+   Backend path:
    ├── Update API if external interface changes
    ├── Update IC if service contract changes
    ├── Update AGG if entity structure changes
    └── Update SB if service responsibility changes
 
+   Frontend path:
+   ├── Update UX if user interface changes
+   └── Update DS if visual constraints change
+
 4. Generate/update code
-   └── With @spec annotations pointing to AC/BR
+   ├── Backend: with @spec annotations pointing to AC/BR
+   └── Frontend: with @spec annotations pointing to UX/DS
 
 5. Commit with traceability
    └── Reference domain trigger in commit message
@@ -133,55 +161,60 @@ Before approving any technical spec change:
 
 Not all changes require domain-level triggers. Changes are categorized by their nature:
 
-### Category A: Domain Changes
+### Category A: Domain Changes (Spec-First)
 
 **Requires:** US, AC, or BR trigger (mandatory)
 
-| Scope | Examples |
-|-------|----------|
-| Business logic | New feature, workflow change, validation rule |
-| API contracts | New endpoint, changed request/response |
-| Data model | New entity, changed relationships |
-| User-facing behavior | Error messages, form validation, notifications |
+Applies to both backend and frontend development that follows the spec-first workflow.
 
-**Commit format:**
+| Scope | Backend Examples | Frontend Examples |
+|-------|------------------|-------------------|
+| New feature | New API endpoint, service | New UI component, screen |
+| Behavior change | Workflow change, validation | User interaction, form behavior |
+| Data/State | New entity, relationships | New state management, data display |
+| User communication | Error messages, notifications | Error states, feedback messages |
+
+**Commit format (backend):**
 ```
 feat(gate): Add BAT approval validation
 
 Spec: AC-GATE-001, BR-GATE-001
 ```
 
-### Category B: UI/UX Changes
+**Commit format (frontend):**
+```
+feat(ui): Add job list panel
 
-**Requires:** Design system reference (DS-\*) OR UX specification reference (UX-\*) OR product owner approval
+Spec: AC-UI-001, UX-PANEL-001
+```
+
+### Category B: Visual Polish (Non-Behavioral)
+
+**Requires:** Design system reference (DS-\*) OR product owner approval
+
+Only for changes that do NOT affect behavior - pure visual/aesthetic adjustments.
 
 | Scope | Examples |
 |-------|----------|
-| Styling | Colors, typography, spacing, shadows |
-| Animations | Transitions, hover effects, loading states |
-| Layout polish | Alignment, responsive tweaks |
-| Branding | Logo, color scheme updates |
+| Styling tweaks | Spacing adjustments, shadow refinements |
+| Animations | Transition timing, hover effects |
+| Branding | Logo updates, color scheme refresh |
+| Polish | Alignment fixes, responsive tweaks |
+
+**Important:** If a visual change affects user communication or behavior (e.g., error states, success feedback), it is Category A, not Category B.
 
 **Commit format:**
 ```
-[ui] Update primary button color to brand green
+[ui] Adjust button shadow depth
 
-Design system: DS-COLOR-001
+Design system: DS-SHADOW-001
 ```
 
 ```
-[ui] Adjust panel layout spacing
+[ui] Update brand colors
 
-UX spec: UX-PANEL-003
+PO: {Name} - approval {date}
 ```
-
-```
-[ui] Change icon set to Lucide
-
-PO: {Name} - verbal approval {date}
-```
-
-**Note:** If a UI change affects user communication (e.g., error states, success feedback), it may require Category A treatment with an AC.
 
 ### Category C: Technical/Infrastructure Changes
 
@@ -208,19 +241,30 @@ PO: {Name} - verbal approval {date}
 
 ## 9. Category Decision Matrix
 
+### Backend Changes
+
 | Change Type | Category | Trigger Required |
 |-------------|----------|------------------|
-| New user capability | A - Domain | US + AC |
+| New API endpoint | A - Domain | US + AC |
 | Business rule change | A - Domain | BR + AC |
-| API endpoint change | A - Domain | AC + API spec |
+| Data model change | A - Domain | AC + BR |
 | Error message wording | A - Domain | AC (user communication) |
-| Button color (branding) | B - UI/UX | Design system ref |
-| Loading spinner style | B - UI/UX | Design system ref |
-| Red color for errors | A - Domain | AC (semantic meaning) |
-| Security patch | C - Tech | CVE reference |
 | Query optimization | C - Tech | Justification |
 | Add logging | C - Tech | Justification |
+| Security patch | C - Tech | CVE reference |
+
+### Frontend Changes
+
+| Change Type | Category | Trigger Required |
+|-------------|----------|------------------|
+| New UI component | A - Domain | US + AC + UX |
+| User interaction change | A - Domain | AC + UX |
+| Error/feedback states | A - Domain | AC (user communication) |
 | Accessibility (WCAG) | A - Domain | US-ACCESS + AC |
+| Button shadow tweak | B - Visual Polish | DS ref |
+| Spacing adjustment | B - Visual Polish | DS ref |
+| Brand color update | B - Visual Polish | PO approval |
+| Animation timing | B - Visual Polish | DS ref |
 
 ---
 
@@ -233,8 +277,10 @@ Some changes fall between categories. Use this guide:
 | Does it change what users can do? | Category A | → |
 | Does it change how the system behaves? | Category A | → |
 | Does it communicate meaning to users? | Category A | → |
-| Is it purely visual/aesthetic? | Category B | → |
+| Is it purely visual/aesthetic (no behavior change)? | Category B | → |
 | Is it infrastructure/tooling? | Category C | Category A |
+
+**Key distinction for frontend:** If a UI change affects user interaction, feedback, or communication, it is Category A (spec-first). Category B is only for pure visual polish that doesn't change what the user experiences functionally.
 
 ---
 
