@@ -86,9 +86,9 @@ Domain Level (specifications originate here)
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  1. SPECIFY                                                     │
+│     ├── Identify or create US (user story)                      │
 │     ├── Create or modify AC (acceptance criteria)               │
-│     ├── Reference relevant BR (business rules)                  │
-│     └── Link to parent US (user story)                          │
+│     └── Reference relevant BR (business rules)                  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
