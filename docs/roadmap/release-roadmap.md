@@ -404,11 +404,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ## Milestone 3: Frontend Integration (v0.3.x)
 
+> **Reference:** [UX-UI Specification](../ux-ui/00-overview.md) | [Open Questions (Resolved)](../ux-ui/07-open-questions.md)
+
 ### Phase 3A: Frontend Mock Data
 
 #### v0.3.0 - Mock Data Generators
-- [ ] Station generator
-- [ ] Job generator with tasks
+- [ ] Station generator (with operating schedules)
+- [ ] Job generator with tasks (including problematic jobs: late, conflicts)
 - [ ] Assignment generator
 - [ ] Snapshot cache implementation
 
@@ -416,129 +418,185 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] getSnapshot endpoint
 - [ ] CRUD operations (create, update, delete)
 - [ ] Configurable latency
-- [ ] TypeScript types
+- [ ] TypeScript types matching `@flux/types`
 
-### Phase 3B: Frontend Core UI
+### Phase 3B: Frontend Core Layout
 
-#### v0.3.2 - Layout Components
-- [ ] Header with navigation
-- [ ] Main page 3-column layout
-- [ ] Responsive breakpoints
-- [ ] Panel collapse/expand
+> **Layout:** Sidebar | Jobs List | Job Details | Date Strip | Timeline | Station Columns
+> **No Right Panel** — problems shown in Jobs List "Problèmes" section
 
-#### v0.3.3 - Left Panel - Jobs List
-- [ ] Job list component
-- [ ] Job filtering by reference/client/description
-- [ ] Job selection state
-- [ ] Status indicators
+#### v0.3.2 - Sidebar Component
+- [ ] Fixed width (w-14 / 56px)
+- [ ] Navigation icons: layout-grid (active), calendar, settings
+- [ ] Active/inactive/hover states
+- [ ] Settings icon (disabled for MVP)
 
-#### v0.3.4 - Left Panel - Tasks List
-- [ ] Task list for selected job
-- [ ] Task mini-tiles with duration
-- [ ] Scheduled vs unscheduled appearance
-- [ ] Recall button on hover
+#### v0.3.3 - Jobs List Component
+- [ ] Fixed width (w-72 / 288px)
+- [ ] Add Job button (green +)
+- [ ] Search field with filtering (reference, client, description)
+- [ ] **Problèmes section** at top with count badge
+- [ ] Late jobs: red background, `alert-circle` icon, "En retard" badge
+- [ ] Conflict jobs: amber background, `shuffle` icon, "Conflit" badge
+- [ ] **Travaux section** for normal jobs
+- [ ] Job cards with progress dots (task completion visualization)
+- [ ] Selected job highlight (bg-white/10, border)
+- [ ] Keyboard navigation (ALT+↑/↓)
 
-#### v0.3.5 - Center Panel - Time Axis
-- [ ] Vertical time axis component
+#### v0.3.4 - Job Details Panel
+- [ ] Fixed width (w-72 / 288px)
+- [ ] Job info: Code, Client, Intitulé, Départ
+- [ ] Status section: BAT, Papier, Plaques (read-only for MVP)
+- [ ] **Task List** with two visual states:
+  - Unscheduled: Full job color, border-l-4, draggable
+  - Scheduled: Dark placeholder, station + datetime only
+- [ ] Single-click scheduled task → scroll grid to tile
+- [ ] Double-click scheduled task → recall (unschedule)
+
+#### v0.3.5 - Date Strip Component
+- [ ] Fixed width (w-12 / 48px)
+- [ ] Day abbreviation + day number per row
+- [ ] Today highlight (amber background)
+- [ ] Click to jump to date
+- [ ] Hover 2s while dragging → auto-jump to date
+
+### Phase 3C: Scheduling Grid
+
+#### v0.3.6 - Timeline Column
+- [ ] Fixed width (w-12 / 48px)
+- [ ] Hour markers with grid lines
+- [ ] 30-minute and 15-minute tick marks
+- [ ] "Now" line (red, `bg-red-500`) with time label
+- [ ] **Synchronized vertical scroll** with station columns
+
+#### v0.3.7 - Station Column Headers
+- [ ] Sticky header row (z-30)
+- [ ] Station names
+- [ ] **Off-screen indicators**: rectangle with arrow + datetime
+  - Above viewport: `↑` chevron-up + datetime of nearest tile
+  - Below viewport: `↓` chevron-down + datetime of nearest tile
+  - Click to scroll to tile
+
+#### v0.3.8 - Station Columns
+- [ ] Dynamic width columns (w-60 / 240px each)
+- [ ] Horizontal scroll for many stations
+- [ ] Unavailability overlay (hatched pattern `bg-stripes-dark`)
+- [ ] Hour grid lines
+- [ ] **Departure date marker** (blue line, `bg-blue-500`) for selected job
+
+#### v0.3.9 - Tile Component
+- [ ] Job color: border-l-4 + low-opacity background
+- [ ] **Setup/Run sections**: lighter shade (setup) + full color (run)
+- [ ] Content: completion icon + job reference + client
+- [ ] Completion icon: `circle` (incomplete) / `circle-check` (complete, emerald)
+- [ ] Completed tile: green gradient from left
+- [ ] **Swap buttons** (hover): chevron-up/down at bottom-right
+- [ ] Click behavior: single = select job, double = recall tile
+
+#### v0.3.10 - Similarity Indicators
+- [ ] **Link icons** between consecutive tiles (not circles)
+- [ ] `link` icon (zinc-400) = criterion matched
+- [ ] `unlink` icon (zinc-800) = criterion not matched
+- [ ] Position: horizontal row at top-right of lower tile
+
+### Phase 3D: Interactions
+
+#### v0.3.11 - Drag & Drop Infrastructure
+- [ ] Drag infrastructure (dnd-kit or similar)
+- [ ] Drag from Job Details Panel (unscheduled tasks only)
+- [ ] Drag preview with slight transparency
 - [ ] 30-minute snap grid
-- [ ] Day/hour markers
-- [ ] "Today" marker line
 
-#### v0.3.6 - Center Panel - Station Columns
-- [ ] Station column headers
-- [ ] Column scroll (horizontal)
-- [ ] Provider columns with subcolumns
-- [ ] Unavailability overlay (hatched)
-
-#### v0.3.7 - Center Panel - Tile Component
-- [ ] Task tile with job color
-- [ ] Setup vs run sections
-- [ ] Job reference and description
-- [ ] Start/end time display
-- [ ] Completion checkbox (manual toggle, not time-based)
-- [ ] Completion indicator visual
-
-#### v0.3.8 - Center Panel - Similarity Indicators
-- [ ] Circles between consecutive tiles
-- [ ] Filled vs hollow appearance
-- [ ] Position calculation
-
-#### v0.3.9 - Right Panel - Late Jobs
-- [ ] Late jobs list component
-- [ ] Delay amount display
-- [ ] Link to job details
-
-#### v0.3.10 - Right Panel - Job Details
-- [ ] Task list with times
-- [ ] Approval gate status
-- [ ] Paper status
-- [ ] Comments section
-
-### Phase 3C: Client-Side Validation Integration
-
-#### v0.3.11 - Validator Package Integration
-- [ ] Install @flux/schedule-validator in frontend
-- [ ] Validation utility wrapper
-- [ ] Validation result display components
-- [ ] Error message formatting
-
-#### v0.3.12 - Drag & Drop Infrastructure
-- [ ] Drag infrastructure (dnd-kit)
-- [ ] Drag preview component
-- [ ] Drop zone detection
+#### v0.3.12 - Column Focus on Drag
+- [ ] Non-target columns collapse to 120px during drag
+- [ ] Active job tiles keep color, others desaturated
+- [ ] Animation: 150ms ease-out
+- [ ] Job-colored bands show other tile positions
 
 #### v0.3.13 - Real-Time Validation During Drag
 - [ ] Validate on drag move (< 10ms)
-- [ ] Valid/invalid drop zone visualization
-- [ ] Precedence safeguard (snap to valid)
-- [ ] Alt-key bypass detection
+- [ ] Valid drop zone: highlighted
+- [ ] Invalid drop zone: red indicator
+- [ ] Precedence safeguard: auto-snap to valid position
+- [ ] ALT key bypass: allows violation with red halo warning
 
 #### v0.3.14 - Drop Handling
 - [ ] Create assignment on valid drop
-- [ ] Show conflict panel on invalid (warnings only in MVP, no hard blocks)
-- [ ] Optimistic update
+- [ ] Show conflict in Problèmes section (warnings only, no hard blocks)
+- [ ] Optimistic UI update
 - [ ] Tile insertion with push-down (capacity-1 stations)
 - [ ] Tile overlap allowed (capacity > 1 stations)
 
-### Phase 3D: Backend API Integration
+#### v0.3.15 - Tile Swap
+- [ ] Swap buttons visible on hover
+- [ ] Click swap up/down → exchange positions with adjacent tile
+- [ ] Validation on swap
+- [ ] Smooth animation
 
-#### v0.3.15 - API Client Setup
-- [ ] API client configuration
+#### v0.3.16 - Quick Placement Mode
+- [ ] Toggle: ALT+Q
+- [ ] **Placement indicator**: white glow line at snap position
+- [ ] **Active tile**: white ring/halo around tile being placed
+- [ ] **Tooltip**: task info near cursor
+- [ ] **No task available**: forbidden icon as cursor
+- [ ] Click to place task
+- [ ] Integrates with job navigation (ALT+↑/↓)
+
+### Phase 3E: Keyboard Navigation
+
+#### v0.3.17 - Keyboard Shortcuts
+- [ ] ALT+Q: Toggle Quick Placement Mode
+- [ ] ALT+D: Jump to selected job's departure date
+- [ ] ALT+↑: Previous job
+- [ ] ALT+↓: Next job
+- [ ] ALT+←: Navigate columns left
+- [ ] ALT+→: Navigate columns right
+- [ ] Home: Jump to today
+- [ ] Page Up/Down: Scroll by day
+
+### Phase 3F: Client-Side Validation
+
+#### v0.3.18 - Validator Package Integration
+- [ ] Install @flux/schedule-validator in frontend
+- [ ] Validation utility wrapper
+- [ ] Error message formatting (French)
+- [ ] Conflict type to visual mapping
+
+### Phase 3G: Backend API Integration
+
+#### v0.3.19 - API Client Setup
+- [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.3.16 - Snapshot Loading
+#### v0.3.20 - Snapshot Loading
 - [ ] Replace mock with real API
-- [ ] Loading states
+- [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.3.17 - Assignment Operations Integration
+#### v0.3.21 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
+- [ ] Toggle completion via API
 - [ ] Server validation response handling
 
-### Phase 3E: DSL Editor
+### Phase 3H: DSL Editor (Post-MVP scope)
 
-#### v0.3.18 - DSL Parser Package (see [ADR-011](../architecture/decision-records.md#adr-011--lezer-parser-system-for-task-dsl))
+> **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
+
+#### v0.3.22 - DSL Parser Package (Post-MVP)
 - [ ] `@flux/task-dsl-parser` package setup
-- [ ] Lezer grammar definition (`task-dsl.grammar`)
-- [ ] Grammar compilation and parser generation
-- [ ] Internal task syntax: [Station] setup+run "comment"
-- [ ] Outsourced task syntax: ST [Provider] ActionType duration "comment"
-- [ ] Error recovery for partial parsing
-- [ ] CodeMirror 6 language extension
-- [ ] Syntax highlighting for task DSL
-- [ ] Real-time parse error display
+- [ ] Lezer grammar definition
+- [ ] CodeMirror 6 integration
+- [ ] Syntax highlighting
 
-#### v0.3.19 - Job Creation Modal
+#### v0.3.23 - Job Creation Modal (Post-MVP)
 - [ ] Modal component
-- [ ] Required fields (reference, client, description, workshopExitDate)
-- [ ] DSL textarea with syntax highlighting (uses v0.3.18)
-- [ ] Autocomplete integration (uses v0.1.13 endpoints)
-- [ ] Validation and submission
+- [ ] DSL textarea with highlighting
+- [ ] Autocomplete integration
 
 ---
 
