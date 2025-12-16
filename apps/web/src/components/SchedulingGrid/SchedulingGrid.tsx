@@ -1,15 +1,17 @@
-import type { Station, Job, TaskAssignment, Task } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, StationCategory } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
-import { Tile } from '../Tile';
+import { Tile, compareSimilarity } from '../Tile';
 import { useEffect, useState, useMemo } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 
 export interface SchedulingGridProps {
   /** Stations to display */
   stations: Station[];
+  /** Station categories (for similarity criteria lookup) */
+  categories?: StationCategory[];
   /** All jobs (for looking up job data by ID) */
   jobs?: Job[];
   /** All tasks (for looking up task data) */
@@ -38,6 +40,7 @@ export interface SchedulingGridProps {
  */
 export function SchedulingGrid({
   stations,
+  categories = [],
   jobs = [],
   tasks = [],
   assignments = [],
@@ -77,6 +80,12 @@ export function SchedulingGrid({
     tasks.forEach((task) => map.set(task.id, task));
     return map;
   }, [tasks]);
+
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, StationCategory>();
+    categories.forEach((category) => map.set(category.id, category));
+    return map;
+  }, [categories]);
 
   // Group assignments by station (internal assignments only, not outsourced)
   const assignmentsByStation = useMemo(() => {
@@ -167,6 +176,9 @@ export function SchedulingGrid({
             {/* Station columns */}
             {stations.map((station) => {
               const stationAssignments = assignmentsByStation.get(station.id) || [];
+              const category = categoryMap.get(station.categoryId);
+              const criteria = category?.similarityCriteria || [];
+
               return (
                 <StationColumn
                   key={station.id}
@@ -189,6 +201,17 @@ export function SchedulingGrid({
                     const showSwapUp = index > 0;
                     const showSwapDown = index < stationAssignments.length - 1;
 
+                    // Calculate similarity results with previous tile (if any)
+                    let similarityResults = undefined;
+                    if (index > 0 && criteria.length > 0) {
+                      const prevAssignment = stationAssignments[index - 1];
+                      const prevTask = taskMap.get(prevAssignment.taskId);
+                      const prevJob = prevTask ? jobMap.get(prevTask.jobId) : null;
+                      if (prevJob) {
+                        similarityResults = compareSimilarity(prevJob, job, criteria);
+                      }
+                    }
+
                     return (
                       <Tile
                         key={assignment.id}
@@ -199,6 +222,7 @@ export function SchedulingGrid({
                         isSelected={selectedJobId === job.id}
                         showSwapUp={showSwapUp}
                         showSwapDown={showSwapDown}
+                        similarityResults={similarityResults}
                         onSelect={onSelectJob}
                         onRecall={onRecallAssignment}
                         onSwapUp={onSwapUp}

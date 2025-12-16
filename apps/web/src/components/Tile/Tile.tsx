@@ -2,7 +2,9 @@ import { Circle, CircleCheck } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
+import { SimilarityIndicators } from './SimilarityIndicators';
 import { getJobColorClasses } from './colorUtils';
+import type { SimilarityResult } from './similarityUtils';
 
 export interface TileProps {
   /** Task assignment data */
@@ -27,6 +29,8 @@ export interface TileProps {
   showSwapDown?: boolean;
   /** Whether this tile's job is selected */
   isSelected?: boolean;
+  /** Similarity comparison results with previous tile (if any) */
+  similarityResults?: SimilarityResult[];
 }
 
 /**
@@ -52,6 +56,7 @@ export function Tile({
   showSwapUp = true,
   showSwapDown = true,
   isSelected = false,
+  similarityResults,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const totalMinutes = setupMinutes + runMinutes;
@@ -110,6 +115,11 @@ export function Tile({
         if (e.key === 'Enter') handleClick();
       }}
     >
+      {/* Similarity indicators (shown at top of tile, overlapping junction with previous tile) */}
+      {similarityResults && similarityResults.length > 0 && (
+        <SimilarityIndicators results={similarityResults} />
+      )}
+
       {/* Setup section (if has setup time) */}
       {hasSetup && (
         <div
