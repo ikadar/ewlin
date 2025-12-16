@@ -38,6 +38,7 @@ function App() {
       />
       <SchedulingGrid
         stations={snapshot.stations}
+        categories={snapshot.categories}
         jobs={snapshot.jobs}
         tasks={snapshot.tasks}
         assignments={snapshot.assignments}

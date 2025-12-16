@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Tile } from './Tile';
 import { SwapButtons } from './SwapButtons';
+import { SimilarityIndicators } from './SimilarityIndicators';
 import { hexToTailwindColor, getColorClasses, getJobColorClasses } from './colorUtils';
 import type { TaskAssignment, InternalTask, Job } from '@flux/types';
 
@@ -343,5 +344,99 @@ describe('Tile', () => {
     const tile = screen.getByTestId('tile-assignment-1');
     expect(tile).toHaveAttribute('role', 'button');
     expect(tile).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('renders similarity indicators when provided', () => {
+    const similarityResults = [
+      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
+      { criterion: { id: 'crit-2', name: 'Same client', fieldPath: 'client' }, isMatched: false },
+    ];
+
+    render(<Tile {...defaultProps} similarityResults={similarityResults} />);
+
+    expect(screen.getByTestId('similarity-indicators')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/similarity-icon-/)).toHaveLength(2);
+  });
+
+  it('does not render similarity indicators when not provided', () => {
+    render(<Tile {...defaultProps} />);
+
+    expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
+  });
+
+  it('does not render similarity indicators when empty array', () => {
+    render(<Tile {...defaultProps} similarityResults={[]} />);
+
+    expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
+  });
+});
+
+describe('SimilarityIndicators', () => {
+  it('renders link icon for matched criterion', () => {
+    const results = [
+      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
+    ];
+
+    render(<SimilarityIndicators results={results} />);
+
+    expect(screen.getByTestId('similarity-link-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('similarity-unlink-icon')).not.toBeInTheDocument();
+  });
+
+  it('renders unlink icon for non-matched criterion', () => {
+    const results = [
+      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: false },
+    ];
+
+    render(<SimilarityIndicators results={results} />);
+
+    expect(screen.getByTestId('similarity-unlink-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('similarity-link-icon')).not.toBeInTheDocument();
+  });
+
+  it('renders mixed icons for mixed results', () => {
+    const results = [
+      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
+      { criterion: { id: 'crit-2', name: 'Same client', fieldPath: 'client' }, isMatched: false },
+      { criterion: { id: 'crit-3', name: 'Same color', fieldPath: 'color' }, isMatched: true },
+    ];
+
+    render(<SimilarityIndicators results={results} />);
+
+    const linkIcons = screen.getAllByTestId('similarity-link-icon');
+    const unlinkIcons = screen.getAllByTestId('similarity-unlink-icon');
+
+    expect(linkIcons).toHaveLength(2);
+    expect(unlinkIcons).toHaveLength(1);
+  });
+
+  it('renders nothing when results array is empty', () => {
+    const { container } = render(<SimilarityIndicators results={[]} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('displays correct number of icons', () => {
+    const results = [
+      { criterion: { id: 'crit-1', name: 'Paper', fieldPath: 'p' }, isMatched: true },
+      { criterion: { id: 'crit-2', name: 'Client', fieldPath: 'c' }, isMatched: true },
+      { criterion: { id: 'crit-3', name: 'Color', fieldPath: 'col' }, isMatched: false },
+      { criterion: { id: 'crit-4', name: 'Size', fieldPath: 's' }, isMatched: true },
+    ];
+
+    render(<SimilarityIndicators results={results} />);
+
+    const icons = screen.getAllByTestId(/similarity-icon-/);
+    expect(icons).toHaveLength(4);
+  });
+
+  it('has correct styling classes', () => {
+    const results = [
+      { criterion: { id: 'crit-1', name: 'Paper', fieldPath: 'p' }, isMatched: true },
+    ];
+
+    render(<SimilarityIndicators results={results} />);
+
+    const container = screen.getByTestId('similarity-indicators');
+    expect(container).toHaveClass('absolute', 'right-3', 'flex', 'gap-0.5');
   });
 });
