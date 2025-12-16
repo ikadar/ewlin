@@ -425,11 +425,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 > **Layout:** Sidebar | Jobs List | Job Details | Date Strip | Timeline | Station Columns
 > **No Right Panel** — problems shown in Jobs List "Problèmes" section
 
-#### v0.3.2 - Sidebar Component
-- [ ] Fixed width (w-14 / 56px)
-- [ ] Navigation icons: layout-grid (active), calendar, settings
-- [ ] Active/inactive/hover states
-- [ ] Settings icon (disabled for MVP)
+#### v0.3.2 - Sidebar Component ✅
+- [x] Fixed width (w-14 / 56px)
+- [x] Navigation icons: layout-grid (active), calendar, settings
+- [x] Active/inactive/hover states
+- [x] Settings icon (disabled for MVP)
 
 #### v0.3.3 - Jobs List Component
 - [ ] Fixed width (w-72 / 288px)
