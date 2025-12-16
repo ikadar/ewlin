@@ -110,12 +110,43 @@ Continue only after approval!
 
 ---
 
-### Phase 4: Documentation Update
+### Phase 4: Tag and Release
+
+1. **Create git tag on ux-ui-development:**
+   ```bash
+   git tag -a v{VERSION} -m "v{VERSION} - {Title}"
+   git push origin v{VERSION}
+   ```
+
+2. **Create GitHub release:**
+   ```bash
+   gh release create v{VERSION} \
+     --target ux-ui-development \
+     --title "v{VERSION} - {Title}" \
+     --notes "$(cat <<'EOF'
+   ## Summary
+   {Brief description}
+
+   ## Features
+   - Feature 1
+   - Feature 2
+
+   ## Notes
+   - This is a UI development release (ux-ui-development branch)
+   - Not yet merged to main
+   EOF
+   )"
+   ```
+
+---
+
+### Phase 5: Documentation Update
 
 1. **Update documents:**
    - `docs/roadmap/release-roadmap.md` - mark release as completed
    - `docs/releases/v{VERSION}-*.md`:
-     - Status: Implemented (on ux-ui-development)
+     - Status: ✅ Released (on ux-ui-development)
+     - Release Date: current date
      - Feature checklist: all checked
      - Definition of Done: all checked
 
@@ -135,8 +166,8 @@ Continue only after approval!
 - **ALWAYS** use feature branches, never commit directly to `ux-ui-development`
 - **ALWAYS** use TodoWrite to track progress
 - **ALWAYS** run lint, typecheck, and tests
+- **ALWAYS** create git tag and GitHub release after merge
 - **NEVER** merge into `main` - only merge into `ux-ui-development`
-- **NEVER** create git tags or GitHub releases (that happens after main merge)
 - Commit messages in English, communication in the user's language
 
 ## Affected Repository
