@@ -443,15 +443,15 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Selected job highlight (bg-white/10, border)
 - [ ] Keyboard navigation (ALT+↑/↓) - deferred
 
-#### v0.3.4 - Job Details Panel
-- [ ] Fixed width (w-72 / 288px)
-- [ ] Job info: Code, Client, Intitulé, Départ
-- [ ] Status section: BAT, Papier, Plaques (read-only for MVP)
-- [ ] **Task List** with two visual states:
+#### v0.3.4 - Job Details Panel ✅
+- [x] Fixed width (w-72 / 288px)
+- [x] Job info: Code, Client, Intitulé, Départ
+- [x] Status section: BAT, Papier, Plaques (read-only for MVP)
+- [x] **Task List** with two visual states:
   - Unscheduled: Full job color, border-l-4, draggable
   - Scheduled: Dark placeholder, station + datetime only
-- [ ] Single-click scheduled task → scroll grid to tile
-- [ ] Double-click scheduled task → recall (unschedule)
+- [ ] Single-click scheduled task → scroll grid to tile (deferred - requires grid)
+- [ ] Double-click scheduled task → recall (deferred - requires grid integration)
 
 #### v0.3.5 - Date Strip Component
 - [ ] Fixed width (w-12 / 48px)
