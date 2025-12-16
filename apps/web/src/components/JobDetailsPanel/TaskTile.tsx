@@ -1,5 +1,4 @@
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import type { Task, TaskAssignment, Station, Job } from '@flux/types';
 import type { TaskDragData } from '../../App';
 
@@ -31,17 +30,14 @@ export function TaskTile({ task, job, jobColor, assignment, station }: TaskTileP
     job,
   };
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task-${task.id}`,
     data: dragData,
     disabled: isScheduled, // Only unscheduled tasks are draggable
   });
 
-  const style = transform
-    ? {
-        transform: CSS.Translate.toString(transform),
-      }
-    : undefined;
+  // Note: We don't apply transform here because we use DragOverlay for the preview.
+  // The source element stays in place while dragging.
 
   // Format duration as Xh YY
   const formatDuration = (): string => {
@@ -156,7 +152,6 @@ export function TaskTile({ task, job, jobColor, assignment, station }: TaskTileP
         height: `${height}px`,
         borderLeftColor: jobColor,
         backgroundColor: colorStyles.backgroundColor,
-        ...style,
       }}
       data-testid={`task-tile-${task.id}`}
     >

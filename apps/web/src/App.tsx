@@ -296,6 +296,7 @@ function App() {
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
+      autoScroll={false}
     >
       <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
         <Sidebar />
