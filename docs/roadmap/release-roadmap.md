@@ -462,12 +462,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3C: Scheduling Grid
 
-#### v0.3.6 - Timeline Column
-- [ ] Fixed width (w-12 / 48px)
-- [ ] Hour markers with grid lines
-- [ ] 30-minute and 15-minute tick marks
-- [ ] "Now" line (red, `bg-red-500`) with time label
-- [ ] **Synchronized vertical scroll** with station columns
+#### v0.3.6 - Timeline Column ✅
+- [x] Fixed width (w-12 / 48px)
+- [x] Hour markers with grid lines
+- [x] 30-minute and 15-minute tick marks
+- [x] "Now" line (red, `bg-red-500`) with time label
+- [ ] **Synchronized vertical scroll** with station columns (deferred - requires station columns)
 
 #### v0.3.7 - Station Column Headers
 - [ ] Sticky header row (z-30)
