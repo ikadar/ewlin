@@ -1,7 +1,15 @@
 import type { ReactNode } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 import type { Station, DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
+import type { TaskDragData } from '../../App';
+
+/** Data attached to droppable station columns */
+export interface StationDropData {
+  type: 'station-column';
+  stationId: string;
+}
 
 export interface StationColumnProps {
   /** Station to display */
@@ -36,6 +44,7 @@ function getDaySchedule(station: Station, dayOfWeek: number): DaySchedule {
 
 /**
  * StationColumn - Individual station column with grid lines and unavailability overlay.
+ * Acts as a drop target for task tiles.
  */
 export function StationColumn({
   station,
@@ -44,6 +53,24 @@ export function StationColumn({
   dayOfWeek,
   children,
 }: StationColumnProps) {
+  // Set up droppable
+  const dropData: StationDropData = {
+    type: 'station-column',
+    stationId: station.id,
+  };
+
+  const { setNodeRef, isOver, active } = useDroppable({
+    id: `station-${station.id}`,
+    data: dropData,
+  });
+
+  // Check if the dragged task belongs to this station
+  const activeData = active?.data.current as TaskDragData | undefined;
+  const isValidDropTarget =
+    activeData?.type === 'task' &&
+    activeData.task.type === 'Internal' &&
+    activeData.task.stationId === station.id;
+
   // Use current day if not specified
   const effectiveDayOfWeek = dayOfWeek ?? new Date().getDay();
   const daySchedule = getDaySchedule(station, effectiveDayOfWeek);
@@ -57,9 +84,19 @@ export function StationColumn({
     gridLines.push(i * PIXELS_PER_HOUR);
   }
 
+  // Determine highlight style based on drag state
+  const getHighlightClass = () => {
+    if (!active) return '';
+    if (isValidDropTarget) {
+      return isOver ? 'ring-2 ring-green-500/50 bg-green-500/5' : 'ring-1 ring-green-500/30';
+    }
+    return '';
+  };
+
   return (
     <div
-      className="w-60 shrink-0 bg-[#0a0a0a] relative"
+      ref={setNodeRef}
+      className={`w-60 shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ${getHighlightClass()}`}
       style={{ height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
     >
