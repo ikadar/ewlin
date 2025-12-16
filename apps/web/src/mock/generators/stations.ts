@@ -1,266 +1,302 @@
+/**
+ * Station Generators
+ * Generate mock stations, categories, groups, and providers for testing.
+ */
+
 import type {
   Station,
   StationCategory,
   StationGroup,
-  OutsourcedProvider,
   OperatingSchedule,
-} from '../../types';
+  DaySchedule,
+  TimeSlot,
+  ScheduleException,
+  SimilarityCriterion,
+  OutsourcedProvider,
+  StationStatus,
+  ProviderStatus,
+} from '@flux/types';
 
-// Default operating schedule: Monday-Friday, 6:00-12:00 and 13:00-17:00 (with lunch break)
-const defaultOperatingSchedule: OperatingSchedule = {
-  weeklyPattern: [
-    { dayOfWeek: 1, timeSlots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] }, // Monday
-    { dayOfWeek: 2, timeSlots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] }, // Tuesday
-    { dayOfWeek: 3, timeSlots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] }, // Wednesday
-    { dayOfWeek: 4, timeSlots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] }, // Thursday
-    { dayOfWeek: 5, timeSlots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] }, // Friday
-  ],
-};
+// ============================================================================
+// Similarity Criteria
+// ============================================================================
 
-// Extended schedule for high-demand stations
-const extendedOperatingSchedule: OperatingSchedule = {
-  weeklyPattern: [
-    { dayOfWeek: 1, timeSlots: [{ start: '05:00', end: '21:00' }] },
-    { dayOfWeek: 2, timeSlots: [{ start: '05:00', end: '21:00' }] },
-    { dayOfWeek: 3, timeSlots: [{ start: '05:00', end: '21:00' }] },
-    { dayOfWeek: 4, timeSlots: [{ start: '05:00', end: '21:00' }] },
-    { dayOfWeek: 5, timeSlots: [{ start: '05:00', end: '21:00' }] },
-    { dayOfWeek: 6, timeSlots: [{ start: '06:00', end: '12:00' }] }, // Saturday morning
-  ],
-};
+const OFFSET_PRESS_CRITERIA: SimilarityCriterion[] = [
+  { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'paperType' },
+  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+  { id: 'crit-inking', name: 'Même encrage', fieldPath: 'inking' },
+];
 
+const FINISHING_CRITERIA: SimilarityCriterion[] = [
+  { id: 'crit-paper-weight', name: 'Même grammage', fieldPath: 'paperWeight' },
+  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+];
+
+const CUTTING_CRITERIA: SimilarityCriterion[] = [
+  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+];
+
+// ============================================================================
 // Station Categories
-export function generateCategories(): StationCategory[] {
+// ============================================================================
+
+export function generateStationCategories(): StationCategory[] {
   return [
     {
       id: 'cat-offset',
-      name: 'Offset Printing Press',
-      similarityCriteria: [
-        { code: 'paper_type', name: 'Same paper type', fieldPath: 'paperType' },
-        { code: 'paper_size', name: 'Same paper size', fieldPath: 'paperFormat' },
-        { code: 'paper_weight', name: 'Same paper weight', fieldPath: 'paperWeight' },
-        { code: 'inking', name: 'Same inking', fieldPath: 'inking' },
-      ],
+      name: 'Presses Offset',
+      description: 'Machines d\'impression offset',
+      similarityCriteria: OFFSET_PRESS_CRITERIA,
     },
     {
       id: 'cat-digital',
-      name: 'Digital Press',
+      name: 'Impression Numérique',
+      description: 'Machines d\'impression numérique',
       similarityCriteria: [
-        { code: 'paper_type', name: 'Same paper type', fieldPath: 'paperType' },
-        { code: 'paper_size', name: 'Same paper size', fieldPath: 'paperFormat' },
-      ],
-    },
-    {
-      id: 'cat-finishing',
-      name: 'Finishing Equipment',
-      similarityCriteria: [
-        { code: 'paper_weight', name: 'Same paper weight', fieldPath: 'paperWeight' },
+        { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'paperType' },
       ],
     },
     {
       id: 'cat-cutting',
-      name: 'Cutting Equipment',
-      similarityCriteria: [
-        { code: 'paper_size', name: 'Same paper size', fieldPath: 'paperFormat' },
-      ],
+      name: 'Massicots',
+      description: 'Machines de découpe',
+      similarityCriteria: CUTTING_CRITERIA,
     },
     {
-      id: 'cat-binding',
-      name: 'Binding Equipment',
-      similarityCriteria: [
-        { code: 'binding_type', name: 'Same binding type', fieldPath: 'bindingType' },
-      ],
+      id: 'cat-finishing',
+      name: 'Finition',
+      description: 'Machines de finition (pliage, reliure, etc.)',
+      similarityCriteria: FINISHING_CRITERIA,
+    },
+    {
+      id: 'cat-outsourced',
+      name: 'Sous-traitance',
+      description: 'Travaux externalisés',
+      similarityCriteria: [],
     },
   ];
 }
 
+// ============================================================================
 // Station Groups
-export function generateGroups(): StationGroup[] {
+// ============================================================================
+
+export function generateStationGroups(): StationGroup[] {
   return [
     {
       id: 'grp-offset',
-      name: 'Offset Presses',
-      maxConcurrent: 2, // Only 2 offset presses can run simultaneously (operator limitation)
+      name: 'Presses Offset',
+      maxConcurrent: 2,
       isOutsourcedProviderGroup: false,
     },
     {
       id: 'grp-digital',
-      name: 'Digital Presses',
-      maxConcurrent: null, // Unlimited
-      isOutsourcedProviderGroup: false,
-    },
-    {
-      id: 'grp-finishing',
-      name: 'Finishing',
-      maxConcurrent: 3,
+      name: 'Impression Numérique',
+      maxConcurrent: 2,
       isOutsourcedProviderGroup: false,
     },
     {
       id: 'grp-cutting',
-      name: 'Cutting',
-      maxConcurrent: 1, // Only one cutting job at a time
+      name: 'Massicots',
+      maxConcurrent: 1,
       isOutsourcedProviderGroup: false,
     },
+    {
+      id: 'grp-finishing',
+      name: 'Finition',
+      maxConcurrent: 3,
+      isOutsourcedProviderGroup: false,
+    },
+    // Provider groups (unlimited capacity)
+    {
+      id: 'grp-clement',
+      name: 'Clément',
+      maxConcurrent: null,
+      isOutsourcedProviderGroup: true,
+    },
+    {
+      id: 'grp-reliure',
+      name: 'Reliure Express',
+      maxConcurrent: null,
+      isOutsourcedProviderGroup: true,
+    },
   ];
 }
 
-// Stations
-export function generateStations(): Station[] {
+// ============================================================================
+// Operating Schedules
+// ============================================================================
+
+function createDaySchedule(isOperating: boolean, slots: TimeSlot[] = []): DaySchedule {
+  return { isOperating, slots };
+}
+
+function createStandardWorkday(): DaySchedule {
+  return createDaySchedule(true, [
+    { start: '06:00', end: '12:00' },
+    { start: '13:00', end: '22:00' },
+  ]);
+}
+
+function createExtendedWorkday(): DaySchedule {
+  return createDaySchedule(true, [
+    { start: '00:00', end: '05:00' },
+    { start: '06:00', end: '24:00' },
+  ]);
+}
+
+function createClosedDay(): DaySchedule {
+  return createDaySchedule(false, []);
+}
+
+export function generateOperatingSchedule(type: 'standard' | 'extended' | '24h' = 'standard'): OperatingSchedule {
+  if (type === '24h') {
+    const fullDay = createDaySchedule(true, [{ start: '00:00', end: '24:00' }]);
+    return {
+      monday: fullDay,
+      tuesday: fullDay,
+      wednesday: fullDay,
+      thursday: fullDay,
+      friday: fullDay,
+      saturday: createClosedDay(),
+      sunday: createClosedDay(),
+    };
+  }
+
+  if (type === 'extended') {
+    return {
+      monday: createExtendedWorkday(),
+      tuesday: createExtendedWorkday(),
+      wednesday: createExtendedWorkday(),
+      thursday: createExtendedWorkday(),
+      friday: createExtendedWorkday(),
+      saturday: createClosedDay(),
+      sunday: createClosedDay(),
+    };
+  }
+
+  // Standard schedule
+  return {
+    monday: createStandardWorkday(),
+    tuesday: createStandardWorkday(),
+    wednesday: createStandardWorkday(),
+    thursday: createStandardWorkday(),
+    friday: createStandardWorkday(),
+    saturday: createClosedDay(),
+    sunday: createClosedDay(),
+  };
+}
+
+export function generateScheduleExceptions(stationId: string): ScheduleException[] {
+  // Generate a few schedule exceptions for testing
+  const today = new Date();
+  const nextMonth = new Date(today);
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+
   return [
-    // Offset Presses
     {
-      id: 'station-komori-g37',
-      name: 'Komori G37',
-      categoryId: 'cat-offset',
-      groupId: 'grp-offset',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: extendedOperatingSchedule,
-      exceptions: [],
+      id: `exc-${stationId}-christmas`,
+      date: `${today.getFullYear()}-12-25`,
+      schedule: createClosedDay(),
+      reason: 'Noël',
     },
     {
-      id: 'station-komori-xl',
-      name: 'Komori XL 106',
-      categoryId: 'cat-offset',
-      groupId: 'grp-offset',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: extendedOperatingSchedule,
-      exceptions: [],
-    },
-    {
-      id: 'station-heidelberg',
-      name: 'Heidelberg SM 52',
-      categoryId: 'cat-offset',
-      groupId: 'grp-offset',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: defaultOperatingSchedule,
-      exceptions: [],
-    },
-    // Digital Presses
-    {
-      id: 'station-xerox',
-      name: 'Xerox Iridesse',
-      categoryId: 'cat-digital',
-      groupId: 'grp-digital',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: defaultOperatingSchedule,
-      exceptions: [],
-    },
-    {
-      id: 'station-canon',
-      name: 'Canon imagePRESS',
-      categoryId: 'cat-digital',
-      groupId: 'grp-digital',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: defaultOperatingSchedule,
-      exceptions: [],
-    },
-    // Finishing
-    {
-      id: 'station-vernisseuse',
-      name: 'Vernisseuse UV',
-      categoryId: 'cat-finishing',
-      groupId: 'grp-finishing',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: defaultOperatingSchedule,
-      exceptions: [],
-    },
-    {
-      id: 'station-plieuse',
-      name: 'Plieuse MBO',
-      categoryId: 'cat-finishing',
-      groupId: 'grp-finishing',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: defaultOperatingSchedule,
-      exceptions: [],
-    },
-    // Cutting
-    {
-      id: 'station-massicot',
-      name: 'Massicot Polar',
-      categoryId: 'cat-cutting',
-      groupId: 'grp-cutting',
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: extendedOperatingSchedule,
-      exceptions: [],
-    },
-    // Binding
-    {
-      id: 'station-reliure',
-      name: 'Reliure Horizon',
-      categoryId: 'cat-binding',
-      groupId: null,
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: defaultOperatingSchedule,
-      exceptions: [],
-    },
-    // Packaging/Conditioning
-    {
-      id: 'station-conditionnement',
-      name: 'Conditionnement',
-      categoryId: 'cat-finishing',
-      groupId: null,
-      capacity: 1,
-      status: 'Available',
-      operatingSchedule: defaultOperatingSchedule,
-      exceptions: [],
+      id: `exc-${stationId}-newyear`,
+      date: `${today.getFullYear() + 1}-01-01`,
+      schedule: createClosedDay(),
+      reason: 'Jour de l\'an',
     },
   ];
 }
 
+// ============================================================================
+// Stations
+// ============================================================================
+
+interface StationDefinition {
+  id: string;
+  name: string;
+  categoryId: string;
+  groupId: string;
+  scheduleType: 'standard' | 'extended' | '24h';
+}
+
+const STATION_DEFINITIONS: StationDefinition[] = [
+  // Offset presses
+  { id: 'sta-komori-g40', name: 'Komori G40', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'extended' },
+  { id: 'sta-heidelberg-sm', name: 'Heidelberg Speedmaster', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'extended' },
+  { id: 'sta-komori-ls', name: 'Komori LS29', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'standard' },
+
+  // Digital presses
+  { id: 'sta-xerox', name: 'Xerox Versant', categoryId: 'cat-digital', groupId: 'grp-digital', scheduleType: 'standard' },
+  { id: 'sta-hp-indigo', name: 'HP Indigo 7900', categoryId: 'cat-digital', groupId: 'grp-digital', scheduleType: 'standard' },
+
+  // Cutters
+  { id: 'sta-polar-137', name: 'Polar 137', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
+  { id: 'sta-massicot', name: 'Massicot Ideal', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
+
+  // Finishing
+  { id: 'sta-stahl', name: 'Stahl TH82', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
+  { id: 'sta-muller', name: 'Muller Martini', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
+  { id: 'sta-horizon', name: 'Horizon BQ-270', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
+];
+
+export function generateStations(): Station[] {
+  return STATION_DEFINITIONS.map((def): Station => ({
+    id: def.id,
+    name: def.name,
+    status: 'Available' as StationStatus,
+    categoryId: def.categoryId,
+    groupId: def.groupId,
+    capacity: 1,
+    operatingSchedule: generateOperatingSchedule(def.scheduleType),
+    exceptions: generateScheduleExceptions(def.id),
+  }));
+}
+
+// ============================================================================
 // Outsourced Providers
+// ============================================================================
+
 export function generateProviders(): OutsourcedProvider[] {
   return [
     {
       id: 'prov-clement',
       name: 'Clément',
-      supportedActionTypes: ['Pelliculage', 'Dorure', 'Gaufrage'],
+      status: 'Active' as ProviderStatus,
+      supportedActionTypes: ['Pelliculage', 'Dorure', 'Vernis UV', 'Gaufrage'],
       latestDepartureTime: '14:00',
       receptionTime: '09:00',
-      groupId: 'grp-prov-clement',
-      status: 'Active',
+      groupId: 'grp-clement',
     },
     {
-      id: 'prov-abc',
-      name: 'ABC Finishing',
-      supportedActionTypes: ['Reliure', 'Dorure', 'Découpe'],
-      latestDepartureTime: '15:00',
+      id: 'prov-reliure',
+      name: 'Reliure Express',
+      status: 'Active' as ProviderStatus,
+      supportedActionTypes: ['Reliure dos carré collé', 'Reliure spirale', 'Reliure Wire-O'],
+      latestDepartureTime: '12:00',
       receptionTime: '10:00',
-      groupId: 'grp-prov-abc',
-      status: 'Active',
-    },
-    {
-      id: 'prov-express',
-      name: 'Express Logistics',
-      supportedActionTypes: ['Transport', 'Livraison'],
-      latestDepartureTime: '16:00',
-      receptionTime: '08:00',
-      groupId: 'grp-prov-express',
-      status: 'Active',
+      groupId: 'grp-reliure',
     },
   ];
 }
 
-// Provider groups (auto-generated, unlimited capacity)
-export function generateProviderGroups(): StationGroup[] {
-  const providers = generateProviders();
-  return providers.map((provider) => ({
-    id: provider.groupId,
-    name: `${provider.name} (Provider)`,
-    maxConcurrent: null, // Providers have unlimited capacity
-    isOutsourcedProviderGroup: true,
-  }));
+// ============================================================================
+// Combined Generator
+// ============================================================================
+
+export interface StationData {
+  categories: StationCategory[];
+  groups: StationGroup[];
+  stations: Station[];
+  providers: OutsourcedProvider[];
 }
 
-// Get all groups (stations + providers)
-export function generateAllGroups(): StationGroup[] {
-  return [...generateGroups(), ...generateProviderGroups()];
+export function generateAllStationData(): StationData {
+  return {
+    categories: generateStationCategories(),
+    groups: generateStationGroups(),
+    stations: generateStations(),
+    providers: generateProviders(),
+  };
 }

@@ -1,309 +1,329 @@
-import { faker } from '@faker-js/faker';
-import { addDays } from 'date-fns';
-import type { Job, Task, JobStatus, TaskStatus, PaperPurchaseStatus, PlatesStatus, JobComment } from '../../types';
-import { generateStations, generateProviders } from './stations';
+/**
+ * Job Generators
+ * Generate mock jobs with tasks for testing.
+ */
 
-// Print shop specific data
-const CLIENTS = [
-  'Fibois Grand Est',
-  'Crédit Mutuel',
-  'Région Grand Est',
-  'EDF',
-  'SNCF',
-  'Mulhouse Alsace Agglomération',
-  'Université de Strasbourg',
-  'CCI Alsace',
-  'Conseil Départemental 67',
-  'Eurométropole',
-];
+import { faker } from '@faker-js/faker/locale/fr';
+import type {
+  Job,
+  JobStatus,
+  PaperPurchaseStatus,
+  PlatesStatus,
+  Task,
+  InternalTask,
+  OutsourcedTask,
+  TaskStatus,
+  LateJob,
+} from '@flux/types';
 
-const PAPER_TYPES = ['CB300', 'Couché Mat 135g', 'Couché Brillant 170g', 'Offset 80g', 'Recyclé 90g', 'Création 250g'];
-const PAPER_FORMATS = ['45x64', '52x72', '63x88', '70x100', '64x90'];
+// ============================================================================
+// Constants
+// ============================================================================
 
 const JOB_COLORS = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#84CC16', // Lime
-  '#F97316', // Orange
-  '#6366F1', // Indigo
+  '#3B82F6', // blue
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#F59E0B', // amber
+  '#10B981', // emerald
+  '#EF4444', // red
+  '#06B6D4', // cyan
+  '#84CC16', // lime
+  '#F97316', // orange
+  '#6366F1', // indigo
 ];
 
-const PRODUCT_TYPES = [
-  'Cartes de visite',
-  'Brochures',
-  'Flyers',
-  'Affiches',
-  'Catalogues',
-  'Dépliants',
-  'Enveloppes',
-  'Papier à en-tête',
-  'Cartes de voeux',
-  'Calendriers',
+const PAPER_TYPES = ['CB 135g', 'CB 300g', 'CB 350g', 'Couché mat 170g', 'Couché brillant 250g', 'Offset 80g', 'Kraft 120g'];
+const PAPER_FORMATS = ['45x64', '52x74', '63x88', '70x100', 'A4', 'A3', 'SRA3'];
+
+const CLIENT_NAMES = [
+  'Autosphere',
+  'Carrefour',
+  'Décathlon',
+  'E.Leclerc',
+  'FNAC',
+  'Galeries Lafayette',
+  'Ikea',
+  'Leroy Merlin',
+  'Mairie de Paris',
+  'Orange',
+];
+
+const JOB_DESCRIPTIONS = [
+  'Cartes de voeux - 9,9 x 21 cm',
+  'Brochures A4 - 16 pages',
+  'Affiches A2 - quadri',
+  'Dépliants 3 volets',
+  'Catalogues 48 pages',
+  'Flyers A5 - recto/verso',
+  'Calendriers muraux',
   'Chemises à rabats',
-  'Livrets',
+  'Enveloppes personnalisées',
+  'Carnets de bons',
 ];
 
-export interface GeneratedJobData {
-  job: Job;
+const PROVIDER_IDS = ['prov-clement', 'prov-reliure'];
+const PROVIDER_ACTION_TYPES: Record<string, string[]> = {
+  'prov-clement': ['Pelliculage', 'Dorure', 'Vernis UV'],
+  'prov-reliure': ['Reliure dos carré collé', 'Reliure spirale'],
+};
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+function randomElement<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// Get stations and providers for task generation
-const stations = generateStations();
-const providers = generateProviders();
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-// Station name to ID mapping
-const stationMap = new Map(stations.map(s => [s.name.toLowerCase().replace(/\s+/g, '_'), s]));
-const providerMap = new Map(providers.map(p => [p.name.toLowerCase().replace(/\s+/g, '_'), p]));
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
 
-function generateTasksForJob(jobId: string, jobStatus: JobStatus): Task[] {
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function formatTimestamp(date: Date): string {
+  return date.toISOString();
+}
+
+// ============================================================================
+// Task Generators
+// ============================================================================
+
+interface TaskGeneratorOptions {
+  jobId: string;
+  startSequence?: number;
+  includeOutsourced?: boolean;
+}
+
+function generateInternalTask(
+  jobId: string,
+  sequenceOrder: number,
+  stationId: string,
+  status: TaskStatus = 'Ready'
+): InternalTask {
+  const now = new Date();
+  return {
+    id: `task-${jobId}-${sequenceOrder}`,
+    jobId,
+    sequenceOrder,
+    status,
+    type: 'Internal',
+    stationId,
+    duration: {
+      setupMinutes: randomInt(10, 45),
+      runMinutes: randomInt(30, 180),
+    },
+    comment: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
+    createdAt: formatTimestamp(now),
+    updatedAt: formatTimestamp(now),
+  };
+}
+
+function generateOutsourcedTask(
+  jobId: string,
+  sequenceOrder: number,
+  providerId: string,
+  actionType: string,
+  status: TaskStatus = 'Ready'
+): OutsourcedTask {
+  const now = new Date();
+  return {
+    id: `task-${jobId}-${sequenceOrder}`,
+    jobId,
+    sequenceOrder,
+    status,
+    type: 'Outsourced',
+    providerId,
+    actionType,
+    duration: {
+      openDays: randomInt(1, 3),
+      latestDepartureTime: providerId === 'prov-clement' ? '14:00' : '12:00',
+      receptionTime: providerId === 'prov-clement' ? '09:00' : '10:00',
+    },
+    comment: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.2 }),
+    createdAt: formatTimestamp(now),
+    updatedAt: formatTimestamp(now),
+  };
+}
+
+export function generateTasksForJob(options: TaskGeneratorOptions): Task[] {
+  const { jobId, startSequence = 0, includeOutsourced = true } = options;
   const tasks: Task[] = [];
+  let seq = startSequence;
 
-  // Generate 2-5 tasks per job
-  const patterns = [
-    // Pattern 1: Print + Cut
-    ['Komori G37:20+60', 'Massicot Polar:15'],
-    // Pattern 2: Print + Finishing + Cut + Pack
-    ['Komori XL 106:30+90', 'Vernisseuse UV:20+30', 'Massicot Polar:20', 'Conditionnement:30'],
-    // Pattern 3: Print + Outsource + Cut
-    ['Heidelberg SM 52:25+45', 'ST Clément Pelliculage 2JO', 'Massicot Polar:15'],
-    // Pattern 4: Digital + Fold + Pack
-    ['Xerox Iridesse:10+30', 'Plieuse MBO:15+20', 'Conditionnement:20'],
-    // Pattern 5: Print + Multiple finishing
-    ['Komori G37:20+120', 'Vernisseuse UV:15+25', 'Plieuse MBO:20+30', 'Massicot Polar:25', 'Conditionnement:45'],
-  ];
+  // Typical workflow: Print → Cut → (optional: Outsourced finishing) → Fold/Bind
 
-  const pattern = faker.helpers.arrayElement(patterns);
+  // 1. Printing task (offset or digital)
+  const printStation = randomElement(['sta-komori-g40', 'sta-heidelberg-sm', 'sta-xerox', 'sta-hp-indigo']);
+  tasks.push(generateInternalTask(jobId, seq++, printStation));
 
-  pattern.forEach((taskDef, index) => {
-    const taskId = faker.string.uuid();
+  // 2. Cutting task
+  const cutStation = randomElement(['sta-polar-137', 'sta-massicot']);
+  tasks.push(generateInternalTask(jobId, seq++, cutStation));
 
-    if (taskDef.startsWith('ST ')) {
-      // Outsourced task: ST [Provider] ActionType NJO
-      const match = taskDef.match(/ST (\w+) (\w+) (\d+)JO/);
-      if (match) {
-        const providerName = match[1];
-        const actionType = match[2];
-        const days = parseInt(match[3], 10);
-        const provider = providerMap.get(providerName.toLowerCase());
+  // 3. Optional outsourced finishing
+  if (includeOutsourced && Math.random() > 0.5) {
+    const providerId = randomElement(PROVIDER_IDS);
+    const actionTypes = PROVIDER_ACTION_TYPES[providerId];
+    const actionType = randomElement(actionTypes);
+    tasks.push(generateOutsourcedTask(jobId, seq++, providerId, actionType));
+  }
 
-        tasks.push({
-          id: taskId,
-          jobId,
-          sequenceOrder: index + 1,
-          type: 'outsourced',
-          stationId: null,
-          stationName: null,
-          setupMinutes: 0,
-          runMinutes: 0,
-          totalMinutes: 0,
-          providerId: provider?.id || `prov-${providerName.toLowerCase()}`,
-          providerName: provider?.name || providerName,
-          actionType,
-          durationOpenDays: days,
-          comment: null,
-          status: getTaskStatus(jobStatus, index, pattern.length),
-          rawInput: taskDef,
-        });
-      }
-    } else {
-      // Internal task: Station:setup+run or Station:run
-      const parts = taskDef.split(':');
-      const stationName = parts[0];
-      const timeParts = parts[1].split('+');
-      const setupMinutes = timeParts.length > 1 ? parseInt(timeParts[0], 10) : 0;
-      const runMinutes = timeParts.length > 1 ? parseInt(timeParts[1], 10) : parseInt(timeParts[0], 10);
-
-      const station = Array.from(stationMap.values()).find(s =>
-        s.name.toLowerCase() === stationName.toLowerCase()
-      );
-
-      tasks.push({
-        id: taskId,
-        jobId,
-        sequenceOrder: index + 1,
-        type: 'internal',
-        stationId: station?.id || `station-${stationName.toLowerCase().replace(/\s+/g, '-')}`,
-        stationName: station?.name || stationName,
-        setupMinutes,
-        runMinutes,
-        totalMinutes: setupMinutes + runMinutes,
-        providerId: null,
-        providerName: null,
-        actionType: null,
-        durationOpenDays: null,
-        comment: faker.datatype.boolean(0.2) ? faker.helpers.arrayElement(['vernis', 'recto-verso', 'pantone', 'au mieux']) : null,
-        status: getTaskStatus(jobStatus, index, pattern.length),
-        rawInput: `[${stationName.replace(/\s+/g, '_')}] ${setupMinutes > 0 ? `${setupMinutes}+${runMinutes}` : runMinutes}`,
-      });
-    }
-  });
+  // 4. Final finishing task
+  if (Math.random() > 0.3) {
+    const finishStation = randomElement(['sta-stahl', 'sta-muller', 'sta-horizon']);
+    tasks.push(generateInternalTask(jobId, seq++, finishStation));
+  }
 
   return tasks;
 }
 
-function getTaskStatus(jobStatus: JobStatus, taskIndex: number, totalTasks: number): TaskStatus {
-  if (jobStatus === 'Draft') {
-    return 'Defined';
-  }
-  if (jobStatus === 'Completed') {
-    return 'Completed';
-  }
-  if (jobStatus === 'Cancelled') {
-    return faker.helpers.arrayElement(['Completed', 'Cancelled']);
-  }
+// ============================================================================
+// Job Generators
+// ============================================================================
 
-  // For InProgress/Planned jobs, earlier tasks are more likely to be done
-  const progressRatio = taskIndex / totalTasks;
+interface JobGeneratorOptions {
+  count?: number;
+  includeLateJobs?: number;
+  includeConflictJobs?: number;
+}
 
-  if (jobStatus === 'Planned') {
-    return faker.helpers.weightedArrayElement([
-      { weight: 20, value: 'Defined' as const },
-      { weight: 50, value: 'Ready' as const },
-      { weight: 30, value: 'Assigned' as const },
-    ]);
-  }
+function generateJob(index: number, isLate: boolean = false): { job: Job; tasks: Task[] } {
+  const now = new Date();
+  const jobId = `job-${String(index).padStart(5, '0')}`;
 
-  // InProgress or Delayed
-  if (progressRatio < 0.3) {
-    return faker.helpers.weightedArrayElement([
-      { weight: 60, value: 'Completed' as const },
-      { weight: 30, value: 'Assigned' as const },
-      { weight: 10, value: 'Ready' as const },
-    ]);
-  } else if (progressRatio < 0.7) {
-    return faker.helpers.weightedArrayElement([
-      { weight: 20, value: 'Completed' as const },
-      { weight: 40, value: 'Assigned' as const },
-      { weight: 30, value: 'Ready' as const },
-      { weight: 10, value: 'Defined' as const },
-    ]);
+  // Workshop exit date: 5-20 days from now, or in the past for late jobs
+  const daysFromNow = isLate ? randomInt(-5, -1) : randomInt(5, 20);
+  const workshopExitDate = addDays(now, daysFromNow);
+
+  // Determine job status based on whether it's late
+  let status: JobStatus;
+  if (isLate) {
+    status = 'Delayed';
   } else {
-    return faker.helpers.weightedArrayElement([
-      { weight: 10, value: 'Assigned' as const },
-      { weight: 40, value: 'Ready' as const },
-      { weight: 50, value: 'Defined' as const },
-    ]);
+    status = randomElement(['Planned', 'InProgress'] as JobStatus[]);
   }
-}
 
-function generateComments(jobId: string, count: number): JobComment[] {
-  const comments: JobComment[] = [];
-  const authors = ['scheduler@flux.local', 'manager@flux.local', 'production@flux.local'];
+  // Generate tasks first to know if fully scheduled
+  const tasks = generateTasksForJob({
+    jobId,
+    includeOutsourced: Math.random() > 0.4,
+  });
 
-  for (let i = 0; i < count; i++) {
-    comments.push({
-      author: faker.helpers.arrayElement(authors),
-      timestamp: faker.date.recent({ days: 7 }).toISOString(),
-      content: faker.helpers.arrayElement([
-        'Client confirmed color specs',
-        'Rush order - prioritize',
-        'Waiting for paper delivery',
-        'Proof approved by client',
-        'Changed paper type per client request',
-        'Quantity updated',
-        'Delivery date confirmed',
-      ]),
+  // Randomly assign some tasks as Assigned
+  const fullyScheduled = Math.random() > 0.6;
+  if (fullyScheduled) {
+    tasks.forEach((task) => {
+      (task as InternalTask | OutsourcedTask).status = 'Assigned';
     });
+  } else if (Math.random() > 0.5) {
+    // Partially scheduled
+    const scheduledCount = randomInt(1, tasks.length - 1);
+    for (let i = 0; i < scheduledCount; i++) {
+      (tasks[i] as InternalTask | OutsourcedTask).status = 'Assigned';
+    }
   }
 
-  return comments.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const client = randomElement(CLIENT_NAMES);
+  const description = randomElement(JOB_DESCRIPTIONS);
+  const quantity = randomElement([100, 250, 500, 1000, 2500, 5000]);
+
+  const job: Job = {
+    id: jobId,
+    reference: `${now.getFullYear()}-${String(index).padStart(4, '0')}`,
+    client,
+    description: `${description} - ${quantity} ex`,
+    status,
+    workshopExitDate: formatDate(workshopExitDate),
+    fullyScheduled,
+    color: JOB_COLORS[index % JOB_COLORS.length],
+    paperType: randomElement(PAPER_TYPES),
+    paperFormat: randomElement(PAPER_FORMATS),
+    paperPurchaseStatus: randomElement(['InStock', 'Ordered', 'Received'] as PaperPurchaseStatus[]),
+    proofApproval: {
+      sentAt: Math.random() > 0.3 ? formatDate(addDays(now, -randomInt(3, 10))) : 'AwaitingFile',
+      approvedAt: Math.random() > 0.5 ? formatDate(addDays(now, -randomInt(1, 5))) : null,
+    },
+    platesStatus: randomElement(['Todo', 'Done'] as PlatesStatus[]),
+    requiredJobIds: [],
+    comments: [],
+    taskIds: tasks.map((t) => t.id),
+    createdAt: formatTimestamp(addDays(now, -randomInt(5, 30))),
+    updatedAt: formatTimestamp(now),
+  };
+
+  return { job, tasks };
 }
 
-export function generateJobs(
-  count: number = 10,
-  startDate: Date = new Date()
-): GeneratedJobData[] {
-  const results: GeneratedJobData[] = [];
+export interface JobData {
+  jobs: Job[];
+  tasks: Task[];
+}
 
-  for (let i = 0; i < count; i++) {
-    const jobId = faker.string.uuid();
-    const jobNumber = faker.number.int({ min: 45000, max: 45999 });
-    const suffix = faker.helpers.arrayElement(['', ' A', ' B', ' C', '']);
+export function generateJobs(options: JobGeneratorOptions = {}): JobData {
+  const { count = 15, includeLateJobs = 2, includeConflictJobs = 1 } = options;
 
-    const status: JobStatus = faker.helpers.weightedArrayElement([
-      { weight: 10, value: 'Draft' as const },
-      { weight: 35, value: 'Planned' as const },
-      { weight: 35, value: 'InProgress' as const },
-      { weight: 10, value: 'Delayed' as const },
-      { weight: 8, value: 'Completed' as const },
-      { weight: 2, value: 'Cancelled' as const },
-    ]);
+  const jobs: Job[] = [];
+  const tasks: Task[] = [];
 
-    const deadlineDays = faker.number.int({ min: 3, max: 21 });
-    const productType = faker.helpers.arrayElement(PRODUCT_TYPES);
-    const quantity = faker.helpers.arrayElement([100, 250, 500, 1000, 2500, 5000, 10000]);
-    const format = faker.helpers.arrayElement(['A4', 'A5', 'A6', '10x21', '21x29.7', '9.9x21']);
-
-    const paperPurchaseStatus: PaperPurchaseStatus = faker.helpers.weightedArrayElement([
-      { weight: 50, value: 'InStock' as const },
-      { weight: 15, value: 'ToOrder' as const },
-      { weight: 20, value: 'Ordered' as const },
-      { weight: 15, value: 'Received' as const },
-    ]);
-
-    const platesStatus: PlatesStatus = status === 'Draft' ? 'Todo' : faker.helpers.weightedArrayElement([
-      { weight: 30, value: 'Todo' as const },
-      { weight: 70, value: 'Done' as const },
-    ]);
-
-    // Proof status logic
-    let proofSentAt: string | null = null;
-    let proofApprovedAt: string | null = null;
-
-    if (status !== 'Draft') {
-      const proofChoice = faker.helpers.weightedArrayElement([
-        { weight: 20, value: 'awaiting' },
-        { weight: 50, value: 'sent' },
-        { weight: 20, value: 'approved' },
-        { weight: 10, value: 'noProof' },
-      ]);
-
-      if (proofChoice === 'awaiting') {
-        proofSentAt = 'AwaitingFile';
-      } else if (proofChoice === 'sent') {
-        proofSentAt = faker.date.recent({ days: 5 }).toISOString();
-      } else if (proofChoice === 'approved') {
-        proofSentAt = faker.date.recent({ days: 7 }).toISOString();
-        proofApprovedAt = faker.date.recent({ days: 3 }).toISOString();
-      } else {
-        proofSentAt = 'NoProofRequired';
-      }
-    }
-
-    const tasks = generateTasksForJob(jobId, status);
-    const fullyScheduled = tasks.every(t => t.status === 'Assigned' || t.status === 'Completed');
-
-    const job: Job = {
-      id: jobId,
-      reference: `${jobNumber}${suffix}`,
-      client: faker.helpers.arrayElement(CLIENTS),
-      description: `${productType} - ${format} - ${faker.helpers.arrayElement(PAPER_TYPES).split(' ')[0]} - ${quantity} ex`,
-      workshopExitDate: addDays(startDate, deadlineDays).toISOString(),
-      status,
-      fullyScheduled,
-      color: JOB_COLORS[i % JOB_COLORS.length],
-      paperType: faker.helpers.arrayElement(PAPER_TYPES),
-      paperFormat: faker.helpers.arrayElement(PAPER_FORMATS),
-      paperPurchaseStatus,
-      paperOrderedAt: paperPurchaseStatus === 'Ordered' || paperPurchaseStatus === 'Received'
-        ? faker.date.recent({ days: 10 }).toISOString()
-        : null,
-      proofSentAt,
-      proofApprovedAt,
-      platesStatus,
-      notes: faker.datatype.boolean(0.3) ? faker.lorem.sentence() : '',
-      comments: faker.datatype.boolean(0.4) ? generateComments(jobId, faker.number.int({ min: 1, max: 3 })) : [],
-      dependencies: [], // Could add job dependencies here
-      tasks,
-    };
-
-    results.push({ job });
+  // Generate late jobs first
+  for (let i = 0; i < includeLateJobs && i < count; i++) {
+    const { job, tasks: jobTasks } = generateJob(i + 1, true);
+    jobs.push(job);
+    tasks.push(...jobTasks);
   }
 
-  return results;
+  // Generate normal jobs
+  for (let i = includeLateJobs; i < count; i++) {
+    const { job, tasks: jobTasks } = generateJob(i + 1, false);
+    jobs.push(job);
+    tasks.push(...jobTasks);
+  }
+
+  // Mark some jobs for conflicts (will be handled in assignment generator)
+  // Just add a marker in the job notes
+  for (let i = 0; i < includeConflictJobs && i < jobs.length; i++) {
+    jobs[i].notes = 'CONFLICT_TEST';
+  }
+
+  return { jobs, tasks };
+}
+
+// ============================================================================
+// Late Jobs Detection
+// ============================================================================
+
+export function identifyLateJobs(jobs: Job[], _tasks?: Task[]): LateJob[] {
+  const lateJobs: LateJob[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (const job of jobs) {
+    const deadline = new Date(job.workshopExitDate);
+    deadline.setHours(0, 0, 0, 0);
+
+    // Check if deadline has passed
+    if (deadline < today) {
+      const delayMs = today.getTime() - deadline.getTime();
+      const delayDays = Math.ceil(delayMs / (1000 * 60 * 60 * 24));
+
+      lateJobs.push({
+        jobId: job.id,
+        deadline: job.workshopExitDate,
+        expectedCompletion: formatDate(addDays(today, randomInt(1, 5))),
+        delayDays,
+      });
+    }
+  }
+
+  return lateJobs;
 }
