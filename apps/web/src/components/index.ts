@@ -17,10 +17,13 @@ export { StationHeaders, StationHeader, OffScreenIndicator } from './StationHead
 export type { StationHeadersProps, StationHeaderProps, OffScreenInfo, OffScreenIndicatorProps } from './StationHeaders';
 
 export { StationColumns, StationColumn, UnavailabilityOverlay } from './StationColumns';
-export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProps } from './StationColumns';
+export type { StationColumnsProps, StationColumnProps, StationDropData, UnavailabilityOverlayProps } from './StationColumns';
 
 export { SchedulingGrid } from './SchedulingGrid';
 export type { SchedulingGridProps } from './SchedulingGrid';
 
 export { Tile, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
 export type { TileProps, SwapButtonsProps, TailwindColor } from './Tile';
+
+export { DragPreview, snapToGrid, yPositionToTime, formatTime, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
+export type { DragPreviewProps } from './DragPreview';

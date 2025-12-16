@@ -1,8 +1,13 @@
-import type { Task, TaskAssignment, Station } from '@flux/types';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import type { Task, TaskAssignment, Station, Job } from '@flux/types';
+import type { TaskDragData } from '../../App';
 
 export interface TaskTileProps {
   /** The task to display */
   task: Task;
+  /** The job this task belongs to */
+  job: Job;
   /** Job color for unscheduled styling */
   jobColor: string;
   /** Assignment if task is scheduled */
@@ -13,11 +18,30 @@ export interface TaskTileProps {
 
 /**
  * Individual task tile with state-based styling.
- * Unscheduled: job color, border-l-4, cursor-grab
+ * Unscheduled: job color, border-l-4, cursor-grab, draggable
  * Scheduled: dark placeholder with station + datetime
  */
-export function TaskTile({ task, jobColor, assignment, station }: TaskTileProps) {
+export function TaskTile({ task, job, jobColor, assignment, station }: TaskTileProps) {
   const isScheduled = !!assignment;
+
+  // Set up draggable for unscheduled tasks only
+  const dragData: TaskDragData = {
+    type: 'task',
+    task,
+    job,
+  };
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `task-${task.id}`,
+    data: dragData,
+    disabled: isScheduled, // Only unscheduled tasks are draggable
+  });
+
+  const style = transform
+    ? {
+        transform: CSS.Translate.toString(transform),
+      }
+    : undefined;
 
   // Format duration as Xh YY
   const formatDuration = (): string => {
@@ -102,11 +126,12 @@ export function TaskTile({ task, jobColor, assignment, station }: TaskTileProps)
   const height = getHeight();
 
   if (isScheduled) {
-    // Scheduled (placed) task - dark placeholder
+    // Scheduled (placed) task - dark placeholder (not draggable)
     return (
       <div
         className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40"
         style={{ height: `${height}px` }}
+        data-testid={`task-tile-${task.id}`}
       >
         <div className="flex items-center justify-between gap-2">
           <span className="text-zinc-400 font-medium truncate min-w-0">{stationName}</span>
@@ -118,15 +143,22 @@ export function TaskTile({ task, jobColor, assignment, station }: TaskTileProps)
     );
   }
 
-  // Unscheduled task - job color styling
+  // Unscheduled task - job color styling, draggable
   return (
     <div
-      className="pt-0.5 px-2 cursor-grab text-sm border-l-4"
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`pt-0.5 px-2 text-sm border-l-4 touch-none select-none ${
+        isDragging ? 'opacity-50 cursor-grabbing' : 'cursor-grab'
+      }`}
       style={{
         height: `${height}px`,
         borderLeftColor: jobColor,
         backgroundColor: colorStyles.backgroundColor,
+        ...style,
       }}
+      data-testid={`task-tile-${task.id}`}
     >
       <div className="flex items-center justify-between gap-2">
         <span

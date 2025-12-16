@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { DndContext } from '@dnd-kit/core';
 import { StationColumns } from './StationColumns';
 import { StationColumn } from './StationColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import type { Station, Job, DaySchedule } from '@flux/types';
+
+// Helper to wrap components with DndContext
+const DndWrapper = ({ children }: { children: React.ReactNode }) => (
+  <DndContext>{children}</DndContext>
+);
 
 // Mock station with standard schedule
 const mockStation: Station = {
@@ -155,14 +161,22 @@ describe('UnavailabilityOverlay', () => {
 
 describe('StationColumn', () => {
   it('renders with correct width class', () => {
-    render(<StationColumn station={mockStation} dayOfWeek={1} />);
+    render(
+      <DndWrapper>
+        <StationColumn station={mockStation} dayOfWeek={1} />
+      </DndWrapper>
+    );
 
     const column = screen.getByTestId('station-column-station-1');
     expect(column).toHaveClass('w-60');
   });
 
   it('renders hour grid lines', () => {
-    render(<StationColumn station={mockStation} startHour={6} hoursToDisplay={24} dayOfWeek={1} />);
+    render(
+      <DndWrapper>
+        <StationColumn station={mockStation} startHour={6} hoursToDisplay={24} dayOfWeek={1} />
+      </DndWrapper>
+    );
 
     const gridLines = screen.getAllByTestId('hour-grid-line');
     // 24 hours + 1 for the final line = 25 lines
@@ -170,17 +184,38 @@ describe('StationColumn', () => {
   });
 
   it('renders unavailability overlay', () => {
-    render(<StationColumn station={mockStation} dayOfWeek={1} />);
+    render(
+      <DndWrapper>
+        <StationColumn station={mockStation} dayOfWeek={1} />
+      </DndWrapper>
+    );
 
     const overlays = screen.getAllByTestId('unavailability-overlay');
     expect(overlays.length).toBeGreaterThan(0);
   });
 
   it('has correct background color', () => {
-    render(<StationColumn station={mockStation} dayOfWeek={1} />);
+    render(
+      <DndWrapper>
+        <StationColumn station={mockStation} dayOfWeek={1} />
+      </DndWrapper>
+    );
 
     const column = screen.getByTestId('station-column-station-1');
     expect(column).toHaveClass('bg-[#0a0a0a]');
+  });
+
+  it('is a droppable target', () => {
+    render(
+      <DndWrapper>
+        <StationColumn station={mockStation} dayOfWeek={1} />
+      </DndWrapper>
+    );
+
+    const column = screen.getByTestId('station-column-station-1');
+    // Column should have transition class for drag highlighting
+    expect(column).toHaveClass('transition-all');
+    expect(column).toHaveClass('duration-150');
   });
 });
 
@@ -196,7 +231,11 @@ describe('StationColumns', () => {
   });
 
   it('renders all station columns', () => {
-    render(<StationColumns stations={mockStations} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={mockStations} />
+      </DndWrapper>
+    );
 
     expect(screen.getByTestId('station-column-station-1')).toBeInTheDocument();
     expect(screen.getByTestId('station-column-station-2')).toBeInTheDocument();
@@ -204,7 +243,11 @@ describe('StationColumns', () => {
   });
 
   it('renders now line', () => {
-    render(<StationColumns stations={mockStations} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={mockStations} />
+      </DndWrapper>
+    );
 
     const nowLine = screen.getByTestId('now-line');
     expect(nowLine).toBeInTheDocument();
@@ -218,7 +261,11 @@ describe('StationColumns', () => {
       workshopExitDate: new Date('2025-12-15T14:00:00').toISOString(),
     };
 
-    render(<StationColumns stations={mockStations} selectedJob={jobToday} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={mockStations} selectedJob={jobToday} />
+      </DndWrapper>
+    );
 
     const departureMarker = screen.getByTestId('departure-marker');
     expect(departureMarker).toBeInTheDocument();
@@ -226,7 +273,11 @@ describe('StationColumns', () => {
   });
 
   it('does not render departure marker when no job is selected', () => {
-    render(<StationColumns stations={mockStations} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={mockStations} />
+      </DndWrapper>
+    );
 
     const departureMarker = screen.queryByTestId('departure-marker');
     expect(departureMarker).not.toBeInTheDocument();
@@ -238,14 +289,22 @@ describe('StationColumns', () => {
       workshopExitDate: null as unknown as string,
     };
 
-    render(<StationColumns stations={mockStations} selectedJob={jobNoDate} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={mockStations} selectedJob={jobNoDate} />
+      </DndWrapper>
+    );
 
     const departureMarker = screen.queryByTestId('departure-marker');
     expect(departureMarker).not.toBeInTheDocument();
   });
 
   it('has correct container styling', () => {
-    render(<StationColumns stations={mockStations} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={mockStations} />
+      </DndWrapper>
+    );
 
     const container = screen.getByTestId('station-columns-container');
     expect(container).toHaveClass('flex');
@@ -255,7 +314,11 @@ describe('StationColumns', () => {
   });
 
   it('renders empty when no stations', () => {
-    render(<StationColumns stations={[]} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={[]} />
+      </DndWrapper>
+    );
 
     const container = screen.getByTestId('station-columns-container');
     // Should still render container with now line but no station columns
@@ -264,7 +327,11 @@ describe('StationColumns', () => {
   });
 
   it('uses default startHour of 6', () => {
-    render(<StationColumns stations={mockStations} />);
+    render(
+      <DndWrapper>
+        <StationColumns stations={mockStations} />
+      </DndWrapper>
+    );
 
     // The now line should be positioned based on startHour=6
     // At 11:10, that's 5h10m from startHour=6, so 5.167 * 80 = ~413px

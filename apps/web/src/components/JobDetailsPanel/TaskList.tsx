@@ -49,6 +49,7 @@ export function TaskList({ tasks, job, assignments, stations }: TaskListProps) {
           <TaskTile
             key={task.id}
             task={task}
+            job={job}
             jobColor={job.color}
             assignment={assignment}
             station={station}
