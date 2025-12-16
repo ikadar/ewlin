@@ -509,11 +509,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] 30-minute snap grid
 - [x] Droppable station columns with highlighting
 
-#### v0.3.12 - Column Focus on Drag
-- [ ] Non-target columns collapse to 120px during drag
-- [ ] Active job tiles keep color, others desaturated
-- [ ] Animation: 150ms ease-out
-- [ ] Job-colored bands show other tile positions
+#### v0.3.12 - Column Focus on Drag ✅
+- [x] Non-target columns collapse to 120px during drag
+- [x] Target station stays full width (240px)
+- [x] Active job tiles keep color, others desaturated
+- [x] Animation: 150ms ease-out transitions
 
 #### v0.3.13 - Real-Time Validation During Drag
 - [ ] Validate on drag move (< 10ms)
