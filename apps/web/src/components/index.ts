@@ -12,3 +12,6 @@ export type { DateStripProps, DateCellProps } from './DateStrip';
 
 export { TimelineColumn, HourMarker, NowLine, PIXELS_PER_HOUR, timeToYPosition } from './TimelineColumn';
 export type { TimelineColumnProps, HourMarkerProps, NowLineProps } from './TimelineColumn';
+
+export { StationHeaders, StationHeader, OffScreenIndicator } from './StationHeaders';
+export type { StationHeadersProps, StationHeaderProps, OffScreenInfo, OffScreenIndicatorProps } from './StationHeaders';
