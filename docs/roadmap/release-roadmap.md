@@ -469,13 +469,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] "Now" line (red, `bg-red-500`) with time label
 - [ ] **Synchronized vertical scroll** with station columns (deferred - requires station columns)
 
-#### v0.3.7 - Station Column Headers
-- [ ] Sticky header row (z-30)
-- [ ] Station names
-- [ ] **Off-screen indicators**: rectangle with arrow + datetime
-  - Above viewport: `↑` chevron-up + datetime of nearest tile
-  - Below viewport: `↓` chevron-down + datetime of nearest tile
-  - Click to scroll to tile
+#### v0.3.7 - Station Column Headers ✅
+- [x] Sticky header row (z-30)
+- [x] Station names
+- [x] **Off-screen indicators**: chevron + count
+  - Above viewport: `↑` chevron-up + count
+  - Below viewport: `↓` chevron-down + count
+  - Click to scroll to tile (structure ready, calculation in v0.3.9)
 
 #### v0.3.8 - Station Columns
 - [ ] Dynamic width columns (w-60 / 240px each)
