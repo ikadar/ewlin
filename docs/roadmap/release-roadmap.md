@@ -494,11 +494,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] **Swap buttons** (hover): chevron-up/down at bottom-right
 - [x] Click behavior: single = select job, double = recall tile
 
-#### v0.3.10 - Similarity Indicators
-- [ ] **Link icons** between consecutive tiles (not circles)
-- [ ] `link` icon (zinc-400) = criterion matched
-- [ ] `unlink` icon (zinc-800) = criterion not matched
-- [ ] Position: horizontal row at top-right of lower tile
+#### v0.3.10 - Similarity Indicators ✅
+- [x] **Link icons** between consecutive tiles (not circles)
+- [x] `link` icon (zinc-400) = criterion matched
+- [x] `unlink` icon (zinc-800) = criterion not matched
+- [x] Position: horizontal row at top-right of lower tile
 
 ### Phase 3D: Interactions
 
