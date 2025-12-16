@@ -485,14 +485,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] **Departure date marker** (blue line, `bg-blue-500`) for selected job
 - [x] **SchedulingGrid** unified component with synchronized scrolling
 
-#### v0.3.9 - Tile Component
-- [ ] Job color: border-l-4 + low-opacity background
-- [ ] **Setup/Run sections**: lighter shade (setup) + full color (run)
-- [ ] Content: completion icon + job reference + client
-- [ ] Completion icon: `circle` (incomplete) / `circle-check` (complete, emerald)
-- [ ] Completed tile: green gradient from left
-- [ ] **Swap buttons** (hover): chevron-up/down at bottom-right
-- [ ] Click behavior: single = select job, double = recall tile
+#### v0.3.9 - Tile Component ✅
+- [x] Job color: border-l-4 + low-opacity background
+- [x] **Setup/Run sections**: lighter shade (setup) + full color (run)
+- [x] Content: completion icon + job reference + client
+- [x] Completion icon: `circle` (incomplete) / `circle-check` (complete, emerald)
+- [x] Completed tile: green gradient from left
+- [x] **Swap buttons** (hover): chevron-up/down at bottom-right
+- [x] Click behavior: single = select job, double = recall tile
 
 #### v0.3.10 - Similarity Indicators
 - [ ] **Link icons** between consecutive tiles (not circles)
