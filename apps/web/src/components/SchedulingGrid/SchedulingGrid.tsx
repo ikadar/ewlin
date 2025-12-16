@@ -4,8 +4,20 @@ import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
 import { Tile, compareSimilarity } from '../Tile';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
+
+/** Handle for programmatic grid scrolling */
+export interface SchedulingGridHandle {
+  /** Scroll to a specific Y position */
+  scrollToY: (y: number, behavior?: ScrollBehavior) => void;
+  /** Scroll by a delta amount */
+  scrollByY: (deltaY: number, behavior?: ScrollBehavior) => void;
+  /** Get current scroll position */
+  getScrollY: () => number;
+  /** Get viewport height */
+  getViewportHeight: () => number;
+}
 
 /** Validation state during drag */
 export interface ValidationState {
@@ -72,31 +84,48 @@ export interface SchedulingGridProps {
  * SchedulingGrid - Unified grid component with synchronized scrolling.
  * Contains Timeline, Station Headers, and Station Columns in a single scroll container.
  */
-export function SchedulingGrid({
-  stations,
-  categories = [],
-  jobs = [],
-  tasks = [],
-  assignments = [],
-  selectedJobId,
-  startHour = 6,
-  hoursToDisplay = 24,
-  onSelectJob,
-  onRecallAssignment,
-  onSwapUp,
-  onSwapDown,
-  activeTask,
-  activeJob,
-  validationState,
-  isQuickPlacementMode = false,
-  stationsWithAvailableTasks = new Set(),
-  quickPlacementIndicatorY,
-  quickPlacementHoverStationId,
-  onQuickPlacementMouseMove,
-  onQuickPlacementMouseLeave,
-  onQuickPlacementClick,
-}: SchedulingGridProps) {
-  const [now, setNow] = useState(() => new Date());
+export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridProps>(
+  function SchedulingGrid(
+    {
+      stations,
+      categories = [],
+      jobs = [],
+      tasks = [],
+      assignments = [],
+      selectedJobId,
+      startHour = 6,
+      hoursToDisplay = 24,
+      onSelectJob,
+      onRecallAssignment,
+      onSwapUp,
+      onSwapDown,
+      activeTask,
+      activeJob,
+      validationState,
+      isQuickPlacementMode = false,
+      stationsWithAvailableTasks = new Set(),
+      quickPlacementIndicatorY,
+      quickPlacementHoverStationId,
+      onQuickPlacementMouseMove,
+      onQuickPlacementMouseLeave,
+      onQuickPlacementClick,
+    },
+    ref
+  ) {
+    const [now, setNow] = useState(() => new Date());
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // Expose scroll methods via ref
+    useImperativeHandle(ref, () => ({
+      scrollToY: (y: number, behavior: ScrollBehavior = 'smooth') => {
+        scrollContainerRef.current?.scrollTo({ top: y, behavior });
+      },
+      scrollByY: (deltaY: number, behavior: ScrollBehavior = 'smooth') => {
+        scrollContainerRef.current?.scrollBy({ top: deltaY, behavior });
+      },
+      getScrollY: () => scrollContainerRef.current?.scrollTop ?? 0,
+      getViewportHeight: () => scrollContainerRef.current?.clientHeight ?? 0,
+    }));
 
   // Update current time every minute
   useEffect(() => {
@@ -172,7 +201,11 @@ export function SchedulingGrid({
   }
 
   return (
-    <div className="flex-1 overflow-auto min-w-0" data-testid="scheduling-grid">
+    <div
+      ref={scrollContainerRef}
+      className="flex-1 overflow-auto min-w-0"
+      data-testid="scheduling-grid"
+    >
       {/* Grid content wrapper - enables horizontal scrolling */}
       <div className="inline-flex flex-col" style={{ minWidth: 'fit-content', minHeight: '100%' }}>
         {/* Header row - sticky top */}
@@ -311,4 +344,5 @@ export function SchedulingGrid({
       </div>
     </div>
   );
-}
+  }
+);

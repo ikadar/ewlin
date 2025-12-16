@@ -9,3 +9,10 @@ export {
   canActivateQuickPlacement,
   getStationsWithAvailableTasks,
 } from './quickPlacement';
+export {
+  getOrderedJobIds,
+  getPreviousJobId,
+  getNextJobId,
+  calculateScrollToBottom,
+  calculateScrollToCenter,
+} from './keyboardNavigation';

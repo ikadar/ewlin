@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -9,7 +9,8 @@ import {
   type DragEndEvent,
   type DragMoveEvent,
 } from '@dnd-kit/core';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, PIXELS_PER_HOUR, timeToYPosition } from './components';
+import type { SchedulingGridHandle } from './components';
 import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
@@ -65,6 +66,9 @@ function App() {
     snappedY: number;
   }>({ stationId: null, y: 0, snappedY: 0 });
 
+  // Grid ref for programmatic scrolling
+  const gridRef = useRef<SchedulingGridHandle>(null);
+
   // The mock snapshot is already a ScheduleSnapshot type
   // Just use it directly for validation
 
@@ -99,6 +103,82 @@ function App() {
         setIsQuickPlacementMode(false);
         setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
       }
+      // ALT+↑ to select previous job
+      if (e.altKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (orderedJobIds.length > 0) {
+          if (!selectedJobId) {
+            // No job selected, select the first one
+            setSelectedJobId(orderedJobIds[0]);
+          } else {
+            const currentIndex = orderedJobIds.indexOf(selectedJobId);
+            if (currentIndex > 0) {
+              setSelectedJobId(orderedJobIds[currentIndex - 1]);
+            } else {
+              // Wrap around to last job
+              setSelectedJobId(orderedJobIds[orderedJobIds.length - 1]);
+            }
+          }
+        }
+      }
+      // ALT+↓ to select next job
+      if (e.altKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (orderedJobIds.length > 0) {
+          if (!selectedJobId) {
+            // No job selected, select the first one
+            setSelectedJobId(orderedJobIds[0]);
+          } else {
+            const currentIndex = orderedJobIds.indexOf(selectedJobId);
+            if (currentIndex < orderedJobIds.length - 1) {
+              setSelectedJobId(orderedJobIds[currentIndex + 1]);
+            } else {
+              // Wrap around to first job
+              setSelectedJobId(orderedJobIds[0]);
+            }
+          }
+        }
+      }
+      // ALT+D to jump to selected job's departure date
+      if (e.altKey && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        if (selectedJob?.workshopExitDate && gridRef.current) {
+          const departureDate = new Date(selectedJob.workshopExitDate);
+          const y = timeToYPosition(departureDate, START_HOUR);
+          // Position departure date at bottom of viewport
+          const viewportHeight = gridRef.current.getViewportHeight();
+          const scrollTarget = Math.max(0, y - viewportHeight + 100); // 100px margin from bottom
+          gridRef.current.scrollToY(scrollTarget);
+        }
+      }
+      // Home to jump to today
+      if (e.key === 'Home' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (gridRef.current) {
+          const now = new Date();
+          const y = timeToYPosition(now, START_HOUR);
+          // Center today in viewport
+          const viewportHeight = gridRef.current.getViewportHeight();
+          const scrollTarget = Math.max(0, y - viewportHeight / 2);
+          gridRef.current.scrollToY(scrollTarget);
+        }
+      }
+      // Page Up to scroll up by one day
+      if (e.key === 'PageUp' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (gridRef.current) {
+          const oneDayPixels = 24 * PIXELS_PER_HOUR;
+          gridRef.current.scrollByY(-oneDayPixels);
+        }
+      }
+      // Page Down to scroll down by one day
+      if (e.key === 'PageDown' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (gridRef.current) {
+          const oneDayPixels = 24 * PIXELS_PER_HOUR;
+          gridRef.current.scrollByY(oneDayPixels);
+        }
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
@@ -113,7 +193,7 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob]);
 
   // Configure pointer sensor with activation constraint
   const sensors = useSensors(
@@ -133,6 +213,39 @@ function App() {
 
   // Find selected job
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
+
+  // Get ordered job IDs for navigation (matching JobsList display order)
+  // Problems first (late, then conflicts), then normal jobs
+  const orderedJobIds = useMemo(() => {
+    const lateJobIds = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
+    const conflictJobIds = new Set<string>();
+    snapshot.conflicts.forEach((c) => {
+      const task = snapshot.tasks.find((t) => t.id === c.taskId);
+      if (task) conflictJobIds.add(task.jobId);
+    });
+
+    const problems: Job[] = [];
+    const normal: Job[] = [];
+
+    snapshot.jobs.forEach((job) => {
+      if (lateJobIds.has(job.id) || conflictJobIds.has(job.id)) {
+        problems.push(job);
+      } else {
+        normal.push(job);
+      }
+    });
+
+    // Sort problems: late first, then conflicts
+    problems.sort((a, b) => {
+      const aIsLate = lateJobIds.has(a.id);
+      const bIsLate = lateJobIds.has(b.id);
+      if (aIsLate && !bIsLate) return -1;
+      if (!aIsLate && bIsLate) return 1;
+      return 0;
+    });
+
+    return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
+  }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks]);
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
@@ -492,6 +605,7 @@ function App() {
           dayCount={21}
         />
         <SchedulingGrid
+          ref={gridRef}
           stations={snapshot.stations}
           categories={snapshot.categories}
           jobs={snapshot.jobs}

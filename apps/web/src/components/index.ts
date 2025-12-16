@@ -20,7 +20,7 @@ export { StationColumns, StationColumn, UnavailabilityOverlay } from './StationC
 export type { StationColumnsProps, StationColumnProps, StationDropData, UnavailabilityOverlayProps } from './StationColumns';
 
 export { SchedulingGrid } from './SchedulingGrid';
-export type { SchedulingGridProps } from './SchedulingGrid';
+export type { SchedulingGridProps, SchedulingGridHandle } from './SchedulingGrid';
 
 export { Tile, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
 export type { TileProps, SwapButtonsProps, TailwindColor } from './Tile';
