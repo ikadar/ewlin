@@ -502,11 +502,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3D: Interactions
 
-#### v0.3.11 - Drag & Drop Infrastructure
-- [ ] Drag infrastructure (dnd-kit or similar)
-- [ ] Drag from Job Details Panel (unscheduled tasks only)
-- [ ] Drag preview with slight transparency
-- [ ] 30-minute snap grid
+#### v0.3.11 - Drag & Drop Infrastructure ✅
+- [x] Drag infrastructure (@dnd-kit/core, @dnd-kit/utilities)
+- [x] Drag from Job Details Panel (unscheduled tasks only)
+- [x] Drag preview with slight transparency
+- [x] 30-minute snap grid
+- [x] Droppable station columns with highlighting
 
 #### v0.3.12 - Column Focus on Drag
 - [ ] Non-target columns collapse to 120px during drag
