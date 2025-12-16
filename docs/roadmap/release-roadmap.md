@@ -431,17 +431,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Active/inactive/hover states
 - [x] Settings icon (disabled for MVP)
 
-#### v0.3.3 - Jobs List Component
-- [ ] Fixed width (w-72 / 288px)
-- [ ] Add Job button (green +)
-- [ ] Search field with filtering (reference, client, description)
-- [ ] **Problèmes section** at top with count badge
-- [ ] Late jobs: red background, `alert-circle` icon, "En retard" badge
-- [ ] Conflict jobs: amber background, `shuffle` icon, "Conflit" badge
-- [ ] **Travaux section** for normal jobs
-- [ ] Job cards with progress dots (task completion visualization)
-- [ ] Selected job highlight (bg-white/10, border)
-- [ ] Keyboard navigation (ALT+↑/↓)
+#### v0.3.3 - Jobs List Component ✅
+- [x] Fixed width (w-72 / 288px)
+- [x] Add Job button (green +, disabled for MVP)
+- [x] Search field with filtering (reference, client, description)
+- [x] **Problèmes section** at top with count badge
+- [x] Late jobs: red background, `alert-circle` icon, "En retard" badge
+- [x] Conflict jobs: amber background, `shuffle` icon, "Conflit" badge
+- [x] **Travaux section** for normal jobs
+- [x] Job cards with progress dots (task completion visualization)
+- [x] Selected job highlight (bg-white/10, border)
+- [ ] Keyboard navigation (ALT+↑/↓) - deferred
 
 #### v0.3.4 - Job Details Panel
 - [ ] Fixed width (w-72 / 288px)
