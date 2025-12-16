@@ -535,14 +535,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Validation on swap - deferred
 - [ ] Smooth animation - deferred (instant swap for MVP)
 
-#### v0.3.16 - Quick Placement Mode
-- [ ] Toggle: ALT+Q
-- [ ] **Placement indicator**: white glow line at snap position
-- [ ] **Active tile**: white ring/halo around tile being placed
-- [ ] **Tooltip**: task info near cursor
-- [ ] **No task available**: forbidden icon as cursor
-- [ ] Click to place task
-- [ ] Integrates with job navigation (ALT+↑/↓)
+#### v0.3.16 - Quick Placement Mode ✅
+- [x] Toggle: ALT+Q
+- [x] **Placement indicator**: white glow line at snap position
+- [x] **Active tile**: white ring/halo around tile being placed
+- [ ] **Tooltip**: task info near cursor - deferred
+- [x] **No task available**: forbidden icon as cursor
+- [x] Click to place task
+- [ ] Integrates with job navigation (ALT+↑/↓) - deferred to v0.3.17
 
 ### Phase 3E: Keyboard Navigation
 
