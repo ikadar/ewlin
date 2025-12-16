@@ -546,15 +546,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3E: Keyboard Navigation
 
-#### v0.3.17 - Keyboard Shortcuts
-- [ ] ALT+Q: Toggle Quick Placement Mode
-- [ ] ALT+D: Jump to selected job's departure date
-- [ ] ALT+↑: Previous job
-- [ ] ALT+↓: Next job
-- [ ] ALT+←: Navigate columns left
-- [ ] ALT+→: Navigate columns right
-- [ ] Home: Jump to today
-- [ ] Page Up/Down: Scroll by day
+#### v0.3.17 - Keyboard Shortcuts ✅
+- [x] ALT+Q: Toggle Quick Placement Mode (implemented in v0.3.16)
+- [x] ALT+D: Jump to selected job's departure date
+- [x] ALT+↑: Previous job
+- [x] ALT+↓: Next job
+- [ ] ALT+←/→: Navigate columns left/right - deferred (no clear use case)
+- [x] Home: Jump to today
+- [x] Page Up/Down: Scroll by day
 
 ### Phase 3F: Client-Side Validation
 
