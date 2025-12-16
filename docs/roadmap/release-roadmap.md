@@ -414,11 +414,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Assignment generator
 - [x] Snapshot cache implementation
 
-#### v0.3.1 - Mock API
-- [ ] getSnapshot endpoint
-- [ ] CRUD operations (create, update, delete)
-- [ ] Configurable latency
-- [ ] TypeScript types matching `@flux/types`
+#### v0.3.1 - Mock API ✅
+- [x] getSnapshot endpoint
+- [x] CRUD operations (create, update, delete)
+- [x] Configurable latency
+- [x] TypeScript types matching `@flux/types`
 
 ### Phase 3B: Frontend Core Layout
 
