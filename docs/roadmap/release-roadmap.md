@@ -477,12 +477,13 @@ This document contains the development roadmap for the Flux print shop schedulin
   - Below viewport: `↓` chevron-down + count
   - Click to scroll to tile (structure ready, calculation in v0.3.9)
 
-#### v0.3.8 - Station Columns
-- [ ] Dynamic width columns (w-60 / 240px each)
-- [ ] Horizontal scroll for many stations
-- [ ] Unavailability overlay (hatched pattern `bg-stripes-dark`)
-- [ ] Hour grid lines
-- [ ] **Departure date marker** (blue line, `bg-blue-500`) for selected job
+#### v0.3.8 - Station Columns ✅
+- [x] Dynamic width columns (w-60 / 240px each)
+- [x] Horizontal scroll for many stations
+- [x] Unavailability overlay (hatched pattern `bg-stripes-dark`)
+- [x] Hour grid lines
+- [x] **Departure date marker** (blue line, `bg-blue-500`) for selected job
+- [x] **SchedulingGrid** unified component with synchronized scrolling
 
 #### v0.3.9 - Tile Component
 - [ ] Job color: border-l-4 + low-opacity background
