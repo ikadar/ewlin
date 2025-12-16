@@ -408,11 +408,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3A: Frontend Mock Data
 
-#### v0.3.0 - Mock Data Generators
-- [ ] Station generator (with operating schedules)
-- [ ] Job generator with tasks (including problematic jobs: late, conflicts)
-- [ ] Assignment generator
-- [ ] Snapshot cache implementation
+#### v0.3.0 - Mock Data Generators ✅
+- [x] Station generator (with operating schedules)
+- [x] Job generator with tasks (including problematic jobs: late, conflicts)
+- [x] Assignment generator
+- [x] Snapshot cache implementation
 
 #### v0.3.1 - Mock API
 - [ ] getSnapshot endpoint
