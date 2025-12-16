@@ -136,7 +136,13 @@ describe('SchedulingGrid', () => {
       workshopExitDate: new Date('2025-12-15T14:00:00').toISOString(),
     };
 
-    render(<SchedulingGrid stations={mockStations} selectedJob={jobToday} />);
+    render(
+      <SchedulingGrid
+        stations={mockStations}
+        jobs={[jobToday]}
+        selectedJobId={jobToday.id}
+      />
+    );
 
     const departureMarker = screen.getByTestId('departure-marker');
     expect(departureMarker).toBeInTheDocument();
@@ -155,7 +161,13 @@ describe('SchedulingGrid', () => {
       workshopExitDate: new Date('2025-12-16T14:00:00').toISOString(),
     };
 
-    render(<SchedulingGrid stations={mockStations} selectedJob={jobTomorrow} />);
+    render(
+      <SchedulingGrid
+        stations={mockStations}
+        jobs={[jobTomorrow]}
+        selectedJobId={jobTomorrow.id}
+      />
+    );
 
     expect(screen.queryByTestId('departure-marker')).not.toBeInTheDocument();
   });

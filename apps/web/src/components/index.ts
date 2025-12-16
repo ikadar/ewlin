@@ -21,3 +21,6 @@ export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProp
 
 export { SchedulingGrid } from './SchedulingGrid';
 export type { SchedulingGridProps } from './SchedulingGrid';
+
+export { Tile, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
+export type { TileProps, SwapButtonsProps, TailwindColor } from './Tile';

@@ -1,19 +1,35 @@
-import type { Station, Job } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task } from '@flux/types';
+import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
-import { useEffect, useState } from 'react';
+import { Tile } from '../Tile';
+import { useEffect, useState, useMemo } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 
 export interface SchedulingGridProps {
   /** Stations to display */
   stations: Station[];
-  /** Currently selected job */
-  selectedJob?: Job | null;
+  /** All jobs (for looking up job data by ID) */
+  jobs?: Job[];
+  /** All tasks (for looking up task data) */
+  tasks?: Task[];
+  /** Task assignments to display as tiles */
+  assignments?: TaskAssignment[];
+  /** Currently selected job ID */
+  selectedJobId?: string | null;
   /** Starting hour of the grid (default: 6) */
   startHour?: number;
   /** Number of hours to display (default: 24) */
   hoursToDisplay?: number;
+  /** Callback when a tile is clicked (select job) */
+  onSelectJob?: (jobId: string) => void;
+  /** Callback when a tile is double-clicked (recall) */
+  onRecallAssignment?: (assignmentId: string) => void;
+  /** Callback when swap up is clicked */
+  onSwapUp?: (assignmentId: string) => void;
+  /** Callback when swap down is clicked */
+  onSwapDown?: (assignmentId: string) => void;
 }
 
 /**
@@ -22,9 +38,16 @@ export interface SchedulingGridProps {
  */
 export function SchedulingGrid({
   stations,
-  selectedJob,
+  jobs = [],
+  tasks = [],
+  assignments = [],
+  selectedJobId,
   startHour = 6,
   hoursToDisplay = 24,
+  onSelectJob,
+  onRecallAssignment,
+  onSwapUp,
+  onSwapDown,
 }: SchedulingGridProps) {
   const [now, setNow] = useState(() => new Date());
 
@@ -42,7 +65,46 @@ export function SchedulingGrid({
   // Calculate now line position
   const nowPosition = timeToYPosition(now, startHour);
 
-  // Calculate departure marker position (if job has workshopExitDate)
+  // Create lookup maps for jobs and tasks
+  const jobMap = useMemo(() => {
+    const map = new Map<string, Job>();
+    jobs.forEach((job) => map.set(job.id, job));
+    return map;
+  }, [jobs]);
+
+  const taskMap = useMemo(() => {
+    const map = new Map<string, Task>();
+    tasks.forEach((task) => map.set(task.id, task));
+    return map;
+  }, [tasks]);
+
+  // Group assignments by station (internal assignments only, not outsourced)
+  const assignmentsByStation = useMemo(() => {
+    const grouped = new Map<string, TaskAssignment[]>();
+    stations.forEach((station) => grouped.set(station.id, []));
+
+    assignments.forEach((assignment) => {
+      // Skip outsourced assignments - they go to providers, not stations
+      if (assignment.isOutsourced) return;
+
+      const stationAssignments = grouped.get(assignment.targetId);
+      if (stationAssignments) {
+        stationAssignments.push(assignment);
+      }
+    });
+
+    // Sort assignments within each station by scheduled start time
+    grouped.forEach((stationAssignments) => {
+      stationAssignments.sort(
+        (a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime()
+      );
+    });
+
+    return grouped;
+  }, [assignments, stations]);
+
+  // Calculate departure marker position (if selected job has workshopExitDate)
+  const selectedJob = selectedJobId ? jobMap.get(selectedJobId) : null;
   let departurePosition: number | null = null;
   if (selectedJob?.workshopExitDate) {
     const departureDate = new Date(selectedJob.workshopExitDate);
@@ -103,14 +165,50 @@ export function SchedulingGrid({
             )}
 
             {/* Station columns */}
-            {stations.map((station) => (
-              <StationColumn
-                key={station.id}
-                station={station}
-                startHour={startHour}
-                hoursToDisplay={hoursToDisplay}
-              />
-            ))}
+            {stations.map((station) => {
+              const stationAssignments = assignmentsByStation.get(station.id) || [];
+              return (
+                <StationColumn
+                  key={station.id}
+                  station={station}
+                  startHour={startHour}
+                  hoursToDisplay={hoursToDisplay}
+                >
+                  {stationAssignments.map((assignment, index) => {
+                    const task = taskMap.get(assignment.taskId);
+                    const job = task ? jobMap.get(task.jobId) : null;
+
+                    // Skip if we don't have the task/job data or if task is not internal
+                    if (!task || !job || !isInternalTask(task)) return null;
+
+                    // Calculate top position from assignment.scheduledStart
+                    const startTime = new Date(assignment.scheduledStart);
+                    const top = timeToYPosition(startTime, startHour);
+
+                    // Determine swap button visibility
+                    const showSwapUp = index > 0;
+                    const showSwapDown = index < stationAssignments.length - 1;
+
+                    return (
+                      <Tile
+                        key={assignment.id}
+                        assignment={assignment}
+                        task={task}
+                        job={job}
+                        top={top}
+                        isSelected={selectedJobId === job.id}
+                        showSwapUp={showSwapUp}
+                        showSwapDown={showSwapDown}
+                        onSelect={onSelectJob}
+                        onRecall={onRecallAssignment}
+                        onSwapUp={onSwapUp}
+                        onSwapDown={onSwapDown}
+                      />
+                    );
+                  })}
+                </StationColumn>
+              );
+            })}
           </div>
         </div>
       </div>
