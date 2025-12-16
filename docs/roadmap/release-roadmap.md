@@ -453,12 +453,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Single-click scheduled task → scroll grid to tile (deferred - requires grid)
 - [ ] Double-click scheduled task → recall (deferred - requires grid integration)
 
-#### v0.3.5 - Date Strip Component
-- [ ] Fixed width (w-12 / 48px)
-- [ ] Day abbreviation + day number per row
-- [ ] Today highlight (amber background)
-- [ ] Click to jump to date
-- [ ] Hover 2s while dragging → auto-jump to date
+#### v0.3.5 - Date Strip Component ✅
+- [x] Fixed width (w-12 / 48px)
+- [x] Day abbreviation + day number per row
+- [x] Today highlight (amber background)
+- [x] Click to jump to date
+- [ ] Hover 2s while dragging → auto-jump to date (deferred - requires drag state)
 
 ### Phase 3C: Scheduling Grid
 
