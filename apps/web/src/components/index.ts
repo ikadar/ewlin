@@ -15,3 +15,9 @@ export type { TimelineColumnProps, HourMarkerProps, NowLineProps } from './Timel
 
 export { StationHeaders, StationHeader, OffScreenIndicator } from './StationHeaders';
 export type { StationHeadersProps, StationHeaderProps, OffScreenInfo, OffScreenIndicatorProps } from './StationHeaders';
+
+export { StationColumns, StationColumn, UnavailabilityOverlay } from './StationColumns';
+export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProps } from './StationColumns';
+
+export { SchedulingGrid } from './SchedulingGrid';
+export type { SchedulingGridProps } from './SchedulingGrid';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, TimelineColumn, StationHeaders } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid } from './components';
 import { getSnapshot } from './mock';
 
 function App() {
@@ -36,21 +36,10 @@ function App() {
         })()}
         dayCount={21}
       />
-      <TimelineColumn />
-      {/* Station columns area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <StationHeaders stations={snapshot.stations} />
-        <main className="flex-1 flex items-center justify-center overflow-auto bg-[#050505]">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold mb-2">Flux Scheduler</h1>
-            <p className="text-zinc-500">
-              {selectedJobId
-                ? `Selected: ${selectedJob?.reference || selectedJobId}`
-                : 'Select a job from the list'}
-            </p>
-          </div>
-        </main>
-      </div>
+      <SchedulingGrid
+        stations={snapshot.stations}
+        selectedJob={selectedJob}
+      />
     </div>
   );
 }
