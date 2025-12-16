@@ -41,3 +41,16 @@ export {
   generateAllAssignmentData,
   type AssignmentData,
 } from './generators';
+
+// Mock API (simulates backend HTTP calls)
+export {
+  createMockApi,
+  mockApi,
+  simulateLatency,
+  simulateFailure,
+  MockApiError,
+  type MockApi,
+  type MockApiConfig,
+  type CreateAssignmentRequest,
+  type UpdateAssignmentRequest,
+} from './api';
