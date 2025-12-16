@@ -105,6 +105,15 @@ When inserting a tile between existing tiles on a station:
 
 ---
 
+## Technical Implementation
+
+| Aspect | Decision |
+|--------|----------|
+| **Library** | [dnd kit](https://dndkit.com) |
+| **Why** | Modern React DnD, hooks-based, accessible, performant |
+
+---
+
 ## Related Documents
 
 - [Precedence Safeguard Details](../domain-model/business-rules.md#ui-behavior-rules)
