@@ -522,12 +522,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Precedence safeguard: auto-snap to valid position
 - [x] ALT key bypass: allows violation with amber ring warning
 
-#### v0.3.14 - Drop Handling
-- [ ] Create assignment on valid drop
-- [ ] Show conflict in Problèmes section (warnings only, no hard blocks)
-- [ ] Optimistic UI update
-- [ ] Tile insertion with push-down (capacity-1 stations)
-- [ ] Tile overlap allowed (capacity > 1 stations)
+#### v0.3.14 - Drop Handling ✅
+- [x] Create assignment on valid drop
+- [x] Show conflict in Problèmes section (warnings only, no hard blocks)
+- [x] Optimistic UI update
+- [x] Tile insertion with push-down (capacity-1 stations)
+- [ ] Tile overlap allowed (capacity > 1 stations) - deferred
 
 #### v0.3.15 - Tile Swap
 - [ ] Swap buttons visible on hover
