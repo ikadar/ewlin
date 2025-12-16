@@ -515,12 +515,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Active job tiles keep color, others desaturated
 - [x] Animation: 150ms ease-out transitions
 
-#### v0.3.13 - Real-Time Validation During Drag
-- [ ] Validate on drag move (< 10ms)
-- [ ] Valid drop zone: highlighted
-- [ ] Invalid drop zone: red indicator
-- [ ] Precedence safeguard: auto-snap to valid position
-- [ ] ALT key bypass: allows violation with red halo warning
+#### v0.3.13 - Real-Time Validation During Drag ✅
+- [x] Validate on drag move (< 10ms)
+- [x] Valid drop zone: green ring highlight
+- [x] Invalid drop zone: red ring indicator
+- [x] Precedence safeguard: auto-snap to valid position
+- [x] ALT key bypass: allows violation with amber ring warning
 
 #### v0.3.14 - Drop Handling
 - [ ] Create assignment on valid drop
