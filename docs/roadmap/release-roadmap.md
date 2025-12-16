@@ -529,11 +529,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Tile insertion with push-down (capacity-1 stations)
 - [ ] Tile overlap allowed (capacity > 1 stations) - deferred
 
-#### v0.3.15 - Tile Swap
-- [ ] Swap buttons visible on hover
-- [ ] Click swap up/down → exchange positions with adjacent tile
-- [ ] Validation on swap
-- [ ] Smooth animation
+#### v0.3.15 - Tile Swap ✅
+- [x] Swap buttons visible on hover
+- [x] Click swap up/down → exchange positions with adjacent tile
+- [ ] Validation on swap - deferred
+- [ ] Smooth animation - deferred (instant swap for MVP)
 
 #### v0.3.16 - Quick Placement Mode
 - [ ] Toggle: ALT+Q

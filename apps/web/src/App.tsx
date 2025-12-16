@@ -13,7 +13,7 @@ import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid } from '.
 import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap } from './utils';
 import type { StationDropData } from './components/StationColumns';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict } from '@flux/types';
 
@@ -290,6 +290,38 @@ function App() {
     });
   };
 
+  // Handle swap up - exchange position with tile above
+  const handleSwapUp = useCallback((assignmentId: string) => {
+    updateSnapshot((currentSnapshot) => {
+      const result = applySwap(currentSnapshot.assignments, assignmentId, 'up');
+      if (result.swapped) {
+        console.log('Swapped up:', { assignmentId, swappedWithId: result.swappedWithId });
+        return {
+          ...currentSnapshot,
+          assignments: result.assignments,
+        };
+      }
+      return currentSnapshot;
+    });
+    setSnapshotVersion((v) => v + 1);
+  }, []);
+
+  // Handle swap down - exchange position with tile below
+  const handleSwapDown = useCallback((assignmentId: string) => {
+    updateSnapshot((currentSnapshot) => {
+      const result = applySwap(currentSnapshot.assignments, assignmentId, 'down');
+      if (result.swapped) {
+        console.log('Swapped down:', { assignmentId, swappedWithId: result.swappedWithId });
+        return {
+          ...currentSnapshot,
+          assignments: result.assignments,
+        };
+      }
+      return currentSnapshot;
+    });
+    setSnapshotVersion((v) => v + 1);
+  }, []);
+
   return (
     <DndContext
       sensors={sensors}
@@ -330,6 +362,8 @@ function App() {
           assignments={snapshot.assignments}
           selectedJobId={selectedJobId}
           onSelectJob={setSelectedJobId}
+          onSwapUp={handleSwapUp}
+          onSwapDown={handleSwapDown}
           activeTask={activeTask}
           activeJob={activeJob}
           validationState={{
