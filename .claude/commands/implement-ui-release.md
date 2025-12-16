@@ -48,6 +48,13 @@ Continue only after approval!
    - State management (Redux if needed)
    - Unit tests
 
+   **IMPORTANT - Follow mockups precisely:**
+   - **Primary mockup file:** `docs/ux-ui/dark-prettier.html`
+   - **Visual reference:** `docs/ux-ui/assets/mockup-reference.png`
+   - Copy class names exactly from mockup code (spacing, colors, typography)
+   - Match visual structure: element order, flex directions, alignments
+   - Compare your implementation's rendered HTML with the mockup HTML
+
 4. **Quality checks:**
    ```bash
    cd apps/web

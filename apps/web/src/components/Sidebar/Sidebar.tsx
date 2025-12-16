@@ -16,10 +16,11 @@ export interface SidebarProps {
 export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
   return (
     <aside
-      className="w-14 h-screen flex flex-col items-center py-4 gap-2 bg-zinc-900/50 border-r border-white/5"
+      className="w-14 shrink-0 bg-zinc-900/50 border-r border-white/5"
       role="navigation"
       aria-label="Main navigation"
     >
+      <div className="h-full flex flex-col items-center py-3 gap-2">
       <SidebarButton
         icon={LayoutGrid}
         label="Scheduling view"
@@ -38,6 +39,7 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
         isActive={activeView === 'settings'}
         isDisabled
       />
+      </div>
     </aside>
   );
 }
