@@ -23,6 +23,9 @@ importers:
       '@faker-js/faker':
         specifier: ^10.1.0
         version: 10.1.0
+      '@flux/schedule-validator':
+        specifier: link:../../packages/validator
+        version: link:../../packages/validator
       '@flux/types':
         specifier: link:../../packages/types
         version: link:../../packages/types

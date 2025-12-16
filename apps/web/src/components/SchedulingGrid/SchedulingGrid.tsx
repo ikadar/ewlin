@@ -7,6 +7,20 @@ import { Tile, compareSimilarity } from '../Tile';
 import { useEffect, useState, useMemo } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 
+/** Validation state during drag */
+export interface ValidationState {
+  /** Target station ID being hovered */
+  targetStationId: string | null;
+  /** Whether the current drop position is valid */
+  isValid: boolean;
+  /** Whether there's a precedence conflict */
+  hasPrecedenceConflict: boolean;
+  /** Suggested start time if precedence conflict exists */
+  suggestedStart: string | null;
+  /** Whether Alt key is pressed (bypass precedence) */
+  isAltPressed: boolean;
+}
+
 export interface SchedulingGridProps {
   /** Stations to display */
   stations: Station[];
@@ -36,6 +50,8 @@ export interface SchedulingGridProps {
   activeTask?: Task | null;
   /** Job of the currently dragged task (for tile muting) */
   activeJob?: Job | null;
+  /** Validation state during drag */
+  validationState?: ValidationState;
 }
 
 /**
@@ -57,6 +73,7 @@ export function SchedulingGrid({
   onSwapDown,
   activeTask,
   activeJob,
+  validationState,
 }: SchedulingGridProps) {
   const [now, setNow] = useState(() => new Date());
 
@@ -191,6 +208,14 @@ export function SchedulingGrid({
                 activeTask?.type === 'Internal' ? activeTask.stationId : null;
               const isCollapsed = targetStationId !== null && targetStationId !== station.id;
 
+              // Determine validation visual state for this column
+              const isValidationTarget = validationState?.targetStationId === station.id;
+              const isValidDrop = isValidationTarget && validationState?.isValid;
+              const isInvalidDrop = isValidationTarget && !validationState?.isValid;
+              const showBypassWarning = isValidationTarget &&
+                validationState?.hasPrecedenceConflict &&
+                validationState?.isAltPressed;
+
               return (
                 <StationColumn
                   key={station.id}
@@ -198,6 +223,9 @@ export function SchedulingGrid({
                   startHour={startHour}
                   hoursToDisplay={hoursToDisplay}
                   isCollapsed={isCollapsed}
+                  isValidDrop={isValidDrop}
+                  isInvalidDrop={isInvalidDrop}
+                  showBypassWarning={showBypassWarning}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);

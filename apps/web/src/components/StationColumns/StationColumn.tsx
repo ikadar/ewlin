@@ -24,6 +24,12 @@ export interface StationColumnProps {
   children?: ReactNode;
   /** Whether this column is collapsed (during drag to another station) */
   isCollapsed?: boolean;
+  /** Whether a valid drop is being hovered over this column */
+  isValidDrop?: boolean;
+  /** Whether an invalid drop is being hovered over this column */
+  isInvalidDrop?: boolean;
+  /** Whether to show bypass warning (Alt key + precedence conflict) */
+  showBypassWarning?: boolean;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -55,6 +61,9 @@ export function StationColumn({
   dayOfWeek,
   children,
   isCollapsed = false,
+  isValidDrop = false,
+  isInvalidDrop = false,
+  showBypassWarning = false,
 }: StationColumnProps) {
   // Set up droppable
   const dropData: StationDropData = {
@@ -87,8 +96,22 @@ export function StationColumn({
     gridLines.push(i * PIXELS_PER_HOUR);
   }
 
-  // Determine highlight style based on drag state
+  // Determine highlight style based on drag state and validation
   const getHighlightClass = () => {
+    // Priority: validation-based highlighting over basic drag state
+    if (showBypassWarning) {
+      // Alt-key bypass with precedence conflict - amber/orange warning
+      return 'ring-2 ring-amber-500 bg-amber-500/10';
+    }
+    if (isInvalidDrop) {
+      // Invalid drop zone - red indicator
+      return 'ring-2 ring-red-500 bg-red-500/10';
+    }
+    if (isValidDrop) {
+      // Valid drop zone - green indicator
+      return 'ring-2 ring-green-500 bg-green-500/10';
+    }
+    // Fallback to basic drag state highlighting
     if (!active) return '';
     if (isValidDropTarget) {
       return isOver ? 'ring-2 ring-green-500/50 bg-green-500/5' : 'ring-1 ring-green-500/30';

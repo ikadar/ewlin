@@ -16,6 +16,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/utilities": "^3.2.2",
     "@faker-js/faker": "^10.1.0",
+    "@flux/schedule-validator": "link:../../packages/validator",
     "@flux/types": "link:../../packages/types",
     "@reduxjs/toolkit": "^2.11.1",
     "class-variance-authority": "^0.7.1",

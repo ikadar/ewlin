@@ -265,6 +265,103 @@ describe('StationColumn', () => {
       expect(column).toHaveClass('ease-out');
     });
   });
+
+  describe('validation visual feedback', () => {
+    it('shows green highlight when isValidDrop is true', () => {
+      render(
+        <DndWrapper>
+          <StationColumn station={mockStation} dayOfWeek={1} isValidDrop={true} />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).toHaveClass('ring-2');
+      expect(column).toHaveClass('ring-green-500');
+      expect(column).toHaveClass('bg-green-500/10');
+    });
+
+    it('shows red highlight when isInvalidDrop is true', () => {
+      render(
+        <DndWrapper>
+          <StationColumn station={mockStation} dayOfWeek={1} isInvalidDrop={true} />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).toHaveClass('ring-2');
+      expect(column).toHaveClass('ring-red-500');
+      expect(column).toHaveClass('bg-red-500/10');
+    });
+
+    it('shows amber highlight when showBypassWarning is true', () => {
+      render(
+        <DndWrapper>
+          <StationColumn station={mockStation} dayOfWeek={1} showBypassWarning={true} />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).toHaveClass('ring-2');
+      expect(column).toHaveClass('ring-amber-500');
+      expect(column).toHaveClass('bg-amber-500/10');
+    });
+
+    it('prioritizes bypass warning over valid/invalid states', () => {
+      render(
+        <DndWrapper>
+          <StationColumn
+            station={mockStation}
+            dayOfWeek={1}
+            isValidDrop={true}
+            isInvalidDrop={false}
+            showBypassWarning={true}
+          />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      // Should show amber (bypass), not green (valid)
+      expect(column).toHaveClass('ring-amber-500');
+      expect(column).not.toHaveClass('ring-green-500');
+    });
+
+    it('prioritizes invalid state over valid state', () => {
+      render(
+        <DndWrapper>
+          <StationColumn
+            station={mockStation}
+            dayOfWeek={1}
+            isValidDrop={true}
+            isInvalidDrop={true}
+          />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      // Should show red (invalid), not green (valid)
+      expect(column).toHaveClass('ring-red-500');
+      expect(column).not.toHaveClass('ring-green-500');
+    });
+
+    it('shows no validation highlight when all validation states are false', () => {
+      render(
+        <DndWrapper>
+          <StationColumn
+            station={mockStation}
+            dayOfWeek={1}
+            isValidDrop={false}
+            isInvalidDrop={false}
+            showBypassWarning={false}
+          />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).not.toHaveClass('ring-green-500');
+      expect(column).not.toHaveClass('ring-red-500');
+      expect(column).not.toHaveClass('ring-amber-500');
+    });
+  });
 });
 
 describe('StationColumns', () => {

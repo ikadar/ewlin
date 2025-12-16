@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -7,10 +7,12 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type DragMoveEvent,
 } from '@dnd-kit/core';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid } from './components';
-import { DragPreview, snapToGrid, yPositionToTime, formatTime } from './components/DragPreview';
+import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot } from './mock';
+import { useDropValidation } from './hooks';
 import type { StationDropData } from './components/StationColumns';
 import type { Task, Job } from '@flux/types';
 
@@ -21,11 +23,69 @@ export interface TaskDragData {
   job: Job;
 }
 
+/** Validation state during drag */
+export interface DragValidationState {
+  targetStationId: string | null;
+  scheduledStart: string | null;
+  isValid: boolean;
+  hasPrecedenceConflict: boolean;
+  suggestedStart: string | null;
+}
+
+const START_HOUR = 6;
+
 function App() {
   const snapshot = getSnapshot();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
+
+  // Alt key state for precedence bypass
+  const [isAltPressed, setIsAltPressed] = useState(false);
+
+  // Drag validation state
+  const [dragValidation, setDragValidation] = useState<DragValidationState>({
+    targetStationId: null,
+    scheduledStart: null,
+    isValid: false,
+    hasPrecedenceConflict: false,
+    suggestedStart: null,
+  });
+
+  // The mock snapshot is already a ScheduleSnapshot type
+  // Just use it directly for validation
+
+  // Use drop validation hook
+  const validation = useDropValidation({
+    snapshot,
+    task: activeTask,
+    targetStationId: dragValidation.targetStationId,
+    scheduledStart: dragValidation.scheduledStart,
+    bypassPrecedence: isAltPressed,
+  });
+
+  // Track Alt key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        e.preventDefault();
+        setIsAltPressed(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        setIsAltPressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Configure pointer sensor with activation constraint
   const sensors = useSensors(
@@ -52,16 +112,73 @@ function App() {
     if (data?.type === 'task') {
       setActiveTask(data.task);
       setActiveJob(data.job);
+      // Reset validation state
+      setDragValidation({
+        targetStationId: null,
+        scheduledStart: null,
+        isValid: false,
+        hasPrecedenceConflict: false,
+        suggestedStart: null,
+      });
     }
   };
+
+  // Handle drag move - real-time validation
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    const { over } = event;
+
+    if (!over || !activeTask) {
+      setDragValidation((prev) => ({
+        ...prev,
+        targetStationId: null,
+        scheduledStart: null,
+      }));
+      return;
+    }
+
+    const dropData = over.data.current as StationDropData | undefined;
+    if (dropData?.type !== 'station-column') {
+      return;
+    }
+
+    // Get the droppable element's position to calculate Y offset
+    const droppableElement = document.querySelector(`[data-testid="station-column-${dropData.stationId}"]`);
+    if (!droppableElement) return;
+
+    const rect = droppableElement.getBoundingClientRect();
+
+    // Calculate relative Y position in the column
+    // delta.y is from where the drag started, we need cursor position
+    // Use the pointer position from the event
+    const pointerY = (event.activatorEvent as PointerEvent)?.clientY ?? 0;
+    const deltaY = event.delta.y;
+    const relativeY = pointerY + deltaY - rect.top;
+
+    // Snap to 30-minute grid
+    const snappedY = snapToGrid(Math.max(0, relativeY));
+    const dropTime = yPositionToTime(snappedY, START_HOUR);
+
+    setDragValidation((prev) => ({
+      ...prev,
+      targetStationId: dropData.stationId,
+      scheduledStart: dropTime.toISOString(),
+    }));
+  }, [activeTask]);
 
   // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    // Reset active state
+    // Reset active state and validation
     setActiveTask(null);
     setActiveJob(null);
+    setDragValidation({
+      targetStationId: null,
+      scheduledStart: null,
+      isValid: false,
+      hasPrecedenceConflict: false,
+      suggestedStart: null,
+    });
 
     // If not dropped on a valid target, do nothing
     if (!over) return;
@@ -78,19 +195,25 @@ function App() {
       return;
     }
 
-    // Calculate the drop position relative to the column
-    // For now, use a placeholder - in v0.3.14 we'll calculate based on cursor position
-    const startHour = 6;
-    const rawY = 200; // Placeholder - will be calculated from event in v0.3.14
-    const snappedY = snapToGrid(rawY);
-    const dropTime = yPositionToTime(snappedY, startHour);
+    // Use the validation result to determine if drop is valid
+    // (Actual assignment creation will be in v0.3.14)
+    if (!validation.isValid && !isAltPressed) {
+      console.log('Invalid drop: validation failed', validation.conflicts);
+      return;
+    }
+
+    // Calculate the drop position (use suggested start if precedence conflict and Alt pressed)
+    const scheduledStart = validation.hasPrecedenceConflict && !isAltPressed && validation.suggestedStart
+      ? validation.suggestedStart
+      : dragValidation.scheduledStart;
 
     // Log the drop info (actual assignment creation in v0.3.14)
     console.log('Drop info:', {
       taskId: dragData.task.id,
       stationId: dropData.stationId,
-      snappedY,
-      dropTime: formatTime(dropTime),
+      scheduledStart,
+      isValid: validation.isValid,
+      bypassedPrecedence: isAltPressed && validation.hasPrecedenceConflict,
     });
   };
 
@@ -98,6 +221,7 @@ function App() {
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
       <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
@@ -134,6 +258,13 @@ function App() {
           onSelectJob={setSelectedJobId}
           activeTask={activeTask}
           activeJob={activeJob}
+          validationState={{
+            targetStationId: dragValidation.targetStationId,
+            isValid: validation.isValid,
+            hasPrecedenceConflict: validation.hasPrecedenceConflict,
+            suggestedStart: validation.suggestedStart,
+            isAltPressed,
+          }}
         />
       </div>
 
