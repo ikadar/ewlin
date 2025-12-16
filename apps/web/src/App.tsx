@@ -13,7 +13,7 @@ import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid } from '.
 import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation } from './utils';
 import type { StationDropData } from './components/StationColumns';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict } from '@flux/types';
 
@@ -57,6 +57,14 @@ function App() {
     suggestedStart: null,
   });
 
+  // Quick Placement Mode state
+  const [isQuickPlacementMode, setIsQuickPlacementMode] = useState(false);
+  const [quickPlacementHover, setQuickPlacementHover] = useState<{
+    stationId: string | null;
+    y: number;
+    snappedY: number;
+  }>({ stationId: null, y: 0, snappedY: 0 });
+
   // The mock snapshot is already a ScheduleSnapshot type
   // Just use it directly for validation
 
@@ -69,12 +77,27 @@ function App() {
     bypassPrecedence: isAltPressed,
   });
 
-  // Track Alt key
+  // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
         e.preventDefault();
         setIsAltPressed(true);
+      }
+      // ALT+Q to toggle Quick Placement Mode
+      if (e.altKey && (e.key === 'q' || e.key === 'Q')) {
+        e.preventDefault();
+        // Only allow quick placement mode when a job is selected
+        if (selectedJobId) {
+          setIsQuickPlacementMode((prev) => !prev);
+          // Reset hover state when toggling
+          setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+        }
+      }
+      // ESC to exit Quick Placement Mode
+      if (e.key === 'Escape' && isQuickPlacementMode) {
+        setIsQuickPlacementMode(false);
+        setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -90,7 +113,7 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [selectedJobId, isQuickPlacementMode]);
 
   // Configure pointer sensor with activation constraint
   const sensors = useSensors(
@@ -322,6 +345,119 @@ function App() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
+  // Quick Placement: get available task for hovered station
+  const quickPlacementTask = useMemo(() => {
+    if (!isQuickPlacementMode || !selectedJob || !quickPlacementHover.stationId) {
+      return null;
+    }
+    return getAvailableTaskForStation(
+      selectedJob,
+      snapshot.tasks,
+      snapshot.assignments,
+      quickPlacementHover.stationId
+    );
+  }, [isQuickPlacementMode, selectedJob, quickPlacementHover.stationId, snapshot.tasks, snapshot.assignments]);
+
+  // Quick Placement: handle mouse move in station column
+  const handleQuickPlacementMouseMove = useCallback((stationId: string, y: number) => {
+    const snappedY = snapToGrid(Math.max(0, y));
+    setQuickPlacementHover({ stationId, y, snappedY });
+  }, []);
+
+  // Quick Placement: handle mouse leave from station column
+  const handleQuickPlacementMouseLeave = useCallback(() => {
+    setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+  }, []);
+
+  // Quick Placement: handle click to place task
+  const handleQuickPlacementClick = useCallback((stationId: string, y: number) => {
+    if (!selectedJob || !isQuickPlacementMode) return;
+
+    // Get the available task for this station
+    const taskToPlace = getAvailableTaskForStation(
+      selectedJob,
+      snapshot.tasks,
+      snapshot.assignments,
+      stationId
+    );
+
+    if (!taskToPlace) {
+      console.log('No task available to place on this station');
+      return;
+    }
+
+    // Calculate the time from Y position
+    const snappedY = snapToGrid(Math.max(0, y));
+    const dropTime = yPositionToTime(snappedY, START_HOUR);
+    const scheduledStart = dropTime.toISOString();
+    const scheduledEnd = calculateEndTime(taskToPlace, scheduledStart);
+
+    // Create the assignment
+    const newAssignment: TaskAssignment = {
+      id: generateId(),
+      taskId: taskToPlace.id,
+      targetId: stationId,
+      isOutsourced: false,
+      scheduledStart,
+      scheduledEnd,
+      isCompleted: false,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update snapshot with new assignment and push-down logic
+    updateSnapshot((currentSnapshot) => {
+      const { updatedAssignments, shiftedIds } = applyPushDown(
+        currentSnapshot.assignments,
+        stationId,
+        scheduledStart,
+        scheduledEnd,
+        taskToPlace.id
+      );
+
+      if (shiftedIds.length > 0) {
+        console.log('Push-down applied to assignments:', shiftedIds);
+      }
+
+      return {
+        ...currentSnapshot,
+        assignments: [...updatedAssignments, newAssignment],
+      };
+    });
+
+    // Trigger re-render
+    setSnapshotVersion((v) => v + 1);
+
+    console.log('Quick placement assignment created:', {
+      assignmentId: newAssignment.id,
+      taskId: taskToPlace.id,
+      stationId,
+      scheduledStart,
+      scheduledEnd,
+    });
+  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments]);
+
+  // Calculate which stations have available tasks (for quick placement cursor)
+  const stationsWithAvailableTasks = useMemo(() => {
+    if (!isQuickPlacementMode || !selectedJob) {
+      return new Set<string>();
+    }
+    const stationIds = new Set<string>();
+    snapshot.stations.forEach((station) => {
+      const task = getAvailableTaskForStation(
+        selectedJob,
+        snapshot.tasks,
+        snapshot.assignments,
+        station.id
+      );
+      if (task) {
+        stationIds.add(station.id);
+      }
+    });
+    return stationIds;
+  }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.assignments]);
+
   return (
     <DndContext
       sensors={sensors}
@@ -345,6 +481,7 @@ function App() {
           tasks={snapshot.tasks}
           assignments={snapshot.assignments}
           stations={snapshot.stations}
+          activeTaskId={quickPlacementTask?.id}
         />
         <DateStrip
           startDate={(() => {
@@ -373,6 +510,13 @@ function App() {
             suggestedStart: validation.suggestedStart,
             isAltPressed,
           }}
+          isQuickPlacementMode={isQuickPlacementMode}
+          stationsWithAvailableTasks={stationsWithAvailableTasks}
+          quickPlacementIndicatorY={quickPlacementHover.snappedY}
+          quickPlacementHoverStationId={quickPlacementHover.stationId}
+          onQuickPlacementMouseMove={handleQuickPlacementMouseMove}
+          onQuickPlacementMouseLeave={handleQuickPlacementMouseLeave}
+          onQuickPlacementClick={handleQuickPlacementClick}
         />
       </div>
 

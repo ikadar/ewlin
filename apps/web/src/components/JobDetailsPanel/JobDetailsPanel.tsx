@@ -12,6 +12,8 @@ export interface JobDetailsPanelProps {
   assignments: TaskAssignment[];
   /** All stations */
   stations: Station[];
+  /** Task ID that is the active placement target in Quick Placement Mode */
+  activeTaskId?: string | null;
 }
 
 /**
@@ -23,6 +25,7 @@ export function JobDetailsPanel({
   tasks,
   assignments,
   stations,
+  activeTaskId,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -54,6 +57,7 @@ export function JobDetailsPanel({
         job={job}
         assignments={jobAssignments}
         stations={stations}
+        activeTaskId={activeTaskId}
       />
     </div>
   );

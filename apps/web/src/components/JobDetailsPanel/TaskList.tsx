@@ -10,12 +10,14 @@ export interface TaskListProps {
   assignments: TaskAssignment[];
   /** All stations to get station names */
   stations: Station[];
+  /** Task ID that is the active placement target in Quick Placement Mode */
+  activeTaskId?: string | null;
 }
 
 /**
  * Scrollable list of task tiles for the selected job.
  */
-export function TaskList({ tasks, job, assignments, stations }: TaskListProps) {
+export function TaskList({ tasks, job, assignments, stations, activeTaskId }: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
     assignments.map((a) => [a.taskId, a])
@@ -53,6 +55,7 @@ export function TaskList({ tasks, job, assignments, stations }: TaskListProps) {
             jobColor={job.color}
             assignment={assignment}
             station={station}
+            isActivePlacement={activeTaskId === task.id}
           />
         );
       })}

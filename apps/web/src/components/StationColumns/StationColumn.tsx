@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, MouseEvent } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import type { Station, DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
+import { PlacementIndicator } from '../PlacementIndicator';
 import type { TaskDragData } from '../../App';
 
 /** Data attached to droppable station columns */
@@ -30,6 +31,18 @@ export interface StationColumnProps {
   isInvalidDrop?: boolean;
   /** Whether to show bypass warning (Alt key + precedence conflict) */
   showBypassWarning?: boolean;
+  /** Whether quick placement mode is active */
+  isQuickPlacementMode?: boolean;
+  /** Whether there's an available task for this station in quick placement mode */
+  hasAvailableTask?: boolean;
+  /** Y position for placement indicator (snapped) */
+  placementIndicatorY?: number;
+  /** Callback when mouse moves in the column (for tracking position) */
+  onQuickPlacementMouseMove?: (stationId: string, y: number) => void;
+  /** Callback when mouse leaves the column */
+  onQuickPlacementMouseLeave?: () => void;
+  /** Callback when user clicks to place a task */
+  onQuickPlacementClick?: (stationId: string, y: number) => void;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -64,6 +77,12 @@ export function StationColumn({
   isValidDrop = false,
   isInvalidDrop = false,
   showBypassWarning = false,
+  isQuickPlacementMode = false,
+  hasAvailableTask = false,
+  placementIndicatorY,
+  onQuickPlacementMouseMove,
+  onQuickPlacementMouseLeave,
+  onQuickPlacementClick,
 }: StationColumnProps) {
   // Set up droppable
   const dropData: StationDropData = {
@@ -122,12 +141,41 @@ export function StationColumn({
   // Column width: full (240px / w-60) or collapsed (120px / w-30)
   const widthClass = isCollapsed ? 'w-30' : 'w-60';
 
+  // Quick placement mode handlers
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (!isQuickPlacementMode || !onQuickPlacementMouseMove) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    onQuickPlacementMouseMove(station.id, relativeY);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isQuickPlacementMode || !onQuickPlacementMouseLeave) return;
+    onQuickPlacementMouseLeave();
+  };
+
+  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (!isQuickPlacementMode || !hasAvailableTask || !onQuickPlacementClick) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    onQuickPlacementClick(station.id, relativeY);
+  };
+
+  // Cursor style for quick placement mode
+  const getCursorClass = () => {
+    if (!isQuickPlacementMode) return '';
+    return hasAvailableTask ? 'cursor-pointer' : 'cursor-not-allowed';
+  };
+
   return (
     <div
       ref={setNodeRef}
-      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${getHighlightClass()}`}
+      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${getHighlightClass()} ${getCursorClass()}`}
       style={{ height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
     >
       {/* Unavailability overlay */}
       <UnavailabilityOverlay
@@ -145,6 +193,11 @@ export function StationColumn({
           data-testid="hour-grid-line"
         />
       ))}
+
+      {/* Quick Placement Indicator */}
+      {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && (
+        <PlacementIndicator y={placementIndicatorY} isVisible={true} />
+      )}
 
       {/* Tiles (children) */}
       {children}

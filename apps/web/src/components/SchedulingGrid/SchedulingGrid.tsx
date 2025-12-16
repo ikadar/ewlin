@@ -52,6 +52,20 @@ export interface SchedulingGridProps {
   activeJob?: Job | null;
   /** Validation state during drag */
   validationState?: ValidationState;
+  /** Whether quick placement mode is active */
+  isQuickPlacementMode?: boolean;
+  /** Station IDs that have available tasks for quick placement */
+  stationsWithAvailableTasks?: Set<string>;
+  /** Y position for placement indicator (snapped) */
+  quickPlacementIndicatorY?: number;
+  /** Station ID being hovered in quick placement mode */
+  quickPlacementHoverStationId?: string | null;
+  /** Callback when mouse moves in a station column during quick placement */
+  onQuickPlacementMouseMove?: (stationId: string, y: number) => void;
+  /** Callback when mouse leaves a station column during quick placement */
+  onQuickPlacementMouseLeave?: () => void;
+  /** Callback when user clicks to place a task in quick placement mode */
+  onQuickPlacementClick?: (stationId: string, y: number) => void;
 }
 
 /**
@@ -74,6 +88,13 @@ export function SchedulingGrid({
   activeTask,
   activeJob,
   validationState,
+  isQuickPlacementMode = false,
+  stationsWithAvailableTasks = new Set(),
+  quickPlacementIndicatorY,
+  quickPlacementHoverStationId,
+  onQuickPlacementMouseMove,
+  onQuickPlacementMouseLeave,
+  onQuickPlacementClick,
 }: SchedulingGridProps) {
   const [now, setNow] = useState(() => new Date());
 
@@ -216,6 +237,10 @@ export function SchedulingGrid({
                 validationState?.hasPrecedenceConflict &&
                 validationState?.isAltPressed;
 
+              // Quick placement state for this column
+              const isHoveredForQuickPlacement = quickPlacementHoverStationId === station.id;
+              const hasAvailableTaskForQuickPlacement = stationsWithAvailableTasks.has(station.id);
+
               return (
                 <StationColumn
                   key={station.id}
@@ -226,6 +251,12 @@ export function SchedulingGrid({
                   isValidDrop={isValidDrop}
                   isInvalidDrop={isInvalidDrop}
                   showBypassWarning={showBypassWarning}
+                  isQuickPlacementMode={isQuickPlacementMode}
+                  hasAvailableTask={hasAvailableTaskForQuickPlacement}
+                  placementIndicatorY={isHoveredForQuickPlacement ? quickPlacementIndicatorY : undefined}
+                  onQuickPlacementMouseMove={onQuickPlacementMouseMove}
+                  onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
+                  onQuickPlacementClick={onQuickPlacementClick}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);

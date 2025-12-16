@@ -13,6 +13,8 @@ export interface TaskTileProps {
   assignment?: TaskAssignment;
   /** Station for this task (to show name) */
   station?: Station;
+  /** Whether this task is the active placement target in Quick Placement Mode */
+  isActivePlacement?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface TaskTileProps {
  * Unscheduled: job color, border-l-4, cursor-grab, draggable
  * Scheduled: dark placeholder with station + datetime
  */
-export function TaskTile({ task, job, jobColor, assignment, station }: TaskTileProps) {
+export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false }: TaskTileProps) {
   const isScheduled = !!assignment;
 
   // Set up draggable for unscheduled tasks only
@@ -139,6 +141,13 @@ export function TaskTile({ task, job, jobColor, assignment, station }: TaskTileP
     );
   }
 
+  // Active placement styling (white ring/halo)
+  const activePlacementStyle = isActivePlacement
+    ? {
+        boxShadow: '0 0 0 2px white, 0 0 16px rgba(255, 255, 255, 0.5)',
+      }
+    : undefined;
+
   // Unscheduled task - job color styling, draggable
   return (
     <div
@@ -152,6 +161,7 @@ export function TaskTile({ task, job, jobColor, assignment, station }: TaskTileP
         height: `${height}px`,
         borderLeftColor: jobColor,
         backgroundColor: colorStyles.backgroundColor,
+        ...activePlacementStyle,
       }}
       data-testid={`task-tile-${task.id}`}
     >
