@@ -14,11 +14,11 @@ Quick Placement Mode accelerates the backward scheduling workflow by allowing ra
 
 | Action | Result |
 |--------|--------|
-| Keyboard shortcut (TBD) | Toggle mode ON |
-| Same shortcut | Toggle mode OFF |
-| ESC key | Exit mode |
+| **ALT+Q** | Toggle mode ON |
+| **ALT+Q** (again) | Toggle mode OFF |
+| **ESC** | Exit mode |
 
-**Prerequisite:** A job must be selected in the left panel.
+**Prerequisite:** A job must be selected in the Jobs List.
 
 ---
 
@@ -27,15 +27,44 @@ Quick Placement Mode accelerates the backward scheduling workflow by allowing ra
 ### Placement Indicator
 
 - **Mouse cursor:** Moves freely (no snapping)
-- **Placement indicator:** A separate visual element that follows the cursor
-- **Snapping:** Indicator magnetizes to the nearest gap between existing tiles
+- **Placement line:** Glowing thick line in **pure white** that follows the cursor
+- **Snapping:** Line magnetizes to the nearest gap between existing tiles
 - Shows exactly where the tile will be placed on click
+
+### Visual Appearance
+
+```css
+/* Placement indicator line */
+.placement-indicator {
+  height: 4px;
+  background: white;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+}
+```
+
+### Active Tile Highlight
+
+The tile being placed gets a **white ring/halo** to indicate it's the active placement target:
+
+```css
+/* Active tile during Quick Placement */
+.tile-active-placement {
+  box-shadow: 0 0 0 2px white, 0 0 16px rgba(255, 255, 255, 0.5);
+}
+```
 
 ### Tooltip
 
-A tooltip near the cursor displays:
-- **Task available:** Name/info of the task that will be placed
-- **No task available:** Visual indicator (e.g., "No task for this station")
+Simple text near the cursor showing task information:
+- **Task available:** Task name/station displayed
+- **No task available:** "Forbidden" cursor icon (crossed-out circle)
+
+### No Task Available State
+
+When hovering a station with no available task:
+- **Cursor:** Changes to "forbidden" icon (`cursor: not-allowed`)
+- **No placement line:** Indicator hidden
+- **Visual feedback:** Clear indication that clicking won't work
 
 ### Click to Place
 
@@ -95,21 +124,35 @@ When job navigation shortcuts (prev/next) are used while in Quick Placement Mode
 ## Visual Summary
 
 ```
-+------------------+
-|  Quick Placement |
-|  Mode: ACTIVE    |
-+------------------+
+Quick Placement Mode: ACTIVE (ALT+Q to toggle)
 
-Cursor: [free movement]
-        |
-        v
-   +---------+
-   | (snap)  |  <-- Placement indicator snaps to gap
-   +---------+
+┌─────────────────────────────────────┐
+│  Station Column                     │
+├─────────────────────────────────────┤
+│  ┌─────────────────────────────┐    │
+│  │ Existing Tile               │    │
+│  └─────────────────────────────┘    │
+│                                     │
+│  ════════════════════════════════   │  ← White glowing line (placement indicator)
+│        ↑ cursor position            │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │ Another Tile                │    │
+│  └─────────────────────────────┘    │
+└─────────────────────────────────────┘
 
-Tooltip: "Task 3: Komori - 20+40min"
-         or
-         "No task available"
+Task available: Simple tooltip text near cursor
+No task available: 🚫 cursor (not-allowed)
+```
+
+### Active Tile (in Job Details)
+
+```
+┌────────────────────────────┐
+│ ○○○○○○○○○○○○○○○○○○○○○○○○○  │  ← White ring/halo around tile
+│ ○ Task being placed     ○  │
+│ ○○○○○○○○○○○○○○○○○○○○○○○○○  │
+└────────────────────────────┘
 ```
 
 ---

@@ -4,237 +4,180 @@ Decisions to be made and items for future consideration.
 
 ---
 
-## Keyboard Shortcuts (TBD)
+## Keyboard Shortcuts (Resolved)
 
-The following keyboard shortcuts need to be assigned:
+All keyboard shortcuts have been assigned:
 
-| Action | Proposed | Final |
-|--------|----------|-------|
-| Toggle Sequence/Timeline View | | TBD |
-| Toggle Quick Placement Mode | | TBD |
-| Jump to job's departure date | | TBD |
-| Previous job | | TBD |
-| Next job | | TBD |
-| Navigate columns left | | TBD |
-| Navigate columns right | | TBD |
+| Action | Shortcut |
+|--------|----------|
+| Toggle Quick Placement Mode | ALT+Q |
+| Jump to job's departure date | ALT+D |
+| Previous job | ALT+↑ |
+| Next job | ALT+↓ |
+| Navigate columns left | ALT+← |
+| Navigate columns right | ALT+→ |
 
-### Considerations
+### Notes
 
-- Avoid conflicts with browser shortcuts
-- Consider vim-style keys for power users (`j`/`k`, `h`/`l`)
-- Ensure discoverability (help panel, tooltips)
-
----
-
-## Visual Design (TBD)
-
-### Date Strip Day Separators
-
-- Currently: horizontal lines
-- Alternative: distinct boxes/zones
-- Decision needed before implementation
-
-### Swap Buttons Visibility
-
-- Option A: Always visible
-- Option B: Only on hover
-- Decision: **Hover** (per mockup)
-
-### Off-Screen Indicator Distinct Styles
-
-- Preceding task (N-1): specific style TBD
-- Following task (N+1): specific style TBD
-- Need to define exact visual treatment in dropdown
-
-### Task Completion Checkbox
-
-- Position on tile: TBD
-- Visual style: **circle/circle-check icons** (per mockup)
-
-### Quick Placement Mode Visuals
-
-- Placement indicator: shape, color, size TBD
-- Tooltip: position relative to cursor TBD
-- Tooltip: styling (background, border, font) TBD
-- "No task available" indicator styling TBD
-
-### Column Focus on Drag Details
-
-- Collapsed column width TBD
-- Job-colored band height/styling TBD
-- Target station detection method TBD
-- Animation timing/easing TBD
-
-### View Mode Toggle Button Location
-
-- Option A: Station headers row (right side)
-- Option B: Sidebar (new icon)
-- Option C: Timeline column top
-- Decision needed
-
-### Jump to Date / Today Button Location
-
-- Option A: Date Strip top
-- Option B: Station headers row (left side)
-- Option C: Separate toolbar row
-- Decision needed
-
-### Selected Tile State
-
-- Trigger: click? keyboard?
-- How many tiles can be selected: one? multiple?
-- What happens on selection: panel update? scroll?
-- Glow/border styling: exact CSS TBD
-
-### Outsourced Task Tiles
-
-- Visual distinction from internal tasks TBD
-- Provider column appearance TBD
-- Duration display format: "2 JO" vs "2 jours" TBD
+- Timeline/Sequence toggle removed from MVP (see Decision Log)
+- Future: consider vim-style keys (`j`/`k`, `h`/`l`) for power users
+- Help panel with shortcuts will be implemented later
 
 ---
 
-## Interaction Details (TBD)
+## Visual Design (Resolved)
 
-### Unscheduled Tile Single-Click
+### Date Strip Day Separators (Resolved)
 
-- Currently: no action defined for single-click on unscheduled tile
-- Option: open task details
-- Option: start drag
-- Option: no action
+- Horizontal lines separate days
+- Divs change background on hover (already implemented in mockup)
 
-### Comments UI
+### Swap Buttons Visibility (Resolved)
 
-- Popover vs modal: TBD
-- Threading support (future): TBD
+- **Decision:** Shown on hover only
 
-### Approval Gates Workflow
+### Off-Screen Indicators (Resolved)
 
-- How to change BAT/Plates/Paper status from UI?
-- Read-only display vs interactive controls?
-- What happens when scheduling is blocked by gates?
-- Visual feedback for blocked scheduling attempts?
+- **Design:** Rectangle with arrow (up/down) showing date/time of off-screen task
+- No dropdown - simple indicator showing direction and timing
+- Preceding/following tasks show their scheduled date/time in the indicator
 
-### Keyboard Shortcuts Help
+### Task Completion Checkbox (Resolved)
 
-- Help panel design
-- Keyboard shortcut overlay (e.g., "?" to show)
-- Tooltips on hover for buttons with shortcuts
+- **Position:** Left of job ID in tile header row
+- **Icon:** Lucide `circle` (incomplete) / `circle-check` (complete)
+- **Location:** Before job reference number (per mockup)
+
+### Quick Placement Mode Visuals (Resolved)
+
+- **Placement indicator:** Glowing thick line in pure white
+- **Active tile:** White ring/halo around the tile being placed
+- **Tooltip:** Simple text next to cursor showing task info
+- **No task available:** "Forbidden" icon (crossed-out circle) as mouse pointer
+
+### Column Focus on Drag (Resolved)
+
+- **Collapsed column width:** 120px (configurable)
+- **Active job tiles:** Keep regular color
+- **Other jobs:** Muted/desaturated border and background colors (near grey)
+- **Target station:** Determined by task's assigned station (from backend)
+- **Animation:** 150ms ease-out
+
+### View Mode Toggle (Removed from MVP)
+
+- Timeline/Sequence view toggle removed from MVP scope
+- Only Timeline View implemented for now
+- Sequence View may be added post-MVP
+
+### Jump to Date / Today (Resolved)
+
+- Today is visually highlighted in Date Strip
+- Clicking any day jumps to that date
+- While dragging: hovering over a day for 2s auto-jumps to it
+
+### Tile Selection Behavior (Resolved)
+
+- **Single click on tile (grid):** Selects that job (same as clicking in Jobs List)
+- **Single click again (same tile):** Deselects
+- **Double-click on tile (grid):** Recalls tile (removes from schedule)
+- These behaviors are compatible (single vs double click)
+
+### Outsourced Task Tiles (Resolved)
+
+- Appear in dedicated outsourced provider columns
+- **Border style:** Dotted (easily changeable)
+- **Duration format:** "2 JO"
 
 ---
 
-## Modals & Dialogs (TBD)
+## Interaction Details (Resolved)
 
-### Job Creation Modal
+### Unscheduled Tile Single-Click (Resolved)
 
-- Fields to include: reference, client, description, departure date, etc.
-- Validation rules and error display
-- Task definition within modal or separate step?
-- Layout and sizing
+- **Single click on unscheduled tile:** Selects the job
+- **Tiles already on grid:** Off-screen indicators (top/bottom markers) show when relevant for current viewport
 
-### Task Details View
+### Comments UI (Post-MVP)
 
-- Popover vs modal vs sidebar panel?
-- Content: duration breakdown, notes, history?
-- When to show: click on tile? dedicated button?
+- Will be added later
+- Location: Job Details column, below the task list
 
-### Confirmation Dialogs
+### Approval Gates Workflow (Resolved)
 
-- When required: tile recall, job delete, swap with violation?
-- Standard dialog layout
-- "Don't ask again" option?
+- **BAT/Plates/Paper status:** Read-only display for now
+- **Editing status:** Not implemented in MVP
+- **Scheduling restrictions:** No blocking based on gates currently
+- Can be enhanced post-MVP
+
+### Keyboard Shortcuts Help (Post-MVP)
+
+- Help panel with keyboard shortcuts
+- Shortcut overlay on "?" key press
+- Tooltips showing shortcuts on hover
+- All to be implemented later
 
 ---
 
-## System UI (TBD)
+## Modals & Dialogs (Post-MVP)
 
-### Error/Success Messages (Toast/Notifications)
+All modal and dialog designs will be defined post-MVP. Current focus is on the scheduling screen with mocked data.
 
-- Position: top-right? bottom-right?
-- Auto-dismiss timing
-- Stacking behavior for multiple notifications
-- Action buttons in notifications?
+- Job Creation Modal
+- Task Details View
+- Confirmation Dialogs
 
-### Loading States
+---
 
-- Initial page load: skeleton screens?
-- Data fetching: inline spinners?
-- Save operations: button loading state?
-- Grid loading: overlay or inline?
+## System UI (Post-MVP)
 
-### Settings Page
+All system UI designs will be defined post-MVP. Current focus is on the scheduling screen with mocked data.
 
-- What settings are configurable?
-- Station management UI?
-- Operating schedule editor?
-- User preferences (theme, language)?
-- Provider management?
+- Error/Success Messages (Toast/Notifications)
+- Loading States
+- Settings Page
 
 ---
 
 ## Future Features (Post-MVP)
 
-### Zoom Levels
+These features will be considered after MVP:
 
-- Day / Week / Month views
-- Mentioned in domain questions as post-MVP
-
-### Column Customization
-
-- Reorderable columns
-- Resizable column widths
-- Hide/show columns
-
-### Compact View
-
-- High-density display for many tiles
-- Mentioned in domain questions
-
-### Offline Mode
-
-- Local storage of schedule data
-- Sync when reconnected
-
-### Multi-User
-
-- Real-time updates
-- Conflict resolution when two users edit same schedule
-- User presence indicators
-
-### Schedule Branching
-
-- Multiple schedule versions
-- PROD designation
-- Branch comparison
+- **Zoom Levels:** Day / Week / Month views
+- **Sequence View:** Alternative display mode (uniform tile heights)
+- **Column Customization:** Reorderable, resizable, hide/show
+- **Compact View:** High-density display for many tiles
+- **Offline Mode:** Local storage with sync
+- **Multi-User:** Real-time updates, conflict resolution
+- **Schedule Branching:** Multiple versions, PROD designation
 
 ---
 
-## Performance Targets (To Validate)
+## Performance Targets (Validated)
 
-| Metric | Target | Validated? |
-|--------|--------|------------|
-| Drag feedback | < 10ms | |
-| Grid render (100 tiles) | < 100ms | |
-| Initial load | < 2s | |
-| Animation frame rate | 60 FPS | |
-
----
-
-## Accessibility (TBD)
-
-- Keyboard-only navigation: full coverage needed
-- Screen reader support: ARIA labels
-- Color contrast: WCAG AA compliance
-- Reduced motion preference: respect user settings
+| Metric | Target | Status |
+|--------|--------|--------|
+| Drag feedback | < 10ms | ✓ Agreed |
+| Grid render (100 tiles) | < 100ms | ✓ Agreed |
+| Initial load | < 2s | ✓ Agreed |
+| Animation frame rate | 60 FPS | ✓ Agreed |
 
 ---
 
-## Internationalization (TBD)
+## Accessibility (Resolved)
 
-- Date format: locale-specific
-- Time format: 24h vs 12h
-- Right-to-left support: future consideration
-- Language: French primary, others future
+- **Keyboard-only navigation:** Full coverage for power users
+- **Screen reader support:** Not required (internal tool for experienced users)
+- **Color contrast:** WCAG AA compliance maintained
+- **Reduced motion:** Respect user settings
+
+---
+
+## Internationalization (Resolved)
+
+- **Date format:** Locale-specific (configurable)
+- **Time format:** 24h (French standard)
+- **Right-to-left support:** Future consideration
+- **Language:** French primary; may expand later
 
 ---
 
@@ -250,6 +193,15 @@ This document should be updated as decisions are made. Move resolved items to th
 |------|----------|----------|-----------|
 | 2025-12-13 | View mode names | Timeline / Sequence | Clear distinction between time-aligned and list views |
 | 2025-12-16 | Layout structure | Column-based (no Right Panel) | Simpler layout, problems in Jobs List |
+| 2025-12-16 | Timeline/Sequence toggle | Removed from MVP | Focus on Timeline View only |
+| 2025-12-16 | Off-screen indicators | Rectangles with arrows | Simple design showing date/time |
+| 2025-12-16 | Checkbox position | Left of job ID | Per mockup specification |
+| 2025-12-16 | Quick Placement indicator | White glow line | High visibility during placement |
+| 2025-12-16 | Column focus animation | 150ms ease-out | Fast yet smooth |
+| 2025-12-16 | Tile click behavior | Single=select, Double=recall | Compatible behaviors |
+| 2025-12-16 | Departure date marker | Blue line on grid | Distinct from red "now" line |
+| 2025-12-16 | Performance targets | All approved | Validated by stakeholder |
+| 2025-12-16 | Placed tile in Job Details | Dark placeholder | Simple display with station + datetime |
 
 ---
 

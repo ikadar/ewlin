@@ -97,38 +97,55 @@ Plaques: Prêtes
 
 ## Task List Section
 
-Shows all tasks for the selected job as mini-tiles.
+Shows all tasks for the selected job as tiles with different styling based on state.
 
-### Task Tile in Panel
+### Unscheduled Task Tile
+
+Unscheduled tiles have the **full job color** styling - draggable to the grid.
 
 ```html
-<div class="pt-0.5 px-2 pb-2 text-sm border-l-4 border-l-purple-500 bg-purple-950/35" style="height: 60px;">
+<div class="pt-0.5 px-2 pb-2 text-sm border-l-4 border-l-purple-500 bg-purple-950/35 cursor-grab" style="height: 60px;">
   <div class="flex items-center justify-between gap-2">
     <span class="text-purple-300 font-medium truncate">Polar 137</span>
     <span class="text-purple-300 font-medium truncate">12345 · Autosphere</span>
-    <span class="text-zinc-400 shrink-0">0h15</span>
-    <span class="text-zinc-400 shrink-0">Di 15/12 08:30</span>
+    <span class="text-zinc-400 shrink-0">0h45</span>
   </div>
 </div>
 ```
 
+### Scheduled (Placed) Task Tile
+
+Scheduled tiles appear as **simple dark placeholders** showing only station and datetime.
+
+```html
+<div class="pt-0.5 px-2 pb-2 text-sm" style="height: 200px;">
+  <div class="flex items-center justify-between gap-2">
+    <span class="text-zinc-400 font-medium truncate min-w-0">Komori G40</span>
+    <span class="text-zinc-500 shrink-0">Di 15/12 07:00</span>
+  </div>
+</div>
+```
+
+Note: Placed tiles have no colored border, no job color background — just minimal text on a dark background.
+
 ### Task Tile Content
 
-| Element | Description |
-|---------|-------------|
-| **Station name** | Target station for the task |
-| **Job reference + Client** | Job context (useful when comparing multiple jobs) |
-| **Duration** | Task duration (e.g., "0h15", "2h30") |
-| **Scheduled time** | Start datetime if scheduled |
-| **Height** | Proportional to duration (Timeline View) |
+| Element | Unscheduled | Scheduled (Placed) |
+|---------|-------------|-------------------|
+| **Border** | `border-l-4` with job color | None |
+| **Background** | Job color at low opacity | Dark (inherited) |
+| **Station name** | Shown | Shown |
+| **Duration** | Shown | Not shown |
+| **Scheduled time** | Not shown | Shown |
+| **Cursor** | `cursor-grab` (draggable) | `cursor-pointer` (clickable) |
 
 ### Visual States
 
 | State | Appearance |
 |-------|------------|
-| **Unscheduled** | Full opacity, no time shown |
-| **Scheduled** | Shows scheduled time |
-| **Completed** | Green gradient from left |
+| **Unscheduled** | Full job color, no time shown, draggable |
+| **Scheduled (Placed)** | Dark placeholder, shows station + datetime |
+| **Completed** | Green gradient from left (on grid tile) |
 
 ---
 

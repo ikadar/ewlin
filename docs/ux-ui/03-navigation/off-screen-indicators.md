@@ -19,86 +19,48 @@ When a job is selected, tiles from that job may be scheduled at times not curren
 
 ---
 
-## Display: Header Count
+## Design: Rectangle with Arrow
 
-Off-screen indicators appear in the **station column headers** as a compact count:
+Off-screen indicators appear as **small rectangles with directional arrows** showing the date/time of tiles outside the viewport.
 
 ### Position
 
-- Inside the sticky header row
-- Right side of each station header
+- **Above viewport:** Indicator at top of station column
+- **Below viewport:** Indicator at bottom of station column
 - Only shown when there are off-screen tiles for the selected job
 
 ### Appearance
 
 ```
-+----------------------------------------------------------+
-| Komori G40                                    ↑ 2        |
-+----------------------------------------------------------+
++---------------------------+
+|  ↑ Di 15/12 08:30         |  ← Rectangle with up arrow + datetime
++---------------------------+
 ```
 
-- Chevron icon (`chevron-up` or `chevron-down`) indicating direction
-- Count of off-screen tiles in that direction
-- Subtle styling (`text-zinc-500`)
+- **Arrow:** Up (`↑`) for tiles above, Down (`↓`) for tiles below
+- **Content:** Date and time of the off-screen tile
+- **Styling:** Subtle background (`bg-zinc-800`), rounded corners
+
+### Multiple Off-Screen Tiles
+
+When multiple tiles are off-screen in the same direction, the indicator shows the **nearest tile's** information:
+
+- Above viewport: Shows the latest (closest to visible area)
+- Below viewport: Shows the earliest (closest to visible area)
 
 ### HTML Example
 
 ```html
-<div class="w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 flex items-center justify-between">
-  <span>Komori G40</span>
-  <!-- Off-screen indicator: 2 tiles above viewport -->
-  <div class="flex items-center gap-1 text-xs text-zinc-500 cursor-pointer hover:text-zinc-300">
-    <i data-lucide="chevron-up" class="w-3 h-3"></i>
-    <span>2</span>
-  </div>
+<!-- Off-screen indicator: tile above viewport -->
+<div class="absolute top-0 left-0 right-0 px-2 py-1 bg-zinc-800/90 text-xs flex items-center gap-1 cursor-pointer hover:bg-zinc-700/90 rounded-b">
+  <i data-lucide="chevron-up" class="w-3 h-3 text-zinc-400"></i>
+  <span class="text-zinc-300">Di 15/12 08:30</span>
 </div>
-```
 
----
-
-## Interaction: Click for Details
-
-Clicking on the header indicator reveals a **dropdown** with details:
-
-### Dropdown Content
-
-| Element | Description |
-|---------|-------------|
-| **Tile entries** | List of off-screen tiles |
-| **Per entry:** | Date/time + task info |
-| **Click entry** | Scrolls grid to that tile |
-
-### Dropdown Example
-
-```
-+------------------------+
-| ↑ 2 tiles above        |
-+------------------------+
-| Dec 12, 09:00          |
-| Task 1 - Impression    |
-+------------------------+
-| Dec 12, 14:00          |
-| Task 4 - Vernis        |
-+------------------------+
-```
-
-### HTML Structure
-
-```html
-<div class="absolute top-full right-0 mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-lg z-40 min-w-48">
-  <div class="px-3 py-2 text-xs text-zinc-400 border-b border-white/5">
-    2 tiles above
-  </div>
-  <div class="py-1">
-    <button class="w-full px-3 py-2 text-left hover:bg-white/5 text-sm">
-      <div class="text-zinc-300">Dec 12, 09:00</div>
-      <div class="text-zinc-500 text-xs">Task 1 - Impression</div>
-    </button>
-    <button class="w-full px-3 py-2 text-left hover:bg-white/5 text-sm">
-      <div class="text-zinc-300">Dec 12, 14:00</div>
-      <div class="text-zinc-500 text-xs">Task 4 - Vernis</div>
-    </button>
-  </div>
+<!-- Off-screen indicator: tile below viewport -->
+<div class="absolute bottom-0 left-0 right-0 px-2 py-1 bg-zinc-800/90 text-xs flex items-center gap-1 cursor-pointer hover:bg-zinc-700/90 rounded-t">
+  <i data-lucide="chevron-down" class="w-3 h-3 text-zinc-400"></i>
+  <span class="text-zinc-300">Je 18/12 14:00</span>
 </div>
 ```
 
@@ -106,32 +68,10 @@ Clicking on the header indicator reveals a **dropdown** with details:
 
 ## Direction Indicators
 
-| Tile Location | Indicator |
-|---------------|-----------|
-| Above viewport (earlier time) | `chevron-up` + count |
-| Below viewport (later time) | `chevron-down` + count |
-
-If tiles exist both above and below:
-
-```
-+----------------------------------------------------------+
-| Komori G40                                ↑ 2    ↓ 1     |
-+----------------------------------------------------------+
-```
-
----
-
-## Distinct Styling for Sequence Context
-
-In the dropdown, **preceding and following tasks** (in sequence order) can have distinct styling:
-
-| Indicator Type | Description | Visual Style |
-|----------------|-------------|--------------|
-| **Preceding task** (N-1) | Task immediately before visible tiles | Highlighted/bold |
-| **Following task** (N+1) | Task immediately after visible tiles | Highlighted/bold |
-| **Other tiles** | Other tiles from same job | Standard style |
-
-This helps users understand sequence context.
+| Tile Location | Arrow | Content |
+|---------------|-------|---------|
+| Above viewport (earlier time) | `↑` (chevron-up) | Date/time of nearest tile |
+| Below viewport (later time) | `↓` (chevron-down) | Date/time of nearest tile |
 
 ---
 
@@ -139,19 +79,30 @@ This helps users understand sequence context.
 
 | Action | Result |
 |--------|--------|
-| **Hover on header indicator** | Slight highlight |
-| **Click on header indicator** | Toggle dropdown open/close |
-| **Click on dropdown entry** | Grid scrolls to that tile, dropdown closes |
-| **Click outside dropdown** | Dropdown closes |
+| **Click on indicator** | Grid scrolls to that tile's position |
+| **Hover** | Slight highlight |
+
+---
+
+## Sequence Context
+
+For tiles with sequence relationships:
+
+| Indicator Type | Description |
+|----------------|-------------|
+| **Preceding task** (N-1) | Task immediately before visible tiles in sequence |
+| **Following task** (N+1) | Task immediately after visible tiles in sequence |
+
+The indicator can optionally show if the off-screen tile is the immediate predecessor or successor to help users understand workflow sequence.
 
 ---
 
 ## Rationale
 
-- **Compact:** Header count keeps UI clean
-- **Progressive disclosure:** Details available on click
-- **Actionable:** Each entry is a navigation shortcut
-- **Sequence context:** Preceding/following distinction helps workflow
+- **Simple:** Clear rectangle with arrow and datetime
+- **Actionable:** Click to navigate directly
+- **Contextual:** Shows when the off-screen tile is scheduled
+- **Non-intrusive:** Appears only when relevant (job selected)
 
 ---
 

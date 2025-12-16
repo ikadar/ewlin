@@ -14,8 +14,13 @@ Tiles have different visual appearances based on their state, location, and vali
 
 | State | Appearance | Interactions |
 |-------|------------|--------------|
-| **Unscheduled** | Full opacity | Draggable; can be placed on grid |
-| **Scheduled (placed)** | Lower opacity | Single-click: jump to tile; Double-click: recall; Hover: shows buttons |
+| **Unscheduled** | Full job color, border-l-4, job-colored background | Draggable to grid |
+| **Scheduled (placed)** | Dark placeholder, no color, shows station + datetime | Single-click: jump to tile; Double-click: recall |
+
+### Visual Distinction
+
+- **Unscheduled:** Colorful tile with job border and background
+- **Scheduled:** Simple dark placeholder with minimal text (station name, scheduled time)
 
 ---
 
@@ -24,9 +29,17 @@ Tiles have different visual appearances based on their state, location, and vali
 | State | Appearance |
 |-------|------------|
 | **Normal** | Job color, setup/run sections visible |
-| **Selected** | Highlighted border or glow |
+| **Selected (job active)** | Highlighted border/glow (when job is selected) |
 | **Dragging** | Slight transparency, follows cursor |
-| **Hovered** | Swap buttons visible; slight highlight |
+| **Hovered** | Swap buttons visible at bottom-right; slight highlight |
+
+### Click Behavior on Grid
+
+| Action | Result |
+|--------|--------|
+| Single click | Selects the job (same as clicking in Jobs List) |
+| Single click again | Deselects the job |
+| Double click | Recalls tile (removes from schedule) |
 
 ---
 

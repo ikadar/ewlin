@@ -1,6 +1,8 @@
 # Timeline View vs Sequence View
 
-Two view modes for the scheduling grid, toggled via button or keyboard shortcut.
+Two view modes for the scheduling grid.
+
+> **Note:** Sequence View is **post-MVP**. Only Timeline View is implemented for MVP.
 
 ---
 
@@ -8,10 +10,10 @@ Two view modes for the scheduling grid, toggled via button or keyboard shortcut.
 
 The grid supports two view modes that change how tiles are displayed:
 
-| Mode | Tile Height | Tile Position | Purpose |
-|------|-------------|---------------|---------|
-| **Timeline View** | Proportional to duration | Aligned to time axis | Focus on scheduling (when) |
-| **Sequence View** | Uniform (all same height) | Stacked as list | Focus on ordering (what sequence) |
+| Mode | Tile Height | Tile Position | MVP Status |
+|------|-------------|---------------|------------|
+| **Timeline View** | Proportional to duration | Aligned to time axis | ✓ MVP |
+| **Sequence View** | Uniform (all same height) | Stacked as list | Post-MVP |
 
 ---
 
@@ -33,7 +35,9 @@ The grid supports two view modes that change how tiles are displayed:
 
 ---
 
-## Sequence View
+## Sequence View (Post-MVP)
+
+> This section describes post-MVP functionality.
 
 ### Characteristics
 
@@ -61,12 +65,16 @@ The grid supports two view modes that change how tiles are displayed:
 
 ---
 
-## Toggle Mechanism
+## Toggle Mechanism (Post-MVP)
+
+> View mode toggle is not implemented for MVP.
+
+When implemented:
 
 | Method | Action |
 |--------|--------|
-| Button | UI button (location TBD) toggles between modes |
-| Keyboard shortcut | TBD — toggles between modes |
+| Button | UI button toggles between modes |
+| Keyboard shortcut | Toggle between modes |
 
 ---
 

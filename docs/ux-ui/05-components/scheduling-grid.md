@@ -62,9 +62,17 @@ The Timeline and Station Columns scroll together horizontally and vertically.
 
 ### Departure Date Marker
 
-- Horizontal line indicating selected job's deadline
-- Different color from "now" line (e.g., blue or amber)
+- Horizontal **blue line** (`bg-blue-500`) indicating selected job's deadline
+- Spans across all station columns
 - Only visible when a job is selected
+
+```html
+<div class="absolute left-0 right-0 h-0.5 bg-blue-500 z-20 pointer-events-none" style="top: {position}px;"></div>
+```
+
+**Visual distinction:**
+- Red line = Current time ("now")
+- Blue line = Selected job's departure date
 
 ---
 
@@ -158,8 +166,15 @@ Each station column has a sticky header showing:
 
 ### Synchronized Scrolling
 
-- Timeline and Station Columns scroll together
-- Date Strip can scroll independently
+**Critical requirement:** Timeline and Station Columns **must** scroll together vertically.
+
+| Element | Vertical Scroll | Horizontal Scroll |
+|---------|-----------------|-------------------|
+| Timeline column | Synced with grid | N/A (fixed position) |
+| Station columns | Synced | Scrolls horizontally |
+| Date Strip | Independent | N/A |
+
+**Implementation note:** The Timeline column and Station columns must be in the **same scroll container** to ensure synchronized vertical scrolling. Do not put them in separate scroll containers.
 
 ### Sticky Elements
 

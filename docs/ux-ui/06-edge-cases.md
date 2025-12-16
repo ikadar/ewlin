@@ -132,7 +132,9 @@ This document catalogs edge cases — unusual situations that the UI must handle
 
 ---
 
-## View Modes
+## View Modes (Post-MVP)
+
+> View mode switching is post-MVP. Only Timeline View is implemented.
 
 ### What if user switches view mode while dragging?
 

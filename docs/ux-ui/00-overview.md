@@ -70,7 +70,9 @@ The interface uses a **column-based layout** with the following structure:
 
 | Document | Description |
 |----------|-------------|
-| [timeline-vs-sequence.md](02-view-modes/timeline-vs-sequence.md) | Timeline view (default) vs Sequence view |
+| [timeline-vs-sequence.md](02-view-modes/timeline-vs-sequence.md) | Timeline view (default) vs Sequence view (post-MVP) |
+
+> **Note:** Only Timeline View is implemented for MVP. Sequence View is post-MVP.
 
 ### 03 — Navigation
 

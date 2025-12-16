@@ -19,11 +19,13 @@ Each tile represents one task assignment — a task scheduled on a station at a 
 |                       |
 |  Run Section          |  ← Full job color
 |                       |
-|  ○ 12345 · Client     |  ← Completion icon + Reference + Client
+|  ○ 12345 · Client     |  ← Checkbox + Reference + Client (header row)
 |                       |
-|  [↑] [↓]              |  ← Swap buttons (on hover)
+|  [↑] [↓]              |  ← Swap buttons (on hover, bottom-right)
 +-----------------------+
 ```
+
+**Checkbox position:** Left of job reference number in the header row.
 
 ---
 
@@ -33,15 +35,26 @@ Each tile represents one task assignment — a task scheduled on a station at a 
 |---------|-------------|
 | **Setup section** | Visual representation of setup time (top portion, lighter shade) |
 | **Run section** | Visual representation of run time (main portion, full color) |
-| **Completion icon** | Circle icon indicating task status |
+| **Completion checkbox** | Circle icon left of job reference (see below) |
 | **Job reference** | Order reference number |
 | **Client name** | Client name (truncated if needed) |
-| **Swap buttons** | Up/down arrows for swapping with adjacent tiles |
+| **Swap buttons** | Chevron up/down at bottom-right (visible on hover) |
+
+### Header Row Layout
+
+```
+○ 12345 · Client
+^   ^       ^
+|   |       |
+|   |       └── Client name (truncated)
+|   └── Job reference number (monospace)
+└── Completion checkbox (circle icon)
+```
 
 ### Simplified Display
 
 Tiles show minimal information for clarity:
-- Job reference + client name only
+- Checkbox + job reference + client name only
 - No description or time display on tile
 - Full details available in Job Details Panel when selected
 
@@ -117,16 +130,26 @@ Jobs with dependencies appear as **shades of one another** to show relationship.
 
 ## Interactive Elements
 
+### Tile Click Behavior (on Grid)
+
+| Action | Result |
+|--------|--------|
+| **Single click** | Selects the job (same as clicking in Jobs List) |
+| **Single click again** | Deselects the job |
+| **Double click** | Recalls tile (removes from schedule) |
+
+Note: Single and double click are compatible — single click triggers immediately, double click triggers after the second click.
+
 ### Swap Buttons
 
-- **Position:** Bottom of tile, visible on hover
+- **Position:** Bottom-right of tile
 - **Icons:** `chevron-up` and `chevron-down`
 - **Actions:** Swap with tile above / below
-- **Visibility:** Shown on hover
+- **Visibility:** Shown on hover only
 
 ### Completion Toggle
 
-- **Click:** Toggle between complete/incomplete
+- **Click on checkbox:** Toggle between complete/incomplete
 - **Does not affect:** Precedence validation (assumes tasks happen as defined)
 
 ---
@@ -136,12 +159,18 @@ Jobs with dependencies appear as **shades of one another** to show relationship.
 | State | Appearance |
 |-------|------------|
 | Normal | Job color, full opacity |
-| Selected | Highlighted border/glow |
+| Selected (job active) | Highlighted border/glow (job is selected in Jobs List) |
 | Dragging | Reduced opacity, follows cursor |
-| Completed | Green gradient, circle-check icon |
-| Late/Problem | Red gradient, red circle icon |
+| Completed | Green gradient from left, `circle-check` icon |
+| Late/Problem | Red gradient from left, red `circle` icon |
 | Precedence violation | Red halo effect |
 | During unavailability | Different appearance (hatched/lighter) |
+
+### Selected State
+
+When a job is selected (via Jobs List or by clicking a tile on the grid):
+- All tiles belonging to that job get a subtle highlight/glow
+- Off-screen indicators appear for tiles outside viewport
 
 See [Tile States](../04-visual-feedback/tile-states.md) for details.
 
@@ -149,10 +178,13 @@ See [Tile States](../04-visual-feedback/tile-states.md) for details.
 
 ## Outsourced Task Tiles
 
-Outsourced tasks appear similarly but may have subtle visual distinction:
-- Different border style or icon
-- Provider name instead of station
-- Duration shown in days (JO) rather than minutes
+Outsourced tasks appear in dedicated provider columns with visual distinction:
+
+| Element | Outsourced Tile |
+|---------|-----------------|
+| **Border style** | Dotted (instead of solid) |
+| **Column** | Provider column (not station) |
+| **Duration format** | "2 JO" (days, not hours/minutes) |
 
 ---
 

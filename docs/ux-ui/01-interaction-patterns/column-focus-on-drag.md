@@ -23,16 +23,29 @@ This feature reduces visual clutter during drag operations by collapsing columns
 
 | Column Type | Behavior |
 |-------------|----------|
-| Target station column | Remains full width |
-| Other station columns | Collapse to thin lines |
+| Target station column | Remains full width (w-60 / 240px) |
+| Other station columns | Collapse to **120px** width |
 | Outsourced provider columns | Same behavior as stations |
+
+**Target station detection:** Each task is assigned to a station in the backend. The station matching the dragged tile's task stays expanded.
 
 ### Animation
 
-- **Transition:** Smooth CSS animation
-- **Duration:** Quick (e.g., 150-200ms)
+- **Transition:** CSS `transition: width 150ms ease-out`
+- **Duration:** 150ms
+- **Easing:** ease-out (fast start, smooth finish)
 - **Timing:** Starts when drag begins, reverses on drop/cancel
 - **Performance:** CSS transition runs independently, does not affect <10ms drag feedback
+
+```css
+.station-column {
+  transition: width 150ms ease-out;
+}
+
+.station-column--collapsed {
+  width: 120px;
+}
+```
 
 ---
 
@@ -40,29 +53,50 @@ This feature reduces visual clutter during drag operations by collapsing columns
 
 Collapsed columns still show useful information:
 
-### Job-Colored Bands
+### Active Job Tiles
 
-- Collapsed columns display **colored bands** at vertical positions where other tiles from the **same job** are already placed
-- Band color matches the job's assigned color
-- Allows user to see: "This job has tasks on Massicot at ~10am and Conditionnement at ~2pm"
+- Tiles from the **active job** (the job being dragged) **keep their regular color**
+- Shows where other tasks from this job are already placed
+
+### Other Job Tiles
+
+- Tiles from **other jobs** get **muted/desaturated colors**
+- Border and background become very close to grey
+- This visual distinction helps focus on the current job
+
+```css
+/* Other job tiles during drag */
+.tile--muted {
+  filter: saturate(0.2);
+  opacity: 0.6;
+}
+
+/* Active job tiles keep their color */
+.tile--active-job {
+  filter: none;
+  opacity: 1;
+}
+```
 
 ### Visual Example
 
 ```
-Full width        Collapsed         Collapsed         Full width
-[Komori]          |                 |                 [Massicot]
-                  |                 |
-+---------+       |                 |                 +---------+
-| Tile A  |       |###|             |                 |         |
-+---------+       |   |  <-- job    |                 |  DROP   |
-                  |   |     color   |                 |  HERE   |
-+---------+       |   |     band    |                 |         |
-| Tile B  |       |###|             |                 +---------+
-+---------+       |                 |
-                  |                 |                 +---------+
-                  |                 |                 | Tile C  |
-                  |                 |                 +---------+
+Full width        Collapsed (120px)   Collapsed         Full width
+[Komori]          |                   |                 [Massicot]
+                  |                   |
++---------+       +--------+          |                 +---------+
+| Tile A  |       | Job    |          |                 |         |
+| (color) |       | tile   |  muted   |                 |  DROP   |
++---------+       | (color)|  tiles   |                 |  HERE   |
+                  +--------+   ↓      |                 |         |
++---------+       +--------+          |                 +---------+
+| Tile B  |       | Other  |          |
+| (muted) |       | (grey) |          |                 +---------+
++---------+       +--------+          |                 | Tile C  |
+                  |                   |                 +---------+
 ```
+
+Note: Active job tiles maintain their color, other jobs appear muted.
 
 ---
 
