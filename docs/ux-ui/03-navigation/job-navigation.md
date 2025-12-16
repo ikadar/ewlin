@@ -52,7 +52,7 @@ This allows rapid job-by-job scheduling without exiting Quick Placement Mode.
 - Selected job is highlighted in the job list
 - Task list updates to show new job's tasks
 - Date navigation strip updates range (today → new job's departure date)
-- Status bar updates to show new job's approval gates
+- Job Details Panel updates to show new job's approval gates (BAT, Papier, Plaques)
 
 ---
 

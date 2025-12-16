@@ -17,8 +17,9 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 | **Precedence violation** | Red halo effect around tile | On the violating tile |
 | **Station conflict** (double-booking) | Red highlight on both tiles | On overlapping tiles |
 | **Group capacity exceeded** | Yellow/orange highlight | On affected time slot |
-| **Deadline conflict** (late job) | Listed in right panel | Right panel |
-| **Approval gate conflict** | Tile grayed out / blocked | On the tile (if scheduling attempted) |
+| **Deadline conflict** (late job) | Red background, "En retard" badge | Jobs List (Problèmes section) |
+| **Scheduling conflict** (incoherent) | Amber background, "Conflit" badge | Jobs List (Problèmes section) |
+| **Approval gate conflict** | Tile grayed out / blocked | On the tile |
 | **Availability conflict** | Gray hatched overlay | On the time slot |
 
 ---
@@ -29,7 +30,7 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 
 **Visual:**
 - Red halo/glow effect around the tile
-- Listed in right panel under violations
+- Job appears in Jobs List "Problèmes" section with "Conflit" badge
 
 **Resolution:** Move the tile to a later time, or move predecessor earlier
 
@@ -41,7 +42,7 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 
 **Visual:**
 - Both tiles highlighted in red
-- Listed in right panel
+- Job appears in Jobs List "Problèmes" section
 
 **Note:** System normally prevents this via tile insertion (push down). Conflict may occur due to external schedule changes.
 
@@ -53,7 +54,7 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 
 **Visual:**
 - Time slot highlighted in yellow/orange across affected columns
-- Listed in right panel
+- Jobs appear in "Problèmes" section
 
 ---
 
@@ -62,34 +63,84 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 **When:** Job's last task completes after `workshopExitDate`
 
 **Visual:**
-- Job appears in "Late Jobs" section of right panel
-- Shows: job reference, deadline, expected completion, delay days
+- Job appears in Jobs List "Problèmes" section at top
+- Red background (`bg-red-500/10`)
+- Red border (`border-red-500/20`)
+- "En retard" badge
+- `alert-circle` icon
+
+### HTML Example
+
+```html
+<div class="job-item bg-red-500/10 border border-red-500/20">
+  <div class="flex items-center gap-2">
+    <span class="font-mono text-red-300">12342</span>
+    <span class="text-zinc-300">AXA</span>
+    <i data-lucide="alert-circle" class="text-red-400"></i>
+  </div>
+  <div class="text-zinc-100">Contrat assurance habitation</div>
+  <span class="text-xs text-red-400 font-medium">En retard</span>
+</div>
+```
 
 ---
 
-## Right Panel: Problems List
+## Scheduling Conflict (Incoherent)
 
-The right panel displays all active conflicts:
+**When:** Job has precedence violations or other scheduling inconsistencies
+
+**Visual:**
+- Job appears in Jobs List "Problèmes" section
+- Amber background (`bg-amber-500/10`)
+- Amber border (`border-amber-500/20`)
+- "Conflit" badge
+- `shuffle` icon
+
+### HTML Example
+
+```html
+<div class="job-item bg-amber-500/10 border border-amber-500/20">
+  <div class="flex items-center gap-2">
+    <span class="font-mono text-amber-300">12341</span>
+    <span class="text-zinc-300">Michelin</span>
+    <i data-lucide="shuffle" class="text-amber-400"></i>
+  </div>
+  <div class="text-zinc-100">Guide vert Bretagne</div>
+  <span class="text-xs text-amber-400 font-medium">Conflit</span>
+</div>
+```
+
+---
+
+## Jobs List: Problèmes Section
+
+Problematic jobs appear at the **top** of the Jobs List in a dedicated section:
 
 ```
 +------------------------+
-|     LATE JOBS          |
+|  PROBLÈMES (2)         |
 +------------------------+
-| Job 45113 A            |
-| Deadline: Dec 15       |
-| Expected: Dec 17       |
-| Delay: 2 days          |
+| [Late job card]        |
+|  12342 · AXA           |
+|  En retard             |
 +------------------------+
-|                        |
+| [Conflict job card]    |
+|  12341 · Michelin      |
+|  Conflit               |
 +------------------------+
-|     VIOLATIONS         |
+|  TRAVAUX               |
 +------------------------+
-| Task 3 (Job 45113 A)   |
-| Precedence violation   |
+| [Normal job cards...]  |
 +------------------------+
-| Komori @ Dec 14 10:00  |
-| Group capacity (3/2)   |
-+------------------------+
+```
+
+### Section Header
+
+```html
+<div class="px-3 py-2 flex items-center gap-2">
+  <span class="text-[11px] font-semibold text-red-400/80 uppercase tracking-wider">Problèmes</span>
+  <span class="text-[11px] text-zinc-600">2</span>
+</div>
 ```
 
 ---
@@ -108,4 +159,4 @@ The right panel displays all active conflicts:
 
 - [Business Rules](../../domain-model/business-rules.md) — Validation rules
 - [Drag and Drop](../01-interaction-patterns/drag-drop.md) — Precedence safeguard
-- [Right Panel](../05-components/right-panel.md) — Problems display
+- [Left Panel](../05-components/left-panel.md) — Jobs List with Problèmes section

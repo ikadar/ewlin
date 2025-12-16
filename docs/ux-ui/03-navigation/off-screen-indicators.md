@@ -19,81 +19,139 @@ When a job is selected, tiles from that job may be scheduled at times not curren
 
 ---
 
-## Position
+## Display: Header Count
 
-| Tile Location | Indicator Position |
-|---------------|-------------------|
-| Above viewport (earlier time) | **Top** of the station column |
-| Below viewport (later time) | **Bottom** of the station column |
+Off-screen indicators appear in the **station column headers** as a compact count:
+
+### Position
+
+- Inside the sticky header row
+- Right side of each station header
+- Only shown when there are off-screen tiles for the selected job
+
+### Appearance
+
+```
++----------------------------------------------------------+
+| Komori G40                                    ↑ 2        |
++----------------------------------------------------------+
+```
+
+- Chevron icon (`chevron-up` or `chevron-down`) indicating direction
+- Count of off-screen tiles in that direction
+- Subtle styling (`text-zinc-500`)
+
+### HTML Example
+
+```html
+<div class="w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 flex items-center justify-between">
+  <span>Komori G40</span>
+  <!-- Off-screen indicator: 2 tiles above viewport -->
+  <div class="flex items-center gap-1 text-xs text-zinc-500 cursor-pointer hover:text-zinc-300">
+    <i data-lucide="chevron-up" class="w-3 h-3"></i>
+    <span>2</span>
+  </div>
+</div>
+```
 
 ---
 
-## Quantity
+## Interaction: Click for Details
 
-- **One indicator per off-screen tile** from the selected job
-- If multiple tiles are above/below, multiple indicators appear (stacked)
-- Rare in practice — most jobs have few tiles per station
+Clicking on the header indicator reveals a **dropdown** with details:
+
+### Dropdown Content
+
+| Element | Description |
+|---------|-------------|
+| **Tile entries** | List of off-screen tiles |
+| **Per entry:** | Date/time + task info |
+| **Click entry** | Scrolls grid to that tile |
+
+### Dropdown Example
+
+```
++------------------------+
+| ↑ 2 tiles above        |
++------------------------+
+| Dec 12, 09:00          |
+| Task 1 - Impression    |
++------------------------+
+| Dec 12, 14:00          |
+| Task 4 - Vernis        |
++------------------------+
+```
+
+### HTML Structure
+
+```html
+<div class="absolute top-full right-0 mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-lg z-40 min-w-48">
+  <div class="px-3 py-2 text-xs text-zinc-400 border-b border-white/5">
+    2 tiles above
+  </div>
+  <div class="py-1">
+    <button class="w-full px-3 py-2 text-left hover:bg-white/5 text-sm">
+      <div class="text-zinc-300">Dec 12, 09:00</div>
+      <div class="text-zinc-500 text-xs">Task 1 - Impression</div>
+    </button>
+    <button class="w-full px-3 py-2 text-left hover:bg-white/5 text-sm">
+      <div class="text-zinc-300">Dec 12, 14:00</div>
+      <div class="text-zinc-500 text-xs">Task 4 - Vernis</div>
+    </button>
+  </div>
+</div>
+```
 
 ---
 
-## Content
+## Direction Indicators
 
-Each indicator displays:
-- **Colored mark** using the job's assigned color
-- **Date/time** of the tile
+| Tile Location | Indicator |
+|---------------|-----------|
+| Above viewport (earlier time) | `chevron-up` + count |
+| Below viewport (later time) | `chevron-down` + count |
+
+If tiles exist both above and below:
+
+```
++----------------------------------------------------------+
+| Komori G40                                ↑ 2    ↓ 1     |
++----------------------------------------------------------+
+```
 
 ---
 
-## Visual Distinction
+## Distinct Styling for Sequence Context
 
-Indicators for **preceding and following tasks** (in sequence order) have distinct styling:
+In the dropdown, **preceding and following tasks** (in sequence order) can have distinct styling:
 
 | Indicator Type | Description | Visual Style |
 |----------------|-------------|--------------|
-| **Preceding task** (N-1) | Task immediately before currently visible tiles | Distinct style A |
-| **Following task** (N+1) | Task immediately after currently visible tiles | Distinct style B |
+| **Preceding task** (N-1) | Task immediately before visible tiles | Highlighted/bold |
+| **Following task** (N+1) | Task immediately after visible tiles | Highlighted/bold |
 | **Other tiles** | Other tiles from same job | Standard style |
 
 This helps users understand sequence context.
 
 ---
 
-## Interaction
+## Behavior
 
 | Action | Result |
 |--------|--------|
-| **Click on indicator** | Grid scrolls to that specific tile |
-
-Each indicator is independently clickable.
-
----
-
-## Visual Example
-
-```
-Column: [Komori]
-
-  [Dec 12, 09:00] ← indicator (preceding, distinct style)
-  [Dec 12, 14:00] ← indicator (standard)
-+-----------------+
-|                 |
-|  (visible area) |
-|                 |
-|  +-----------+  |
-|  | Tile 3    |  |
-|  +-----------+  |
-|                 |
-+-----------------+
-  [Dec 15, 10:00] ← indicator (following, distinct style)
-```
+| **Hover on header indicator** | Slight highlight |
+| **Click on header indicator** | Toggle dropdown open/close |
+| **Click on dropdown entry** | Grid scrolls to that tile, dropdown closes |
+| **Click outside dropdown** | Dropdown closes |
 
 ---
 
 ## Rationale
 
-- **Awareness:** Know where job's tiles are without scrolling
-- **Navigation:** Click to jump directly to any tile
-- **Sequence context:** Preceding/following distinction shows schedule flow
+- **Compact:** Header count keeps UI clean
+- **Progressive disclosure:** Details available on click
+- **Actionable:** Each entry is a navigation shortcut
+- **Sequence context:** Preceding/following distinction helps workflow
 
 ---
 
@@ -101,4 +159,4 @@ Column: [Komori]
 
 - [Tile Component](../05-components/tile-component.md) — Job color
 - [Grid Navigation](grid-navigation.md) — Other navigation methods
-- [Left Panel](../05-components/left-panel.md) — Task list as alternative navigation
+- [Job Details Panel](../05-components/job-details-panel.md) — Task list as alternative navigation

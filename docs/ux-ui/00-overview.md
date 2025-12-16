@@ -30,24 +30,27 @@ This ensures jobs meet their deadlines by design.
 
 ## Screen Layout
 
+The interface uses a **column-based layout** with the following structure:
+
 ```
-+------------------+--------------------------------+------------------+
-|                  |                                |                  |
-|   LEFT PANEL     |         CENTER GRID            |   RIGHT PANEL    |
-|                  |                                |                  |
-|  Jobs List       |   Station Columns              |   Late Jobs      |
-|  + Task List     |   + Time (vertical)            |   + Violations   |
-|  + Date Strip    |   + Tiles                      |                  |
-|  + Status Bar    |                                |                  |
-|                  |                                |                  |
-+------------------+--------------------------------+------------------+
++--------+------------+-------------+------+----------+-------------------+
+|        |            |             |      |          |                   |
+| SIDE-  |   JOBS     |    JOB      | DATE | TIMELINE |   STATION         |
+| BAR    |   LIST     |   DETAILS   | STRIP|          |   COLUMNS         |
+|        |            |             |      |          |                   |
+| w-14   |   w-72     |    w-72     | w-12 |   w-12   |   flex-1          |
+|        |            |             |      |          |                   |
++--------+------------+-------------+------+----------+-------------------+
 ```
 
-| Panel | Purpose |
-|-------|---------|
-| **Left** | Job context — what I'm working on |
-| **Center** | Schedule grid — where I'm scheduling |
-| **Right** | Schedule health — what's wrong |
+| Column | Width | Purpose |
+|--------|-------|---------|
+| **Sidebar** | 56px (w-14) | Navigation icons (grid, calendar, settings) |
+| **Jobs List** | 288px (w-72) | All jobs with problems section at top |
+| **Job Details** | 288px (w-72) | Selected job info + task list |
+| **Date Strip** | 48px (w-12) | Day navigation (clickable dates) |
+| **Timeline** | 48px (w-12) | Hour markers, "now" line |
+| **Station Columns** | flex | Scheduling grid with tiles |
 
 ---
 
@@ -74,7 +77,7 @@ This ensures jobs meet their deadlines by design.
 | Document | Description |
 |----------|-------------|
 | [grid-navigation.md](03-navigation/grid-navigation.md) | Scrolling, jump to date, today button |
-| [date-navigation-strip.md](03-navigation/date-navigation-strip.md) | Day zones next to task list |
+| [date-navigation-strip.md](03-navigation/date-navigation-strip.md) | Standalone date column |
 | [job-navigation.md](03-navigation/job-navigation.md) | Previous/next job shortcuts |
 | [backward-scheduling.md](03-navigation/backward-scheduling.md) | Jump to deadline workflow |
 | [off-screen-indicators.md](03-navigation/off-screen-indicators.md) | Indicators for tiles outside viewport |
@@ -85,17 +88,18 @@ This ensures jobs meet their deadlines by design.
 |----------|-------------|
 | [tile-states.md](04-visual-feedback/tile-states.md) | Normal, dragging, placed, invalid states |
 | [conflict-indicators.md](04-visual-feedback/conflict-indicators.md) | Red halo, group capacity highlight |
-| [similarity-circles.md](04-visual-feedback/similarity-circles.md) | Time-saving indicators between tiles |
+| [similarity-circles.md](04-visual-feedback/similarity-circles.md) | Link icons showing time-saving potential |
 | [station-unavailability.md](04-visual-feedback/station-unavailability.md) | Hatched overlay, task stretching |
 
 ### 05 — Components
 
 | Document | Description |
 |----------|-------------|
+| [sidebar.md](05-components/sidebar.md) | Navigation icon strip |
+| [left-panel.md](05-components/left-panel.md) | Jobs list with problems section |
+| [job-details-panel.md](05-components/job-details-panel.md) | Selected job info and task list |
 | [scheduling-grid.md](05-components/scheduling-grid.md) | Time axis, station columns |
 | [tile-component.md](05-components/tile-component.md) | Tile anatomy, job colors |
-| [left-panel.md](05-components/left-panel.md) | Jobs list, task list, status bar |
-| [right-panel.md](05-components/right-panel.md) | Late jobs, violations |
 
 ### Other
 
@@ -119,4 +123,5 @@ This ensures jobs meet their deadlines by design.
 
 | Date | Change |
 |------|--------|
+| 2025-12-16 | Updated to column-based layout, removed Right Panel |
 | 2025-12-13 | Initial structure with 8 new UX improvements |

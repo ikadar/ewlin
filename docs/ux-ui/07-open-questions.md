@@ -38,18 +38,59 @@ The following keyboard shortcuts need to be assigned:
 
 - Option A: Always visible
 - Option B: Only on hover
-- Decision needed
+- Decision: **Hover** (per mockup)
 
 ### Off-Screen Indicator Distinct Styles
 
 - Preceding task (N-1): specific style TBD
 - Following task (N+1): specific style TBD
-- Need to define exact visual treatment
+- Need to define exact visual treatment in dropdown
 
 ### Task Completion Checkbox
 
 - Position on tile: TBD
-- Visual style: TBD
+- Visual style: **circle/circle-check icons** (per mockup)
+
+### Quick Placement Mode Visuals
+
+- Placement indicator: shape, color, size TBD
+- Tooltip: position relative to cursor TBD
+- Tooltip: styling (background, border, font) TBD
+- "No task available" indicator styling TBD
+
+### Column Focus on Drag Details
+
+- Collapsed column width TBD
+- Job-colored band height/styling TBD
+- Target station detection method TBD
+- Animation timing/easing TBD
+
+### View Mode Toggle Button Location
+
+- Option A: Station headers row (right side)
+- Option B: Sidebar (new icon)
+- Option C: Timeline column top
+- Decision needed
+
+### Jump to Date / Today Button Location
+
+- Option A: Date Strip top
+- Option B: Station headers row (left side)
+- Option C: Separate toolbar row
+- Decision needed
+
+### Selected Tile State
+
+- Trigger: click? keyboard?
+- How many tiles can be selected: one? multiple?
+- What happens on selection: panel update? scroll?
+- Glow/border styling: exact CSS TBD
+
+### Outsourced Task Tiles
+
+- Visual distinction from internal tasks TBD
+- Provider column appearance TBD
+- Duration display format: "2 JO" vs "2 jours" TBD
 
 ---
 
@@ -67,10 +108,67 @@ The following keyboard shortcuts need to be assigned:
 - Popover vs modal: TBD
 - Threading support (future): TBD
 
-### Status Bar Icons
+### Approval Gates Workflow
 
-- Exact icons to use: TBD
-- Colorblind-friendly considerations
+- How to change BAT/Plates/Paper status from UI?
+- Read-only display vs interactive controls?
+- What happens when scheduling is blocked by gates?
+- Visual feedback for blocked scheduling attempts?
+
+### Keyboard Shortcuts Help
+
+- Help panel design
+- Keyboard shortcut overlay (e.g., "?" to show)
+- Tooltips on hover for buttons with shortcuts
+
+---
+
+## Modals & Dialogs (TBD)
+
+### Job Creation Modal
+
+- Fields to include: reference, client, description, departure date, etc.
+- Validation rules and error display
+- Task definition within modal or separate step?
+- Layout and sizing
+
+### Task Details View
+
+- Popover vs modal vs sidebar panel?
+- Content: duration breakdown, notes, history?
+- When to show: click on tile? dedicated button?
+
+### Confirmation Dialogs
+
+- When required: tile recall, job delete, swap with violation?
+- Standard dialog layout
+- "Don't ask again" option?
+
+---
+
+## System UI (TBD)
+
+### Error/Success Messages (Toast/Notifications)
+
+- Position: top-right? bottom-right?
+- Auto-dismiss timing
+- Stacking behavior for multiple notifications
+- Action buttons in notifications?
+
+### Loading States
+
+- Initial page load: skeleton screens?
+- Data fetching: inline spinners?
+- Save operations: button loading state?
+- Grid loading: overlay or inline?
+
+### Settings Page
+
+- What settings are configurable?
+- Station management UI?
+- Operating schedule editor?
+- User preferences (theme, language)?
+- Provider management?
 
 ---
 
@@ -150,8 +248,8 @@ This document should be updated as decisions are made. Move resolved items to th
 
 | Date | Question | Decision | Rationale |
 |------|----------|----------|-----------|
-| 2025-12-13 | Right panel content | Late jobs + violations only | Job details moved to left panel with new UX improvements |
 | 2025-12-13 | View mode names | Timeline / Sequence | Clear distinction between time-aligned and list views |
+| 2025-12-16 | Layout structure | Column-based (no Right Panel) | Simpler layout, problems in Jobs List |
 
 ---
 

@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scheduling App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Custom refinements */
+    body { font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; }
+    .job-item { transition: background-color 0.15s ease, opacity 0.15s ease; }
+    .tile-hover { transition: transform 0.1s ease, box-shadow 0.1s ease; }
+    .tile-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    /* Imprint tile style - scheduled task with faded/watermark appearance */
+    .tile-imprint-dark {
+      border-left: 4px solid rgba(168, 85, 247, 0.4);
+      background: linear-gradient(to right, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.05) 100%);
+      color: rgba(168, 85, 247, 0.6);
+    }
+    /* Striped pattern for unavailability */
+    .bg-stripes-dark {
+      background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(255,255,255,0.03) 10px,
+        rgba(255,255,255,0.03) 20px
+      );
+    }
+  </style>
+</head>
+<body class="h-screen bg-zinc-950 text-zinc-100 antialiased">
+  <div class="flex h-full">
+    <!-- Sidebar -->
+    <aside class="w-14 shrink-0 bg-zinc-900/50 border-r border-white/5">
+      <div class="h-full flex flex-col items-center py-3 gap-2">
+        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-zinc-300 hover:bg-white/15 hover:text-white transition-colors">
+          <i data-lucide="layout-grid" class="w-5 h-5"></i>
+        </button>
+        <button class="w-10 h-10 flex items-center justify-center rounded-xl text-zinc-500 hover:bg-white/10 hover:text-zinc-300 transition-colors">
+          <i data-lucide="calendar" class="w-5 h-5"></i>
+        </button>
+        <button class="w-10 h-10 flex items-center justify-center rounded-xl text-zinc-500 hover:bg-white/10 hover:text-zinc-300 transition-colors">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex flex-1 min-w-0">
+      <!-- Column 1: Jobs List -->
+      <div class="w-72 shrink-0 bg-zinc-900/30 flex flex-col border-r border-white/5">
+
+        <!-- Header with Add Job button and Search field -->
+        <div class="shrink-0 p-3 flex gap-2">
+          <button class="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors" title="Ajouter un travail">
+            <i data-lucide="plus" class="w-5 h-5"></i>
+          </button>
+          <div class="relative flex-1">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"></i>
+            <input type="text" placeholder="Rechercher..." class="w-full pl-9 pr-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-white/20 focus:bg-white/10">
+          </div>
+        </div>
+
+        <!-- Job list container -->
+        <div class="flex-1 overflow-y-auto">
+
+        <!-- Problematic jobs section -->
+        <div class="px-3 py-2 flex items-center gap-2">
+          <span class="text-[11px] font-semibold text-red-400/80 uppercase tracking-wider">Problèmes</span>
+          <span class="text-[11px] text-zinc-600">2</span>
+        </div>
+
+        <!-- Late job -->
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 cursor-pointer text-sm hover:bg-red-500/15">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-red-300">12342</span>
+            <span class="text-zinc-400">·</span>
+            <span class="text-zinc-300 truncate">AXA</span>
+            <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-red-400 ml-auto shrink-0"></i>
+          </div>
+          <div class="text-zinc-100 truncate mb-1.5">Contrat assurance habitation</div>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-1">
+              <span class="w-1.5 h-1.5 rounded-full border border-zinc-600"></span>
+              <span class="w-1.5 h-1.5 rounded-full border border-zinc-600"></span>
+              <span class="w-1.5 h-1.5 rounded-full border border-zinc-600"></span>
+            </div>
+            <span class="text-xs text-red-400 font-medium">En retard</span>
+          </div>
+        </div>
+
+        <!-- Incoherent scheduling job -->
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 cursor-pointer text-sm hover:bg-amber-500/15">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-amber-300">12341</span>
+            <span class="text-zinc-400">·</span>
+            <span class="text-zinc-300 truncate">Michelin</span>
+            <i data-lucide="shuffle" class="w-3.5 h-3.5 text-amber-400 ml-auto shrink-0"></i>
+          </div>
+          <div class="text-zinc-100 truncate mb-1.5">Guide vert Bretagne édition 2025</div>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span class="w-1.5 h-1.5 rounded-full border border-zinc-600"></span>
+              <span class="w-1.5 h-1.5 rounded-full border border-zinc-600"></span>
+              <span class="w-1.5 h-1.5 rounded-full border border-zinc-600"></span>
+            </div>
+            <span class="text-xs text-amber-400 font-medium">Conflit</span>
+          </div>
+        </div>
+
+        <!-- Other jobs section -->
+        <div class="px-3 py-2 mt-2 flex items-center gap-2">
+          <span class="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Travaux</span>
+        </div>
+
+        <!-- Regular job item -->
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">12340</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Galeries Lafayette</span>
+            <span class="text-zinc-600 text-xs ml-auto">17/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Catalogue soldes hiver 2025</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">12343</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Picard Surgelés</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 ml-auto shrink-0"></span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Menu fêtes fin d'année</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">12344</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Club Med</span>
+            <span class="text-zinc-600 text-xs ml-auto">20/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Brochure villages ski 2025</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <!-- Selected job -->
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg bg-white/10 border border-white/10 cursor-pointer text-sm">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-200">12345</span>
+            <span class="text-zinc-500">·</span>
+            <span class="text-zinc-200 truncate">Autosphere</span>
+            <span class="text-zinc-400 text-xs ml-auto">18/12</span>
+          </div>
+          <div class="text-white truncate mb-1.5">Brochures Autosphère accueil</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">67890</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Volkswagen</span>
+            <span class="text-zinc-600 text-xs ml-auto">21/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Catalogue promotionnel été 2025</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">11111</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Renault France</span>
+            <span class="text-zinc-600 text-xs ml-auto">15/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Flyers promotionnels printemps</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22341</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Carrefour</span>
+            <span class="text-zinc-600 text-xs ml-auto">16/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Catalogue hebdomadaire semaine 12</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22342</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">BNP Paribas</span>
+            <span class="text-zinc-600 text-xs ml-auto">23/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Rapport annuel 2024</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22343</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Sephora</span>
+            <span class="text-zinc-600 text-xs ml-auto">17/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Lookbook collection printemps-été</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22344</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Air France</span>
+            <span class="text-zinc-600 text-xs ml-auto">18/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Magazine de bord janvier</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22345</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Decathlon</span>
+            <span class="text-zinc-600 text-xs ml-auto">19/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Guide équipement running 2025</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22346</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Orange Business</span>
+            <span class="text-zinc-600 text-xs ml-auto">20/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Plaquette solutions entreprises</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22347</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Univ. Paris-Saclay</span>
+            <span class="text-zinc-600 text-xs ml-auto">22/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Brochure formations master</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22348</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Leroy Merlin</span>
+            <span class="text-zinc-600 text-xs ml-auto">24/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Catalogue jardin et extérieur</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22349</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">AccorHotels</span>
+            <span class="text-zinc-600 text-xs ml-auto">26/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Dépliant fidélité ALL Rewards</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22350</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">LVMH</span>
+            <span class="text-zinc-600 text-xs ml-auto">27/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Coffret presse lancement parfum</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22351</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Danone</span>
+            <span class="text-zinc-600 text-xs ml-auto">28/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Packaging yaourts bio gamme enfant</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22352</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">SNCF</span>
+            <span class="text-zinc-600 text-xs ml-auto">29/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Affiches horaires été 2025</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22353</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Fnac Darty</span>
+            <span class="text-zinc-600 text-xs ml-auto">30/12</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Guide high-tech Noël</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22354</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Crédit Agricole</span>
+            <span class="text-zinc-600 text-xs ml-auto">02/01</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Livret offre jeunes actifs</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22355</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">L'Oréal Paris</span>
+            <span class="text-zinc-600 text-xs ml-auto">03/01</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">PLV comptoir pharmacie</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22356</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">EDF</span>
+            <span class="text-zinc-600 text-xs ml-auto">05/01</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Brochure tarifs professionnels</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22357</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Bouygues Immo.</span>
+            <span class="text-zinc-600 text-xs ml-auto">06/01</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Plaquette programme neuf Lyon</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        <div class="job-item mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm hover:bg-white/5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-[13px] text-zinc-500">22358</span>
+            <span class="text-zinc-600">·</span>
+            <span class="text-zinc-400 truncate">Pernod Ricard</span>
+            <span class="text-zinc-600 text-xs ml-auto">08/01</span>
+          </div>
+          <div class="text-zinc-300 truncate mb-1.5">Étiquettes édition limitée Ricard</div>
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>
+          </div>
+        </div>
+
+        </div>
+        <!-- End job list container -->
+
+      </div>
+
+      <!-- Column 2: Medium 288px - Job Details -->
+      <div class="w-72 shrink-0 bg-zinc-900/50 border-r border-white/5 flex flex-col">
+        <!-- Job details - simple key-value list -->
+        <div class="p-3 border-b border-white/5 space-y-2.5 text-sm">
+          <div>
+            <div class="text-zinc-500 text-xs uppercase tracking-wide">Code</div>
+            <div class="text-zinc-200 font-mono">12345</div>
+          </div>
+          <div>
+            <div class="text-zinc-500 text-xs uppercase tracking-wide">Client</div>
+            <div class="text-zinc-200">Autosphere</div>
+          </div>
+          <div>
+            <div class="text-zinc-500 text-xs uppercase tracking-wide">Intitulé</div>
+            <div class="text-zinc-200">Brochures Autosphère accueil</div>
+          </div>
+          <div>
+            <div class="text-zinc-500 text-xs uppercase tracking-wide">Départ</div>
+            <div class="text-zinc-200">18/12/2025</div>
+          </div>
+          <div class="border-t border-white/5 pt-2.5"></div>
+          <div>
+            <div class="text-zinc-500 text-xs uppercase tracking-wide">BAT</div>
+            <div class="text-zinc-200">Reçu 12/12 14:30</div>
+          </div>
+          <div>
+            <div class="text-zinc-500 text-xs uppercase tracking-wide">Papier</div>
+            <div class="text-zinc-200">Commandé</div>
+          </div>
+          <div>
+            <div class="text-zinc-500 text-xs uppercase tracking-wide">Plaques</div>
+            <div class="text-zinc-200">Prêtes</div>
+          </div>
+        </div>
+
+        <!-- Task tiles -->
+        <div class="p-3 space-y-2 overflow-y-auto flex-grow bg-zinc-900/30">
+          <!-- Task tile: SCHEDULED (imprint) - 2h30 = 250px -->
+          <div class="pt-0.5 px-2 pb-2 text-sm tile-imprint-dark" style="height: 200px;">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-zinc-400 font-medium truncate min-w-0">Komori G40</span>
+              <span class="text-zinc-500 shrink-0">Di 15/12 07:00</span>
+            </div>
+          </div>
+
+          <!-- Task tile: 0h15 = 25px -->
+          <div class="pt-0.5 px-2 cursor-grab text-sm border-l-4 border-l-purple-500 bg-purple-950/35" style="height: 20px;">
+            <div class="flex items-center justify-between gap-2">
+              <span class="tile-context-station text-purple-300 font-medium truncate min-w-0">Polar 137</span>
+              <span class="tile-context-job text-purple-300 font-medium truncate min-w-0">12345 · Autosphere</span>
+              <span class="tile-context-duration text-zinc-400 shrink-0">0h15</span>
+              <span class="tile-context-starttime text-zinc-400 shrink-0">Di 15/12 08:30</span>
+            </div>
+          </div>
+
+          <!-- Task tile: 0h45 = 75px -->
+          <div class="pt-0.5 px-2 cursor-grab text-sm border-l-4 border-l-purple-500 bg-purple-950/35" style="height: 60px;">
+            <div class="flex items-center justify-between gap-2">
+              <span class="tile-context-station text-purple-300 font-medium truncate min-w-0">Conditionnement</span>
+              <span class="tile-context-job text-purple-300 font-medium truncate min-w-0">12345 · Autosphere</span>
+              <span class="tile-context-duration text-zinc-400 shrink-0">0h45</span>
+              <span class="tile-context-starttime text-zinc-400 shrink-0">Lu 16/12 10:00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Days (48px) - Independent scroll -->
+      <div class="w-12 shrink-0 bg-zinc-950 overflow-y-auto border-r border-white/5">
+        <div class="flex flex-col">
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Lu</span>
+            <span class="font-medium text-zinc-400">09</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Ma</span>
+            <span class="font-medium text-zinc-400">10</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Me</span>
+            <span class="font-medium text-zinc-400">11</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Je</span>
+            <span class="font-medium text-zinc-400">12</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Ve</span>
+            <span class="font-medium text-zinc-400">13</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Sa</span>
+            <span class="font-medium text-zinc-400">14</span>
+          </div>
+          <!-- Current day - amber highlight -->
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-amber-200 border-b border-amber-500/30 cursor-pointer bg-amber-500/15">
+            <span class="text-[10px]">Di</span>
+            <span class="font-medium">15</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Lu</span>
+            <span class="font-medium text-zinc-400">16</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Ma</span>
+            <span class="font-medium text-zinc-400">17</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Me</span>
+            <span class="font-medium text-zinc-400">18</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Je</span>
+            <span class="font-medium text-zinc-400">19</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Ve</span>
+            <span class="font-medium text-zinc-400">20</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Sa</span>
+            <span class="font-medium text-zinc-400">21</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Di</span>
+            <span class="font-medium text-zinc-400">22</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Lu</span>
+            <span class="font-medium text-zinc-400">23</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Ma</span>
+            <span class="font-medium text-zinc-400">24</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Me</span>
+            <span class="font-medium text-zinc-400">25</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Je</span>
+            <span class="font-medium text-zinc-400">26</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Ve</span>
+            <span class="font-medium text-zinc-400">27</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Sa</span>
+            <span class="font-medium text-zinc-400">28</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Di</span>
+            <span class="font-medium text-zinc-400">29</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Lu</span>
+            <span class="font-medium text-zinc-400">30</span>
+          </div>
+          <div class="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+            <span class="text-[10px]">Ma</span>
+            <span class="font-medium text-zinc-400">31</span>
+          </div>
+          <!-- Spacer to fill remaining space -->
+          <div class="flex-grow"></div>
+        </div>
+      </div>
+
+      <!-- Columns 4+5 wrapper: scroll together -->
+      <div class="flex flex-1 min-w-0 overflow-auto">
+          <!-- Column 4: Timeline (48px) -->
+          <div class="w-12 shrink-0 border-r border-white/5">
+            <div class="relative bg-zinc-900/50" style="height: 1920px;">
+            <!-- Hour markers: 100px per hour × 24h, starting at 6h -->
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 0px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1px;">6h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 20px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 40px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 60px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 80px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 81px;">7h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 100px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 120px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 140px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 160px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 161px;">8h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 180px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 200px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 220px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 240px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 241px;">9h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 260px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 280px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 300px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 320px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 321px;">10h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 340px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 360px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 380px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 400px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 401px;">11h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 420px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 440px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 460px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 480px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 481px;">12h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 500px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 520px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 540px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 560px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 561px;">13h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 580px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 600px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 620px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 640px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 641px;">14h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 660px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 680px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 700px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 720px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 721px;">15h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 740px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 760px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 780px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 800px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 801px;">16h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 820px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 840px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 860px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 880px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 881px;">17h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 900px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 920px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 940px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 960px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 961px;">18h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 980px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1000px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1020px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1040px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1041px;">19h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1060px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1080px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1100px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1120px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1121px;">20h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1140px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1160px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1180px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1200px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1201px;">21h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1220px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1240px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1260px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1280px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1281px;">22h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1300px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1320px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1340px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1360px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1361px;">23h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1380px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1400px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1420px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1440px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1441px;">0h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1460px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1480px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1500px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1520px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1521px;">1h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1540px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1560px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1580px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1600px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1601px;">2h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1620px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1640px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1660px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1680px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1681px;">3h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1700px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1720px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1740px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1760px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1761px;">4h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1780px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1800px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1820px;"></div>
+
+            <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1840px;"></div>
+            <span class="absolute right-2 text-sm font-mono text-zinc-600" style="top: 1841px;">5h</span>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1860px;"></div>
+            <div class="absolute right-0 w-3 h-px bg-zinc-700/50" style="top: 1880px;"></div>
+            <div class="absolute right-0 w-2 h-px bg-zinc-800/50" style="top: 1900px;"></div>
+            <!-- Now line -->
+            <div class="absolute left-0 right-0 h-0.5 bg-red-500 z-20" style="top: 413px;"></div>
+            <span class="absolute left-1 text-xs font-mono text-red-400 bg-zinc-900 px-1 rounded z-20" style="top: 406px;">11:10</span>
+            </div>
+          </div>
+
+          <!-- Column 5: XL flex - Station columns -->
+          <div class="flex-1 xl-area flex flex-col">
+            <!-- Station headers row (sticky) with off-screen indicators -->
+            <div class="flex gap-3 px-3 bg-zinc-900 border-b border-white/10 shrink-0 sticky top-0 z-30">
+              <div class="w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 flex items-center justify-between">
+                <span>Komori G40</span>
+                <!-- Off-screen indicator (example: 2 tiles above) -->
+                <div class="flex items-center gap-1 text-xs text-zinc-500">
+                  <i data-lucide="chevron-up" class="w-3 h-3"></i>
+                  <span>2</span>
+                </div>
+              </div>
+              <div class="w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 flex items-center justify-between">
+                <span>Polar 137</span>
+              </div>
+              <div class="w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 flex items-center justify-between">
+                <span>Heidelberg XL</span>
+                <!-- Off-screen indicator (example: 1 tile above) -->
+                <div class="flex items-center gap-1 text-xs text-zinc-500">
+                  <i data-lucide="chevron-up" class="w-3 h-3"></i>
+                  <span>1</span>
+                </div>
+              </div>
+              <div class="w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300">Conditionnement</div>
+              <div class="w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300">Expédition</div>
+            </div>
+            <!-- Station columns content -->
+            <div class="flex gap-3 px-3 bg-[#050505] relative flex-1 overflow-auto" style="height: 1920px;">
+            <!-- Now line spanning all stations -->
+            <div class="absolute left-0 right-0 h-0.5 bg-red-500 z-20 pointer-events-none" style="top: 413px;"></div>
+            <!-- Departure date marker (selected job: 18/12, visible at ~960px which is 18h on Dec 15 but this is a different day) -->
+            <div class="absolute left-0 right-0 h-0.5 bg-blue-500 z-20 pointer-events-none" style="top: 960px;"></div>
+            <!-- Station: Komori G40 (uptime 7h-12h and 13h-18h) -->
+            <div class="w-60 shrink-0 bg-[#0a0a0a] relative">
+              <!-- Downtime 6h-7h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 0px; height: 80px;"></div>
+              <!-- Downtime 12h-13h (lunch) -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 480px; height: 80px;"></div>
+              <!-- Downtime 18h onwards -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 960px; height: 960px;"></div>
+              <!-- Scheduled tile: 07:00, 2h30 - CHECKED (before 11:10) - with Setup/Run sections -->
+              <div class="absolute left-0 right-0 text-sm border-l-4 border-l-purple-500 group" style="top: 80px; height: 200px;">
+                <!-- Setup section (20min = 27px, lighter shade) -->
+                <div class="absolute left-0 right-0 bg-purple-900/40 border-b border-purple-700/30" style="top: 0; height: 27px; background-image: linear-gradient(to right, rgba(34,197,94,0.3) 0%, transparent 80%);"></div>
+                <!-- Run section (130min = 173px, full color) -->
+                <div class="absolute left-0 right-0 bg-purple-950/35 pt-0.5 px-2" style="top: 27px; height: 173px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                  <div class="flex items-center gap-2">
+                    <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                    <span class="tile-context-job text-purple-300 font-medium truncate min-w-0">12345 · Autosphere</span>
+                  </div>
+                </div>
+                <!-- Swap buttons (visible on hover) -->
+                <div class="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button class="w-6 h-6 flex items-center justify-center rounded bg-white/10 hover:bg-white/20 text-zinc-400 hover:text-white">
+                    <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                  </button>
+                  <button class="w-6 h-6 flex items-center justify-center rounded bg-white/10 hover:bg-white/20 text-zinc-400 hover:text-white">
+                    <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+              <!-- Scheduled tile: 09:30, 2h - BNP Paribas - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-rose-500 bg-rose-950/35" style="top: 280px; height: 160px;">
+                <!-- Chain link icons overlapping tile junction -->
+                <div class="absolute right-3 flex gap-0.5 px-1.5 py-1 rounded-full" style="top: -10px;">
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <i data-lucide="unlink" class="w-3.5 h-3.5 text-zinc-800"></i>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-rose-300 font-medium truncate min-w-0">22342 · BNP Paribas</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 11:30, 4h (spans lunch break 12-13h) - SNCF - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-yellow-500 bg-yellow-950/35" style="top: 440px; height: 320px;">
+                <!-- Chain link icons overlapping tile junction -->
+                <div class="absolute right-3 flex gap-0.5 px-1.5 py-1 rounded-full" style="top: -10px;">
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <i data-lucide="unlink" class="w-3.5 h-3.5 text-zinc-800"></i>
+                  <i data-lucide="unlink" class="w-3.5 h-3.5 text-zinc-800"></i>
+                  <i data-lucide="unlink" class="w-3.5 h-3.5 text-zinc-800"></i>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-yellow-300 font-medium truncate min-w-0">22352 · SNCF</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 15:30, 2h - Air France - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-teal-500 bg-teal-950/35" style="top: 760px; height: 160px;">
+                <!-- Chain link icons overlapping tile junction -->
+                <div class="absolute right-3 flex gap-0.5 px-1.5 py-1 rounded-full" style="top: -10px;">
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                  <i data-lucide="link" class="w-3.5 h-3.5 text-zinc-400"></i>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-teal-300 font-medium truncate min-w-0">22344 · Air France</span>
+                </div>
+              </div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 0px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 80px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 160px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 240px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 320px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 400px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 480px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 560px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 640px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 720px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 800px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 880px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 960px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1040px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1120px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1200px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1280px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1360px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1440px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1520px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1600px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1680px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1760px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1840px;"></div>
+            </div>
+
+            <!-- Station: Polar 137 (uptime 7h-19h) -->
+            <div class="w-60 shrink-0 bg-[#0a0a0a] relative">
+              <!-- Downtime 6h-7h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 0px; height: 80px;"></div>
+              <!-- Downtime 12h-13h (lunch) -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 480px; height: 80px;"></div>
+              <!-- Downtime 19h-6h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 1040px; height: 880px;"></div>
+              <!-- Scheduled tile: 07:00, 1h30 - Michelin - CHECKED -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-green-500 bg-green-950/35" style="top: 80px; height: 120px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-green-300 font-medium truncate min-w-0">67890 · Michelin</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 08:30, 0h15 - Autosphere - CHECKED -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-purple-500 bg-purple-950/35" style="top: 200px; height: 20px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-purple-300 font-medium truncate min-w-0">12345 · Autosphere</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 08:45, 2h - Renault - CHECKED -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-cyan-500 bg-cyan-950/35" style="top: 220px; height: 160px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-cyan-300 font-medium truncate min-w-0">11111 · Renault</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 10:45, 3h15 - Orange - unchecked (overlaps with now) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-sky-500 bg-sky-950/35" style="top: 380px; height: 260px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-sky-300 font-medium truncate min-w-0">22346 · Orange</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 14:00, 2h - Leroy Merlin - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-emerald-500 bg-emerald-950/35" style="top: 640px; height: 160px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-emerald-300 font-medium truncate min-w-0">22348 · Leroy Merlin</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 15:15, 2h30 - AccorHotels - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-violet-500 bg-violet-950/35" style="top: 740px; height: 200px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-violet-300 font-medium truncate min-w-0">22349 · AccorHotels</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 17:45, 1h15 - LVMH - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-fuchsia-500 bg-fuchsia-950/35" style="top: 940px; height: 100px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-fuchsia-300 font-medium truncate min-w-0">22350 · LVMH</span>
+                </div>
+              </div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 0px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 80px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 160px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 240px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 320px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 400px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 480px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 560px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 640px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 720px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 800px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 880px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 960px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1040px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1120px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1200px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1280px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1360px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1440px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1520px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1600px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1680px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1760px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1840px;"></div>
+            </div>
+
+            <!-- Station: Heidelberg XL (uptime 6h-22h) -->
+            <div class="w-60 shrink-0 bg-[#0a0a0a] relative">
+              <!-- Downtime 12h-13h (lunch) -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 480px; height: 80px;"></div>
+              <!-- Downtime 22h-6h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 1280px; height: 640px;"></div>
+              <!-- Scheduled tile: 06:00, 3h - Carrefour - CHECKED -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-amber-500 bg-amber-950/35" style="top: 0px; height: 240px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-amber-300 font-medium truncate min-w-0">22341 · Carrefour</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 09:00, 1h30 - BNP Paribas - CHECKED -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-rose-500 bg-rose-950/35" style="top: 240px; height: 120px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-rose-300 font-medium truncate min-w-0">22342 · BNP Paribas</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 10:30, 1h - Michelin - unchecked (overlaps with now) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-green-500 bg-green-950/35" style="top: 360px; height: 80px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-green-300 font-medium truncate min-w-0">67890 · Michelin</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 11:30, 2h - Sephora - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-indigo-500 bg-indigo-950/35" style="top: 440px; height: 160px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-indigo-300 font-medium truncate min-w-0">22343 · Sephora</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 13:30, 1h30 - Leroy Merlin - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-emerald-500 bg-emerald-950/35" style="top: 600px; height: 120px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-emerald-300 font-medium truncate min-w-0">22348 · Leroy Merlin</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 15:00, 2h - Renault - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-cyan-500 bg-cyan-950/35" style="top: 720px; height: 160px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-cyan-300 font-medium truncate min-w-0">11111 · Renault</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 17:00, 3h - LVMH - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-fuchsia-500 bg-fuchsia-950/35" style="top: 880px; height: 240px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-fuchsia-300 font-medium truncate min-w-0">22350 · LVMH</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 20:00, 2h - Danone - unchecked -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm border-l-4 border-l-pink-500 bg-pink-950/35" style="top: 1120px; height: 160px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-pink-300 font-medium truncate min-w-0">22351 · Danone</span>
+                </div>
+              </div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 0px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 80px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 160px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 240px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 320px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 400px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 480px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 560px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 640px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 720px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 800px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 880px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 960px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1040px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1120px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1200px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1280px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1360px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1440px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1520px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1600px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1680px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1760px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1840px;"></div>
+            </div>
+
+            <!-- Station: Conditionnement (uptime 8h-18h) -->
+            <div class="w-60 shrink-0 bg-[#0a0a0a] relative">
+              <!-- Downtime 6h-8h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 0px; height: 160px;"></div>
+              <!-- Downtime 12h-13h (lunch) -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 480px; height: 80px;"></div>
+              <!-- Downtime 18h-6h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 960px; height: 960px;"></div>
+              <!-- Scheduled tile: 08:00, 2h -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-teal-500 bg-teal-950/35" style="top: 160px; height: 160px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-teal-300 font-medium truncate min-w-0">22344 · Air France</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 10:00, 0h45 - Autosphere (also in Komori G40, Polar 137) - LATE -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-purple-500 bg-purple-950/35" style="top: 320px; height: 60px; background-image: linear-gradient(to right, rgba(239,68,68,0.7) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-red-500 shrink-0"></i>
+                  <span class="tile-context-job text-purple-300 font-medium truncate min-w-0">12345 · Autosphere</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 10:45, 3h15 (spans lunch 12-13h) - Carrefour - unchecked (overlaps with now) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-amber-500 bg-amber-950/35" style="top: 380px; height: 260px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-amber-300 font-medium truncate min-w-0">22341 · Carrefour</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 14:00, 1h - Sephora (also in Heidelberg XL) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-indigo-500 bg-indigo-950/35" style="top: 640px; height: 80px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-indigo-300 font-medium truncate min-w-0">22343 · Sephora</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 15:00, 2h - AccorHotels (also in Polar 137) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-violet-500 bg-violet-950/35" style="top: 720px; height: 160px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-violet-300 font-medium truncate min-w-0">22349 · AccorHotels</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 16:15, 1h45 - Michelin (also in Polar 137, Heidelberg XL) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-green-500 bg-green-950/35" style="top: 820px; height: 140px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-green-300 font-medium truncate min-w-0">67890 · Michelin</span>
+                </div>
+              </div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 0px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 80px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 160px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 240px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 320px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 400px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 480px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 560px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 640px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 720px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 800px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 880px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 960px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1040px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1120px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1200px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1280px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1360px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1440px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1520px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1600px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1680px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1760px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1840px;"></div>
+            </div>
+
+            <!-- Station: Expédition (uptime 9h-17h) -->
+            <div class="w-60 shrink-0 bg-[#0a0a0a] relative">
+              <!-- Downtime 6h-9h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 0px; height: 240px;"></div>
+              <!-- Downtime 12h-13h (lunch) -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 480px; height: 80px;"></div>
+              <!-- Downtime 17h-6h -->
+              <div class="absolute left-0 right-0 bg-stripes-dark" style="top: 880px; height: 1040px;"></div>
+              <!-- Scheduled tile: 09:00, 1h30 -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-sky-500 bg-sky-950/35" style="top: 240px; height: 120px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-sky-300 font-medium truncate min-w-0">22346 · Orange</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 10:30, 0h30 - Michelin (also in Polar 137, Heidelberg XL) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-green-500 bg-green-950/35" style="top: 360px; height: 40px; background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                  <span class="tile-context-job text-green-300 font-medium truncate min-w-0">67890 · Michelin</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 11:00, 1h - Carrefour (also in Heidelberg XL, Conditionnement) - unchecked (overlaps with now) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-amber-500 bg-amber-950/35" style="top: 400px; height: 80px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-amber-300 font-medium truncate min-w-0">22341 · Carrefour</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 12:00, 2h (spans lunch 12-13h) - Université -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-lime-500 bg-lime-950/35" style="top: 480px; height: 160px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-lime-300 font-medium truncate min-w-0">22347 · Université</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 14:00, 1h - Decathlon (also in Conditionnement) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-orange-500 bg-orange-950/35" style="top: 640px; height: 80px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-orange-300 font-medium truncate min-w-0">22345 · Decathlon</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 15:00, 1h30 - Renault (also in Polar 137, Heidelberg XL) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-cyan-500 bg-cyan-950/35" style="top: 720px; height: 120px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-cyan-300 font-medium truncate min-w-0">11111 · Renault</span>
+                </div>
+              </div>
+              <!-- Scheduled tile: 16:30, 0h30 - Autosphere (also in Komori G40, Polar 137, Conditionnement) -->
+              <div class="absolute left-0 right-0 pt-0.5 px-2 text-sm  border-l-4 border-l-purple-500 bg-purple-950/35" style="top: 840px; height: 40px;">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="circle" class="w-4 h-4 text-zinc-600 shrink-0"></i>
+                  <span class="tile-context-job text-purple-300 font-medium truncate min-w-0">12345 · Autosphere</span>
+                </div>
+              </div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 0px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 80px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 160px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 240px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 320px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 400px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 480px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 560px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 640px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 720px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 800px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 880px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 960px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1040px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1120px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1200px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1280px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1360px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1440px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1520px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1600px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1680px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1760px;"></div>
+              <div class="absolute left-0 right-0 h-px bg-zinc-700/50" style="top: 1840px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

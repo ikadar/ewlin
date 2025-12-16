@@ -12,7 +12,7 @@ Removing a scheduled tile from the grid (unassigning a task).
 
 ## Methods
 
-### From Task List (Left Panel)
+### From Task List (Job Details Panel)
 
 Placed tiles appear with **lower opacity** in the task list.
 
@@ -82,5 +82,5 @@ T1 and T3 remain in their positions. T2 returns to unscheduled state in the task
 
 ## Related Documents
 
-- [Left Panel](../05-components/left-panel.md) — Task list component
+- [Job Details Panel](../05-components/job-details-panel.md) — Task list component
 - [Tile States](../04-visual-feedback/tile-states.md) — Visual state definitions

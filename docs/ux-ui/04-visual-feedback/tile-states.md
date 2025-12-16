@@ -10,7 +10,7 @@ Tiles have different visual appearances based on their state, location, and vali
 
 ---
 
-## States in Task List (Left Panel)
+## States in Task List (Job Details Panel)
 
 | State | Appearance | Interactions |
 |-------|------------|--------------|

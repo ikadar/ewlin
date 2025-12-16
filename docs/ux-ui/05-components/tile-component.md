@@ -19,9 +19,7 @@ Each tile represents one task assignment — a task scheduled on a station at a 
 |                       |
 |  Run Section          |  ← Full job color
 |                       |
-|  Reference: 45113 A   |
-|  Description: Cartes  |
-|  09:00 - 10:00        |
+|  ○ 12345 · Client     |  ← Completion icon + Reference + Client
 |                       |
 |  [↑] [↓]              |  ← Swap buttons (on hover)
 +-----------------------+
@@ -33,12 +31,47 @@ Each tile represents one task assignment — a task scheduled on a station at a 
 
 | Element | Description |
 |---------|-------------|
-| **Setup section** | Visual representation of setup time (top portion) |
-| **Run section** | Visual representation of run time (main portion) |
-| **Job reference** | Order reference from job |
-| **Description** | Job description (truncated if needed) |
-| **Time** | Start and end time |
+| **Setup section** | Visual representation of setup time (top portion, lighter shade) |
+| **Run section** | Visual representation of run time (main portion, full color) |
+| **Completion icon** | Circle icon indicating task status |
+| **Job reference** | Order reference number |
+| **Client name** | Client name (truncated if needed) |
 | **Swap buttons** | Up/down arrows for swapping with adjacent tiles |
+
+### Simplified Display
+
+Tiles show minimal information for clarity:
+- Job reference + client name only
+- No description or time display on tile
+- Full details available in Job Details Panel when selected
+
+---
+
+## Completion Icon
+
+Uses Lucide circle icons instead of checkbox:
+
+| State | Icon | Color | Additional Visual |
+|-------|------|-------|-------------------|
+| **Not completed** | `circle` | `text-zinc-600` | — |
+| **Completed** | `circle-check` | `text-emerald-500` | Green gradient from left |
+| **Late/Problem** | `circle` | `text-red-500` | Red gradient from left |
+
+### HTML Examples
+
+```html
+<!-- Not completed -->
+<i data-lucide="circle" class="w-4 h-4 text-zinc-600"></i>
+
+<!-- Completed -->
+<i data-lucide="circle-check" class="w-4 h-4 text-emerald-500"></i>
+```
+
+### Completed Tile Gradient
+
+```html
+<div style="background-image: linear-gradient(to right, rgba(34,197,94,0.4) 0%, transparent 80%);">
+```
 
 ---
 
@@ -48,7 +81,7 @@ Each tile represents one task assignment — a task scheduled on a station at a 
 
 - **Width:** Column width minus padding
 - **Height:** Proportional to duration (setup + run)
-- **Minimum height:** Enough to display core info (reference, time)
+- **Minimum height:** Enough to display completion icon + reference
 
 ### Sequence View
 
@@ -70,11 +103,11 @@ Each tile represents one task assignment — a task scheduled on a station at a 
 
 | Element | Color |
 |---------|-------|
-| Run section | Full job color |
-| Setup section | Lighter shade of job color |
-| Similarity circles | Job colors of both tiles |
-| Off-screen indicators | Job color |
-| Column collapse bands | Job color |
+| Left border | Full job color (border-l-4) |
+| Background | Job color at low opacity (e.g., `bg-purple-950/35`) |
+| Text | Lighter shade of job color (e.g., `text-purple-300`) |
+| Setup section | Even lighter shade |
+| Run section | Standard background |
 
 ### Dependent Jobs
 
@@ -86,15 +119,15 @@ Jobs with dependencies appear as **shades of one another** to show relationship.
 
 ### Swap Buttons
 
-- **Position:** Bottom of tile, or on hover
-- **Visibility:** On hover (or always visible TBD)
+- **Position:** Bottom of tile, visible on hover
+- **Icons:** `chevron-up` and `chevron-down`
 - **Actions:** Swap with tile above / below
+- **Visibility:** Shown on hover
 
-### Checkbox (Task Completion)
+### Completion Toggle
 
-- Each tile has a checkbox to mark the task as completed
-- Visible on the tile
-- Does not affect precedence validation (which assumes scheduled tasks happen as defined)
+- **Click:** Toggle between complete/incomplete
+- **Does not affect:** Precedence validation (assumes tasks happen as defined)
 
 ---
 
@@ -105,6 +138,8 @@ Jobs with dependencies appear as **shades of one another** to show relationship.
 | Normal | Job color, full opacity |
 | Selected | Highlighted border/glow |
 | Dragging | Reduced opacity, follows cursor |
+| Completed | Green gradient, circle-check icon |
+| Late/Problem | Red gradient, red circle icon |
 | Precedence violation | Red halo effect |
 | During unavailability | Different appearance (hatched/lighter) |
 
@@ -124,6 +159,6 @@ Outsourced tasks appear similarly but may have subtle visual distinction:
 ## Related Documents
 
 - [Tile States](../04-visual-feedback/tile-states.md) — State variations
-- [Similarity Circles](../04-visual-feedback/similarity-circles.md) — Between tiles
+- [Similarity Indicators](../04-visual-feedback/similarity-circles.md) — Link icons between tiles
 - [Tile Swap](../01-interaction-patterns/tile-swap.md) — Swap interaction
 - [Tile Recall](../01-interaction-patterns/tile-recall.md) — Recall behavior

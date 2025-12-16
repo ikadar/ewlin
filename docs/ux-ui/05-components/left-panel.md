@@ -1,140 +1,163 @@
-# Left Panel
+# Left Panel — Jobs List
 
-The left side of the screen showing jobs, tasks, status, and navigation aids.
+The leftmost content column showing all jobs with their status and progress.
 
 ---
 
 ## Overview
 
-The left panel provides job context — what the user is working on. It contains multiple sub-components arranged vertically/horizontally.
+The Jobs List provides job context — what the user can work on. It displays all jobs organized by status, with problematic jobs prominently shown at the top.
 
 ---
 
 ## Structure
 
 ```
-+------------------+-------+
-|   JOBS LIST      | DATE  |
-|                  | STRIP |
-+------------------+       |
-|   STATUS BAR     |       |
-+------------------+       |
-|   TASK LIST      |       |
-|                  |       |
-|                  |       |
-|                  |       |
-+------------------+-------+
++------------------------+
+|  [+] Add Job   [Search]|
++------------------------+
+|  PROBLEMS (2)          |
+|  [Late job card]       |
+|  [Conflict job card]   |
++------------------------+
+|  JOBS                  |
+|  [Job card]            |
+|  [Job card - selected] |
+|  [Job card]            |
+|  ...                   |
++------------------------+
 ```
 
 ---
 
-## Jobs List
+## Header
 
-### Content
+### Add Job Button
 
-- List of all jobs (filtered/sorted)
-- Each row shows:
-  - Job reference
-  - Client name (truncated)
-  - Status indicator (color-coded)
-  - Deadline indicator (if approaching)
+- **Position:** Top-left of the panel
+- **Icon:** Plus icon
+- **Action:** Opens job creation modal
 
-### Interactions
+### Search Field
+
+- **Position:** Top-right of the panel
+- **Placeholder:** "Rechercher..." (Search)
+- **Filters by:** Reference, client name, description
+- **Behavior:** Real-time filtering as user types
+
+---
+
+## Problems Section
+
+Jobs with issues appear at the **top** of the list, visually separated.
+
+### Section Header
+
+```html
+<span class="text-red-400/80 uppercase tracking-wider">Problèmes</span>
+<span class="text-zinc-600">2</span>  <!-- count -->
+```
+
+### Problem Types
+
+| Type | Visual | Icon |
+|------|--------|------|
+| **Late** (En retard) | Red background, red border | `alert-circle` |
+| **Conflict** (Conflit) | Amber background, amber border | `shuffle` |
+
+### Late Job Card
+
+```html
+<div class="bg-red-500/10 border border-red-500/20">
+  <span class="font-mono text-red-300">12342</span>
+  <span class="text-zinc-300">AXA</span>
+  <i data-lucide="alert-circle" class="text-red-400"></i>
+  <div>Contrat assurance habitation</div>
+  <span class="text-red-400">En retard</span>
+</div>
+```
+
+### Conflict Job Card
+
+```html
+<div class="bg-amber-500/10 border border-amber-500/20">
+  <span class="font-mono text-amber-300">12341</span>
+  <span class="text-zinc-300">Michelin</span>
+  <i data-lucide="shuffle" class="text-amber-400"></i>
+  <div>Guide vert Bretagne</div>
+  <span class="text-amber-400">Conflit</span>
+</div>
+```
+
+---
+
+## Jobs Section
+
+Regular jobs listed below the problems section.
+
+### Section Header
+
+```html
+<span class="text-zinc-500 uppercase tracking-wider">Travaux</span>
+```
+
+### Job Card Content
+
+| Element | Description |
+|---------|-------------|
+| **Reference** | Job reference number (monospace) |
+| **Client** | Client name (truncated) |
+| **Description** | Job description (truncated) |
+| **Deadline indicator** | Date shown on right if approaching |
+| **Progress dots** | Task completion visualization |
+
+### Progress Dots
+
+Small circles showing task completion status:
+
+```html
+<div class="flex gap-1">
+  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>  <!-- completed -->
+  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>  <!-- completed -->
+  <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>  <!-- pending -->
+  <span class="w-1.5 h-1.5 rounded-full border border-zinc-700"></span>  <!-- pending -->
+</div>
+```
+
+- **Filled green (bg-emerald-500):** Task completed
+- **Empty outline (border-zinc-700):** Task pending
+
+Number of dots = number of tasks in the job.
+
+---
+
+## Visual States
+
+### Normal Job Card
+
+```html
+<div class="rounded-lg cursor-pointer hover:bg-white/5">
+```
+
+### Selected Job Card
+
+```html
+<div class="rounded-lg bg-white/10 border border-white/10">
+```
+- Lighter text colors
+- Background highlight
+- Border visible
+
+---
+
+## Interactions
 
 | Action | Result |
 |--------|--------|
-| Click job | Select job (highlights, shows tasks) |
-| Keyboard prev/next | Navigate between jobs |
-| Filter input | Filter by reference, client, description |
-| "Add Job" button | Opens job creation modal |
-
-### Visual States
-
-| State | Appearance |
-|-------|------------|
-| Normal | Default styling |
-| Selected | Highlighted background |
-| Late | Warning indicator |
-
----
-
-## Status Bar
-
-Shown when a job is selected. Displays job-level status information.
-
-### Content
-
-| Element | Values | Visual |
-|---------|--------|--------|
-| **BAT status** | Awaiting file / Sent / Approved / No proof required | Icon: ⚠ / ○ / ✓ / — |
-| **Plates status** | Todo / Done | Icon: ○ / ✓ |
-| **Paper status** | InStock / ToOrder / Ordered / Received | Icon with state |
-
-### Interactions
-
-- Icons are informational (display only)
-- Editing done via job edit modal
-- Tooltips show full status on hover
-
----
-
-## Task List
-
-Shows tasks for the selected job.
-
-### Content
-
-- Ordered list of tasks (sequence order)
-- Each task shown as mini-tile with:
-  - Task info (station, duration)
-  - Scheduled state (opacity difference)
-
-### Visual States
-
-| State | Appearance |
-|-------|------------|
-| Unscheduled | Full opacity |
-| Scheduled | Lower opacity |
-
-### Interactions
-
-| Action | Result |
-|--------|--------|
-| **Single-click** (scheduled) | Scroll grid to tile |
-| **Double-click** (scheduled) | Recall tile |
-| **Hover** (scheduled) | Show "Jump to" and "Recall" buttons |
-| **Drag** (unscheduled) | Start drag to grid |
-| **Reorder** (drag within list) | Change task sequence |
-
-See [Tile Recall](../01-interaction-patterns/tile-recall.md) for details.
-
----
-
-## Date Navigation Strip
-
-Narrow column to the right of the task list.
-
-### Content
-
-- Day zones from today to job's departure date
-- Highlights: today, departure date, days with placed tiles
-
-### Interactions
-
-| Action | Result |
-|--------|--------|
-| Click day | Scroll grid to that day |
-| Hover 2 seconds | Auto-scroll to that day |
-
-See [Date Navigation Strip](../03-navigation/date-navigation-strip.md) for details.
-
----
-
-## Comments Access
-
-- **Icon** on job row or status bar
-- **Badge** indicates unread/recent comments
-- **Click** opens comments popover or modal
+| **Click job** | Select job (highlights, shows details in Job Details Panel) |
+| **Keyboard ↑/↓** | Navigate between jobs |
+| **Type in search** | Filter jobs in real-time |
+| **Click Add Job** | Opens job creation modal |
 
 ---
 
@@ -142,14 +165,14 @@ See [Date Navigation Strip](../03-navigation/date-navigation-strip.md) for detai
 
 | Feature | Behavior |
 |---------|----------|
-| Collapsible | Yes (toggle to hide) |
-| Resizable | TBD |
-| Responsive | Adjusts for smaller screens |
+| Width | Fixed (w-72 / 288px) |
+| Scrollable | Yes (overflow-y-auto) |
+| Collapsible | TBD |
 
 ---
 
 ## Related Documents
 
 - [Job Navigation](../03-navigation/job-navigation.md) — Keyboard navigation
-- [Date Navigation Strip](../03-navigation/date-navigation-strip.md) — Day navigation
-- [Tile Recall](../01-interaction-patterns/tile-recall.md) — Task list interactions
+- [Job Details Panel](job-details-panel.md) — Selected job details
+- [Conflict Indicators](../04-visual-feedback/conflict-indicators.md) — Problem types

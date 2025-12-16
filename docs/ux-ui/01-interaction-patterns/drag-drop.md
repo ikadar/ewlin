@@ -63,7 +63,7 @@ If the drop position would violate precedence (Task N placed before Task N-1 com
 Holding **Alt** during drag bypasses the safeguard:
 - Tile can be placed in a violating position
 - **Red halo** appears on the tile after placement
-- Violation listed in right panel
+- Job appears in Jobs List "Problèmes" section with "Conflit" badge
 
 ### Validation Timing
 
