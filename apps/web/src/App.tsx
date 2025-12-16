@@ -12,7 +12,7 @@ function App() {
     : null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
+    <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
       <Sidebar />
       <JobsList
         jobs={snapshot.jobs}
