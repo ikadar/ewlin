@@ -11,10 +11,11 @@ import {
 } from '@dnd-kit/core';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid } from './components';
 import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
-import { getSnapshot } from './mock';
+import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
+import { generateId, calculateEndTime, applyPushDown } from './utils';
 import type { StationDropData } from './components/StationColumns';
-import type { Task, Job } from '@flux/types';
+import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict } from '@flux/types';
 
 /** Data attached to draggable task tiles */
 export interface TaskDragData {
@@ -35,7 +36,11 @@ export interface DragValidationState {
 const START_HOUR = 6;
 
 function App() {
-  const snapshot = getSnapshot();
+  // Snapshot version state to force re-render on updates
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshotVersion triggers refetch
+  const snapshot = useMemo(() => getSnapshot(), [snapshotVersion]);
+
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
@@ -165,9 +170,14 @@ function App() {
     }));
   }, [activeTask]);
 
-  // Handle drag end
+  // Handle drag end - create assignment on valid drop
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+
+    // Capture current drag state before resetting
+    const currentDragValidation = { ...dragValidation };
+    const currentValidation = { ...validation };
+    const wasAltPressed = isAltPressed;
 
     // Reset active state and validation
     setActiveTask(null);
@@ -196,24 +206,87 @@ function App() {
     }
 
     // Use the validation result to determine if drop is valid
-    // (Actual assignment creation will be in v0.3.14)
-    if (!validation.isValid && !isAltPressed) {
-      console.log('Invalid drop: validation failed', validation.conflicts);
+    if (!currentValidation.isValid && !wasAltPressed) {
+      console.log('Invalid drop: validation failed', currentValidation.conflicts);
       return;
     }
 
-    // Calculate the drop position (use suggested start if precedence conflict and Alt pressed)
-    const scheduledStart = validation.hasPrecedenceConflict && !isAltPressed && validation.suggestedStart
-      ? validation.suggestedStart
-      : dragValidation.scheduledStart;
+    // Calculate the drop position (use suggested start if precedence conflict without Alt)
+    const scheduledStart = currentValidation.hasPrecedenceConflict && !wasAltPressed && currentValidation.suggestedStart
+      ? currentValidation.suggestedStart
+      : currentDragValidation.scheduledStart;
 
-    // Log the drop info (actual assignment creation in v0.3.14)
-    console.log('Drop info:', {
-      taskId: dragData.task.id,
+    if (!scheduledStart) {
+      console.log('Invalid drop: no scheduled start');
+      return;
+    }
+
+    // Create the assignment
+    const task = dragData.task as InternalTask;
+    const scheduledEnd = calculateEndTime(task, scheduledStart);
+    const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
+
+    const newAssignment: TaskAssignment = {
+      id: generateId(),
+      taskId: task.id,
+      targetId: dropData.stationId,
+      isOutsourced: false,
+      scheduledStart,
+      scheduledEnd,
+      isCompleted: false,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update snapshot with new assignment and push-down logic
+    updateSnapshot((currentSnapshot) => {
+      // Apply push-down to existing assignments
+      const { updatedAssignments, shiftedIds } = applyPushDown(
+        currentSnapshot.assignments,
+        dropData.stationId,
+        scheduledStart,
+        scheduledEnd,
+        task.id
+      );
+
+      if (shiftedIds.length > 0) {
+        console.log('Push-down applied to assignments:', shiftedIds);
+      }
+
+      // Add conflict if precedence was bypassed
+      let newConflicts = [...currentSnapshot.conflicts];
+      if (bypassedPrecedence) {
+        const precedenceConflict: ScheduleConflict = {
+          type: 'PrecedenceConflict',
+          message: `Task placed before predecessor completes (Alt-key bypass)`,
+          taskId: task.id,
+          targetId: dropData.stationId,
+          details: {
+            bypassedByUser: true,
+          },
+        };
+        newConflicts = [...newConflicts, precedenceConflict];
+        console.log('Added precedence conflict for bypass');
+      }
+
+      return {
+        ...currentSnapshot,
+        assignments: [...updatedAssignments, newAssignment],
+        conflicts: newConflicts,
+      };
+    });
+
+    // Trigger re-render
+    setSnapshotVersion((v) => v + 1);
+
+    console.log('Assignment created:', {
+      assignmentId: newAssignment.id,
+      taskId: task.id,
       stationId: dropData.stationId,
       scheduledStart,
-      isValid: validation.isValid,
-      bypassedPrecedence: isAltPressed && validation.hasPrecedenceConflict,
+      scheduledEnd,
+      bypassedPrecedence,
     });
   };
 
