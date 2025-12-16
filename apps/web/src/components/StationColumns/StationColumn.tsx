@@ -22,6 +22,8 @@ export interface StationColumnProps {
   dayOfWeek?: number;
   /** Children (tiles) to render inside the column */
   children?: ReactNode;
+  /** Whether this column is collapsed (during drag to another station) */
+  isCollapsed?: boolean;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -52,6 +54,7 @@ export function StationColumn({
   hoursToDisplay = 24,
   dayOfWeek,
   children,
+  isCollapsed = false,
 }: StationColumnProps) {
   // Set up droppable
   const dropData: StationDropData = {
@@ -93,10 +96,13 @@ export function StationColumn({
     return '';
   };
 
+  // Column width: full (240px / w-60) or collapsed (120px / w-30)
+  const widthClass = isCollapsed ? 'w-30' : 'w-60';
+
   return (
     <div
       ref={setNodeRef}
-      className={`w-60 shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ${getHighlightClass()}`}
+      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${getHighlightClass()}`}
       style={{ height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
     >

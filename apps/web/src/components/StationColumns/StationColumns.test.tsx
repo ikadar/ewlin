@@ -217,6 +217,54 @@ describe('StationColumn', () => {
     expect(column).toHaveClass('transition-all');
     expect(column).toHaveClass('duration-150');
   });
+
+  describe('column collapse during drag', () => {
+    it('collapses to 120px (w-30) when isCollapsed is true', () => {
+      render(
+        <DndWrapper>
+          <StationColumn station={mockStation} dayOfWeek={1} isCollapsed={true} />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).toHaveClass('w-30');
+      expect(column).not.toHaveClass('w-60');
+    });
+
+    it('stays full width (w-60) when isCollapsed is false', () => {
+      render(
+        <DndWrapper>
+          <StationColumn station={mockStation} dayOfWeek={1} isCollapsed={false} />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).toHaveClass('w-60');
+      expect(column).not.toHaveClass('w-30');
+    });
+
+    it('stays full width (w-60) when isCollapsed is not provided', () => {
+      render(
+        <DndWrapper>
+          <StationColumn station={mockStation} dayOfWeek={1} />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).toHaveClass('w-60');
+    });
+
+    it('has ease-out transition for smooth animation', () => {
+      render(
+        <DndWrapper>
+          <StationColumn station={mockStation} dayOfWeek={1} />
+        </DndWrapper>
+      );
+
+      const column = screen.getByTestId('station-column-station-1');
+      expect(column).toHaveClass('ease-out');
+    });
+  });
 });
 
 describe('StationColumns', () => {

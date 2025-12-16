@@ -369,6 +369,40 @@ describe('Tile', () => {
 
     expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
   });
+
+  describe('muting during drag', () => {
+    it('has muted styles when activeJobId differs from job.id', () => {
+      render(<Tile {...defaultProps} activeJobId="other-job" />);
+
+      const tile = screen.getByTestId('tile-assignment-1');
+      expect(tile).toHaveStyle({ filter: 'saturate(0.2)', opacity: '0.6' });
+    });
+
+    it('has normal styles when activeJobId matches job.id', () => {
+      render(<Tile {...defaultProps} activeJobId="job-1" />);
+
+      const tile = screen.getByTestId('tile-assignment-1');
+      expect(tile).not.toHaveStyle({ filter: 'saturate(0.2)' });
+      expect(tile).not.toHaveStyle({ opacity: '0.6' });
+    });
+
+    it('has normal styles when activeJobId is undefined (no drag)', () => {
+      render(<Tile {...defaultProps} />);
+
+      const tile = screen.getByTestId('tile-assignment-1');
+      expect(tile).not.toHaveStyle({ filter: 'saturate(0.2)' });
+      expect(tile).not.toHaveStyle({ opacity: '0.6' });
+    });
+
+    it('has transition classes for smooth muting animation', () => {
+      render(<Tile {...defaultProps} />);
+
+      const tile = screen.getByTestId('tile-assignment-1');
+      expect(tile).toHaveClass('transition-[filter,opacity]');
+      expect(tile).toHaveClass('duration-150');
+      expect(tile).toHaveClass('ease-out');
+    });
+  });
 });
 
 describe('SimilarityIndicators', () => {

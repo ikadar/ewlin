@@ -132,6 +132,8 @@ function App() {
           assignments={snapshot.assignments}
           selectedJobId={selectedJobId}
           onSelectJob={setSelectedJobId}
+          activeTask={activeTask}
+          activeJob={activeJob}
         />
       </div>
 

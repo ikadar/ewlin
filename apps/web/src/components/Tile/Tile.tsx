@@ -31,6 +31,8 @@ export interface TileProps {
   isSelected?: boolean;
   /** Similarity comparison results with previous tile (if any) */
   similarityResults?: SimilarityResult[];
+  /** ID of the job being dragged (for muting other jobs during drag) */
+  activeJobId?: string;
 }
 
 /**
@@ -57,6 +59,7 @@ export function Tile({
   showSwapDown = true,
   isSelected = false,
   similarityResults,
+  activeJobId,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const totalMinutes = setupMinutes + runMinutes;
@@ -71,6 +74,9 @@ export function Tile({
 
   // Completion state
   const isCompleted = assignment.isCompleted;
+
+  // Muting state: tile is muted during drag if it belongs to a different job
+  const isMuted = activeJobId !== undefined && activeJobId !== job.id;
 
   // Completed gradient style
   const completedGradient = isCompleted
@@ -102,10 +108,15 @@ export function Tile({
   // Selected state styling
   const selectedClass = isSelected ? 'ring-2 ring-white/30' : '';
 
+  // Muting style: desaturate and reduce opacity for other jobs during drag
+  const mutingStyle = isMuted
+    ? { filter: 'saturate(0.2)', opacity: 0.6 }
+    : undefined;
+
   return (
     <div
-      className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-pointer ${selectedClass}`}
-      style={{ top: `${top}px`, height: `${totalHeight}px` }}
+      className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-pointer ${selectedClass} transition-[filter,opacity] duration-150 ease-out`}
+      style={{ top: `${top}px`, height: `${totalHeight}px`, ...mutingStyle }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       data-testid={`tile-${assignment.id}`}

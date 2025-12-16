@@ -32,6 +32,10 @@ export interface SchedulingGridProps {
   onSwapUp?: (assignmentId: string) => void;
   /** Callback when swap down is clicked */
   onSwapDown?: (assignmentId: string) => void;
+  /** Currently dragged task (for column focus) */
+  activeTask?: Task | null;
+  /** Job of the currently dragged task (for tile muting) */
+  activeJob?: Job | null;
 }
 
 /**
@@ -51,6 +55,8 @@ export function SchedulingGrid({
   onRecallAssignment,
   onSwapUp,
   onSwapDown,
+  activeTask,
+  activeJob,
 }: SchedulingGridProps) {
   const [now, setNow] = useState(() => new Date());
 
@@ -179,12 +185,19 @@ export function SchedulingGrid({
               const category = categoryMap.get(station.categoryId);
               const criteria = category?.similarityCriteria || [];
 
+              // Determine if this column should be collapsed during drag
+              // Target station stays full width, others collapse
+              const targetStationId =
+                activeTask?.type === 'Internal' ? activeTask.stationId : null;
+              const isCollapsed = targetStationId !== null && targetStationId !== station.id;
+
               return (
                 <StationColumn
                   key={station.id}
                   station={station}
                   startHour={startHour}
                   hoursToDisplay={hoursToDisplay}
+                  isCollapsed={isCollapsed}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
@@ -227,6 +240,7 @@ export function SchedulingGrid({
                         onRecall={onRecallAssignment}
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
+                        activeJobId={activeJob?.id}
                       />
                     );
                   })}
