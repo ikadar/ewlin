@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, TimelineColumn } from './components';
 import { getSnapshot } from './mock';
 
 function App() {
@@ -36,7 +36,8 @@ function App() {
         })()}
         dayCount={21}
       />
-      <main className="flex-1 flex items-center justify-center">
+      <TimelineColumn />
+      <main className="flex-1 flex items-center justify-center overflow-auto">
         <div className="text-center">
           <h1 className="text-2xl font-semibold mb-2">Flux Scheduler</h1>
           <p className="text-zinc-500">

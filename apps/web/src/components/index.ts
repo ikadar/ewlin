@@ -9,3 +9,6 @@ export type { JobDetailsPanelProps, JobInfoProps, JobStatusProps, InfoFieldProps
 
 export { DateStrip, DateCell } from './DateStrip';
 export type { DateStripProps, DateCellProps } from './DateStrip';
+
+export { TimelineColumn, HourMarker, NowLine, PIXELS_PER_HOUR, timeToYPosition } from './TimelineColumn';
+export type { TimelineColumnProps, HourMarkerProps, NowLineProps } from './TimelineColumn';
