@@ -50,15 +50,25 @@ stateDiagram-v2
     }
 
     state BackendPath {
+        API: API - Interface Drafts
+        IC: IC - Interface Contracts
+        AGG: AGG - Aggregate Design
+        SB: SB - Service Boundaries
+        BE: Backend Code
+
         API --> IC
-        IC --> AGG
-        AGG --> SB
-        SB --> BE: Code
+        IC --> BE
+        SB --> AGG
+        AGG --> BE
     }
 
     state FrontendPath {
+        UX: UX - UI Specifications
+        DS: DS - Design System
+        FE: Frontend Components
+
         UX --> DS
-        DS --> FE: Components
+        DS --> FE
     }
 
     DomainLevel --> BackendPath

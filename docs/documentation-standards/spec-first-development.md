@@ -84,9 +84,9 @@ stateDiagram-v2
         BE: Backend Code
 
         API --> IC
-        IC --> AGG
-        AGG --> SB
-        SB --> BE
+        IC --> BE
+        SB --> AGG
+        AGG --> BE
     }
 
     state FrontendPath {
