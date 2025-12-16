@@ -6,3 +6,6 @@ export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSect
 
 export { JobDetailsPanel, JobInfo, JobStatus, InfoField, TaskList, TaskTile } from './JobDetailsPanel';
 export type { JobDetailsPanelProps, JobInfoProps, JobStatusProps, InfoFieldProps, TaskListProps, TaskTileProps } from './JobDetailsPanel';
+
+export { DateStrip, DateCell } from './DateStrip';
+export type { DateStripProps, DateCellProps } from './DateStrip';

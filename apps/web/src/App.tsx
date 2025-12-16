@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip } from './components';
 import { getSnapshot } from './mock';
 
 function App() {
@@ -27,6 +27,14 @@ function App() {
         tasks={snapshot.tasks}
         assignments={snapshot.assignments}
         stations={snapshot.stations}
+      />
+      <DateStrip
+        startDate={(() => {
+          const today = new Date();
+          today.setDate(today.getDate() - 6); // Start 6 days before today
+          return today;
+        })()}
+        dayCount={21}
       />
       <main className="flex-1 flex items-center justify-center">
         <div className="text-center">
