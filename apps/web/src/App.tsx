@@ -38,7 +38,11 @@ function App() {
       />
       <SchedulingGrid
         stations={snapshot.stations}
-        selectedJob={selectedJob}
+        jobs={snapshot.jobs}
+        tasks={snapshot.tasks}
+        assignments={snapshot.assignments}
+        selectedJobId={selectedJobId}
+        onSelectJob={setSelectedJobId}
       />
     </div>
   );

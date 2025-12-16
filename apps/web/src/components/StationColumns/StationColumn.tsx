@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Station, DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
@@ -11,6 +12,8 @@ export interface StationColumnProps {
   hoursToDisplay?: number;
   /** Day of week to show schedule for (0 = Sunday, 1 = Monday, etc.) */
   dayOfWeek?: number;
+  /** Children (tiles) to render inside the column */
+  children?: ReactNode;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -39,6 +42,7 @@ export function StationColumn({
   startHour = 6,
   hoursToDisplay = 24,
   dayOfWeek,
+  children,
 }: StationColumnProps) {
   // Use current day if not specified
   const effectiveDayOfWeek = dayOfWeek ?? new Date().getDay();
@@ -75,6 +79,9 @@ export function StationColumn({
           data-testid="hour-grid-line"
         />
       ))}
+
+      {/* Tiles (children) */}
+      {children}
     </div>
   );
 }

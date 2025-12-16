@@ -26,6 +26,11 @@
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
+  font-size: 14px;
+  font-weight: 500;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Striped pattern for unavailability overlay */
