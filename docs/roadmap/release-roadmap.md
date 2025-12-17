@@ -591,10 +591,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3H: Additional UX Features
 
-#### v0.3.23 - Downtime-Aware Tile Height
-- [ ] Tile height based on `scheduledEnd - scheduledStart`
-- [ ] Visual representation of time-stretched tasks
-- [ ] Setup/run sections scale proportionally
+#### v0.3.23 - Downtime-Aware Tile Height ✅
+- [x] Tile height based on `scheduledEnd - scheduledStart`
+- [x] Visual representation of time-stretched tasks
+- [x] Setup/run sections scale proportionally
 
 #### v0.3.24 - No Conflict for Unscheduled Predecessors (Validator)
 - [ ] Update `@flux/schedule-validator` precedence logic
