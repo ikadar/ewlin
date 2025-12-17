@@ -130,8 +130,8 @@ export function StationColumn({
       // Valid drop zone - green indicator
       return 'ring-2 ring-green-500 bg-green-500/10';
     }
-    // Quick Placement Mode highlighting
-    if (isQuickPlacementMode) {
+    // Quick Placement Mode highlighting (only when not dragging)
+    if (isQuickPlacementMode && !active) {
       if (hasAvailableTask) {
         // Available column - green highlight
         return 'ring-2 ring-green-500 bg-green-500/10';
