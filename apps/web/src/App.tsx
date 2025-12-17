@@ -140,8 +140,8 @@ function App() {
         e.preventDefault();
         setIsAltPressed(true);
       }
-      // ALT+Q to toggle Quick Placement Mode
-      if (e.altKey && (e.key === 'q' || e.key === 'Q')) {
+      // ALT+Q to toggle Quick Placement Mode (use e.code for cross-platform support)
+      if (e.altKey && e.code === 'KeyQ') {
         e.preventDefault();
         // Only allow quick placement mode when a job is selected
         if (selectedJobId) {
@@ -191,8 +191,8 @@ function App() {
           }
         }
       }
-      // ALT+D to jump to selected job's departure date
-      if (e.altKey && (e.key === 'd' || e.key === 'D')) {
+      // ALT+D to jump to selected job's departure date (use e.code for cross-platform support)
+      if (e.altKey && e.code === 'KeyD') {
         e.preventDefault();
         if (selectedJob?.workshopExitDate && gridRef.current) {
           const departureDate = new Date(selectedJob.workshopExitDate);

@@ -102,6 +102,8 @@ interface TaskGeneratorOptions {
   jobId: string;
   startSequence?: number;
   includeOutsourced?: boolean;
+  /** Force the first task to use this station ID */
+  forceFirstStation?: string;
 }
 
 function generateInternalTask(
@@ -156,14 +158,14 @@ function generateOutsourcedTask(
 }
 
 export function generateTasksForJob(options: TaskGeneratorOptions): Task[] {
-  const { jobId, startSequence = 0, includeOutsourced = true } = options;
+  const { jobId, startSequence = 0, includeOutsourced = true, forceFirstStation } = options;
   const tasks: Task[] = [];
   let seq = startSequence;
 
   // Typical workflow: Print → Cut → (optional: Outsourced finishing) → Fold/Bind
 
   // 1. Printing task (offset or digital)
-  const printStation = randomElement(['sta-komori-g40', 'sta-heidelberg-sm', 'sta-xerox', 'sta-hp-indigo']);
+  const printStation = forceFirstStation || randomElement(['sta-komori-g40', 'sta-heidelberg-sm', 'sta-xerox', 'sta-hp-indigo']);
   tasks.push(generateInternalTask(jobId, seq++, printStation));
 
   // 2. Cutting task
@@ -197,7 +199,19 @@ interface JobGeneratorOptions {
   includeConflictJobs?: number;
 }
 
-function generateJob(index: number, isLate: boolean = false): { job: Job; tasks: Task[] } {
+interface GenerateJobOptions {
+  index: number;
+  isLate?: boolean;
+  /** Force the first task to use this station ID */
+  forceFirstStation?: string;
+  /** Keep the first task unscheduled */
+  keepFirstUnscheduled?: boolean;
+  /** Ensure all approval gates are satisfied (BAT approved, Plates done) */
+  forceApproved?: boolean;
+}
+
+function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
+  const { index, isLate = false, forceFirstStation, keepFirstUnscheduled = false, forceApproved = false } = options;
   const now = new Date();
   const jobId = `job-${String(index).padStart(5, '0')}`;
 
@@ -217,18 +231,21 @@ function generateJob(index: number, isLate: boolean = false): { job: Job; tasks:
   const tasks = generateTasksForJob({
     jobId,
     includeOutsourced: Math.random() > 0.4,
+    forceFirstStation,
   });
 
   // Randomly assign some tasks as Assigned
-  const fullyScheduled = Math.random() > 0.6;
+  const fullyScheduled = !keepFirstUnscheduled && Math.random() > 0.6;
   if (fullyScheduled) {
     tasks.forEach((task) => {
       (task as InternalTask | OutsourcedTask).status = 'Assigned';
     });
   } else if (Math.random() > 0.5) {
-    // Partially scheduled
-    const scheduledCount = randomInt(1, tasks.length - 1);
-    for (let i = 0; i < scheduledCount; i++) {
+    // Partially scheduled - but keep first unscheduled if requested
+    const startIndex = keepFirstUnscheduled ? 1 : 0;
+    const maxScheduled = tasks.length - (keepFirstUnscheduled ? 1 : 0);
+    const scheduledCount = randomInt(0, maxScheduled - 1);
+    for (let i = startIndex; i < startIndex + scheduledCount && i < tasks.length; i++) {
       (tasks[i] as InternalTask | OutsourcedTask).status = 'Assigned';
     }
   }
@@ -249,11 +266,16 @@ function generateJob(index: number, isLate: boolean = false): { job: Job; tasks:
     paperType: randomElement(PAPER_TYPES),
     paperFormat: randomElement(PAPER_FORMATS),
     paperPurchaseStatus: randomElement(['InStock', 'Ordered', 'Received'] as PaperPurchaseStatus[]),
-    proofApproval: {
-      sentAt: Math.random() > 0.3 ? formatDate(addDays(now, -randomInt(3, 10))) : 'AwaitingFile',
-      approvedAt: Math.random() > 0.5 ? formatDate(addDays(now, -randomInt(1, 5))) : null,
-    },
-    platesStatus: randomElement(['Todo', 'Done'] as PlatesStatus[]),
+    proofApproval: forceApproved
+      ? {
+          sentAt: formatDate(addDays(now, -randomInt(5, 10))),
+          approvedAt: formatDate(addDays(now, -randomInt(1, 4))),
+        }
+      : {
+          sentAt: Math.random() > 0.3 ? formatDate(addDays(now, -randomInt(3, 10))) : 'AwaitingFile',
+          approvedAt: Math.random() > 0.5 ? formatDate(addDays(now, -randomInt(1, 5))) : null,
+        },
+    platesStatus: forceApproved ? 'Done' : randomElement(['Todo', 'Done'] as PlatesStatus[]),
     requiredJobIds: [],
     comments: [],
     taskIds: tasks.map((t) => t.id),
@@ -275,16 +297,35 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   const jobs: Job[] = [];
   const tasks: Task[] = [];
 
-  // Generate late jobs first
-  for (let i = 0; i < includeLateJobs && i < count; i++) {
-    const { job, tasks: jobTasks } = generateJob(i + 1, true);
+  // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved)
+  const { job: qaJob, tasks: qaTasks } = generateJob({
+    index: 1,
+    isLate: false, // NOT late so deadline is in the future
+    forceFirstStation: 'sta-komori-g40',
+    keepFirstUnscheduled: true,
+    forceApproved: true,
+  });
+  jobs.push(qaJob);
+  tasks.push(...qaTasks);
+
+  // Generate late jobs (starting from index 2)
+  for (let i = 0; i < includeLateJobs && i + 1 < count; i++) {
+    const { job, tasks: jobTasks } = generateJob({
+      index: i + 2,
+      isLate: true,
+    });
     jobs.push(job);
     tasks.push(...jobTasks);
   }
 
-  // Generate normal jobs
-  for (let i = includeLateJobs; i < count; i++) {
-    const { job, tasks: jobTasks } = generateJob(i + 1, false);
+  // Generate normal jobs (after QA job and late jobs)
+  // QA job = 1, late jobs = 2 to (includeLateJobs+1), normal jobs start after
+  const normalStartIndex = 1 + includeLateJobs + 1; // +1 for QA job, +1 because indexes are 1-based
+  for (let i = normalStartIndex; i <= count; i++) {
+    const { job, tasks: jobTasks } = generateJob({
+      index: i,
+      isLate: false,
+    });
     jobs.push(job);
     tasks.push(...jobTasks);
   }

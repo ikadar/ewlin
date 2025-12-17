@@ -130,6 +130,16 @@ export function StationColumn({
       // Valid drop zone - green indicator
       return 'ring-2 ring-green-500 bg-green-500/10';
     }
+    // Quick Placement Mode highlighting
+    if (isQuickPlacementMode) {
+      if (hasAvailableTask) {
+        // Available column - green highlight
+        return 'ring-2 ring-green-500 bg-green-500/10';
+      } else {
+        // Unavailable column - subtle dimming
+        return 'opacity-50';
+      }
+    }
     // Fallback to basic drag state highlighting
     if (!active) return '';
     if (isValidDropTarget) {
