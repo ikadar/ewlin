@@ -408,151 +408,152 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3A: Frontend Mock Data
 
-#### v0.3.0 - Mock Data Generators
-- [ ] Station generator (with operating schedules)
-- [ ] Job generator with tasks (including problematic jobs: late, conflicts)
-- [ ] Assignment generator
-- [ ] Snapshot cache implementation
+#### v0.3.0 - Mock Data Generators ✅
+- [x] Station generator (with operating schedules)
+- [x] Job generator with tasks (including problematic jobs: late, conflicts)
+- [x] Assignment generator
+- [x] Snapshot cache implementation
 
-#### v0.3.1 - Mock API
-- [ ] getSnapshot endpoint
-- [ ] CRUD operations (create, update, delete)
-- [ ] Configurable latency
-- [ ] TypeScript types matching `@flux/types`
+#### v0.3.1 - Mock API ✅
+- [x] getSnapshot endpoint
+- [x] CRUD operations (create, update, delete)
+- [x] Configurable latency
+- [x] TypeScript types matching `@flux/types`
 
 ### Phase 3B: Frontend Core Layout
 
 > **Layout:** Sidebar | Jobs List | Job Details | Date Strip | Timeline | Station Columns
 > **No Right Panel** — problems shown in Jobs List "Problèmes" section
 
-#### v0.3.2 - Sidebar Component
-- [ ] Fixed width (w-14 / 56px)
-- [ ] Navigation icons: layout-grid (active), calendar, settings
-- [ ] Active/inactive/hover states
-- [ ] Settings icon (disabled for MVP)
+#### v0.3.2 - Sidebar Component ✅
+- [x] Fixed width (w-14 / 56px)
+- [x] Navigation icons: layout-grid (active), calendar, settings
+- [x] Active/inactive/hover states
+- [x] Settings icon (disabled for MVP)
 
-#### v0.3.3 - Jobs List Component
-- [ ] Fixed width (w-72 / 288px)
-- [ ] Add Job button (green +)
-- [ ] Search field with filtering (reference, client, description)
-- [ ] **Problèmes section** at top with count badge
-- [ ] Late jobs: red background, `alert-circle` icon, "En retard" badge
-- [ ] Conflict jobs: amber background, `shuffle` icon, "Conflit" badge
-- [ ] **Travaux section** for normal jobs
-- [ ] Job cards with progress dots (task completion visualization)
-- [ ] Selected job highlight (bg-white/10, border)
-- [ ] Keyboard navigation (ALT+↑/↓)
+#### v0.3.3 - Jobs List Component ✅
+- [x] Fixed width (w-72 / 288px)
+- [x] Add Job button (green +, disabled for MVP)
+- [x] Search field with filtering (reference, client, description)
+- [x] **Problèmes section** at top with count badge
+- [x] Late jobs: red background, `alert-circle` icon, "En retard" badge
+- [x] Conflict jobs: amber background, `shuffle` icon, "Conflit" badge
+- [x] **Travaux section** for normal jobs
+- [x] Job cards with progress dots (task completion visualization)
+- [x] Selected job highlight (bg-white/10, border)
+- [ ] Keyboard navigation (ALT+↑/↓) - deferred
 
-#### v0.3.4 - Job Details Panel
-- [ ] Fixed width (w-72 / 288px)
-- [ ] Job info: Code, Client, Intitulé, Départ
-- [ ] Status section: BAT, Papier, Plaques (read-only for MVP)
-- [ ] **Task List** with two visual states:
+#### v0.3.4 - Job Details Panel ✅
+- [x] Fixed width (w-72 / 288px)
+- [x] Job info: Code, Client, Intitulé, Départ
+- [x] Status section: BAT, Papier, Plaques (read-only for MVP)
+- [x] **Task List** with two visual states:
   - Unscheduled: Full job color, border-l-4, draggable
   - Scheduled: Dark placeholder, station + datetime only
-- [ ] Single-click scheduled task → scroll grid to tile
-- [ ] Double-click scheduled task → recall (unschedule)
+- [ ] Single-click scheduled task → scroll grid to tile (deferred - requires grid)
+- [ ] Double-click scheduled task → recall (deferred - requires grid integration)
 
-#### v0.3.5 - Date Strip Component
-- [ ] Fixed width (w-12 / 48px)
-- [ ] Day abbreviation + day number per row
-- [ ] Today highlight (amber background)
-- [ ] Click to jump to date
-- [ ] Hover 2s while dragging → auto-jump to date
+#### v0.3.5 - Date Strip Component ✅
+- [x] Fixed width (w-12 / 48px)
+- [x] Day abbreviation + day number per row
+- [x] Today highlight (amber background)
+- [x] Click to jump to date
+- [ ] Hover 2s while dragging → auto-jump to date (deferred - requires drag state)
 
 ### Phase 3C: Scheduling Grid
 
-#### v0.3.6 - Timeline Column
-- [ ] Fixed width (w-12 / 48px)
-- [ ] Hour markers with grid lines
-- [ ] 30-minute and 15-minute tick marks
-- [ ] "Now" line (red, `bg-red-500`) with time label
-- [ ] **Synchronized vertical scroll** with station columns
+#### v0.3.6 - Timeline Column ✅
+- [x] Fixed width (w-12 / 48px)
+- [x] Hour markers with grid lines
+- [x] 30-minute and 15-minute tick marks
+- [x] "Now" line (red, `bg-red-500`) with time label
+- [ ] **Synchronized vertical scroll** with station columns (deferred - requires station columns)
 
-#### v0.3.7 - Station Column Headers
-- [ ] Sticky header row (z-30)
-- [ ] Station names
-- [ ] **Off-screen indicators**: rectangle with arrow + datetime
-  - Above viewport: `↑` chevron-up + datetime of nearest tile
-  - Below viewport: `↓` chevron-down + datetime of nearest tile
-  - Click to scroll to tile
+#### v0.3.7 - Station Column Headers ✅
+- [x] Sticky header row (z-30)
+- [x] Station names
+- [x] **Off-screen indicators**: chevron + count
+  - Above viewport: `↑` chevron-up + count
+  - Below viewport: `↓` chevron-down + count
+  - Click to scroll to tile (structure ready, calculation in v0.3.9)
 
-#### v0.3.8 - Station Columns
-- [ ] Dynamic width columns (w-60 / 240px each)
-- [ ] Horizontal scroll for many stations
-- [ ] Unavailability overlay (hatched pattern `bg-stripes-dark`)
-- [ ] Hour grid lines
-- [ ] **Departure date marker** (blue line, `bg-blue-500`) for selected job
+#### v0.3.8 - Station Columns ✅
+- [x] Dynamic width columns (w-60 / 240px each)
+- [x] Horizontal scroll for many stations
+- [x] Unavailability overlay (hatched pattern `bg-stripes-dark`)
+- [x] Hour grid lines
+- [x] **Departure date marker** (blue line, `bg-blue-500`) for selected job
+- [x] **SchedulingGrid** unified component with synchronized scrolling
 
-#### v0.3.9 - Tile Component
-- [ ] Job color: border-l-4 + low-opacity background
-- [ ] **Setup/Run sections**: lighter shade (setup) + full color (run)
-- [ ] Content: completion icon + job reference + client
-- [ ] Completion icon: `circle` (incomplete) / `circle-check` (complete, emerald)
-- [ ] Completed tile: green gradient from left
-- [ ] **Swap buttons** (hover): chevron-up/down at bottom-right
-- [ ] Click behavior: single = select job, double = recall tile
+#### v0.3.9 - Tile Component ✅
+- [x] Job color: border-l-4 + low-opacity background
+- [x] **Setup/Run sections**: lighter shade (setup) + full color (run)
+- [x] Content: completion icon + job reference + client
+- [x] Completion icon: `circle` (incomplete) / `circle-check` (complete, emerald)
+- [x] Completed tile: green gradient from left
+- [x] **Swap buttons** (hover): chevron-up/down at bottom-right
+- [x] Click behavior: single = select job, double = recall tile
 
-#### v0.3.10 - Similarity Indicators
-- [ ] **Link icons** between consecutive tiles (not circles)
-- [ ] `link` icon (zinc-400) = criterion matched
-- [ ] `unlink` icon (zinc-800) = criterion not matched
-- [ ] Position: horizontal row at top-right of lower tile
+#### v0.3.10 - Similarity Indicators ✅
+- [x] **Link icons** between consecutive tiles (not circles)
+- [x] `link` icon (zinc-400) = criterion matched
+- [x] `unlink` icon (zinc-800) = criterion not matched
+- [x] Position: horizontal row at top-right of lower tile
 
 ### Phase 3D: Interactions
 
-#### v0.3.11 - Drag & Drop Infrastructure
-- [ ] Drag infrastructure (dnd-kit or similar)
-- [ ] Drag from Job Details Panel (unscheduled tasks only)
-- [ ] Drag preview with slight transparency
-- [ ] 30-minute snap grid
+#### v0.3.11 - Drag & Drop Infrastructure ✅
+- [x] Drag infrastructure (@dnd-kit/core, @dnd-kit/utilities)
+- [x] Drag from Job Details Panel (unscheduled tasks only)
+- [x] Drag preview with slight transparency
+- [x] 30-minute snap grid
+- [x] Droppable station columns with highlighting
 
-#### v0.3.12 - Column Focus on Drag
-- [ ] Non-target columns collapse to 120px during drag
-- [ ] Active job tiles keep color, others desaturated
-- [ ] Animation: 150ms ease-out
-- [ ] Job-colored bands show other tile positions
+#### v0.3.12 - Column Focus on Drag ✅
+- [x] Non-target columns collapse to 120px during drag
+- [x] Target station stays full width (240px)
+- [x] Active job tiles keep color, others desaturated
+- [x] Animation: 150ms ease-out transitions
 
-#### v0.3.13 - Real-Time Validation During Drag
-- [ ] Validate on drag move (< 10ms)
-- [ ] Valid drop zone: highlighted
-- [ ] Invalid drop zone: red indicator
-- [ ] Precedence safeguard: auto-snap to valid position
-- [ ] ALT key bypass: allows violation with red halo warning
+#### v0.3.13 - Real-Time Validation During Drag ✅
+- [x] Validate on drag move (< 10ms)
+- [x] Valid drop zone: green ring highlight
+- [x] Invalid drop zone: red ring indicator
+- [x] Precedence safeguard: auto-snap to valid position
+- [x] ALT key bypass: allows violation with amber ring warning
 
-#### v0.3.14 - Drop Handling
-- [ ] Create assignment on valid drop
-- [ ] Show conflict in Problèmes section (warnings only, no hard blocks)
-- [ ] Optimistic UI update
-- [ ] Tile insertion with push-down (capacity-1 stations)
-- [ ] Tile overlap allowed (capacity > 1 stations)
+#### v0.3.14 - Drop Handling ✅
+- [x] Create assignment on valid drop
+- [x] Show conflict in Problèmes section (warnings only, no hard blocks)
+- [x] Optimistic UI update
+- [x] Tile insertion with push-down (capacity-1 stations)
+- [ ] Tile overlap allowed (capacity > 1 stations) - deferred
 
-#### v0.3.15 - Tile Swap
-- [ ] Swap buttons visible on hover
-- [ ] Click swap up/down → exchange positions with adjacent tile
-- [ ] Validation on swap
-- [ ] Smooth animation
+#### v0.3.15 - Tile Swap ✅
+- [x] Swap buttons visible on hover
+- [x] Click swap up/down → exchange positions with adjacent tile
+- [ ] Validation on swap - deferred
+- [ ] Smooth animation - deferred (instant swap for MVP)
 
-#### v0.3.16 - Quick Placement Mode
-- [ ] Toggle: ALT+Q
-- [ ] **Placement indicator**: white glow line at snap position
-- [ ] **Active tile**: white ring/halo around tile being placed
-- [ ] **Tooltip**: task info near cursor
-- [ ] **No task available**: forbidden icon as cursor
-- [ ] Click to place task
-- [ ] Integrates with job navigation (ALT+↑/↓)
+#### v0.3.16 - Quick Placement Mode ✅
+- [x] Toggle: ALT+Q
+- [x] **Placement indicator**: white glow line at snap position
+- [x] **Active tile**: white ring/halo around tile being placed
+- [ ] **Tooltip**: task info near cursor - deferred
+- [x] **No task available**: forbidden icon as cursor
+- [x] Click to place task
+- [ ] Integrates with job navigation (ALT+↑/↓) - deferred to v0.3.17
 
 ### Phase 3E: Keyboard Navigation
 
-#### v0.3.17 - Keyboard Shortcuts
-- [ ] ALT+Q: Toggle Quick Placement Mode
-- [ ] ALT+D: Jump to selected job's departure date
-- [ ] ALT+↑: Previous job
-- [ ] ALT+↓: Next job
-- [ ] ALT+←: Navigate columns left
-- [ ] ALT+→: Navigate columns right
-- [ ] Home: Jump to today
-- [ ] Page Up/Down: Scroll by day
+#### v0.3.17 - Keyboard Shortcuts ✅
+- [x] ALT+Q: Toggle Quick Placement Mode (implemented in v0.3.16)
+- [x] ALT+D: Jump to selected job's departure date
+- [x] ALT+↑: Previous job
+- [x] ALT+↓: Next job
+- [ ] ALT+←/→: Navigate columns left/right - deferred (no clear use case)
+- [x] Home: Jump to today
+- [x] Page Up/Down: Scroll by day
 
 ### Phase 3F: Client-Side Validation
 
