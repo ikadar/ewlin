@@ -23,6 +23,8 @@ export interface TaskDragData {
   type: 'task';
   task: Task;
   job: Job;
+  /** Assignment ID if this is a reschedule (existing tile being repositioned) */
+  assignmentId?: string;
 }
 
 /** Validation state during drag */
@@ -274,9 +276,13 @@ function App() {
       // Calculate grab offset (where user grabbed within the tile)
       // This enables tile-based drop positioning instead of cursor-based
       // Find the tile element from the activator event target
+      // Look for both sidebar task tiles (task-tile-*) and grid tiles (tile-*)
       const activatorEvent = event.activatorEvent as PointerEvent | MouseEvent;
       const target = activatorEvent?.target as HTMLElement | null;
-      const tileElement = target?.closest('[data-testid^="task-tile-"]') as HTMLElement | null;
+      const tileElement = (
+        target?.closest('[data-testid^="task-tile-"]') ||
+        target?.closest('[data-testid^="tile-"]')
+      ) as HTMLElement | null;
       if (activatorEvent && tileElement) {
         const rect = tileElement.getBoundingClientRect();
         grabOffsetRef.current = { y: calculateGrabOffset(activatorEvent.clientY, rect.top) };
@@ -340,7 +346,7 @@ function App() {
     }));
   }, [activeTask]);
 
-  // Handle drag end - create assignment on valid drop
+  // Handle drag end - create or reschedule assignment on valid drop
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -382,6 +388,9 @@ function App() {
       return;
     }
 
+    // Determine if this is a reschedule (moving existing tile) or new placement
+    const isReschedule = !!dragData.assignmentId;
+
     // Use the validation result to determine if drop is valid
     // StationConflict is allowed because push-down will resolve it
     const blockingConflicts = currentValidation.conflicts.filter(
@@ -409,24 +418,24 @@ function App() {
     const scheduledEnd = calculateEndTime(task, scheduledStart);
     const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
 
-    const newAssignment: TaskAssignment = {
-      id: generateId(),
-      taskId: task.id,
-      targetId: dropData.stationId,
-      isOutsourced: false,
-      scheduledStart,
-      scheduledEnd,
-      isCompleted: false,
-      completedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Update snapshot with new assignment and push-down logic
+    // Update snapshot with new/updated assignment and push-down logic
     updateSnapshot((currentSnapshot) => {
-      // Apply push-down to existing assignments
+      let assignmentsWithoutCurrent = currentSnapshot.assignments;
+      let existingAssignment: TaskAssignment | undefined;
+
+      // For reschedule, find and remove the existing assignment first
+      if (isReschedule && dragData.assignmentId) {
+        existingAssignment = currentSnapshot.assignments.find(
+          (a) => a.id === dragData.assignmentId
+        );
+        assignmentsWithoutCurrent = currentSnapshot.assignments.filter(
+          (a) => a.id !== dragData.assignmentId
+        );
+      }
+
+      // Apply push-down to remaining assignments (excluding the one being moved)
       const { updatedAssignments, shiftedIds } = applyPushDown(
-        currentSnapshot.assignments,
+        assignmentsWithoutCurrent,
         dropData.stationId,
         scheduledStart,
         scheduledEnd,
@@ -436,6 +445,27 @@ function App() {
       if (shiftedIds.length > 0) {
         console.log('Push-down applied to assignments:', shiftedIds);
       }
+
+      // Create the new/updated assignment
+      const finalAssignment: TaskAssignment = isReschedule && existingAssignment
+        ? {
+            ...existingAssignment,
+            scheduledStart,
+            scheduledEnd,
+            updatedAt: new Date().toISOString(),
+          }
+        : {
+            id: generateId(),
+            taskId: task.id,
+            targetId: dropData.stationId,
+            isOutsourced: false,
+            scheduledStart,
+            scheduledEnd,
+            isCompleted: false,
+            completedAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
 
       // Add conflict if precedence was bypassed
       let newConflicts = [...currentSnapshot.conflicts];
@@ -455,7 +485,7 @@ function App() {
 
       return {
         ...currentSnapshot,
-        assignments: [...updatedAssignments, newAssignment],
+        assignments: [...updatedAssignments, finalAssignment],
         conflicts: newConflicts,
       };
     });
@@ -463,8 +493,8 @@ function App() {
     // Trigger re-render
     setSnapshotVersion((v) => v + 1);
 
-    console.log('Assignment created:', {
-      assignmentId: newAssignment.id,
+    console.log(isReschedule ? 'Assignment rescheduled:' : 'Assignment created:', {
+      assignmentId: dragData.assignmentId || 'new',
       taskId: task.id,
       stationId: dropData.stationId,
       scheduledStart,
