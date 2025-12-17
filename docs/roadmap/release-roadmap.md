@@ -602,12 +602,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Enables backward scheduling workflow
 - [x] Update validator tests
 
-#### v0.3.25 - Grid Tile Repositioning
-- [ ] Drag scheduled tiles within same station column
-- [ ] Reschedule to new time position on drop
-- [ ] Ghost placeholder at original position
-- [ ] Push-down behavior when dropping onto other tiles
-- [ ] Reuses tile-based drop position calculation
+#### v0.3.25 - Grid Tile Repositioning ✅
+- [x] Drag scheduled tiles within same station column
+- [x] Reschedule to new time position on drop
+- [x] Ghost placeholder at original position
+- [x] Push-down behavior when dropping onto other tiles
+- [x] Reuses tile-based drop position calculation
 
 ### Phase 3I: Backend API Integration
 
