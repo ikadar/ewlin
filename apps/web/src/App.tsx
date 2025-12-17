@@ -342,8 +342,14 @@ function App() {
     }
 
     // Use the validation result to determine if drop is valid
-    if (!currentValidation.isValid && !wasAltPressed) {
-      console.log('Invalid drop: validation failed', currentValidation.conflicts);
+    // StationConflict is allowed because push-down will resolve it
+    const blockingConflicts = currentValidation.conflicts.filter(
+      (c) => c.type !== 'StationConflict'
+    );
+    const hasBlockingConflicts = blockingConflicts.length > 0;
+
+    if (hasBlockingConflicts && !wasAltPressed) {
+      console.log('Invalid drop: validation failed', blockingConflicts);
       return;
     }
 
@@ -619,7 +625,8 @@ function App() {
           activeJob={activeJob}
           validationState={{
             targetStationId: dragValidation.targetStationId,
-            isValid: validation.isValid,
+            // StationConflict is allowed because push-down will resolve it
+            isValid: validation.isValid || validation.conflicts.every((c) => c.type === 'StationConflict'),
             hasPrecedenceConflict: validation.hasPrecedenceConflict,
             suggestedStart: validation.suggestedStart,
             isAltPressed,

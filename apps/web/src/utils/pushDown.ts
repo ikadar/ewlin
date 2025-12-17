@@ -15,8 +15,8 @@ export interface PushDownResult {
 
 /**
  * Calculate push-down shifts for assignments on a station.
- * All assignments that start at or after the new tile's start time
- * are shifted by the new tile's duration.
+ * Tiles that overlap with the new tile are shifted to start at the new tile's end.
+ * Subsequent tiles are cascaded to avoid overlaps.
  *
  * @param assignments - All current assignments
  * @param stationId - Station where the new tile is being placed
@@ -34,49 +34,66 @@ export function applyPushDown(
 ): PushDownResult {
   const newStartTime = new Date(newStart).getTime();
   const newEndTime = new Date(newEnd).getTime();
-  const shiftDuration = newEndTime - newStartTime;
+
+  // Get assignments on this station, sorted by start time
+  const stationAssignments = assignments
+    .filter(
+      (a) => !a.isOutsourced && a.targetId === stationId && a.taskId !== excludeTaskId
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime()
+    );
 
   const shiftedIds: string[] = [];
+  const shiftMap = new Map<string, { newStart: number; newEnd: number }>();
 
-  const updatedAssignments = assignments.map((assignment) => {
-    // Skip if not on the same station
-    if (assignment.isOutsourced || assignment.targetId !== stationId) {
-      return assignment;
-    }
+  // Track the "earliest available time" - initially the end of the new tile
+  let earliestAvailable = newEndTime;
 
-    // Skip the task being assigned (in case it's a reschedule)
-    if (assignment.taskId === excludeTaskId) {
-      return assignment;
-    }
+  for (const assignment of stationAssignments) {
+    const startTime = new Date(assignment.scheduledStart).getTime();
+    const endTime = new Date(assignment.scheduledEnd).getTime();
+    const duration = endTime - startTime;
 
-    const assignmentStart = new Date(assignment.scheduledStart).getTime();
-    const assignmentEnd = new Date(assignment.scheduledEnd).getTime();
+    // Check if this assignment overlaps with the new tile
+    const overlapWithNewTile = startTime < newEndTime && endTime > newStartTime;
 
-    // Check if this assignment overlaps with or comes after the new tile
-    // We shift if the assignment starts at or after the new tile's start
-    // OR if the assignment overlaps with the new tile
-    const overlaps =
-      (assignmentStart >= newStartTime && assignmentStart < newEndTime) ||
-      (assignmentEnd > newStartTime && assignmentEnd <= newEndTime) ||
-      (assignmentStart <= newStartTime && assignmentEnd >= newEndTime);
+    // Only consider cascade shifting for tiles that start at or after the new tile's position
+    const startsAtOrAfterNewTile = startTime >= newStartTime;
 
-    const startsAfter = assignmentStart >= newStartTime;
+    // Check if this tile would overlap with previously shifted tiles (cascade effect)
+    const wouldOverlapWithShifted = startsAtOrAfterNewTile && startTime < earliestAvailable;
 
-    if (overlaps || startsAfter) {
-      // Shift this assignment by the new tile's duration
-      const newAssignmentStart = new Date(assignmentStart + shiftDuration);
-      const newAssignmentEnd = new Date(assignmentEnd + shiftDuration);
+    if (overlapWithNewTile || wouldOverlapWithShifted) {
+      // Need to shift this tile to start at earliest available slot
+      const newShiftedStart = earliestAvailable;
+      const newShiftedEnd = newShiftedStart + duration;
 
       shiftedIds.push(assignment.id);
+      shiftMap.set(assignment.id, { newStart: newShiftedStart, newEnd: newShiftedEnd });
 
+      // Update earliest available for cascading shifts
+      earliestAvailable = newShiftedEnd;
+    } else if (startsAtOrAfterNewTile) {
+      // This tile doesn't need to shift, but update tracking for later tiles
+      // Only update if this tile is after the new tile position
+      earliestAvailable = Math.max(earliestAvailable, endTime);
+    }
+    // Tiles before the new tile position are ignored for cascade tracking
+  }
+
+  // Apply shifts to all assignments
+  const updatedAssignments = assignments.map((assignment) => {
+    const shift = shiftMap.get(assignment.id);
+    if (shift) {
       return {
         ...assignment,
-        scheduledStart: newAssignmentStart.toISOString(),
-        scheduledEnd: newAssignmentEnd.toISOString(),
+        scheduledStart: new Date(shift.newStart).toISOString(),
+        scheduledEnd: new Date(shift.newEnd).toISOString(),
         updatedAt: new Date().toISOString(),
       };
     }
-
     return assignment;
   });
 

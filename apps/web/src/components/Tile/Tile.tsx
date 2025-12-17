@@ -78,6 +78,10 @@ export function Tile({
   // Muting state: tile is muted during drag if it belongs to a different job
   const isMuted = activeJobId !== undefined && activeJobId !== job.id;
 
+  // During any drag operation, make tiles non-interactive so drops can pass through
+  // to the StationColumn droppable underneath (enables dropping onto existing tiles)
+  const isDragActive = activeJobId !== undefined;
+
   // Completed gradient style
   const completedGradient = isCompleted
     ? 'linear-gradient(to right, rgba(34,197,94,0.6) 0%, rgba(34,197,94,0.2) 50%, transparent 100%)'
@@ -109,9 +113,12 @@ export function Tile({
   const selectedClass = isSelected ? 'ring-2 ring-white/30' : '';
 
   // Muting style: desaturate and reduce opacity for other jobs during drag
+  // Also disable pointer events during drag so drops pass through to StationColumn
   const mutingStyle = isMuted
-    ? { filter: 'saturate(0.2)', opacity: 0.6 }
-    : undefined;
+    ? { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const }
+    : isDragActive
+      ? { pointerEvents: 'none' as const }
+      : undefined;
 
   return (
     <div
