@@ -243,15 +243,16 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} isSelected={true} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).toHaveClass('ring-2');
-    expect(tile).toHaveClass('ring-white/30');
+    // Selection now uses box-shadow glow effect with job color at 60% opacity
+    expect(tile).toHaveStyle({ boxShadow: '0 0 12px 4px #8B5CF699' });
   });
 
   it('does not apply selection styling when not selected', () => {
     render(<Tile {...defaultProps} isSelected={false} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).not.toHaveClass('ring-2');
+    // No box-shadow glow when not selected
+    expect(tile.style.boxShadow).toBeFalsy();
   });
 
   it('calls onSelect with job id when clicked', () => {
@@ -398,7 +399,8 @@ describe('Tile', () => {
       render(<Tile {...defaultProps} />);
 
       const tile = screen.getByTestId('tile-assignment-1');
-      expect(tile).toHaveClass('transition-[filter,opacity]');
+      // Also includes box-shadow for selection glow transition
+      expect(tile).toHaveClass('transition-[filter,opacity,box-shadow]');
       expect(tile).toHaveClass('duration-150');
       expect(tile).toHaveClass('ease-out');
     });

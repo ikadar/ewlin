@@ -109,8 +109,10 @@ export function Tile({
   // Determine if we have setup time to show
   const hasSetup = setupMinutes > 0;
 
-  // Selected state styling
-  const selectedClass = isSelected ? 'ring-2 ring-white/30' : '';
+  // Selected state styling - glow effect using job color at 60% opacity
+  const selectedStyle = isSelected
+    ? { boxShadow: `0 0 12px 4px ${job.color}99` } // 99 hex = ~60% opacity
+    : undefined;
 
   // Muting style: desaturate and reduce opacity for other jobs during drag
   // Also disable pointer events during drag so drops pass through to StationColumn
@@ -122,8 +124,8 @@ export function Tile({
 
   return (
     <div
-      className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-pointer ${selectedClass} transition-[filter,opacity] duration-150 ease-out`}
-      style={{ top: `${top}px`, height: `${totalHeight}px`, ...mutingStyle }}
+      className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-pointer transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      style={{ top: `${top}px`, height: `${totalHeight}px`, ...selectedStyle, ...mutingStyle }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       data-testid={`tile-${assignment.id}`}
