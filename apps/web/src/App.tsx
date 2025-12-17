@@ -14,7 +14,7 @@ import type { SchedulingGridHandle } from './components';
 import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask } from './utils';
 import type { StationDropData } from './components/StationColumns';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict } from '@flux/types';
 
@@ -68,6 +68,9 @@ function App() {
 
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
+
+  // Track current mouse position during drag (dnd-kit's delta doesn't give us this directly)
+  const currentPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // The mock snapshot is already a ScheduleSnapshot type
   // Just use it directly for validation
@@ -261,6 +264,17 @@ function App() {
         hasPrecedenceConflict: false,
         suggestedStart: null,
       });
+
+      // Set up pointer tracking during drag
+      const handlePointerMove = (e: PointerEvent) => {
+        currentPointerRef.current = { x: e.clientX, y: e.clientY };
+      };
+      window.addEventListener('pointermove', handlePointerMove);
+
+      // Store cleanup function reference
+      (window as unknown as { __cleanupPointerTracking?: () => void }).__cleanupPointerTracking = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+      };
     }
   };
 
@@ -289,11 +303,9 @@ function App() {
     const rect = droppableElement.getBoundingClientRect();
 
     // Calculate relative Y position in the column
-    // delta.y is from where the drag started, we need cursor position
-    // Use the pointer position from the event
-    const pointerY = (event.activatorEvent as PointerEvent)?.clientY ?? 0;
-    const deltaY = event.delta.y;
-    const relativeY = pointerY + deltaY - rect.top;
+    // Use the tracked pointer position (more accurate than delta calculation)
+    const currentY = currentPointerRef.current.y;
+    const relativeY = currentY - rect.top;
 
     // Snap to 30-minute grid
     const snappedY = snapToGrid(Math.max(0, relativeY));
@@ -325,6 +337,13 @@ function App() {
       hasPrecedenceConflict: false,
       suggestedStart: null,
     });
+
+    // Clean up pointer tracking
+    const cleanup = (window as unknown as { __cleanupPointerTracking?: () => void }).__cleanupPointerTracking;
+    if (cleanup) {
+      cleanup();
+      delete (window as unknown as { __cleanupPointerTracking?: () => void }).__cleanupPointerTracking;
+    }
 
     // If not dropped on a valid target, do nothing
     if (!over) return;
@@ -487,7 +506,7 @@ function App() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
-  // Quick Placement: get available task for hovered station
+  // Quick Placement: get available task for hovered station (for actual placement)
   const quickPlacementTask = useMemo(() => {
     if (!isQuickPlacementMode || !selectedJob || !quickPlacementHover.stationId) {
       return null;
@@ -499,6 +518,15 @@ function App() {
       quickPlacementHover.stationId
     );
   }, [isQuickPlacementMode, selectedJob, quickPlacementHover.stationId, snapshot.tasks, snapshot.assignments]);
+
+  // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
+  // In backward scheduling, we always show the last task as the one to place
+  const lastUnscheduledTask = useMemo(() => {
+    if (!isQuickPlacementMode || !selectedJob) {
+      return null;
+    }
+    return getLastUnscheduledTask(selectedJob, snapshot.tasks, snapshot.assignments);
+  }, [isQuickPlacementMode, selectedJob, snapshot.tasks, snapshot.assignments]);
 
   // Quick Placement: handle mouse move in station column
   const handleQuickPlacementMouseMove = useCallback((stationId: string, y: number) => {
@@ -623,7 +651,7 @@ function App() {
           tasks={snapshot.tasks}
           assignments={snapshot.assignments}
           stations={snapshot.stations}
-          activeTaskId={quickPlacementTask?.id}
+          activeTaskId={lastUnscheduledTask?.id}
         />
         <DateStrip
           startDate={(() => {

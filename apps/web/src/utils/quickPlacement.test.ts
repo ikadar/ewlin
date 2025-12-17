@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   getAvailableTaskForStation,
+  getLastUnscheduledTask,
   canActivateQuickPlacement,
   getStationsWithAvailableTasks,
 } from './quickPlacement';
@@ -14,13 +15,20 @@ function createJob(id: string): Job {
     client: 'Test Client',
     description: 'Test Job',
     color: '#8b5cf6',
-    workshopEntryDate: '2025-12-16T08:00:00Z',
-    workshopExitDate: '2025-12-20T17:00:00Z',
-    approvalGates: {
-      bat: 'approved',
-      paper: 'approved',
-      plates: 'approved',
+    workshopExitDate: '2025-12-20',
+    status: 'Planned',
+    fullyScheduled: false,
+    paperType: 'CB 300g',
+    paperFormat: '52x74',
+    paperPurchaseStatus: 'InStock',
+    proofApproval: {
+      sentAt: '2025-12-10',
+      approvedAt: '2025-12-12',
     },
+    platesStatus: 'Done',
+    requiredJobIds: [],
+    comments: [],
+    taskIds: [],
     createdAt: '2025-12-15T00:00:00Z',
     updatedAt: '2025-12-15T00:00:00Z',
   };
@@ -30,15 +38,15 @@ function createInternalTask(
   id: string,
   jobId: string,
   stationId: string,
-  sequence: number
+  sequenceOrder: number
 ): InternalTask {
   return {
     id,
     jobId,
     type: 'Internal',
     stationId,
-    sequence,
-    sequenceOrder: sequence,
+    status: 'Ready',
+    sequenceOrder,
     duration: {
       setupMinutes: 30,
       runMinutes: 60,
@@ -73,18 +81,96 @@ describe('canActivateQuickPlacement', () => {
   });
 });
 
+describe('getLastUnscheduledTask', () => {
+  const job = createJob('job-1');
+
+  it('returns the only unscheduled task', () => {
+    const tasks: Task[] = [createInternalTask('task-1', 'job-1', 'station-a', 1)];
+    const assignments: TaskAssignment[] = [];
+
+    const result = getLastUnscheduledTask(job, tasks, assignments);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('task-1');
+  });
+
+  it('returns the highest sequence unscheduled task', () => {
+    const tasks: Task[] = [
+      createInternalTask('task-1', 'job-1', 'station-a', 1),
+      createInternalTask('task-2', 'job-1', 'station-b', 2),
+      createInternalTask('task-3', 'job-1', 'station-c', 3),
+    ];
+    const assignments: TaskAssignment[] = [];
+
+    const result = getLastUnscheduledTask(job, tasks, assignments);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('task-3');
+    expect(result!.sequenceOrder).toBe(3);
+  });
+
+  it('skips already scheduled tasks', () => {
+    const tasks: Task[] = [
+      createInternalTask('task-1', 'job-1', 'station-a', 1),
+      createInternalTask('task-2', 'job-1', 'station-b', 2),
+      createInternalTask('task-3', 'job-1', 'station-c', 3),
+    ];
+    // Task 3 is scheduled
+    const assignments: TaskAssignment[] = [createAssignment('task-3', 'station-c')];
+
+    const result = getLastUnscheduledTask(job, tasks, assignments);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('task-2');
+  });
+
+  it('returns null when all tasks are scheduled', () => {
+    const tasks: Task[] = [createInternalTask('task-1', 'job-1', 'station-a', 1)];
+    const assignments: TaskAssignment[] = [createAssignment('task-1', 'station-a')];
+
+    const result = getLastUnscheduledTask(job, tasks, assignments);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when job has no tasks', () => {
+    const tasks: Task[] = [];
+    const assignments: TaskAssignment[] = [];
+
+    const result = getLastUnscheduledTask(job, tasks, assignments);
+    expect(result).toBeNull();
+  });
+});
+
 describe('getAvailableTaskForStation', () => {
   const job = createJob('job-1');
   const stationA = 'station-a';
   const stationB = 'station-b';
+  const stationC = 'station-c';
 
-  it('returns the only unscheduled task when there is just one', () => {
+  it('returns the task when it is the last unscheduled and matches station', () => {
+    // Only one task, it's the last and matches station
     const tasks: Task[] = [createInternalTask('task-1', 'job-1', stationA, 1)];
     const assignments: TaskAssignment[] = [];
 
     const result = getAvailableTaskForStation(job, tasks, assignments, stationA);
     expect(result).not.toBeNull();
     expect(result!.id).toBe('task-1');
+  });
+
+  it('returns null when station does not have the last unscheduled task', () => {
+    // Task 1 is on stationA (seq 1), Task 2 is on stationB (seq 2)
+    // Last unscheduled is task-2, so stationA returns null
+    const tasks: Task[] = [
+      createInternalTask('task-1', 'job-1', stationA, 1),
+      createInternalTask('task-2', 'job-1', stationB, 2),
+    ];
+    const assignments: TaskAssignment[] = [];
+
+    // StationA should return null because task-2 (last) is not on stationA
+    const result = getAvailableTaskForStation(job, tasks, assignments, stationA);
+    expect(result).toBeNull();
+
+    // StationB should return task-2 because it's the last unscheduled
+    const resultB = getAvailableTaskForStation(job, tasks, assignments, stationB);
+    expect(resultB).not.toBeNull();
+    expect(resultB!.id).toBe('task-2');
   });
 
   it('returns null when all tasks are scheduled', () => {
@@ -103,107 +189,68 @@ describe('getAvailableTaskForStation', () => {
     expect(result).toBeNull();
   });
 
-  it('returns the highest sequence task without successor (backward scheduling)', () => {
-    // Job has: Task 1 (seq 1) → Task 2 (seq 2) → Task 3 (seq 3)
-    // All on stationA, none scheduled
-    // Should return Task 3 (highest sequence, no successor)
-    const tasks: Task[] = [
-      createInternalTask('task-1', 'job-1', stationA, 1),
-      createInternalTask('task-2', 'job-1', stationA, 2),
-      createInternalTask('task-3', 'job-1', stationA, 3),
-    ];
-    const assignments: TaskAssignment[] = [];
-
-    const result = getAvailableTaskForStation(job, tasks, assignments, stationA);
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('task-3');
-  });
-
-  it('returns task when its successor is already scheduled', () => {
-    // Task 3 is scheduled, so Task 2 should be available
-    const tasks: Task[] = [
-      createInternalTask('task-1', 'job-1', stationA, 1),
-      createInternalTask('task-2', 'job-1', stationA, 2),
-      createInternalTask('task-3', 'job-1', stationA, 3),
-    ];
-    const assignments: TaskAssignment[] = [createAssignment('task-3', stationA)];
-
-    const result = getAvailableTaskForStation(job, tasks, assignments, stationA);
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('task-2');
-  });
-
-  it('returns null when successor is not yet scheduled', () => {
-    // Task 3 is not scheduled, so Task 2 should NOT be available
-    // Even though Task 2 is unscheduled, its successor (Task 3) is not placed
-    // Only Task 3 should be available
-    const tasks: Task[] = [
-      createInternalTask('task-1', 'job-1', stationA, 1),
-      createInternalTask('task-2', 'job-1', stationA, 2),
-      createInternalTask('task-3', 'job-1', stationA, 3),
-    ];
-    const assignments: TaskAssignment[] = [];
-
-    // getAvailableTaskForStation should return task-3, not task-2
-    const result = getAvailableTaskForStation(job, tasks, assignments, stationA);
-    expect(result!.id).toBe('task-3');
-
-    // Simulating: if task-3 were the only unscheduled one, we'd still get task-3
-    // But if we ask for a task when task-3 is not the highest unscheduled,
-    // we need to check the logic works in sequence
-  });
-
-  it('handles tasks on different stations correctly', () => {
-    // Job has tasks on different stations
-    // Should only consider tasks for the requested station
-    const tasks: Task[] = [
-      createInternalTask('task-1', 'job-1', stationA, 1),
-      createInternalTask('task-2', 'job-1', stationB, 2), // Different station
-      createInternalTask('task-3', 'job-1', stationA, 3),
-    ];
-    const assignments: TaskAssignment[] = [];
-
-    // For stationA, task-3 is the highest sequence unscheduled task
-    const result = getAvailableTaskForStation(job, tasks, assignments, stationA);
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('task-3');
-  });
-
-  it('considers cross-station sequencing for successor check', () => {
-    // Task 1 (stationA, seq 1) → Task 2 (stationB, seq 2) → Task 3 (stationA, seq 3)
-    // Task 2 and Task 3 are not scheduled
-    // For stationA: Task 3 is available (no successor)
-    // For stationB: Task 2's successor (Task 3) is not scheduled, so Task 2 is NOT available
+  it('supports backward scheduling: place last task first', () => {
+    // Workflow: Task 1 (seq 1, stationA) → Task 2 (seq 2, stationB) → Task 3 (seq 3, stationC)
+    // None scheduled → only stationC is available (task 3)
     const tasks: Task[] = [
       createInternalTask('task-1', 'job-1', stationA, 1),
       createInternalTask('task-2', 'job-1', stationB, 2),
-      createInternalTask('task-3', 'job-1', stationA, 3),
+      createInternalTask('task-3', 'job-1', stationC, 3),
     ];
     const assignments: TaskAssignment[] = [];
 
-    // For stationA: task-3 is available
-    const resultA = getAvailableTaskForStation(job, tasks, assignments, stationA);
-    expect(resultA).not.toBeNull();
-    expect(resultA!.id).toBe('task-3');
-
-    // For stationB: task-2's successor (task-3) is not scheduled
-    const resultB = getAvailableTaskForStation(job, tasks, assignments, stationB);
-    expect(resultB).toBeNull();
+    // Only stationC should have available task
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationA)).toBeNull();
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationB)).toBeNull();
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationC)?.id).toBe('task-3');
   });
 
-  it('allows task when successor on different station is scheduled', () => {
-    // Task 2 (stationB) → Task 3 (stationA) where Task 3 is scheduled
-    // Task 2 should be available for stationB
+  it('allows previous task after last is scheduled', () => {
+    // Task 3 is scheduled → Task 2 becomes available
     const tasks: Task[] = [
       createInternalTask('task-1', 'job-1', stationA, 1),
       createInternalTask('task-2', 'job-1', stationB, 2),
-      createInternalTask('task-3', 'job-1', stationA, 3),
+      createInternalTask('task-3', 'job-1', stationC, 3),
     ];
-    const assignments: TaskAssignment[] = [createAssignment('task-3', stationA)];
+    const assignments: TaskAssignment[] = [createAssignment('task-3', stationC)];
 
-    const result = getAvailableTaskForStation(job, tasks, assignments, stationB);
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('task-2');
+    // Now stationB should have task-2 available
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationA)).toBeNull();
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationB)?.id).toBe('task-2');
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationC)).toBeNull();
+  });
+
+  it('works through full backward scheduling sequence', () => {
+    const tasks: Task[] = [
+      createInternalTask('task-1', 'job-1', stationA, 1),
+      createInternalTask('task-2', 'job-1', stationB, 2),
+      createInternalTask('task-3', 'job-1', stationC, 3),
+    ];
+
+    // Step 1: None scheduled → only task-3 available
+    let assignments: TaskAssignment[] = [];
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationC)?.id).toBe('task-3');
+
+    // Step 2: Task 3 scheduled → task-2 available
+    assignments = [createAssignment('task-3', stationC)];
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationB)?.id).toBe('task-2');
+
+    // Step 3: Task 2 & 3 scheduled → task-1 available
+    assignments = [
+      createAssignment('task-3', stationC),
+      createAssignment('task-2', stationB),
+    ];
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationA)?.id).toBe('task-1');
+
+    // Step 4: All scheduled → nothing available
+    assignments = [
+      createAssignment('task-3', stationC),
+      createAssignment('task-2', stationB),
+      createAssignment('task-1', stationA),
+    ];
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationA)).toBeNull();
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationB)).toBeNull();
+    expect(getAvailableTaskForStation(job, tasks, assignments, stationC)).toBeNull();
   });
 });
 
@@ -211,8 +258,11 @@ describe('getStationsWithAvailableTasks', () => {
   const job = createJob('job-1');
   const stationA = 'station-a';
   const stationB = 'station-b';
+  const stationC = 'station-c';
 
-  it('returns stations with available tasks', () => {
+  it('returns only the station with the last unscheduled task', () => {
+    // Task 1 on stationA, Task 2 on stationB
+    // Only stationB should be available (task-2 is the last)
     const tasks: Task[] = [
       createInternalTask('task-1', 'job-1', stationA, 1),
       createInternalTask('task-2', 'job-1', stationB, 2),
@@ -220,14 +270,9 @@ describe('getStationsWithAvailableTasks', () => {
     const assignments: TaskAssignment[] = [];
 
     const result = getStationsWithAvailableTasks(job, tasks, assignments);
-
-    // stationA has task-1 available (no successor in this case because task-2 is on stationB)
-    // Wait, task-2 has sequence 2, so it's the successor of task-1
-    // task-2 is not scheduled, so task-1's successor is not placed
-    // Only task-2 should be available (highest sequence, no successor)
-    // So only stationB should have available tasks
     expect(result).toContain(stationB);
     expect(result).not.toContain(stationA);
+    expect(result).toHaveLength(1);
   });
 
   it('returns empty array when all tasks are scheduled', () => {
@@ -244,5 +289,28 @@ describe('getStationsWithAvailableTasks', () => {
 
     const result = getStationsWithAvailableTasks(job, tasks, assignments);
     expect(result).toHaveLength(0);
+  });
+
+  it('shifts to previous station as tasks are scheduled', () => {
+    const tasks: Task[] = [
+      createInternalTask('task-1', 'job-1', stationA, 1),
+      createInternalTask('task-2', 'job-1', stationB, 2),
+      createInternalTask('task-3', 'job-1', stationC, 3),
+    ];
+
+    // None scheduled → only stationC
+    let result = getStationsWithAvailableTasks(job, tasks, []);
+    expect(result).toEqual([stationC]);
+
+    // Task 3 scheduled → only stationB
+    result = getStationsWithAvailableTasks(job, tasks, [createAssignment('task-3', stationC)]);
+    expect(result).toEqual([stationB]);
+
+    // Task 2 & 3 scheduled → only stationA
+    result = getStationsWithAvailableTasks(job, tasks, [
+      createAssignment('task-3', stationC),
+      createAssignment('task-2', stationB),
+    ]);
+    expect(result).toEqual([stationA]);
   });
 });

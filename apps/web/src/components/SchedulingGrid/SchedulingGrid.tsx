@@ -214,9 +214,19 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           <div className="w-12 shrink-0 bg-zinc-900 border-r border-white/5 border-b border-white/10 sticky left-0 z-40" />
           {/* Station headers */}
           <div className="flex gap-3 px-3 border-b border-white/10">
-            {stations.map((station) => (
-              <StationHeader key={station.id} station={station} />
-            ))}
+            {stations.map((station) => {
+              // Determine if this header should be collapsed during drag
+              const targetStationId =
+                activeTask?.type === 'Internal' ? activeTask.stationId : null;
+              const isCollapsed = targetStationId !== null && targetStationId !== station.id;
+              return (
+                <StationHeader
+                  key={station.id}
+                  station={station}
+                  isCollapsed={isCollapsed}
+                />
+              );
+            })}
           </div>
         </div>
 

@@ -15,6 +15,8 @@ export interface StationHeaderProps {
   offScreen?: OffScreenInfo;
   /** Click handler for off-screen indicator */
   onOffScreenClick?: (direction: 'up' | 'down') => void;
+  /** Whether this header is collapsed (during drag to another station) */
+  isCollapsed?: boolean;
 }
 
 /**
@@ -25,12 +27,16 @@ export function StationHeader({
   station,
   offScreen,
   onOffScreenClick,
+  isCollapsed = false,
 }: StationHeaderProps) {
   const hasIndicator = offScreen && (offScreen.above > 0 || offScreen.below > 0);
 
+  // Width: full (240px / w-60) or collapsed (120px / w-30)
+  const widthClass = isCollapsed ? 'w-30' : 'w-60';
+
   return (
     <div
-      className={`w-60 shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 ${
+      className={`${widthClass} shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 transition-all duration-150 ease-out ${
         hasIndicator ? 'flex items-center justify-between' : ''
       }`}
     >

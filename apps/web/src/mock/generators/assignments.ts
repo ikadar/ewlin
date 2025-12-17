@@ -114,6 +114,12 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
         const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
         const scheduledEnd = addMinutes(scheduledStart, totalMinutes);
 
+        // Only mark tasks as completed if they're in the past
+        const now = new Date();
+        const isInPast = scheduledEnd < now;
+        // 80% of past tasks are completed, future tasks are never completed
+        const isCompleted = isInPast && Math.random() > 0.2;
+
         const assignment: TaskAssignment = {
           id: `assign-${task.id}`,
           taskId: task.id,
@@ -121,16 +127,11 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
           isOutsourced: false,
           scheduledStart: formatTimestamp(scheduledStart),
           scheduledEnd: formatTimestamp(scheduledEnd),
-          isCompleted: Math.random() > 0.8, // 20% chance of being completed
-          completedAt: null,
+          isCompleted,
+          completedAt: isCompleted ? formatTimestamp(scheduledEnd) : null,
           createdAt: formatTimestamp(baseDate),
           updatedAt: formatTimestamp(baseDate),
         };
-
-        // Set completedAt if completed
-        if (assignment.isCompleted) {
-          assignment.completedAt = formatTimestamp(scheduledEnd);
-        }
 
         assignments.push(assignment);
         stationNextAvailable.set(stationId, scheduledEnd);

@@ -6,6 +6,7 @@ export { applySwap, findAdjacentAssignment } from './swap';
 export type { SwapDirection, SwapResult } from './swap';
 export {
   getAvailableTaskForStation,
+  getLastUnscheduledTask,
   canActivateQuickPlacement,
   getStationsWithAvailableTasks,
 } from './quickPlacement';

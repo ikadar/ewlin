@@ -7,19 +7,45 @@ import type { Task, Job, TaskAssignment, InternalTask } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 
 /**
+ * Get the last (highest sequenceOrder) unscheduled internal task for a job.
+ * This is the task that should be placed next in backward scheduling.
+ *
+ * @param job - The job to get the task for
+ * @param tasks - All tasks in the snapshot
+ * @param assignments - All current assignments
+ * @returns The last unscheduled internal task, or null if none
+ */
+export function getLastUnscheduledTask(
+  job: Job,
+  tasks: Task[],
+  assignments: TaskAssignment[]
+): InternalTask | null {
+  // Get all internal tasks for this job that are unscheduled
+  const unscheduledTasks = tasks
+    .filter((t) => t.jobId === job.id)
+    .filter((t): t is InternalTask => isInternalTask(t))
+    .filter((t) => !assignments.some((a) => a.taskId === t.id));
+
+  if (unscheduledTasks.length === 0) {
+    return null;
+  }
+
+  // Sort by sequenceOrder descending and return the highest
+  unscheduledTasks.sort((a, b) => b.sequenceOrder - a.sequenceOrder);
+  return unscheduledTasks[0];
+}
+
+/**
  * Get the available task for quick placement on a specific station.
  *
- * For backward scheduling, the available task is:
- * 1. An unscheduled internal task for the given station
- * 2. The task with the highest sequence number where:
- *    - It has no successor in the job, OR
- *    - Its immediate successor is already scheduled
+ * In backward scheduling, only the LAST unscheduled task of the job can be placed.
+ * This function returns that task ONLY if it belongs to the given station.
  *
  * @param job - The currently selected job
  * @param tasks - All tasks in the snapshot
  * @param assignments - All current assignments
  * @param stationId - The station being hovered
- * @returns The task to place, or null if none available
+ * @returns The task to place, or null if the last task is not on this station
  */
 export function getAvailableTaskForStation(
   job: Job,
@@ -27,42 +53,14 @@ export function getAvailableTaskForStation(
   assignments: TaskAssignment[],
   stationId: string
 ): InternalTask | null {
-  // Get all tasks for this job
-  const jobTasks = tasks.filter((t) => t.jobId === job.id);
+  // Get the last (highest sequence) unscheduled task for this job
+  const lastTask = getLastUnscheduledTask(job, tasks, assignments);
 
-  // Filter to internal tasks on the target station that are unscheduled
-  const stationTasks = jobTasks
-    .filter((t): t is InternalTask => isInternalTask(t) && t.stationId === stationId)
-    .filter((t) => !assignments.some((a) => a.taskId === t.id));
-
-  if (stationTasks.length === 0) {
-    return null;
+  // Only return if this task belongs to the hovered station
+  if (lastTask && lastTask.stationId === stationId) {
+    return lastTask;
   }
 
-  // Sort by sequence descending (highest first for backward scheduling)
-  stationTasks.sort((a, b) => b.sequence - a.sequence);
-
-  // Find the first task where successor is placed or no successor exists
-  for (const task of stationTasks) {
-    // Find the immediate successor (next sequence number in the same job)
-    const successorTask = jobTasks.find(
-      (t) => t.jobId === job.id && t.sequence === task.sequence + 1
-    );
-
-    if (!successorTask) {
-      // No successor - this task can be placed
-      return task;
-    }
-
-    // Check if successor is already scheduled
-    const successorIsScheduled = assignments.some((a) => a.taskId === successorTask.id);
-    if (successorIsScheduled) {
-      // Successor is placed - this task can be placed
-      return task;
-    }
-  }
-
-  // No task available (all remaining tasks have unplaced successors)
   return null;
 }
 

@@ -113,6 +113,16 @@ function generateInternalTask(
   status: TaskStatus = 'Ready'
 ): InternalTask {
   const now = new Date();
+
+  // Generate total duration as multiple of 15 minutes (45min to 3h range)
+  const totalMinutes = randomInt(3, 12) * 15; // 45, 60, 75, ..., 180
+
+  // Setup is roughly 15-30% of total, rounded to 15 minutes
+  const setupPercent = randomInt(15, 30) / 100;
+  const rawSetup = totalMinutes * setupPercent;
+  const setupMinutes = Math.round(rawSetup / 15) * 15 || 15; // At least 15 min
+  const runMinutes = totalMinutes - setupMinutes;
+
   return {
     id: `task-${jobId}-${sequenceOrder}`,
     jobId,
@@ -121,8 +131,8 @@ function generateInternalTask(
     type: 'Internal',
     stationId,
     duration: {
-      setupMinutes: randomInt(10, 45),
-      runMinutes: randomInt(30, 180),
+      setupMinutes,
+      runMinutes,
     },
     comment: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
     createdAt: formatTimestamp(now),

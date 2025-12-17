@@ -138,22 +138,43 @@ export function Tile({
         <SimilarityIndicators results={similarityResults} />
       )}
 
-      {/* Setup section (if has setup time) */}
+      {/* Setup section (if has setup time) - contains the label */}
       {hasSetup && (
         <div
-          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder}`}
+          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder} pt-0.5 px-2`}
           style={{
             top: 0,
             height: `${setupHeight}px`,
             backgroundImage: completedGradient,
           }}
           data-testid="tile-setup-section"
-        />
+        >
+          {/* Content: completion icon + reference + client */}
+          <div className="flex items-center gap-2">
+            {isCompleted ? (
+              <CircleCheck
+                className="w-4 h-4 text-emerald-500 shrink-0"
+                data-testid="tile-completed-icon"
+              />
+            ) : (
+              <Circle
+                className="w-4 h-4 text-zinc-600 shrink-0"
+                data-testid="tile-incomplete-icon"
+              />
+            )}
+            <span
+              className={`${colorClasses.text} font-medium truncate min-w-0`}
+              data-testid="tile-content"
+            >
+              {job.reference} · {job.client}
+            </span>
+          </div>
+        </div>
       )}
 
       {/* Run section */}
       <div
-        className={`absolute left-0 right-0 ${colorClasses.runBg} pt-0.5 px-2`}
+        className={`absolute left-0 right-0 ${colorClasses.runBg} ${!hasSetup ? 'pt-0.5 px-2' : ''}`}
         style={{
           top: hasSetup ? `${setupHeight}px` : 0,
           height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
@@ -161,26 +182,28 @@ export function Tile({
         }}
         data-testid="tile-run-section"
       >
-        {/* Content: completion icon + reference + client */}
-        <div className="flex items-center gap-2">
-          {isCompleted ? (
-            <CircleCheck
-              className="w-4 h-4 text-emerald-500 shrink-0"
-              data-testid="tile-completed-icon"
-            />
-          ) : (
-            <Circle
-              className="w-4 h-4 text-zinc-600 shrink-0"
-              data-testid="tile-incomplete-icon"
-            />
-          )}
-          <span
-            className={`${colorClasses.text} font-medium truncate min-w-0`}
-            data-testid="tile-content"
-          >
-            {job.reference} · {job.client}
-          </span>
-        </div>
+        {/* Content only if no setup section */}
+        {!hasSetup && (
+          <div className="flex items-center gap-2">
+            {isCompleted ? (
+              <CircleCheck
+                className="w-4 h-4 text-emerald-500 shrink-0"
+                data-testid="tile-completed-icon"
+              />
+            ) : (
+              <Circle
+                className="w-4 h-4 text-zinc-600 shrink-0"
+                data-testid="tile-incomplete-icon"
+              />
+            )}
+            <span
+              className={`${colorClasses.text} font-medium truncate min-w-0`}
+              data-testid="tile-content"
+            >
+              {job.reference} · {job.client}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Swap buttons (visible on hover) */}
