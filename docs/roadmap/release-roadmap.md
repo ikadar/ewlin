@@ -555,46 +555,98 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Home: Jump to today
 - [x] Page Up/Down: Scroll by day
 
-### Phase 3F: Client-Side Validation
+### Phase 3F: UX/UI Enhancements
 
-#### v0.3.18 - Validator Package Integration
+#### v0.3.18 - Job Details Task Interactions
+- [ ] Single-click scheduled task → scroll grid to tile position
+- [ ] Double-click scheduled task → recall (unschedule)
+- [ ] Visual indicator for scheduled vs unscheduled tasks
+- [ ] Grid scroll integration with Job Details Panel
+
+#### v0.3.19 - Selection Glow Effect
+- [ ] Replace ring border with box-shadow glow for selected tiles
+- [ ] Glow effect: `box-shadow: 0 0 12px 4px rgba(color, 0.6)`
+- [ ] Works with all job colors
+
+#### v0.3.20 - Tile-Based Drop Position
+- [ ] Calculate drop position from tile top edge (not cursor)
+- [ ] Track grab offset on drag start
+- [ ] Prevents tile "jumping" on drop
+- [ ] Applies to both new placements and repositioning
+
+### Phase 3G: Station Compact (Backend + Frontend)
+
+#### v0.3.21 - Station Compact API (Backend)
+- [ ] `POST /api/stations/{id}/compact` endpoint
+- [ ] CompactStationService with gap removal algorithm
+- [ ] Respects precedence rules (no conflicts created)
+- [ ] Single transaction for all assignment updates
+- [ ] PHPStan level 8, unit tests
+
+#### v0.3.22 - Station Compact UI (Frontend)
+- [ ] Compact button in station headers
+- [ ] API integration (call compact endpoint)
+- [ ] Loading state during operation
+- [ ] Refresh assignments after successful compact
+
+### Phase 3H: Additional UX Features
+
+#### v0.3.23 - Downtime-Aware Tile Height
+- [ ] Tile height based on `scheduledEnd - scheduledStart`
+- [ ] Visual representation of time-stretched tasks
+- [ ] Setup/run sections scale proportionally
+
+#### v0.3.24 - No Conflict for Unscheduled Predecessors (Validator)
+- [ ] Update `@flux/schedule-validator` precedence logic
+- [ ] Unscheduled predecessors don't create conflicts
+- [ ] Enables backward scheduling workflow
+- [ ] Update validator tests
+
+#### v0.3.25 - Grid Tile Repositioning
+- [ ] Drag scheduled tiles within same station column
+- [ ] Reschedule to new time position on drop
+- [ ] Ghost placeholder at original position
+- [ ] Push-down behavior when dropping onto other tiles
+- [ ] Reuses tile-based drop position calculation
+
+### Phase 3I: Backend API Integration
+
+#### v0.3.26 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-### Phase 3G: Backend API Integration
-
-#### v0.3.19 - API Client Setup
+#### v0.3.27 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.3.20 - Snapshot Loading
+#### v0.3.28 - Snapshot Loading
 - [ ] Replace mock with real API
 - [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.3.21 - Assignment Operations Integration
+#### v0.3.29 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
 - [ ] Toggle completion via API
 - [ ] Server validation response handling
 
-### Phase 3H: DSL Editor (Post-MVP scope)
+### Phase 3J: DSL Editor (Post-MVP scope)
 
 > **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
 
-#### v0.3.22 - DSL Parser Package (Post-MVP)
+#### v0.3.30 - DSL Parser Package (Post-MVP)
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition
 - [ ] CodeMirror 6 integration
 - [ ] Syntax highlighting
 
-#### v0.3.23 - Job Creation Modal (Post-MVP)
+#### v0.3.31 - Job Creation Modal (Post-MVP)
 - [ ] Modal component
 - [ ] DSL textarea with highlighting
 - [ ] Autocomplete integration

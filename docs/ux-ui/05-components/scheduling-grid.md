@@ -155,6 +155,54 @@ Each station column has a sticky header showing:
 - Shows job-colored bands indicating tile positions
 - See [Column Focus on Drag](../01-interaction-patterns/column-focus-on-drag.md)
 
+### Compact (schedule optimization)
+
+Button in station header that automatically removes empty time gaps between tiles, moving them as early as possible while respecting precedence rules.
+
+**Compact button:**
+- Located in station header
+- Icon: Compress/minimize icon
+- Click to trigger compact algorithm
+
+**Compact algorithm:**
+1. Process tiles from earliest to latest
+2. For each tile, find earliest valid start:
+   - After predecessor's `scheduledEnd` (if scheduled)
+   - After previous tile on same station ends
+   - Not in the past
+3. Move tile to earliest valid position if it's earlier than current
+
+**Example:**
+```
+Before compact:           After compact:
+08:00 ┌─────────┐         08:00 ┌─────────┐
+      │  Tile A │               │  Tile A │
+09:00 └─────────┘         09:00 └─────────┘
+                          09:00 ┌─────────┐
+10:00    (gap)                  │  Tile B │
+                          10:00 └─────────┘
+11:00 ┌─────────┐         10:00 ┌─────────┐
+      │  Tile B │               │  Tile C │
+12:00 └─────────┘         11:00 └─────────┘
+
+13:00    (gap)            (gaps removed)
+
+14:00 ┌─────────┐
+      │  Tile C │
+15:00 └─────────┘
+```
+
+**Constraints:**
+- Respects precedence rules (no conflicts created)
+- Respects station capacity (no overlaps)
+- Cannot schedule into the past
+- Considers predecessors on other stations
+
+**Use cases:**
+- Optimize station utilization after manual adjustments
+- Close gaps left by recalled tiles
+- Quick schedule tightening
+
 ---
 
 ## Scroll Behavior

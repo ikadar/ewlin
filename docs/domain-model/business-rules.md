@@ -404,7 +404,11 @@ The system MUST prevent any state where station group concurrent task count exce
 #### BR-SCHED-003
 **Task sequence enforcement**
 
-The system MUST prevent scheduling a task before its predecessor task completes.
+The system MUST warn (not block) when scheduling a task whose predecessor is scheduled to complete after the proposed task starts.
+
+**Important clarification:** If a predecessor task is **unscheduled**, no conflict is raised. This enables backward scheduling workflow where users place the last task first and work backwards. Conflicts only occur when:
+1. Predecessor IS scheduled, AND
+2. Predecessor's scheduledEnd > proposed task's scheduledStart
 
 #### BR-SCHED-004
 **Job dependency enforcement**
@@ -578,7 +582,7 @@ The following table provides a quick reference for validation rules, their corre
 | VAL-001.1 | Station exists and is Available | AvailabilityConflict | High | Yes |
 | VAL-001.2 | No station double-booking | StationConflict | High | Yes |
 | VAL-001.3 | Group capacity not exceeded | GroupCapacityConflict | High | Yes |
-| VAL-001.4 | Task sequence respected | PrecedenceConflict | Medium | Soft* |
+| VAL-001.4 | Task sequence respected (only when predecessor is scheduled) | PrecedenceConflict | Medium | Soft* |
 | VAL-001.5 | Job dependencies satisfied | PrecedenceConflict | High | Yes |
 | VAL-001.6 | Approval gates cleared (BAT) | ApprovalGateConflict | High | Yes |
 | VAL-001.7 | Approval gates cleared (Plates) | ApprovalGateConflict | Medium | Warning |
@@ -594,7 +598,7 @@ The following table provides a quick reference for validation rules, their corre
 |---------------|-------------|------------------|
 | StationConflict | Station double-booked (overlapping assignments) | Red highlight on both tiles |
 | GroupCapacityConflict | Station group MaxConcurrent exceeded | Yellow/orange time slot |
-| PrecedenceConflict | Task sequence violated within job | Red halo on violating tile |
+| PrecedenceConflict | Scheduled predecessor ends after proposed task starts | Red halo on violating tile |
 | ApprovalGateConflict | BAT or Plates approval not satisfied | Tile grayed out / blocked |
 | AvailabilityConflict | Outside station operating hours | Gray hatched overlay |
 | DeadlineConflict | Task completion exceeds workshopExitDate | Job in "Late Jobs" panel |
