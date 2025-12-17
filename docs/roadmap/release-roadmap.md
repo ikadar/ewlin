@@ -583,11 +583,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Single transaction for all assignment updates
 - [x] PHPStan level 8, unit tests (7 unit + 3 integration)
 
-#### v0.3.22 - Station Compact UI (Frontend)
-- [ ] Compact button in station headers
-- [ ] API integration (call compact endpoint)
-- [ ] Loading state during operation
-- [ ] Refresh assignments after successful compact
+#### v0.3.22 - Station Compact UI (Frontend) ✅
+- [x] Compact button in station headers
+- [x] API integration (call compact endpoint)
+- [x] Loading state during operation
+- [x] Refresh assignments after successful compact
 
 ### Phase 3H: Additional UX Features
 
