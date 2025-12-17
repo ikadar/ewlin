@@ -576,12 +576,12 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3G: Station Compact (Backend + Frontend)
 
-#### v0.3.21 - Station Compact API (Backend)
-- [ ] `POST /api/stations/{id}/compact` endpoint
-- [ ] CompactStationService with gap removal algorithm
-- [ ] Respects precedence rules (no conflicts created)
-- [ ] Single transaction for all assignment updates
-- [ ] PHPStan level 8, unit tests
+#### v0.3.21 - Station Compact API (Backend) ✅
+- [x] `POST /api/v1/stations/{id}/compact` endpoint
+- [x] CompactStationService with gap removal algorithm
+- [x] Respects precedence rules (no conflicts created)
+- [x] Single transaction for all assignment updates
+- [x] PHPStan level 8, unit tests (7 unit + 3 integration)
 
 #### v0.3.22 - Station Compact UI (Frontend)
 - [ ] Compact button in station headers
