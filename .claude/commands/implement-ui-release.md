@@ -55,7 +55,23 @@ Continue only after approval!
    - Match visual structure: element order, flex directions, alignments
    - Compare your implementation's rendered HTML with the mockup HTML
 
-4. **Quality checks:**
+4. **Write E2E tests (Cypress):**
+   - Location: `apps/web/cypress/e2e/`
+   - **When to write E2E tests:**
+     - User interactions (click, double-click, drag & drop)
+     - Navigation and scrolling behavior
+     - Keyboard shortcuts
+     - Visual state changes (selection, hover, active states)
+     - Form interactions (search, filter)
+   - **When NOT to write E2E tests:**
+     - Pure styling changes (colors, spacing)
+     - Internal refactoring without behavior change
+     - Performance optimizations
+   - **Test file naming:** `{feature-name}.cy.ts` (e.g., `tile-recall.cy.ts`)
+   - **Use existing custom commands** from `cypress/support/commands.ts`
+   - **Add data-testid** attributes to new components for reliable selection
+
+5. **Quality checks:**
    ```bash
    cd apps/web
    pnpm run lint
@@ -63,9 +79,27 @@ Continue only after approval!
    pnpm test
    ```
 
-5. **STOP - Present the implementation summary:**
+6. **Run E2E tests:**
+   ```bash
+   # Start dev server in background
+   pnpm dev &
+   # Wait for server to be ready
+   sleep 5
+   # Run E2E tests
+   pnpm cypress run --e2e
+   # Kill dev server
+   kill %1
+   ```
+
+   **If E2E tests fail:**
+   - Fix the failing tests or the implementation
+   - Re-run until all tests pass
+   - Never skip failing tests without fixing
+
+7. **STOP - Present the implementation summary:**
    - Created/modified files
-   - Test results
+   - Unit test results
+   - E2E test results
    - Lint/TypeScript results
    - **WAIT for approval!**
 
@@ -172,9 +206,11 @@ Continue only after approval!
 - **ALWAYS** read specification documents in Phase 1
 - **ALWAYS** use feature branches, never commit directly to `ux-ui-development`
 - **ALWAYS** use TodoWrite to track progress
-- **ALWAYS** run lint, typecheck, and tests
+- **ALWAYS** run lint, typecheck, unit tests, and E2E tests
+- **ALWAYS** write E2E tests for user interactions (when applicable)
 - **ALWAYS** create git tag and GitHub release after merge
 - **NEVER** merge into `main` - only merge into `ux-ui-development`
+- **NEVER** skip failing E2E tests - fix them before proceeding
 - Commit messages in English, communication in the user's language
 
 ## Affected Repository
