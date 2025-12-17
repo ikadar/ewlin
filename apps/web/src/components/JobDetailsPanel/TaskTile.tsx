@@ -64,8 +64,15 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     return `${dayName} ${day}/${month} ${hours}:${minutes}`;
   };
 
-  // Get station name
-  const stationName = station?.name || 'Unknown';
+  // Get display name based on task type
+  const getDisplayName = (): string => {
+    if (task.type === 'Internal') {
+      return station?.name || 'Unknown';
+    }
+    // Outsourced task - show action type (e.g., "Pelliculage", "Reliure")
+    return task.actionType || 'Sous-traitance';
+  };
+  const displayName = getDisplayName();
 
   // Calculate height based on duration (for visual representation)
   // 1 hour = 100px, minimum 20px
@@ -132,7 +139,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
         data-testid={`task-tile-${task.id}`}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-zinc-400 font-medium truncate min-w-0">{stationName}</span>
+          <span className="text-zinc-400 font-medium truncate min-w-0">{displayName}</span>
           <span className="text-zinc-500 shrink-0">
             {formatScheduledTime(assignment.scheduledStart)}
           </span>
@@ -170,7 +177,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
           className={`font-medium truncate min-w-0 ${colorStyles.textColor}`}
           style={colorStyles.textColor ? undefined : { color: jobColor }}
         >
-          {stationName}
+          {displayName}
         </span>
         <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
       </div>
