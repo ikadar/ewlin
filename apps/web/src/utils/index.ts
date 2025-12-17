@@ -17,3 +17,4 @@ export {
   calculateScrollToBottom,
   calculateScrollToCenter,
 } from './keyboardNavigation';
+export { calculateGrabOffset, calculateTileTopPosition } from './dragOffset';

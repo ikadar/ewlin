@@ -14,7 +14,7 @@ import type { SchedulingGridHandle } from './components';
 import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateGrabOffset, calculateTileTopPosition } from './utils';
 import type { StationDropData } from './components/StationColumns';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict } from '@flux/types';
 
@@ -71,6 +71,9 @@ function App() {
 
   // Track current mouse position during drag (dnd-kit's delta doesn't give us this directly)
   const currentPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Track grab offset (where user grabbed within the tile) for tile-based drop positioning
+  const grabOffsetRef = useRef<{ y: number }>({ y: 0 });
 
   // The mock snapshot is already a ScheduleSnapshot type
   // Just use it directly for validation
@@ -265,6 +268,19 @@ function App() {
         suggestedStart: null,
       });
 
+      // Calculate grab offset (where user grabbed within the tile)
+      // This enables tile-based drop positioning instead of cursor-based
+      // Find the tile element from the activator event target
+      const activatorEvent = event.activatorEvent as PointerEvent | MouseEvent;
+      const target = activatorEvent?.target as HTMLElement | null;
+      const tileElement = target?.closest('[data-testid^="task-tile-"]') as HTMLElement | null;
+      if (activatorEvent && tileElement) {
+        const rect = tileElement.getBoundingClientRect();
+        grabOffsetRef.current = { y: calculateGrabOffset(activatorEvent.clientY, rect.top) };
+      } else {
+        grabOffsetRef.current = { y: 0 };
+      }
+
       // Set up pointer tracking during drag
       const handlePointerMove = (e: PointerEvent) => {
         currentPointerRef.current = { x: e.clientX, y: e.clientY };
@@ -302,13 +318,16 @@ function App() {
 
     const rect = droppableElement.getBoundingClientRect();
 
-    // Calculate relative Y position in the column
-    // Use the tracked pointer position (more accurate than delta calculation)
-    const currentY = currentPointerRef.current.y;
-    const relativeY = currentY - rect.top;
+    // Calculate tile top position using tile-based positioning
+    // This subtracts the grab offset to get where the tile's top edge should be
+    const relativeY = calculateTileTopPosition(
+      currentPointerRef.current.y,
+      rect.top,
+      grabOffsetRef.current.y
+    );
 
     // Snap to 30-minute grid
-    const snappedY = snapToGrid(Math.max(0, relativeY));
+    const snappedY = snapToGrid(relativeY);
     const dropTime = yPositionToTime(snappedY, START_HOUR);
 
     setDragValidation((prev) => ({
