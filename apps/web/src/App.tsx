@@ -483,6 +483,52 @@ function App() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
+  // Handle jump to task - scroll grid to assignment position (single-click in Job Details Panel)
+  const handleJumpToTask = useCallback((assignment: TaskAssignment) => {
+    if (!gridRef.current) return;
+
+    // Calculate Y position from assignment's scheduledStart
+    const startTime = new Date(assignment.scheduledStart);
+    const y = timeToYPosition(startTime, START_HOUR);
+
+    // Position the tile ~20vh from top of viewport
+    const viewportHeight = gridRef.current.getViewportHeight();
+    const scrollTargetY = Math.max(0, y - viewportHeight * 0.2);
+
+    // Calculate X position from station index
+    // Station layout: px-3 (12px) padding, then each station is 240px + 12px gap
+    const stationId = assignment.targetId;
+    const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
+
+    let scrollTargetX = gridRef.current.getScrollX(); // Default: keep current X
+
+    if (stationIndex >= 0) {
+      const STATION_WIDTH = 240; // w-60
+      const GAP = 12; // gap-3
+      const PADDING_LEFT = 12; // px-3
+
+      // Calculate station's X position
+      const stationX = PADDING_LEFT + stationIndex * (STATION_WIDTH + GAP);
+
+      // Center the station in the viewport (accounting for timeline column width)
+      const TIMELINE_WIDTH = 48; // w-12
+      const viewportWidth = gridRef.current.getViewportWidth();
+      scrollTargetX = Math.max(0, stationX - (viewportWidth - TIMELINE_WIDTH - STATION_WIDTH) / 2);
+    }
+
+    // Scroll both X and Y at once
+    gridRef.current.scrollTo(scrollTargetX, scrollTargetY);
+
+    console.log('Jump to task:', {
+      assignmentId: assignment.id,
+      taskId: assignment.taskId,
+      stationId,
+      scheduledStart: assignment.scheduledStart,
+      scrollTargetX,
+      scrollTargetY,
+    });
+  }, [snapshot.stations]);
+
   // Handle recall - remove assignment (double-click on tile)
   const handleRecallAssignment = useCallback((assignmentId: string) => {
     updateSnapshot((currentSnapshot) => {
@@ -507,7 +553,8 @@ function App() {
   }, []);
 
   // Quick Placement: get available task for hovered station (for actual placement)
-  const quickPlacementTask = useMemo(() => {
+  // Note: Currently unused but may be needed for future tooltip/preview features
+  const _quickPlacementTask = useMemo(() => {
     if (!isQuickPlacementMode || !selectedJob || !quickPlacementHover.stationId) {
       return null;
     }
@@ -652,6 +699,8 @@ function App() {
           assignments={snapshot.assignments}
           stations={snapshot.stations}
           activeTaskId={lastUnscheduledTask?.id}
+          onJumpToTask={handleJumpToTask}
+          onRecallTask={handleRecallAssignment}
         />
         <DateStrip
           startDate={(() => {

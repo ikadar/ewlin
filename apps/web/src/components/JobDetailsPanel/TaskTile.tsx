@@ -15,6 +15,10 @@ export interface TaskTileProps {
   station?: Station;
   /** Whether this task is the active placement target in Quick Placement Mode */
   isActivePlacement?: boolean;
+  /** Callback when a scheduled task is clicked (jump to grid) */
+  onJumpToTask?: (assignment: TaskAssignment) => void;
+  /** Callback when a scheduled task is double-clicked (recall) */
+  onRecallTask?: (assignmentId: string) => void;
 }
 
 /**
@@ -22,7 +26,7 @@ export interface TaskTileProps {
  * Unscheduled: job color, border-l-4, cursor-grab, draggable
  * Scheduled: dark placeholder with station + datetime
  */
-export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false }: TaskTileProps) {
+export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, onJumpToTask, onRecallTask }: TaskTileProps) {
   const isScheduled = !!assignment;
 
   // Set up draggable for unscheduled tasks only
@@ -132,11 +136,27 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
 
   if (isScheduled) {
     // Scheduled (placed) task - dark placeholder (not draggable)
+    // Single-click: jump to grid position
+    // Double-click: recall (unschedule)
+    const handleClick = () => {
+      if (onJumpToTask && assignment) {
+        onJumpToTask(assignment);
+      }
+    };
+
+    const handleDoubleClick = () => {
+      if (onRecallTask && assignment) {
+        onRecallTask(assignment.id);
+      }
+    };
+
     return (
       <div
-        className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40"
+        className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors"
         style={{ height: `${height}px` }}
         data-testid={`task-tile-${task.id}`}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
       >
         <div className="flex items-center justify-between gap-2">
           <span className="text-zinc-400 font-medium truncate min-w-0">{displayName}</span>

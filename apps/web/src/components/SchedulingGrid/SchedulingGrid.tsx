@@ -9,7 +9,7 @@ import { timeToYPosition } from '../TimelineColumn';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
-  /** Scroll to a specific Y position */
+  /** Scroll to a specific Y position (preserves X) */
   scrollToY: (y: number, behavior?: ScrollBehavior) => void;
   /** Scroll by a delta amount */
   scrollByY: (deltaY: number, behavior?: ScrollBehavior) => void;
@@ -17,6 +17,14 @@ export interface SchedulingGridHandle {
   getScrollY: () => number;
   /** Get viewport height */
   getViewportHeight: () => number;
+  /** Scroll to a specific X position (preserves Y) */
+  scrollToX: (x: number, behavior?: ScrollBehavior) => void;
+  /** Get current horizontal scroll position */
+  getScrollX: () => number;
+  /** Get viewport width */
+  getViewportWidth: () => number;
+  /** Scroll to both X and Y positions at once */
+  scrollTo: (x: number, y: number, behavior?: ScrollBehavior) => void;
 }
 
 /** Validation state during drag */
@@ -118,13 +126,25 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     // Expose scroll methods via ref
     useImperativeHandle(ref, () => ({
       scrollToY: (y: number, behavior: ScrollBehavior = 'smooth') => {
-        scrollContainerRef.current?.scrollTo({ top: y, behavior });
+        // Preserve current X position when scrolling Y
+        const currentX = scrollContainerRef.current?.scrollLeft ?? 0;
+        scrollContainerRef.current?.scrollTo({ top: y, left: currentX, behavior });
       },
       scrollByY: (deltaY: number, behavior: ScrollBehavior = 'smooth') => {
         scrollContainerRef.current?.scrollBy({ top: deltaY, behavior });
       },
       getScrollY: () => scrollContainerRef.current?.scrollTop ?? 0,
       getViewportHeight: () => scrollContainerRef.current?.clientHeight ?? 0,
+      scrollToX: (x: number, behavior: ScrollBehavior = 'smooth') => {
+        // Preserve current Y position when scrolling X
+        const currentY = scrollContainerRef.current?.scrollTop ?? 0;
+        scrollContainerRef.current?.scrollTo({ left: x, top: currentY, behavior });
+      },
+      getScrollX: () => scrollContainerRef.current?.scrollLeft ?? 0,
+      getViewportWidth: () => scrollContainerRef.current?.clientWidth ?? 0,
+      scrollTo: (x: number, y: number, behavior: ScrollBehavior = 'smooth') => {
+        scrollContainerRef.current?.scrollTo({ left: x, top: y, behavior });
+      },
     }));
 
   // Update current time every minute
