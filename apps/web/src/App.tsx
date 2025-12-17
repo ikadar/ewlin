@@ -81,6 +81,58 @@ function App() {
     bypassPrecedence: isAltPressed,
   });
 
+  // Configure pointer sensor with activation constraint
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required before drag starts
+      },
+    })
+  );
+
+  // Create lookup maps
+  const jobMap = useMemo(() => {
+    const map = new Map<string, Job>();
+    snapshot.jobs.forEach((job) => map.set(job.id, job));
+    return map;
+  }, [snapshot.jobs]);
+
+  // Find selected job
+  const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
+
+  // Get ordered job IDs for navigation (matching JobsList display order)
+  // Problems first (late, then conflicts), then normal jobs
+  const orderedJobIds = useMemo(() => {
+    const lateJobIds = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
+    const conflictJobIds = new Set<string>();
+    snapshot.conflicts.forEach((c) => {
+      const task = snapshot.tasks.find((t) => t.id === c.taskId);
+      if (task) conflictJobIds.add(task.jobId);
+    });
+
+    const problems: Job[] = [];
+    const normal: Job[] = [];
+
+    snapshot.jobs.forEach((job) => {
+      if (lateJobIds.has(job.id) || conflictJobIds.has(job.id)) {
+        problems.push(job);
+      } else {
+        normal.push(job);
+      }
+    });
+
+    // Sort problems: late first, then conflicts
+    problems.sort((a, b) => {
+      const aIsLate = lateJobIds.has(a.id);
+      const bIsLate = lateJobIds.has(b.id);
+      if (aIsLate && !bIsLate) return -1;
+      if (!aIsLate && bIsLate) return 1;
+      return 0;
+    });
+
+    return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
+  }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks]);
+
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -194,58 +246,6 @@ function App() {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob]);
-
-  // Configure pointer sensor with activation constraint
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement required before drag starts
-      },
-    })
-  );
-
-  // Create lookup maps
-  const jobMap = useMemo(() => {
-    const map = new Map<string, Job>();
-    snapshot.jobs.forEach((job) => map.set(job.id, job));
-    return map;
-  }, [snapshot.jobs]);
-
-  // Find selected job
-  const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
-
-  // Get ordered job IDs for navigation (matching JobsList display order)
-  // Problems first (late, then conflicts), then normal jobs
-  const orderedJobIds = useMemo(() => {
-    const lateJobIds = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
-    const conflictJobIds = new Set<string>();
-    snapshot.conflicts.forEach((c) => {
-      const task = snapshot.tasks.find((t) => t.id === c.taskId);
-      if (task) conflictJobIds.add(task.jobId);
-    });
-
-    const problems: Job[] = [];
-    const normal: Job[] = [];
-
-    snapshot.jobs.forEach((job) => {
-      if (lateJobIds.has(job.id) || conflictJobIds.has(job.id)) {
-        problems.push(job);
-      } else {
-        normal.push(job);
-      }
-    });
-
-    // Sort problems: late first, then conflicts
-    problems.sort((a, b) => {
-      const aIsLate = lateJobIds.has(a.id);
-      const bIsLate = lateJobIds.has(b.id);
-      if (aIsLate && !bIsLate) return -1;
-      if (!aIsLate && bIsLate) return 1;
-      return 0;
-    });
-
-    return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
-  }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks]);
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
