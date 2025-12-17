@@ -1,10 +1,12 @@
 import { Circle, CircleCheck } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/core';
 import type { TaskAssignment, Job, InternalTask } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
+import type { TaskDragData } from '../../App';
 
 export interface TileProps {
   /** Task assignment data */
@@ -45,6 +47,7 @@ function minutesToPixels(minutes: number): number {
 /**
  * Tile - Visual representation of a scheduled task assignment.
  * Shows job color, setup/run sections, completion status, and swap buttons.
+ * Draggable within its station column for repositioning.
  */
 export function Tile({
   assignment,
@@ -63,6 +66,19 @@ export function Tile({
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
+
+  // Set up draggable - tiles can be repositioned within their station column
+  const dragData: TaskDragData = {
+    type: 'task',
+    task,
+    job,
+    assignmentId: assignment.id, // Include assignment ID for reschedule detection
+  };
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `grid-tile-${assignment.id}`,
+    data: dragData,
+  });
 
   // Calculate total height from scheduled time span (downtime-aware)
   // This reflects actual time on grid, including stretching across non-operating periods
@@ -124,15 +140,31 @@ export function Tile({
 
   // Muting style: desaturate and reduce opacity for other jobs during drag
   // Also disable pointer events during drag so drops pass through to StationColumn
+  // But NOT for the tile being dragged itself (it needs to remain the drag source)
   const mutingStyle = isMuted
     ? { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const }
-    : isDragActive
+    : isDragActive && !isDragging
       ? { pointerEvents: 'none' as const }
       : undefined;
 
+  // Ghost placeholder shown at original position when tile is being dragged
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        className="absolute left-0 right-0 border-2 border-dashed border-zinc-600 bg-zinc-800/30 rounded"
+        style={{ top: `${top}px`, height: `${totalHeight}px` }}
+        data-testid={`tile-ghost-${assignment.id}`}
+      />
+    );
+  }
+
   return (
     <div
-      className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-pointer transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-grab touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{ top: `${top}px`, height: `${totalHeight}px`, ...selectedStyle, ...mutingStyle }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
