@@ -93,8 +93,18 @@ Uses Lucide circle icons instead of checkbox:
 ### Timeline View
 
 - **Width:** Column width minus padding
-- **Height:** Proportional to duration (setup + run)
+- **Height:** Based on **scheduled time span** (`scheduledEnd - scheduledStart`), not raw duration
 - **Minimum height:** Enough to display completion icon + reference
+
+**Downtime-aware height:**
+When a task spans non-operating periods (nights, weekends), the backend calculates an extended `scheduledEnd`. The tile height reflects this stretched duration, so users see accurate visual representation on the grid.
+
+```
+Example: 2-hour task starting at 17:00 (station closes at 18:00)
+- Raw duration: 2 hours = 120px (at 60px/hour)
+- Actual span: 17:00 → 09:00 next day = 16 hours = 960px
+- Setup/run sections scale proportionally within total height
+```
 
 ### Sequence View
 
@@ -169,8 +179,13 @@ Note: Single and double click are compatible — single click triggers immediate
 ### Selected State
 
 When a job is selected (via Jobs List or by clicking a tile on the grid):
-- All tiles belonging to that job get a subtle highlight/glow
+- All tiles belonging to that job display a **glow effect** (box-shadow based)
 - Off-screen indicators appear for tiles outside viewport
+
+**Glow specification:**
+- Effect: `box-shadow: 0 0 12px 4px rgba(color, 0.6)`
+- Color: Blue highlight or job color at 60% opacity
+- No animation (static glow)
 
 See [Tile States](../04-visual-feedback/tile-states.md) for details.
 

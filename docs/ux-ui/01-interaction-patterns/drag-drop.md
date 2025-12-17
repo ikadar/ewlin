@@ -29,6 +29,40 @@ Tiles are placed and repositioned via drag and drop. The system provides real-ti
 
 ---
 
+## Drop Position Calculation
+
+Drop position is calculated from the **tile's top edge**, not the cursor position.
+
+### How It Works
+
+1. On drag start, the system records the **grab offset** (where within the tile the user clicked)
+2. During drag, the cursor position is tracked
+3. On drop, the grab offset is subtracted to determine the tile's top position
+
+```
+Example: User grabs tile in the middle (50px from top)
+- Cursor drops at Y=300
+- Tile top position = 300 - 50 = 250
+- Time calculated from Y=250
+```
+
+### Rationale
+
+This prevents the tile from "jumping" on drop. If you grab a tile in the middle and drop it, the tile stays under your cursor as expected — the top edge doesn't snap to the cursor position.
+
+### Technical Notes
+
+```typescript
+// On drag start
+const grabOffsetY = e.clientY - tileRect.top;
+
+// On drop
+const tileTopY = cursorY - grabOffsetY;
+const dropTime = yPositionToTime(tileTopY);
+```
+
+---
+
 ## Real-Time Validation
 
 During drag, the system validates the proposed position in real-time.

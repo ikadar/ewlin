@@ -26,7 +26,13 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 
 ## Precedence Violation
 
-**When:** Task N is placed before Task N-1 completes (after Alt bypass)
+**When:** A scheduled predecessor task ends after the successor task starts.
+
+**Important:** Unscheduled predecessors do **not** create conflicts. This enables backward scheduling where users place the last task first and work backwards.
+
+**Conflict conditions:**
+1. Predecessor task IS scheduled, AND
+2. Predecessor's `scheduledEnd` > successor's `scheduledStart`
 
 **Visual:**
 - Red halo/glow effect around the tile
