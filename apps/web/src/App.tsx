@@ -464,6 +464,29 @@ function App() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
+  // Handle recall - remove assignment (double-click on tile)
+  const handleRecallAssignment = useCallback((assignmentId: string) => {
+    updateSnapshot((currentSnapshot) => {
+      const assignment = currentSnapshot.assignments.find((a) => a.id === assignmentId);
+      if (!assignment) {
+        console.warn('Assignment not found for recall:', assignmentId);
+        return currentSnapshot;
+      }
+
+      console.log('Recalling assignment:', {
+        assignmentId,
+        taskId: assignment.taskId,
+      });
+
+      // Remove the assignment
+      return {
+        ...currentSnapshot,
+        assignments: currentSnapshot.assignments.filter((a) => a.id !== assignmentId),
+      };
+    });
+    setSnapshotVersion((v) => v + 1);
+  }, []);
+
   // Quick Placement: get available task for hovered station
   const quickPlacementTask = useMemo(() => {
     if (!isQuickPlacementMode || !selectedJob || !quickPlacementHover.stationId) {
@@ -621,6 +644,7 @@ function App() {
           onSelectJob={setSelectedJobId}
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
+          onRecallAssignment={handleRecallAssignment}
           activeTask={activeTask}
           activeJob={activeJob}
           validationState={{
