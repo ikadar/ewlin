@@ -135,7 +135,7 @@ export function JobsList({
   };
 
   return (
-    <aside className="w-72 shrink-0 bg-zinc-900/30 flex flex-col border-r border-white/5">
+    <aside className="w-72 shrink-0 bg-zinc-900/30 flex flex-col border-r border-white/5" data-testid="jobs-list">
       <JobsListHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}

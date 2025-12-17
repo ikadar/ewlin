@@ -31,6 +31,7 @@ export interface JobCardProps {
  * Supports normal, late, conflict, and selected states.
  */
 export function JobCard({
+  id,
   reference,
   client,
   description,
@@ -74,6 +75,7 @@ export function JobCard({
       onClick={onClick}
       role="button"
       tabIndex={0}
+      data-testid={`job-card-${id}`}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
