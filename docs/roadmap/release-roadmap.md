@@ -563,10 +563,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Visual indicator for scheduled vs unscheduled tasks (cursor-pointer, hover state)
 - [x] Grid scroll integration with Job Details Panel
 
-#### v0.3.19 - Selection Glow Effect
-- [ ] Replace ring border with box-shadow glow for selected tiles
-- [ ] Glow effect: `box-shadow: 0 0 12px 4px rgba(color, 0.6)`
-- [ ] Works with all job colors
+#### v0.3.19 - Selection Glow Effect ✅
+- [x] Replace ring border with box-shadow glow for selected tiles
+- [x] Glow effect: `box-shadow: 0 0 12px 4px rgba(color, 0.6)`
+- [x] Works with all job colors
 
 #### v0.3.20 - Tile-Based Drop Position
 - [ ] Calculate drop position from tile top edge (not cursor)
