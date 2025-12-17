@@ -450,8 +450,8 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] **Task List** with two visual states:
   - Unscheduled: Full job color, border-l-4, draggable
   - Scheduled: Dark placeholder, station + datetime only
-- [ ] Single-click scheduled task → scroll grid to tile (deferred - requires grid)
-- [ ] Double-click scheduled task → recall (deferred - requires grid integration)
+- [x] Single-click scheduled task → scroll grid to tile (implemented in v0.3.18)
+- [x] Double-click scheduled task → recall (implemented in v0.3.18)
 
 #### v0.3.5 - Date Strip Component ✅
 - [x] Fixed width (w-12 / 48px)
@@ -557,11 +557,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3F: UX/UI Enhancements
 
-#### v0.3.18 - Job Details Task Interactions
-- [ ] Single-click scheduled task → scroll grid to tile position
-- [ ] Double-click scheduled task → recall (unschedule)
-- [ ] Visual indicator for scheduled vs unscheduled tasks
-- [ ] Grid scroll integration with Job Details Panel
+#### v0.3.18 - Job Details Task Interactions ✅
+- [x] Single-click scheduled task → scroll grid to tile position (X and Y)
+- [x] Double-click scheduled task → recall (unschedule)
+- [x] Visual indicator for scheduled vs unscheduled tasks (cursor-pointer, hover state)
+- [x] Grid scroll integration with Job Details Panel
 
 #### v0.3.19 - Selection Glow Effect
 - [ ] Replace ring border with box-shadow glow for selected tiles
