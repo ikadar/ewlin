@@ -37,10 +37,15 @@ const mockTask: InternalTask = {
 const mockAssignment: TaskAssignment = {
   id: 'assignment-1',
   taskId: 'task-1',
-  stationId: 'station-1',
-  sequence: 1,
-  startTime: '2025-12-15T09:00:00Z',
+  targetId: 'station-1',
+  isOutsourced: false,
+  // 90 minutes span (30 setup + 60 run) = 1.5 hours = 120px at 80px/hour
+  scheduledStart: '2025-12-15T09:00:00Z',
+  scheduledEnd: '2025-12-15T10:30:00Z',
   isCompleted: false,
+  completedAt: null,
+  createdAt: '2025-12-15T08:00:00Z',
+  updatedAt: '2025-12-15T08:00:00Z',
 };
 
 describe('colorUtils', () => {
@@ -308,12 +313,53 @@ describe('Tile', () => {
     expect(onSwapDown).toHaveBeenCalledWith('assignment-1');
   });
 
-  it('calculates correct height based on duration', () => {
+  it('calculates correct height based on scheduled time span', () => {
     render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    // 30 + 60 = 90 minutes = 1.5 hours = 120px (at 80px/hour)
+    // scheduledEnd - scheduledStart = 90 minutes = 1.5 hours = 120px (at 80px/hour)
     expect(tile).toHaveStyle({ height: '120px' });
+  });
+
+  it('calculates stretched height for overnight assignments (downtime-aware)', () => {
+    // Assignment that spans overnight: 17:00 to 09:00 next day = 16 hours
+    const stretchedAssignment: TaskAssignment = {
+      ...mockAssignment,
+      id: 'stretched-1',
+      scheduledStart: '2025-12-15T17:00:00Z',
+      scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
+    };
+
+    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+
+    const tile = screen.getByTestId('tile-stretched-1');
+    // 16 hours = 960 minutes = 1280px (at 80px/hour)
+    expect(tile).toHaveStyle({ height: '1280px' });
+  });
+
+  it('maintains setup/run ratio for stretched tiles', () => {
+    // Assignment that spans overnight: 17:00 to 09:00 next day = 16 hours
+    const stretchedAssignment: TaskAssignment = {
+      ...mockAssignment,
+      id: 'stretched-2',
+      scheduledStart: '2025-12-15T17:00:00Z',
+      scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
+    };
+
+    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+
+    const setupSection = screen.getByTestId('tile-setup-section');
+    const runSection = screen.getByTestId('tile-run-section');
+
+    // Original ratio: 30 setup / 90 total = 1/3
+    // Stretched total height: 1280px
+    // Setup height: 1280 * (30/90) = 426.67px ≈ 426.6666...px
+    // Run height: 1280 * (60/90) = 853.33px ≈ 853.3333...px
+    const setupHeight = parseFloat(setupSection.style.height);
+    const runHeight = parseFloat(runSection.style.height);
+
+    // Check ratio is maintained (setup should be 1/3 of total)
+    expect(setupHeight / (setupHeight + runHeight)).toBeCloseTo(30 / 90, 2);
   });
 
   it('positions at correct top position', () => {

@@ -245,6 +245,43 @@ export function generateConflicts(options: ConflictGeneratorOptions): ScheduleCo
 }
 
 // ============================================================================
+// Stretched Assignment Generator (for downtime-aware height testing)
+// ============================================================================
+
+/**
+ * Creates an assignment that spans overnight (stretched across non-operating period).
+ * This simulates a 2-hour task starting at 17:00 that continues at 07:00 next day.
+ * Used for testing downtime-aware tile height calculation.
+ */
+export function createStretchedAssignment(
+  task: Task,
+  baseDate: Date = new Date()
+): TaskAssignment | null {
+  if (!isInternalTask(task)) return null;
+
+  // Start at 17:00 today (simulating 1 hour before station closes at 18:00)
+  const scheduledStart = setTime(baseDate, 17, 0);
+
+  // End at 09:00 next day (1 hour work before close + 1 hour after next day open)
+  // This creates a 16-hour span for a 2-hour task
+  const scheduledEnd = setTime(new Date(baseDate), 9, 0);
+  scheduledEnd.setDate(scheduledEnd.getDate() + 1);
+
+  return {
+    id: `assign-stretched-${task.id}`,
+    taskId: task.id,
+    targetId: task.stationId,
+    isOutsourced: false,
+    scheduledStart: formatTimestamp(scheduledStart),
+    scheduledEnd: formatTimestamp(scheduledEnd),
+    isCompleted: false,
+    completedAt: null,
+    createdAt: formatTimestamp(baseDate),
+    updatedAt: formatTimestamp(baseDate),
+  };
+}
+
+// ============================================================================
 // Combined Generator
 // ============================================================================
 

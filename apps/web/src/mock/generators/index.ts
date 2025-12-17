@@ -25,5 +25,6 @@ export {
   generateAssignments,
   generateConflicts,
   generateAllAssignmentData,
+  createStretchedAssignment,
   type AssignmentData,
 } from './assignments';

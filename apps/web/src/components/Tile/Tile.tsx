@@ -62,12 +62,20 @@ export function Tile({
   activeJobId,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
-  const totalMinutes = setupMinutes + runMinutes;
+  const originalTotalMinutes = setupMinutes + runMinutes;
 
-  // Calculate heights
-  const setupHeight = minutesToPixels(setupMinutes);
-  const runHeight = minutesToPixels(runMinutes);
-  const totalHeight = minutesToPixels(totalMinutes);
+  // Calculate total height from scheduled time span (downtime-aware)
+  // This reflects actual time on grid, including stretching across non-operating periods
+  const startTime = new Date(assignment.scheduledStart);
+  const endTime = new Date(assignment.scheduledEnd);
+  const spanMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+  const totalHeight = minutesToPixels(spanMinutes);
+
+  // Calculate setup/run heights proportionally based on original duration ratio
+  // This maintains visual distinction even when tile is stretched
+  const setupRatio = originalTotalMinutes > 0 ? setupMinutes / originalTotalMinutes : 0;
+  const setupHeight = totalHeight * setupRatio;
+  const runHeight = totalHeight * (1 - setupRatio);
 
   // Get color classes
   const colorClasses = getJobColorClasses(job.color);
