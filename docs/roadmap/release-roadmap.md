@@ -596,11 +596,11 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Visual representation of time-stretched tasks
 - [x] Setup/run sections scale proportionally
 
-#### v0.3.24 - No Conflict for Unscheduled Predecessors (Validator)
-- [ ] Update `@flux/schedule-validator` precedence logic
-- [ ] Unscheduled predecessors don't create conflicts
-- [ ] Enables backward scheduling workflow
-- [ ] Update validator tests
+#### v0.3.24 - No Conflict for Unscheduled Predecessors (Validator) ✅
+- [x] Update `@flux/schedule-validator` precedence logic
+- [x] Unscheduled predecessors don't create conflicts
+- [x] Enables backward scheduling workflow
+- [x] Update validator tests
 
 #### v0.3.25 - Grid Tile Repositioning
 - [ ] Drag scheduled tiles within same station column
