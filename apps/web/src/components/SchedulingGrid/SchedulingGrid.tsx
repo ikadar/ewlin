@@ -86,6 +86,10 @@ export interface SchedulingGridProps {
   onQuickPlacementMouseLeave?: () => void;
   /** Callback when user clicks to place a task in quick placement mode */
   onQuickPlacementClick?: (stationId: string, y: number) => void;
+  /** Station ID currently being compacted (for loading state) */
+  compactingStationId?: string | null;
+  /** Callback when compact button is clicked */
+  onCompact?: (stationId: string) => void;
 }
 
 /**
@@ -117,6 +121,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onQuickPlacementMouseMove,
       onQuickPlacementMouseLeave,
       onQuickPlacementClick,
+      compactingStationId,
+      onCompact,
     },
     ref
   ) {
@@ -239,11 +245,19 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const targetStationId =
                 activeTask?.type === 'Internal' ? activeTask.stationId : null;
               const isCollapsed = targetStationId !== null && targetStationId !== station.id;
+              // Check if station has tiles
+              const stationAssignments = assignmentsByStation.get(station.id) || [];
+              const hasTiles = stationAssignments.length > 0;
+              // Check if this station is being compacted
+              const isCompacting = compactingStationId === station.id;
               return (
                 <StationHeader
                   key={station.id}
                   station={station}
                   isCollapsed={isCollapsed}
+                  hasTiles={hasTiles}
+                  isCompacting={isCompacting}
+                  onCompact={onCompact}
                 />
               );
             })}

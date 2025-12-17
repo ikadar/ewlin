@@ -66,6 +66,9 @@ function App() {
     snappedY: number;
   }>({ stationId: null, y: 0, snappedY: 0 });
 
+  // Compact station loading state
+  const [compactingStationId, setCompactingStationId] = useState<string | null>(null);
+
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
 
@@ -694,6 +697,63 @@ function App() {
     return stationIds;
   }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.assignments]);
 
+  // Handle station compact - call API to remove gaps between tiles
+  const handleCompact = useCallback(async (stationId: string) => {
+    setCompactingStationId(stationId);
+    try {
+      const response = await fetch(`/api/v1/stations/${stationId}/compact`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to compact station:', errorData);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Update snapshot with the compacted assignments
+      updateSnapshot((currentSnapshot) => {
+        // Create a map of updated assignments by task ID
+        const updatedMap = new Map<string, { taskId: string; targetId: string; scheduledStart: string; scheduledEnd: string }>();
+        data.assignments.forEach((a: { taskId: string; targetId: string; scheduledStart: string; scheduledEnd: string }) => {
+          updatedMap.set(a.taskId, a);
+        });
+
+        // Update existing assignments with new times
+        const newAssignments = currentSnapshot.assignments.map((assignment) => {
+          const updated = updatedMap.get(assignment.taskId);
+          if (updated && assignment.targetId === updated.targetId) {
+            return {
+              ...assignment,
+              scheduledStart: updated.scheduledStart,
+              scheduledEnd: updated.scheduledEnd,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return assignment;
+        });
+
+        return {
+          ...currentSnapshot,
+          assignments: newAssignments,
+        };
+      });
+
+      setSnapshotVersion((v) => v + 1);
+
+      console.log('Station compacted:', {
+        stationId,
+        compactedCount: data.compactedCount,
+      });
+    } catch (error) {
+      console.error('Error compacting station:', error);
+    } finally {
+      setCompactingStationId(null);
+    }
+  }, []);
+
   return (
     <DndContext
       sensors={sensors}
@@ -758,6 +818,8 @@ function App() {
           onQuickPlacementMouseMove={handleQuickPlacementMouseMove}
           onQuickPlacementMouseLeave={handleQuickPlacementMouseLeave}
           onQuickPlacementClick={handleQuickPlacementClick}
+          compactingStationId={compactingStationId}
+          onCompact={handleCompact}
         />
       </div>
 
