@@ -808,6 +808,9 @@ function App() {
         // Build task map for predecessor lookup
         const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
 
+        // Get the station for end time calculation
+        const station = currentSnapshot.stations.find((s) => s.id === stationId);
+
         // Build a map to track updated end times (for precedence within same compact)
         const updatedEndTimes = new Map<string, Date>();
 
@@ -817,7 +820,6 @@ function App() {
 
         stationAssignments.forEach((assignment) => {
           const task = taskMap.get(assignment.taskId);
-          const duration = new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime();
 
           // Find predecessor constraint
           let earliestStart = nextStartTime;
@@ -852,11 +854,14 @@ function App() {
           }
 
           const newStart = earliestStart.toISOString();
-          const newEnd = new Date(earliestStart.getTime() + duration).toISOString();
+          // Use calculateEndTime for proper stretching across non-operating periods
+          const newEnd = task && task.type === 'Internal'
+            ? calculateEndTime(task, newStart, station)
+            : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
 
           updatedAssignments.set(assignment.id, { scheduledStart: newStart, scheduledEnd: newEnd });
-          updatedEndTimes.set(assignment.taskId, new Date(earliestStart.getTime() + duration));
-          nextStartTime = new Date(earliestStart.getTime() + duration);
+          updatedEndTimes.set(assignment.taskId, new Date(newEnd));
+          nextStartTime = new Date(newEnd);
         });
 
         // Apply updates to all assignments
