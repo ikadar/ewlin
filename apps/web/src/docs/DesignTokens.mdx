@@ -1,6 +1,6 @@
 {/* Design Tokens Documentation */}
 
-import { Meta, ColorPalette, ColorItem } from '@storybook/blocks';
+import { Meta } from '@storybook/addon-docs';
 
 <Meta title="Design System/Design Tokens" />
 
@@ -12,145 +12,45 @@ This page documents the design tokens used in the Flux Scheduling UI.
 
 Jobs are assigned colors from a predefined palette of 17 colors.
 
-<ColorPalette>
-  <ColorItem
-    title="Purple"
-    subtitle="#A855F7"
-    colors={{ Purple: '#A855F7' }}
-  />
-  <ColorItem
-    title="Violet"
-    subtitle="#8B5CF6"
-    colors={{ Violet: '#8B5CF6' }}
-  />
-  <ColorItem
-    title="Blue"
-    subtitle="#3B82F6"
-    colors={{ Blue: '#3B82F6' }}
-  />
-  <ColorItem
-    title="Indigo"
-    subtitle="#6366F1"
-    colors={{ Indigo: '#6366F1' }}
-  />
-  <ColorItem
-    title="Sky"
-    subtitle="#0EA5E9"
-    colors={{ Sky: '#0EA5E9' }}
-  />
-  <ColorItem
-    title="Cyan"
-    subtitle="#06B6D4"
-    colors={{ Cyan: '#06B6D4' }}
-  />
-  <ColorItem
-    title="Teal"
-    subtitle="#14B8A6"
-    colors={{ Teal: '#14B8A6' }}
-  />
-  <ColorItem
-    title="Emerald"
-    subtitle="#10B981"
-    colors={{ Emerald: '#10B981' }}
-  />
-  <ColorItem
-    title="Green"
-    subtitle="#22C55E"
-    colors={{ Green: '#22C55E' }}
-  />
-  <ColorItem
-    title="Lime"
-    subtitle="#84CC16"
-    colors={{ Lime: '#84CC16' }}
-  />
-  <ColorItem
-    title="Yellow"
-    subtitle="#EAB308"
-    colors={{ Yellow: '#EAB308' }}
-  />
-  <ColorItem
-    title="Amber"
-    subtitle="#F59E0B"
-    colors={{ Amber: '#F59E0B' }}
-  />
-  <ColorItem
-    title="Orange"
-    subtitle="#F97316"
-    colors={{ Orange: '#F97316' }}
-  />
-  <ColorItem
-    title="Red"
-    subtitle="#EF4444"
-    colors={{ Red: '#EF4444' }}
-  />
-  <ColorItem
-    title="Rose"
-    subtitle="#F43F5E"
-    colors={{ Rose: '#F43F5E' }}
-  />
-  <ColorItem
-    title="Pink"
-    subtitle="#EC4899"
-    colors={{ Pink: '#EC4899' }}
-  />
-  <ColorItem
-    title="Fuchsia"
-    subtitle="#D946EF"
-    colors={{ Fuchsia: '#D946EF' }}
-  />
-</ColorPalette>
+| Color | Hex | Preview |
+|-------|-----|---------|
+| Purple | `#A855F7` | <span style={{background: '#A855F7', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Violet | `#8B5CF6` | <span style={{background: '#8B5CF6', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Blue | `#3B82F6` | <span style={{background: '#3B82F6', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Indigo | `#6366F1` | <span style={{background: '#6366F1', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Sky | `#0EA5E9` | <span style={{background: '#0EA5E9', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Cyan | `#06B6D4` | <span style={{background: '#06B6D4', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Teal | `#14B8A6` | <span style={{background: '#14B8A6', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Emerald | `#10B981` | <span style={{background: '#10B981', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Green | `#22C55E` | <span style={{background: '#22C55E', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Lime | `#84CC16` | <span style={{background: '#84CC16', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Yellow | `#EAB308` | <span style={{background: '#EAB308', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Amber | `#F59E0B` | <span style={{background: '#F59E0B', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Orange | `#F97316` | <span style={{background: '#F97316', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Red | `#EF4444` | <span style={{background: '#EF4444', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Rose | `#F43F5E` | <span style={{background: '#F43F5E', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Pink | `#EC4899` | <span style={{background: '#EC4899', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
+| Fuchsia | `#D946EF` | <span style={{background: '#D946EF', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> |
 
 ## Validation Feedback Colors
 
 Visual feedback during drag operations:
 
-<ColorPalette>
-  <ColorItem
-    title="Valid Drop"
-    subtitle="Green ring - drop is allowed"
-    colors={{ Ring: '#22C55E', Background: 'rgba(34, 197, 94, 0.1)' }}
-  />
-  <ColorItem
-    title="Invalid Drop"
-    subtitle="Red ring - drop is blocked"
-    colors={{ Ring: '#EF4444', Background: 'rgba(239, 68, 68, 0.1)' }}
-  />
-  <ColorItem
-    title="Warning Drop"
-    subtitle="Orange ring - soft constraint (e.g., Plates pending)"
-    colors={{ Ring: '#F97316', Background: 'rgba(249, 115, 22, 0.1)' }}
-  />
-  <ColorItem
-    title="Bypass Warning"
-    subtitle="Amber ring - Alt+drop precedence bypass"
-    colors={{ Ring: '#F59E0B', Background: 'rgba(245, 158, 11, 0.1)' }}
-  />
-</ColorPalette>
+| State | Color | Usage |
+|-------|-------|-------|
+| Valid | <span style={{background: '#22C55E', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> `#22C55E` | Drop is allowed |
+| Invalid | <span style={{background: '#EF4444', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> `#EF4444` | Drop is blocked |
+| Warning | <span style={{background: '#F97316', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> `#F97316` | Soft constraint (Plates pending) |
+| Bypass | <span style={{background: '#F59E0B', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> `#F59E0B` | Alt+drop precedence bypass |
 
 ## UI Colors
 
-<ColorPalette>
-  <ColorItem
-    title="Background"
-    subtitle="Main application background"
-    colors={{ Dark: 'hsl(222.2 84% 4.9%)' }}
-  />
-  <ColorItem
-    title="Now Line"
-    subtitle="Current time indicator"
-    colors={{ Red: '#EF4444' }}
-  />
-  <ColorItem
-    title="Departure Line"
-    subtitle="Job departure date indicator"
-    colors={{ Blue: '#3B82F6' }}
-  />
-  <ColorItem
-    title="Placement Indicator"
-    subtitle="Quick placement mode cursor"
-    colors={{ White: '#FFFFFF' }}
-  />
-</ColorPalette>
+| Element | Color | Usage |
+|---------|-------|-------|
+| Background | `hsl(222.2 84% 4.9%)` | Main app background |
+| Now Line | <span style={{background: '#EF4444', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> `#EF4444` | Current time indicator |
+| Departure Line | <span style={{background: '#3B82F6', padding: '2px 12px', borderRadius: '4px'}}>&nbsp;</span> `#3B82F6` | Job departure date |
+| Placement Indicator | `#FFFFFF` | Quick placement cursor |
 
 ## Layout Dimensions
 
