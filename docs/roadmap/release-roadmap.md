@@ -615,6 +615,8 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Reschedule validation bypass (isRescheduleDrag)
 - [x] Validator package rebuild (v0.3.24 changes)
 - [x] Mock data fixes (group capacity, BAT approval)
+- [x] Local compact implementation (mock mode)
+- [x] Disable column collapse during reschedule
 
 ### Phase 3I: Backend API Integration
 

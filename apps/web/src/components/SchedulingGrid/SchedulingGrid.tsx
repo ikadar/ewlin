@@ -90,6 +90,8 @@ export interface SchedulingGridProps {
   compactingStationId?: string | null;
   /** Callback when compact button is clicked */
   onCompact?: (stationId: string) => void;
+  /** Whether current drag is a reschedule (existing tile) - disables column collapse */
+  isRescheduleDrag?: boolean;
 }
 
 /**
@@ -123,6 +125,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onQuickPlacementClick,
       compactingStationId,
       onCompact,
+      isRescheduleDrag = false,
     },
     ref
   ) {
@@ -242,9 +245,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           <div className="flex gap-3 px-3 border-b border-white/10">
             {stations.map((station) => {
               // Determine if this header should be collapsed during drag
+              // Don't collapse during reschedule (existing tile repositioning)
               const targetStationId =
                 activeTask?.type === 'Internal' ? activeTask.stationId : null;
-              const isCollapsed = targetStationId !== null && targetStationId !== station.id;
+              const isCollapsed = !isRescheduleDrag && targetStationId !== null && targetStationId !== station.id;
               // Check if station has tiles
               const stationAssignments = assignmentsByStation.get(station.id) || [];
               const hasTiles = stationAssignments.length > 0;
@@ -302,9 +306,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
               // Determine if this column should be collapsed during drag
               // Target station stays full width, others collapse
+              // Don't collapse during reschedule (existing tile repositioning)
               const targetStationId =
                 activeTask?.type === 'Internal' ? activeTask.stationId : null;
-              const isCollapsed = targetStationId !== null && targetStationId !== station.id;
+              const isCollapsed = !isRescheduleDrag && targetStationId !== null && targetStationId !== station.id;
 
               // Determine validation visual state for this column
               const isValidationTarget = validationState?.targetStationId === station.id;

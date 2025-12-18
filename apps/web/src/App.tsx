@@ -782,34 +782,39 @@ function App() {
     return stationIds;
   }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.assignments]);
 
-  // Handle station compact - call API to remove gaps between tiles
-  const handleCompact = useCallback(async (stationId: string) => {
+  // Handle station compact - remove gaps between tiles (mock implementation)
+  const handleCompact = useCallback((stationId: string) => {
     setCompactingStationId(stationId);
-    try {
-      const response = await fetch(`/api/v1/stations/${stationId}/compact`, {
-        method: 'POST',
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Failed to compact station:', errorData);
-        return;
-      }
-
-      const data = await response.json();
-
-      // Update snapshot with the compacted assignments
+    // Simulate async operation for UI feedback
+    setTimeout(() => {
       updateSnapshot((currentSnapshot) => {
-        // Create a map of updated assignments by task ID
-        const updatedMap = new Map<string, { taskId: string; targetId: string; scheduledStart: string; scheduledEnd: string }>();
-        data.assignments.forEach((a: { taskId: string; targetId: string; scheduledStart: string; scheduledEnd: string }) => {
-          updatedMap.set(a.taskId, a);
+        // Get assignments for this station, sorted by start time
+        const stationAssignments = currentSnapshot.assignments
+          .filter((a) => a.targetId === stationId && !a.isOutsourced)
+          .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
+
+        if (stationAssignments.length === 0) {
+          return currentSnapshot;
+        }
+
+        // Start compacting from the first tile's position
+        let nextStartTime = new Date(stationAssignments[0].scheduledStart);
+        const updatedAssignments = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
+
+        stationAssignments.forEach((assignment) => {
+          const duration = new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime();
+          const newStart = nextStartTime.toISOString();
+          const newEnd = new Date(nextStartTime.getTime() + duration).toISOString();
+
+          updatedAssignments.set(assignment.id, { scheduledStart: newStart, scheduledEnd: newEnd });
+          nextStartTime = new Date(nextStartTime.getTime() + duration);
         });
 
-        // Update existing assignments with new times
+        // Apply updates to all assignments
         const newAssignments = currentSnapshot.assignments.map((assignment) => {
-          const updated = updatedMap.get(assignment.taskId);
-          if (updated && assignment.targetId === updated.targetId) {
+          const updated = updatedAssignments.get(assignment.id);
+          if (updated) {
             return {
               ...assignment,
               scheduledStart: updated.scheduledStart,
@@ -820,6 +825,11 @@ function App() {
           return assignment;
         });
 
+        console.log('Station compacted:', {
+          stationId,
+          compactedCount: updatedAssignments.size,
+        });
+
         return {
           ...currentSnapshot,
           assignments: newAssignments,
@@ -827,16 +837,8 @@ function App() {
       });
 
       setSnapshotVersion((v) => v + 1);
-
-      console.log('Station compacted:', {
-        stationId,
-        compactedCount: data.compactedCount,
-      });
-    } catch (error) {
-      console.error('Error compacting station:', error);
-    } finally {
       setCompactingStationId(null);
-    }
+    }, 300); // Small delay for visual feedback
   }, []);
 
   return (
@@ -914,6 +916,7 @@ function App() {
           onQuickPlacementClick={handleQuickPlacementClick}
           compactingStationId={compactingStationId}
           onCompact={handleCompact}
+          isRescheduleDrag={isRescheduleDrag}
         />
       </div>
 
