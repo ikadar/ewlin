@@ -1,10 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, type RenderOptions } from '@testing-library/react';
+import { type ReactElement } from 'react';
 import { Tile } from './Tile';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { hexToTailwindColor, getColorClasses, getJobColorClasses } from './colorUtils';
+import { DragStateProvider } from '../../dnd';
 import type { TaskAssignment, InternalTask, Job } from '@flux/types';
+
+// Custom render that wraps components in DragStateProvider
+function renderWithDragContext(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
+  return render(ui, {
+    wrapper: ({ children }) => <DragStateProvider>{children}</DragStateProvider>,
+    ...options,
+  });
+}
 
 // Mock data
 const mockJob: Job = {
@@ -195,19 +205,19 @@ describe('Tile', () => {
   };
 
   it('renders with correct testId', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     expect(screen.getByTestId('tile-assignment-1')).toBeInTheDocument();
   });
 
   it('displays job reference and client', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     expect(screen.getByTestId('tile-content')).toHaveTextContent('12345 · Autosphere');
   });
 
   it('renders setup section when task has setup time', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     expect(screen.getByTestId('tile-setup-section')).toBeInTheDocument();
     expect(screen.getByTestId('tile-run-section')).toBeInTheDocument();
@@ -219,14 +229,14 @@ describe('Tile', () => {
       duration: { setupMinutes: 0, runMinutes: 60 },
     };
 
-    render(<Tile {...defaultProps} task={taskNoSetup} />);
+    renderWithDragContext(<Tile {...defaultProps} task={taskNoSetup} />);
 
     expect(screen.queryByTestId('tile-setup-section')).not.toBeInTheDocument();
     expect(screen.getByTestId('tile-run-section')).toBeInTheDocument();
   });
 
   it('shows incomplete icon when not completed', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     expect(screen.getByTestId('tile-incomplete-icon')).toBeInTheDocument();
     expect(screen.queryByTestId('tile-completed-icon')).not.toBeInTheDocument();
@@ -238,14 +248,14 @@ describe('Tile', () => {
       isCompleted: true,
     };
 
-    render(<Tile {...defaultProps} assignment={completedAssignment} />);
+    renderWithDragContext(<Tile {...defaultProps} assignment={completedAssignment} />);
 
     expect(screen.getByTestId('tile-completed-icon')).toBeInTheDocument();
     expect(screen.queryByTestId('tile-incomplete-icon')).not.toBeInTheDocument();
   });
 
   it('applies selection styling when selected', () => {
-    render(<Tile {...defaultProps} isSelected={true} />);
+    renderWithDragContext(<Tile {...defaultProps} isSelected={true} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     // Selection now uses box-shadow glow effect with job color at 60% opacity
@@ -253,7 +263,7 @@ describe('Tile', () => {
   });
 
   it('does not apply selection styling when not selected', () => {
-    render(<Tile {...defaultProps} isSelected={false} />);
+    renderWithDragContext(<Tile {...defaultProps} isSelected={false} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     // No box-shadow glow when not selected
@@ -262,7 +272,7 @@ describe('Tile', () => {
 
   it('calls onSelect with job id when clicked', () => {
     const onSelect = vi.fn();
-    render(<Tile {...defaultProps} onSelect={onSelect} />);
+    renderWithDragContext(<Tile {...defaultProps} onSelect={onSelect} />);
 
     fireEvent.click(screen.getByTestId('tile-assignment-1'));
     expect(onSelect).toHaveBeenCalledWith('job-1');
@@ -270,28 +280,28 @@ describe('Tile', () => {
 
   it('calls onRecall with assignment id when double-clicked', () => {
     const onRecall = vi.fn();
-    render(<Tile {...defaultProps} onRecall={onRecall} />);
+    renderWithDragContext(<Tile {...defaultProps} onRecall={onRecall} />);
 
     fireEvent.doubleClick(screen.getByTestId('tile-assignment-1'));
     expect(onRecall).toHaveBeenCalledWith('assignment-1');
   });
 
   it('shows swap buttons on hover (via group class)', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     // Swap buttons should be rendered (visibility controlled by CSS)
     expect(screen.getByTestId('swap-buttons')).toBeInTheDocument();
   });
 
   it('hides swap up button when showSwapUp is false', () => {
-    render(<Tile {...defaultProps} showSwapUp={false} />);
+    renderWithDragContext(<Tile {...defaultProps} showSwapUp={false} />);
 
     expect(screen.queryByTestId('swap-up-button')).not.toBeInTheDocument();
     expect(screen.getByTestId('swap-down-button')).toBeInTheDocument();
   });
 
   it('hides swap down button when showSwapDown is false', () => {
-    render(<Tile {...defaultProps} showSwapDown={false} />);
+    renderWithDragContext(<Tile {...defaultProps} showSwapDown={false} />);
 
     expect(screen.getByTestId('swap-up-button')).toBeInTheDocument();
     expect(screen.queryByTestId('swap-down-button')).not.toBeInTheDocument();
@@ -299,7 +309,7 @@ describe('Tile', () => {
 
   it('calls onSwapUp with assignment id when swap up is clicked', () => {
     const onSwapUp = vi.fn();
-    render(<Tile {...defaultProps} onSwapUp={onSwapUp} />);
+    renderWithDragContext(<Tile {...defaultProps} onSwapUp={onSwapUp} />);
 
     fireEvent.click(screen.getByTestId('swap-up-button'));
     expect(onSwapUp).toHaveBeenCalledWith('assignment-1');
@@ -307,14 +317,14 @@ describe('Tile', () => {
 
   it('calls onSwapDown with assignment id when swap down is clicked', () => {
     const onSwapDown = vi.fn();
-    render(<Tile {...defaultProps} onSwapDown={onSwapDown} />);
+    renderWithDragContext(<Tile {...defaultProps} onSwapDown={onSwapDown} />);
 
     fireEvent.click(screen.getByTestId('swap-down-button'));
     expect(onSwapDown).toHaveBeenCalledWith('assignment-1');
   });
 
   it('calculates correct height based on scheduled time span', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     // scheduledEnd - scheduledStart = 90 minutes = 1.5 hours = 120px (at 80px/hour)
@@ -330,7 +340,7 @@ describe('Tile', () => {
       scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
     };
 
-    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+    renderWithDragContext(<Tile {...defaultProps} assignment={stretchedAssignment} />);
 
     const tile = screen.getByTestId('tile-stretched-1');
     // 16 hours = 960 minutes = 1280px (at 80px/hour)
@@ -346,7 +356,7 @@ describe('Tile', () => {
       scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
     };
 
-    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+    renderWithDragContext(<Tile {...defaultProps} assignment={stretchedAssignment} />);
 
     const setupSection = screen.getByTestId('tile-setup-section');
     const runSection = screen.getByTestId('tile-run-section');
@@ -363,14 +373,14 @@ describe('Tile', () => {
   });
 
   it('positions at correct top position', () => {
-    render(<Tile {...defaultProps} top={200} />);
+    renderWithDragContext(<Tile {...defaultProps} top={200} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     expect(tile).toHaveStyle({ top: '200px' });
   });
 
   it('applies job color to border', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     expect(tile).toHaveClass('border-l-purple-500');
@@ -378,7 +388,7 @@ describe('Tile', () => {
 
   it('handles keyboard Enter for selection', () => {
     const onSelect = vi.fn();
-    render(<Tile {...defaultProps} onSelect={onSelect} />);
+    renderWithDragContext(<Tile {...defaultProps} onSelect={onSelect} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     fireEvent.keyDown(tile, { key: 'Enter' });
@@ -386,7 +396,7 @@ describe('Tile', () => {
   });
 
   it('has correct accessibility attributes', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     expect(tile).toHaveAttribute('role', 'button');
@@ -399,34 +409,34 @@ describe('Tile', () => {
       { criterion: { id: 'crit-2', name: 'Same client', fieldPath: 'client' }, isMatched: false },
     ];
 
-    render(<Tile {...defaultProps} similarityResults={similarityResults} />);
+    renderWithDragContext(<Tile {...defaultProps} similarityResults={similarityResults} />);
 
     expect(screen.getByTestId('similarity-indicators')).toBeInTheDocument();
     expect(screen.getAllByTestId(/similarity-icon-/)).toHaveLength(2);
   });
 
   it('does not render similarity indicators when not provided', () => {
-    render(<Tile {...defaultProps} />);
+    renderWithDragContext(<Tile {...defaultProps} />);
 
     expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
   });
 
   it('does not render similarity indicators when empty array', () => {
-    render(<Tile {...defaultProps} similarityResults={[]} />);
+    renderWithDragContext(<Tile {...defaultProps} similarityResults={[]} />);
 
     expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
   });
 
   describe('muting during drag', () => {
     it('has muted styles when activeJobId differs from job.id', () => {
-      render(<Tile {...defaultProps} activeJobId="other-job" />);
+      renderWithDragContext(<Tile {...defaultProps} activeJobId="other-job" />);
 
       const tile = screen.getByTestId('tile-assignment-1');
       expect(tile).toHaveStyle({ filter: 'saturate(0.2)', opacity: '0.6' });
     });
 
     it('has normal styles when activeJobId matches job.id', () => {
-      render(<Tile {...defaultProps} activeJobId="job-1" />);
+      renderWithDragContext(<Tile {...defaultProps} activeJobId="job-1" />);
 
       const tile = screen.getByTestId('tile-assignment-1');
       expect(tile).not.toHaveStyle({ filter: 'saturate(0.2)' });
@@ -434,7 +444,7 @@ describe('Tile', () => {
     });
 
     it('has normal styles when activeJobId is undefined (no drag)', () => {
-      render(<Tile {...defaultProps} />);
+      renderWithDragContext(<Tile {...defaultProps} />);
 
       const tile = screen.getByTestId('tile-assignment-1');
       expect(tile).not.toHaveStyle({ filter: 'saturate(0.2)' });
@@ -442,7 +452,7 @@ describe('Tile', () => {
     });
 
     it('has transition classes for smooth muting animation', () => {
-      render(<Tile {...defaultProps} />);
+      renderWithDragContext(<Tile {...defaultProps} />);
 
       const tile = screen.getByTestId('tile-assignment-1');
       // Also includes box-shadow for selection glow transition

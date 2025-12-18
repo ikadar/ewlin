@@ -14,9 +14,177 @@ import {
   type StationDropData,
   type DragValidationState,
 } from './dnd';
-import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict } from '@flux/types';
+import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict, ScheduleSnapshot, Station } from '@flux/types';
 
 const START_HOUR = 6;
+
+// ============================================================================
+// Helper functions extracted to reduce nesting depth (SonarQube S2004)
+// ============================================================================
+
+/**
+ * Process a drop operation and return the updated snapshot.
+ * Extracted from onDrop to reduce function nesting.
+ */
+function processDropAssignment(
+  currentSnapshot: ScheduleSnapshot,
+  task: InternalTask,
+  stationId: string,
+  scheduledStart: string,
+  scheduledEnd: string,
+  isRescheduleOp: boolean,
+  assignmentId: string | undefined,
+  bypassedPrecedence: boolean
+): ScheduleSnapshot {
+  let assignmentsWithoutCurrent = currentSnapshot.assignments;
+  let existingAssignment: TaskAssignment | undefined;
+
+  if (isRescheduleOp && assignmentId) {
+    existingAssignment = currentSnapshot.assignments.find((a) => a.id === assignmentId);
+    assignmentsWithoutCurrent = currentSnapshot.assignments.filter((a) => a.id !== assignmentId);
+  }
+
+  const { updatedAssignments, shiftedIds } = applyPushDown(
+    assignmentsWithoutCurrent,
+    stationId,
+    scheduledStart,
+    scheduledEnd,
+    task.id
+  );
+
+  if (shiftedIds.length > 0) {
+    console.log('Push-down applied:', shiftedIds);
+  }
+
+  const finalAssignment: TaskAssignment = isRescheduleOp && existingAssignment
+    ? { ...existingAssignment, scheduledStart, scheduledEnd, updatedAt: new Date().toISOString() }
+    : {
+        id: generateId(),
+        taskId: task.id,
+        targetId: stationId,
+        isOutsourced: false,
+        scheduledStart,
+        scheduledEnd,
+        isCompleted: false,
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+  let newConflicts = [...currentSnapshot.conflicts];
+  if (bypassedPrecedence) {
+    newConflicts.push({
+      type: 'PrecedenceConflict',
+      message: 'Task placed before predecessor completes (Alt-key bypass)',
+      taskId: task.id,
+      targetId: stationId,
+      details: { bypassedByUser: true },
+    });
+  }
+
+  return {
+    ...currentSnapshot,
+    assignments: [...updatedAssignments, finalAssignment],
+    conflicts: newConflicts,
+  };
+}
+
+/**
+ * Compact station assignments by removing gaps.
+ * Extracted from handleCompact to reduce function nesting.
+ */
+function compactStationAssignments(
+  currentSnapshot: ScheduleSnapshot,
+  stationId: string,
+  calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
+): ScheduleSnapshot {
+  // Get assignments for this station, sorted by start time
+  const stationAssignments = currentSnapshot.assignments
+    .filter((a) => a.targetId === stationId && !a.isOutsourced)
+    .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
+
+  if (stationAssignments.length === 0) {
+    return currentSnapshot;
+  }
+
+  // Build task map for predecessor lookup
+  const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
+
+  // Get the station for end time calculation
+  const station = currentSnapshot.stations.find((s) => s.id === stationId);
+
+  // Build a map to track updated end times (for precedence within same compact)
+  const updatedEndTimes = new Map<string, Date>();
+
+  // Start compacting from the first tile's position
+  let nextStartTime = new Date(stationAssignments[0].scheduledStart);
+  const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
+
+  for (const assignment of stationAssignments) {
+    const task = taskMap.get(assignment.taskId);
+    let earliestStart = nextStartTime;
+
+    if (task) {
+      // Find predecessor task (previous task in same job by sequenceOrder)
+      const jobTasks = currentSnapshot.tasks
+        .filter((t) => t.jobId === task.jobId)
+        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
+
+      if (taskIndex > 0) {
+        const predecessorTask = jobTasks[taskIndex - 1];
+        const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
+
+        if (updatedPredecessorEnd && updatedPredecessorEnd > earliestStart) {
+          earliestStart = updatedPredecessorEnd;
+        } else {
+          const predecessorAssignment = currentSnapshot.assignments.find(
+            (a) => a.taskId === predecessorTask.id
+          );
+          if (predecessorAssignment) {
+            const predecessorEnd = new Date(predecessorAssignment.scheduledEnd);
+            if (predecessorEnd > earliestStart) {
+              earliestStart = predecessorEnd;
+            }
+          }
+        }
+      }
+    }
+
+    const newStart = earliestStart.toISOString();
+    const newEnd = task && task.type === 'Internal'
+      ? calculateEndTimeFn(task, newStart, station)
+      : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
+
+    updatedAssignmentsMap.set(assignment.id, { scheduledStart: newStart, scheduledEnd: newEnd });
+    updatedEndTimes.set(assignment.taskId, new Date(newEnd));
+    nextStartTime = new Date(newEnd);
+  }
+
+  // Apply updates to all assignments
+  const newAssignments = currentSnapshot.assignments.map((assignment) => {
+    const updated = updatedAssignmentsMap.get(assignment.id);
+    if (updated) {
+      return {
+        ...assignment,
+        scheduledStart: updated.scheduledStart,
+        scheduledEnd: updated.scheduledEnd,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return assignment;
+  });
+
+  console.log('Station compacted:', {
+    stationId,
+    compactedCount: updatedAssignmentsMap.size,
+  });
+
+  return {
+    ...currentSnapshot,
+    assignments: newAssignments,
+  };
+}
 
 // Inner App component that uses drag state context
 function AppContent() {
@@ -414,64 +582,17 @@ function AppContent() {
         const scheduledEnd = calculateEndTime(task, scheduledStart, station);
         const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
 
-        // Update snapshot
-        updateSnapshot((currentSnapshot) => {
-          let assignmentsWithoutCurrent = currentSnapshot.assignments;
-          let existingAssignment: TaskAssignment | undefined;
-
-          if (isRescheduleOp && dragData.assignmentId) {
-            existingAssignment = currentSnapshot.assignments.find(
-              (a) => a.id === dragData.assignmentId
-            );
-            assignmentsWithoutCurrent = currentSnapshot.assignments.filter(
-              (a) => a.id !== dragData.assignmentId
-            );
-          }
-
-          const { updatedAssignments, shiftedIds } = applyPushDown(
-            assignmentsWithoutCurrent,
-            dropData.stationId,
-            scheduledStart,
-            scheduledEnd,
-            task.id
-          );
-
-          if (shiftedIds.length > 0) {
-            console.log('Push-down applied:', shiftedIds);
-          }
-
-          const finalAssignment: TaskAssignment = isRescheduleOp && existingAssignment
-            ? { ...existingAssignment, scheduledStart, scheduledEnd, updatedAt: new Date().toISOString() }
-            : {
-                id: generateId(),
-                taskId: task.id,
-                targetId: dropData.stationId,
-                isOutsourced: false,
-                scheduledStart,
-                scheduledEnd,
-                isCompleted: false,
-                completedAt: null,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              };
-
-          let newConflicts = [...currentSnapshot.conflicts];
-          if (bypassedPrecedence) {
-            newConflicts.push({
-              type: 'PrecedenceConflict',
-              message: 'Task placed before predecessor completes (Alt-key bypass)',
-              taskId: task.id,
-              targetId: dropData.stationId,
-              details: { bypassedByUser: true },
-            });
-          }
-
-          return {
-            ...currentSnapshot,
-            assignments: [...updatedAssignments, finalAssignment],
-            conflicts: newConflicts,
-          };
-        });
+        // Update snapshot using extracted helper function
+        updateSnapshot((currentSnapshot) => processDropAssignment(
+          currentSnapshot,
+          task,
+          dropData.stationId,
+          scheduledStart,
+          scheduledEnd,
+          isRescheduleOp,
+          dragData.assignmentId,
+          bypassedPrecedence
+        ));
 
         setSnapshotVersion((v) => v + 1);
         console.log(isRescheduleOp ? 'Rescheduled:' : 'Created:', { taskId: task.id, scheduledStart });
@@ -711,99 +832,10 @@ function AppContent() {
 
     // Simulate async operation for UI feedback
     setTimeout(() => {
-      updateSnapshot((currentSnapshot) => {
-        // Get assignments for this station, sorted by start time
-        const stationAssignments = currentSnapshot.assignments
-          .filter((a) => a.targetId === stationId && !a.isOutsourced)
-          .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
-
-        if (stationAssignments.length === 0) {
-          return currentSnapshot;
-        }
-
-        // Build task map for predecessor lookup
-        const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
-
-        // Get the station for end time calculation
-        const station = currentSnapshot.stations.find((s) => s.id === stationId);
-
-        // Build a map to track updated end times (for precedence within same compact)
-        const updatedEndTimes = new Map<string, Date>();
-
-        // Start compacting from the first tile's position
-        let nextStartTime = new Date(stationAssignments[0].scheduledStart);
-        const updatedAssignments = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
-
-        stationAssignments.forEach((assignment) => {
-          const task = taskMap.get(assignment.taskId);
-
-          // Find predecessor constraint
-          let earliestStart = nextStartTime;
-
-          if (task) {
-            // Find predecessor task (previous task in same job by sequenceOrder)
-            const jobTasks = currentSnapshot.tasks
-              .filter((t) => t.jobId === task.jobId)
-              .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-            const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
-
-            if (taskIndex > 0) {
-              const predecessorTask = jobTasks[taskIndex - 1];
-
-              // Check if predecessor was updated in this compact operation
-              const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
-              if (updatedPredecessorEnd && updatedPredecessorEnd > earliestStart) {
-                earliestStart = updatedPredecessorEnd;
-              } else {
-                // Check existing assignment for predecessor
-                const predecessorAssignment = currentSnapshot.assignments.find(
-                  (a) => a.taskId === predecessorTask.id
-                );
-                if (predecessorAssignment) {
-                  const predecessorEnd = new Date(predecessorAssignment.scheduledEnd);
-                  if (predecessorEnd > earliestStart) {
-                    earliestStart = predecessorEnd;
-                  }
-                }
-              }
-            }
-          }
-
-          const newStart = earliestStart.toISOString();
-          // Use calculateEndTime for proper stretching across non-operating periods
-          const newEnd = task && task.type === 'Internal'
-            ? calculateEndTime(task, newStart, station)
-            : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
-
-          updatedAssignments.set(assignment.id, { scheduledStart: newStart, scheduledEnd: newEnd });
-          updatedEndTimes.set(assignment.taskId, new Date(newEnd));
-          nextStartTime = new Date(newEnd);
-        });
-
-        // Apply updates to all assignments
-        const newAssignments = currentSnapshot.assignments.map((assignment) => {
-          const updated = updatedAssignments.get(assignment.id);
-          if (updated) {
-            return {
-              ...assignment,
-              scheduledStart: updated.scheduledStart,
-              scheduledEnd: updated.scheduledEnd,
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          return assignment;
-        });
-
-        console.log('Station compacted:', {
-          stationId,
-          compactedCount: updatedAssignments.size,
-        });
-
-        return {
-          ...currentSnapshot,
-          assignments: newAssignments,
-        };
-      });
+      // Use extracted helper function to reduce nesting depth
+      updateSnapshot((currentSnapshot) =>
+        compactStationAssignments(currentSnapshot, stationId, calculateEndTime)
+      );
 
       setSnapshotVersion((v) => v + 1);
       setCompactingStationId(null);
