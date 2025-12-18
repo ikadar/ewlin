@@ -103,6 +103,18 @@ The interface uses a **column-based layout** with the following structure:
 | [scheduling-grid.md](05-components/scheduling-grid.md) | Time axis, station columns |
 | [tile-component.md](05-components/tile-component.md) | Tile anatomy, job colors |
 
+### 06 — Specifications
+
+| Document | Description |
+|----------|-------------|
+| [user-stories.md](specifications/user-stories.md) | UI User Stories (US-UI-*) for all interactions |
+| [acceptance-criteria.md](specifications/acceptance-criteria.md) | Acceptance Criteria in Given-When-Then format |
+| [non-functional-requirements.md](specifications/non-functional-requirements.md) | Performance, accessibility, i18n requirements |
+| [design-tokens.md](specifications/design-tokens.md) | Colors, spacing, typography, animations |
+| [state-machines.md](specifications/state-machines.md) | Drag, tile, quick placement state diagrams |
+| [keyboard-shortcuts.md](specifications/keyboard-shortcuts.md) | All keyboard shortcuts reference |
+| [component-api.md](specifications/component-api.md) | Component props and interfaces |
+
 ### Other
 
 | Document | Description |
@@ -116,8 +128,16 @@ The interface uses a **column-based layout** with the following structure:
 
 - [Scheduling UI Design](../requirements/scheduling-ui-design.md) — Original UI requirements
 - [Business Rules](../domain-model/business-rules.md) — UI behavior rules (UI-001 to UI-005)
-- [User Stories](../requirements/user-stories.md) — User stories for scheduling features
-- [Acceptance Criteria](../requirements/acceptance-criteria.md) — Testable criteria
+- [User Stories](../requirements/user-stories.md) — Backend user stories for scheduling features
+- [Acceptance Criteria](../requirements/acceptance-criteria.md) — Backend testable criteria
+- **UI Specifications:**
+  - [UI User Stories](specifications/user-stories.md) — UI-specific user stories (US-UI-*)
+  - [UI Acceptance Criteria](specifications/acceptance-criteria.md) — UI-specific acceptance criteria (AC-UI-*)
+  - [Non-Functional Requirements](specifications/non-functional-requirements.md) — Performance, accessibility, i18n
+  - [Design Tokens](specifications/design-tokens.md) — Colors, spacing, typography, animations
+  - [State Machines](specifications/state-machines.md) — Interaction state diagrams
+  - [Keyboard Shortcuts](specifications/keyboard-shortcuts.md) — All shortcuts reference
+  - [Component API](specifications/component-api.md) — Component props and interfaces
 
 ---
 
@@ -125,5 +145,7 @@ The interface uses a **column-based layout** with the following structure:
 
 | Date | Change |
 |------|--------|
+| 2025-12-18 | Added complete specifications: NFR, design tokens, state machines, keyboard shortcuts, component API |
+| 2025-12-18 | Added specifications folder with UI user stories and acceptance criteria |
 | 2025-12-16 | Updated to column-based layout, removed Right Panel |
 | 2025-12-13 | Initial structure with 8 new UX improvements |

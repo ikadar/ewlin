@@ -629,12 +629,24 @@ This document contains the development roadmap for the Flux print shop schedulin
 #### v0.3.27 - Drag-Drop E2E Test Suite ✅
 - [x] Deterministic test fixtures (6 fixtures: test, push-down, precedence, approval-gates, swap, sidebar-drag)
 - [x] Reusable drag helpers (`playwright/helpers/drag.ts`)
+- [x] UC-01: Sidebar-to-grid task placement tests (5 tests)
 - [x] UC-02/UC-03: Tile reschedule + grid snapping tests (3 tests)
 - [x] UC-04: Push-down collision tests (4 tests)
+- [x] UC-06: Precedence validation tests (4 tests)
+- [x] UC-07: Approval gate tests (4 tests)
 - [x] UC-09: Swap operation tests (5 tests)
 - [x] EC-02/EC-04: Edge case tests (4 tests)
-- [x] 100% test reliability (10/10 runs without failure)
+- [x] 100% test reliability (5/5 runs without failure)
 - [x] HTML5 DragEvent API with DataTransfer (pragmatic-drag-and-drop)
+- [x] **UX-UI Specifications** - Complete documentation structure:
+  - [x] `user-stories.md` - 16 UI user stories (US-UI-*)
+  - [x] `acceptance-criteria.md` - Given-When-Then format (AC-UI-*)
+  - [x] `non-functional-requirements.md` - Performance, accessibility, i18n
+  - [x] `design-tokens.md` - Colors, spacing, typography, animations
+  - [x] `state-machines.md` - Drag, tile, quick placement states
+  - [x] `keyboard-shortcuts.md` - Complete shortcuts reference
+  - [x] `component-api.md` - Component props and interfaces
+- [x] `06-edge-cases.md` expanded with error messages and recovery
 
 ### Phase 3I: Backend API Integration
 
