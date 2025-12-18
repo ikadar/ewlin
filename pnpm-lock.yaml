@@ -108,6 +108,9 @@ importers:
       postcss:
         specifier: ^8.5.6
         version: 8.5.6
+      sonar-scanner:
+        specifier: ^3.1.0
+        version: 3.1.0
       tailwindcss:
         specifier: ^4.1.17
         version: 4.1.18
@@ -2760,6 +2763,10 @@ packages:
   slice-ansi@4.0.0:
     resolution: {integrity: sha512-qMCMfhY040cVHT43K9BFygqYbUPFZKHOg7K73mtTWJRb8pyP3fzf4Ixd5SzdEJQ6MRUg/WBnOLxghZtKKurENQ==}
     engines: {node: '>=10'}
+
+  sonar-scanner@3.1.0:
+    resolution: {integrity: sha512-KD7W3wHCKJKAakhn8ckxNYTxkdb1cnJa3ot0NVvO8CCeJjb0yvF0fW2yGdI09zMHsqxCRsl4dLtyCL2SUv47WA==}
+    hasBin: true
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -5768,6 +5775,8 @@ snapshots:
       ansi-styles: 4.3.0
       astral-regex: 2.0.0
       is-fullwidth-code-point: 3.0.0
+
+  sonar-scanner@3.1.0: {}
 
   source-map-js@1.2.1: {}
 
