@@ -57,11 +57,7 @@ export function getAvailableTaskForStation(
   const lastTask = getLastUnscheduledTask(job, tasks, assignments);
 
   // Only return if this task belongs to the hovered station
-  if (lastTask && lastTask.stationId === stationId) {
-    return lastTask;
-  }
-
-  return null;
+  return lastTask?.stationId === stationId ? lastTask : null;
 }
 
 /**

@@ -15,9 +15,8 @@ export interface SidebarProps {
  */
 export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
   return (
-    <aside
+    <nav
       className="w-14 shrink-0 bg-zinc-900/50 border-r border-white/5"
-      role="navigation"
       aria-label="Main navigation"
     >
       <div className="h-full flex flex-col items-center py-3 gap-2">
@@ -40,6 +39,6 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
         isDisabled
       />
       </div>
-    </aside>
+    </nav>
   );
 }

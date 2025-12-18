@@ -66,33 +66,28 @@ export function JobCard({
     return 'text-zinc-500';
   })();
 
-  const ProblemIcon = problemType === 'late' ? AlertCircle : problemType === 'conflict' ? Shuffle : null;
+  const getProblemIcon = () => {
+    if (problemType === 'late') return AlertCircle;
+    if (problemType === 'conflict') return Shuffle;
+    return null;
+  };
+  const ProblemIcon = getProblemIcon();
   const iconColor = problemType === 'late' ? 'text-red-400' : 'text-amber-400';
 
   return (
-    <div
-      className={`${baseClasses} ${stateClasses}`}
+    <button
+      type="button"
+      className={`${baseClasses} ${stateClasses} text-left w-full`}
       onClick={onClick}
-      role="button"
-      tabIndex={0}
       data-testid={`job-card-${id}`}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick?.();
-        }
-      }}
     >
       {/* Header row: reference · client + date/icon */}
       <div className="flex items-center gap-2 mb-1">
         <span className={`font-mono text-[13px] ${referenceColor}`}>{reference}</span>
         <span className="text-zinc-600">·</span>
         <span className="text-zinc-400 truncate">{client}</span>
-        {ProblemIcon ? (
-          <ProblemIcon className={`w-4 h-4 ml-auto ${iconColor}`} />
-        ) : deadline ? (
-          <span className="text-zinc-600 text-xs ml-auto">{deadline}</span>
-        ) : null}
+        {ProblemIcon && <ProblemIcon className={`w-4 h-4 ml-auto ${iconColor}`} />}
+        {!ProblemIcon && deadline && <span className="text-zinc-600 text-xs ml-auto">{deadline}</span>}
       </div>
 
       {/* Description */}
@@ -110,6 +105,6 @@ export function JobCard({
           <span className="text-xs font-medium text-amber-400">Conflit</span>
         )}
       </div>
-    </div>
+    </button>
   );
 }

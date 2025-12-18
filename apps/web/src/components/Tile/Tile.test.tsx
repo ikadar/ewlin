@@ -399,6 +399,7 @@ describe('Tile', () => {
     renderWithDragContext(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
+    // Tile uses div with role="button" due to nested interactive elements (SwapButtons)
     expect(tile).toHaveAttribute('role', 'button');
     expect(tile).toHaveAttribute('tabIndex', '0');
   });

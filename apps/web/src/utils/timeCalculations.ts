@@ -28,15 +28,12 @@ function parseTimeToMinutes(time: string): number {
  * Get the day schedule for a specific date, considering exceptions.
  */
 function getDaySchedule(station: Station, date: Date): DaySchedule {
-  // Check for exceptions first
-  const dateStr = date.toISOString().split('T')[0];
-  const exception = station.exceptions.find((e) => {
-    // Use local date for comparison
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    return e.date === `${year}-${month}-${day}`;
-  });
+  // Check for exceptions first (use local date for comparison)
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+  const exception = station.exceptions.find((e) => e.date === dateStr);
 
   if (exception) {
     return exception.schedule;

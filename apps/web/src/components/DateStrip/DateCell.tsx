@@ -31,29 +31,25 @@ export function DateCell({ date, isToday = false, onClick }: DateCellProps) {
 
   if (isToday) {
     return (
-      <div
-        className="h-10 flex flex-col items-center justify-center text-xs font-mono text-amber-200 border-b border-amber-500/30 cursor-pointer bg-amber-500/15"
+      <button
+        type="button"
+        className="h-10 w-full flex flex-col items-center justify-center text-xs font-mono text-amber-200 border-b border-amber-500/30 cursor-pointer bg-amber-500/15"
         onClick={onClick}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
       >
         <span className="text-[10px]">{dayAbbrev}</span>
         <span className="font-medium">{dayNumber}</span>
-      </div>
+      </button>
     );
   }
 
   return (
-    <div
-      className="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
+    <button
+      type="button"
+      className="h-10 w-full flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
       onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
     >
       <span className="text-[10px]">{dayAbbrev}</span>
       <span className="font-medium text-zinc-400">{dayNumber}</span>
-    </div>
+    </button>
   );
 }

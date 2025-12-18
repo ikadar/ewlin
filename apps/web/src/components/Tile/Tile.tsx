@@ -175,11 +175,12 @@ export function Tile({
   // Muting style: desaturate and reduce opacity for other jobs during drag
   // Also disable pointer events during drag so drops pass through to StationColumn
   // But NOT for the tile being dragged itself (it needs to remain the drag source)
-  const mutingStyle = isMuted
-    ? { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const }
-    : isDragActive && !isDragging
-      ? { pointerEvents: 'none' as const }
-      : undefined;
+  const getMutingStyle = () => {
+    if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const };
+    if (isDragActive && !isDragging) return { pointerEvents: 'none' as const };
+    return undefined;
+  };
+  const mutingStyle = getMutingStyle();
 
   // Ghost placeholder shown at original position when tile is being dragged
   if (isDragging) {

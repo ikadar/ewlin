@@ -5,7 +5,7 @@
  * Provides drag state and update methods to all components.
  */
 
-import { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useCallback, useMemo, type ReactNode } from 'react';
 import type { Task, Job } from '@flux/types';
 import { type DragState, type DragValidationState, INITIAL_DRAG_STATE } from './types';
 
@@ -99,16 +99,13 @@ export function DragStateProvider({ children }: DragStateProviderProps) {
     dispatch({ type: 'UPDATE_GRAB_OFFSET', payload: offset });
   }, []);
 
+  const contextValue = useMemo(
+    () => ({ state, startDrag, endDrag, updateValidation, updateGrabOffset }),
+    [state, startDrag, endDrag, updateValidation, updateGrabOffset]
+  );
+
   return (
-    <DragStateContext.Provider
-      value={{
-        state,
-        startDrag,
-        endDrag,
-        updateValidation,
-        updateGrabOffset,
-      }}
-    >
+    <DragStateContext.Provider value={contextValue}>
       {children}
     </DragStateContext.Provider>
   );

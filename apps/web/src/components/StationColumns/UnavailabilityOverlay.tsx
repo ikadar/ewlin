@@ -164,13 +164,13 @@ export function UnavailabilityOverlay({
 
   return (
     <>
-      {unavailablePeriods.map((period, index) => {
+      {unavailablePeriods.map((period) => {
         const top = minutesToYPosition(period.startMinutes, startHour);
         const height = ((period.endMinutes - period.startMinutes) / 60) * PIXELS_PER_HOUR;
 
         return (
           <div
-            key={index}
+            key={`${period.startMinutes}-${period.endMinutes}`}
             className="absolute left-0 right-0 bg-stripes-dark pointer-events-none"
             style={{
               top: `${top}px`,

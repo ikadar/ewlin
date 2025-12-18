@@ -108,6 +108,12 @@ export function StationHeader({
     }
   };
 
+  const getCompactButtonTitle = () => {
+    if (isCompacting) return 'Compacting...';
+    if (hasTiles) return 'Compact station';
+    return 'No tiles to compact';
+  };
+
   return (
     <div
       className={`${widthClass} shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 transition-all duration-150 ease-out flex items-center justify-between`}
@@ -141,7 +147,7 @@ export function StationHeader({
                 ? 'text-zinc-600 cursor-not-allowed'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
             }`}
-            title={isCompacting ? 'Compacting...' : hasTiles ? 'Compact station' : 'No tiles to compact'}
+            title={getCompactButtonTitle()}
             data-testid={`compact-button-${station.id}`}
           >
             {isCompacting ? <Spinner /> : <CompressIcon />}

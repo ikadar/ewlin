@@ -185,8 +185,9 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     };
 
     return (
-      <div
-        className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors"
+      <button
+        type="button"
+        className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full"
         style={{ height: `${height}px` }}
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
@@ -198,7 +199,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
             {formatScheduledTime(assignment.scheduledStart)}
           </span>
         </div>
-      </div>
+      </button>
     );
   }
 

@@ -67,13 +67,13 @@ describe('DateCell', () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClick on Enter key press', () => {
-    const handleClick = vi.fn();
+  it('is a focusable button element', () => {
     const date = new Date(2024, 11, 9);
-    render(<DateCell date={date} onClick={handleClick} />);
+    render(<DateCell date={date} />);
 
-    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
-    expect(handleClick).toHaveBeenCalledTimes(1);
+    // Button elements are implicitly focusable and handle Enter key natively
+    const button = screen.getByRole('button');
+    expect(button.tagName).toBe('BUTTON');
   });
 });
 

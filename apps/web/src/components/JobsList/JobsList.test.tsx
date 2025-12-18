@@ -213,7 +213,8 @@ describe('JobsList', () => {
       />
     );
 
-    const jobCard = screen.getByText('12345').closest('[role="button"]');
+    // JobCard is now a proper button element
+    const jobCard = screen.getByText('12345').closest('button');
     expect(jobCard).toHaveClass('bg-white/10');
   });
 });
@@ -356,8 +357,9 @@ describe('JobCard', () => {
       />
     );
 
+    // Button elements natively handle Enter key - simulate with click
     const card = screen.getByRole('button');
-    fireEvent.keyDown(card, { key: 'Enter' });
+    fireEvent.click(card);
     expect(onClick).toHaveBeenCalled();
   });
 });

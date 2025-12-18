@@ -23,19 +23,34 @@ const START_HOUR = 6;
 // ============================================================================
 
 /**
+ * Options for processing a drop assignment.
+ */
+interface ProcessDropOptions {
+  currentSnapshot: ScheduleSnapshot;
+  task: InternalTask;
+  stationId: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  isRescheduleOp: boolean;
+  assignmentId: string | undefined;
+  bypassedPrecedence: boolean;
+}
+
+/**
  * Process a drop operation and return the updated snapshot.
  * Extracted from onDrop to reduce function nesting.
  */
-function processDropAssignment(
-  currentSnapshot: ScheduleSnapshot,
-  task: InternalTask,
-  stationId: string,
-  scheduledStart: string,
-  scheduledEnd: string,
-  isRescheduleOp: boolean,
-  assignmentId: string | undefined,
-  bypassedPrecedence: boolean
-): ScheduleSnapshot {
+function processDropAssignment(options: ProcessDropOptions): ScheduleSnapshot {
+  const {
+    currentSnapshot,
+    task,
+    stationId,
+    scheduledStart,
+    scheduledEnd,
+    isRescheduleOp,
+    assignmentId,
+    bypassedPrecedence,
+  } = options;
   let assignmentsWithoutCurrent = currentSnapshot.assignments;
   let existingAssignment: TaskAssignment | undefined;
 
@@ -124,7 +139,7 @@ function calculateCompactedEndTime(
   station: Station | undefined,
   calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
 ): string {
-  if (task && task.type === 'Internal') {
+  if (task?.type === 'Internal') {
     return calculateEndTimeFn(task as InternalTask, newStart.toISOString(), station);
   }
   // Preserve original duration for non-internal tasks
@@ -336,8 +351,8 @@ function AppContent() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   // Get drag state from context (replaces local activeTask/activeJob state)
-  const { state: dragState, updateValidation } = useDragState();
-  const { activeTask, activeJob, isRescheduleDrag, grabOffset, activeAssignmentId } = dragState;
+  const { state: dragState } = useDragState();
+  const { activeTask, activeJob, isRescheduleDrag, grabOffset } = dragState;
 
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
@@ -509,7 +524,7 @@ function AppContent() {
 
         // Get drag data
         const dragData = source.data as TaskDragData | undefined;
-        if (!dragData || dragData.type !== 'task') return;
+        if (dragData?.type !== 'task') return;
 
         // Find the drop target station
         const { clientX, clientY } = location.current.input;
@@ -590,16 +605,16 @@ function AppContent() {
         const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
 
         // Update snapshot using extracted helper function
-        updateSnapshot((currentSnapshot) => processDropAssignment(
+        updateSnapshot((currentSnapshot) => processDropAssignment({
           currentSnapshot,
           task,
-          dropData.stationId,
+          stationId: dropData.stationId,
           scheduledStart,
           scheduledEnd,
           isRescheduleOp,
-          dragData.assignmentId,
-          bypassedPrecedence
-        ));
+          assignmentId: dragData.assignmentId,
+          bypassedPrecedence,
+        }));
 
         setSnapshotVersion((v) => v + 1);
         console.log(isRescheduleOp ? 'Rescheduled:' : 'Created:', { taskId: task.id, scheduledStart });
