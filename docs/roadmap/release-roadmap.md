@@ -612,7 +612,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 #### v0.3.26 - Manual QA Fixes ✅
 - [x] Custom collision detection (`document.elementsFromPoint()`)
 - [x] DragPreview pointer-events-none (prevents infinite loop)
-- [x] Reschedule validation bypass (isRescheduleDrag)
+- [x] Reschedule uses same validation as new placement (per UX spec)
 - [x] Validator package rebuild (v0.3.24 changes)
 - [x] Mock data fixes (group capacity, BAT approval)
 - [x] Local compact implementation (mock mode)

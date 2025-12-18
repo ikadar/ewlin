@@ -458,7 +458,7 @@ function App() {
     );
     const hasBlockingConflicts = blockingConflicts.length > 0;
 
-    if (hasBlockingConflicts && !wasAltPressed && !isReschedule) {
+    if (hasBlockingConflicts && !wasAltPressed) {
       console.log('Invalid drop: validation failed', blockingConflicts);
       return;
     }
@@ -953,10 +953,8 @@ function App() {
           validationState={{
             targetStationId: dragValidation.targetStationId,
             // StationConflict is allowed because push-down will resolve it
-            // Reschedule (moving existing tile) is always allowed within same station
             isValid: validation.isValid ||
-              validation.conflicts.every((c) => c.type === 'StationConflict') ||
-              isRescheduleDrag,
+              validation.conflicts.every((c) => c.type === 'StationConflict'),
             hasPrecedenceConflict: validation.hasPrecedenceConflict,
             suggestedStart: validation.suggestedStart,
             isAltPressed,
