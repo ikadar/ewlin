@@ -447,9 +447,11 @@ function App() {
 
     // Use the validation result to determine if drop is valid
     // StationConflict is allowed because push-down will resolve it
+    // PrecedenceConflict is allowed if we have a suggestedStart (auto-snap)
     // Reschedule (moving existing tile) is always allowed within same station
     const blockingConflicts = currentValidation.conflicts.filter(
-      (c) => c.type !== 'StationConflict'
+      (c) => c.type !== 'StationConflict' &&
+             !(c.type === 'PrecedenceConflict' && currentValidation.suggestedStart)
     );
     const hasBlockingConflicts = blockingConflicts.length > 0;
 
