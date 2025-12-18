@@ -12,6 +12,7 @@ import type {
   Station,
 } from '@flux/types';
 import { isInternalTask, isOutsourcedTask } from '@flux/types';
+import { calculateEndTime } from '../../utils/timeCalculations';
 
 // ============================================================================
 // Helper Functions
@@ -96,6 +97,7 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
 
       if (isInternalTask(task)) {
         const stationId = task.stationId;
+        const station = stations.find((s) => s.id === stationId);
         const stationAvailable = stationNextAvailable.get(stationId) || startTime;
 
         // Start time is the later of: station availability or previous task end
@@ -110,9 +112,9 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
           scheduledStart.setMinutes(Math.ceil(minutes / 30) * 30);
         }
 
-        // Calculate end time
-        const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-        const scheduledEnd = addMinutes(scheduledStart, totalMinutes);
+        // Calculate end time with operating hours stretching (BR-ASSIGN-003b)
+        const scheduledEndStr = calculateEndTime(task, scheduledStart.toISOString(), station);
+        const scheduledEnd = new Date(scheduledEndStr);
 
         // Only mark tasks as completed if they're in the past
         const now = new Date();
