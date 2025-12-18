@@ -448,10 +448,12 @@ function App() {
     // Use the validation result to determine if drop is valid
     // StationConflict is allowed because push-down will resolve it
     // PrecedenceConflict is allowed if we have a suggestedStart (auto-snap)
+    // ApprovalGateConflict for Plates is warning only (not blocking)
     // Reschedule (moving existing tile) is always allowed within same station
     const blockingConflicts = currentValidation.conflicts.filter(
       (c) => c.type !== 'StationConflict' &&
-             !(c.type === 'PrecedenceConflict' && currentValidation.suggestedStart)
+             !(c.type === 'PrecedenceConflict' && currentValidation.suggestedStart) &&
+             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
     );
     const hasBlockingConflicts = blockingConflicts.length > 0;
 
@@ -472,7 +474,8 @@ function App() {
 
     // Create the assignment
     const task = dragData.task as InternalTask;
-    const scheduledEnd = calculateEndTime(task, scheduledStart);
+    const station = snapshot.stations.find((s) => s.id === dropData.stationId);
+    const scheduledEnd = calculateEndTime(task, scheduledStart, station);
     const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
 
     // Update snapshot with new/updated assignment and push-down logic
@@ -716,7 +719,8 @@ function App() {
     const snappedY = snapToGrid(Math.max(0, y));
     const dropTime = yPositionToTime(snappedY, START_HOUR);
     const scheduledStart = dropTime.toISOString();
-    const scheduledEnd = calculateEndTime(taskToPlace, scheduledStart);
+    const station = snapshot.stations.find((s) => s.id === stationId);
+    const scheduledEnd = calculateEndTime(taskToPlace, scheduledStart, station);
 
     // Create the assignment
     const newAssignment: TaskAssignment = {

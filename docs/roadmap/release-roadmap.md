@@ -620,6 +620,8 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Operating hours validation timezone fix (UTC → local)
 - [x] Precedence conflict auto-snap to valid position
 - [x] Compact respects precedence (task.sequenceOrder)
+- [x] Plates ApprovalGateConflict is warning only
+- [x] End time stretching (BR-ASSIGN-003b)
 
 ### Phase 3I: Backend API Integration
 
