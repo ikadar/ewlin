@@ -103,7 +103,7 @@ describe('Drag & Drop - Task Placement', () => {
     // Select a job to show the Job Details Panel
     cy.get('[data-testid="jobs-list"]')
       .find('[data-testid^="job-card-"]')
-      .first()
+      .first().next().next()
       .click();
 
     cy.wait(300);

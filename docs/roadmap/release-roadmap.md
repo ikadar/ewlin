@@ -617,6 +617,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Mock data fixes (group capacity, BAT approval)
 - [x] Local compact implementation (mock mode)
 - [x] Disable column collapse during reschedule
+- [x] Operating hours validation timezone fix (UTC → local)
 
 ### Phase 3I: Backend API Integration
 
