@@ -23,6 +23,88 @@ function parseTimeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
+interface OperatingPeriod {
+  startMinutes: number;
+  endMinutes: number;
+}
+
+/**
+ * Add gap before the first operating period (if any).
+ */
+function addGapBeforeFirstPeriod(
+  periods: UnavailablePeriod[],
+  firstPeriodStart: number,
+  displayStart: number,
+  displayEnd: number
+): void {
+  if (firstPeriodStart > displayStart) {
+    periods.push({
+      startMinutes: displayStart,
+      endMinutes: Math.min(firstPeriodStart, displayEnd),
+    });
+  }
+}
+
+/**
+ * Add gaps between consecutive operating periods.
+ */
+function addGapsBetweenPeriods(
+  periods: UnavailablePeriod[],
+  operatingPeriods: OperatingPeriod[],
+  displayStart: number,
+  displayEnd: number
+): void {
+  for (let i = 0; i < operatingPeriods.length - 1; i++) {
+    const currentEnd = operatingPeriods[i].endMinutes;
+    const nextStart = operatingPeriods[i + 1].startMinutes;
+
+    if (nextStart > currentEnd) {
+      const gapStart = Math.max(currentEnd, displayStart);
+      const gapEnd = Math.min(nextStart, displayEnd);
+
+      if (gapEnd > gapStart && gapStart < displayEnd && gapEnd > displayStart) {
+        periods.push({ startMinutes: gapStart, endMinutes: gapEnd });
+      }
+    }
+  }
+}
+
+/**
+ * Add gap after the last operating period, handling wrap-around days.
+ */
+function addGapAfterLastPeriod(
+  periods: UnavailablePeriod[],
+  lastPeriodEnd: number,
+  firstPeriodStart: number,
+  displayStart: number,
+  displayEnd: number
+): void {
+  if (lastPeriodEnd >= displayEnd) return;
+
+  const MIDNIGHT = 24 * 60;
+  const isWrapAround = displayEnd > MIDNIGHT;
+
+  if (isWrapAround) {
+    // Gap from last slot to midnight
+    if (lastPeriodEnd < MIDNIGHT) {
+      periods.push({ startMinutes: lastPeriodEnd, endMinutes: MIDNIGHT });
+    }
+    // Gap from midnight to first slot next day
+    const wrappedFirstSlot = firstPeriodStart + MIDNIGHT;
+    if (wrappedFirstSlot > MIDNIGHT) {
+      periods.push({
+        startMinutes: MIDNIGHT,
+        endMinutes: Math.min(wrappedFirstSlot, displayEnd),
+      });
+    }
+  } else {
+    periods.push({
+      startMinutes: Math.max(lastPeriodEnd, displayStart),
+      endMinutes: displayEnd,
+    });
+  }
+}
+
 /**
  * Calculate unavailable periods from operating time slots.
  * Returns periods in minutes since midnight.
@@ -32,82 +114,31 @@ function calculateUnavailablePeriods(
   startHour: number,
   hoursToDisplay: number
 ): UnavailablePeriod[] {
-  const displayStartMinutes = startHour * 60;
-  const displayEndMinutes = displayStartMinutes + hoursToDisplay * 60;
+  const displayStart = startHour * 60;
+  const displayEnd = displayStart + hoursToDisplay * 60;
 
-  // If station is not operating at all, entire display period is unavailable
   if (!daySchedule.isOperating || daySchedule.slots.length === 0) {
-    return [{ startMinutes: displayStartMinutes, endMinutes: displayEndMinutes }];
+    return [{ startMinutes: displayStart, endMinutes: displayEnd }];
   }
 
-  // Convert slots to minutes and sort by start time
-  const operatingPeriods = daySchedule.slots
+  const operatingPeriods: OperatingPeriod[] = daySchedule.slots
     .map((slot) => ({
       startMinutes: parseTimeToMinutes(slot.start),
       endMinutes: slot.end === '24:00' ? 24 * 60 : parseTimeToMinutes(slot.end),
     }))
     .sort((a, b) => a.startMinutes - b.startMinutes);
 
-  // Calculate unavailable periods (gaps between operating periods)
   const unavailablePeriods: UnavailablePeriod[] = [];
 
-  // Start of display window to first operating period
-  if (operatingPeriods[0].startMinutes > displayStartMinutes) {
-    unavailablePeriods.push({
-      startMinutes: displayStartMinutes,
-      endMinutes: Math.min(operatingPeriods[0].startMinutes, displayEndMinutes),
-    });
-  }
-
-  // Gaps between operating periods
-  for (let i = 0; i < operatingPeriods.length - 1; i++) {
-    const currentEnd = operatingPeriods[i].endMinutes;
-    const nextStart = operatingPeriods[i + 1].startMinutes;
-
-    if (nextStart > currentEnd) {
-      // There's a gap
-      const gapStart = Math.max(currentEnd, displayStartMinutes);
-      const gapEnd = Math.min(nextStart, displayEndMinutes);
-
-      if (gapEnd > gapStart && gapStart < displayEndMinutes && gapEnd > displayStartMinutes) {
-        unavailablePeriods.push({
-          startMinutes: gapStart,
-          endMinutes: gapEnd,
-        });
-      }
-    }
-  }
-
-  // Last operating period to end of display window
-  const lastPeriod = operatingPeriods[operatingPeriods.length - 1];
-  if (lastPeriod.endMinutes < displayEndMinutes) {
-    // For wrap-around days (e.g., display from 6:00 to 6:00 next day)
-    // The unavailability from last slot to midnight, then midnight to first slot next morning
-    if (displayEndMinutes > 24 * 60) {
-      // We're wrapping around midnight
-      // Unavailable from last slot end to midnight
-      if (lastPeriod.endMinutes < 24 * 60) {
-        unavailablePeriods.push({
-          startMinutes: lastPeriod.endMinutes,
-          endMinutes: 24 * 60,
-        });
-      }
-      // Unavailable from midnight (as 24*60) to either first slot or start hour
-      const wrappedStart = 24 * 60;
-      const wrappedFirstSlot = operatingPeriods[0].startMinutes + 24 * 60;
-      if (wrappedFirstSlot > wrappedStart) {
-        unavailablePeriods.push({
-          startMinutes: wrappedStart,
-          endMinutes: Math.min(wrappedFirstSlot, displayEndMinutes),
-        });
-      }
-    } else {
-      unavailablePeriods.push({
-        startMinutes: Math.max(lastPeriod.endMinutes, displayStartMinutes),
-        endMinutes: displayEndMinutes,
-      });
-    }
-  }
+  addGapBeforeFirstPeriod(unavailablePeriods, operatingPeriods[0].startMinutes, displayStart, displayEnd);
+  addGapsBetweenPeriods(unavailablePeriods, operatingPeriods, displayStart, displayEnd);
+  addGapAfterLastPeriod(
+    unavailablePeriods,
+    operatingPeriods[operatingPeriods.length - 1].endMinutes,
+    operatingPeriods[0].startMinutes,
+    displayStart,
+    displayEnd
+  );
 
   return unavailablePeriods;
 }

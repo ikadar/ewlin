@@ -90,100 +90,240 @@ function processDropAssignment(
 }
 
 /**
- * Compact station assignments by removing gaps.
- * Extracted from handleCompact to reduce function nesting.
+ * Find the earliest start time for a task based on predecessor constraints.
  */
+function findPredecessorEndTime(
+  task: Task,
+  tasks: Task[],
+  assignments: TaskAssignment[],
+  updatedEndTimes: Map<string, Date>
+): Date | null {
+  const jobTasks = tasks
+    .filter((t) => t.jobId === task.jobId)
+    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+  const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
+
+  if (taskIndex <= 0) return null;
+
+  const predecessorTask = jobTasks[taskIndex - 1];
+  const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
+
+  if (updatedPredecessorEnd) return updatedPredecessorEnd;
+
+  const predecessorAssignment = assignments.find((a) => a.taskId === predecessorTask.id);
+  return predecessorAssignment ? new Date(predecessorAssignment.scheduledEnd) : null;
+}
+
+/**
+ * Calculate the new end time for an assignment during compacting.
+ */
+function calculateCompactedEndTime(
+  task: Task | undefined,
+  assignment: TaskAssignment,
+  newStart: Date,
+  station: Station | undefined,
+  calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
+): string {
+  if (task && task.type === 'Internal') {
+    return calculateEndTimeFn(task as InternalTask, newStart.toISOString(), station);
+  }
+  // Preserve original duration for non-internal tasks
+  const originalDuration = new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime();
+  return new Date(newStart.getTime() + originalDuration).toISOString();
+}
+
 function compactStationAssignments(
   currentSnapshot: ScheduleSnapshot,
   stationId: string,
   calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
 ): ScheduleSnapshot {
-  // Get assignments for this station, sorted by start time
   const stationAssignments = currentSnapshot.assignments
     .filter((a) => a.targetId === stationId && !a.isOutsourced)
     .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
 
-  if (stationAssignments.length === 0) {
-    return currentSnapshot;
-  }
+  if (stationAssignments.length === 0) return currentSnapshot;
 
-  // Build task map for predecessor lookup
   const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
-
-  // Get the station for end time calculation
   const station = currentSnapshot.stations.find((s) => s.id === stationId);
-
-  // Build a map to track updated end times (for precedence within same compact)
   const updatedEndTimes = new Map<string, Date>();
-
-  // Start compacting from the first tile's position
-  let nextStartTime = new Date(stationAssignments[0].scheduledStart);
   const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
+
+  let nextStartTime = new Date(stationAssignments[0].scheduledStart);
 
   for (const assignment of stationAssignments) {
     const task = taskMap.get(assignment.taskId);
     let earliestStart = nextStartTime;
 
+    // Check predecessor constraint
     if (task) {
-      // Find predecessor task (previous task in same job by sequenceOrder)
-      const jobTasks = currentSnapshot.tasks
-        .filter((t) => t.jobId === task.jobId)
-        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-      const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
-
-      if (taskIndex > 0) {
-        const predecessorTask = jobTasks[taskIndex - 1];
-        const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
-
-        if (updatedPredecessorEnd && updatedPredecessorEnd > earliestStart) {
-          earliestStart = updatedPredecessorEnd;
-        } else {
-          const predecessorAssignment = currentSnapshot.assignments.find(
-            (a) => a.taskId === predecessorTask.id
-          );
-          if (predecessorAssignment) {
-            const predecessorEnd = new Date(predecessorAssignment.scheduledEnd);
-            if (predecessorEnd > earliestStart) {
-              earliestStart = predecessorEnd;
-            }
-          }
-        }
+      const predecessorEnd = findPredecessorEndTime(task, currentSnapshot.tasks, currentSnapshot.assignments, updatedEndTimes);
+      if (predecessorEnd && predecessorEnd > earliestStart) {
+        earliestStart = predecessorEnd;
       }
     }
 
-    const newStart = earliestStart.toISOString();
-    const newEnd = task && task.type === 'Internal'
-      ? calculateEndTimeFn(task, newStart, station)
-      : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
-
-    updatedAssignmentsMap.set(assignment.id, { scheduledStart: newStart, scheduledEnd: newEnd });
+    const newEnd = calculateCompactedEndTime(task, assignment, earliestStart, station, calculateEndTimeFn);
+    updatedAssignmentsMap.set(assignment.id, { scheduledStart: earliestStart.toISOString(), scheduledEnd: newEnd });
     updatedEndTimes.set(assignment.taskId, new Date(newEnd));
     nextStartTime = new Date(newEnd);
   }
 
-  // Apply updates to all assignments
   const newAssignments = currentSnapshot.assignments.map((assignment) => {
     const updated = updatedAssignmentsMap.get(assignment.id);
-    if (updated) {
-      return {
-        ...assignment,
-        scheduledStart: updated.scheduledStart,
-        scheduledEnd: updated.scheduledEnd,
-        updatedAt: new Date().toISOString(),
-      };
+    return updated
+      ? { ...assignment, scheduledStart: updated.scheduledStart, scheduledEnd: updated.scheduledEnd, updatedAt: new Date().toISOString() }
+      : assignment;
+  });
+
+  console.log('Station compacted:', { stationId, compactedCount: updatedAssignmentsMap.size });
+  return { ...currentSnapshot, assignments: newAssignments };
+}
+
+// ============================================================================
+// Drag helper functions (extracted to reduce cognitive complexity S3776)
+// ============================================================================
+
+/**
+ * Find station column element from pointer coordinates.
+ */
+function findStationColumnFromPointer(clientX: number, clientY: number): HTMLElement | null {
+  const elements = document.elementsFromPoint(clientX, clientY);
+  return elements.find((el): el is HTMLElement =>
+    el instanceof HTMLElement && el.dataset.testid?.startsWith('station-column-') === true
+  ) || null;
+}
+
+/**
+ * Extract station ID from station column element.
+ */
+function getStationIdFromElement(element: HTMLElement | null): string | null {
+  if (!element) return null;
+  return element.dataset.testid?.replace('station-column-', '') || null;
+}
+
+/**
+ * Calculate scheduled start time from pointer position on a station column.
+ */
+function calculateScheduledStartFromPointer(
+  clientX: number,
+  clientY: number,
+  grabOffsetY: number
+): string | null {
+  const stationElement = findStationColumnFromPointer(clientX, clientY);
+  if (!stationElement) return null;
+
+  const rect = stationElement.getBoundingClientRect();
+  const relativeY = calculateTileTopPosition(clientY, rect.top, grabOffsetY);
+  const dropTime = yPositionToTime(relativeY, START_HOUR);
+  return dropTime.toISOString();
+}
+
+// ============================================================================
+// Keyboard shortcut handlers (extracted to reduce cognitive complexity S3776)
+// ============================================================================
+
+interface KeyboardContext {
+  selectedJobId: string | null;
+  isQuickPlacementMode: boolean;
+  orderedJobIds: string[];
+  selectedJob: Job | null;
+  gridRef: React.RefObject<SchedulingGridHandle | null>;
+  setIsAltPressed: (v: boolean) => void;
+  setSelectedJobId: (id: string | null) => void;
+  setIsQuickPlacementMode: (fn: (prev: boolean) => boolean) => void;
+  setQuickPlacementHover: (v: { stationId: string | null; y: number; snappedY: number }) => void;
+}
+
+function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (e.key === 'Alt') {
+    e.preventDefault();
+    ctx.setIsAltPressed(true);
+    return true;
+  }
+  return false;
+}
+
+function handleToggleQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (e.altKey && e.code === 'KeyQ') {
+    e.preventDefault();
+    if (ctx.selectedJobId) {
+      ctx.setIsQuickPlacementMode((prev) => !prev);
+      ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
     }
-    return assignment;
-  });
+    return true;
+  }
+  return false;
+}
 
-  console.log('Station compacted:', {
-    stationId,
-    compactedCount: updatedAssignmentsMap.size,
-  });
+function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (e.key === 'Escape' && ctx.isQuickPlacementMode) {
+    ctx.setIsQuickPlacementMode(() => false);
+    ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+    return true;
+  }
+  return false;
+}
 
-  return {
-    ...currentSnapshot,
-    assignments: newAssignments,
-  };
+function handleJobNavigation(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) {
+    return false;
+  }
+  e.preventDefault();
+  if (ctx.orderedJobIds.length === 0) return true;
+
+  const direction = e.key === 'ArrowUp' ? -1 : 1;
+  if (!ctx.selectedJobId) {
+    ctx.setSelectedJobId(ctx.orderedJobIds[0]);
+    return true;
+  }
+
+  const currentIndex = ctx.orderedJobIds.indexOf(ctx.selectedJobId);
+  const newIndex = (currentIndex + direction + ctx.orderedJobIds.length) % ctx.orderedJobIds.length;
+  ctx.setSelectedJobId(ctx.orderedJobIds[newIndex]);
+  return true;
+}
+
+function handleJumpToDeparture(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (e.altKey && e.code === 'KeyD') {
+    e.preventDefault();
+    if (ctx.selectedJob?.workshopExitDate && ctx.gridRef.current) {
+      const departureDate = new Date(ctx.selectedJob.workshopExitDate);
+      const y = timeToYPosition(departureDate, START_HOUR);
+      const viewportHeight = ctx.gridRef.current.getViewportHeight();
+      const scrollTarget = Math.max(0, y - viewportHeight + 100);
+      ctx.gridRef.current.scrollToY(scrollTarget);
+    }
+    return true;
+  }
+  return false;
+}
+
+function handleJumpToToday(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (e.key === 'Home' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    if (ctx.gridRef.current) {
+      const now = new Date();
+      const y = timeToYPosition(now, START_HOUR);
+      const viewportHeight = ctx.gridRef.current.getViewportHeight();
+      const scrollTarget = Math.max(0, y - viewportHeight / 2);
+      ctx.gridRef.current.scrollToY(scrollTarget);
+    }
+    return true;
+  }
+  return false;
+}
+
+function handlePageScroll(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if ((e.key === 'PageUp' || e.key === 'PageDown') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    if (ctx.gridRef.current) {
+      const oneDayPixels = 24 * PIXELS_PER_HOUR;
+      const direction = e.key === 'PageUp' ? -1 : 1;
+      ctx.gridRef.current.scrollByY(direction * oneDayPixels);
+    }
+    return true;
+  }
+  return false;
 }
 
 // Inner App component that uses drag state context
@@ -283,103 +423,29 @@ function AppContent() {
 
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        e.preventDefault();
-        setIsAltPressed(true);
-      }
-      // ALT+Q to toggle Quick Placement Mode (use e.code for cross-platform support)
-      if (e.altKey && e.code === 'KeyQ') {
-        e.preventDefault();
-        // Only allow quick placement mode when a job is selected
-        if (selectedJobId) {
-          setIsQuickPlacementMode((prev) => !prev);
-          // Reset hover state when toggling
-          setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-        }
-      }
-      // ESC to exit Quick Placement Mode
-      if (e.key === 'Escape' && isQuickPlacementMode) {
-        setIsQuickPlacementMode(false);
-        setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-      }
-      // ALT+↑ to select previous job
-      if (e.altKey && e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (orderedJobIds.length > 0) {
-          if (!selectedJobId) {
-            // No job selected, select the first one
-            setSelectedJobId(orderedJobIds[0]);
-          } else {
-            const currentIndex = orderedJobIds.indexOf(selectedJobId);
-            if (currentIndex > 0) {
-              setSelectedJobId(orderedJobIds[currentIndex - 1]);
-            } else {
-              // Wrap around to last job
-              setSelectedJobId(orderedJobIds[orderedJobIds.length - 1]);
-            }
-          }
-        }
-      }
-      // ALT+↓ to select next job
-      if (e.altKey && e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (orderedJobIds.length > 0) {
-          if (!selectedJobId) {
-            // No job selected, select the first one
-            setSelectedJobId(orderedJobIds[0]);
-          } else {
-            const currentIndex = orderedJobIds.indexOf(selectedJobId);
-            if (currentIndex < orderedJobIds.length - 1) {
-              setSelectedJobId(orderedJobIds[currentIndex + 1]);
-            } else {
-              // Wrap around to first job
-              setSelectedJobId(orderedJobIds[0]);
-            }
-          }
-        }
-      }
-      // ALT+D to jump to selected job's departure date (use e.code for cross-platform support)
-      if (e.altKey && e.code === 'KeyD') {
-        e.preventDefault();
-        if (selectedJob?.workshopExitDate && gridRef.current) {
-          const departureDate = new Date(selectedJob.workshopExitDate);
-          const y = timeToYPosition(departureDate, START_HOUR);
-          // Position departure date at bottom of viewport
-          const viewportHeight = gridRef.current.getViewportHeight();
-          const scrollTarget = Math.max(0, y - viewportHeight + 100); // 100px margin from bottom
-          gridRef.current.scrollToY(scrollTarget);
-        }
-      }
-      // Home to jump to today
-      if (e.key === 'Home' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        if (gridRef.current) {
-          const now = new Date();
-          const y = timeToYPosition(now, START_HOUR);
-          // Center today in viewport
-          const viewportHeight = gridRef.current.getViewportHeight();
-          const scrollTarget = Math.max(0, y - viewportHeight / 2);
-          gridRef.current.scrollToY(scrollTarget);
-        }
-      }
-      // Page Up to scroll up by one day
-      if (e.key === 'PageUp' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        if (gridRef.current) {
-          const oneDayPixels = 24 * PIXELS_PER_HOUR;
-          gridRef.current.scrollByY(-oneDayPixels);
-        }
-      }
-      // Page Down to scroll down by one day
-      if (e.key === 'PageDown' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        if (gridRef.current) {
-          const oneDayPixels = 24 * PIXELS_PER_HOUR;
-          gridRef.current.scrollByY(oneDayPixels);
-        }
-      }
+    const ctx: KeyboardContext = {
+      selectedJobId,
+      isQuickPlacementMode,
+      orderedJobIds,
+      selectedJob,
+      gridRef,
+      setIsAltPressed,
+      setSelectedJobId,
+      setIsQuickPlacementMode,
+      setQuickPlacementHover,
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Each handler returns true if it handled the event
+      handleAltKey(e, ctx) ||
+        handleToggleQuickPlacement(e, ctx) ||
+        handleEscapeQuickPlacement(e, ctx) ||
+        handleJobNavigation(e, ctx) ||
+        handleJumpToDeparture(e, ctx) ||
+        handleJumpToToday(e, ctx) ||
+        handlePageScroll(e, ctx);
+    };
+
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
         setIsAltPressed(false);
@@ -411,49 +477,19 @@ function AppContent() {
         });
       },
       onDrag: ({ location }) => {
-        // Track current pointer position
-        currentPointerRef.current = {
-          x: location.current.input.clientX,
-          y: location.current.input.clientY,
-        };
+        const { clientX, clientY } = location.current.input;
+        currentPointerRef.current = { x: clientX, y: clientY };
 
-        // Find station column under pointer for validation
-        const elements = document.elementsFromPoint(
-          location.current.input.clientX,
-          location.current.input.clientY
-        );
-        const stationColumnElement = elements.find(el =>
-          el.getAttribute('data-testid')?.startsWith('station-column-')
-        );
+        const stationElement = findStationColumnFromPointer(clientX, clientY);
+        const stationId = getStationIdFromElement(stationElement);
 
-        if (!stationColumnElement || !activeTask) {
-          setDragValidation((prev) => ({
-            ...prev,
-            targetStationId: null,
-            scheduledStart: null,
-          }));
+        if (!stationElement || !activeTask) {
+          setDragValidation((prev) => ({ ...prev, targetStationId: null, scheduledStart: null }));
           return;
         }
 
-        const testId = stationColumnElement.getAttribute('data-testid');
-        const stationId = testId?.replace('station-column-', '') || null;
-        const rect = stationColumnElement.getBoundingClientRect();
-
-        // Calculate tile top position using grab offset
-        const relativeY = calculateTileTopPosition(
-          location.current.input.clientY,
-          rect.top,
-          grabOffset.y
-        );
-
-        // Calculate drop time for validation
-        const dropTime = yPositionToTime(relativeY, START_HOUR);
-
-        setDragValidation((prev) => ({
-          ...prev,
-          targetStationId: stationId,
-          scheduledStart: dropTime.toISOString(),
-        }));
+        const scheduledStart = calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y);
+        setDragValidation((prev) => ({ ...prev, targetStationId: stationId, scheduledStart }));
       },
       onDrop: ({ source, location }) => {
         // Capture current state before reset
@@ -475,31 +511,22 @@ function AppContent() {
         const dragData = source.data as TaskDragData | undefined;
         if (!dragData || dragData.type !== 'task') return;
 
-        // Find the drop target (station column under pointer)
-        // Try pragmatic-dnd's dropTargets first, fallback to elementsFromPoint for synthetic events
-        let targetStationId: string | null = null;
+        // Find the drop target station
+        const { clientX, clientY } = location.current.input;
         const dropTargets = location.current.dropTargets;
 
+        // Try pragmatic-dnd's dropTargets first
+        let targetStationId: string | null = null;
         if (dropTargets.length > 0) {
-          const dropData = dropTargets[0].data as StationDropData | undefined;
-          if (dropData?.type === 'station-column') {
-            targetStationId = dropData.stationId;
+          const targetData = dropTargets[0].data as StationDropData | undefined;
+          if (targetData?.type === 'station-column') {
+            targetStationId = targetData.stationId;
           }
         }
 
         // Fallback: use elementsFromPoint (for synthetic events in tests)
         if (!targetStationId) {
-          const elements = document.elementsFromPoint(
-            location.current.input.clientX,
-            location.current.input.clientY
-          );
-          const stationElement = elements.find(el =>
-            el.getAttribute('data-testid')?.startsWith('station-column-')
-          );
-          if (stationElement) {
-            const testId = stationElement.getAttribute('data-testid');
-            targetStationId = testId?.replace('station-column-', '') || null;
-          }
+          targetStationId = getStationIdFromElement(findStationColumnFromPointer(clientX, clientY));
         }
 
         if (!targetStationId) {
@@ -507,31 +534,11 @@ function AppContent() {
           return;
         }
 
-        // Create dropData for compatibility with existing code
         const dropData: StationDropData = { type: 'station-column', stationId: targetStationId };
 
-        // Calculate scheduledStart directly from coordinates (don't rely on potentially stale state)
-        // This ensures test synthetic events work correctly
-        let calculatedScheduledStart = currentDragValidation.scheduledStart;
-        if (!calculatedScheduledStart) {
-          const elements = document.elementsFromPoint(
-            location.current.input.clientX,
-            location.current.input.clientY
-          );
-          const stationColumnElement = elements.find(el =>
-            el.getAttribute('data-testid')?.startsWith('station-column-')
-          );
-          if (stationColumnElement) {
-            const rect = stationColumnElement.getBoundingClientRect();
-            const relativeY = calculateTileTopPosition(
-              location.current.input.clientY,
-              rect.top,
-              grabOffset.y
-            );
-            const dropTime = yPositionToTime(relativeY, START_HOUR);
-            calculatedScheduledStart = dropTime.toISOString();
-          }
-        }
+        // Calculate scheduledStart (use cached or calculate from pointer)
+        const calculatedScheduledStart = currentDragValidation.scheduledStart
+          || calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y);
 
         // Verify the task belongs to this station
         if (dragData.task.type !== 'Internal' || dragData.task.stationId !== dropData.stationId) {
