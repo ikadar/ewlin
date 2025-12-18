@@ -1,12 +1,14 @@
+import { useRef, useState, useEffect } from 'react';
 import { Circle, CircleCheck } from 'lucide-react';
-import { useDraggable } from '@dnd-kit/core';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
 import type { TaskAssignment, Job, InternalTask } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
-import type { TaskDragData } from '../../App';
+import { useDragState, type TaskDragData } from '../../dnd';
 
 export interface TileProps {
   /** Task assignment data */
@@ -67,18 +69,50 @@ export function Tile({
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
 
-  // Set up draggable - tiles can be repositioned within their station column
-  const dragData: TaskDragData = {
-    type: 'task',
-    task,
-    job,
-    assignmentId: assignment.id, // Include assignment ID for reschedule detection
-  };
+  // Ref for the draggable element
+  const tileRef = useRef<HTMLDivElement>(null);
 
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `grid-tile-${assignment.id}`,
-    data: dragData,
-  });
+  // Local state for isDragging (replaces useDraggable's isDragging)
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Get drag state methods from context
+  const { startDrag, endDrag } = useDragState();
+
+  // Set up draggable using pragmatic-drag-and-drop
+  useEffect(() => {
+    const element = tileRef.current;
+    if (!element) return;
+
+    const dragData: TaskDragData = {
+      type: 'task',
+      task,
+      job,
+      assignmentId: assignment.id, // Include assignment ID for reschedule detection
+    };
+
+    return draggable({
+      element,
+      getInitialData: () => dragData,
+      onGenerateDragPreview: ({ nativeSetDragImage }) => {
+        // Use pragmatic-dnd's official API to disable native drag preview
+        disableNativeDragPreview({ nativeSetDragImage });
+      },
+      onDragStart: ({ location }) => {
+        setIsDragging(true);
+        // Calculate grab offset (where user grabbed within the tile)
+        const rect = element.getBoundingClientRect();
+        const grabOffset = {
+          x: location.initial.input.clientX - rect.left,
+          y: location.initial.input.clientY - rect.top,
+        };
+        startDrag(task, job, assignment.id, grabOffset);
+      },
+      onDrop: () => {
+        setIsDragging(false);
+        endDrag();
+      },
+    });
+  }, [task, job, assignment.id, startDrag, endDrag]);
 
   // Calculate total height from scheduled time span (downtime-aware)
   // This reflects actual time on grid, including stretching across non-operating periods
@@ -151,7 +185,7 @@ export function Tile({
   if (isDragging) {
     return (
       <div
-        ref={setNodeRef}
+        ref={tileRef}
         className="absolute left-0 right-0 border-2 border-dashed border-zinc-600 bg-zinc-800/30 rounded pointer-events-none"
         style={{ top: `${top}px`, height: `${totalHeight}px` }}
         data-testid={`tile-ghost-${assignment.id}`}
@@ -161,14 +195,16 @@ export function Tile({
 
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
+      ref={tileRef}
       className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-grab touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{ top: `${top}px`, height: `${totalHeight}px`, ...selectedStyle, ...mutingStyle }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       data-testid={`tile-${assignment.id}`}
+      data-scheduled-start={assignment.scheduledStart}
+      data-scheduled-end={assignment.scheduledEnd}
+      data-task-id={task.id}
+      data-station-id={task.stationId}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {

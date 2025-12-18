@@ -1,16 +1,10 @@
-import type { ReactNode, MouseEvent } from 'react';
-import { useDroppable } from '@dnd-kit/core';
+import { type ReactNode, type MouseEvent, useEffect, useRef, useState } from 'react';
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { Station, DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import { PlacementIndicator } from '../PlacementIndicator';
-import type { TaskDragData } from '../../App';
-
-/** Data attached to droppable station columns */
-export interface StationDropData {
-  type: 'station-column';
-  stationId: string;
-}
+import { useDragStateValue, type TaskDragData, type StationDropData } from '../../dnd';
 
 export interface StationColumnProps {
   /** Station to display */
@@ -87,23 +81,48 @@ export function StationColumn({
   onQuickPlacementMouseLeave,
   onQuickPlacementClick,
 }: StationColumnProps) {
-  // Set up droppable
-  const dropData: StationDropData = {
-    type: 'station-column',
-    stationId: station.id,
-  };
+  // Ref for the drop target element
+  const columnRef = useRef<HTMLDivElement>(null);
 
-  const { setNodeRef, isOver, active } = useDroppable({
-    id: `station-${station.id}`,
-    data: dropData,
-  });
+  // Local state for isOver (replaces useDroppable's isOver)
+  const [isOver, setIsOver] = useState(false);
+
+  // Get drag state from context (replaces useDroppable's active)
+  const { isDragging, activeTask } = useDragStateValue();
+
+  // Set up drop target using pragmatic-drag-and-drop
+  useEffect(() => {
+    const element = columnRef.current;
+    if (!element) return;
+
+    const dropData: StationDropData = {
+      type: 'station-column',
+      stationId: station.id,
+    };
+
+    return dropTargetForElements({
+      element,
+      getData: () => dropData,
+      canDrop: ({ source }) => {
+        // Only accept task drags for this station
+        const data = source.data as TaskDragData;
+        return (
+          data.type === 'task' &&
+          data.task.type === 'Internal' &&
+          data.task.stationId === station.id
+        );
+      },
+      onDragEnter: () => setIsOver(true),
+      onDragLeave: () => setIsOver(false),
+      onDrop: () => setIsOver(false),
+    });
+  }, [station.id]);
 
   // Check if the dragged task belongs to this station
-  const activeData = active?.data.current as TaskDragData | undefined;
   const isValidDropTarget =
-    activeData?.type === 'task' &&
-    activeData.task.type === 'Internal' &&
-    activeData.task.stationId === station.id;
+    isDragging &&
+    activeTask?.type === 'Internal' &&
+    activeTask.stationId === station.id;
 
   // Use current day if not specified
   const effectiveDayOfWeek = dayOfWeek ?? new Date().getDay();
@@ -138,7 +157,7 @@ export function StationColumn({
       return 'ring-2 ring-green-500 bg-green-500/10';
     }
     // Quick Placement Mode highlighting (only when not dragging)
-    if (isQuickPlacementMode && !active) {
+    if (isQuickPlacementMode && !isDragging) {
       if (hasAvailableTask) {
         // Available column - green highlight
         return 'ring-2 ring-green-500 bg-green-500/10';
@@ -148,7 +167,7 @@ export function StationColumn({
       }
     }
     // Fallback to basic drag state highlighting
-    if (!active) return '';
+    if (!isDragging) return '';
     if (isValidDropTarget) {
       return isOver ? 'ring-2 ring-green-500/50 bg-green-500/5' : 'ring-1 ring-green-500/30';
     }
@@ -186,7 +205,7 @@ export function StationColumn({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={columnRef}
       className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${getHighlightClass()} ${getCursorClass()}`}
       style={{ height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}

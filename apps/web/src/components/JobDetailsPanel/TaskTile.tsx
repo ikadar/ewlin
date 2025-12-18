@@ -1,6 +1,8 @@
-import { useDraggable } from '@dnd-kit/core';
+import { useRef, useState, useEffect } from 'react';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
 import type { Task, TaskAssignment, Station, Job } from '@flux/types';
-import type { TaskDragData } from '../../App';
+import { useDragState, type TaskDragData } from '../../dnd';
 
 export interface TaskTileProps {
   /** The task to display */
@@ -29,20 +31,52 @@ export interface TaskTileProps {
 export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, onJumpToTask, onRecallTask }: TaskTileProps) {
   const isScheduled = !!assignment;
 
-  // Set up draggable for unscheduled tasks only
-  const dragData: TaskDragData = {
-    type: 'task',
-    task,
-    job,
-  };
+  // Ref for the draggable element
+  const tileRef = useRef<HTMLDivElement>(null);
 
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `task-${task.id}`,
-    data: dragData,
-    disabled: isScheduled, // Only unscheduled tasks are draggable
-  });
+  // Local state for isDragging
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Note: We don't apply transform here because we use DragOverlay for the preview.
+  // Get drag state methods from context
+  const { startDrag, endDrag } = useDragState();
+
+  // Set up draggable for unscheduled tasks only using pragmatic-drag-and-drop
+  useEffect(() => {
+    const element = tileRef.current;
+    if (!element || isScheduled) return; // Only unscheduled tasks are draggable
+
+    const dragData: TaskDragData = {
+      type: 'task',
+      task,
+      job,
+      // No assignmentId - this is a new placement, not reschedule
+    };
+
+    return draggable({
+      element,
+      getInitialData: () => dragData,
+      onGenerateDragPreview: ({ nativeSetDragImage }) => {
+        // Use pragmatic-dnd's official API to disable native drag preview
+        disableNativeDragPreview({ nativeSetDragImage });
+      },
+      onDragStart: ({ location }) => {
+        setIsDragging(true);
+        // Calculate grab offset (where user grabbed within the tile)
+        const rect = element.getBoundingClientRect();
+        const grabOffset = {
+          x: location.initial.input.clientX - rect.left,
+          y: location.initial.input.clientY - rect.top,
+        };
+        startDrag(task, job, undefined, grabOffset); // No assignmentId for new placement
+      },
+      onDrop: () => {
+        setIsDragging(false);
+        endDrag();
+      },
+    });
+  }, [task, job, isScheduled, startDrag, endDrag]);
+
+  // Note: We don't apply transform here because we use DragLayer for the preview.
   // The source element stays in place while dragging.
 
   // Format duration as Xh YY
@@ -178,9 +212,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   // Unscheduled task - job color styling, draggable
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
+      ref={tileRef}
       className={`pt-0.5 px-2 text-sm border-l-4 touch-none select-none ${
         isDragging ? 'opacity-50 cursor-grabbing' : 'cursor-grab'
       }`}

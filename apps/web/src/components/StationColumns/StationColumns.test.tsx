@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DndContext } from '@dnd-kit/core';
+import { DragStateProvider } from '../../dnd';
 import { StationColumns } from './StationColumns';
 import { StationColumn } from './StationColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import type { Station, Job, DaySchedule } from '@flux/types';
 
-// Helper to wrap components with DndContext
+// Helper to wrap components with DragStateProvider
 const DndWrapper = ({ children }: { children: React.ReactNode }) => (
-  <DndContext>{children}</DndContext>
+  <DragStateProvider>{children}</DragStateProvider>
 );
 
 // Mock station with standard schedule

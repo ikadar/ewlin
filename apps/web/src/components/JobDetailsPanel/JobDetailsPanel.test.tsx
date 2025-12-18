@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DndContext } from '@dnd-kit/core';
+import { DragStateProvider } from '../../dnd';
 import { JobDetailsPanel } from './JobDetailsPanel';
 import { JobInfo } from './JobInfo';
 import { JobStatus } from './JobStatus';
@@ -9,9 +9,9 @@ import { TaskList } from './TaskList';
 import { TaskTile } from './TaskTile';
 import type { Job, Task, TaskAssignment, Station } from '@flux/types';
 
-// Helper to wrap components with DndContext
+// Helper to wrap components with DragStateProvider
 const DndWrapper = ({ children }: { children: React.ReactNode }) => (
-  <DndContext>{children}</DndContext>
+  <DragStateProvider>{children}</DragStateProvider>
 );
 
 // Mock data

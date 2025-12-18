@@ -10,6 +10,7 @@ import {
   generateAllAssignmentData,
   identifyLateJobs,
 } from './generators';
+import { createTestFixtureSnapshot, shouldUseTestFixture } from './testFixture';
 
 // ============================================================================
 // Snapshot Creation
@@ -75,6 +76,14 @@ let cacheOptions: SnapshotOptions = {};
  * @returns The cached or newly created snapshot
  */
 export function getSnapshot(options?: SnapshotOptions): ScheduleSnapshot {
+  // Check for test fixture mode (URL parameter ?fixture=test)
+  if (shouldUseTestFixture()) {
+    if (!cachedSnapshot) {
+      cachedSnapshot = createTestFixtureSnapshot();
+    }
+    return cachedSnapshot;
+  }
+
   // If options changed, invalidate cache
   if (options && JSON.stringify(options) !== JSON.stringify(cacheOptions)) {
     cachedSnapshot = null;

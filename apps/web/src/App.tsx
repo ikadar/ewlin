@@ -1,111 +1,47 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  MeasuringStrategy,
-  type DragStartEvent,
-  type DragEndEvent,
-  type DragMoveEvent,
-  type CollisionDetection,
-  type DroppableContainer,
-} from '@dnd-kit/core';
+import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, PIXELS_PER_HOUR, timeToYPosition } from './components';
 import type { SchedulingGridHandle } from './components';
-import { DragPreview, snapToGrid, yPositionToTime } from './components/DragPreview';
+import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateGrabOffset, calculateTileTopPosition } from './utils';
-import type { StationDropData } from './components/StationColumns';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition } from './utils';
+import {
+  DragStateProvider,
+  DragLayer,
+  useDragState,
+  type TaskDragData,
+  type StationDropData,
+  type DragValidationState,
+} from './dnd';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict } from '@flux/types';
-
-/** Data attached to draggable task tiles */
-export interface TaskDragData {
-  type: 'task';
-  task: Task;
-  job: Job;
-  /** Assignment ID if this is a reschedule (existing tile being repositioned) */
-  assignmentId?: string;
-}
-
-/** Validation state during drag */
-export interface DragValidationState {
-  targetStationId: string | null;
-  scheduledStart: string | null;
-  isValid: boolean;
-  hasPrecedenceConflict: boolean;
-  suggestedStart: string | null;
-  hasWarningOnly: boolean;
-}
 
 const START_HOUR = 6;
 
-/**
- * Custom collision detection that uses document.elementsFromPoint() to find
- * the station column under the pointer. This bypasses dnd-kit's cached rect values
- * which can be stale during column collapse animations.
- */
-const pointerBasedCollision: CollisionDetection = ({
-  droppableContainers,
-  pointerCoordinates,
-}) => {
-  if (!pointerCoordinates) {
-    return [];
-  }
-
-  // Use browser's elementsFromPoint to find actual elements at pointer position
-  const elements = document.elementsFromPoint(pointerCoordinates.x, pointerCoordinates.y);
-
-  // Find station column element
-  const stationColumnElement = elements.find(el =>
-    el.getAttribute('data-testid')?.startsWith('station-column-')
-  );
-
-  if (!stationColumnElement) {
-    return [];
-  }
-
-  // Extract station ID from data-testid
-  const testId = stationColumnElement.getAttribute('data-testid');
-  const stationId = testId?.replace('station-column-', '');
-  const droppableId = `station-${stationId}`;
-
-  // Find the matching droppable container
-  const container = droppableContainers.find(c => c.id === droppableId);
-  if (!container) {
-    return [];
-  }
-
-  return [{
-    id: droppableId,
-    data: { droppableContainer: container },
-  }];
-};
-
-function App() {
+// Inner App component that uses drag state context
+function AppContent() {
   // Snapshot version state to force re-render on updates
   const [snapshotVersion, setSnapshotVersion] = useState(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshotVersion triggers refetch
   const snapshot = useMemo(() => getSnapshot(), [snapshotVersion]);
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [activeJob, setActiveJob] = useState<Job | null>(null);
-  // Track if this is a reschedule drag (grid tile repositioning vs sidebar drag)
-  const [isRescheduleDrag, setIsRescheduleDrag] = useState(false);
+
+  // Get drag state from context (replaces local activeTask/activeJob state)
+  const { state: dragState, updateValidation } = useDragState();
+  const { activeTask, activeJob, isRescheduleDrag, grabOffset, activeAssignmentId } = dragState;
 
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
 
-  // Drag validation state
+  // Drag validation state (for real-time position tracking)
   const [dragValidation, setDragValidation] = useState<DragValidationState>({
     targetStationId: null,
     scheduledStart: null,
     isValid: false,
     hasPrecedenceConflict: false,
     suggestedStart: null,
+    hasWarningOnly: false,
   });
 
   // Quick Placement Mode state
@@ -122,14 +58,8 @@ function App() {
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
 
-  // Track current mouse position during drag (dnd-kit's delta doesn't give us this directly)
+  // Track current mouse position during drag
   const currentPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // Track grab offset (where user grabbed within the tile) for tile-based drop positioning
-  const grabOffsetRef = useRef<{ y: number }>({ y: 0 });
-
-  // The mock snapshot is already a ScheduleSnapshot type
-  // Just use it directly for validation
 
   // Use drop validation hook
   const validation = useDropValidation({
@@ -139,15 +69,6 @@ function App() {
     scheduledStart: dragValidation.scheduledStart,
     bypassPrecedence: isAltPressed,
   });
-
-  // Configure pointer sensor with activation constraint
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement required before drag starts
-      },
-    })
-  );
 
   // Create lookup maps
   const jobMap = useMemo(() => {
@@ -306,270 +227,257 @@ function App() {
     };
   }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob]);
 
-  // Handle drag start
-  const handleDragStart = (event: DragStartEvent) => {
-    const data = event.active.data.current as TaskDragData | undefined;
-    if (data?.type === 'task') {
-      setActiveTask(data.task);
-      setActiveJob(data.job);
-      // Track if this is a reschedule (grid tile repositioning) vs new placement (sidebar drag)
-      setIsRescheduleDrag(!!data.assignmentId);
-      // Reset validation state
-      setDragValidation({
-        targetStationId: null,
-        scheduledStart: null,
-        isValid: false,
-        hasPrecedenceConflict: false,
-        suggestedStart: null,
-      });
-
-      // Calculate grab offset (where user grabbed within the tile)
-      // This enables tile-based drop positioning instead of cursor-based
-      // Find the tile element from the activator event target
-      // Look for both sidebar task tiles (task-tile-*) and grid tiles (tile-*)
-      const activatorEvent = event.activatorEvent as PointerEvent | MouseEvent;
-      const target = activatorEvent?.target as HTMLElement | null;
-      const tileElement = (
-        target?.closest('[data-testid^="task-tile-"]') ||
-        target?.closest('[data-testid^="tile-"]')
-      ) as HTMLElement | null;
-      if (activatorEvent && tileElement) {
-        const rect = tileElement.getBoundingClientRect();
-        grabOffsetRef.current = { y: calculateGrabOffset(activatorEvent.clientY, rect.top) };
-      } else {
-        grabOffsetRef.current = { y: 0 };
-      }
-
-      // Set up pointer tracking during drag
-      const handlePointerMove = (e: PointerEvent) => {
-        currentPointerRef.current = { x: e.clientX, y: e.clientY };
-      };
-      window.addEventListener('pointermove', handlePointerMove);
-
-      // Store cleanup function reference
-      (window as unknown as { __cleanupPointerTracking?: () => void }).__cleanupPointerTracking = () => {
-        window.removeEventListener('pointermove', handlePointerMove);
-      };
-    }
-  };
-
-  // Handle drag move - real-time validation
-  const handleDragMove = useCallback((event: DragMoveEvent) => {
-    const { over } = event;
-
-    if (!over || !activeTask) {
-      setDragValidation((prev) => ({
-        ...prev,
-        targetStationId: null,
-        scheduledStart: null,
-      }));
-      return;
-    }
-
-    const dropData = over.data.current as StationDropData | undefined;
-    if (dropData?.type !== 'station-column') {
-      return;
-    }
-
-    // Get the droppable element's position to calculate Y offset
-    const droppableElement = document.querySelector(`[data-testid="station-column-${dropData.stationId}"]`);
-    if (!droppableElement) return;
-
-    const rect = droppableElement.getBoundingClientRect();
-
-    // Calculate tile top position using tile-based positioning
-    // This subtracts the grab offset to get where the tile's top edge should be
-    const relativeY = calculateTileTopPosition(
-      currentPointerRef.current.y,
-      rect.top,
-      grabOffsetRef.current.y
-    );
-
-    // Use unsnapped position for real-time validation feedback
-    // The actual drop will snap to grid, but validation shows current cursor position
-    const dropTime = yPositionToTime(relativeY, START_HOUR);
-
-    setDragValidation((prev) => ({
-      ...prev,
-      targetStationId: dropData.stationId,
-      scheduledStart: dropTime.toISOString(),
-    }));
-  }, [activeTask]);
-
-  // Handle drag end - create or reschedule assignment on valid drop
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    // Capture current drag state before resetting
-    const currentDragValidation = { ...dragValidation };
-    const currentValidation = { ...validation };
-    const wasAltPressed = isAltPressed;
-
-    // Reset active state and validation
-    setActiveTask(null);
-    setActiveJob(null);
-    setIsRescheduleDrag(false);
-    setDragValidation({
-      targetStationId: null,
-      scheduledStart: null,
-      isValid: false,
-      hasPrecedenceConflict: false,
-      suggestedStart: null,
-    });
-
-    // Clean up pointer tracking
-    const cleanup = (window as unknown as { __cleanupPointerTracking?: () => void }).__cleanupPointerTracking;
-    if (cleanup) {
-      cleanup();
-      delete (window as unknown as { __cleanupPointerTracking?: () => void }).__cleanupPointerTracking;
-    }
-
-    // If not dropped on a valid target, do nothing
-    if (!over) return;
-
-    // Get drop data
-    const dropData = over.data.current as StationDropData | undefined;
-    const dragData = active.data.current as TaskDragData | undefined;
-
-    if (dropData?.type !== 'station-column' || dragData?.type !== 'task') return;
-
-    // Verify the task belongs to this station
-    if (dragData.task.type !== 'Internal' || dragData.task.stationId !== dropData.stationId) {
-      console.log('Invalid drop: task does not belong to this station', {
-        taskType: dragData.task.type,
-        taskStationId: dragData.task.type === 'Internal' ? dragData.task.stationId : 'N/A',
-        dropStationId: dropData.stationId,
-      });
-      return;
-    }
-
-    // Determine if this is a reschedule (moving existing tile) or new placement
-    const isReschedule = !!dragData.assignmentId;
-
-    // Use the validation result to determine if drop is valid
-    // StationConflict is allowed because push-down will resolve it
-    // PrecedenceConflict is allowed if we have a suggestedStart (auto-snap)
-    // ApprovalGateConflict for Plates is warning only (not blocking)
-    // Reschedule (moving existing tile) is always allowed within same station
-    const blockingConflicts = currentValidation.conflicts.filter(
-      (c) => c.type !== 'StationConflict' &&
-             !(c.type === 'PrecedenceConflict' && currentValidation.suggestedStart) &&
-             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
-    );
-    const hasBlockingConflicts = blockingConflicts.length > 0;
-
-    if (hasBlockingConflicts && !wasAltPressed) {
-      console.log('Invalid drop: validation failed', blockingConflicts);
-      return;
-    }
-
-    // Calculate the drop position (use suggested start if precedence conflict without Alt)
-    const rawScheduledStart = currentValidation.hasPrecedenceConflict && !wasAltPressed && currentValidation.suggestedStart
-      ? currentValidation.suggestedStart
-      : currentDragValidation.scheduledStart;
-
-    if (!rawScheduledStart) {
-      console.log('Invalid drop: no scheduled start');
-      return;
-    }
-
-    // Snap the scheduled start to 30-minute grid
-    const startDate = new Date(rawScheduledStart);
-    const minutes = startDate.getMinutes();
-    const snappedMinutes = Math.round(minutes / 30) * 30;
-    startDate.setMinutes(snappedMinutes, 0, 0);
-    const scheduledStart = startDate.toISOString();
-
-    // Create the assignment
-    const task = dragData.task as InternalTask;
-    const station = snapshot.stations.find((s) => s.id === dropData.stationId);
-    const scheduledEnd = calculateEndTime(task, scheduledStart, station);
-    const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
-
-    // Update snapshot with new/updated assignment and push-down logic
-    updateSnapshot((currentSnapshot) => {
-      let assignmentsWithoutCurrent = currentSnapshot.assignments;
-      let existingAssignment: TaskAssignment | undefined;
-
-      // For reschedule, find and remove the existing assignment first
-      if (isReschedule && dragData.assignmentId) {
-        existingAssignment = currentSnapshot.assignments.find(
-          (a) => a.id === dragData.assignmentId
-        );
-        assignmentsWithoutCurrent = currentSnapshot.assignments.filter(
-          (a) => a.id !== dragData.assignmentId
-        );
-      }
-
-      // Apply push-down to remaining assignments (excluding the one being moved)
-      const { updatedAssignments, shiftedIds } = applyPushDown(
-        assignmentsWithoutCurrent,
-        dropData.stationId,
-        scheduledStart,
-        scheduledEnd,
-        task.id
-      );
-
-      if (shiftedIds.length > 0) {
-        console.log('Push-down applied to assignments:', shiftedIds);
-      }
-
-      // Create the new/updated assignment
-      const finalAssignment: TaskAssignment = isReschedule && existingAssignment
-        ? {
-            ...existingAssignment,
-            scheduledStart,
-            scheduledEnd,
-            updatedAt: new Date().toISOString(),
-          }
-        : {
-            id: generateId(),
-            taskId: task.id,
-            targetId: dropData.stationId,
-            isOutsourced: false,
-            scheduledStart,
-            scheduledEnd,
-            isCompleted: false,
-            completedAt: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-      // Add conflict if precedence was bypassed
-      let newConflicts = [...currentSnapshot.conflicts];
-      if (bypassedPrecedence) {
-        const precedenceConflict: ScheduleConflict = {
-          type: 'PrecedenceConflict',
-          message: `Task placed before predecessor completes (Alt-key bypass)`,
-          taskId: task.id,
-          targetId: dropData.stationId,
-          details: {
-            bypassedByUser: true,
-          },
+  // Set up global drag monitoring using pragmatic-drag-and-drop
+  // Handles: position tracking during drag, drop processing
+  useEffect(() => {
+    return monitorForElements({
+      onDragStart: () => {
+        // Reset validation state when drag starts
+        setDragValidation({
+          targetStationId: null,
+          scheduledStart: null,
+          isValid: false,
+          hasPrecedenceConflict: false,
+          suggestedStart: null,
+          hasWarningOnly: false,
+        });
+      },
+      onDrag: ({ location }) => {
+        // Track current pointer position
+        currentPointerRef.current = {
+          x: location.current.input.clientX,
+          y: location.current.input.clientY,
         };
-        newConflicts = [...newConflicts, precedenceConflict];
-        console.log('Added precedence conflict for bypass');
-      }
 
-      return {
-        ...currentSnapshot,
-        assignments: [...updatedAssignments, finalAssignment],
-        conflicts: newConflicts,
-      };
+        // Find station column under pointer for validation
+        const elements = document.elementsFromPoint(
+          location.current.input.clientX,
+          location.current.input.clientY
+        );
+        const stationColumnElement = elements.find(el =>
+          el.getAttribute('data-testid')?.startsWith('station-column-')
+        );
+
+        if (!stationColumnElement || !activeTask) {
+          setDragValidation((prev) => ({
+            ...prev,
+            targetStationId: null,
+            scheduledStart: null,
+          }));
+          return;
+        }
+
+        const testId = stationColumnElement.getAttribute('data-testid');
+        const stationId = testId?.replace('station-column-', '') || null;
+        const rect = stationColumnElement.getBoundingClientRect();
+
+        // Calculate tile top position using grab offset
+        const relativeY = calculateTileTopPosition(
+          location.current.input.clientY,
+          rect.top,
+          grabOffset.y
+        );
+
+        // Calculate drop time for validation
+        const dropTime = yPositionToTime(relativeY, START_HOUR);
+
+        setDragValidation((prev) => ({
+          ...prev,
+          targetStationId: stationId,
+          scheduledStart: dropTime.toISOString(),
+        }));
+      },
+      onDrop: ({ source, location }) => {
+        // Capture current state before reset
+        const currentDragValidation = { ...dragValidation };
+        const currentValidation = { ...validation };
+        const wasAltPressed = isAltPressed;
+
+        // Reset validation state
+        setDragValidation({
+          targetStationId: null,
+          scheduledStart: null,
+          isValid: false,
+          hasPrecedenceConflict: false,
+          suggestedStart: null,
+          hasWarningOnly: false,
+        });
+
+        // Get drag data
+        const dragData = source.data as TaskDragData | undefined;
+        if (!dragData || dragData.type !== 'task') return;
+
+        // Find the drop target (station column under pointer)
+        // Try pragmatic-dnd's dropTargets first, fallback to elementsFromPoint for synthetic events
+        let targetStationId: string | null = null;
+        const dropTargets = location.current.dropTargets;
+
+        if (dropTargets.length > 0) {
+          const dropData = dropTargets[0].data as StationDropData | undefined;
+          if (dropData?.type === 'station-column') {
+            targetStationId = dropData.stationId;
+          }
+        }
+
+        // Fallback: use elementsFromPoint (for synthetic events in tests)
+        if (!targetStationId) {
+          const elements = document.elementsFromPoint(
+            location.current.input.clientX,
+            location.current.input.clientY
+          );
+          const stationElement = elements.find(el =>
+            el.getAttribute('data-testid')?.startsWith('station-column-')
+          );
+          if (stationElement) {
+            const testId = stationElement.getAttribute('data-testid');
+            targetStationId = testId?.replace('station-column-', '') || null;
+          }
+        }
+
+        if (!targetStationId) {
+          console.log('Invalid drop: no station column found');
+          return;
+        }
+
+        // Create dropData for compatibility with existing code
+        const dropData: StationDropData = { type: 'station-column', stationId: targetStationId };
+
+        // Calculate scheduledStart directly from coordinates (don't rely on potentially stale state)
+        // This ensures test synthetic events work correctly
+        let calculatedScheduledStart = currentDragValidation.scheduledStart;
+        if (!calculatedScheduledStart) {
+          const elements = document.elementsFromPoint(
+            location.current.input.clientX,
+            location.current.input.clientY
+          );
+          const stationColumnElement = elements.find(el =>
+            el.getAttribute('data-testid')?.startsWith('station-column-')
+          );
+          if (stationColumnElement) {
+            const rect = stationColumnElement.getBoundingClientRect();
+            const relativeY = calculateTileTopPosition(
+              location.current.input.clientY,
+              rect.top,
+              grabOffset.y
+            );
+            const dropTime = yPositionToTime(relativeY, START_HOUR);
+            calculatedScheduledStart = dropTime.toISOString();
+          }
+        }
+
+        // Verify the task belongs to this station
+        if (dragData.task.type !== 'Internal' || dragData.task.stationId !== dropData.stationId) {
+          console.log('Invalid drop: task does not belong to this station');
+          return;
+        }
+
+        // Determine if this is a reschedule
+        const isRescheduleOp = !!dragData.assignmentId;
+
+        // Check for blocking conflicts
+        const blockingConflicts = currentValidation.conflicts.filter(
+          (c) => c.type !== 'StationConflict' &&
+                 !(c.type === 'PrecedenceConflict' && currentValidation.suggestedStart) &&
+                 !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+        );
+
+        if (blockingConflicts.length > 0 && !wasAltPressed) {
+          console.log('Invalid drop: validation failed', JSON.stringify(blockingConflicts), JSON.stringify({
+            currentValidation,
+            currentDragValidation,
+            calculatedScheduledStart,
+            targetStationId,
+          }));
+          return;
+        }
+
+        // Calculate drop position
+        const rawScheduledStart = currentValidation.hasPrecedenceConflict && !wasAltPressed && currentValidation.suggestedStart
+          ? currentValidation.suggestedStart
+          : calculatedScheduledStart;
+
+        if (!rawScheduledStart) {
+          console.log('Invalid drop: no scheduled start', { calculatedScheduledStart, currentDragValidation });
+          return;
+        }
+
+        // Snap to 30-minute grid
+        const startDate = new Date(rawScheduledStart);
+        const minutes = startDate.getMinutes();
+        const snappedMinutes = Math.round(minutes / 30) * 30;
+        startDate.setMinutes(snappedMinutes, 0, 0);
+        const scheduledStart = startDate.toISOString();
+
+        // Create the assignment
+        const task = dragData.task as InternalTask;
+        const station = snapshot.stations.find((s) => s.id === dropData.stationId);
+        const scheduledEnd = calculateEndTime(task, scheduledStart, station);
+        const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
+
+        // Update snapshot
+        updateSnapshot((currentSnapshot) => {
+          let assignmentsWithoutCurrent = currentSnapshot.assignments;
+          let existingAssignment: TaskAssignment | undefined;
+
+          if (isRescheduleOp && dragData.assignmentId) {
+            existingAssignment = currentSnapshot.assignments.find(
+              (a) => a.id === dragData.assignmentId
+            );
+            assignmentsWithoutCurrent = currentSnapshot.assignments.filter(
+              (a) => a.id !== dragData.assignmentId
+            );
+          }
+
+          const { updatedAssignments, shiftedIds } = applyPushDown(
+            assignmentsWithoutCurrent,
+            dropData.stationId,
+            scheduledStart,
+            scheduledEnd,
+            task.id
+          );
+
+          if (shiftedIds.length > 0) {
+            console.log('Push-down applied:', shiftedIds);
+          }
+
+          const finalAssignment: TaskAssignment = isRescheduleOp && existingAssignment
+            ? { ...existingAssignment, scheduledStart, scheduledEnd, updatedAt: new Date().toISOString() }
+            : {
+                id: generateId(),
+                taskId: task.id,
+                targetId: dropData.stationId,
+                isOutsourced: false,
+                scheduledStart,
+                scheduledEnd,
+                isCompleted: false,
+                completedAt: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+
+          let newConflicts = [...currentSnapshot.conflicts];
+          if (bypassedPrecedence) {
+            newConflicts.push({
+              type: 'PrecedenceConflict',
+              message: 'Task placed before predecessor completes (Alt-key bypass)',
+              taskId: task.id,
+              targetId: dropData.stationId,
+              details: { bypassedByUser: true },
+            });
+          }
+
+          return {
+            ...currentSnapshot,
+            assignments: [...updatedAssignments, finalAssignment],
+            conflicts: newConflicts,
+          };
+        });
+
+        setSnapshotVersion((v) => v + 1);
+        console.log(isRescheduleOp ? 'Rescheduled:' : 'Created:', { taskId: task.id, scheduledStart });
+      },
     });
-
-    // Trigger re-render
-    setSnapshotVersion((v) => v + 1);
-
-    console.log(isReschedule ? 'Assignment rescheduled:' : 'Assignment created:', {
-      assignmentId: dragData.assignmentId || 'new',
-      taskId: task.id,
-      stationId: dropData.stationId,
-      scheduledStart,
-      scheduledEnd,
-      bypassedPrecedence,
-    });
-  };
+  }, [activeTask, grabOffset, dragValidation, validation, isAltPressed, snapshot.stations]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {
@@ -903,19 +811,7 @@ function App() {
   }, []);
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={pointerBasedCollision}
-      onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
-      onDragEnd={handleDragEnd}
-      autoScroll={false}
-      measuring={{
-        droppable: {
-          strategy: MeasuringStrategy.Always,
-        },
-      }}
-    >
+    <>
       <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
         <Sidebar />
         <JobsList
@@ -982,13 +878,18 @@ function App() {
         />
       </div>
 
-      {/* Drag overlay - shows preview of dragged tile */}
-      <DragOverlay dropAnimation={null}>
-        {activeTask && activeJob && (
-          <DragPreview task={activeTask} job={activeJob} />
-        )}
-      </DragOverlay>
-    </DndContext>
+      {/* Drag layer - portal-based preview of dragged tile */}
+      <DragLayer />
+    </>
+  );
+}
+
+// Main App component wrapping with DragStateProvider
+function App() {
+  return (
+    <DragStateProvider>
+      <AppContent />
+    </DragStateProvider>
   );
 }
 
