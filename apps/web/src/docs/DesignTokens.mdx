@@ -1,0 +1,188 @@
+{/* Design Tokens Documentation */}
+
+import { Meta, ColorPalette, ColorItem } from '@storybook/blocks';
+
+<Meta title="Design System/Design Tokens" />
+
+# Design Tokens
+
+This page documents the design tokens used in the Flux Scheduling UI.
+
+## Job Colors
+
+Jobs are assigned colors from a predefined palette of 17 colors.
+
+<ColorPalette>
+  <ColorItem
+    title="Purple"
+    subtitle="#A855F7"
+    colors={{ Purple: '#A855F7' }}
+  />
+  <ColorItem
+    title="Violet"
+    subtitle="#8B5CF6"
+    colors={{ Violet: '#8B5CF6' }}
+  />
+  <ColorItem
+    title="Blue"
+    subtitle="#3B82F6"
+    colors={{ Blue: '#3B82F6' }}
+  />
+  <ColorItem
+    title="Indigo"
+    subtitle="#6366F1"
+    colors={{ Indigo: '#6366F1' }}
+  />
+  <ColorItem
+    title="Sky"
+    subtitle="#0EA5E9"
+    colors={{ Sky: '#0EA5E9' }}
+  />
+  <ColorItem
+    title="Cyan"
+    subtitle="#06B6D4"
+    colors={{ Cyan: '#06B6D4' }}
+  />
+  <ColorItem
+    title="Teal"
+    subtitle="#14B8A6"
+    colors={{ Teal: '#14B8A6' }}
+  />
+  <ColorItem
+    title="Emerald"
+    subtitle="#10B981"
+    colors={{ Emerald: '#10B981' }}
+  />
+  <ColorItem
+    title="Green"
+    subtitle="#22C55E"
+    colors={{ Green: '#22C55E' }}
+  />
+  <ColorItem
+    title="Lime"
+    subtitle="#84CC16"
+    colors={{ Lime: '#84CC16' }}
+  />
+  <ColorItem
+    title="Yellow"
+    subtitle="#EAB308"
+    colors={{ Yellow: '#EAB308' }}
+  />
+  <ColorItem
+    title="Amber"
+    subtitle="#F59E0B"
+    colors={{ Amber: '#F59E0B' }}
+  />
+  <ColorItem
+    title="Orange"
+    subtitle="#F97316"
+    colors={{ Orange: '#F97316' }}
+  />
+  <ColorItem
+    title="Red"
+    subtitle="#EF4444"
+    colors={{ Red: '#EF4444' }}
+  />
+  <ColorItem
+    title="Rose"
+    subtitle="#F43F5E"
+    colors={{ Rose: '#F43F5E' }}
+  />
+  <ColorItem
+    title="Pink"
+    subtitle="#EC4899"
+    colors={{ Pink: '#EC4899' }}
+  />
+  <ColorItem
+    title="Fuchsia"
+    subtitle="#D946EF"
+    colors={{ Fuchsia: '#D946EF' }}
+  />
+</ColorPalette>
+
+## Validation Feedback Colors
+
+Visual feedback during drag operations:
+
+<ColorPalette>
+  <ColorItem
+    title="Valid Drop"
+    subtitle="Green ring - drop is allowed"
+    colors={{ Ring: '#22C55E', Background: 'rgba(34, 197, 94, 0.1)' }}
+  />
+  <ColorItem
+    title="Invalid Drop"
+    subtitle="Red ring - drop is blocked"
+    colors={{ Ring: '#EF4444', Background: 'rgba(239, 68, 68, 0.1)' }}
+  />
+  <ColorItem
+    title="Warning Drop"
+    subtitle="Orange ring - soft constraint (e.g., Plates pending)"
+    colors={{ Ring: '#F97316', Background: 'rgba(249, 115, 22, 0.1)' }}
+  />
+  <ColorItem
+    title="Bypass Warning"
+    subtitle="Amber ring - Alt+drop precedence bypass"
+    colors={{ Ring: '#F59E0B', Background: 'rgba(245, 158, 11, 0.1)' }}
+  />
+</ColorPalette>
+
+## UI Colors
+
+<ColorPalette>
+  <ColorItem
+    title="Background"
+    subtitle="Main application background"
+    colors={{ Dark: 'hsl(222.2 84% 4.9%)' }}
+  />
+  <ColorItem
+    title="Now Line"
+    subtitle="Current time indicator"
+    colors={{ Red: '#EF4444' }}
+  />
+  <ColorItem
+    title="Departure Line"
+    subtitle="Job departure date indicator"
+    colors={{ Blue: '#3B82F6' }}
+  />
+  <ColorItem
+    title="Placement Indicator"
+    subtitle="Quick placement mode cursor"
+    colors={{ White: '#FFFFFF' }}
+  />
+</ColorPalette>
+
+## Layout Dimensions
+
+| Element | Width | Tailwind Class |
+|---------|-------|----------------|
+| Sidebar | 56px | `w-14` |
+| Jobs List | 288px | `w-72` |
+| Job Details Panel | 288px | `w-72` |
+| Date Strip | 48px | `w-12` |
+| Timeline Column | 48px | `w-12` |
+| Station Column (normal) | 240px | `w-60` |
+| Station Column (collapsed) | 120px | `w-30` |
+
+## Grid Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| Pixels per hour | 80px | Vertical scale |
+| Start hour | 6:00 | Grid starts at 6 AM |
+| Hours displayed | 24 | Full day visible |
+| Snap interval | 30min | Drop positions snap to :00/:30 |
+
+## Animation
+
+| Property | Duration | Easing |
+|----------|----------|--------|
+| Tile transitions | 150ms | ease-out |
+| Column collapse | 150ms | ease-out |
+| Button hover | 100ms | default |
+
+## Typography
+
+- **Base font size:** 14px
+- **Font weight:** 500 (medium)
+- **Font smoothing:** antialiased
