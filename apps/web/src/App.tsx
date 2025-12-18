@@ -385,9 +385,9 @@ function App() {
       grabOffsetRef.current.y
     );
 
-    // Snap to 30-minute grid
-    const snappedY = snapToGrid(relativeY);
-    const dropTime = yPositionToTime(snappedY, START_HOUR);
+    // Use unsnapped position for real-time validation feedback
+    // The actual drop will snap to grid, but validation shows current cursor position
+    const dropTime = yPositionToTime(relativeY, START_HOUR);
 
     setDragValidation((prev) => ({
       ...prev,
@@ -464,14 +464,21 @@ function App() {
     }
 
     // Calculate the drop position (use suggested start if precedence conflict without Alt)
-    const scheduledStart = currentValidation.hasPrecedenceConflict && !wasAltPressed && currentValidation.suggestedStart
+    const rawScheduledStart = currentValidation.hasPrecedenceConflict && !wasAltPressed && currentValidation.suggestedStart
       ? currentValidation.suggestedStart
       : currentDragValidation.scheduledStart;
 
-    if (!scheduledStart) {
+    if (!rawScheduledStart) {
       console.log('Invalid drop: no scheduled start');
       return;
     }
+
+    // Snap the scheduled start to 30-minute grid
+    const startDate = new Date(rawScheduledStart);
+    const minutes = startDate.getMinutes();
+    const snappedMinutes = Math.round(minutes / 30) * 30;
+    startDate.setMinutes(snappedMinutes, 0, 0);
+    const scheduledStart = startDate.toISOString();
 
     // Create the assignment
     const task = dragData.task as InternalTask;
