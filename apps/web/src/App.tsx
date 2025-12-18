@@ -961,7 +961,8 @@ function App() {
             suggestedStart: validation.suggestedStart,
             isAltPressed,
             // Warning-only if we have Plates approval conflict but no blocking conflicts
-            hasWarningOnly: !isRescheduleDrag && validation.hasWarningOnly,
+            // Show warning even during reschedule for visual feedback
+            hasWarningOnly: validation.hasWarningOnly,
           }}
           isQuickPlacementMode={isQuickPlacementMode}
           stationsWithAvailableTasks={stationsWithAvailableTasks}
