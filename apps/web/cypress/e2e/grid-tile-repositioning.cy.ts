@@ -7,7 +7,12 @@
 
 describe('Grid Tile Repositioning', () => {
   beforeEach(() => {
-    cy.visit('/');
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        // Spy on console.log to detect "Invalid drop" errors
+        cy.spy(win.console, 'log').as('consoleLog');
+      },
+    });
     cy.waitForAppReady();
   });
 
@@ -19,6 +24,172 @@ describe('Grid Tile Repositioning', () => {
         .first()
         .should('have.class', 'cursor-grab')
         .and('have.class', 'touch-none');
+    });
+
+    it('should successfully drop tile on its own station column without "Invalid drop" error', () => {
+      // Find a scheduled tile on the grid
+      cy.get('[data-testid^="tile-"]')
+        .not('[data-testid^="tile-ghost-"]')
+        .first()
+        .then(($tile) => {
+          // Find which station column this tile is in
+          const $column = $tile.closest('[data-testid^="station-column-"]');
+          const columnTestId = $column.attr('data-testid');
+          const stationId = columnTestId?.replace('station-column-', '');
+
+          cy.log(`Tile is in station column: ${stationId}`);
+
+          const tileRect = $tile[0].getBoundingClientRect();
+          const columnRect = $column[0].getBoundingClientRect();
+
+          const grabX = tileRect.left + tileRect.width / 2;
+          const grabY = tileRect.top + 10;
+
+          // Calculate drop position (move down 100px within the same column)
+          const dropX = columnRect.left + columnRect.width / 2;
+          const dropY = grabY + 100;
+
+          cy.log(`Grab at: (${grabX}, ${grabY})`);
+          cy.log(`Drop at: (${dropX}, ${dropY})`);
+
+          // Start drag
+          cy.wrap($tile)
+            .trigger('pointerdown', {
+              button: 0,
+              pointerId: 1,
+              clientX: grabX,
+              clientY: grabY,
+              force: true,
+            });
+
+          // Move to new position (still in same column)
+          cy.wrap($tile)
+            .trigger('pointermove', {
+              pointerId: 1,
+              clientX: dropX,
+              clientY: dropY,
+              force: true,
+            });
+
+          cy.wait(300);
+
+          // Drop on the station column
+          cy.get(`[data-testid="${columnTestId}"]`)
+            .trigger('pointerup', {
+              pointerId: 1,
+              clientX: dropX,
+              clientY: dropY,
+              force: true,
+            });
+
+          cy.wait(500);
+
+          // Verify NO "Invalid drop" error was logged
+          cy.get('@consoleLog').then((spy) => {
+            const calls = (spy as unknown as sinon.SinonSpy).getCalls();
+            const invalidDropCalls = calls.filter((call) => {
+              const firstArg = call.args[0];
+              return typeof firstArg === 'string' && firstArg.includes('Invalid drop');
+            });
+
+            if (invalidDropCalls.length > 0) {
+              cy.log('ERROR: Invalid drop was logged!');
+              invalidDropCalls.forEach((call) => {
+                cy.log(`Console log: ${JSON.stringify(call.args)}`);
+              });
+            }
+
+            expect(invalidDropCalls.length, 'Should not have "Invalid drop" errors').to.equal(0);
+          });
+
+          // Verify the tile was rescheduled (look for console log)
+          cy.get('@consoleLog').then((spy) => {
+            const calls = (spy as unknown as sinon.SinonSpy).getCalls();
+            const rescheduleCalls = calls.filter((call) => {
+              const firstArg = call.args[0];
+              return typeof firstArg === 'string' && firstArg.includes('rescheduled');
+            });
+
+            cy.log(`Reschedule log calls: ${rescheduleCalls.length}`);
+          });
+        });
+    });
+
+    it('should successfully drop tile when pointerup is on document (realistic drag)', () => {
+      // This test simulates a more realistic drag where pointerup happens on document
+      cy.get('[data-testid^="tile-"]')
+        .not('[data-testid^="tile-ghost-"]')
+        .first()
+        .then(($tile) => {
+          const $column = $tile.closest('[data-testid^="station-column-"]');
+          const columnTestId = $column.attr('data-testid');
+          const stationId = columnTestId?.replace('station-column-', '');
+
+          cy.log(`Tile is in station column: ${stationId}`);
+
+          const tileRect = $tile[0].getBoundingClientRect();
+          const columnRect = $column[0].getBoundingClientRect();
+
+          const grabX = tileRect.left + tileRect.width / 2;
+          const grabY = tileRect.top + 10;
+          const dropX = columnRect.left + columnRect.width / 2;
+          const dropY = grabY + 100;
+
+          // Start drag on tile
+          cy.wrap($tile)
+            .trigger('pointerdown', {
+              button: 0,
+              pointerId: 1,
+              clientX: grabX,
+              clientY: grabY,
+              force: true,
+            });
+
+          // Move pointer (on document, not tile)
+          cy.document().trigger('pointermove', {
+            pointerId: 1,
+            clientX: dropX,
+            clientY: dropY,
+            force: true,
+          });
+
+          cy.wait(300);
+
+          // Drop on document (not directly on station column)
+          cy.document().trigger('pointerup', {
+            pointerId: 1,
+            clientX: dropX,
+            clientY: dropY,
+            force: true,
+          });
+
+          cy.wait(500);
+
+          // Check for Invalid drop errors
+          cy.get('@consoleLog').then((spy) => {
+            const calls = (spy as unknown as sinon.SinonSpy).getCalls();
+            const invalidDropCalls = calls.filter((call) => {
+              const firstArg = call.args[0];
+              return typeof firstArg === 'string' && firstArg.includes('Invalid drop');
+            });
+
+            if (invalidDropCalls.length > 0) {
+              cy.log('ERROR: Invalid drop was logged!');
+              invalidDropCalls.forEach((call) => {
+                cy.log(`Console log: ${JSON.stringify(call.args)}`);
+              });
+              // Log the actual error details for debugging
+              const errorDetails = invalidDropCalls[0]?.args[1];
+              if (errorDetails) {
+                cy.log(`Task type: ${errorDetails.taskType}`);
+                cy.log(`Task stationId: ${errorDetails.taskStationId}`);
+                cy.log(`Drop stationId: ${errorDetails.dropStationId}`);
+              }
+            }
+
+            expect(invalidDropCalls.length, 'Should not have "Invalid drop" errors').to.equal(0);
+          });
+        });
     });
 
     it('should be able to initiate drag on scheduled tile', () => {

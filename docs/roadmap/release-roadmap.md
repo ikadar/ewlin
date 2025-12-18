@@ -609,15 +609,22 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Push-down behavior when dropping onto other tiles
 - [x] Reuses tile-based drop position calculation
 
+#### v0.3.26 - Manual QA Fixes ✅
+- [x] Custom collision detection (`document.elementsFromPoint()`)
+- [x] DragPreview pointer-events-none (prevents infinite loop)
+- [x] Reschedule validation bypass (isRescheduleDrag)
+- [x] Validator package rebuild (v0.3.24 changes)
+- [x] Mock data fixes (group capacity, BAT approval)
+
 ### Phase 3I: Backend API Integration
 
-#### v0.3.26 - Validator Package Integration
+#### v0.3.27 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-#### v0.3.27 - API Client Setup
+#### v0.3.28 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities

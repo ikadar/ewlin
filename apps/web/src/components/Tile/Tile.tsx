@@ -152,7 +152,7 @@ export function Tile({
     return (
       <div
         ref={setNodeRef}
-        className="absolute left-0 right-0 border-2 border-dashed border-zinc-600 bg-zinc-800/30 rounded"
+        className="absolute left-0 right-0 border-2 border-dashed border-zinc-600 bg-zinc-800/30 rounded pointer-events-none"
         style={{ top: `${top}px`, height: `${totalHeight}px` }}
         data-testid={`tile-ghost-${assignment.id}`}
       />

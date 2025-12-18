@@ -43,7 +43,7 @@ export function DragPreview({ task, job }: DragPreviewProps) {
 
   return (
     <div
-      className={`w-56 pt-1 px-2 pb-2 text-sm border-l-4 ${colors.border} ${colors.runBg} opacity-80 shadow-lg rounded cursor-grabbing`}
+      className={`w-56 pt-1 px-2 pb-2 text-sm border-l-4 ${colors.border} ${colors.runBg} opacity-80 shadow-lg rounded cursor-grabbing pointer-events-none`}
       style={{ height: `${getHeight()}px` }}
       data-testid="drag-preview"
     >

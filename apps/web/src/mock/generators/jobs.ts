@@ -283,7 +283,7 @@ function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
         }
       : {
           sentAt: Math.random() > 0.3 ? formatDate(addDays(now, -randomInt(3, 10))) : 'AwaitingFile',
-          approvedAt: Math.random() > 0.5 ? formatDate(addDays(now, -randomInt(1, 5))) : null,
+          approvedAt: Math.random() > 0.1 ? formatDate(addDays(now, -randomInt(1, 5))) : null,
         },
     platesStatus: forceApproved ? 'Done' : randomElement(['Todo', 'Done'] as PlatesStatus[]),
     requiredJobIds: [],

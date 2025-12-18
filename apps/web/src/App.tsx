@@ -5,9 +5,12 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  MeasuringStrategy,
   type DragStartEvent,
   type DragEndEvent,
   type DragMoveEvent,
+  type CollisionDetection,
+  type DroppableContainer,
 } from '@dnd-kit/core';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, PIXELS_PER_HOUR, timeToYPosition } from './components';
 import type { SchedulingGridHandle } from './components';
@@ -38,6 +41,48 @@ export interface DragValidationState {
 
 const START_HOUR = 6;
 
+/**
+ * Custom collision detection that uses document.elementsFromPoint() to find
+ * the station column under the pointer. This bypasses dnd-kit's cached rect values
+ * which can be stale during column collapse animations.
+ */
+const pointerBasedCollision: CollisionDetection = ({
+  droppableContainers,
+  pointerCoordinates,
+}) => {
+  if (!pointerCoordinates) {
+    return [];
+  }
+
+  // Use browser's elementsFromPoint to find actual elements at pointer position
+  const elements = document.elementsFromPoint(pointerCoordinates.x, pointerCoordinates.y);
+
+  // Find station column element
+  const stationColumnElement = elements.find(el =>
+    el.getAttribute('data-testid')?.startsWith('station-column-')
+  );
+
+  if (!stationColumnElement) {
+    return [];
+  }
+
+  // Extract station ID from data-testid
+  const testId = stationColumnElement.getAttribute('data-testid');
+  const stationId = testId?.replace('station-column-', '');
+  const droppableId = `station-${stationId}`;
+
+  // Find the matching droppable container
+  const container = droppableContainers.find(c => c.id === droppableId);
+  if (!container) {
+    return [];
+  }
+
+  return [{
+    id: droppableId,
+    data: { droppableContainer: container },
+  }];
+};
+
 function App() {
   // Snapshot version state to force re-render on updates
   const [snapshotVersion, setSnapshotVersion] = useState(0);
@@ -47,6 +92,8 @@ function App() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
+  // Track if this is a reschedule drag (grid tile repositioning vs sidebar drag)
+  const [isRescheduleDrag, setIsRescheduleDrag] = useState(false);
 
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
@@ -264,6 +311,8 @@ function App() {
     if (data?.type === 'task') {
       setActiveTask(data.task);
       setActiveJob(data.job);
+      // Track if this is a reschedule (grid tile repositioning) vs new placement (sidebar drag)
+      setIsRescheduleDrag(!!data.assignmentId);
       // Reset validation state
       setDragValidation({
         targetStationId: null,
@@ -358,6 +407,7 @@ function App() {
     // Reset active state and validation
     setActiveTask(null);
     setActiveJob(null);
+    setIsRescheduleDrag(false);
     setDragValidation({
       targetStationId: null,
       scheduledStart: null,
@@ -384,7 +434,11 @@ function App() {
 
     // Verify the task belongs to this station
     if (dragData.task.type !== 'Internal' || dragData.task.stationId !== dropData.stationId) {
-      console.log('Invalid drop: task does not belong to this station');
+      console.log('Invalid drop: task does not belong to this station', {
+        taskType: dragData.task.type,
+        taskStationId: dragData.task.type === 'Internal' ? dragData.task.stationId : 'N/A',
+        dropStationId: dropData.stationId,
+      });
       return;
     }
 
@@ -393,12 +447,13 @@ function App() {
 
     // Use the validation result to determine if drop is valid
     // StationConflict is allowed because push-down will resolve it
+    // Reschedule (moving existing tile) is always allowed within same station
     const blockingConflicts = currentValidation.conflicts.filter(
       (c) => c.type !== 'StationConflict'
     );
     const hasBlockingConflicts = blockingConflicts.length > 0;
 
-    if (hasBlockingConflicts && !wasAltPressed) {
+    if (hasBlockingConflicts && !wasAltPressed && !isReschedule) {
       console.log('Invalid drop: validation failed', blockingConflicts);
       return;
     }
@@ -787,10 +842,16 @@ function App() {
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={pointerBasedCollision}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       autoScroll={false}
+      measuring={{
+        droppable: {
+          strategy: MeasuringStrategy.Always,
+        },
+      }}
     >
       <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
         <Sidebar />
@@ -836,7 +897,10 @@ function App() {
           validationState={{
             targetStationId: dragValidation.targetStationId,
             // StationConflict is allowed because push-down will resolve it
-            isValid: validation.isValid || validation.conflicts.every((c) => c.type === 'StationConflict'),
+            // Reschedule (moving existing tile) is always allowed within same station
+            isValid: validation.isValid ||
+              validation.conflicts.every((c) => c.type === 'StationConflict') ||
+              isRescheduleDrag,
             hasPrecedenceConflict: validation.hasPrecedenceConflict,
             suggestedStart: validation.suggestedStart,
             isAltPressed,

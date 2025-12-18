@@ -198,7 +198,7 @@ export function StationColumn({
       {gridLines.map((top) => (
         <div
           key={top}
-          className="absolute left-0 right-0 h-px bg-zinc-700/50"
+          className="absolute left-0 right-0 h-px bg-zinc-700/50 pointer-events-none"
           style={{ top: `${top}px` }}
           data-testid="hour-grid-line"
         />

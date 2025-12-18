@@ -98,7 +98,7 @@ export function generateStationGroups(): StationGroup[] {
     {
       id: 'grp-cutting',
       name: 'Massicots',
-      maxConcurrent: 1,
+      maxConcurrent: 2,
       isOutsourcedProviderGroup: false,
     },
     {
