@@ -622,6 +622,9 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Compact respects precedence (task.sequenceOrder)
 - [x] Plates ApprovalGateConflict is warning only
 - [x] End time stretching (BR-ASSIGN-003b)
+- [x] Compact uses calculateEndTime for stretching
+- [x] Initial assignments use BR-ASSIGN-003b stretching
+- [x] Orange warning color for non-blocking conflicts (Plates approval)
 
 ### Phase 3I: Backend API Integration
 

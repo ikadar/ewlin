@@ -31,6 +31,8 @@ export interface DropValidationResult {
   validationResult: ValidationResult | null;
   /** All conflicts */
   conflicts: ValidationResult['conflicts'];
+  /** Whether there are only warning conflicts (non-blocking, like Plates approval) */
+  hasWarningOnly: boolean;
 }
 
 /**
@@ -82,6 +84,7 @@ export function useDropValidation({
         suggestedStart: null,
         validationResult: null,
         conflicts: [],
+        hasWarningOnly: false,
       };
     }
 
@@ -89,12 +92,28 @@ export function useDropValidation({
       (c) => c.type === 'PrecedenceConflict'
     );
 
+    // Check if there are only warning conflicts (non-blocking)
+    // Warning-only conflicts: Plates ApprovalGateConflict
+    // Non-blocking (handled by system): StationConflict (push-down), PrecedenceConflict with suggestedStart (auto-snap)
+    const hasConflicts = validationResult.conflicts.length > 0;
+    const blockingConflicts = validationResult.conflicts.filter(
+      (c) =>
+        c.type !== 'StationConflict' &&
+        !(c.type === 'PrecedenceConflict' && validationResult.suggestedStart) &&
+        !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+    );
+    const warningConflicts = validationResult.conflicts.filter(
+      (c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates'
+    );
+    const hasWarningOnly = hasConflicts && blockingConflicts.length === 0 && warningConflicts.length > 0;
+
     return {
       isValid: validationResult.valid,
       hasPrecedenceConflict,
       suggestedStart: validationResult.suggestedStart ?? null,
       validationResult,
       conflicts: validationResult.conflicts,
+      hasWarningOnly,
     };
   }, [validationResult]);
 

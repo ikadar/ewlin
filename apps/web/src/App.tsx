@@ -37,6 +37,7 @@ export interface DragValidationState {
   isValid: boolean;
   hasPrecedenceConflict: boolean;
   suggestedStart: string | null;
+  hasWarningOnly: boolean;
 }
 
 const START_HOUR = 6;
@@ -959,6 +960,8 @@ function App() {
             hasPrecedenceConflict: validation.hasPrecedenceConflict,
             suggestedStart: validation.suggestedStart,
             isAltPressed,
+            // Warning-only if we have Plates approval conflict but no blocking conflicts
+            hasWarningOnly: !isRescheduleDrag && validation.hasWarningOnly,
           }}
           isQuickPlacementMode={isQuickPlacementMode}
           stationsWithAvailableTasks={stationsWithAvailableTasks}

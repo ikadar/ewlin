@@ -599,7 +599,8 @@ The following table provides a quick reference for validation rules, their corre
 | StationConflict | Station double-booked (overlapping assignments) | Red highlight on both tiles |
 | GroupCapacityConflict | Station group MaxConcurrent exceeded | Yellow/orange time slot |
 | PrecedenceConflict | Scheduled predecessor ends after proposed task starts | Red halo on violating tile |
-| ApprovalGateConflict | BAT or Plates approval not satisfied | Tile grayed out / blocked |
+| ApprovalGateConflict (BAT) | BAT approval not satisfied | Red drop highlight (blocking) |
+| ApprovalGateConflict (Plates) | Plates approval not satisfied | Orange drop highlight (warning, non-blocking) |
 | AvailabilityConflict | Outside station operating hours | Gray hatched overlay |
 | DeadlineConflict | Task completion exceeds workshopExitDate | Job in "Late Jobs" panel |
 

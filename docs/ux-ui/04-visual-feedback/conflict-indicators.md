@@ -19,7 +19,8 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 | **Group capacity exceeded** | Yellow/orange highlight | On affected time slot |
 | **Deadline conflict** (late job) | Red background, "En retard" badge | Jobs List (Problèmes section) |
 | **Scheduling conflict** (incoherent) | Amber background, "Conflit" badge | Jobs List (Problèmes section) |
-| **Approval gate conflict** | Tile grayed out / blocked | On the tile |
+| **Approval gate conflict (BAT)** | Red drop zone highlight (blocking) | On station column during drag |
+| **Approval gate conflict (Plates)** | Orange drop zone highlight (warning, non-blocking) | On station column during drag |
 | **Availability conflict** | Gray hatched overlay | On the time slot |
 
 ---

@@ -74,11 +74,13 @@ During drag, the system validates the proposed position in real-time.
 
 ### Visual Feedback
 
-| State | Visual |
-|-------|--------|
-| Valid drop zone | Highlighted area |
-| Invalid drop zone | Red indicator |
-| Dragging | Tile follows cursor with slight transparency |
+| State | Visual | Border Color |
+|-------|--------|--------------|
+| Valid drop zone | Green highlight | `ring-green-500` |
+| Warning drop zone | Orange highlight (non-blocking conflict like Plates approval) | `ring-orange-500` |
+| Invalid drop zone | Red highlight (blocking conflict) | `ring-red-500` |
+| Alt-key bypass | Amber highlight (precedence override) | `ring-amber-500` |
+| Dragging | Tile follows cursor with slight transparency | — |
 
 ---
 

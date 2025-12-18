@@ -27,6 +27,8 @@ export interface StationColumnProps {
   isCollapsed?: boolean;
   /** Whether a valid drop is being hovered over this column */
   isValidDrop?: boolean;
+  /** Whether a warning-only drop (non-blocking, like Plates approval) is being hovered */
+  isWarningDrop?: boolean;
   /** Whether an invalid drop is being hovered over this column */
   isInvalidDrop?: boolean;
   /** Whether to show bypass warning (Alt key + precedence conflict) */
@@ -75,6 +77,7 @@ export function StationColumn({
   children,
   isCollapsed = false,
   isValidDrop = false,
+  isWarningDrop = false,
   isInvalidDrop = false,
   showBypassWarning = false,
   isQuickPlacementMode = false,
@@ -119,12 +122,16 @@ export function StationColumn({
   const getHighlightClass = () => {
     // Priority: validation-based highlighting over basic drag state
     if (showBypassWarning) {
-      // Alt-key bypass with precedence conflict - amber/orange warning
+      // Alt-key bypass with precedence conflict - amber warning
       return 'ring-2 ring-amber-500 bg-amber-500/10';
     }
     if (isInvalidDrop) {
-      // Invalid drop zone - red indicator
+      // Invalid drop zone - red indicator (blocking conflicts)
       return 'ring-2 ring-red-500 bg-red-500/10';
+    }
+    if (isWarningDrop) {
+      // Warning-only drop zone - orange indicator (non-blocking, like Plates approval)
+      return 'ring-2 ring-orange-500 bg-orange-500/10';
     }
     if (isValidDrop) {
       // Valid drop zone - green indicator

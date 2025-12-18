@@ -39,6 +39,8 @@ export interface ValidationState {
   suggestedStart: string | null;
   /** Whether Alt key is pressed (bypass precedence) */
   isAltPressed: boolean;
+  /** Whether there are only warning conflicts (non-blocking, like Plates approval) */
+  hasWarningOnly: boolean;
 }
 
 export interface SchedulingGridProps {
@@ -313,8 +315,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
               // Determine validation visual state for this column
               const isValidationTarget = validationState?.targetStationId === station.id;
-              const isValidDrop = isValidationTarget && validationState?.isValid;
-              const isInvalidDrop = isValidationTarget && !validationState?.isValid;
+              const isValidDrop = isValidationTarget && validationState?.isValid && !validationState?.hasWarningOnly;
+              const isWarningDrop = isValidationTarget && validationState?.hasWarningOnly;
+              const isInvalidDrop = isValidationTarget && !validationState?.isValid && !validationState?.hasWarningOnly;
               const showBypassWarning = isValidationTarget &&
                 validationState?.hasPrecedenceConflict &&
                 validationState?.isAltPressed;
@@ -331,6 +334,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   hoursToDisplay={hoursToDisplay}
                   isCollapsed={isCollapsed}
                   isValidDrop={isValidDrop}
+                  isWarningDrop={isWarningDrop}
                   isInvalidDrop={isInvalidDrop}
                   showBypassWarning={showBypassWarning}
                   isQuickPlacementMode={isQuickPlacementMode}
