@@ -785,6 +785,7 @@ function App() {
   }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.assignments]);
 
   // Handle station compact - remove gaps between tiles (mock implementation)
+  // Respects precedence: tasks cannot start before their predecessor ends
   const handleCompact = useCallback((stationId: string) => {
     setCompactingStationId(stationId);
 
@@ -800,17 +801,58 @@ function App() {
           return currentSnapshot;
         }
 
+        // Build task map for predecessor lookup
+        const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
+
+        // Build a map to track updated end times (for precedence within same compact)
+        const updatedEndTimes = new Map<string, Date>();
+
         // Start compacting from the first tile's position
         let nextStartTime = new Date(stationAssignments[0].scheduledStart);
         const updatedAssignments = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
 
         stationAssignments.forEach((assignment) => {
+          const task = taskMap.get(assignment.taskId);
           const duration = new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime();
-          const newStart = nextStartTime.toISOString();
-          const newEnd = new Date(nextStartTime.getTime() + duration).toISOString();
+
+          // Find predecessor constraint
+          let earliestStart = nextStartTime;
+
+          if (task) {
+            // Find predecessor task (previous task in same job by sequenceOrder)
+            const jobTasks = currentSnapshot.tasks
+              .filter((t) => t.jobId === task.jobId)
+              .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+            const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
+
+            if (taskIndex > 0) {
+              const predecessorTask = jobTasks[taskIndex - 1];
+
+              // Check if predecessor was updated in this compact operation
+              const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
+              if (updatedPredecessorEnd && updatedPredecessorEnd > earliestStart) {
+                earliestStart = updatedPredecessorEnd;
+              } else {
+                // Check existing assignment for predecessor
+                const predecessorAssignment = currentSnapshot.assignments.find(
+                  (a) => a.taskId === predecessorTask.id
+                );
+                if (predecessorAssignment) {
+                  const predecessorEnd = new Date(predecessorAssignment.scheduledEnd);
+                  if (predecessorEnd > earliestStart) {
+                    earliestStart = predecessorEnd;
+                  }
+                }
+              }
+            }
+          }
+
+          const newStart = earliestStart.toISOString();
+          const newEnd = new Date(earliestStart.getTime() + duration).toISOString();
 
           updatedAssignments.set(assignment.id, { scheduledStart: newStart, scheduledEnd: newEnd });
-          nextStartTime = new Date(nextStartTime.getTime() + duration);
+          updatedEndTimes.set(assignment.taskId, new Date(earliestStart.getTime() + duration));
+          nextStartTime = new Date(earliestStart.getTime() + duration);
         });
 
         // Apply updates to all assignments

@@ -619,6 +619,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Disable column collapse during reschedule
 - [x] Operating hours validation timezone fix (UTC → local)
 - [x] Precedence conflict auto-snap to valid position
+- [x] Compact respects precedence (task.sequenceOrder)
 
 ### Phase 3I: Backend API Integration
 
