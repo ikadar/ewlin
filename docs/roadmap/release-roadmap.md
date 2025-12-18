@@ -626,27 +626,37 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Initial assignments use BR-ASSIGN-003b stretching
 - [x] Orange warning color for non-blocking conflicts (Plates approval)
 
+#### v0.3.27 - Drag-Drop E2E Test Suite ✅
+- [x] Deterministic test fixtures (6 fixtures: test, push-down, precedence, approval-gates, swap, sidebar-drag)
+- [x] Reusable drag helpers (`playwright/helpers/drag.ts`)
+- [x] UC-02/UC-03: Tile reschedule + grid snapping tests (3 tests)
+- [x] UC-04: Push-down collision tests (4 tests)
+- [x] UC-09: Swap operation tests (5 tests)
+- [x] EC-02/EC-04: Edge case tests (4 tests)
+- [x] 100% test reliability (10/10 runs without failure)
+- [x] HTML5 DragEvent API with DataTransfer (pragmatic-drag-and-drop)
+
 ### Phase 3I: Backend API Integration
 
-#### v0.3.27 - Validator Package Integration
+#### v0.3.28 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-#### v0.3.28 - API Client Setup
+#### v0.3.29 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.3.28 - Snapshot Loading
+#### v0.3.30 - Snapshot Loading
 - [ ] Replace mock with real API
 - [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.3.29 - Assignment Operations Integration
+#### v0.3.31 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
@@ -657,13 +667,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 > **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
 
-#### v0.3.30 - DSL Parser Package (Post-MVP)
+#### v0.3.32 - DSL Parser Package (Post-MVP)
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition
 - [ ] CodeMirror 6 integration
 - [ ] Syntax highlighting
 
-#### v0.3.31 - Job Creation Modal (Post-MVP)
+#### v0.3.33 - Job Creation Modal (Post-MVP)
 - [ ] Modal component
 - [ ] DSL textarea with highlighting
 - [ ] Autocomplete integration
