@@ -107,7 +107,7 @@ The interface uses a **column-based layout** with the following structure:
 
 | Document | Description |
 |----------|-------------|
-| [user-stories.md](specifications/user-stories.md) | UI User Stories (US-UI-*) for all interactions |
+| [ui-interaction-stories.md](specifications/ui-interaction-stories.md) | UI Interaction Stories (US-UI-*) for all interactions |
 | [acceptance-criteria.md](specifications/acceptance-criteria.md) | Acceptance Criteria in Given-When-Then format |
 | [non-functional-requirements.md](specifications/non-functional-requirements.md) | Performance, accessibility, i18n requirements |
 | [design-tokens.md](specifications/design-tokens.md) | Colors, spacing, typography, animations |
@@ -131,7 +131,7 @@ The interface uses a **column-based layout** with the following structure:
 - [User Stories](../requirements/user-stories.md) — Backend user stories for scheduling features
 - [Acceptance Criteria](../requirements/acceptance-criteria.md) — Backend testable criteria
 - **UI Specifications:**
-  - [UI User Stories](specifications/user-stories.md) — UI-specific user stories (US-UI-*)
+  - [UI Interaction Stories](specifications/ui-interaction-stories.md) — UI-specific interaction stories (US-UI-*)
   - [UI Acceptance Criteria](specifications/acceptance-criteria.md) — UI-specific acceptance criteria (AC-UI-*)
   - [Non-Functional Requirements](specifications/non-functional-requirements.md) — Performance, accessibility, i18n
   - [Design Tokens](specifications/design-tokens.md) — Colors, spacing, typography, animations

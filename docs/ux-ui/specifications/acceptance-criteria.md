@@ -16,7 +16,7 @@ Each criterion is traceable to its parent user story via ID.
 ## Drag-Drop Interactions
 
 ### AC-UI-DRAG-001: New Task Placement
-> **User Story:** [US-UI-DRAG-001](user-stories.md#us-ui-drag-001)
+> **User Story:** [US-UI-DRAG-001](ui-interaction-stories.md#us-ui-drag-001)
 
 #### AC-UI-DRAG-001.1
 **Given** an unscheduled task tile in the sidebar
@@ -46,7 +46,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-DRAG-002: Tile Reschedule
-> **User Story:** [US-UI-DRAG-002](user-stories.md#us-ui-drag-002)
+> **User Story:** [US-UI-DRAG-002](ui-interaction-stories.md#us-ui-drag-002)
 
 #### AC-UI-DRAG-002.1
 **Given** a scheduled tile on the grid
@@ -76,7 +76,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-DRAG-003: Grid Snapping
-> **User Story:** [US-UI-DRAG-003](user-stories.md#us-ui-drag-003)
+> **User Story:** [US-UI-DRAG-003](ui-interaction-stories.md#us-ui-drag-003)
 
 #### AC-UI-DRAG-003.1
 **Given** a tile being dropped at an arbitrary Y position
@@ -100,7 +100,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-DRAG-004: Push-Down on Collision
-> **User Story:** [US-UI-DRAG-004](user-stories.md#us-ui-drag-004)
+> **User Story:** [US-UI-DRAG-004](ui-interaction-stories.md#us-ui-drag-004)
 
 #### AC-UI-DRAG-004.1
 **Given** a tile being dropped on a time slot occupied by another tile
@@ -125,7 +125,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-DRAG-005: Station Constraint
-> **User Story:** [US-UI-DRAG-005](user-stories.md#us-ui-drag-005)
+> **User Story:** [US-UI-DRAG-005](ui-interaction-stories.md#us-ui-drag-005)
 
 #### AC-UI-DRAG-005.1
 **Given** a task assigned to station A
@@ -147,7 +147,7 @@ Each criterion is traceable to its parent user story via ID.
 ## Validation
 
 ### AC-UI-VALID-001: Precedence Validation
-> **User Story:** [US-UI-VALID-001](user-stories.md#us-ui-valid-001)
+> **User Story:** [US-UI-VALID-001](ui-interaction-stories.md#us-ui-valid-001)
 
 #### AC-UI-VALID-001.1
 **Given** Task B depends on Task A (precedence constraint)
@@ -178,7 +178,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-VALID-002: Approval Gate Validation
-> **User Story:** [US-UI-VALID-002](user-stories.md#us-ui-valid-002)
+> **User Story:** [US-UI-VALID-002](ui-interaction-stories.md#us-ui-valid-002)
 
 #### AC-UI-VALID-002.1
 **Given** a task without BAT approval
@@ -205,7 +205,7 @@ Each criterion is traceable to its parent user story via ID.
 ## Visual Feedback
 
 ### AC-UI-VISUAL-001: Drag Visual Feedback
-> **User Story:** [US-UI-VISUAL-001](user-stories.md#us-ui-visual-001)
+> **User Story:** [US-UI-VISUAL-001](ui-interaction-stories.md#us-ui-visual-001)
 
 #### AC-UI-VISUAL-001.1
 **Given** a tile being dragged over a valid drop zone
@@ -236,7 +236,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-VISUAL-002: Tile Ghost
-> **User Story:** [US-UI-VISUAL-002](user-stories.md#us-ui-visual-002)
+> **User Story:** [US-UI-VISUAL-002](ui-interaction-stories.md#us-ui-visual-002)
 
 #### AC-UI-VISUAL-002.1
 **Given** a scheduled tile
@@ -256,7 +256,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-VISUAL-003: Drag Preview
-> **User Story:** [US-UI-VISUAL-003](user-stories.md#us-ui-visual-003)
+> **User Story:** [US-UI-VISUAL-003](ui-interaction-stories.md#us-ui-visual-003)
 
 #### AC-UI-VISUAL-003.1
 **Given** a tile being dragged
@@ -278,7 +278,7 @@ Each criterion is traceable to its parent user story via ID.
 ## Tile Operations
 
 ### AC-UI-TILE-001: Swap Operations
-> **User Story:** [US-UI-TILE-001](user-stories.md#us-ui-tile-001)
+> **User Story:** [US-UI-TILE-001](ui-interaction-stories.md#us-ui-tile-001)
 
 #### AC-UI-TILE-001.1
 **Given** two adjacent tiles on the same station
@@ -308,7 +308,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-TILE-002: Tile Recall
-> **User Story:** [US-UI-TILE-002](user-stories.md#us-ui-tile-002)
+> **User Story:** [US-UI-TILE-002](ui-interaction-stories.md#us-ui-tile-002)
 
 #### AC-UI-TILE-002.1
 **Given** a scheduled tile on the grid
@@ -330,7 +330,7 @@ Each criterion is traceable to its parent user story via ID.
 ## Quick Placement
 
 ### AC-UI-QUICK-001: Quick Placement Mode
-> **User Story:** [US-UI-QUICK-001](user-stories.md#us-ui-quick-001)
+> **User Story:** [US-UI-QUICK-001](ui-interaction-stories.md#us-ui-quick-001)
 
 #### AC-UI-QUICK-001.1
 **Given** normal mode
@@ -368,7 +368,7 @@ Each criterion is traceable to its parent user story via ID.
 ## Edge Cases
 
 ### AC-UI-EDGE-001: Past Time Validation
-> **User Story:** [US-UI-EDGE-001](user-stories.md#us-ui-edge-001)
+> **User Story:** [US-UI-EDGE-001](ui-interaction-stories.md#us-ui-edge-001)
 
 #### AC-UI-EDGE-001.1
 **Given** a task being scheduled
@@ -383,7 +383,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-EDGE-002: Drag Cancel
-> **User Story:** [US-UI-EDGE-002](user-stories.md#us-ui-edge-002)
+> **User Story:** [US-UI-EDGE-002](ui-interaction-stories.md#us-ui-edge-002)
 
 #### AC-UI-EDGE-002.1
 **Given** a tile being dragged
@@ -398,7 +398,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-EDGE-003: Overnight Tasks
-> **User Story:** [US-UI-EDGE-003](user-stories.md#us-ui-edge-003)
+> **User Story:** [US-UI-EDGE-003](ui-interaction-stories.md#us-ui-edge-003)
 
 #### AC-UI-EDGE-003.1
 **Given** a task scheduled at 22:00 with 4-hour duration
@@ -413,7 +413,7 @@ Each criterion is traceable to its parent user story via ID.
 ---
 
 ### AC-UI-EDGE-004: Push-Down Chain
-> **User Story:** [US-UI-EDGE-004](user-stories.md#us-ui-edge-004)
+> **User Story:** [US-UI-EDGE-004](ui-interaction-stories.md#us-ui-edge-004)
 
 #### AC-UI-EDGE-004.1
 **Given** three consecutive tiles: A, B, C

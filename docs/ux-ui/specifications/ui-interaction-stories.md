@@ -2,16 +2,20 @@
 tags:
   - specification
   - ux-ui
-  - requirements
+  - interaction
 ---
 
-# User Stories – Flux Scheduling UI
+# UI Interaction Stories – Flux Scheduling UI
 
-This file contains user stories for the scheduling UI interactions.
+This file contains **UI-specific interaction stories** that describe HOW users interact with the scheduling interface.
+
+These stories implement the higher-level capabilities defined in [User Stories](../../requirements/user-stories.md).
 
 Each story follows the standard format:
 
 > As a \<role>, I want \<capability>, so that \<outcome>.
+
+**Naming convention:** `US-UI-{category}-{number}` where category is DRAG, TILE, QUICK, VISUAL, VALID, or EDGE.
 
 ---
 
