@@ -672,15 +672,15 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] E2E tests for visual feedback states
 - [x] Bug fix: Amber ring only on compatible stations
 
-#### v0.3.30 - Job Deselection Methods
-> **Implements:** [REQ-02/03](../ux-ui/tmp/refactored-new-requirements-en.md#req-0203-job-deselection-methods)
+#### v0.3.30 - Job Deselection Methods ✅
+> **Implements:** [REQ-02/03](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-0203-job-deselection-methods)
+> **Released:** 2025-12-22
 
-- [ ] Close button (X) in JobDetailsPanel header
-- [ ] `onClose` prop for JobDetailsPanel
-- [ ] Toggle click in JobsList: click selected job → deselect
-- [ ] Both methods set `selectedJobId(null)`
-- [ ] Unit tests for toggle logic
-- [ ] E2E test: close button and toggle click
+- [x] Close button (X) in JobDetailsPanel header
+- [x] `onClose` prop for JobDetailsPanel
+- [x] Toggle click in JobsList: click selected job → deselect
+- [x] Both methods set `selectedJobId(null)`
+- [x] E2E test: close button and toggle click (6 tests)
 
 #### v0.3.31 - Real-Time Drag Snapping
 > **Implements:** [REQ-08/09](../ux-ui/tmp/refactored-new-requirements-en.md#req-0809-snapping-drag-preview-with-vertical-constraint)

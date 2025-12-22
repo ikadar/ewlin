@@ -70,9 +70,8 @@ test.describe('v0.3.29: Visual Feedback (REQ-01, REQ-12)', () => {
       }
     });
 
-    test.skip('deselecting job removes muting from all tiles', async ({ page }) => {
-      // NOTE: Toggle click deselection (REQ-02/03) is not implemented yet.
-      // This test will be enabled in v0.3.30 when toggle click is added.
+    test('deselecting job removes muting from all tiles', async ({ page }) => {
+      // NOTE: Toggle click deselection (REQ-02/03) implemented in v0.3.30.
 
       // ARRANGE: Select a job first
       const firstJobCard = page.locator('[data-testid^="job-card-"]').first();

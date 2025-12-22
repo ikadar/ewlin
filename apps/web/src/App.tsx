@@ -904,6 +904,7 @@ function AppContent() {
           activeTaskId={lastUnscheduledTask?.id}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
+          onClose={() => setSelectedJobId(null)}
         />
         <DateStrip
           startDate={(() => {
