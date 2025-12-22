@@ -704,7 +704,18 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit tests for state calculation (21 tests)
 - [x] Visual test fixture
 
-#### v0.3.33 - Top Navigation Bar
+#### v0.3.33 - Task Completion Toggle
+> **Implements:** Task completion interaction on Tiles
+
+- [ ] Add `onToggleComplete` prop to `Tile` component
+- [ ] Make Circle/CircleCheck icon clickable with `stopPropagation`
+- [ ] Hover state on icon (cursor-pointer, color change)
+- [ ] Wire up handler in `App.tsx` to update `assignment.isCompleted`
+- [ ] ProgressSegments automatically reflects state change
+- [ ] Unit tests for toggle behavior
+- [ ] E2E test: click icon toggles completion state
+
+#### v0.3.34 - Top Navigation Bar
 > **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-en.md#req-040506-top-navigation-bar-with-controls)
 
 - [ ] **REQ-04:** New `TopNavBar` component (`h-12`, `bg-zinc-900`)
@@ -718,7 +729,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Adjust main layout to accommodate nav bar
 - [ ] E2E tests for zoom and quick placement button
 
-#### v0.3.34 - Global Timeline Compaction
+#### v0.3.35 - Global Timeline Compaction
 > **Implements:** [REQ-10](../ux-ui/tmp/refactored-new-requirements-en.md#req-10-global-timeline-compaction)
 
 - [ ] Segmented buttons in TopNavBar: `[4h] [8h] [24h]`
@@ -730,7 +741,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Mock implementation (local state)
 - [ ] E2E test: compact 4h removes gaps
 
-#### v0.3.35 - Dry Time Precedence
+#### v0.3.36 - Dry Time Precedence
 > **Implements:** [REQ-11](../ux-ui/tmp/refactored-new-requirements-en.md#req-11-dry-time-drying-delay-after-printing)
 
 - [ ] `DRY_TIME_MINUTES = 240` constant (4 hours)
@@ -741,7 +752,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Validator unit tests
 - [ ] E2E test: precedence with dry time
 
-#### v0.3.36 - Multi-Day Grid Navigation
+#### v0.3.37 - Multi-Day Grid Navigation
 > **Implements:** [REQ-14/15/16/17](../ux-ui/tmp/refactored-new-requirements-en.md#req-14151617-multi-day-grid-navigation--date-strip-integration)
 
 - [ ] **REQ-14:** Multi-day grid support (extend beyond 24h)
@@ -754,7 +765,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Consider virtual scrolling (`@tanstack/virtual`) for performance
 - [ ] E2E tests for navigation and highlighting
 
-#### v0.3.37 - Group Capacity Visualization
+#### v0.3.38 - Group Capacity Visualization
 > **Implements:** [REQ-18](../ux-ui/tmp/refactored-new-requirements-en.md#req-18-machine-group-capacity-limits-visualization)
 
 - [ ] Grid: red indicator on time slots exceeding group capacity
@@ -763,7 +774,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Drag validation: show `GroupCapacityConflict` feedback
 - [ ] E2E test: capacity conflict visualization
 
-#### v0.3.38 - Outsourcing Columns
+#### v0.3.39 - Outsourcing Columns
 > **Implements:** [REQ-19](../ux-ui/tmp/refactored-new-requirements-en.md#req-19-outsourcing-columns-provider-display)
 
 - [ ] Remove `if (assignment.isOutsourced) return;` skip in SchedulingGrid
@@ -777,7 +788,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Greedy subcolumn index assignment algorithm
 - [ ] E2E test: outsourced task rendering
 
-#### v0.3.39 - Similarities Feature Completion
+#### v0.3.40 - Similarities Feature Completion
 > **Implements:** [REQ-20](../ux-ui/tmp/refactored-new-requirements-en.md#req-20-similarities-feature-completion)
 
 - [ ] Extend `Job` type: add `paperWeight?: number`, `inking?: string`
@@ -791,25 +802,25 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3I: Backend API Integration
 
-#### v0.3.40 - Validator Package Integration
+#### v0.3.41 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-#### v0.3.41 - API Client Setup
+#### v0.3.42 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.3.42 - Snapshot Loading
+#### v0.3.43 - Snapshot Loading
 - [ ] Replace mock with real API
 - [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.3.43 - Assignment Operations Integration
+#### v0.3.44 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
@@ -820,13 +831,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 > **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
 
-#### v0.3.44 - DSL Parser Package (Post-MVP)
+#### v0.3.45 - DSL Parser Package (Post-MVP)
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition
 - [ ] CodeMirror 6 integration
 - [ ] Syntax highlighting
 
-#### v0.3.45 - Job Creation Modal (Post-MVP)
+#### v0.3.46 - Job Creation Modal (Post-MVP)
 - [ ] Modal component
 - [ ] DSL textarea with highlighting
 - [ ] Autocomplete integration
