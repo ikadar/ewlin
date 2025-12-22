@@ -716,19 +716,20 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit tests for toggle behavior (5 tests)
 - [x] E2E test: click icon toggles completion state (4 tests)
 
-#### v0.3.34 - Top Navigation Bar
+#### v0.3.34 - Top Navigation Bar ✅
 > **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-en.md#req-040506-top-navigation-bar-with-controls)
+> **Released:** 2025-12-22
 
-- [ ] **REQ-04:** New `TopNavBar` component (`h-12`, `bg-zinc-900`)
-- [ ] Logo/app name on left
-- [ ] **REQ-05:** Quick Placement toggle button (visual alternative to ALT+Q)
-- [ ] Button disabled when no job selected
-- [ ] **REQ-06:** Zoom control: `[-] 100% [+]` or dropdown
-- [ ] Zoom levels: 50%, 75%, 100%, 150%, 200%
-- [ ] `PIXELS_PER_HOUR` state: 40px, 60px, 80px, 120px, 160px
-- [ ] User/Settings section on right (placeholder)
-- [ ] Adjust main layout to accommodate nav bar
-- [ ] E2E tests for zoom and quick placement button
+- [x] **REQ-04:** New `TopNavBar` component (`h-12`, `bg-zinc-900`)
+- [x] Logo/app name on left
+- [x] **REQ-05:** Quick Placement toggle button (visual alternative to ALT+Q)
+- [x] Button disabled when no job selected
+- [x] **REQ-06:** Zoom control: `[-] 100% [+]` or dropdown
+- [x] Zoom levels: 50%, 75%, 100%, 150%, 200%
+- [x] `PIXELS_PER_HOUR` state: 40px, 60px, 80px, 120px, 160px
+- [x] User/Settings section on right (placeholder)
+- [x] Adjust main layout to accommodate nav bar
+- [x] E2E tests for zoom and quick placement button (15 tests)
 
 #### v0.3.35 - Global Timeline Compaction
 > **Implements:** [REQ-10](../ux-ui/tmp/refactored-new-requirements-en.md#req-10-global-timeline-compaction)
