@@ -1,4 +1,4 @@
-import type { Station, Job, TaskAssignment, Task, StationCategory } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader } from '../StationHeaders/StationHeader';
@@ -94,6 +94,8 @@ export interface SchedulingGridProps {
   onCompact?: (stationId: string) => void;
   /** Whether current drag is a reschedule (existing tile) - disables column collapse */
   isRescheduleDrag?: boolean;
+  /** Schedule conflicts for conflict visualization (REQ-12) */
+  conflicts?: ScheduleConflict[];
 }
 
 /**
@@ -128,6 +130,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       compactingStationId,
       onCompact,
       isRescheduleDrag = false,
+      conflicts = [],
     },
     ref
   ) {
@@ -190,6 +193,17 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     categories.forEach((category) => map.set(category.id, category));
     return map;
   }, [categories]);
+
+  // REQ-12: Calculate set of task IDs with conflicts for visual feedback
+  const conflictTaskIds = useMemo(() => {
+    const taskIds = new Set<string>();
+    conflicts.forEach((conflict) => {
+      if (conflict.type === 'PrecedenceConflict' && conflict.taskId) {
+        taskIds.add(conflict.taskId);
+      }
+    });
+    return taskIds;
+  }, [conflicts]);
 
   // Group assignments by station (internal assignments only, not outsourced)
   const assignmentsByStation = useMemo(() => {
@@ -318,9 +332,15 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isValidDrop = isValidationTarget && validationState?.isValid && !validationState?.hasWarningOnly;
               const isWarningDrop = isValidationTarget && validationState?.hasWarningOnly;
               const isInvalidDrop = isValidationTarget && !validationState?.isValid && !validationState?.hasWarningOnly;
+              // Bypass warning only shows when:
+              // 1. Hovering over this column
+              // 2. Has precedence conflict
+              // 3. Alt is pressed
+              // 4. Station is otherwise valid (compatible) - amber only for valid station with precedence issue
               const showBypassWarning = isValidationTarget &&
                 validationState?.hasPrecedenceConflict &&
-                validationState?.isAltPressed;
+                validationState?.isAltPressed &&
+                validationState?.isValid;
 
               // Quick placement state for this column
               const isHoveredForQuickPlacement = quickPlacementHoverStationId === station.id;
@@ -386,6 +406,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
                         activeJobId={activeJob?.id}
+                        selectedJobId={selectedJobId ?? undefined}
+                        hasConflict={conflictTaskIds.has(task.id)}
                       />
                     );
                   })}

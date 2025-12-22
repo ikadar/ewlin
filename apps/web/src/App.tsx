@@ -949,6 +949,7 @@ function AppContent() {
           compactingStationId={compactingStationId}
           onCompact={handleCompact}
           isRescheduleDrag={isRescheduleDrag}
+          conflicts={snapshot.conflicts}
         />
       </div>
 

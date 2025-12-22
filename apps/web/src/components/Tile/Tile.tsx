@@ -37,6 +37,10 @@ export interface TileProps {
   similarityResults?: SimilarityResult[];
   /** ID of the job being dragged (for muting other jobs during drag) */
   activeJobId?: string;
+  /** ID of the currently selected job (for muting non-selected jobs - REQ-01) */
+  selectedJobId?: string;
+  /** Whether this tile has a conflict (precedence violation - REQ-12) */
+  hasConflict?: boolean;
 }
 
 /**
@@ -65,6 +69,8 @@ export function Tile({
   isSelected = false,
   similarityResults,
   activeJobId,
+  selectedJobId,
+  hasConflict = false,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
@@ -134,7 +140,10 @@ export function Tile({
   const isCompleted = assignment.isCompleted;
 
   // Muting state: tile is muted during drag if it belongs to a different job
-  const isMuted = activeJobId !== undefined && activeJobId !== job.id;
+  // REQ-01: Also mute when a job is selected (not just during drag)
+  const isMutedByDrag = activeJobId !== undefined && activeJobId !== job.id;
+  const isMutedBySelection = selectedJobId !== undefined && selectedJobId !== job.id;
+  const isMuted = isMutedByDrag || isMutedBySelection;
 
   // During any drag operation, make tiles non-interactive so drops can pass through
   // to the StationColumn droppable underneath (enables dropping onto existing tiles)
@@ -167,10 +176,20 @@ export function Tile({
   // Determine if we have setup time to show
   const hasSetup = setupMinutes > 0;
 
+  // REQ-12: Conflict glow (amber) overrides selection glow (job color)
   // Selected state styling - glow effect using job color at 60% opacity
-  const selectedStyle = isSelected
-    ? { boxShadow: `0 0 12px 4px ${job.color}99` } // 99 hex = ~60% opacity
-    : undefined;
+  const getGlowStyle = () => {
+    if (hasConflict) {
+      // Amber glow for conflict tiles (overrides selection glow)
+      return { boxShadow: '0 0 12px 4px #F59E0B99' }; // amber-500 at ~60% opacity
+    }
+    if (isSelected) {
+      // Job color glow for selected tiles
+      return { boxShadow: `0 0 12px 4px ${job.color}99` }; // 99 hex = ~60% opacity
+    }
+    return undefined;
+  };
+  const glowStyle = getGlowStyle();
 
   // Muting style: desaturate and reduce opacity for other jobs during drag
   // Also disable pointer events during drag so drops pass through to StationColumn
@@ -198,7 +217,7 @@ export function Tile({
     <div
       ref={tileRef}
       className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-grab touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
-      style={{ top: `${top}px`, height: `${totalHeight}px`, ...selectedStyle, ...mutingStyle }}
+      style={{ top: `${top}px`, height: `${totalHeight}px`, ...glowStyle, ...mutingStyle }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       data-testid={`tile-${assignment.id}`}
@@ -206,6 +225,7 @@ export function Tile({
       data-scheduled-end={assignment.scheduledEnd}
       data-task-id={task.id}
       data-station-id={task.stationId}
+      data-has-conflict={hasConflict ? 'true' : undefined}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
