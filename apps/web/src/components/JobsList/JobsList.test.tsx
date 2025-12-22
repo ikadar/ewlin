@@ -6,7 +6,7 @@ import { ProgressDots } from './ProgressDots';
 import { ProblemsSection } from './ProblemsSection';
 import { JobsSection } from './JobsSection';
 import { JobsListHeader } from './JobsListHeader';
-import type { Job, Task, LateJob, ScheduleConflict } from '@flux/types';
+import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict } from '@flux/types';
 
 // Mock data
 const mockJobs: Job[] = [
@@ -102,6 +102,33 @@ const mockTasks: Task[] = [
   },
 ];
 
+const mockAssignments: TaskAssignment[] = [
+  {
+    id: 'assign-1',
+    taskId: 'task-1',
+    targetId: 'station-1',
+    isOutsourced: false,
+    scheduledStart: '2025-12-15T08:00:00Z',
+    scheduledEnd: '2025-12-15T09:30:00Z',
+    isCompleted: true,
+    completedAt: '2025-12-15T09:25:00Z',
+    createdAt: '2025-12-15T07:00:00Z',
+    updatedAt: '2025-12-15T09:25:00Z',
+  },
+  {
+    id: 'assign-2',
+    taskId: 'task-2',
+    targetId: 'station-2',
+    isOutsourced: false,
+    scheduledStart: '2025-12-16T08:00:00Z',
+    scheduledEnd: '2025-12-16T09:00:00Z',
+    isCompleted: false,
+    completedAt: null,
+    createdAt: '2025-12-15T07:00:00Z',
+    updatedAt: '2025-12-15T07:00:00Z',
+  },
+];
+
 const mockLateJobs: LateJob[] = [
   {
     jobId: 'job-3',
@@ -119,6 +146,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
       />
@@ -131,6 +159,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
       />
@@ -145,6 +174,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        assignments={mockAssignments}
         lateJobs={mockLateJobs}
         conflicts={[]}
       />
@@ -158,6 +188,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
       />
@@ -175,6 +206,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
       />
@@ -192,6 +224,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
         onSelectJob={onSelectJob}
@@ -207,6 +240,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
         selectedJobId="job-1"
@@ -219,16 +253,50 @@ describe('JobsList', () => {
   });
 });
 
+// Helper to create test tasks
+const createTestTask = (id: string, jobId: string): Task => ({
+  id,
+  jobId,
+  type: 'Internal',
+  stationId: 'station-1',
+  sequenceOrder: 0,
+  status: 'Defined',
+  duration: { setupMinutes: 10, runMinutes: 20 },
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+// Helper to create test assignments
+const createTestAssignment = (taskId: string, isCompleted: boolean): TaskAssignment => ({
+  id: `assign-${taskId}`,
+  taskId,
+  targetId: 'station-1',
+  isOutsourced: false,
+  scheduledStart: new Date().toISOString(),
+  scheduledEnd: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  isCompleted,
+  completedAt: isCompleted ? new Date().toISOString() : null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
 describe('JobCard', () => {
   it('renders job information with separator', () => {
+    const tasks = [
+      createTestTask('t1', 'job-1'),
+      createTestTask('t2', 'job-1'),
+      createTestTask('t3', 'job-1'),
+    ];
+    const assignments = [createTestAssignment('t1', true)];
+
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        taskCount={3}
-        completedTaskCount={1}
+        tasks={tasks}
+        assignments={assignments}
       />
     );
 
@@ -239,14 +307,16 @@ describe('JobCard', () => {
   });
 
   it('shows deadline on normal cards', () => {
+    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
+
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        taskCount={2}
-        completedTaskCount={0}
+        tasks={tasks}
+        assignments={[]}
         deadline="17/12"
       />
     );
@@ -254,69 +324,101 @@ describe('JobCard', () => {
     expect(screen.getByText('17/12')).toBeInTheDocument();
   });
 
-  it('shows progress dots on normal cards', () => {
-    const { container } = render(
-      <JobCard
-        id="job-1"
-        reference="12345"
-        client="Test Client"
-        description="Test Description"
-        taskCount={3}
-        completedTaskCount={2}
-      />
-    );
+  it('shows progress segments on normal cards', () => {
+    const tasks = [
+      createTestTask('t1', 'job-1'),
+      createTestTask('t2', 'job-1'),
+      createTestTask('t3', 'job-1'),
+    ];
+    const assignments = [
+      createTestAssignment('t1', true),
+      createTestAssignment('t2', true),
+    ];
 
-    const dots = container.querySelectorAll('.rounded-full');
-    expect(dots).toHaveLength(3);
-  });
-
-  it('shows late badge AND progress dots when problem type is late', () => {
-    const { container } = render(
-      <JobCard
-        id="job-1"
-        reference="12345"
-        client="Test Client"
-        description="Test Description"
-        taskCount={3}
-        completedTaskCount={1}
-        problemType="late"
-      />
-    );
-
-    expect(screen.getByText('En retard')).toBeInTheDocument();
-    // Progress dots should also be shown for problem cards
-    const dots = container.querySelectorAll('.rounded-full');
-    expect(dots).toHaveLength(3);
-  });
-
-  it('shows conflict badge AND progress dots when problem type is conflict', () => {
-    const { container } = render(
-      <JobCard
-        id="job-1"
-        reference="12345"
-        client="Test Client"
-        description="Test Description"
-        taskCount={4}
-        completedTaskCount={4}
-        problemType="conflict"
-      />
-    );
-
-    expect(screen.getByText('Conflit')).toBeInTheDocument();
-    // Progress dots should also be shown for problem cards
-    const dots = container.querySelectorAll('.rounded-full');
-    expect(dots).toHaveLength(4);
-  });
-
-  it('applies selected styling', () => {
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        taskCount={2}
-        completedTaskCount={0}
+        tasks={tasks}
+        assignments={assignments}
+      />
+    );
+
+    // Check that segments are rendered
+    expect(screen.getByTestId('segment-t1')).toBeInTheDocument();
+    expect(screen.getByTestId('segment-t2')).toBeInTheDocument();
+    expect(screen.getByTestId('segment-t3')).toBeInTheDocument();
+  });
+
+  it('shows late badge AND progress segments when problem type is late', () => {
+    const tasks = [
+      createTestTask('t1', 'job-1'),
+      createTestTask('t2', 'job-1'),
+      createTestTask('t3', 'job-1'),
+    ];
+    const assignments = [createTestAssignment('t1', true)];
+
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
+        tasks={tasks}
+        assignments={assignments}
+        problemType="late"
+      />
+    );
+
+    expect(screen.getByText('En retard')).toBeInTheDocument();
+    // Progress segments should also be shown for problem cards
+    expect(screen.getByTestId('progress-segments')).toBeInTheDocument();
+  });
+
+  it('shows conflict badge AND progress segments when problem type is conflict', () => {
+    const tasks = [
+      createTestTask('t1', 'job-1'),
+      createTestTask('t2', 'job-1'),
+      createTestTask('t3', 'job-1'),
+      createTestTask('t4', 'job-1'),
+    ];
+    const assignments = [
+      createTestAssignment('t1', true),
+      createTestAssignment('t2', true),
+      createTestAssignment('t3', true),
+      createTestAssignment('t4', true),
+    ];
+
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
+        tasks={tasks}
+        assignments={assignments}
+        problemType="conflict"
+      />
+    );
+
+    expect(screen.getByText('Conflit')).toBeInTheDocument();
+    // Progress segments should also be shown for problem cards
+    expect(screen.getByTestId('progress-segments')).toBeInTheDocument();
+  });
+
+  it('applies selected styling', () => {
+    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
+
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
+        tasks={tasks}
+        assignments={[]}
         isSelected
       />
     );
@@ -327,14 +429,16 @@ describe('JobCard', () => {
 
   it('calls onClick when clicked', () => {
     const onClick = vi.fn();
+    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
+
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        taskCount={2}
-        completedTaskCount={0}
+        tasks={tasks}
+        assignments={[]}
         onClick={onClick}
       />
     );
@@ -345,14 +449,16 @@ describe('JobCard', () => {
 
   it('handles keyboard navigation', () => {
     const onClick = vi.fn();
+    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
+
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        taskCount={2}
-        completedTaskCount={0}
+        tasks={tasks}
+        assignments={[]}
         onClick={onClick}
       />
     );

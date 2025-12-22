@@ -1,5 +1,6 @@
+import type { Task, TaskAssignment } from '@flux/types';
 import { AlertCircle, Shuffle } from 'lucide-react';
-import { ProgressDots } from './ProgressDots';
+import { ProgressSegments } from './ProgressSegments';
 
 export type JobProblemType = 'late' | 'conflict' | null;
 
@@ -12,10 +13,10 @@ export interface JobCardProps {
   client: string;
   /** Job description */
   description: string;
-  /** Total number of tasks */
-  taskCount: number;
-  /** Number of completed tasks */
-  completedTaskCount: number;
+  /** Tasks for this job */
+  tasks: Task[];
+  /** Assignments for this job's tasks */
+  assignments: TaskAssignment[];
   /** Deadline date string (e.g., "17/12") */
   deadline?: string;
   /** Problem type if any */
@@ -27,7 +28,7 @@ export interface JobCardProps {
 }
 
 /**
- * Individual job card with reference, client, description, and progress dots.
+ * Individual job card with reference, client, description, and progress segments.
  * Supports normal, late, conflict, and selected states.
  */
 export function JobCard({
@@ -35,8 +36,8 @@ export function JobCard({
   reference,
   client,
   description,
-  taskCount,
-  completedTaskCount,
+  tasks,
+  assignments,
   deadline,
   problemType,
   isSelected = false,
@@ -95,9 +96,9 @@ export function JobCard({
         {description}
       </div>
 
-      {/* Footer: progress dots (left) + badge (right) */}
+      {/* Footer: progress segments (left) + badge (right) */}
       <div className="flex items-center justify-between">
-        <ProgressDots total={taskCount} completed={completedTaskCount} />
+        <ProgressSegments tasks={tasks} assignments={assignments} />
         {problemType === 'late' && (
           <span className="text-xs font-medium text-red-400">En retard</span>
         )}

@@ -891,6 +891,7 @@ function AppContent() {
         <JobsList
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
+          assignments={snapshot.assignments}
           lateJobs={snapshot.lateJobs}
           conflicts={snapshot.conflicts}
           selectedJobId={selectedJobId}

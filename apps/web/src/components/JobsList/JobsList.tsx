@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { Job, Task, LateJob, ScheduleConflict } from '@flux/types';
+import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict } from '@flux/types';
 import { JobsListHeader } from './JobsListHeader';
 import { ProblemsSection } from './ProblemsSection';
 import { JobsSection } from './JobsSection';
@@ -10,6 +10,8 @@ export interface JobsListProps {
   jobs: Job[];
   /** All tasks */
   tasks: Task[];
+  /** All assignments */
+  assignments: TaskAssignment[];
   /** Late jobs */
   lateJobs: LateJob[];
   /** Schedule conflicts */
@@ -26,6 +28,7 @@ export interface JobsListProps {
 export function JobsList({
   jobs,
   tasks,
+  assignments,
   lateJobs,
   conflicts,
   selectedJobId,
@@ -49,18 +52,33 @@ export function JobsList({
     return ids;
   }, [conflicts, tasks]);
 
-  // Calculate task counts per job
-  const taskCountsByJob = useMemo(() => {
-    const counts = new Map<string, { total: number; completed: number }>();
-    jobs.forEach((job) => {
-      const jobTasks = tasks.filter((t) => t.jobId === job.id);
-      counts.set(job.id, {
-        total: jobTasks.length,
-        completed: jobTasks.filter((t) => t.status === 'Completed').length,
-      });
+  // Group tasks by job ID
+  const tasksByJob = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach((task) => {
+      const existing = map.get(task.jobId) || [];
+      existing.push(task);
+      map.set(task.jobId, existing);
     });
-    return counts;
-  }, [jobs, tasks]);
+    return map;
+  }, [tasks]);
+
+  // Group assignments by job ID (via tasks)
+  const assignmentsByJob = useMemo(() => {
+    const taskJobMap = new Map<string, string>();
+    tasks.forEach((t) => taskJobMap.set(t.id, t.jobId));
+
+    const map = new Map<string, TaskAssignment[]>();
+    assignments.forEach((assignment) => {
+      const jobId = taskJobMap.get(assignment.taskId);
+      if (jobId) {
+        const existing = map.get(jobId) || [];
+        existing.push(assignment);
+        map.set(jobId, existing);
+      }
+    });
+    return map;
+  }, [tasks, assignments]);
 
   // Filter jobs by search query
   const filteredJobs = useMemo(() => {
@@ -116,7 +134,9 @@ export function JobsList({
   };
 
   const renderJobCard = (job: Job) => {
-    const counts = taskCountsByJob.get(job.id) || { total: 0, completed: 0 };
+    const jobTasks = tasksByJob.get(job.id) || [];
+    const jobAssignments = assignmentsByJob.get(job.id) || [];
+
     return (
       <JobCard
         key={job.id}
@@ -124,8 +144,8 @@ export function JobsList({
         reference={job.reference}
         client={job.client}
         description={job.description}
-        taskCount={counts.total}
-        completedTaskCount={counts.completed}
+        tasks={jobTasks}
+        assignments={jobAssignments}
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
         problemType={getProblemType(job.id)}
         isSelected={selectedJobId === job.id}
