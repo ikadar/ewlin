@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { DragPreview } from '../components/DragPreview';
+import { DragPreview, snapToGrid } from '../components/DragPreview';
 import { useDragStateValue } from './DragStateContext';
 
 interface DragPosition {
@@ -53,10 +53,11 @@ export function DragLayer() {
 
   // Position the preview so the grab point stays under the cursor
   // We offset by grabOffset.x and grabOffset.y to maintain the visual position
+  // REQ-08: Snap the top position to 30-minute grid intervals (40px) during drag
   const previewStyle: React.CSSProperties = {
     position: 'fixed',
     left: position.x - grabOffset.x, // Offset so grab point X stays under cursor
-    top: position.y - grabOffset.y,  // Offset so grab point Y stays under cursor
+    top: snapToGrid(position.y - grabOffset.y),  // Snap to 30-min grid (REQ-08)
     pointerEvents: 'none',
     zIndex: 9999,
   };
