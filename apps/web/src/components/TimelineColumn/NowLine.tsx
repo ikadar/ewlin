@@ -1,17 +1,20 @@
 import { timeToYPosition, formatTime } from './utils';
+import { PIXELS_PER_HOUR } from './HourMarker';
 
 export interface NowLineProps {
   /** Current time */
   currentTime: Date;
   /** Start hour of the timeline (default: 6) */
   startHour?: number;
+  /** Pixels per hour (default: 80) */
+  pixelsPerHour?: number;
 }
 
 /**
  * NowLine - Red line indicating current time with time label.
  */
-export function NowLine({ currentTime, startHour = 6 }: NowLineProps) {
-  const yPosition = timeToYPosition(currentTime, startHour);
+export function NowLine({ currentTime, startHour = 6, pixelsPerHour = PIXELS_PER_HOUR }: NowLineProps) {
+  const yPosition = timeToYPosition(currentTime, startHour, pixelsPerHour);
 
   return (
     <>

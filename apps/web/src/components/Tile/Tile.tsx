@@ -43,13 +43,15 @@ export interface TileProps {
   hasConflict?: boolean;
   /** Callback when completion icon is clicked */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Pixels per hour for height calculation (default: 80) */
+  pixelsPerHour?: number;
 }
 
 /**
  * Calculate height in pixels from duration in minutes.
  */
-function minutesToPixels(minutes: number): number {
-  return (minutes / 60) * PIXELS_PER_HOUR;
+function minutesToPixels(minutes: number, pixelsPerHour: number = PIXELS_PER_HOUR): number {
+  return (minutes / 60) * pixelsPerHour;
 }
 
 /**
@@ -74,6 +76,7 @@ export function Tile({
   selectedJobId,
   hasConflict = false,
   onToggleComplete,
+  pixelsPerHour = PIXELS_PER_HOUR,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
@@ -128,7 +131,7 @@ export function Tile({
   const startTime = new Date(assignment.scheduledStart);
   const endTime = new Date(assignment.scheduledEnd);
   const spanMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
-  const totalHeight = minutesToPixels(spanMinutes);
+  const totalHeight = minutesToPixels(spanMinutes, pixelsPerHour);
 
   // Calculate setup/run heights proportionally based on original duration ratio
   // This maintains visual distinction even when tile is stretched

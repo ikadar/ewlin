@@ -13,6 +13,8 @@ export interface StationColumnProps {
   startHour?: number;
   /** Number of hours to display */
   hoursToDisplay?: number;
+  /** Pixels per hour for grid scaling (default: 80) */
+  pixelsPerHour?: number;
   /** Day of week to show schedule for (0 = Sunday, 1 = Monday, etc.) */
   dayOfWeek?: number;
   /** Children (tiles) to render inside the column */
@@ -67,6 +69,7 @@ export function StationColumn({
   station,
   startHour = 6,
   hoursToDisplay = 24,
+  pixelsPerHour = PIXELS_PER_HOUR,
   dayOfWeek,
   children,
   isCollapsed = false,
@@ -129,12 +132,12 @@ export function StationColumn({
   const daySchedule = getDaySchedule(station, effectiveDayOfWeek);
 
   // Calculate total height
-  const totalHeight = hoursToDisplay * PIXELS_PER_HOUR;
+  const totalHeight = hoursToDisplay * pixelsPerHour;
 
   // Generate hour grid lines
   const gridLines: number[] = [];
   for (let i = 0; i <= hoursToDisplay; i++) {
-    gridLines.push(i * PIXELS_PER_HOUR);
+    gridLines.push(i * pixelsPerHour);
   }
 
   // Determine highlight style based on drag state and validation
@@ -218,6 +221,7 @@ export function StationColumn({
         daySchedule={daySchedule}
         startHour={startHour}
         hoursToDisplay={hoursToDisplay}
+        pixelsPerHour={pixelsPerHour}
       />
 
       {/* Hour grid lines */}

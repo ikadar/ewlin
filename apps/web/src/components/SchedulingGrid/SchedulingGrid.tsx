@@ -60,6 +60,8 @@ export interface SchedulingGridProps {
   startHour?: number;
   /** Number of hours to display (default: 24) */
   hoursToDisplay?: number;
+  /** Pixels per hour for grid scaling (default: 80) */
+  pixelsPerHour?: number;
   /** Callback when a tile is clicked (select job) */
   onSelectJob?: (jobId: string) => void;
   /** Callback when a tile is double-clicked (recall) */
@@ -115,6 +117,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       selectedJobId,
       startHour = 6,
       hoursToDisplay = 24,
+      pixelsPerHour = PIXELS_PER_HOUR,
       onSelectJob,
       onRecallAssignment,
       onSwapUp,
@@ -173,10 +176,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   }, []);
 
   // Calculate total height
-  const totalHeight = hoursToDisplay * PIXELS_PER_HOUR;
+  const totalHeight = hoursToDisplay * pixelsPerHour;
 
   // Calculate now line position
-  const nowPosition = timeToYPosition(now, startHour);
+  const nowPosition = timeToYPosition(now, startHour, pixelsPerHour);
 
   // Create lookup maps for jobs and tasks
   const jobMap = useMemo(() => {
@@ -244,7 +247,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       departureDate.getMonth() === today.getMonth() &&
       departureDate.getFullYear() === today.getFullYear()
     ) {
-      departurePosition = timeToYPosition(departureDate, startHour);
+      departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour);
     }
   }
 
@@ -296,6 +299,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               hourCount={hoursToDisplay}
               currentTime={now}
               showNowLine={false}
+              pixelsPerHour={pixelsPerHour}
             />
           </div>
 
@@ -355,6 +359,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   station={station}
                   startHour={startHour}
                   hoursToDisplay={hoursToDisplay}
+                  pixelsPerHour={pixelsPerHour}
                   isCollapsed={isCollapsed}
                   isValidDrop={isValidDrop}
                   isWarningDrop={isWarningDrop}
@@ -376,7 +381,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
                     // Calculate top position from assignment.scheduledStart
                     const startTime = new Date(assignment.scheduledStart);
-                    const top = timeToYPosition(startTime, startHour);
+                    const top = timeToYPosition(startTime, startHour, pixelsPerHour);
 
                     // Determine swap button visibility
                     const showSwapUp = index > 0;
@@ -412,6 +417,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         activeJobId={activeJob?.id}
                         selectedJobId={selectedJobId ?? undefined}
                         hasConflict={conflictTaskIds.has(task.id)}
+                        pixelsPerHour={pixelsPerHour}
                       />
                     );
                   })}

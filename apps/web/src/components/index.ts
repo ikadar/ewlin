@@ -25,8 +25,11 @@ export type { SchedulingGridProps, SchedulingGridHandle } from './SchedulingGrid
 export { Tile, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
 export type { TileProps, SwapButtonsProps, TailwindColor } from './Tile';
 
-export { DragPreview, snapToGrid, yPositionToTime, formatTime, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
+export { DragPreview, snapToGrid, yPositionToTime, formatTime, getPixelsPerSnap, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
 export type { DragPreviewProps } from './DragPreview';
 
 export { PlacementIndicator } from './PlacementIndicator';
 export type { PlacementIndicatorProps } from './PlacementIndicator';
+
+export { TopNavBar, ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from './TopNavBar';
+export type { TopNavBarProps } from './TopNavBar';

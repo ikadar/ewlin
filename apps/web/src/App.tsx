@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, PIXELS_PER_HOUR, timeToYPosition } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR } from './components';
 import type { SchedulingGridHandle } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -88,7 +88,7 @@ function processDropAssignment(options: ProcessDropOptions): ScheduleSnapshot {
       };
 
   // Remove any existing PrecedenceConflict for this task (it may have been resolved by moving to valid position)
-  let newConflicts = currentSnapshot.conflicts.filter(
+  const newConflicts = currentSnapshot.conflicts.filter(
     (c) => !(c.type === 'PrecedenceConflict' && c.taskId === task.id)
   );
   // Add new conflict if bypassed
@@ -248,6 +248,7 @@ interface KeyboardContext {
   orderedJobIds: string[];
   selectedJob: Job | null;
   gridRef: React.RefObject<SchedulingGridHandle | null>;
+  pixelsPerHour: number;
   setIsAltPressed: (v: boolean) => void;
   setSelectedJobId: (id: string | null) => void;
   setIsQuickPlacementMode: (fn: (prev: boolean) => boolean) => void;
@@ -263,7 +264,7 @@ function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   return false;
 }
 
-function handleToggleQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (e.altKey && e.code === 'KeyQ') {
     e.preventDefault();
     if (ctx.selectedJobId) {
@@ -337,7 +338,7 @@ function handlePageScroll(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if ((e.key === 'PageUp' || e.key === 'PageDown') && !e.altKey && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (ctx.gridRef.current) {
-      const oneDayPixels = 24 * PIXELS_PER_HOUR;
+      const oneDayPixels = 24 * ctx.pixelsPerHour;
       const direction = e.key === 'PageUp' ? -1 : 1;
       ctx.gridRef.current.scrollByY(direction * oneDayPixels);
     }
@@ -382,6 +383,9 @@ function AppContent() {
 
   // Compact station loading state
   const [compactingStationId, setCompactingStationId] = useState<string | null>(null);
+
+  // Zoom state (v0.3.34)
+  const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
 
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
@@ -449,6 +453,7 @@ function AppContent() {
       orderedJobIds,
       selectedJob,
       gridRef,
+      pixelsPerHour,
       setIsAltPressed,
       setSelectedJobId,
       setIsQuickPlacementMode,
@@ -457,13 +462,13 @@ function AppContent() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Each handler returns true if it handled the event
-      handleAltKey(e, ctx) ||
-        handleToggleQuickPlacement(e, ctx) ||
-        handleEscapeQuickPlacement(e, ctx) ||
-        handleJobNavigation(e, ctx) ||
-        handleJumpToDeparture(e, ctx) ||
-        handleJumpToToday(e, ctx) ||
-        handlePageScroll(e, ctx);
+      if (handleAltKey(e, ctx)) return;
+      if (handleQuickPlacementKeyboard(e, ctx)) return;
+      if (handleEscapeQuickPlacement(e, ctx)) return;
+      if (handleJobNavigation(e, ctx)) return;
+      if (handleJumpToDeparture(e, ctx)) return;
+      if (handleJumpToToday(e, ctx)) return;
+      handlePageScroll(e, ctx);
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -479,7 +484,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour]);
 
   // Set up global drag monitoring using pragmatic-drag-and-drop
   // Handles: position tracking during drag, drop processing
@@ -918,11 +923,30 @@ function AppContent() {
     }, 300); // Small delay for visual feedback
   }, []);
 
+  // Toggle Quick Placement (for TopNavBar button)
+  const handleToggleQuickPlacement = useCallback(() => {
+    if (selectedJobId) {
+      setIsQuickPlacementMode((prev) => !prev);
+      setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+    }
+  }, [selectedJobId]);
+
   return (
     <>
-      <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
-        <Sidebar />
-        <JobsList
+      <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
+        {/* Top Navigation Bar */}
+        <TopNavBar
+          isQuickPlacementMode={isQuickPlacementMode}
+          onToggleQuickPlacement={handleToggleQuickPlacement}
+          canEnableQuickPlacement={selectedJobId !== null}
+          pixelsPerHour={pixelsPerHour}
+          onZoomChange={setPixelsPerHour}
+        />
+
+        {/* Main content area */}
+        <div className="flex-1 flex overflow-hidden">
+          <Sidebar />
+          <JobsList
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
           assignments={snapshot.assignments}
@@ -987,7 +1011,9 @@ function AppContent() {
           onCompact={handleCompact}
           isRescheduleDrag={isRescheduleDrag}
           conflicts={snapshot.conflicts}
+          pixelsPerHour={pixelsPerHour}
         />
+        </div>
       </div>
 
       {/* Drag layer - portal-based preview of dragged tile */}

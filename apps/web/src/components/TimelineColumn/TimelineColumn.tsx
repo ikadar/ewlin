@@ -10,6 +10,8 @@ export interface TimelineColumnProps {
   currentTime?: Date;
   /** Whether to show the now line (default: true) */
   showNowLine?: boolean;
+  /** Pixels per hour (default: 80) */
+  pixelsPerHour?: number;
 }
 
 /**
@@ -33,9 +35,10 @@ export function TimelineColumn({
   hourCount = 24,
   currentTime = new Date(),
   showNowLine = true,
+  pixelsPerHour = PIXELS_PER_HOUR,
 }: TimelineColumnProps) {
   const hours = generateHourSequence(startHour, hourCount);
-  const totalHeight = hourCount * PIXELS_PER_HOUR;
+  const totalHeight = hourCount * pixelsPerHour;
 
   return (
     <div className="w-12 shrink-0 border-r border-white/5 sticky left-0 z-10 bg-zinc-950">
@@ -47,11 +50,12 @@ export function TimelineColumn({
           <HourMarker
             key={`hour-${hour}-${index}`}
             hour={hour}
-            yPosition={index * PIXELS_PER_HOUR}
+            yPosition={index * pixelsPerHour}
+            pixelsPerHour={pixelsPerHour}
           />
         ))}
         {showNowLine && (
-          <NowLine currentTime={currentTime} startHour={startHour} />
+          <NowLine currentTime={currentTime} startHour={startHour} pixelsPerHour={pixelsPerHour} />
         )}
       </div>
     </div>
