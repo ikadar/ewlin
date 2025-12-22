@@ -23,7 +23,7 @@ export interface DropValidationParams {
 export interface DropValidationResult {
   /** Whether the drop is valid */
   isValid: boolean;
-  /** Whether there's a precedence conflict */
+  /** Whether there's a precedence conflict (checked WITHOUT bypass for accurate detection) */
   hasPrecedenceConflict: boolean;
   /** Suggested start time if precedence conflict exists */
   suggestedStart: string | null;
@@ -75,6 +75,30 @@ export function useDropValidation({
     return validateAssignment(proposedAssignment, snapshot);
   }, [proposedAssignment, snapshot]);
 
+  // REQ-13 Fix: Also check for precedence conflict WITHOUT bypass
+  // This is needed to correctly show amber ring and record conflicts when Alt is pressed
+  const hasPrecedenceConflictWithoutBypass = useMemo((): boolean => {
+    if (!task || !targetStationId || !scheduledStart || task.type !== 'Internal') {
+      return false;
+    }
+
+    // If bypass is not active, use the main validation result
+    if (!bypassPrecedence && validationResult) {
+      return validationResult.conflicts.some((c) => c.type === 'PrecedenceConflict');
+    }
+
+    // When bypass is active, run a separate validation without bypass
+    const proposalWithoutBypass: ProposedAssignment = {
+      taskId: task.id,
+      targetId: targetStationId,
+      isOutsourced: false,
+      scheduledStart,
+      bypassPrecedence: false,
+    };
+    const resultWithoutBypass = validateAssignment(proposalWithoutBypass, snapshot);
+    return resultWithoutBypass.conflicts.some((c) => c.type === 'PrecedenceConflict');
+  }, [task, targetStationId, scheduledStart, bypassPrecedence, validationResult, snapshot]);
+
   // Extract relevant information
   const result = useMemo((): DropValidationResult => {
     if (!validationResult) {
@@ -88,9 +112,8 @@ export function useDropValidation({
       };
     }
 
-    const hasPrecedenceConflict = validationResult.conflicts.some(
-      (c) => c.type === 'PrecedenceConflict'
-    );
+    // Use the bypass-independent check for precedence conflict
+    const hasPrecedenceConflict = hasPrecedenceConflictWithoutBypass;
 
     // Check if there are only warning conflicts (non-blocking)
     // Warning-only conflicts: Plates ApprovalGateConflict
@@ -115,7 +138,7 @@ export function useDropValidation({
       conflicts: validationResult.conflicts,
       hasWarningOnly,
     };
-  }, [validationResult]);
+  }, [validationResult, hasPrecedenceConflictWithoutBypass]);
 
   return result;
 }

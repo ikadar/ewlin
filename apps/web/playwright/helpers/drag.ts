@@ -352,3 +352,148 @@ export async function countTilesOnStation(page: Page, stationId: string): Promis
   const tiles = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]');
   return await tiles.count();
 }
+
+/**
+ * Perform HTML5 drag from sidebar task tile to station column with Alt key pressed
+ * Used for testing Alt+drop precedence bypass (REQ-13)
+ */
+export async function dragFromSidebarToStationWithAlt(
+  page: Page,
+  taskTileSelector: string,
+  stationId: string,
+  targetY: number
+): Promise<void> {
+  // Count tiles before drag
+  const tilesBefore = await page.locator(`[data-testid="station-column-${stationId}"]`).locator('[data-testid^="tile-"][data-scheduled-start]').count();
+
+  await page.evaluate(
+    async ({ taskTileSelector, stationId, targetY }) => {
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const source = document.querySelector(taskTileSelector) as HTMLElement;
+      if (!source) {
+        throw new Error(`Source element not found: ${taskTileSelector}`);
+      }
+
+      const stationColumn = document.querySelector(`[data-testid="station-column-${stationId}"]`) as HTMLElement;
+      if (!stationColumn) {
+        throw new Error(`Station column not found: ${stationId}`);
+      }
+
+      // Get source position
+      const sourceRect = source.getBoundingClientRect();
+      const sourceX = sourceRect.x + sourceRect.width / 2;
+      const sourceY = sourceRect.y + sourceRect.height / 2;
+
+      // Get station column position
+      const stationRect = stationColumn.getBoundingClientRect();
+      const dropX = stationRect.x + stationRect.width / 2;
+      const dropY = stationRect.y + targetY;
+
+      // Create DataTransfer object
+      const dataTransfer = new DataTransfer();
+
+      // Dispatch dragstart on source (no Alt yet)
+      source.dispatchEvent(new DragEvent('dragstart', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer,
+        clientX: sourceX,
+        clientY: sourceY,
+      }));
+
+      await sleep(50);
+
+      // Dispatch dragenter on the station column
+      stationColumn.dispatchEvent(new DragEvent('dragenter', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer,
+        clientX: dropX,
+        clientY: dropY,
+      }));
+
+      await sleep(30);
+
+      // Simulate Alt key press
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
+      await sleep(50);
+
+      // Dispatch dragover events WITH altKey: true
+      for (let i = 0; i < 5; i++) {
+        stationColumn.dispatchEvent(new DragEvent('dragover', {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer,
+          clientX: dropX,
+          clientY: dropY,
+          altKey: true, // Alt key is pressed
+        }));
+        await sleep(20);
+      }
+
+      // Dispatch drop WITH altKey: true
+      stationColumn.dispatchEvent(new DragEvent('drop', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer,
+        clientX: dropX,
+        clientY: dropY,
+        altKey: true, // Alt key is pressed
+      }));
+
+      await sleep(50);
+
+      // Release Alt key
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt', altKey: false }));
+
+      // Dispatch dragend on source
+      source.dispatchEvent(new DragEvent('dragend', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer,
+      }));
+    },
+    { taskTileSelector, stationId, targetY }
+  );
+
+  // Wait for new tile to appear
+  try {
+    await page.waitForFunction(
+      ({ stationId, expectedCount }) => {
+        const column = document.querySelector(`[data-testid="station-column-${stationId}"]`);
+        if (!column) return false;
+        const tiles = column.querySelectorAll('[data-testid^="tile-"][data-scheduled-start]');
+        return tiles.length > expectedCount;
+      },
+      { stationId, expectedCount: tilesBefore },
+      { timeout: 2000 }
+    );
+  } catch {
+    await page.waitForTimeout(300);
+  }
+}
+
+/**
+ * Check if a job appears in the Problems section
+ */
+export async function isJobInProblemsSection(page: Page, jobId: string): Promise<boolean> {
+  // Problems section has jobs with conflict or late status
+  const problemsSection = page.locator('[data-testid="problems-section"]');
+  const jobCard = problemsSection.locator(`[data-testid="job-card-${jobId}"]`);
+  return await jobCard.isVisible().catch(() => false);
+}
+
+/**
+ * Check if a job card has conflict styling (amber background)
+ */
+export async function hasConflictStyling(page: Page, jobId: string): Promise<boolean> {
+  const jobCard = page.locator(`[data-testid="job-card-${jobId}"]`);
+  // Check for amber/conflict background class or shuffle icon
+  const hasAmberBg = await jobCard.evaluate((el) => {
+    return el.classList.contains('bg-amber-500/10') ||
+           el.querySelector('[data-lucide="shuffle"]') !== null ||
+           el.innerHTML.includes('shuffle');
+  }).catch(() => false);
+  return hasAmberBg;
+}

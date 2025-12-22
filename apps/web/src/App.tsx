@@ -14,7 +14,8 @@ import {
   type StationDropData,
   type DragValidationState,
 } from './dnd';
-import type { Task, Job, InternalTask, TaskAssignment, ScheduleConflict, ScheduleSnapshot, Station } from '@flux/types';
+import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
+import { validateAssignment } from '@flux/schedule-validator';
 
 const START_HOUR = 6;
 
@@ -86,7 +87,11 @@ function processDropAssignment(options: ProcessDropOptions): ScheduleSnapshot {
         updatedAt: new Date().toISOString(),
       };
 
-  let newConflicts = [...currentSnapshot.conflicts];
+  // Remove any existing PrecedenceConflict for this task (it may have been resolved by moving to valid position)
+  let newConflicts = currentSnapshot.conflicts.filter(
+    (c) => !(c.type === 'PrecedenceConflict' && c.taskId === task.id)
+  );
+  // Add new conflict if bypassed
   if (bypassedPrecedence) {
     newConflicts.push({
       type: 'PrecedenceConflict',
@@ -602,7 +607,22 @@ function AppContent() {
         const task = dragData.task as InternalTask;
         const station = snapshot.stations.find((s) => s.id === dropData.stationId);
         const scheduledEnd = calculateEndTime(task, scheduledStart, station);
-        const bypassedPrecedence = wasAltPressed && currentValidation.hasPrecedenceConflict;
+
+        // Fix for REQ-13: Check for precedence conflict WITHOUT bypass
+        // The currentValidation may have been run with bypassPrecedence=true (when Alt pressed),
+        // which skips precedence validation. We need to check if there's actually a conflict.
+        let bypassedPrecedence = false;
+        if (wasAltPressed) {
+          const conflictCheckProposal: ProposedAssignment = {
+            taskId: task.id,
+            targetId: dropData.stationId,
+            isOutsourced: false,
+            scheduledStart,
+            bypassPrecedence: false, // Check WITHOUT bypass to detect actual conflict
+          };
+          const conflictCheckResult = validateAssignment(conflictCheckProposal, snapshot);
+          bypassedPrecedence = conflictCheckResult.conflicts.some(c => c.type === 'PrecedenceConflict');
+        }
 
         // Update snapshot using extracted helper function
         updateSnapshot((currentSnapshot) => processDropAssignment({

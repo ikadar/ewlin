@@ -871,10 +871,92 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
 }
 
 // ============================================================================
+// Fixture: alt-bypass
+// For v0.3.28 (Alt+Drag Bypass Bug Fix - REQ-13)
+// Job with 2 sequential tasks - Task 1 scheduled at 10:00-11:00, Task 2 unscheduled
+// Used to test Alt+drop conflict recording
+// ============================================================================
+
+export function createAltBypassFixture(): ScheduleSnapshot {
+  const jobs: Job[] = [
+    {
+      id: 'job-bypass-1',
+      reference: 'BYPASS-001',
+      client: 'Alt Bypass Client',
+      description: 'Alt Bypass Test Job',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 7),
+      color: '#3b82f6', // Blue
+      paperPurchaseStatus: 'InStock',
+      platesStatus: 'Done',
+      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
+      requiredJobIds: [],
+      comments: [],
+      taskIds: ['task-bypass-1', 'task-bypass-2'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  const tasks: Task[] = [
+    {
+      id: 'task-bypass-1',
+      jobId: 'job-bypass-1',
+      sequenceOrder: 0,  // First task
+      status: 'Assigned',
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 30 }, // 1h total (10:00-11:00)
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    {
+      id: 'task-bypass-2',
+      jobId: 'job-bypass-1',
+      sequenceOrder: 1,  // Second task (must wait for first to complete at 11:00)
+      status: 'Ready',
+      type: 'Internal',
+      stationId: 'station-polar', // Different station to allow placement
+      duration: { setupMinutes: 15, runMinutes: 30 }, // 45min
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+  ];
+
+  // Task 1 is scheduled at 10:00-11:00
+  // Task 2 is unscheduled - valid placement is >= 11:00
+  // Placing Task 2 before 11:00 creates a precedence conflict
+  const assignments: TaskAssignment[] = [
+    {
+      id: 'assign-bypass-1',
+      taskId: 'task-bypass-1',
+      targetId: 'station-komori',
+      isOutsourced: false,
+      scheduledStart: isoDate(10, 0),
+      scheduledEnd: isoDate(11, 0),
+      isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  return {
+    ...baseSnapshot(),
+    jobs,
+    tasks,
+    assignments,
+    conflicts: [],
+    lateJobs: [],
+  };
+}
+
+// ============================================================================
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -883,6 +965,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'approval-gates': createApprovalGatesFixture,
   'swap': createSwapFixture,
   'sidebar-drag': createSidebarDragFixture,
+  'alt-bypass': createAltBypassFixture,
 };
 
 /**

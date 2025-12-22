@@ -94,7 +94,16 @@ The UI provides clear visual indicators when scheduling rules are violated. Thes
 
 ## Scheduling Conflict (Incoherent)
 
+> Updated from REQ-13
+
 **When:** Job has precedence violations or other scheduling inconsistencies
+
+**Created when:**
+- User places a task before its predecessor completes using Alt+drop bypass
+
+**Cleared when:**
+- Task is rescheduled to a valid position (after predecessor completes)
+- Conflict is automatically removed from the schedule
 
 **Visual:**
 - Job appears in Jobs List "Problèmes" section

@@ -96,10 +96,24 @@ If the drop position would violate precedence (Task N placed before Task N-1 com
 
 ### Alt-Key Bypass
 
+> Implemented from REQ-13
+
 Holding **Alt** during drag bypasses the safeguard:
-- Tile can be placed in a violating position
-- **Red halo** appears on the tile after placement
+
+**During drag (Alt pressed):**
+- **Amber ring** appears around the drop zone (instead of red)
+- Visual indicator that bypass is active
+
+**On drop (Alt pressed):**
+- Tile is placed in the violating position
+- `PrecedenceConflict` is recorded in the schedule
 - Job appears in Jobs List "Problèmes" section with "Conflit" badge
+- Tile shows conflict styling (amber/red halo)
+
+**On reschedule to valid position:**
+- Existing `PrecedenceConflict` is automatically cleared
+- Job disappears from "Problèmes" section
+- Tile returns to normal styling
 
 ### Validation Timing
 
