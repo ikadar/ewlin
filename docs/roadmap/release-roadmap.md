@@ -692,17 +692,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Horizontal position remains fixed to column center
 - [x] E2E test: drag preview snaps during drag (5 tests)
 
-#### v0.3.32 - Enhanced Job Progression Visualization
+#### v0.3.32 - Enhanced Job Progression Visualization ✅
 > **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-en.md#req-07-enhanced-job-progression-visualization)
 
-- [ ] New `ProgressSegments` component (replaces `ProgressDots`)
-- [ ] Task states: unscheduled (empty), scheduled (gray), completed (green), late (red)
-- [ ] Segment width based on duration: `setupMinutes + runMinutes`
-- [ ] Standard size for ≤30min, proportional for >30min
-- [ ] Outsourced tasks: 5× standard width with duration label (e.g., "2JO")
-- [ ] Flex-wrap layout for multiple rows
-- [ ] Unit tests for state calculation
-- [ ] Visual test fixture
+- [x] New `ProgressSegments` component (replaces `ProgressDots`)
+- [x] Task states: unscheduled (empty), scheduled (gray), completed (green), late (red)
+- [x] Segment width based on duration: `setupMinutes + runMinutes`
+- [x] Standard size for ≤30min, proportional for >30min
+- [x] Outsourced tasks: 5× standard width with duration label (e.g., "2JO")
+- [x] Flex-wrap layout for multiple rows
+- [x] Unit tests for state calculation (21 tests)
+- [x] Visual test fixture
 
 #### v0.3.33 - Top Navigation Bar
 > **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-en.md#req-040506-top-navigation-bar-with-controls)
