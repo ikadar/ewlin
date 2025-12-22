@@ -682,14 +682,15 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Both methods set `selectedJobId(null)`
 - [x] E2E test: close button and toggle click (6 tests)
 
-#### v0.3.31 - Real-Time Drag Snapping
-> **Implements:** [REQ-08/09](../ux-ui/tmp/refactored-new-requirements-en.md#req-0809-snapping-drag-preview-with-vertical-constraint)
+#### v0.3.31 - Real-Time Drag Snapping ✅
+> **Implements:** [REQ-08/09](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-0809-snapping-drag-preview-with-vertical-constraint)
+> **Released:** 2025-12-22
 
-- [ ] **REQ-08:** Snap drag preview to 30-minute grid during drag (not just on drop)
-- [ ] Modify DragLayer.tsx: snap `top` position in real-time
-- [ ] **REQ-09:** Vertical-only drag (already implemented, verify)
-- [ ] Horizontal position remains fixed to column center
-- [ ] E2E test: drag preview snaps during drag
+- [x] **REQ-08:** Snap drag preview to 30-minute grid during drag (not just on drop)
+- [x] Modify DragLayer.tsx: snap `top` position in real-time
+- [x] **REQ-09:** Vertical-only drag (already implemented, verified)
+- [x] Horizontal position remains fixed to column center
+- [x] E2E test: drag preview snaps during drag (5 tests)
 
 #### v0.3.32 - Enhanced Job Progression Visualization
 > **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-en.md#req-07-enhanced-job-progression-visualization)
