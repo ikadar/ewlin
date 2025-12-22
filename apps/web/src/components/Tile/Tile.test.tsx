@@ -462,6 +462,56 @@ describe('Tile', () => {
       expect(tile).toHaveClass('ease-out');
     });
   });
+
+  describe('completion toggle (v0.3.33)', () => {
+    it('calls onToggleComplete with assignment id when incomplete icon is clicked', () => {
+      const onToggleComplete = vi.fn();
+      renderWithDragContext(<Tile {...defaultProps} onToggleComplete={onToggleComplete} />);
+
+      fireEvent.click(screen.getByTestId('tile-incomplete-icon'));
+      expect(onToggleComplete).toHaveBeenCalledWith('assignment-1');
+    });
+
+    it('calls onToggleComplete with assignment id when completed icon is clicked', () => {
+      const completedAssignment: TaskAssignment = {
+        ...mockAssignment,
+        isCompleted: true,
+      };
+      const onToggleComplete = vi.fn();
+      renderWithDragContext(
+        <Tile {...defaultProps} assignment={completedAssignment} onToggleComplete={onToggleComplete} />
+      );
+
+      fireEvent.click(screen.getByTestId('tile-completed-icon'));
+      expect(onToggleComplete).toHaveBeenCalledWith('assignment-1');
+    });
+
+    it('does not call onSelect when icon is clicked (stopPropagation)', () => {
+      const onSelect = vi.fn();
+      const onToggleComplete = vi.fn();
+      renderWithDragContext(
+        <Tile {...defaultProps} onSelect={onSelect} onToggleComplete={onToggleComplete} />
+      );
+
+      fireEvent.click(screen.getByTestId('tile-incomplete-icon'));
+      expect(onToggleComplete).toHaveBeenCalled();
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('icon has hover cursor class', () => {
+      renderWithDragContext(<Tile {...defaultProps} />);
+
+      const icon = screen.getByTestId('tile-incomplete-icon');
+      expect(icon).toHaveClass('cursor-pointer');
+    });
+
+    it('icon has transition class for hover effect', () => {
+      renderWithDragContext(<Tile {...defaultProps} />);
+
+      const icon = screen.getByTestId('tile-incomplete-icon');
+      expect(icon).toHaveClass('transition-colors');
+    });
+  });
 });
 
 describe('SimilarityIndicators', () => {

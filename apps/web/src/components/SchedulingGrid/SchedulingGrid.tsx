@@ -68,6 +68,8 @@ export interface SchedulingGridProps {
   onSwapUp?: (assignmentId: string) => void;
   /** Callback when swap down is clicked */
   onSwapDown?: (assignmentId: string) => void;
+  /** Callback when completion icon is clicked */
+  onToggleComplete?: (assignmentId: string) => void;
   /** Currently dragged task (for column focus) */
   activeTask?: Task | null;
   /** Job of the currently dragged task (for tile muting) */
@@ -117,6 +119,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onRecallAssignment,
       onSwapUp,
       onSwapDown,
+      onToggleComplete,
       activeTask,
       activeJob,
       validationState,
@@ -405,6 +408,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onRecall={onRecallAssignment}
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
+                        onToggleComplete={onToggleComplete}
                         activeJobId={activeJob?.id}
                         selectedJobId={selectedJobId ?? undefined}
                         hasConflict={conflictTaskIds.has(task.id)}

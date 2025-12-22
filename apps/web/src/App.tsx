@@ -743,6 +743,40 @@ function AppContent() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
+  // Handle toggle completion (v0.3.33)
+  const handleToggleComplete = useCallback((assignmentId: string) => {
+    updateSnapshot((currentSnapshot) => {
+      const assignmentIndex = currentSnapshot.assignments.findIndex((a) => a.id === assignmentId);
+      if (assignmentIndex === -1) {
+        console.warn('Assignment not found for toggle:', assignmentId);
+        return currentSnapshot;
+      }
+
+      const assignment = currentSnapshot.assignments[assignmentIndex];
+      const newIsCompleted = !assignment.isCompleted;
+
+      console.log('Toggling completion:', {
+        assignmentId,
+        from: assignment.isCompleted,
+        to: newIsCompleted,
+      });
+
+      // Update the assignment
+      const newAssignments = [...currentSnapshot.assignments];
+      newAssignments[assignmentIndex] = {
+        ...assignment,
+        isCompleted: newIsCompleted,
+        completedAt: newIsCompleted ? new Date().toISOString() : null,
+      };
+
+      return {
+        ...currentSnapshot,
+        assignments: newAssignments,
+      };
+    });
+    setSnapshotVersion((v) => v + 1);
+  }, []);
+
   // Quick Placement: get available task for hovered station (for actual placement)
   // Note: Currently unused but may be needed for future tooltip/preview features
   const _quickPlacementTask = useMemo(() => {
@@ -927,6 +961,7 @@ function AppContent() {
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
           onRecallAssignment={handleRecallAssignment}
+          onToggleComplete={handleToggleComplete}
           activeTask={activeTask}
           activeJob={activeJob}
           validationState={{

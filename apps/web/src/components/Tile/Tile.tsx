@@ -41,6 +41,8 @@ export interface TileProps {
   selectedJobId?: string;
   /** Whether this tile has a conflict (precedence violation - REQ-12) */
   hasConflict?: boolean;
+  /** Callback when completion icon is clicked */
+  onToggleComplete?: (assignmentId: string) => void;
 }
 
 /**
@@ -71,6 +73,7 @@ export function Tile({
   activeJobId,
   selectedJobId,
   hasConflict = false,
+  onToggleComplete,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
@@ -173,6 +176,12 @@ export function Tile({
     onSwapDown?.(assignment.id);
   };
 
+  // Handle completion toggle (v0.3.33)
+  const handleToggleComplete = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger job selection
+    onToggleComplete?.(assignment.id);
+  };
+
   // Determine if we have setup time to show
   const hasSetup = setupMinutes > 0;
 
@@ -252,12 +261,14 @@ export function Tile({
           <div className="flex items-center gap-2">
             {isCompleted ? (
               <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0"
+                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={handleToggleComplete}
                 data-testid="tile-completed-icon"
               />
             ) : (
               <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0"
+                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
+                onClick={handleToggleComplete}
                 data-testid="tile-incomplete-icon"
               />
             )}
@@ -286,12 +297,14 @@ export function Tile({
           <div className="flex items-center gap-2">
             {isCompleted ? (
               <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0"
+                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={handleToggleComplete}
                 data-testid="tile-completed-icon"
               />
             ) : (
               <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0"
+                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
+                onClick={handleToggleComplete}
                 data-testid="tile-incomplete-icon"
               />
             )}
