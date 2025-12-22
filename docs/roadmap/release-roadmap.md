@@ -648,15 +648,16 @@ This document contains the development roadmap for the Flux print shop schedulin
   - [x] `component-api.md` - Component props and interfaces
 - [x] `06-edge-cases.md` expanded with error messages and recovery
 
-#### v0.3.28 - Alt+Drag Bypass Bug Fix
-> **Implements:** [REQ-13](../ux-ui/tmp/refactored-new-requirements-en.md#req-13-fix-altdrag-bypass-conflict-recording-bug)
+#### v0.3.28 - Alt+Drag Bypass Bug Fix ✅
+> **Implements:** [REQ-13](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-13-fix-altdrag-bypass-conflict-recording-bug)
+> **Released:** 2025-12-22
 
-- [ ] Fix `bypassedPrecedence` calculation in `App.tsx`
-- [ ] Validate WITHOUT bypass first to detect conflict existence
-- [ ] Record `PrecedenceConflict` when Alt+drop is used
-- [ ] Job appears in Problems section after bypassed placement
-- [ ] Unit tests for bypass logic
-- [ ] E2E test: Alt+drop creates conflict record
+- [x] Fix `useDropValidation` hook: bypass-independent precedence check
+- [x] Fix `bypassedPrecedence` calculation in `App.tsx`
+- [x] Amber ring appears during Alt+drag over conflict position
+- [x] Record `PrecedenceConflict` when Alt+drop is used
+- [x] Clear conflict when task moved to valid position
+- [x] E2E tests for Alt+drop scenarios
 
 #### v0.3.29 - Job Focus & Conflict Visual Feedback
 > **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-en.md#req-01-job-focus-visual-effect), [REQ-12](../ux-ui/tmp/refactored-new-requirements-en.md#req-12-persistent-visual-feedback-for-precedence-violations)
