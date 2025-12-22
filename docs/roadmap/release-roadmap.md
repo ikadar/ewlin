@@ -648,27 +648,164 @@ This document contains the development roadmap for the Flux print shop schedulin
   - [x] `component-api.md` - Component props and interfaces
 - [x] `06-edge-cases.md` expanded with error messages and recovery
 
+#### v0.3.28 - Alt+Drag Bypass Bug Fix
+> **Implements:** [REQ-13](../ux-ui/tmp/refactored-new-requirements-en.md#req-13-fix-altdrag-bypass-conflict-recording-bug)
+
+- [ ] Fix `bypassedPrecedence` calculation in `App.tsx`
+- [ ] Validate WITHOUT bypass first to detect conflict existence
+- [ ] Record `PrecedenceConflict` when Alt+drop is used
+- [ ] Job appears in Problems section after bypassed placement
+- [ ] Unit tests for bypass logic
+- [ ] E2E test: Alt+drop creates conflict record
+
+#### v0.3.29 - Job Focus & Conflict Visual Feedback
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-en.md#req-01-job-focus-visual-effect), [REQ-12](../ux-ui/tmp/refactored-new-requirements-en.md#req-12-persistent-visual-feedback-for-precedence-violations)
+
+- [ ] **REQ-01:** Mute non-selected job tiles when job is focused (not just during drag)
+- [ ] Extend `isMuted` logic: muted if `selectedJobId !== undefined && selectedJobId !== job.id`
+- [ ] **REQ-12:** Persistent amber glow on tiles with precedence conflict
+- [ ] New `hasConflict` prop on Tile component
+- [ ] Amber glow: `box-shadow: 0 0 12px 4px #F59E0B99`
+- [ ] Conflict glow overrides selection glow
+- [ ] E2E tests for visual feedback states
+
+#### v0.3.30 - Job Deselection Methods
+> **Implements:** [REQ-02/03](../ux-ui/tmp/refactored-new-requirements-en.md#req-0203-job-deselection-methods)
+
+- [ ] Close button (X) in JobDetailsPanel header
+- [ ] `onClose` prop for JobDetailsPanel
+- [ ] Toggle click in JobsList: click selected job → deselect
+- [ ] Both methods set `selectedJobId(null)`
+- [ ] Unit tests for toggle logic
+- [ ] E2E test: close button and toggle click
+
+#### v0.3.31 - Real-Time Drag Snapping
+> **Implements:** [REQ-08/09](../ux-ui/tmp/refactored-new-requirements-en.md#req-0809-snapping-drag-preview-with-vertical-constraint)
+
+- [ ] **REQ-08:** Snap drag preview to 30-minute grid during drag (not just on drop)
+- [ ] Modify DragLayer.tsx: snap `top` position in real-time
+- [ ] **REQ-09:** Vertical-only drag (already implemented, verify)
+- [ ] Horizontal position remains fixed to column center
+- [ ] E2E test: drag preview snaps during drag
+
+#### v0.3.32 - Enhanced Job Progression Visualization
+> **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-en.md#req-07-enhanced-job-progression-visualization)
+
+- [ ] New `ProgressSegments` component (replaces `ProgressDots`)
+- [ ] Task states: unscheduled (empty), scheduled (gray), completed (green), late (red)
+- [ ] Segment width based on duration: `setupMinutes + runMinutes`
+- [ ] Standard size for ≤30min, proportional for >30min
+- [ ] Outsourced tasks: 5× standard width with duration label (e.g., "2JO")
+- [ ] Flex-wrap layout for multiple rows
+- [ ] Unit tests for state calculation
+- [ ] Visual test fixture
+
+#### v0.3.33 - Top Navigation Bar
+> **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-en.md#req-040506-top-navigation-bar-with-controls)
+
+- [ ] **REQ-04:** New `TopNavBar` component (`h-12`, `bg-zinc-900`)
+- [ ] Logo/app name on left
+- [ ] **REQ-05:** Quick Placement toggle button (visual alternative to ALT+Q)
+- [ ] Button disabled when no job selected
+- [ ] **REQ-06:** Zoom control: `[-] 100% [+]` or dropdown
+- [ ] Zoom levels: 50%, 75%, 100%, 150%, 200%
+- [ ] `PIXELS_PER_HOUR` state: 40px, 60px, 80px, 120px, 160px
+- [ ] User/Settings section on right (placeholder)
+- [ ] Adjust main layout to accommodate nav bar
+- [ ] E2E tests for zoom and quick placement button
+
+#### v0.3.34 - Global Timeline Compaction
+> **Implements:** [REQ-10](../ux-ui/tmp/refactored-new-requirements-en.md#req-10-global-timeline-compaction)
+
+- [ ] Segmented buttons in TopNavBar: `[4h] [8h] [24h]`
+- [ ] `compactTimeline(horizon)` function
+- [ ] Compaction starts from current time (`now`)
+- [ ] Tasks in progress are immobile
+- [ ] Respects precedence rules (no violations created)
+- [ ] Processes all stations left-to-right, top-to-bottom
+- [ ] Mock implementation (local state)
+- [ ] E2E test: compact 4h removes gaps
+
+#### v0.3.35 - Dry Time Precedence
+> **Implements:** [REQ-11](../ux-ui/tmp/refactored-new-requirements-en.md#req-11-dry-time-drying-delay-after-printing)
+
+- [ ] `DRY_TIME_MINUTES = 240` constant (4 hours)
+- [ ] Update `@flux/schedule-validator` precedence logic
+- [ ] If predecessor is printing task: `scheduledEnd + DRY_TIME`
+- [ ] Identify printing tasks by station category
+- [ ] Label in JobDetailsPanel: `+4h drying` on precedence bar
+- [ ] Validator unit tests
+- [ ] E2E test: precedence with dry time
+
+#### v0.3.36 - Multi-Day Grid Navigation
+> **Implements:** [REQ-14/15/16/17](../ux-ui/tmp/refactored-new-requirements-en.md#req-14151617-multi-day-grid-navigation--date-strip-integration)
+
+- [ ] **REQ-14:** Multi-day grid support (extend beyond 24h)
+- [ ] DateStrip click-to-scroll: `onDateClick` connected in App.tsx
+- [ ] Bidirectional scroll sync: DateStrip ↔ Grid
+- [ ] DateStrip scrolls with grid (not fixed)
+- [ ] **REQ-15:** Departure date highlight on DateStrip (red styling)
+- [ ] **REQ-16:** Scheduled days highlight (emerald indicator dots)
+- [ ] **REQ-17:** Extended grid background on scroll
+- [ ] Consider virtual scrolling (`@tanstack/virtual`) for performance
+- [ ] E2E tests for navigation and highlighting
+
+#### v0.3.37 - Group Capacity Visualization
+> **Implements:** [REQ-18](../ux-ui/tmp/refactored-new-requirements-en.md#req-18-machine-group-capacity-limits-visualization)
+
+- [ ] Station header: group name display
+- [ ] Capacity indicator in header (if `maxConcurrent` defined)
+- [ ] Grid: yellow/orange highlight on time slots at capacity
+- [ ] Grid: red highlight on time slots exceeding capacity
+- [ ] Drag validation: show `GroupCapacityConflict` feedback
+- [ ] Tile: amber glow on capacity conflict (like precedence)
+- [ ] E2E test: capacity conflict visualization
+
+#### v0.3.38 - Outsourcing Columns
+> **Implements:** [REQ-19](../ux-ui/tmp/refactored-new-requirements-en.md#req-19-outsourcing-columns-provider-display)
+
+- [ ] Remove `if (assignment.isOutsourced) return;` skip in SchedulingGrid
+- [ ] Add provider columns after station columns
+- [ ] `ProviderColumn` component with different styling
+- [ ] Provider header with outsource icon (`building-2`)
+- [ ] Subcolumn layout for parallel tasks (calendar-style)
+- [ ] Subcolumn width calculation: `column_width / max_concurrent`
+- [ ] Greedy subcolumn index assignment algorithm
+- [ ] E2E test: outsourced task rendering
+
+#### v0.3.39 - Similarities Feature Completion
+> **Implements:** [REQ-20](../ux-ui/tmp/refactored-new-requirements-en.md#req-20-similarities-feature-completion)
+
+- [ ] Extend `Job` type: add `paperWeight?: number`, `inking?: string`
+- [ ] Update `@flux/types` package
+- [ ] Extend mock job generator with `paperWeight` and `inking` values
+- [ ] `PAPER_WEIGHTS = [80, 100, 120, 150, 170, 200, 250, 300, 350]`
+- [ ] `INKINGS = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0']`
+- [ ] Similarity indicators now show real comparisons (not always matched)
+- [ ] Unit tests for similarity comparison
+- [ ] Visual test fixture
+
 ### Phase 3I: Backend API Integration
 
-#### v0.3.28 - Validator Package Integration
+#### v0.3.40 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-#### v0.3.29 - API Client Setup
+#### v0.3.41 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.3.30 - Snapshot Loading
+#### v0.3.42 - Snapshot Loading
 - [ ] Replace mock with real API
 - [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.3.31 - Assignment Operations Integration
+#### v0.3.43 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
@@ -679,13 +816,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 > **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
 
-#### v0.3.32 - DSL Parser Package (Post-MVP)
+#### v0.3.44 - DSL Parser Package (Post-MVP)
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition
 - [ ] CodeMirror 6 integration
 - [ ] Syntax highlighting
 
-#### v0.3.33 - Job Creation Modal (Post-MVP)
+#### v0.3.45 - Job Creation Modal (Post-MVP)
 - [ ] Modal component
 - [ ] DSL textarea with highlighting
 - [ ] Autocomplete integration
