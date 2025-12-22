@@ -1,5 +1,6 @@
-import { Crosshair, Minus, Plus, User, Settings } from 'lucide-react';
+import { Crosshair, Minus, Plus, User, Settings, Loader2 } from 'lucide-react';
 import { ZOOM_LEVELS } from './constants';
+import { COMPACT_HORIZONS, type CompactHorizon } from '../../utils/compactTimeline';
 
 export interface TopNavBarProps {
   /** Whether Quick Placement mode is active */
@@ -12,6 +13,10 @@ export interface TopNavBarProps {
   pixelsPerHour: number;
   /** Callback when zoom level changes */
   onZoomChange: (pixelsPerHour: number) => void;
+  /** Callback when compact button is clicked */
+  onCompactTimeline?: (horizonHours: CompactHorizon) => void;
+  /** Whether compaction is in progress */
+  isCompacting?: boolean;
 }
 
 /**
@@ -24,6 +29,8 @@ export function TopNavBar({
   canEnableQuickPlacement,
   pixelsPerHour,
   onZoomChange,
+  onCompactTimeline,
+  isCompacting = false,
 }: TopNavBarProps) {
   // Find current zoom level index
   const currentZoomIndex = ZOOM_LEVELS.findIndex((z) => z.pixelsPerHour === pixelsPerHour);
@@ -55,7 +62,7 @@ export function TopNavBar({
         </span>
       </div>
 
-      {/* Center section: Quick Placement + Zoom */}
+      {/* Center section: Quick Placement + Compact + Zoom */}
       <div className="flex items-center gap-6">
         {/* Quick Placement toggle */}
         <button
@@ -77,6 +84,36 @@ export function TopNavBar({
           <Crosshair className="w-4 h-4" />
           <span>Quick Place</span>
         </button>
+
+        {/* Compact timeline buttons */}
+        <div className="flex items-center gap-1" data-testid="compact-control">
+          <span className="text-xs text-zinc-500 mr-1">Compact:</span>
+          {isCompacting ? (
+            <div className="flex items-center gap-2 px-3 py-1.5" data-testid="compact-loading">
+              <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+              <span className="text-sm text-zinc-400">...</span>
+            </div>
+          ) : (
+            <div className="flex rounded-md overflow-hidden border border-zinc-700">
+              {COMPACT_HORIZONS.map((horizon, index) => (
+                <button
+                  key={horizon.hours}
+                  onClick={() => onCompactTimeline?.(horizon.hours)}
+                  disabled={!onCompactTimeline}
+                  className={`
+                    px-2.5 py-1 text-sm font-medium transition-colors
+                    ${!onCompactTimeline ? 'text-zinc-600 cursor-not-allowed' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'}
+                    ${index > 0 ? 'border-l border-zinc-700' : ''}
+                  `}
+                  data-testid={`compact-${horizon.hours}h-button`}
+                  title={`Compact next ${horizon.hours} hours`}
+                >
+                  {horizon.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Zoom control */}
         <div className="flex items-center gap-1" data-testid="zoom-control">

@@ -155,4 +155,72 @@ describe('TopNavBar', () => {
       expect(DEFAULT_PIXELS_PER_HOUR).toBe(80);
     });
   });
+
+  describe('Compact control', () => {
+    it('renders the compact control section', () => {
+      render(<TopNavBar {...defaultProps} />);
+      expect(screen.getByTestId('compact-control')).toBeInTheDocument();
+    });
+
+    it('renders all three compact buttons', () => {
+      render(<TopNavBar {...defaultProps} onCompactTimeline={vi.fn()} />);
+      expect(screen.getByTestId('compact-4h-button')).toBeInTheDocument();
+      expect(screen.getByTestId('compact-8h-button')).toBeInTheDocument();
+      expect(screen.getByTestId('compact-24h-button')).toBeInTheDocument();
+    });
+
+    it('compact buttons have correct labels', () => {
+      render(<TopNavBar {...defaultProps} onCompactTimeline={vi.fn()} />);
+      expect(screen.getByTestId('compact-4h-button')).toHaveTextContent('4h');
+      expect(screen.getByTestId('compact-8h-button')).toHaveTextContent('8h');
+      expect(screen.getByTestId('compact-24h-button')).toHaveTextContent('24h');
+    });
+
+    it('compact buttons are disabled when onCompactTimeline is not provided', () => {
+      render(<TopNavBar {...defaultProps} />);
+      expect(screen.getByTestId('compact-4h-button')).toBeDisabled();
+      expect(screen.getByTestId('compact-8h-button')).toBeDisabled();
+      expect(screen.getByTestId('compact-24h-button')).toBeDisabled();
+    });
+
+    it('compact buttons are enabled when onCompactTimeline is provided', () => {
+      render(<TopNavBar {...defaultProps} onCompactTimeline={vi.fn()} />);
+      expect(screen.getByTestId('compact-4h-button')).not.toBeDisabled();
+      expect(screen.getByTestId('compact-8h-button')).not.toBeDisabled();
+      expect(screen.getByTestId('compact-24h-button')).not.toBeDisabled();
+    });
+
+    it('calls onCompactTimeline with 4 when 4h button is clicked', () => {
+      const mockCompact = vi.fn();
+      render(<TopNavBar {...defaultProps} onCompactTimeline={mockCompact} />);
+      fireEvent.click(screen.getByTestId('compact-4h-button'));
+      expect(mockCompact).toHaveBeenCalledWith(4);
+    });
+
+    it('calls onCompactTimeline with 8 when 8h button is clicked', () => {
+      const mockCompact = vi.fn();
+      render(<TopNavBar {...defaultProps} onCompactTimeline={mockCompact} />);
+      fireEvent.click(screen.getByTestId('compact-8h-button'));
+      expect(mockCompact).toHaveBeenCalledWith(8);
+    });
+
+    it('calls onCompactTimeline with 24 when 24h button is clicked', () => {
+      const mockCompact = vi.fn();
+      render(<TopNavBar {...defaultProps} onCompactTimeline={mockCompact} />);
+      fireEvent.click(screen.getByTestId('compact-24h-button'));
+      expect(mockCompact).toHaveBeenCalledWith(24);
+    });
+
+    it('shows loading state when isCompacting is true', () => {
+      render(<TopNavBar {...defaultProps} onCompactTimeline={vi.fn()} isCompacting={true} />);
+      expect(screen.getByTestId('compact-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('compact-4h-button')).not.toBeInTheDocument();
+    });
+
+    it('shows buttons when isCompacting is false', () => {
+      render(<TopNavBar {...defaultProps} onCompactTimeline={vi.fn()} isCompacting={false} />);
+      expect(screen.queryByTestId('compact-loading')).not.toBeInTheDocument();
+      expect(screen.getByTestId('compact-4h-button')).toBeInTheDocument();
+    });
+  });
 });

@@ -5,7 +5,8 @@ import type { SchedulingGridHandle } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline } from './utils';
+import type { CompactHorizon } from './utils';
 import {
   DragStateProvider,
   DragLayer,
@@ -383,6 +384,9 @@ function AppContent() {
 
   // Compact station loading state
   const [compactingStationId, setCompactingStationId] = useState<string | null>(null);
+
+  // Global timeline compact loading state (v0.3.35)
+  const [isCompactingTimeline, setIsCompactingTimeline] = useState(false);
 
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
@@ -931,6 +935,26 @@ function AppContent() {
     }
   }, [selectedJobId]);
 
+  // Handle global timeline compaction (v0.3.35)
+  const handleCompactTimeline = useCallback((horizonHours: CompactHorizon) => {
+    setIsCompactingTimeline(true);
+
+    // Simulate async operation for UI feedback
+    setTimeout(() => {
+      updateSnapshot((currentSnapshot) => {
+        const result = compactTimeline({
+          snapshot: currentSnapshot,
+          horizonHours,
+          calculateEndTime,
+        });
+        return result.snapshot;
+      });
+
+      setSnapshotVersion((v) => v + 1);
+      setIsCompactingTimeline(false);
+    }, 300); // Small delay for visual feedback
+  }, []);
+
   return (
     <>
       <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
@@ -941,6 +965,8 @@ function AppContent() {
           canEnableQuickPlacement={selectedJobId !== null}
           pixelsPerHour={pixelsPerHour}
           onZoomChange={setPixelsPerHour}
+          onCompactTimeline={handleCompactTimeline}
+          isCompacting={isCompactingTimeline}
         />
 
         {/* Main content area */}
