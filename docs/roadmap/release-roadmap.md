@@ -659,16 +659,18 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Clear conflict when task moved to valid position
 - [x] E2E tests for Alt+drop scenarios
 
-#### v0.3.29 - Job Focus & Conflict Visual Feedback
-> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-en.md#req-01-job-focus-visual-effect), [REQ-12](../ux-ui/tmp/refactored-new-requirements-en.md#req-12-persistent-visual-feedback-for-precedence-violations)
+#### v0.3.29 - Job Focus & Conflict Visual Feedback ✅
+> **Implements:** [REQ-01](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-01-job-focus-visual-effect), [REQ-12](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-12-persistent-visual-feedback-for-precedence-violations)
+> **Released:** 2025-12-22
 
-- [ ] **REQ-01:** Mute non-selected job tiles when job is focused (not just during drag)
-- [ ] Extend `isMuted` logic: muted if `selectedJobId !== undefined && selectedJobId !== job.id`
-- [ ] **REQ-12:** Persistent amber glow on tiles with precedence conflict
-- [ ] New `hasConflict` prop on Tile component
-- [ ] Amber glow: `box-shadow: 0 0 12px 4px #F59E0B99`
-- [ ] Conflict glow overrides selection glow
-- [ ] E2E tests for visual feedback states
+- [x] **REQ-01:** Mute non-selected job tiles when job is focused (not just during drag)
+- [x] Extend `isMuted` logic: muted if `selectedJobId !== undefined && selectedJobId !== job.id`
+- [x] **REQ-12:** Persistent amber glow on tiles with precedence conflict
+- [x] New `hasConflict` prop on Tile component
+- [x] Amber glow: `box-shadow: 0 0 12px 4px #F59E0B99`
+- [x] Conflict glow overrides selection glow
+- [x] E2E tests for visual feedback states
+- [x] Bug fix: Amber ring only on compatible stations
 
 #### v0.3.30 - Job Deselection Methods
 > **Implements:** [REQ-02/03](../ux-ui/tmp/refactored-new-requirements-en.md#req-0203-job-deselection-methods)
