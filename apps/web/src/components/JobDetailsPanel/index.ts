@@ -15,3 +15,5 @@ export type { TaskListProps } from './TaskList';
 
 export { TaskTile } from './TaskTile';
 export type { TaskTileProps } from './TaskTile';
+
+export { DryTimeLabel } from './DryTimeLabel';

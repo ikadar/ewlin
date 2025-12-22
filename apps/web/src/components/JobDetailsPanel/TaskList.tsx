@@ -1,5 +1,9 @@
 import type { Task, TaskAssignment, Station, Job } from '@flux/types';
 import { TaskTile } from './TaskTile';
+import { DryTimeLabel } from './DryTimeLabel';
+
+/** Category ID for printing stations (offset press) */
+const PRINTING_CATEGORY_ID = 'cat-offset';
 
 export interface TaskListProps {
   /** Tasks to display */
@@ -43,26 +47,41 @@ export function TaskList({ tasks, job, assignments, stations, activeTaskId, onJu
     );
   }
 
+  /**
+   * Check if a task is assigned to a printing station (offset press).
+   */
+  const isPrintingTask = (task: Task): boolean => {
+    if (task.type !== 'Internal') return false;
+    const station = stationById.get(task.stationId);
+    return station?.categoryId === PRINTING_CATEGORY_ID;
+  };
+
   return (
     <div className="p-3 space-y-2 overflow-y-auto flex-grow bg-zinc-900/30">
-      {sortedTasks.map((task) => {
+      {sortedTasks.map((task, index) => {
         const assignment = assignmentByTaskId.get(task.id);
         // Get station based on task type
         const stationId = task.type === 'Internal' ? task.stationId : undefined;
         const station = stationId ? stationById.get(stationId) : undefined;
 
+        // Check if previous task is a printing task (for dry time label)
+        const prevTask = index > 0 ? sortedTasks[index - 1] : null;
+        const showDryTimeLabel = prevTask && isPrintingTask(prevTask);
+
         return (
-          <TaskTile
-            key={task.id}
-            task={task}
-            job={job}
-            jobColor={job.color}
-            assignment={assignment}
-            station={station}
-            isActivePlacement={activeTaskId === task.id}
-            onJumpToTask={onJumpToTask}
-            onRecallTask={onRecallTask}
-          />
+          <div key={task.id}>
+            {showDryTimeLabel && <DryTimeLabel />}
+            <TaskTile
+              task={task}
+              job={job}
+              jobColor={job.color}
+              assignment={assignment}
+              station={station}
+              isActivePlacement={activeTaskId === task.id}
+              onJumpToTask={onJumpToTask}
+              onRecallTask={onRecallTask}
+            />
+          </div>
         );
       })}
     </div>
