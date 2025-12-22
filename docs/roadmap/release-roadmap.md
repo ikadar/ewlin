@@ -744,16 +744,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Mock implementation (local state)
 - [x] E2E test: compact 4h removes gaps
 
-#### v0.3.36 - Dry Time Precedence
+#### v0.3.36 - Dry Time Precedence ✅
 > **Implements:** [REQ-11](../ux-ui/tmp/refactored-new-requirements-en.md#req-11-dry-time-drying-delay-after-printing)
+> **Released:** 2025-12-23
 
-- [ ] `DRY_TIME_MINUTES = 240` constant (4 hours)
-- [ ] Update `@flux/schedule-validator` precedence logic
-- [ ] If predecessor is printing task: `scheduledEnd + DRY_TIME`
-- [ ] Identify printing tasks by station category
-- [ ] Label in JobDetailsPanel: `+4h drying` on precedence bar
-- [ ] Validator unit tests
-- [ ] E2E test: precedence with dry time
+- [x] `DRY_TIME_MINUTES = 240` constant (4 hours)
+- [x] Update `@flux/schedule-validator` precedence logic
+- [x] If predecessor is printing task: `scheduledEnd + DRY_TIME`
+- [x] Identify printing tasks by station category
+- [x] Label in JobDetailsPanel: `+4h drying` on precedence bar
+- [x] Validator unit tests
+- [x] E2E test: precedence with dry time
 
 #### v0.3.37 - Multi-Day Grid Navigation
 > **Implements:** [REQ-14/15/16/17](../ux-ui/tmp/refactored-new-requirements-en.md#req-14151617-multi-day-grid-navigation--date-strip-integration)
