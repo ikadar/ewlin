@@ -7,12 +7,21 @@ export const SNAP_INTERVAL_MINUTES = 30;
 export const PIXELS_PER_SNAP = PIXELS_PER_HOUR / 2;
 
 /**
+ * Calculate pixels per snap based on current pixelsPerHour.
+ */
+export function getPixelsPerSnap(pixelsPerHour: number = PIXELS_PER_HOUR): number {
+  return pixelsPerHour / 2;
+}
+
+/**
  * Snap a Y position to the nearest 30-minute grid line.
  * @param y - Y position in pixels
+ * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
  * @returns Snapped Y position
  */
-export function snapToGrid(y: number): number {
-  return Math.round(y / PIXELS_PER_SNAP) * PIXELS_PER_SNAP;
+export function snapToGrid(y: number, pixelsPerHour: number = PIXELS_PER_HOUR): number {
+  const pixelsPerSnap = getPixelsPerSnap(pixelsPerHour);
+  return Math.round(y / pixelsPerSnap) * pixelsPerSnap;
 }
 
 /**
@@ -21,13 +30,14 @@ export function snapToGrid(y: number): number {
  * @param y - Y position in pixels (relative to grid top)
  * @param startHour - Starting hour of the grid (e.g., 6 for 6:00 AM)
  * @param baseDate - Optional base date (defaults to today)
+ * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
  * @returns Date representing the time at that Y position
  */
-export function yPositionToTime(y: number, startHour: number, baseDate?: Date): Date {
+export function yPositionToTime(y: number, startHour: number, baseDate?: Date, pixelsPerHour: number = PIXELS_PER_HOUR): Date {
   const date = baseDate ? new Date(baseDate) : new Date();
 
   // Calculate hours and minutes from Y position
-  const totalMinutes = (y / PIXELS_PER_HOUR) * 60;
+  const totalMinutes = (y / pixelsPerHour) * 60;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = Math.round(totalMinutes % 60);
 
@@ -41,13 +51,14 @@ export function yPositionToTime(y: number, startHour: number, baseDate?: Date): 
  * Convert a Date to Y position, given the start hour of the grid.
  * @param time - Date to convert
  * @param startHour - Starting hour of the grid
+ * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
  * @returns Y position in pixels
  */
-export function timeToYPosition(time: Date, startHour: number): number {
+export function timeToYPosition(time: Date, startHour: number, pixelsPerHour: number = PIXELS_PER_HOUR): number {
   const hours = time.getHours() - startHour;
   const minutes = time.getMinutes();
   const totalHours = hours + minutes / 60;
-  return totalHours * PIXELS_PER_HOUR;
+  return totalHours * pixelsPerHour;
 }
 
 /**

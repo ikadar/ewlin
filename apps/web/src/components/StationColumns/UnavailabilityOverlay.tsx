@@ -8,6 +8,8 @@ export interface UnavailabilityOverlayProps {
   startHour: number;
   /** Number of hours to display (e.g., 24) */
   hoursToDisplay: number;
+  /** Pixels per hour for grid scaling (default: 80) */
+  pixelsPerHour?: number;
 }
 
 interface UnavailablePeriod {
@@ -146,10 +148,10 @@ function calculateUnavailablePeriods(
 /**
  * Convert minutes to Y position in pixels, relative to grid start.
  */
-function minutesToYPosition(minutes: number, startHour: number): number {
+function minutesToYPosition(minutes: number, startHour: number, pixelsPerHour: number = PIXELS_PER_HOUR): number {
   const startMinutes = startHour * 60;
   const relativeMinutes = minutes - startMinutes;
-  return (relativeMinutes / 60) * PIXELS_PER_HOUR;
+  return (relativeMinutes / 60) * pixelsPerHour;
 }
 
 /**
@@ -159,14 +161,15 @@ export function UnavailabilityOverlay({
   daySchedule,
   startHour,
   hoursToDisplay,
+  pixelsPerHour = PIXELS_PER_HOUR,
 }: UnavailabilityOverlayProps) {
   const unavailablePeriods = calculateUnavailablePeriods(daySchedule, startHour, hoursToDisplay);
 
   return (
     <>
       {unavailablePeriods.map((period) => {
-        const top = minutesToYPosition(period.startMinutes, startHour);
-        const height = ((period.endMinutes - period.startMinutes) / 60) * PIXELS_PER_HOUR;
+        const top = minutesToYPosition(period.startMinutes, startHour, pixelsPerHour);
+        const height = ((period.endMinutes - period.startMinutes) / 60) * pixelsPerHour;
 
         return (
           <div
