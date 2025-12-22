@@ -753,21 +753,21 @@ This document contains the development roadmap for the Flux print shop schedulin
 #### v0.3.37 - Group Capacity Visualization
 > **Implements:** [REQ-18](../ux-ui/tmp/refactored-new-requirements-en.md#req-18-machine-group-capacity-limits-visualization)
 
-- [ ] Station header: group name display
-- [ ] Capacity indicator in header (if `maxConcurrent` defined)
-- [ ] Grid: yellow/orange highlight on time slots at capacity
-- [ ] Grid: red highlight on time slots exceeding capacity
+- [ ] Grid: red indicator on time slots exceeding group capacity
+- [ ] Hover tooltip on indicator: "Folding group capacity exceeded : 4/3"
+- [ ] Tile: red glow on tiles in overloaded group (conflict styling)
 - [ ] Drag validation: show `GroupCapacityConflict` feedback
-- [ ] Tile: amber glow on capacity conflict (like precedence)
 - [ ] E2E test: capacity conflict visualization
 
 #### v0.3.38 - Outsourcing Columns
 > **Implements:** [REQ-19](../ux-ui/tmp/refactored-new-requirements-en.md#req-19-outsourcing-columns-provider-display)
 
 - [ ] Remove `if (assignment.isOutsourced) return;` skip in SchedulingGrid
-- [ ] Add provider columns after station columns
+- [ ] Provider columns with configurable order (like stations)
 - [ ] `ProviderColumn` component with different styling
-- [ ] Provider header with outsource icon (`building-2`)
+- [ ] Provider header with dedicated outsource icon (`building-2`)
+- [ ] Dotted border on provider column
+- [ ] Dotted thick border on outsourced task tiles
 - [ ] Subcolumn layout for parallel tasks (calendar-style)
 - [ ] Subcolumn width calculation: `column_width / max_concurrent`
 - [ ] Greedy subcolumn index assignment algorithm

@@ -652,8 +652,8 @@ The `generateStationGroups()` generator currently creates these groups:
 
 | Question | Answer |
 |----------|--------|
-| Should there be capacity info in the station header? | *Question for user* |
-| Real-time capacity display (e.g., "2/3") or only on conflict? | *Question for user* |
+| Should there be capacity info in the station header? | The capacity overload should be displayed in the timeline as a red indicator that, on hover, gives contextual clues such as which group is causing the capacity overload, "Capacity exceeded" with the current capacity employed and the maximum capacity. For example "Folding group capacity exceeded : 4/3.". The tiles of the overloaded group get a red glow and "conflict" color glow.|
+| Real-time capacity display (e.g., "2/3") or only on conflict? | Only conflict. |
 | Grid time slot highlight format? | Yellow/orange background on affected time period |
 
 **Source:** [REQ-18](new-requirements.md#req-18)
@@ -772,10 +772,10 @@ Provider: Clément (width: 240px)
 
 | Question | Answer |
 |----------|--------|
-| Where should provider columns appear? | After stations to the right (as extra columns) |
-| Visual difference from station columns? | Yes, different background color and icon in header |
+| Where should provider columns appear? | They should have an order assigned to them exaclty like the other stations do |
+| Visual difference from station columns? | Yes, Column header has a dedicated icon and the column border is dotted, as well as the placed job tile's thick border |
 | Is parallel layout needed now? | Yes, calendar-like subcolumns for overlapping tasks |
-| Subcolumn = parallel tasks side by side? | Yes, within the same column, side by side |
+| Subcolumn = parallel tasks side by side? | Yes, within the same column, side by side with reduced width |
 
 **Source:** [REQ-19](new-requirements.md#req-19)
 
