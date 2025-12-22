@@ -704,16 +704,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Unit tests for state calculation (21 tests)
 - [x] Visual test fixture
 
-#### v0.3.33 - Task Completion Toggle
+#### v0.3.33 - Task Completion Toggle ✅
 > **Implements:** Task completion interaction on Tiles
+> **Released:** 2025-12-22
 
-- [ ] Add `onToggleComplete` prop to `Tile` component
-- [ ] Make Circle/CircleCheck icon clickable with `stopPropagation`
-- [ ] Hover state on icon (cursor-pointer, color change)
-- [ ] Wire up handler in `App.tsx` to update `assignment.isCompleted`
-- [ ] ProgressSegments automatically reflects state change
-- [ ] Unit tests for toggle behavior
-- [ ] E2E test: click icon toggles completion state
+- [x] Add `onToggleComplete` prop to `Tile` component
+- [x] Make Circle/CircleCheck icon clickable with `stopPropagation`
+- [x] Hover state on icon (cursor-pointer, color change)
+- [x] Wire up handler in `App.tsx` to update `assignment.isCompleted`
+- [x] ProgressSegments automatically reflects state change
+- [x] Unit tests for toggle behavior (5 tests)
+- [x] E2E test: click icon toggles completion state (4 tests)
 
 #### v0.3.34 - Top Navigation Bar
 > **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-en.md#req-040506-top-navigation-bar-with-controls)
