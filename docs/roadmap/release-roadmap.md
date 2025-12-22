@@ -731,17 +731,18 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Adjust main layout to accommodate nav bar
 - [x] E2E tests for zoom and quick placement button (15 tests)
 
-#### v0.3.35 - Global Timeline Compaction
+#### v0.3.35 - Global Timeline Compaction ✅
 > **Implements:** [REQ-10](../ux-ui/tmp/refactored-new-requirements-en.md#req-10-global-timeline-compaction)
+> **Released:** 2025-12-22
 
-- [ ] Segmented buttons in TopNavBar: `[4h] [8h] [24h]`
-- [ ] `compactTimeline(horizon)` function
-- [ ] Compaction starts from current time (`now`)
-- [ ] Tasks in progress are immobile
-- [ ] Respects precedence rules (no violations created)
-- [ ] Processes all stations left-to-right, top-to-bottom
-- [ ] Mock implementation (local state)
-- [ ] E2E test: compact 4h removes gaps
+- [x] Segmented buttons in TopNavBar: `[4h] [8h] [24h]`
+- [x] `compactTimeline(horizon)` function
+- [x] Compaction starts from current time (`now`)
+- [x] Tasks in progress are immobile
+- [x] Respects precedence rules (no violations created)
+- [x] Processes all stations left-to-right, top-to-bottom
+- [x] Mock implementation (local state)
+- [x] E2E test: compact 4h removes gaps
 
 #### v0.3.36 - Dry Time Precedence
 > **Implements:** [REQ-11](../ux-ui/tmp/refactored-new-requirements-en.md#req-11-dry-time-drying-delay-after-printing)
