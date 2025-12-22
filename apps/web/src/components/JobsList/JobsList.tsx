@@ -16,8 +16,8 @@ export interface JobsListProps {
   conflicts: ScheduleConflict[];
   /** Currently selected job ID */
   selectedJobId?: string | null;
-  /** Job selection handler */
-  onSelectJob?: (jobId: string) => void;
+  /** Job selection handler (null to deselect - REQ-03 toggle) */
+  onSelectJob?: (jobId: string | null) => void;
 }
 
 /**
@@ -129,7 +129,7 @@ export function JobsList({
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
         problemType={getProblemType(job.id)}
         isSelected={selectedJobId === job.id}
-        onClick={() => onSelectJob?.(job.id)}
+        onClick={() => onSelectJob?.(selectedJobId === job.id ? null : job.id)}
       />
     );
   };
