@@ -60,6 +60,8 @@ export interface SchedulingGridProps {
   startHour?: number;
   /** Number of hours to display (default: 24) */
   hoursToDisplay?: number;
+  /** Start date for multi-day grid (REQ-14) */
+  startDate?: Date;
   /** Pixels per hour for grid scaling (default: 80) */
   pixelsPerHour?: number;
   /** Callback when a tile is clicked (select job) */
@@ -117,6 +119,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       selectedJobId,
       startHour = 6,
       hoursToDisplay = 24,
+      startDate,
       pixelsPerHour = PIXELS_PER_HOUR,
       onSelectJob,
       onRecallAssignment,
@@ -178,8 +181,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   // Calculate total height
   const totalHeight = hoursToDisplay * pixelsPerHour;
 
-  // Calculate now line position
-  const nowPosition = timeToYPosition(now, startHour, pixelsPerHour);
+  // Calculate now line position (multi-day aware)
+  const nowPosition = timeToYPosition(now, startHour, pixelsPerHour, startDate);
 
   // Create lookup maps for jobs and tasks
   const jobMap = useMemo(() => {
@@ -237,17 +240,24 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   }, [assignments, stations]);
 
   // Calculate departure marker position (if selected job has workshopExitDate)
+  // Multi-day: show marker regardless of day (REQ-15)
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) : null;
   let departurePosition: number | null = null;
   if (selectedJob?.workshopExitDate) {
     const departureDate = new Date(selectedJob.workshopExitDate);
-    const today = new Date();
-    if (
-      departureDate.getDate() === today.getDate() &&
-      departureDate.getMonth() === today.getMonth() &&
-      departureDate.getFullYear() === today.getFullYear()
-    ) {
-      departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour);
+    // In multi-day mode (when startDate provided), always show the marker
+    // In single-day mode, only show if departure is today
+    if (startDate) {
+      departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour, startDate);
+    } else {
+      const today = new Date();
+      if (
+        departureDate.getDate() === today.getDate() &&
+        departureDate.getMonth() === today.getMonth() &&
+        departureDate.getFullYear() === today.getFullYear()
+      ) {
+        departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour);
+      }
     }
   }
 
@@ -380,8 +390,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     if (!task || !job || !isInternalTask(task)) return null;
 
                     // Calculate top position from assignment.scheduledStart
+                    // Use multi-day calculation when startDate is provided (REQ-14)
                     const startTime = new Date(assignment.scheduledStart);
-                    const top = timeToYPosition(startTime, startHour, pixelsPerHour);
+                    const top = timeToYPosition(startTime, startHour, pixelsPerHour, startDate);
 
                     // Determine swap button visibility
                     const showSwapUp = index > 0;

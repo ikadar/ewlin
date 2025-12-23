@@ -19,6 +19,7 @@ import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station
 import { validateAssignment } from '@flux/schedule-validator';
 
 const START_HOUR = 6;
+const DAY_COUNT = 21; // Number of days to display in grid and DateStrip
 
 // ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
@@ -224,18 +225,23 @@ function getStationIdFromElement(element: HTMLElement | null): string | null {
 
 /**
  * Calculate scheduled start time from pointer position on a station column.
+ * @param startDate - Grid start date for multi-day calculations (REQ-14)
  */
 function calculateScheduledStartFromPointer(
   clientX: number,
   clientY: number,
-  grabOffsetY: number
+  grabOffsetY: number,
+  startDate?: Date
 ): string | null {
   const stationElement = findStationColumnFromPointer(clientX, clientY);
   if (!stationElement) return null;
 
   const rect = stationElement.getBoundingClientRect();
-  const relativeY = calculateTileTopPosition(clientY, rect.top, grabOffsetY);
-  const dropTime = yPositionToTime(relativeY, START_HOUR);
+  // Note: rect.top already accounts for scroll position (negative when scrolled)
+  // so clientY - rect.top gives the absolute position in grid content
+  const absoluteY = calculateTileTopPosition(clientY, rect.top, grabOffsetY);
+
+  const dropTime = yPositionToTime(absoluteY, START_HOUR, startDate);
   return dropTime.toISOString();
 }
 
@@ -250,6 +256,7 @@ interface KeyboardContext {
   selectedJob: Job | null;
   gridRef: React.RefObject<SchedulingGridHandle | null>;
   pixelsPerHour: number;
+  gridStartDate: Date;
   setIsAltPressed: (v: boolean) => void;
   setSelectedJobId: (id: string | null) => void;
   setIsQuickPlacementMode: (fn: (prev: boolean) => boolean) => void;
@@ -310,7 +317,7 @@ function handleJumpToDeparture(e: KeyboardEvent, ctx: KeyboardContext): boolean 
     e.preventDefault();
     if (ctx.selectedJob?.workshopExitDate && ctx.gridRef.current) {
       const departureDate = new Date(ctx.selectedJob.workshopExitDate);
-      const y = timeToYPosition(departureDate, START_HOUR);
+      const y = timeToYPosition(departureDate, START_HOUR, ctx.pixelsPerHour, ctx.gridStartDate);
       const viewportHeight = ctx.gridRef.current.getViewportHeight();
       const scrollTarget = Math.max(0, y - viewportHeight + 100);
       ctx.gridRef.current.scrollToY(scrollTarget);
@@ -325,7 +332,7 @@ function handleJumpToToday(e: KeyboardEvent, ctx: KeyboardContext): boolean {
     e.preventDefault();
     if (ctx.gridRef.current) {
       const now = new Date();
-      const y = timeToYPosition(now, START_HOUR);
+      const y = timeToYPosition(now, START_HOUR, ctx.pixelsPerHour, ctx.gridStartDate);
       const viewportHeight = ctx.gridRef.current.getViewportHeight();
       const scrollTarget = Math.max(0, y - viewportHeight / 2);
       ctx.gridRef.current.scrollToY(scrollTarget);
@@ -416,6 +423,59 @@ function AppContent() {
   // Find selected job
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
 
+  // REQ-14: Calculate grid/DateStrip start date (6 days before today)
+  const gridStartDate = useMemo(() => {
+    const today = new Date();
+    today.setDate(today.getDate() - 6);
+    today.setHours(START_HOUR, 0, 0, 0);
+    return today;
+  }, []);
+
+  // REQ-14: Auto-scroll to today on initial load
+  const hasScrolledToToday = useRef(false);
+  useEffect(() => {
+    if (hasScrolledToToday.current || !gridRef.current) return;
+
+    // Calculate Y position for today at current time
+    const now = new Date();
+    const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
+
+    // Scroll to center today in the viewport
+    const viewportHeight = gridRef.current.getViewportHeight();
+    const scrollTarget = Math.max(0, y - viewportHeight / 2);
+    gridRef.current.scrollToY(scrollTarget, 'instant');
+
+    hasScrolledToToday.current = true;
+  }, [pixelsPerHour, gridStartDate]);
+
+  // REQ-15: Get departure date for selected job
+  const departureDate = useMemo(() => {
+    if (!selectedJob?.workshopExitDate) return null;
+    return new Date(selectedJob.workshopExitDate);
+  }, [selectedJob?.workshopExitDate]);
+
+  // REQ-16: Calculate scheduled days for selected job
+  const scheduledDays = useMemo(() => {
+    if (!selectedJobId) return new Set<string>();
+
+    const days = new Set<string>();
+    const jobTaskIds = new Set(
+      snapshot.tasks
+        .filter((t) => t.jobId === selectedJobId)
+        .map((t) => t.id)
+    );
+
+    snapshot.assignments
+      .filter((a) => jobTaskIds.has(a.taskId))
+      .forEach((a) => {
+        const date = new Date(a.scheduledStart);
+        const dateKey = date.toISOString().split('T')[0];
+        days.add(dateKey);
+      });
+
+    return days;
+  }, [selectedJobId, snapshot.tasks, snapshot.assignments]);
+
   // Get ordered job IDs for navigation (matching JobsList display order)
   // Problems first (late, then conflicts), then normal jobs
   const orderedJobIds = useMemo(() => {
@@ -458,6 +518,7 @@ function AppContent() {
       selectedJob,
       gridRef,
       pixelsPerHour,
+      gridStartDate,
       setIsAltPressed,
       setSelectedJobId,
       setIsQuickPlacementMode,
@@ -488,7 +549,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate]);
 
   // Set up global drag monitoring using pragmatic-drag-and-drop
   // Handles: position tracking during drag, drop processing
@@ -517,7 +578,7 @@ function AppContent() {
           return;
         }
 
-        const scheduledStart = calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y);
+        const scheduledStart = calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate);
         setDragValidation((prev) => ({ ...prev, targetStationId: stationId, scheduledStart }));
       },
       onDrop: ({ source, location }) => {
@@ -567,7 +628,7 @@ function AppContent() {
 
         // Calculate scheduledStart (use cached or calculate from pointer)
         const calculatedScheduledStart = currentDragValidation.scheduledStart
-          || calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y);
+          || calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate);
 
         // Verify the task belongs to this station
         if (dragData.task.type !== 'Internal' || dragData.task.stationId !== dropData.stationId) {
@@ -649,7 +710,7 @@ function AppContent() {
         console.log(isRescheduleOp ? 'Rescheduled:' : 'Created:', { taskId: task.id, scheduledStart });
       },
     });
-  }, [activeTask, grabOffset, dragValidation, validation, isAltPressed, snapshot.stations]);
+  }, [activeTask, grabOffset, dragValidation, validation, isAltPressed, snapshot.stations, gridStartDate]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {
@@ -687,9 +748,9 @@ function AppContent() {
   const handleJumpToTask = useCallback((assignment: TaskAssignment) => {
     if (!gridRef.current) return;
 
-    // Calculate Y position from assignment's scheduledStart
+    // Calculate Y position from assignment's scheduledStart (multi-day aware)
     const startTime = new Date(assignment.scheduledStart);
-    const y = timeToYPosition(startTime, START_HOUR);
+    const y = timeToYPosition(startTime, START_HOUR, pixelsPerHour, gridStartDate);
 
     // Position the tile ~20vh from top of viewport
     const viewportHeight = gridRef.current.getViewportHeight();
@@ -727,7 +788,7 @@ function AppContent() {
       scrollTargetX,
       scrollTargetY,
     });
-  }, [snapshot.stations]);
+  }, [snapshot.stations, pixelsPerHour, gridStartDate]);
 
   // Handle recall - remove assignment (double-click on tile)
   const handleRecallAssignment = useCallback((assignmentId: string) => {
@@ -751,6 +812,26 @@ function AppContent() {
     });
     setSnapshotVersion((v) => v + 1);
   }, []);
+
+  // REQ-14: Handle date click - scroll grid to the clicked date
+  const handleDateClick = useCallback((date: Date) => {
+    if (!gridRef.current) return;
+
+    // Calculate Y position for the start of the clicked day (at START_HOUR)
+    // Use multi-day calculation with gridStartDate
+    const targetDate = new Date(date);
+    targetDate.setHours(START_HOUR, 0, 0, 0);
+    const y = timeToYPosition(targetDate, START_HOUR, pixelsPerHour, gridStartDate);
+
+    // Scroll to position with a small offset from top
+    const scrollTarget = Math.max(0, y);
+    gridRef.current.scrollToY(scrollTarget);
+
+    console.log('DateStrip click-to-scroll:', {
+      date: date.toISOString().split('T')[0],
+      scrollTarget,
+    });
+  }, [pixelsPerHour, gridStartDate]);
 
   // Handle toggle completion (v0.3.33)
   const handleToggleComplete = useCallback((assignmentId: string) => {
@@ -837,9 +918,9 @@ function AppContent() {
       return;
     }
 
-    // Calculate the time from Y position
+    // Calculate the time from Y position (multi-day aware)
     const snappedY = snapToGrid(Math.max(0, y));
-    const dropTime = yPositionToTime(snappedY, START_HOUR);
+    const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate);
     const scheduledStart = dropTime.toISOString();
     const station = snapshot.stations.find((s) => s.id === stationId);
     const scheduledEnd = calculateEndTime(taskToPlace, scheduledStart, station);
@@ -888,7 +969,7 @@ function AppContent() {
       scheduledStart,
       scheduledEnd,
     });
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments]);
+  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, gridStartDate]);
 
   // Calculate which stations have available tasks (for quick placement cursor)
   const stationsWithAvailableTasks = useMemo(() => {
@@ -992,12 +1073,11 @@ function AppContent() {
           onClose={() => setSelectedJobId(null)}
         />
         <DateStrip
-          startDate={(() => {
-            const today = new Date();
-            today.setDate(today.getDate() - 6); // Start 6 days before today
-            return today;
-          })()}
-          dayCount={21}
+          startDate={gridStartDate}
+          dayCount={DAY_COUNT}
+          onDateClick={handleDateClick}
+          departureDate={departureDate}
+          scheduledDays={scheduledDays}
         />
         <SchedulingGrid
           ref={gridRef}
@@ -1007,6 +1087,9 @@ function AppContent() {
           tasks={snapshot.tasks}
           assignments={snapshot.assignments}
           selectedJobId={selectedJobId}
+          startHour={START_HOUR}
+          hoursToDisplay={DAY_COUNT * 24}
+          startDate={gridStartDate}
           onSelectJob={setSelectedJobId}
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
