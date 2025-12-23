@@ -10,12 +10,16 @@ const createMockJob = (overrides: Partial<Job> = {}): Job => ({
   description: 'Test Job',
   status: 'Planned',
   workshopExitDate: new Date().toISOString(),
+  fullyScheduled: false,
   color: '#8B5CF6',
   paperPurchaseStatus: 'InStock',
   platesStatus: 'Done',
-  proofSentAt: null,
-  proofApprovedAt: null,
+  proofApproval: { sentAt: null, approvedAt: null },
   requiredJobIds: [],
+  comments: [],
+  taskIds: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
   ...overrides,
 });
 
@@ -189,5 +193,99 @@ describe('compareSimilarity', () => {
     };
     const results = compareSimilarity(jobA, jobB, [criterion]);
     expect(results[0].criterion).toBe(criterion);
+  });
+
+  // REQ-20: Similarities Feature Completion - paperWeight and inking tests
+  describe('paperWeight comparison', () => {
+    const paperWeightCriterion: SimilarityCriterion = {
+      id: 'crit-paper-weight',
+      name: 'Same paper weight',
+      fieldPath: 'paperWeight',
+    };
+
+    it('marks matching paperWeight as matched', () => {
+      const jobA = createMockJob({ paperWeight: 300 });
+      const jobB = createMockJob({ paperWeight: 300 });
+      const results = compareSimilarity(jobA, jobB, [paperWeightCriterion]);
+      expect(results[0].isMatched).toBe(true);
+    });
+
+    it('marks different paperWeight as not matched', () => {
+      const jobA = createMockJob({ paperWeight: 300 });
+      const jobB = createMockJob({ paperWeight: 170 });
+      const results = compareSimilarity(jobA, jobB, [paperWeightCriterion]);
+      expect(results[0].isMatched).toBe(false);
+    });
+
+    it('marks one undefined paperWeight as not matched', () => {
+      const jobA = createMockJob({ paperWeight: 300 });
+      const jobB = createMockJob({ paperWeight: undefined });
+      const results = compareSimilarity(jobA, jobB, [paperWeightCriterion]);
+      expect(results[0].isMatched).toBe(false);
+    });
+  });
+
+  describe('inking comparison', () => {
+    const inkingCriterion: SimilarityCriterion = {
+      id: 'crit-inking',
+      name: 'Same inking',
+      fieldPath: 'inking',
+    };
+
+    it('marks matching inking as matched', () => {
+      const jobA = createMockJob({ inking: 'CMYK' });
+      const jobB = createMockJob({ inking: 'CMYK' });
+      const results = compareSimilarity(jobA, jobB, [inkingCriterion]);
+      expect(results[0].isMatched).toBe(true);
+    });
+
+    it('marks different inking as not matched', () => {
+      const jobA = createMockJob({ inking: 'CMYK' });
+      const jobB = createMockJob({ inking: '4C+0' });
+      const results = compareSimilarity(jobA, jobB, [inkingCriterion]);
+      expect(results[0].isMatched).toBe(false);
+    });
+
+    it('marks one undefined inking as not matched', () => {
+      const jobA = createMockJob({ inking: 'CMYK' });
+      const jobB = createMockJob({ inking: undefined });
+      const results = compareSimilarity(jobA, jobB, [inkingCriterion]);
+      expect(results[0].isMatched).toBe(false);
+    });
+  });
+
+  describe('offset press criteria (REQ-20)', () => {
+    const offsetPressCriteria: SimilarityCriterion[] = [
+      { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'paperType' },
+      { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+      { id: 'crit-inking', name: 'Même encrage', fieldPath: 'inking' },
+    ];
+
+    it('compares all offset press criteria correctly', () => {
+      const jobA = createMockJob({
+        paperType: 'CB 300g',
+        paperFormat: '63x88',
+        inking: 'CMYK',
+      });
+      const jobB = createMockJob({
+        paperType: 'CB 300g',
+        paperFormat: '70x100', // different
+        inking: 'CMYK',
+      });
+      const results = compareSimilarity(jobA, jobB, offsetPressCriteria);
+
+      expect(results[0].isMatched).toBe(true);  // paperType matches
+      expect(results[1].isMatched).toBe(false); // paperFormat differs
+      expect(results[2].isMatched).toBe(true);  // inking matches
+    });
+
+    it('shows real differences when inking values differ', () => {
+      const jobA = createMockJob({ inking: 'CMYK' });
+      const jobB = createMockJob({ inking: 'Pantone 485+Black' });
+      const results = compareSimilarity(jobA, jobB, [
+        { id: 'crit-inking', name: 'Même encrage', fieldPath: 'inking' },
+      ]);
+      expect(results[0].isMatched).toBe(false);
+    });
   });
 });
