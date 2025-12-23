@@ -26,22 +26,30 @@ export function snapToGrid(y: number, pixelsPerHour: number = PIXELS_PER_HOUR): 
 
 /**
  * Convert a Y position to a Date, given the start hour of the grid.
- * Assumes the grid represents "today" and the Y position is relative to startHour.
+ * Supports multi-day grids (REQ-14) where Y position can span multiple days.
  * @param y - Y position in pixels (relative to grid top)
  * @param startHour - Starting hour of the grid (e.g., 6 for 6:00 AM)
- * @param baseDate - Optional base date (defaults to today)
+ * @param baseDate - Optional base date (defaults to today). For multi-day grids, this is the grid start date.
  * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
  * @returns Date representing the time at that Y position
  */
 export function yPositionToTime(y: number, startHour: number, baseDate?: Date, pixelsPerHour: number = PIXELS_PER_HOUR): Date {
   const date = baseDate ? new Date(baseDate) : new Date();
 
-  // Calculate hours and minutes from Y position
-  const totalMinutes = (y / pixelsPerHour) * 60;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = Math.round(totalMinutes % 60);
+  // Calculate total hours from Y position
+  const totalHours = y / pixelsPerHour;
 
-  // Set the time
+  // For multi-day support: calculate days and remaining hours
+  const hoursPerDay = 24;
+  const dayOffset = Math.floor(totalHours / hoursPerDay);
+  const hoursInDay = totalHours - (dayOffset * hoursPerDay);
+  const hours = Math.floor(hoursInDay);
+  const minutes = Math.round((hoursInDay - hours) * 60);
+
+  // Add day offset to base date
+  date.setDate(date.getDate() + dayOffset);
+
+  // Set the time (startHour + hours within the day)
   date.setHours(startHour + hours, minutes, 0, 0);
 
   return date;

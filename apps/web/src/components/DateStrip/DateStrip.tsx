@@ -7,6 +7,10 @@ export interface DateStripProps {
   dayCount?: number;
   /** Callback when a date is clicked */
   onDateClick?: (date: Date) => void;
+  /** Departure date for selected job (REQ-15) */
+  departureDate?: Date | null;
+  /** Set of dates with scheduled tasks for selected job (REQ-16) */
+  scheduledDays?: Set<string>;
 }
 
 /**
@@ -34,13 +38,23 @@ function generateDateRange(startDate: Date, dayCount: number): Date[] {
 }
 
 /**
+ * Format date as YYYY-MM-DD for Set lookup.
+ */
+function formatDateKey(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+/**
  * DateStrip - Day navigation column.
  * Displays a vertical list of days with click-to-jump functionality.
+ * Supports departure date highlighting (REQ-15) and scheduled days indicator (REQ-16).
  */
 export function DateStrip({
   startDate,
   dayCount = 21,
   onDateClick,
+  departureDate,
+  scheduledDays,
 }: DateStripProps) {
   const today = new Date();
   const dates = generateDateRange(startDate, dayCount);
@@ -48,14 +62,22 @@ export function DateStrip({
   return (
     <div className="w-12 shrink-0 bg-zinc-950 overflow-y-auto border-r border-white/5">
       <div className="flex flex-col">
-        {dates.map((date) => (
-          <DateCell
-            key={date.toISOString()}
-            date={date}
-            isToday={isSameDay(date, today)}
-            onClick={() => onDateClick?.(date)}
-          />
-        ))}
+        {dates.map((date) => {
+          const dateKey = formatDateKey(date);
+          const isDepartureDate = departureDate ? isSameDay(date, departureDate) : false;
+          const hasScheduledTasks = scheduledDays?.has(dateKey) ?? false;
+
+          return (
+            <DateCell
+              key={date.toISOString()}
+              date={date}
+              isToday={isSameDay(date, today)}
+              isDepartureDate={isDepartureDate}
+              hasScheduledTasks={hasScheduledTasks}
+              onClick={() => onDateClick?.(date)}
+            />
+          );
+        })}
       </div>
     </div>
   );
