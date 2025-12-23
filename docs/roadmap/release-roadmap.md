@@ -756,18 +756,18 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Validator unit tests
 - [x] E2E test: precedence with dry time
 
-#### v0.3.37 - Multi-Day Grid Navigation
+#### v0.3.37 - Multi-Day Grid Navigation ✅
 > **Implements:** [REQ-14/15/16/17](../ux-ui/tmp/refactored-new-requirements-en.md#req-14151617-multi-day-grid-navigation--date-strip-integration)
+> **Released:** 2025-12-23
 
-- [ ] **REQ-14:** Multi-day grid support (extend beyond 24h)
-- [ ] DateStrip click-to-scroll: `onDateClick` connected in App.tsx
-- [ ] Bidirectional scroll sync: DateStrip ↔ Grid
-- [ ] DateStrip scrolls with grid (not fixed)
-- [ ] **REQ-15:** Departure date highlight on DateStrip (red styling)
-- [ ] **REQ-16:** Scheduled days highlight (emerald indicator dots)
-- [ ] **REQ-17:** Extended grid background on scroll
-- [ ] Consider virtual scrolling (`@tanstack/virtual`) for performance
-- [ ] E2E tests for navigation and highlighting
+- [x] **REQ-14:** Multi-day grid support (21 days / 504 hours)
+- [x] DateStrip click-to-scroll: `onDateClick` connected in App.tsx
+- [x] Auto-scroll to today on initial load
+- [x] DateStrip scrolls with grid (synchronized Y-scroll)
+- [x] **REQ-15:** Departure date highlight on DateStrip (red styling)
+- [x] **REQ-16:** Scheduled days highlight (emerald indicator dots)
+- [x] **REQ-17:** Extended grid background for multi-day
+- [x] E2E tests for navigation and highlighting (11 tests)
 
 #### v0.3.38 - Group Capacity Visualization
 > **Implements:** [REQ-18](../ux-ui/tmp/refactored-new-requirements-en.md#req-18-machine-group-capacity-limits-visualization)
