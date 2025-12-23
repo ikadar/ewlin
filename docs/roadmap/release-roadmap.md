@@ -769,14 +769,14 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] **REQ-17:** Extended grid background for multi-day
 - [x] E2E tests for navigation and highlighting (11 tests)
 
-#### v0.3.38 - Group Capacity Visualization
+#### v0.3.38 - Group Capacity Visualization ✅
 > **Implements:** [REQ-18](../ux-ui/tmp/refactored-new-requirements-en.md#req-18-machine-group-capacity-limits-visualization)
 
-- [ ] Grid: red indicator on time slots exceeding group capacity
-- [ ] Hover tooltip on indicator: "Folding group capacity exceeded : 4/3"
-- [ ] Tile: red glow on tiles in overloaded group (conflict styling)
-- [ ] Drag validation: show `GroupCapacityConflict` feedback
-- [ ] E2E test: capacity conflict visualization
+- [x] Station header shows group name and capacity (e.g., "Offset Press (2/3)")
+- [x] Red text and warning icon when group capacity exceeded
+- [x] Red ring during drag when drop would exceed group capacity
+- [x] Extended conflict detection for `GroupCapacityConflict` type
+- [x] E2E tests for group capacity visualization (7 tests)
 
 #### v0.3.39 - Outsourcing Columns
 > **Implements:** [REQ-19](../ux-ui/tmp/refactored-new-requirements-en.md#req-19-outsourcing-columns-provider-display)
