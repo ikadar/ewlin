@@ -778,19 +778,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Extended conflict detection for `GroupCapacityConflict` type
 - [x] E2E tests for group capacity visualization (7 tests)
 
-#### v0.3.39 - Outsourcing Columns
+#### v0.3.39 - Outsourcing Columns ✅
 > **Implements:** [REQ-19](../ux-ui/tmp/refactored-new-requirements-en.md#req-19-outsourcing-columns-provider-display)
 
-- [ ] Remove `if (assignment.isOutsourced) return;` skip in SchedulingGrid
-- [ ] Provider columns with configurable order (like stations)
-- [ ] `ProviderColumn` component with different styling
-- [ ] Provider header with dedicated outsource icon (`building-2`)
-- [ ] Dotted border on provider column
-- [ ] Dotted thick border on outsourced task tiles
-- [ ] Subcolumn layout for parallel tasks (calendar-style)
-- [ ] Subcolumn width calculation: `column_width / max_concurrent`
-- [ ] Greedy subcolumn index assignment algorithm
-- [ ] E2E test: outsourced task rendering
+- [x] Provider columns appear after station columns
+- [x] `ProviderColumn` and `ProviderHeader` components
+- [x] Provider header with Building2 icon
+- [x] Dotted border on provider column
+- [x] Dotted thick border on outsourced tiles
+- [x] Subcolumn layout for parallel tasks (calendar-style)
+- [x] Greedy subcolumn index assignment algorithm
+- [x] E2E tests for provider columns (11 tests)
 
 #### v0.3.40 - Similarities Feature Completion
 > **Implements:** [REQ-20](../ux-ui/tmp/refactored-new-requirements-en.md#req-20-similarities-feature-completion)
