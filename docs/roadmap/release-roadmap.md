@@ -790,17 +790,16 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Greedy subcolumn index assignment algorithm
 - [x] E2E tests for provider columns (11 tests)
 
-#### v0.3.40 - Similarities Feature Completion
+#### v0.3.40 - Similarities Feature Completion ✅
 > **Implements:** [REQ-20](../ux-ui/tmp/refactored-new-requirements-en.md#req-20-similarities-feature-completion)
 
-- [ ] Extend `Job` type: add `paperWeight?: number`, `inking?: string`
-- [ ] Update `@flux/types` package
-- [ ] Extend mock job generator with `paperWeight` and `inking` values
-- [ ] `PAPER_WEIGHTS = [80, 100, 120, 150, 170, 200, 250, 300, 350]`
-- [ ] `INKINGS = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0']`
-- [ ] Similarity indicators now show real comparisons (not always matched)
-- [ ] Unit tests for similarity comparison
-- [ ] Visual test fixture
+- [x] Extend `Job` type: add `paperWeight?: number`, `inking?: string`
+- [x] Update `@flux/types` package
+- [x] Extend mock job generator with `paperWeight` and `inking` values
+- [x] `PAPER_WEIGHTS = [80, 100, 120, 150, 170, 200, 250, 300, 350]`
+- [x] `INKINGS = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0']`
+- [x] Similarity indicators now show real comparisons (not always matched)
+- [x] Unit tests for similarity comparison (11 new tests)
 
 ### Phase 3I: Backend API Integration
 
