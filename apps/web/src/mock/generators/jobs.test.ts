@@ -89,6 +89,35 @@ describe('generateJobs', () => {
     }
   });
 
+  // REQ-20: Similarities Feature Completion - paperWeight and inking fields
+  it('each job has paperWeight field with valid value', () => {
+    const result = generateJobs({ count: 10 });
+    const validWeights = [80, 100, 120, 150, 170, 200, 250, 300, 350];
+    for (const job of result.jobs) {
+      expect(job).toHaveProperty('paperWeight');
+      expect(validWeights).toContain(job.paperWeight);
+    }
+  });
+
+  it('each job has inking field with valid value', () => {
+    const result = generateJobs({ count: 10 });
+    const validInkings = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0'];
+    for (const job of result.jobs) {
+      expect(job).toHaveProperty('inking');
+      expect(validInkings).toContain(job.inking);
+    }
+  });
+
+  it('jobs have varied paperWeight and inking values for similarity comparison', () => {
+    const result = generateJobs({ count: 20 });
+    const uniqueWeights = new Set(result.jobs.map(j => j.paperWeight));
+    const uniqueInkings = new Set(result.jobs.map(j => j.inking));
+
+    // With 20 jobs, we should have at least 2 different values for each
+    expect(uniqueWeights.size).toBeGreaterThan(1);
+    expect(uniqueInkings.size).toBeGreaterThan(1);
+  });
+
   it('job colors are valid hex colors', () => {
     const result = generateJobs({ count: 5 });
     for (const job of result.jobs) {
