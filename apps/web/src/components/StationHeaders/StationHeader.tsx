@@ -1,11 +1,24 @@
 import type { Station } from '@flux/types';
 import { OffScreenIndicator } from './OffScreenIndicator';
+import { AlertTriangle } from 'lucide-react';
 
 export interface OffScreenInfo {
   /** Count of tiles above viewport */
   above: number;
   /** Count of tiles below viewport */
   below: number;
+}
+
+/** Group capacity information for display */
+export interface GroupCapacityInfo {
+  /** Group ID */
+  groupId: string;
+  /** Group name */
+  groupName: string;
+  /** Maximum concurrent tasks (null = unlimited) */
+  maxConcurrent: number | null;
+  /** Current number of concurrent tasks in the group */
+  currentUsage: number;
 }
 
 export interface StationHeaderProps {
@@ -23,6 +36,8 @@ export interface StationHeaderProps {
   isCompacting?: boolean;
   /** Callback when compact button is clicked */
   onCompact?: (stationId: string) => void;
+  /** Group capacity information (REQ-18) */
+  groupCapacity?: GroupCapacityInfo;
 }
 
 /**
@@ -93,6 +108,7 @@ export function StationHeader({
   hasTiles = false,
   isCompacting = false,
   onCompact,
+  groupCapacity,
 }: StationHeaderProps) {
   const _hasIndicator = offScreen && (offScreen.above > 0 || offScreen.below > 0);
 
@@ -114,46 +130,74 @@ export function StationHeader({
     return 'No tiles to compact';
   };
 
+  // REQ-18: Group capacity display
+  const isCapacityExceeded = groupCapacity?.maxConcurrent !== null &&
+    groupCapacity?.maxConcurrent !== undefined &&
+    groupCapacity.currentUsage > groupCapacity.maxConcurrent;
+
+  const capacityTextClass = isCapacityExceeded ? 'text-red-400' : 'text-zinc-500';
+
   return (
     <div
-      className={`${widthClass} shrink-0 py-2 px-3 text-sm font-medium text-zinc-300 transition-all duration-150 ease-out flex items-center justify-between`}
+      className={`${widthClass} shrink-0 py-2 px-3 text-sm transition-all duration-150 ease-out flex flex-col`}
       data-testid={`station-header-${station.id}`}
     >
-      <span className="truncate">{station.name}</span>
-      <div className="flex items-center gap-1">
-        {/* Off-screen indicators */}
-        {offScreen && offScreen.above > 0 && (
-          <OffScreenIndicator
-            count={offScreen.above}
-            direction="up"
-            onClick={() => onOffScreenClick?.('up')}
-          />
-        )}
-        {offScreen && offScreen.below > 0 && (
-          <OffScreenIndicator
-            count={offScreen.below}
-            direction="down"
-            onClick={() => onOffScreenClick?.('down')}
-          />
-        )}
-        {/* Compact button */}
-        {onCompact && !isCollapsed && (
-          <button
-            type="button"
-            onClick={handleCompactClick}
-            disabled={isCompactDisabled}
-            className={`p-1 rounded transition-colors ${
-              isCompactDisabled
-                ? 'text-zinc-600 cursor-not-allowed'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
-            }`}
-            title={getCompactButtonTitle()}
-            data-testid={`compact-button-${station.id}`}
-          >
-            {isCompacting ? <Spinner /> : <CompressIcon />}
-          </button>
-        )}
+      {/* Top row: station name and buttons */}
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-zinc-300 truncate">{station.name}</span>
+        <div className="flex items-center gap-1">
+          {/* Off-screen indicators */}
+          {offScreen && offScreen.above > 0 && (
+            <OffScreenIndicator
+              count={offScreen.above}
+              direction="up"
+              onClick={() => onOffScreenClick?.('up')}
+            />
+          )}
+          {offScreen && offScreen.below > 0 && (
+            <OffScreenIndicator
+              count={offScreen.below}
+              direction="down"
+              onClick={() => onOffScreenClick?.('down')}
+            />
+          )}
+          {/* Compact button */}
+          {onCompact && !isCollapsed && (
+            <button
+              type="button"
+              onClick={handleCompactClick}
+              disabled={isCompactDisabled}
+              className={`p-1 rounded transition-colors ${
+                isCompactDisabled
+                  ? 'text-zinc-600 cursor-not-allowed'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+              }`}
+              title={getCompactButtonTitle()}
+              data-testid={`compact-button-${station.id}`}
+            >
+              {isCompacting ? <Spinner /> : <CompressIcon />}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Bottom row: group info (REQ-18) */}
+      {groupCapacity && groupCapacity.maxConcurrent !== null && !isCollapsed && (
+        <div
+          className={`flex items-center gap-1 text-xs ${capacityTextClass} mt-0.5`}
+          data-testid={`group-capacity-${station.id}`}
+          title={isCapacityExceeded
+            ? `${groupCapacity.groupName} capacity exceeded: ${groupCapacity.currentUsage}/${groupCapacity.maxConcurrent}`
+            : `${groupCapacity.groupName}: ${groupCapacity.currentUsage}/${groupCapacity.maxConcurrent} concurrent tasks`
+          }
+        >
+          <span className="truncate">{groupCapacity.groupName}</span>
+          <span>({groupCapacity.currentUsage}/{groupCapacity.maxConcurrent})</span>
+          {isCapacityExceeded && (
+            <AlertTriangle className="w-3 h-3 shrink-0" data-testid="capacity-warning-icon" />
+          )}
+        </div>
+      )}
     </div>
   );
 }

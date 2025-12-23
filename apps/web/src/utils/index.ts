@@ -20,3 +20,10 @@ export {
 export { calculateGrabOffset, calculateTileTopPosition } from './dragOffset';
 export { compactTimeline, COMPACT_HORIZONS } from './compactTimeline';
 export type { CompactHorizon, CompactTimelineOptions, CompactTimelineResult } from './compactTimeline';
+export {
+  calculateGroupUsageAtTime,
+  calculateMaxGroupUsage,
+  getGroupCapacityInfo,
+  buildGroupCapacityMap,
+  findExceededGroups,
+} from './groupCapacity';

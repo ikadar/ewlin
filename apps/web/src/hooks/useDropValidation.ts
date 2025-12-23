@@ -33,6 +33,8 @@ export interface DropValidationResult {
   conflicts: ValidationResult['conflicts'];
   /** Whether there are only warning conflicts (non-blocking, like Plates approval) */
   hasWarningOnly: boolean;
+  /** Whether there's a group capacity conflict (REQ-18) */
+  hasGroupCapacityConflict: boolean;
 }
 
 /**
@@ -109,11 +111,17 @@ export function useDropValidation({
         validationResult: null,
         conflicts: [],
         hasWarningOnly: false,
+        hasGroupCapacityConflict: false,
       };
     }
 
     // Use the bypass-independent check for precedence conflict
     const hasPrecedenceConflict = hasPrecedenceConflictWithoutBypass;
+
+    // REQ-18: Check for group capacity conflict
+    const hasGroupCapacityConflict = validationResult.conflicts.some(
+      (c) => c.type === 'GroupCapacityConflict'
+    );
 
     // Check if there are only warning conflicts (non-blocking)
     // Warning-only conflicts: Plates ApprovalGateConflict
@@ -137,6 +145,7 @@ export function useDropValidation({
       validationResult,
       conflicts: validationResult.conflicts,
       hasWarningOnly,
+      hasGroupCapacityConflict,
     };
   }, [validationResult, hasPrecedenceConflictWithoutBypass]);
 

@@ -1108,6 +1108,8 @@ function AppContent() {
             // Warning-only if we have Plates approval conflict but no blocking conflicts
             // Show warning even during reschedule for visual feedback
             hasWarningOnly: validation.hasWarningOnly,
+            // REQ-18: Group capacity conflict
+            hasGroupCapacityConflict: validation.hasGroupCapacityConflict,
           }}
           isQuickPlacementMode={isQuickPlacementMode}
           stationsWithAvailableTasks={stationsWithAvailableTasks}
@@ -1121,6 +1123,7 @@ function AppContent() {
           isRescheduleDrag={isRescheduleDrag}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
+          groups={snapshot.groups}
         />
         </div>
       </div>

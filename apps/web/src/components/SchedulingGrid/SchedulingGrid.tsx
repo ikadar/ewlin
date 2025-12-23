@@ -1,11 +1,12 @@
-import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, StationGroup } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
-import { StationHeader } from '../StationHeaders/StationHeader';
+import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
 import { Tile, compareSimilarity } from '../Tile';
 import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
+import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -41,6 +42,8 @@ export interface ValidationState {
   isAltPressed: boolean;
   /** Whether there are only warning conflicts (non-blocking, like Plates approval) */
   hasWarningOnly: boolean;
+  /** Whether there's a group capacity conflict (REQ-18) */
+  hasGroupCapacityConflict?: boolean;
 }
 
 export interface SchedulingGridProps {
@@ -102,6 +105,8 @@ export interface SchedulingGridProps {
   isRescheduleDrag?: boolean;
   /** Schedule conflicts for conflict visualization (REQ-12) */
   conflicts?: ScheduleConflict[];
+  /** Station groups for capacity visualization (REQ-18) */
+  groups?: StationGroup[];
 }
 
 /**
@@ -140,6 +145,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onCompact,
       isRescheduleDrag = false,
       conflicts = [],
+      groups = [],
     },
     ref
   ) {
@@ -203,11 +209,22 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return map;
   }, [categories]);
 
-  // REQ-12: Calculate set of task IDs with conflicts for visual feedback
+  // REQ-18: Calculate group capacity info for each station
+  const groupCapacityMap = useMemo((): Map<string, GroupCapacityInfo> => {
+    if (groups.length === 0) return new Map();
+    return buildGroupCapacityMap(stations, groups, assignments, now);
+  }, [stations, groups, assignments, now]);
+
+  // REQ-12 & REQ-18: Calculate set of task IDs with conflicts for visual feedback
   const conflictTaskIds = useMemo(() => {
     const taskIds = new Set<string>();
     conflicts.forEach((conflict) => {
+      // REQ-12: Precedence conflicts
       if (conflict.type === 'PrecedenceConflict' && conflict.taskId) {
+        taskIds.add(conflict.taskId);
+      }
+      // REQ-18: Group capacity conflicts
+      if (conflict.type === 'GroupCapacityConflict' && conflict.taskId) {
         taskIds.add(conflict.taskId);
       }
     });
@@ -286,6 +303,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const hasTiles = stationAssignments.length > 0;
               // Check if this station is being compacted
               const isCompacting = compactingStationId === station.id;
+              // REQ-18: Get group capacity info for this station
+              const groupCapacity = groupCapacityMap.get(station.id);
               return (
                 <StationHeader
                   key={station.id}
@@ -294,6 +313,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   hasTiles={hasTiles}
                   isCompacting={isCompacting}
                   onCompact={onCompact}
+                  groupCapacity={groupCapacity}
                 />
               );
             })}
