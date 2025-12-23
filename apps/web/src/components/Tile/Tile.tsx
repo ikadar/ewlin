@@ -9,6 +9,7 @@ import { SimilarityIndicators } from './SimilarityIndicators';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { useDragState, type TaskDragData } from '../../dnd';
+import type { SubcolumnLayout } from '../../utils/subcolumnLayout';
 
 export interface TileProps {
   /** Task assignment data */
@@ -45,6 +46,10 @@ export interface TileProps {
   onToggleComplete?: (assignmentId: string) => void;
   /** Pixels per hour for height calculation (default: 80) */
   pixelsPerHour?: number;
+  /** Whether this is an outsourced assignment (REQ-19) */
+  isOutsourced?: boolean;
+  /** Subcolumn layout for provider columns (REQ-19) */
+  subcolumnLayout?: SubcolumnLayout;
 }
 
 /**
@@ -77,6 +82,8 @@ export function Tile({
   hasConflict = false,
   onToggleComplete,
   pixelsPerHour = PIXELS_PER_HOUR,
+  isOutsourced = false,
+  subcolumnLayout,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
@@ -213,13 +220,27 @@ export function Tile({
   };
   const mutingStyle = getMutingStyle();
 
+  // REQ-19: Subcolumn layout for outsourced tiles
+  const getSubcolumnStyle = (): React.CSSProperties => {
+    if (!subcolumnLayout) return {};
+    return {
+      left: `${subcolumnLayout.leftPercent}%`,
+      width: `${subcolumnLayout.widthPercent}%`,
+    };
+  };
+  const subcolumnStyle = getSubcolumnStyle();
+
+  // REQ-19: Outsourced tile styling
+  const outsourcedBorderClass = isOutsourced ? 'border-2 border-dashed' : 'border-l-4';
+  const cursorClass = isOutsourced ? 'cursor-default' : 'cursor-grab';
+
   // Ghost placeholder shown at original position when tile is being dragged
   if (isDragging) {
     return (
       <div
         ref={tileRef}
         className="absolute left-0 right-0 border-2 border-dashed border-zinc-600 bg-zinc-800/30 rounded pointer-events-none"
-        style={{ top: `${top}px`, height: `${totalHeight}px` }}
+        style={{ top: `${top}px`, height: `${totalHeight}px`, ...subcolumnStyle }}
         data-testid={`tile-ghost-${assignment.id}`}
       />
     );
@@ -227,9 +248,16 @@ export function Tile({
 
   return (
     <div
-      ref={tileRef}
-      className={`absolute left-0 right-0 text-sm border-l-4 ${colorClasses.border} group cursor-grab touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
-      style={{ top: `${top}px`, height: `${totalHeight}px`, ...glowStyle, ...mutingStyle }}
+      ref={isOutsourced ? undefined : tileRef}
+      className={`absolute text-sm ${outsourcedBorderClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      style={{
+        top: `${top}px`,
+        height: `${totalHeight}px`,
+        ...glowStyle,
+        ...mutingStyle,
+        // Apply subcolumn layout for outsourced tiles, or full width for station tiles
+        ...(subcolumnLayout ? subcolumnStyle : { left: 0, right: 0 }),
+      }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       data-testid={`tile-${assignment.id}`}
@@ -238,6 +266,7 @@ export function Tile({
       data-task-id={task.id}
       data-station-id={task.stationId}
       data-has-conflict={hasConflict ? 'true' : undefined}
+      data-is-outsourced={isOutsourced ? 'true' : undefined}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {

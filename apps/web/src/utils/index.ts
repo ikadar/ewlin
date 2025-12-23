@@ -27,3 +27,11 @@ export {
   buildGroupCapacityMap,
   findExceededGroups,
 } from './groupCapacity';
+export {
+  timeRangesOverlap,
+  findMaxConcurrent,
+  findOverlappingAssignments,
+  calculateSubcolumnLayout,
+  getSubcolumnLayout,
+} from './subcolumnLayout';
+export type { SubcolumnLayout } from './subcolumnLayout';

@@ -1124,6 +1124,7 @@ function AppContent() {
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
+          providers={snapshot.providers}
         />
         </div>
       </div>
