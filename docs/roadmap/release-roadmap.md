@@ -836,18 +836,18 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Update zoom dropdown/controls
 - [x] E2E tests for layout and zoom (9 tests)
 
-#### v0.3.44 - DateStrip Redesign
+#### v0.3.44 - DateStrip Redesign ✅
 > **Implements:** [REQ-09](../ux-ui/tmp/new-requirements-02.md#req-09-datestrip-átdolgozás)
 
-- [ ] **REQ-09.1:** Infinite scroll DateStrip (no fixed `dayCount`)
-- [ ] **REQ-09.2:** Focused day always centered, synced with grid scroll
-- [ ] **REQ-09.3:** Visual states overhaul:
+- [x] **REQ-09.1:** Infinite scroll DateStrip (no fixed `dayCount`)
+- [x] **REQ-09.2:** Focused day always centered, synced with grid scroll
+- [x] **REQ-09.3:** Visual states overhaul:
   - Current day: thin line indicator (not background color)
   - Focused day: highlighted background/border
   - Departure date: red (existing)
   - Scheduled day: green dot (existing)
-- [ ] Update `DateCell.tsx` styling
-- [ ] E2E tests for DateStrip interactions
+- [x] Update `DateCell.tsx` styling
+- [x] E2E tests for DateStrip interactions (6 tests)
 
 #### v0.3.45 - Precedence Constraint Visualization
 > **Implements:** [REQ-10](../ux-ui/tmp/new-requirements-02.md#req-10-precedence-constraint-vizualizáció)
