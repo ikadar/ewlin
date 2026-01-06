@@ -801,27 +801,82 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Similarity indicators now show real comparisons (not always matched)
 - [x] Unit tests for similarity comparison (11 new tests)
 
+#### v0.3.41 - Drag Snapping Consistency
+> **Implements:** [REQ-01/02/03](../ux-ui/tmp/new-requirements-02.md#req-01)
+
+- [ ] **REQ-01:** Tile snaps to correct position during drag-over (not just on drop)
+- [ ] **REQ-02:** Border color (green/red/amber) based on snapped tile position, not cursor
+- [ ] **REQ-03:** `calculateScheduledStartFromPointer` applies `snapToGrid` before validation
+- [ ] Fix: `const snappedY = snapToGrid(absoluteY)` before `yPositionToTime`
+- [ ] E2E tests for snapping consistency
+
+#### v0.3.42 - UI Bug Fixes
+> **Implements:** [REQ-04/05/06](../ux-ui/tmp/new-requirements-02.md#req-04)
+
+- [ ] **REQ-04:** `UnavailabilityOverlay` renders on all days in multi-day grid
+- [ ] Per-day schedule lookup instead of single overlay
+- [ ] **REQ-05:** Job card overflow fix in sidebar (ellipsis/truncate)
+- [ ] Add `overflow-hidden`, `text-overflow: ellipsis` to job card
+- [ ] **REQ-06:** Non-selected job tiles remain clickable
+- [ ] Remove `pointer-events: none` from non-selected tiles
+- [ ] E2E tests for each fix
+
+#### v0.3.43 - Layout Redesign & Zoom
+> **Implements:** [REQ-07/08](../ux-ui/tmp/new-requirements-02.md#req-07-toolbarsidebar-layout-átszervezés)
+
+- [ ] **REQ-07.1:** Sidebar full height (viewport top to bottom)
+- [ ] **REQ-07.2:** Remove "Flux" logo from toolbar
+- [ ] **REQ-07.3:** Move toolbar right icons to sidebar bottom
+- [ ] Layout restructure: sidebar primary, toolbar secondary
+- [ ] **REQ-08:** Zoom levels: 25%, 50%, 75%, 100%, 150%, 200%
+- [ ] Update zoom dropdown/controls
+- [ ] E2E tests for layout and zoom
+
+#### v0.3.44 - DateStrip Redesign
+> **Implements:** [REQ-09](../ux-ui/tmp/new-requirements-02.md#req-09-datestrip-átdolgozás)
+
+- [ ] **REQ-09.1:** Infinite scroll DateStrip (no fixed `dayCount`)
+- [ ] **REQ-09.2:** Focused day always centered, synced with grid scroll
+- [ ] **REQ-09.3:** Visual states overhaul:
+  - Current day: thin line indicator (not background color)
+  - Focused day: highlighted background/border
+  - Departure date: red (existing)
+  - Scheduled day: green dot (existing)
+- [ ] Update `DateCell.tsx` styling
+- [ ] E2E tests for DateStrip interactions
+
+#### v0.3.45 - Precedence Constraint Visualization
+> **Implements:** [REQ-10](../ux-ui/tmp/new-requirements-02.md#req-10-precedence-constraint-vizualizáció)
+
+- [ ] Purple line: earliest possible start (predecessor end + dry time)
+- [ ] Orange line: latest possible start (successor start - task duration)
+- [ ] Lines visible only during drag, only in hovered column
+- [ ] No lines if no scheduled predecessor/successor
+- [ ] Reuse `getEffectivePredecessorEnd` from validator
+- [ ] New `PrecedenceLines` component
+- [ ] E2E tests for precedence visualization
+
 ### Phase 3I: Backend API Integration
 
-#### v0.3.41 - Validator Package Integration
+#### v0.3.51 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-#### v0.3.42 - API Client Setup
+#### v0.3.52 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.3.43 - Snapshot Loading
+#### v0.3.53 - Snapshot Loading
 - [ ] Replace mock with real API
 - [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.3.44 - Assignment Operations Integration
+#### v0.3.54 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
@@ -832,13 +887,13 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 > **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
 
-#### v0.3.45 - DSL Parser Package (Post-MVP)
+#### v0.3.55 - DSL Parser Package (Post-MVP)
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition
 - [ ] CodeMirror 6 integration
 - [ ] Syntax highlighting
 
-#### v0.3.46 - Job Creation Modal (Post-MVP)
+#### v0.3.56 - Job Creation Modal (Post-MVP)
 - [ ] Modal component
 - [ ] DSL textarea with highlighting
 - [ ] Autocomplete integration
