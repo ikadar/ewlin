@@ -51,6 +51,8 @@ Ha egy job ki van választva, akkor a griden a más job-okhoz tartozó tile-ok n
 
 ### REQ-07: Toolbar/Sidebar Layout Átszervezés
 
+> ✅ Implemented in v0.3.43
+
 **Jelenlegi állapot:**
 - Felső toolbar: teljes szélességű, tartalmazza a "Flux" logót bal oldalon és ikonokat jobb oldalon
 - Bal sidebar: a toolbar alatt kezdődik, nem teljes magasságú
@@ -90,6 +92,8 @@ ELŐTTE:                          UTÁNA:
 - `apps/web/src/components/Sidebar/` vagy hasonló sidebar komponens
 
 ### REQ-08: Zoom Szintek
+
+> ✅ Implemented in v0.3.43
 
 **Elvárt zoom szintek:** 25%, 50%, 75%, 100%, 150%, 200%
 

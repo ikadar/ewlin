@@ -1191,10 +1191,21 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
 }
 
 // ============================================================================
+// Fixture: layout-redesign
+// For v0.3.43 (Layout Redesign - REQ-07/08)
+// Standard data to test layout changes and zoom levels
+// ============================================================================
+
+export function createLayoutRedesignFixture(): ScheduleSnapshot {
+  // Use basic fixture data - layout changes don't require specific data
+  return createBasicFixture();
+}
+
+// ============================================================================
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -1206,6 +1217,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'alt-bypass': createAltBypassFixture,
   'drag-snapping': createDragSnappingFixture,
   'ui-bug-fixes': createUiBugFixesFixture,
+  'layout-redesign': createLayoutRedesignFixture,
 };
 
 /**

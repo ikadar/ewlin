@@ -145,6 +145,7 @@ The interface uses a **column-based layout** with the following structure:
 
 | Date | Change |
 |------|--------|
+| 2026-01-06 | REQ-07: Sidebar full height with User/Settings at bottom; REQ-08: Added 25% zoom level |
 | 2025-12-18 | Added complete specifications: NFR, design tokens, state machines, keyboard shortcuts, component API |
 | 2025-12-18 | Added specifications folder with UI user stories and acceptance criteria |
 | 2025-12-16 | Updated to column-based layout, removed Right Panel |

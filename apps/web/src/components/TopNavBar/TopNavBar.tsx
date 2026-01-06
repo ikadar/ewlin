@@ -1,4 +1,4 @@
-import { Crosshair, Minus, Plus, User, Settings, Loader2 } from 'lucide-react';
+import { Crosshair, Minus, Plus, Loader2 } from 'lucide-react';
 import { ZOOM_LEVELS } from './constants';
 import { COMPACT_HORIZONS, type CompactHorizon } from '../../utils/compactTimeline';
 
@@ -55,11 +55,9 @@ export function TopNavBar({
       className="h-12 bg-zinc-900 border-b border-white/5 flex items-center justify-between px-4 shrink-0"
       data-testid="top-nav-bar"
     >
-      {/* Left section: Logo */}
+      {/* Left section: Empty (REQ-07.2: Logo removed) */}
       <div className="flex items-center gap-4">
-        <span className="text-lg font-semibold text-zinc-100" data-testid="nav-logo">
-          Flux
-        </span>
+        {/* Flux logo removed per REQ-07.2 */}
       </div>
 
       {/* Center section: Quick Placement + Compact + Zoom */}
@@ -150,24 +148,9 @@ export function TopNavBar({
         </div>
       </div>
 
-      {/* Right section: User/Settings placeholders */}
+      {/* Right section: Empty (REQ-07.3: User/Settings moved to Sidebar) */}
       <div className="flex items-center gap-2">
-        <button
-          disabled
-          className="p-2 text-zinc-600 cursor-not-allowed"
-          data-testid="user-button"
-          title="User (coming soon)"
-        >
-          <User className="w-5 h-5" />
-        </button>
-        <button
-          disabled
-          className="p-2 text-zinc-600 cursor-not-allowed"
-          data-testid="settings-button"
-          title="Settings (coming soon)"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+        {/* User and Settings icons moved to Sidebar bottom per REQ-07.3 */}
       </div>
     </nav>
   );

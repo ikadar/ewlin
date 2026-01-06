@@ -16,9 +16,10 @@ describe('TopNavBar', () => {
   });
 
   describe('rendering', () => {
-    it('renders the logo', () => {
+    // REQ-07.2: Logo removed from TopNavBar
+    it('does not render the logo (REQ-07.2)', () => {
       render(<TopNavBar {...defaultProps} />);
-      expect(screen.getByTestId('nav-logo')).toHaveTextContent('Flux');
+      expect(screen.queryByTestId('nav-logo')).not.toBeInTheDocument();
     });
 
     it('renders the Quick Placement button', () => {
@@ -34,10 +35,11 @@ describe('TopNavBar', () => {
       expect(screen.getByTestId('zoom-level')).toBeInTheDocument();
     });
 
-    it('renders user and settings buttons (disabled)', () => {
+    // REQ-07.3: User/Settings buttons moved to Sidebar
+    it('does not render user and settings buttons (REQ-07.3)', () => {
       render(<TopNavBar {...defaultProps} />);
-      expect(screen.getByTestId('user-button')).toBeDisabled();
-      expect(screen.getByTestId('settings-button')).toBeDisabled();
+      expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('settings-button')).not.toBeInTheDocument();
     });
   });
 
@@ -116,8 +118,9 @@ describe('TopNavBar', () => {
       expect(screen.getByTestId('zoom-in-button')).toBeDisabled();
     });
 
+    // REQ-08: Minimum zoom is now 25% (20px/hour)
     it('disables zoom out button at minimum zoom', () => {
-      render(<TopNavBar {...defaultProps} pixelsPerHour={40} />);
+      render(<TopNavBar {...defaultProps} pixelsPerHour={20} />);
       expect(screen.getByTestId('zoom-out-button')).toBeDisabled();
     });
 
@@ -128,25 +131,28 @@ describe('TopNavBar', () => {
     });
   });
 
+  // REQ-08: Added 25% zoom level
   describe('ZOOM_LEVELS constant', () => {
-    it('has correct number of levels', () => {
-      expect(ZOOM_LEVELS).toHaveLength(5);
+    it('has correct number of levels (6 including 25%)', () => {
+      expect(ZOOM_LEVELS).toHaveLength(6);
     });
 
     it('has correct pixelsPerHour values', () => {
-      expect(ZOOM_LEVELS[0].pixelsPerHour).toBe(40);
-      expect(ZOOM_LEVELS[1].pixelsPerHour).toBe(60);
-      expect(ZOOM_LEVELS[2].pixelsPerHour).toBe(80);
-      expect(ZOOM_LEVELS[3].pixelsPerHour).toBe(120);
-      expect(ZOOM_LEVELS[4].pixelsPerHour).toBe(160);
+      expect(ZOOM_LEVELS[0].pixelsPerHour).toBe(20); // 25%
+      expect(ZOOM_LEVELS[1].pixelsPerHour).toBe(40); // 50%
+      expect(ZOOM_LEVELS[2].pixelsPerHour).toBe(60); // 75%
+      expect(ZOOM_LEVELS[3].pixelsPerHour).toBe(80); // 100%
+      expect(ZOOM_LEVELS[4].pixelsPerHour).toBe(120); // 150%
+      expect(ZOOM_LEVELS[5].pixelsPerHour).toBe(160); // 200%
     });
 
     it('has correct labels', () => {
-      expect(ZOOM_LEVELS[0].label).toBe('50%');
-      expect(ZOOM_LEVELS[1].label).toBe('75%');
-      expect(ZOOM_LEVELS[2].label).toBe('100%');
-      expect(ZOOM_LEVELS[3].label).toBe('150%');
-      expect(ZOOM_LEVELS[4].label).toBe('200%');
+      expect(ZOOM_LEVELS[0].label).toBe('25%');
+      expect(ZOOM_LEVELS[1].label).toBe('50%');
+      expect(ZOOM_LEVELS[2].label).toBe('75%');
+      expect(ZOOM_LEVELS[3].label).toBe('100%');
+      expect(ZOOM_LEVELS[4].label).toBe('150%');
+      expect(ZOOM_LEVELS[5].label).toBe('200%');
     });
   });
 

@@ -1044,21 +1044,26 @@ function AppContent() {
 
   return (
     <>
-      <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
-        {/* Top Navigation Bar */}
-        <TopNavBar
-          isQuickPlacementMode={isQuickPlacementMode}
-          onToggleQuickPlacement={handleToggleQuickPlacement}
-          canEnableQuickPlacement={selectedJobId !== null}
-          pixelsPerHour={pixelsPerHour}
-          onZoomChange={setPixelsPerHour}
-          onCompactTimeline={handleCompactTimeline}
-          isCompacting={isCompactingTimeline}
-        />
+      {/* REQ-07: Layout restructure - sidebar full height */}
+      <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
+        {/* Sidebar - full viewport height (REQ-07.1) */}
+        <Sidebar />
 
-        {/* Main content area */}
-        <div className="flex-1 flex overflow-hidden">
-          <Sidebar />
+        {/* Main area - right of sidebar */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Top Navigation Bar - now only spans width after sidebar (REQ-07.2/07.3) */}
+          <TopNavBar
+            isQuickPlacementMode={isQuickPlacementMode}
+            onToggleQuickPlacement={handleToggleQuickPlacement}
+            canEnableQuickPlacement={selectedJobId !== null}
+            pixelsPerHour={pixelsPerHour}
+            onZoomChange={setPixelsPerHour}
+            onCompactTimeline={handleCompactTimeline}
+            isCompacting={isCompactingTimeline}
+          />
+
+          {/* Content area */}
+          <div className="flex-1 flex overflow-hidden">
           <JobsList
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
@@ -1132,6 +1137,7 @@ function AppContent() {
           groups={snapshot.groups}
           providers={snapshot.providers}
         />
+          </div>
         </div>
       </div>
 

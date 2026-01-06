@@ -54,6 +54,43 @@ The scheduling grid can display a large time range and many station columns. Nav
 
 ---
 
+## Zoom Levels
+
+> Implemented from REQ-08
+
+The grid supports 6 zoom levels that control how much time is visible:
+
+| Zoom Level | Pixels per Hour | Description |
+|------------|-----------------|-------------|
+| **25%** | 20px | Maximum overview, shows many hours |
+| **50%** | 40px | Compact view |
+| **75%** | 60px | Medium view |
+| **100%** (default) | 80px | Standard view |
+| **150%** | 120px | Detailed view |
+| **200%** | 160px | Maximum detail |
+
+### Zoom Control
+
+Located in the Top Navigation Bar:
+
+```
+[ - ] 100% [ + ]
+```
+
+- **Zoom out (-):** Decrease zoom (show more time)
+- **Zoom level:** Current zoom percentage
+- **Zoom in (+):** Increase zoom (show more detail)
+
+### Button States
+
+| Zoom Level | Zoom Out | Zoom In |
+|------------|----------|---------|
+| 25% | Disabled | Enabled |
+| 50%-150% | Enabled | Enabled |
+| 200% | Enabled | Disabled |
+
+---
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
