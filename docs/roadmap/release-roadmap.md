@@ -824,16 +824,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] `pointer-events: none` only during drag, not selection mute
 - [x] E2E tests for all fixes (6 tests)
 
-#### v0.3.43 - Layout Redesign & Zoom
+#### v0.3.43 - Layout Redesign & Zoom ✅
 > **Implements:** [REQ-07/08](../ux-ui/tmp/new-requirements-02.md#req-07-toolbarsidebar-layout-átszervezés)
+> **Released:** 2026-01-06
 
-- [ ] **REQ-07.1:** Sidebar full height (viewport top to bottom)
-- [ ] **REQ-07.2:** Remove "Flux" logo from toolbar
-- [ ] **REQ-07.3:** Move toolbar right icons to sidebar bottom
-- [ ] Layout restructure: sidebar primary, toolbar secondary
-- [ ] **REQ-08:** Zoom levels: 25%, 50%, 75%, 100%, 150%, 200%
-- [ ] Update zoom dropdown/controls
-- [ ] E2E tests for layout and zoom
+- [x] **REQ-07.1:** Sidebar full height (viewport top to bottom)
+- [x] **REQ-07.2:** Remove "Flux" logo from toolbar
+- [x] **REQ-07.3:** Move toolbar right icons to sidebar bottom
+- [x] Layout restructure: sidebar primary, toolbar secondary
+- [x] **REQ-08:** Zoom levels: 25%, 50%, 75%, 100%, 150%, 200%
+- [x] Update zoom dropdown/controls
+- [x] E2E tests for layout and zoom (9 tests)
 
 #### v0.3.44 - DateStrip Redesign
 > **Implements:** [REQ-09](../ux-ui/tmp/new-requirements-02.md#req-09-datestrip-átdolgozás)
