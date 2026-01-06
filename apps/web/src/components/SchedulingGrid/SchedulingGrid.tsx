@@ -438,6 +438,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   startHour={startHour}
                   hoursToDisplay={hoursToDisplay}
                   pixelsPerHour={pixelsPerHour}
+                  gridStartDate={startDate}
                   isCollapsed={isCollapsed}
                   isValidDrop={isValidDrop}
                   isWarningDrop={isWarningDrop}

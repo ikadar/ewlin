@@ -10,6 +10,8 @@ export interface UnavailabilityOverlayProps {
   hoursToDisplay: number;
   /** Pixels per hour for grid scaling (default: 80) */
   pixelsPerHour?: number;
+  /** Y offset in pixels for multi-day rendering (REQ-04) */
+  yOffset?: number;
 }
 
 interface UnavailablePeriod {
@@ -156,24 +158,26 @@ function minutesToYPosition(minutes: number, startHour: number, pixelsPerHour: n
 
 /**
  * UnavailabilityOverlay - Displays hatched pattern overlay for non-operating periods.
+ * REQ-04: Supports yOffset for multi-day grid rendering.
  */
 export function UnavailabilityOverlay({
   daySchedule,
   startHour,
   hoursToDisplay,
   pixelsPerHour = PIXELS_PER_HOUR,
+  yOffset = 0,
 }: UnavailabilityOverlayProps) {
   const unavailablePeriods = calculateUnavailablePeriods(daySchedule, startHour, hoursToDisplay);
 
   return (
     <>
       {unavailablePeriods.map((period) => {
-        const top = minutesToYPosition(period.startMinutes, startHour, pixelsPerHour);
+        const top = minutesToYPosition(period.startMinutes, startHour, pixelsPerHour) + yOffset;
         const height = ((period.endMinutes - period.startMinutes) / 60) * pixelsPerHour;
 
         return (
           <div
-            key={`${period.startMinutes}-${period.endMinutes}`}
+            key={`${period.startMinutes}-${period.endMinutes}-${yOffset}`}
             className="absolute left-0 right-0 bg-stripes-dark pointer-events-none"
             style={{
               top: `${top}px`,

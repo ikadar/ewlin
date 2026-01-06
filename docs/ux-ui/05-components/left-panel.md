@@ -105,11 +105,22 @@ Regular jobs listed below the problems section.
 
 | Element | Description |
 |---------|-------------|
-| **Reference** | Job reference number (monospace) |
-| **Client** | Client name (truncated) |
-| **Description** | Job description (truncated) |
+| **Reference** | Job reference number (monospace, non-shrinking) |
+| **Client** | Client name (truncated with ellipsis) |
+| **Description** | Job description (truncated with ellipsis) |
 | **Deadline indicator** | Date shown on right if approaching |
 | **Progress dots** | Task completion visualization |
+
+### Overflow Handling
+
+> Implemented from REQ-05 (v0.3.42)
+
+Job cards handle long text content gracefully:
+
+- Card width uses `calc(100% - 1rem)` to account for margins without overflow
+- Header row uses `overflow-hidden min-w-0` for proper flexbox truncation
+- Reference and separator use `shrink-0` to prevent shrinking
+- Client name uses `truncate min-w-0` for ellipsis truncation
 
 ### Progress Dots
 

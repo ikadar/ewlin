@@ -15,8 +15,10 @@ export interface StationColumnProps {
   hoursToDisplay?: number;
   /** Pixels per hour for grid scaling (default: 80) */
   pixelsPerHour?: number;
-  /** Day of week to show schedule for (0 = Sunday, 1 = Monday, etc.) */
+  /** Day of week to show schedule for (0 = Sunday, 1 = Monday, etc.) - used for single-day mode */
   dayOfWeek?: number;
+  /** Start date for multi-day grid (REQ-04) - when provided, enables multi-day overlay rendering */
+  gridStartDate?: Date;
   /** Children (tiles) to render inside the column */
   children?: ReactNode;
   /** Whether this column is collapsed (during drag to another station) */
@@ -71,6 +73,7 @@ export function StationColumn({
   hoursToDisplay = 24,
   pixelsPerHour = PIXELS_PER_HOUR,
   dayOfWeek,
+  gridStartDate,
   children,
   isCollapsed = false,
   isValidDrop = false,
@@ -127,7 +130,12 @@ export function StationColumn({
     activeTask?.type === 'Internal' &&
     activeTask.stationId === station.id;
 
-  // Use current day if not specified
+  // REQ-04: Calculate number of days for multi-day grid
+  // When gridStartDate is provided, render overlays for each day
+  const numberOfDays = Math.ceil(hoursToDisplay / 24);
+  const isMultiDayGrid = gridStartDate !== undefined && numberOfDays > 1;
+
+  // Use current day if not specified (for single-day mode)
   const effectiveDayOfWeek = dayOfWeek ?? new Date().getDay();
   const daySchedule = getDaySchedule(station, effectiveDayOfWeek);
 
@@ -216,13 +224,36 @@ export function StationColumn({
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
     >
-      {/* Unavailability overlay */}
-      <UnavailabilityOverlay
-        daySchedule={daySchedule}
-        startHour={startHour}
-        hoursToDisplay={hoursToDisplay}
-        pixelsPerHour={pixelsPerHour}
-      />
+      {/* Unavailability overlay - REQ-04: Multi-day support */}
+      {isMultiDayGrid ? (
+        // Multi-day mode: render overlay for each day
+        Array.from({ length: numberOfDays }).map((_, dayIndex) => {
+          // Calculate the date for this day
+          const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
+          const dayOfWeekForDay = currentDate.getDay();
+          const dayScheduleForDay = getDaySchedule(station, dayOfWeekForDay);
+          const dayYOffset = dayIndex * 24 * pixelsPerHour;
+
+          return (
+            <UnavailabilityOverlay
+              key={`overlay-day-${dayIndex}`}
+              daySchedule={dayScheduleForDay}
+              startHour={startHour} // Use same startHour as grid (e.g., 6 for 06:00)
+              hoursToDisplay={24} // Each overlay covers 24 hours from startHour
+              pixelsPerHour={pixelsPerHour}
+              yOffset={dayYOffset}
+            />
+          );
+        })
+      ) : (
+        // Single-day mode: original behavior
+        <UnavailabilityOverlay
+          daySchedule={daySchedule}
+          startHour={startHour}
+          hoursToDisplay={hoursToDisplay}
+          pixelsPerHour={pixelsPerHour}
+        />
+      )}
 
       {/* Hour grid lines */}
       {gridLines.map((top) => (

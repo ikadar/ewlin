@@ -812,16 +812,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Fix: DragLayer uses station column coordinates for scroll-aware snapping
 - [x] E2E tests for snapping consistency
 
-#### v0.3.42 - UI Bug Fixes
-> **Implements:** [REQ-04/05/06](../ux-ui/tmp/new-requirements-02.md#req-04)
+#### v0.3.42 - UI Bug Fixes ✅
+> **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-02-en.md#req-04)
+> **Released:** 2026-01-06
 
-- [ ] **REQ-04:** `UnavailabilityOverlay` renders on all days in multi-day grid
-- [ ] Per-day schedule lookup instead of single overlay
-- [ ] **REQ-05:** Job card overflow fix in sidebar (ellipsis/truncate)
-- [ ] Add `overflow-hidden`, `text-overflow: ellipsis` to job card
-- [ ] **REQ-06:** Non-selected job tiles remain clickable
-- [ ] Remove `pointer-events: none` from non-selected tiles
-- [ ] E2E tests for each fix
+- [x] **REQ-04:** `UnavailabilityOverlay` renders on all days in multi-day grid
+- [x] Add `yOffset` prop to UnavailabilityOverlay, render per-day overlays
+- [x] **REQ-05:** Job card overflow fix in sidebar
+- [x] Add `overflow-hidden min-w-0` to header, `w-[calc(100%-1rem)]` for border clipping
+- [x] **REQ-06:** Non-selected job tiles remain clickable
+- [x] `pointer-events: none` only during drag, not selection mute
+- [x] E2E tests for all fixes (6 tests)
 
 #### v0.3.43 - Layout Redesign & Zoom
 > **Implements:** [REQ-07/08](../ux-ui/tmp/new-requirements-02.md#req-07-toolbarsidebar-layout-átszervezés)

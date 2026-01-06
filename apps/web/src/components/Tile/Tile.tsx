@@ -210,12 +210,19 @@ export function Tile({
   };
   const glowStyle = getGlowStyle();
 
-  // Muting style: desaturate and reduce opacity for other jobs during drag
-  // Also disable pointer events during drag so drops pass through to StationColumn
+  // Muting style: desaturate and reduce opacity for other jobs during drag or selection
+  // REQ-06: Keep tiles clickable when muted by selection - only disable pointer events during active drag
+  // Disable pointer events during drag so drops pass through to StationColumn
   // But NOT for the tile being dragged itself (it needs to remain the drag source)
   const getMutingStyle = () => {
-    if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const };
-    if (isDragActive && !isDragging) return { pointerEvents: 'none' as const };
+    // During active drag: disable pointer events on non-dragging tiles (for drop-through)
+    if (isDragActive && !isDragging) {
+      // If muted, also apply visual muting
+      if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const };
+      return { pointerEvents: 'none' as const };
+    }
+    // When just muted by selection (not during drag): visual muting only, keep clickable
+    if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6 };
     return undefined;
   };
   const mutingStyle = getMutingStyle();

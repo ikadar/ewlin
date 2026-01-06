@@ -43,6 +43,7 @@ export function JobCard({
   isSelected = false,
   onClick,
 }: JobCardProps) {
+  // REQ-05: block display respects margins (w-full + margins caused overflow)
   const baseClasses = 'mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors';
 
   const stateClasses = (() => {
@@ -78,17 +79,17 @@ export function JobCard({
   return (
     <button
       type="button"
-      className={`${baseClasses} ${stateClasses} text-left w-full`}
+      className={`${baseClasses} ${stateClasses} text-left w-[calc(100%-1rem)]`}
       onClick={onClick}
       data-testid={`job-card-${id}`}
     >
-      {/* Header row: reference · client + date/icon */}
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`font-mono text-[13px] ${referenceColor}`}>{reference}</span>
-        <span className="text-zinc-600">·</span>
-        <span className="text-zinc-400 truncate">{client}</span>
-        {ProblemIcon && <ProblemIcon className={`w-4 h-4 ml-auto ${iconColor}`} />}
-        {!ProblemIcon && deadline && <span className="text-zinc-600 text-xs ml-auto">{deadline}</span>}
+      {/* Header row: reference · client + date/icon - REQ-05: overflow fix */}
+      <div className="flex items-center gap-2 mb-1 overflow-hidden min-w-0">
+        <span className={`font-mono text-[13px] shrink-0 ${referenceColor}`}>{reference}</span>
+        <span className="text-zinc-600 shrink-0">·</span>
+        <span className="text-zinc-400 truncate min-w-0">{client}</span>
+        {ProblemIcon && <ProblemIcon className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />}
+        {!ProblemIcon && deadline && <span className="text-zinc-600 text-xs ml-auto shrink-0">{deadline}</span>}
       </div>
 
       {/* Description */}
