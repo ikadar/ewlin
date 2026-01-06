@@ -6,6 +6,8 @@ This document contains the reformulated, precise requirements from the second ba
 
 ## REQ-01/02/03: Drag Snapping Consistency
 
+> ✅ **Implemented in v0.3.41** (2026-01-06)
+
 **Description:**
 During drag operations, there is an inconsistency between the visual snap position of the tile and the validation/drop position. The tile visually snaps to the grid, but validation and border color feedback are based on the cursor position, not the snapped position.
 

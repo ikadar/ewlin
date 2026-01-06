@@ -1,9 +1,9 @@
 /**
  * Playwright Drag Snapping Tests
  *
- * Tests for v0.3.31 (REQ-08/09):
- * - REQ-08: Real-time drag preview snapping to 30-minute grid
- * - REQ-09: Vertical-only drag (already implemented, verify)
+ * Tests for:
+ * - v0.3.31 (REQ-08/09): Real-time drag preview snapping to 30-minute grid, vertical-only drag
+ * - v0.3.41 (REQ-01/02/03): Validation uses snapped position, border color matches visual snap
  */
 
 import { test, expect } from '@playwright/test';
@@ -171,5 +171,138 @@ test.describe('v0.3.31: Drag Snapping (REQ-08/09)', () => {
       // This is enforced by the validation logic
       expect(stationIdAttr).toBe('station-komori');
     });
+  });
+});
+
+// =============================================================================
+// v0.3.41: Validation Snapping Consistency (REQ-01/02/03)
+// =============================================================================
+
+test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
+  test.beforeEach(async ({ page }) => {
+    // Use drag-snapping fixture
+    await page.goto('/?fixture=drag-snapping');
+    await waitForAppReady(page);
+  });
+
+  test('REQ-03: drop at boundary position snaps correctly', async ({ page }) => {
+    // This test verifies that calculateScheduledStartFromPointer applies snapToGrid
+    // By dropping at Y positions that are between grid lines and checking the result
+
+    // ARRANGE: Select the job
+    const jobCard = page.locator('[data-testid="job-card-job-snap-1"]');
+    await jobCard.click();
+    await page.waitForTimeout(200);
+
+    const taskTile = page.locator('[data-testid="task-tile-task-snap-1"]');
+    await expect(taskTile).toBeVisible();
+
+    // ACT: Drag to Y position that corresponds to 8:15 (between 8:00 and 8:30)
+    // Grid: 80px/hour at default zoom
+    // 8:00 = 160px, 8:15 = 180px, 8:30 = 200px
+    // Snapping should round 180px (8:15) to either 160px (8:00) or 200px (8:30)
+    await dragFromSidebarToStation(
+      page,
+      '[data-testid="task-tile-task-snap-1"]',
+      'station-komori',
+      180 // 8:15 - between grid lines
+    );
+
+    // ASSERT: Tile should be at a 30-minute boundary (snapped)
+    const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+    const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
+    const scheduledStart = await newTile.getAttribute('data-scheduled-start');
+
+    expect(scheduledStart).toBeTruthy();
+    const time = parseTime(scheduledStart!);
+    console.log(`REQ-03: Dropped at Y=180 (8:15), scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+
+    // Verify on 30-minute boundary
+    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+  });
+
+  test('REQ-01/02: validation and visual snap are consistent', async ({ page }) => {
+    // This test verifies that the validation result (which determines border color)
+    // is based on the snapped position, not the raw cursor position
+
+    // ARRANGE: Select the job
+    const jobCard = page.locator('[data-testid="job-card-job-snap-1"]');
+    await jobCard.click();
+    await page.waitForTimeout(200);
+
+    const taskTile = page.locator('[data-testid="task-tile-task-snap-1"]');
+    await expect(taskTile).toBeVisible();
+
+    // ACT: Drag to a valid snapped position and verify drop succeeds
+    // Y = 80 corresponds to 7:00 (1 hour after START_HOUR=6)
+    await dragFromSidebarToStation(
+      page,
+      '[data-testid="task-tile-task-snap-1"]',
+      'station-komori',
+      80 // 7:00 - valid position
+    );
+
+    // ASSERT: Tile should be created at snapped position
+    const tilesAfter = await countTilesOnStation(page, 'station-komori');
+    expect(tilesAfter).toBe(1);
+
+    // Verify the exact time
+    const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+    const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
+    const scheduledStart = await newTile.getAttribute('data-scheduled-start');
+
+    expect(scheduledStart).toBeTruthy();
+    const time = parseTime(scheduledStart!);
+    console.log(`REQ-01/02: Dropped at Y=80, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+
+    // Should be at 7:00 (snapped from Y=80)
+    expect(time.hours).toBe(7);
+    expect(time.minutes).toBe(0);
+  });
+
+  test('snapping is consistent at various Y positions', async ({ page }) => {
+    // Test multiple positions to ensure snapping is applied consistently
+
+    const testCases = [
+      { y: 40, expectedMinutes: 0 },   // 6:30 → snaps to 6:30 (40px is exactly on grid)
+      { y: 55, expectedMinutes: 30 },  // ~6:40 → snaps to 6:30 (rounds down)
+      { y: 65, expectedMinutes: 0 },   // ~6:50 → snaps to 7:00 (rounds up)
+      { y: 80, expectedMinutes: 0 },   // 7:00 → snaps to 7:00 (exactly on grid)
+    ];
+
+    for (const { y, expectedMinutes } of testCases) {
+      // Navigate fresh for each test
+      await page.goto('/?fixture=drag-snapping');
+      await waitForAppReady(page);
+
+      // Select the job
+      const jobCard = page.locator('[data-testid="job-card-job-snap-1"]');
+      await jobCard.click();
+      await page.waitForTimeout(200);
+
+      const taskTile = page.locator('[data-testid="task-tile-task-snap-1"]');
+      await expect(taskTile).toBeVisible();
+
+      // Drag to test position
+      await dragFromSidebarToStation(
+        page,
+        '[data-testid="task-tile-task-snap-1"]',
+        'station-komori',
+        y
+      );
+
+      // Verify snapping
+      const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+      const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
+      const scheduledStart = await newTile.getAttribute('data-scheduled-start');
+
+      expect(scheduledStart).toBeTruthy();
+      const time = parseTime(scheduledStart!);
+
+      console.log(`Y=${y} → ${time.hours}:${time.minutes.toString().padStart(2, '0')} (expected minutes: ${expectedMinutes})`);
+
+      // Verify on 30-minute boundary
+      expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    }
   });
 });

@@ -225,23 +225,29 @@ function getStationIdFromElement(element: HTMLElement | null): string | null {
 
 /**
  * Calculate scheduled start time from pointer position on a station column.
+ * REQ-01/02/03: Apply snapToGrid before converting Y to time for consistent validation.
  * @param startDate - Grid start date for multi-day calculations (REQ-14)
+ * @param pixelsPerHour - Current zoom level (pixels per hour)
  */
 function calculateScheduledStartFromPointer(
   clientX: number,
   clientY: number,
   grabOffsetY: number,
-  startDate?: Date
+  startDate?: Date,
+  pixelsPerHour: number = DEFAULT_PIXELS_PER_HOUR
 ): string | null {
   const stationElement = findStationColumnFromPointer(clientX, clientY);
   if (!stationElement) return null;
 
   const rect = stationElement.getBoundingClientRect();
-  // Note: rect.top already accounts for scroll position (negative when scrolled)
+  // rect.top accounts for scroll position (becomes negative when scrolled)
   // so clientY - rect.top gives the absolute position in grid content
   const absoluteY = calculateTileTopPosition(clientY, rect.top, grabOffsetY);
 
-  const dropTime = yPositionToTime(absoluteY, START_HOUR, startDate);
+  // REQ-01/02/03: Snap Y position before converting to time
+  // This ensures validation uses the same snapped position as visual preview
+  const snappedY = snapToGrid(absoluteY, pixelsPerHour);
+  const dropTime = yPositionToTime(snappedY, START_HOUR, startDate, pixelsPerHour);
   return dropTime.toISOString();
 }
 
@@ -578,7 +584,7 @@ function AppContent() {
           return;
         }
 
-        const scheduledStart = calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate);
+        const scheduledStart = calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate, pixelsPerHour);
         setDragValidation((prev) => ({ ...prev, targetStationId: stationId, scheduledStart }));
       },
       onDrop: ({ source, location }) => {
@@ -628,7 +634,7 @@ function AppContent() {
 
         // Calculate scheduledStart (use cached or calculate from pointer)
         const calculatedScheduledStart = currentDragValidation.scheduledStart
-          || calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate);
+          || calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate, pixelsPerHour);
 
         // Verify the task belongs to this station
         if (dragData.task.type !== 'Internal' || dragData.task.stationId !== dropData.stationId) {
@@ -710,7 +716,7 @@ function AppContent() {
         console.log(isRescheduleOp ? 'Rescheduled:' : 'Created:', { taskId: task.id, scheduledStart });
       },
     });
-  }, [activeTask, grabOffset, dragValidation, validation, isAltPressed, snapshot.stations, gridStartDate]);
+  }, [activeTask, grabOffset, dragValidation, validation, isAltPressed, snapshot.stations, gridStartDate, pixelsPerHour]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {

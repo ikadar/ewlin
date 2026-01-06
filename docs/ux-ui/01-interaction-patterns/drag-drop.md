@@ -27,6 +27,71 @@ Tiles are placed and repositioned via drag and drop. The system provides real-ti
 - **Behavior:** On release, tile snaps to nearest 30-minute boundary
 - **Visual:** Grid lines show 30-minute intervals
 
+### Snap Consistency (REQ-01/02/03)
+
+> Implemented in v0.3.41
+
+The visual snap during drag must exactly match the validation position on drop. This ensures a consistent user experience where "what you see is what you get."
+
+#### Visual Snap ↔ Validation Alignment
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  During Drag                     On Drop                    │
+│                                                             │
+│  ┌─────┐ ← Visual preview       Same position used for     │
+│  │Tile │   snapped to grid      validation and assignment  │
+│  └─────┘                                                    │
+│                                                             │
+│  Snap position = Validation position = Assignment position  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### How It Works
+
+1. **During drag:** `DragLayer` calculates snapped position using station column coordinates
+2. **On drop:** `calculateScheduledStartFromPointer` applies the same `snapToGrid` function
+3. **Both use:** Station column's `getBoundingClientRect()` as coordinate reference
+
+#### Coordinate System
+
+```
+                      Viewport
+     ┌──────────────────────────────────────┐
+     │                                      │
+     │    Station Column                    │
+     │    ┌─────────────────────────┐       │
+     │    │  ← rect.top (accounts   │       │
+     │    │     for scroll)         │       │
+     │    │                         │       │
+     │    │  contentY = cursorY     │       │
+     │    │            - rect.top   │       │
+     │    │            - grabOffset │       │
+     │    │                         │       │
+     │    │  snappedY = snapToGrid( │       │
+     │    │              contentY)  │       │
+     │    └─────────────────────────┘       │
+     └──────────────────────────────────────┘
+```
+
+**Key insight:** `getBoundingClientRect().top` automatically accounts for scroll position, providing scroll-aware coordinates without explicit scroll offset calculations.
+
+#### Zoom Support
+
+The snap grid respects the current zoom level:
+
+```typescript
+const PIXELS_PER_30_MIN = pixelsPerHour / 2;
+const snappedY = Math.round(y / PIXELS_PER_30_MIN) * PIXELS_PER_30_MIN;
+```
+
+| Zoom Level | Pixels per Hour | 30-min Grid |
+|------------|-----------------|-------------|
+| 50% | 40px | 20px |
+| 100% | 80px | 40px |
+| 150% | 120px | 60px |
+| 200% | 160px | 80px |
+
 ---
 
 ## Drop Position Calculation
@@ -159,8 +224,17 @@ When inserting a tile between existing tiles on a station:
 
 | Aspect | Decision |
 |--------|----------|
-| **Library** | [dnd kit](https://dndkit.com) |
-| **Why** | Modern React DnD, hooks-based, accessible, performant |
+| **Library** | [@atlaskit/pragmatic-drag-and-drop](https://atlassian.design/components/pragmatic-drag-and-drop) |
+| **Why** | Lightweight, framework-agnostic, excellent performance, native drag events |
+
+### Key Components
+
+| Component | Purpose |
+|-----------|---------|
+| `DragLayer` | Portal-based drag preview rendering |
+| `DragStateContext` | Shared drag state (activeTask, activeJob, grabOffset) |
+| `DragPreview` | Visual tile preview component |
+| `monitorForElements` | Global drag event monitoring |
 
 ---
 

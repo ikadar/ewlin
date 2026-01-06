@@ -953,10 +953,65 @@ export function createAltBypassFixture(): ScheduleSnapshot {
 }
 
 // ============================================================================
+// Fixture: drag-snapping
+// For v0.3.41 (Drag Snapping Consistency - REQ-01/02/03)
+// Job with unscheduled task, tests snapping at lunch break boundary (12:00-13:00)
+// ============================================================================
+
+export function createDragSnappingFixture(): ScheduleSnapshot {
+  const jobs: Job[] = [
+    {
+      id: 'job-snap-1',
+      reference: 'SNAP-001',
+      client: 'Snapping Test Client',
+      description: 'Drag Snapping Test Job',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 7),
+      color: '#8b5cf6', // Purple
+      paperPurchaseStatus: 'InStock',
+      platesStatus: 'Done',
+      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
+      requiredJobIds: [],
+      comments: [],
+      taskIds: ['task-snap-1'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  const tasks: Task[] = [
+    {
+      id: 'task-snap-1',
+      jobId: 'job-snap-1',
+      sequenceOrder: 0,
+      status: 'Ready', // Unscheduled, ready to place
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 30 }, // 1h total
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+  ];
+
+  // No assignments - task is unscheduled for drag testing
+  // Station has lunch break 12:00-13:00 (not in standardDaySchedule slots)
+  // Dragging to 12:45 should snap to 13:00 and show GREEN border
+  return {
+    ...baseSnapshot(),
+    jobs,
+    tasks,
+    assignments: [],
+    conflicts: [],
+    lateJobs: [],
+  };
+}
+
+// ============================================================================
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -966,6 +1021,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'swap': createSwapFixture,
   'sidebar-drag': createSidebarDragFixture,
   'alt-bypass': createAltBypassFixture,
+  'drag-snapping': createDragSnappingFixture,
 };
 
 /**

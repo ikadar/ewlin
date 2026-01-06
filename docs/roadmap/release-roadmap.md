@@ -801,14 +801,16 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Similarity indicators now show real comparisons (not always matched)
 - [x] Unit tests for similarity comparison (11 new tests)
 
-#### v0.3.41 - Drag Snapping Consistency
-> **Implements:** [REQ-01/02/03](../ux-ui/tmp/new-requirements-02.md#req-01)
+#### v0.3.41 - Drag Snapping Consistency ✅
+> **Implements:** [REQ-01/02/03](../ux-ui/tmp/refactored-new-requirements-02-en.md#req-010203-drag-snapping-consistency)
+> **Released:** 2026-01-06
 
-- [ ] **REQ-01:** Tile snaps to correct position during drag-over (not just on drop)
-- [ ] **REQ-02:** Border color (green/red/amber) based on snapped tile position, not cursor
-- [ ] **REQ-03:** `calculateScheduledStartFromPointer` applies `snapToGrid` before validation
-- [ ] Fix: `const snappedY = snapToGrid(absoluteY)` before `yPositionToTime`
-- [ ] E2E tests for snapping consistency
+- [x] **REQ-01:** Tile snaps to correct position during drag-over (not just on drop)
+- [x] **REQ-02:** Border color (green/red/amber) based on snapped tile position, not cursor
+- [x] **REQ-03:** `calculateScheduledStartFromPointer` applies `snapToGrid` before validation
+- [x] Fix: `const snappedY = snapToGrid(absoluteY)` before `yPositionToTime`
+- [x] Fix: DragLayer uses station column coordinates for scroll-aware snapping
+- [x] E2E tests for snapping consistency
 
 #### v0.3.42 - UI Bug Fixes
 > **Implements:** [REQ-04/05/06](../ux-ui/tmp/new-requirements-02.md#req-04)

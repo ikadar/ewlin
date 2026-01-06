@@ -54,10 +54,35 @@ export function DragLayer() {
   // Position the preview so the grab point stays under the cursor
   // We offset by grabOffset.x and grabOffset.y to maintain the visual position
   // REQ-08: Snap the top position to 30-minute grid intervals (40px) during drag
+  // REQ-01/02/03: Snap must align with grid lines, accounting for scroll
+
+  // Find the station column under the cursor to get correct coordinate reference
+  const elements = document.elementsFromPoint(position.x, position.y);
+  const stationColumn = elements.find(
+    (el): el is HTMLElement => el instanceof HTMLElement &&
+    el.dataset.testid?.startsWith('station-column-') === true
+  );
+
+  let snappedViewportY: number;
+
+  if (stationColumn) {
+    // Use station column's rect (same as calculateScheduledStartFromPointer)
+    const stationRect = stationColumn.getBoundingClientRect();
+    // Calculate content position: cursor relative to station top, minus grab offset
+    const contentY = position.y - stationRect.top - grabOffset.y;
+    // Snap in content coordinates
+    const snappedContentY = snapToGrid(contentY);
+    // Convert back to viewport: station top + snapped content position
+    snappedViewportY = stationRect.top + snappedContentY;
+  } else {
+    // Fallback: simple viewport snap when not over a station
+    snappedViewportY = snapToGrid(position.y - grabOffset.y);
+  }
+
   const previewStyle: React.CSSProperties = {
     position: 'fixed',
     left: position.x - grabOffset.x, // Offset so grab point X stays under cursor
-    top: snapToGrid(position.y - grabOffset.y),  // Snap to 30-min grid (REQ-08)
+    top: snappedViewportY,
     pointerEvents: 'none',
     zIndex: 9999,
   };
