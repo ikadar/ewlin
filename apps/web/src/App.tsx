@@ -19,7 +19,7 @@ import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station
 import { validateAssignment } from '@flux/schedule-validator';
 
 const START_HOUR = 6;
-const DAY_COUNT = 21; // Number of days to display in grid and DateStrip
+const DAY_COUNT = 365; // REQ-09.1: Extended date range for DateStrip and grid
 
 // ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
@@ -481,6 +481,21 @@ function AppContent() {
 
     return days;
   }, [selectedJobId, snapshot.tasks, snapshot.assignments]);
+
+  // REQ-09.2: Focused date for DateStrip sync
+  const [focusedDate, setFocusedDate] = useState<Date | null>(null);
+
+  // REQ-09.2: Handle grid scroll to calculate focused date
+  const handleGridScroll = useCallback((scrollTop: number) => {
+    // Calculate focused date from scroll position
+    // The focused date is the one visible at the center of the viewport
+    const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
+    const centerY = scrollTop + viewportHeight / 2;
+    const hoursFromStart = centerY / pixelsPerHour;
+    const focusedTime = new Date(gridStartDate);
+    focusedTime.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
+    setFocusedDate(focusedTime);
+  }, [pixelsPerHour, gridStartDate]);
 
   // Get ordered job IDs for navigation (matching JobsList display order)
   // Problems first (late, then conflicts), then normal jobs
@@ -1085,10 +1100,10 @@ function AppContent() {
         />
         <DateStrip
           startDate={gridStartDate}
-          dayCount={DAY_COUNT}
           onDateClick={handleDateClick}
           departureDate={departureDate}
           scheduledDays={scheduledDays}
+          focusedDate={focusedDate}
         />
         <SchedulingGrid
           ref={gridRef}
@@ -1100,6 +1115,7 @@ function AppContent() {
           selectedJobId={selectedJobId}
           startHour={START_HOUR}
           hoursToDisplay={DAY_COUNT * 24}
+          onScroll={handleGridScroll}
           startDate={gridStartDate}
           onSelectJob={setSelectedJobId}
           onSwapUp={handleSwapUp}

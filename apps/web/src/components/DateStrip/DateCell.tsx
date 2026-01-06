@@ -3,6 +3,8 @@ export interface DateCellProps {
   date: Date;
   /** Whether this is today */
   isToday?: boolean;
+  /** Whether this is the focused day in the grid (REQ-09.2) */
+  isFocused?: boolean;
   /** Whether this is the departure date for the selected job (REQ-15) */
   isDepartureDate?: boolean;
   /** Whether the selected job has scheduled tasks on this day (REQ-16) */
@@ -33,6 +35,7 @@ function getFrenchDayAbbrev(date: Date): string {
 export function DateCell({
   date,
   isToday = false,
+  isFocused = false,
   isDepartureDate = false,
   hasScheduledTasks = false,
   onClick,
@@ -40,7 +43,8 @@ export function DateCell({
   const dayAbbrev = getFrenchDayAbbrev(date);
   const dayNumber = date.getDate().toString().padStart(2, '0');
 
-  // Determine styling based on state (priority: departure > today > normal)
+  // Determine styling based on state (priority: departure > focused > normal)
+  // REQ-09.3: Today is now indicated by a thin line, not background color
   let textColor = 'text-zinc-500';
   let bgColor = '';
   let borderColor = 'border-white/5';
@@ -52,12 +56,12 @@ export function DateCell({
     bgColor = 'bg-red-500/10';
     borderColor = 'border-red-500/30';
     dayNumberColor = 'text-red-300';
-  } else if (isToday) {
-    // Today styling (amber)
-    textColor = 'text-amber-200';
-    bgColor = 'bg-amber-500/15';
-    borderColor = 'border-amber-500/30';
-    dayNumberColor = 'text-amber-200';
+  } else if (isFocused) {
+    // REQ-09.3: Focused day styling (white/light highlight)
+    textColor = 'text-zinc-200';
+    bgColor = 'bg-white/10';
+    borderColor = 'border-white/20';
+    dayNumberColor = 'text-zinc-100';
   }
 
   return (
@@ -67,8 +71,15 @@ export function DateCell({
       onClick={onClick}
       data-testid={`date-cell-${date.toISOString().split('T')[0]}`}
     >
-      <span className="text-[10px]">{dayAbbrev}</span>
-      <span className={`font-medium ${dayNumberColor}`}>{dayNumber}</span>
+      {/* REQ-09.3: Today indicator - thin red line (like grid's "now" line) */}
+      {isToday && (
+        <div
+          className="absolute left-1 right-1 top-1/2 h-0.5 bg-red-500 -translate-y-1/2 pointer-events-none"
+          data-testid="today-indicator-line"
+        />
+      )}
+      <span className="text-[10px] relative z-10">{dayAbbrev}</span>
+      <span className={`font-medium ${dayNumberColor} relative z-10`}>{dayNumber}</span>
       {/* REQ-16: Scheduled tasks indicator dot */}
       {hasScheduledTasks && (
         <span

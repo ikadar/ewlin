@@ -112,6 +112,8 @@ export interface SchedulingGridProps {
   groups?: StationGroup[];
   /** Outsourced providers for provider columns (REQ-19) */
   providers?: OutsourcedProvider[];
+  /** REQ-09.2: Callback when grid scrolls (for DateStrip sync) */
+  onScroll?: (scrollTop: number) => void;
 }
 
 /**
@@ -152,6 +154,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       conflicts = [],
       groups = [],
       providers = [],
+      onScroll,
     },
     ref
   ) {
@@ -189,6 +192,22 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // REQ-09.2: Notify parent of scroll position for DateStrip sync
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !onScroll) return;
+
+    const handleScroll = () => {
+      onScroll(container.scrollTop);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    // Report initial scroll position
+    handleScroll();
+
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [onScroll]);
 
   // Calculate total height
   const totalHeight = hoursToDisplay * pixelsPerHour;

@@ -103,6 +103,8 @@ ELŐTTE:                          UTÁNA:
 
 ### REQ-09: DateStrip Átdolgozás
 
+> ✅ Implemented in v0.3.44
+
 #### 9.1 - Infinite DateStrip
 - A DateStrip legyen végtelen görgetésű (infinite scroll)
 - Ne legyen fix `dayCount` limit
