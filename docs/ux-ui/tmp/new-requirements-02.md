@@ -131,6 +131,8 @@ ELŐTTE:                          UTÁNA:
 
 ### REQ-10: Precedence Constraint Vizualizáció
 
+> ✅ Implemented in v0.3.45
+
 Drag közben vizuálisan megjelennek a task precedence constraint-jei két vízszintes vonalként.
 
 #### Mikor jelenik meg?

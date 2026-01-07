@@ -4,6 +4,7 @@ import type { Station, DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import { PlacementIndicator } from '../PlacementIndicator';
+import { PrecedenceLines } from '../PrecedenceLines';
 import { useDragStateValue, type TaskDragData, type StationDropData } from '../../dnd';
 
 export interface StationColumnProps {
@@ -43,6 +44,8 @@ export interface StationColumnProps {
   onQuickPlacementMouseLeave?: () => void;
   /** Callback when user clicks to place a task */
   onQuickPlacementClick?: (stationId: string, y: number) => void;
+  /** REQ-10: Precedence constraint Y positions for visualization */
+  precedenceConstraints?: { earliestY: number | null; latestY: number | null };
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -86,6 +89,7 @@ export function StationColumn({
   onQuickPlacementMouseMove,
   onQuickPlacementMouseLeave,
   onQuickPlacementClick,
+  precedenceConstraints,
 }: StationColumnProps) {
   // Ref for the drop target element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -268,6 +272,15 @@ export function StationColumn({
       {/* Quick Placement Indicator */}
       {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && (
         <PlacementIndicator y={placementIndicatorY} isVisible={true} />
+      )}
+
+      {/* REQ-10: Precedence Constraint Lines (during drag or quick placement) */}
+      {precedenceConstraints && (
+        <PrecedenceLines
+          earliestY={precedenceConstraints.earliestY}
+          latestY={precedenceConstraints.latestY}
+          isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask)}
+        />
       )}
 
       {/* Tiles (children) */}

@@ -100,6 +100,15 @@ export interface SchedulingGridProps {
   onQuickPlacementMouseLeave?: () => void;
   /** Callback when user clicks to place a task in quick placement mode */
   onQuickPlacementClick?: (stationId: string, y: number) => void;
+  /** Quick placement validation result (for green/red border) */
+  quickPlacementValidation?: {
+    isValid: boolean;
+    hasPrecedenceConflict: boolean;
+    suggestedStart: string | null;
+    hasWarningOnly: boolean;
+  };
+  /** Quick placement precedence constraint Y positions */
+  quickPlacementPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** Station ID currently being compacted (for loading state) */
   compactingStationId?: string | null;
   /** Callback when compact button is clicked */
@@ -114,6 +123,8 @@ export interface SchedulingGridProps {
   providers?: OutsourcedProvider[];
   /** REQ-09.2: Callback when grid scrolls (for DateStrip sync) */
   onScroll?: (scrollTop: number) => void;
+  /** REQ-10: Precedence constraint Y positions for visualization */
+  precedenceConstraints?: { earliestY: number | null; latestY: number | null };
 }
 
 /**
@@ -148,6 +159,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onQuickPlacementMouseMove,
       onQuickPlacementMouseLeave,
       onQuickPlacementClick,
+      quickPlacementValidation,
+      quickPlacementPrecedenceConstraints,
       compactingStationId,
       onCompact,
       isRescheduleDrag = false,
@@ -155,6 +168,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       groups = [],
       providers = [],
       onScroll,
+      precedenceConstraints,
     },
     ref
   ) {
@@ -450,6 +464,25 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isHoveredForQuickPlacement = quickPlacementHoverStationId === station.id;
               const hasAvailableTaskForQuickPlacement = stationsWithAvailableTasks.has(station.id);
 
+              // Quick placement validation (similar to drag validation)
+              const isQuickPlacementValid = isHoveredForQuickPlacement &&
+                hasAvailableTaskForQuickPlacement &&
+                quickPlacementValidation?.isValid;
+              const isQuickPlacementInvalid = isHoveredForQuickPlacement &&
+                hasAvailableTaskForQuickPlacement &&
+                !quickPlacementValidation?.isValid;
+
+              // Combine drag and quick placement validation for border display
+              const effectiveIsValidDrop = isValidDrop || isQuickPlacementValid;
+              const effectiveIsInvalidDrop = isInvalidDrop || isQuickPlacementInvalid;
+
+              // Precedence constraints: show for drag or quick placement
+              const effectivePrecedenceConstraints = isValidationTarget
+                ? precedenceConstraints
+                : (isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement
+                    ? quickPlacementPrecedenceConstraints
+                    : undefined);
+
               return (
                 <StationColumn
                   key={station.id}
@@ -459,9 +492,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   pixelsPerHour={pixelsPerHour}
                   gridStartDate={startDate}
                   isCollapsed={isCollapsed}
-                  isValidDrop={isValidDrop}
+                  isValidDrop={effectiveIsValidDrop}
                   isWarningDrop={isWarningDrop}
-                  isInvalidDrop={isInvalidDrop}
+                  isInvalidDrop={effectiveIsInvalidDrop}
                   showBypassWarning={showBypassWarning}
                   isQuickPlacementMode={isQuickPlacementMode}
                   hasAvailableTask={hasAvailableTaskForQuickPlacement}
@@ -469,6 +502,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onQuickPlacementMouseMove={onQuickPlacementMouseMove}
                   onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
                   onQuickPlacementClick={onQuickPlacementClick}
+                  precedenceConstraints={effectivePrecedenceConstraints}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);

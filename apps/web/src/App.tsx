@@ -5,7 +5,7 @@ import type { SchedulingGridHandle } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint } from './utils';
 import type { CompactHorizon } from './utils';
 import {
   DragStateProvider,
@@ -19,7 +19,7 @@ import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station
 import { validateAssignment } from '@flux/schedule-validator';
 
 const START_HOUR = 6;
-const DAY_COUNT = 365; // REQ-09.1: Extended date range for DateStrip and grid
+const DAY_COUNT = 31; // Reduced from 365 for performance - infinite scroll TBD
 
 // ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
@@ -419,6 +419,23 @@ function AppContent() {
     bypassPrecedence: isAltPressed,
   });
 
+  // DEBUG: Log validation state during drag
+  useEffect(() => {
+    if (activeTask && dragValidation.targetStationId) {
+      console.log('[Validation Debug]', {
+        targetStationId: dragValidation.targetStationId,
+        scheduledStart: dragValidation.scheduledStart,
+        isValid: validation.isValid,
+        hasPrecedenceConflict: validation.hasPrecedenceConflict,
+        hasWarningOnly: validation.hasWarningOnly,
+        hasGroupCapacityConflict: validation.hasGroupCapacityConflict,
+        suggestedStart: validation.suggestedStart,
+        conflicts: validation.conflicts.map(c => ({ type: c.type, message: c.message, details: c.details })),
+        isAltPressed,
+      });
+    }
+  }, [activeTask, dragValidation.targetStationId, dragValidation.scheduledStart, validation, isAltPressed]);
+
   // Create lookup maps
   const jobMap = useMemo(() => {
     const map = new Map<string, Job>();
@@ -436,6 +453,16 @@ function AppContent() {
     today.setHours(START_HOUR, 0, 0, 0);
     return today;
   }, []);
+
+  // REQ-10: Calculate precedence constraint Y positions during drag
+  const precedenceConstraints = useMemo(() => {
+    if (!activeTask) {
+      return { earliestY: null, latestY: null };
+    }
+    const earliestY = getPredecessorConstraint(activeTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    const latestY = getSuccessorConstraint(activeTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    return { earliestY, latestY };
+  }, [activeTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // REQ-14: Auto-scroll to today on initial load
   const hasScrolledToToday = useRef(false);
@@ -484,17 +511,36 @@ function AppContent() {
 
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(null);
+  const scrollTimeoutRef = useRef<number | null>(null);
+
+  // Ref to track drag state without causing callback recreation
+  const isDraggingRef = useRef(false);
+  isDraggingRef.current = activeTask !== null;
 
   // REQ-09.2: Handle grid scroll to calculate focused date
+  // CRITICAL: Skip updates during drag to prevent performance degradation
   const handleGridScroll = useCallback((scrollTop: number) => {
-    // Calculate focused date from scroll position
-    // The focused date is the one visible at the center of the viewport
-    const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
-    const centerY = scrollTop + viewportHeight / 2;
-    const hoursFromStart = centerY / pixelsPerHour;
-    const focusedTime = new Date(gridStartDate);
-    focusedTime.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
-    setFocusedDate(focusedTime);
+    // Skip focusedDate updates during drag operations - this is the primary performance fix
+    // Use ref to avoid adding activeTask to dependencies (which would cause callback recreation)
+    if (isDraggingRef.current) {
+      return;
+    }
+
+    // Debounce: cancel previous timeout and set new one
+    if (scrollTimeoutRef.current !== null) {
+      cancelAnimationFrame(scrollTimeoutRef.current);
+    }
+
+    scrollTimeoutRef.current = requestAnimationFrame(() => {
+      // Calculate focused date from scroll position
+      // The focused date is the one visible at the center of the viewport
+      const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
+      const centerY = scrollTop + viewportHeight / 2;
+      const hoursFromStart = centerY / pixelsPerHour;
+      const focusedTime = new Date(gridStartDate);
+      focusedTime.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
+      setFocusedDate(focusedTime);
+    });
   }, [pixelsPerHour, gridStartDate]);
 
   // Get ordered job IDs for navigation (matching JobsList display order)
@@ -661,9 +707,13 @@ function AppContent() {
         const isRescheduleOp = !!dragData.assignmentId;
 
         // Check for blocking conflicts
+        // Predecessor conflicts with suggestedStart can be auto-resolved by snapping
+        // Successor conflicts are always blocking (no valid position exists)
         const blockingConflicts = currentValidation.conflicts.filter(
           (c) => c.type !== 'StationConflict' &&
-                 !(c.type === 'PrecedenceConflict' && currentValidation.suggestedStart) &&
+                 !(c.type === 'PrecedenceConflict' &&
+                   c.details?.constraintType === 'predecessor' &&
+                   currentValidation.suggestedStart) &&
                  !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
         );
 
@@ -888,9 +938,17 @@ function AppContent() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
-  // Quick Placement: get available task for hovered station (for actual placement)
-  // Note: Currently unused but may be needed for future tooltip/preview features
-  const _quickPlacementTask = useMemo(() => {
+  // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
+  // In backward scheduling, we always show the last task as the one to place
+  const lastUnscheduledTask = useMemo(() => {
+    if (!isQuickPlacementMode || !selectedJob) {
+      return null;
+    }
+    return getLastUnscheduledTask(selectedJob, snapshot.tasks, snapshot.assignments);
+  }, [isQuickPlacementMode, selectedJob, snapshot.tasks, snapshot.assignments]);
+
+  // Quick Placement: get the task for the hovered station (for validation)
+  const quickPlacementTask = useMemo(() => {
     if (!isQuickPlacementMode || !selectedJob || !quickPlacementHover.stationId) {
       return null;
     }
@@ -902,14 +960,33 @@ function AppContent() {
     );
   }, [isQuickPlacementMode, selectedJob, quickPlacementHover.stationId, snapshot.tasks, snapshot.assignments]);
 
-  // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
-  // In backward scheduling, we always show the last task as the one to place
-  const lastUnscheduledTask = useMemo(() => {
-    if (!isQuickPlacementMode || !selectedJob) {
+  // Quick Placement: calculate scheduled start from Y position
+  const quickPlacementScheduledStart = useMemo(() => {
+    if (!quickPlacementHover.stationId || quickPlacementHover.snappedY === 0) {
       return null;
     }
-    return getLastUnscheduledTask(selectedJob, snapshot.tasks, snapshot.assignments);
-  }, [isQuickPlacementMode, selectedJob, snapshot.tasks, snapshot.assignments]);
+    const dropTime = yPositionToTime(quickPlacementHover.snappedY, START_HOUR, gridStartDate);
+    return dropTime.toISOString();
+  }, [quickPlacementHover.stationId, quickPlacementHover.snappedY, gridStartDate]);
+
+  // Quick Placement: validation using the same logic as drag
+  const quickPlacementValidation = useDropValidation({
+    snapshot,
+    task: quickPlacementTask,
+    targetStationId: quickPlacementHover.stationId,
+    scheduledStart: quickPlacementScheduledStart,
+    bypassPrecedence: false, // No bypass in quick placement mode
+  });
+
+  // Quick Placement: precedence constraint Y positions
+  const quickPlacementPrecedenceConstraints = useMemo(() => {
+    if (!quickPlacementTask) {
+      return { earliestY: null, latestY: null };
+    }
+    const earliestY = getPredecessorConstraint(quickPlacementTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    const latestY = getSuccessorConstraint(quickPlacementTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    return { earliestY, latestY };
+  }, [quickPlacementTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // Quick Placement: handle mouse move in station column
   const handleQuickPlacementMouseMove = useCallback((stationId: string, y: number) => {
@@ -945,6 +1022,30 @@ function AppContent() {
     const scheduledStart = dropTime.toISOString();
     const station = snapshot.stations.find((s) => s.id === stationId);
     const scheduledEnd = calculateEndTime(taskToPlace, scheduledStart, station);
+
+    // Validate placement before creating assignment
+    const proposedAssignment: ProposedAssignment = {
+      taskId: taskToPlace.id,
+      targetId: stationId,
+      isOutsourced: false,
+      scheduledStart,
+      bypassPrecedence: false,
+    };
+    const validationResult = validateAssignment(proposedAssignment, snapshot);
+
+    // Check for blocking conflicts (same logic as drag & drop)
+    const blockingConflicts = validationResult.conflicts.filter(
+      (c) => c.type !== 'StationConflict' &&
+             !(c.type === 'PrecedenceConflict' &&
+               c.details?.constraintType === 'predecessor' &&
+               validationResult.suggestedStart) &&
+             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+    );
+
+    if (blockingConflicts.length > 0) {
+      console.log('Quick placement blocked: validation failed', blockingConflicts);
+      return;
+    }
 
     // Create the assignment
     const newAssignment: TaskAssignment = {
@@ -1145,6 +1246,8 @@ function AppContent() {
           onQuickPlacementMouseMove={handleQuickPlacementMouseMove}
           onQuickPlacementMouseLeave={handleQuickPlacementMouseLeave}
           onQuickPlacementClick={handleQuickPlacementClick}
+          quickPlacementValidation={quickPlacementValidation}
+          quickPlacementPrecedenceConstraints={quickPlacementPrecedenceConstraints}
           compactingStationId={compactingStationId}
           onCompact={handleCompact}
           isRescheduleDrag={isRescheduleDrag}
@@ -1152,6 +1255,7 @@ function AppContent() {
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
           providers={snapshot.providers}
+          precedenceConstraints={precedenceConstraints}
         />
           </div>
         </div>

@@ -171,6 +171,89 @@ Problematic jobs appear at the **top** of the Jobs List in a dedicated section:
 
 ---
 
+## Precedence Constraint Lines (During Drag)
+
+> Implemented from REQ-10
+
+**When:** User drags a task that has precedence relationships (predecessor and/or successor tasks).
+
+**Purpose:** Show the valid placement range before dropping a task.
+
+### Line Types
+
+| Line | Color | Meaning | Calculation |
+|------|-------|---------|-------------|
+| **Purple line** | `#A855F7` (purple-500) | Earliest possible start | `predecessor.scheduledEnd` + 4h dry time (if predecessor is printing task) |
+| **Orange line** | `#F97316` (orange-500) | Latest possible start | `successor.scheduledStart` - current task duration - dry time (if current is printing task) |
+
+### Visibility Rules
+
+| Condition | Purple Line | Orange Line |
+|-----------|-------------|-------------|
+| Predecessor scheduled | ✅ Visible | — |
+| Predecessor not scheduled | ❌ Hidden | — |
+| Successor scheduled | — | ✅ Visible |
+| Successor not scheduled | — | ❌ Hidden |
+| Not dragging | ❌ Hidden | ❌ Hidden |
+| Dragging but not over column | ❌ Hidden | ❌ Hidden |
+| **Quick Placement Mode** | ✅ Visible (when hovering) | ✅ Visible (when hovering) |
+
+### Visual Appearance
+
+```
+Station Column (during drag)
+┌─────────────────────────────────────┐
+│                                     │
+│ ═══════════════════════════════════ │  ← Purple line (glow effect)
+│         EARLIEST POSSIBLE           │
+│                                     │
+│         [Valid drop zone]           │
+│                                     │
+│          LATEST POSSIBLE            │
+│ ═══════════════════════════════════ │  ← Orange line (glow effect)
+│                                     │
+└─────────────────────────────────────┘
+```
+
+### Styling
+
+Based on `PlacementIndicator` component:
+
+```tsx
+// Purple line (earliest)
+<div
+  className="absolute left-0 right-0 h-1 bg-purple-500 z-30 pointer-events-none"
+  style={{
+    top: `${earliestY}px`,
+    boxShadow: '0 0 12px rgba(168, 85, 247, 0.8)',
+  }}
+/>
+
+// Orange line (latest)
+<div
+  className="absolute left-0 right-0 h-1 bg-orange-500 z-30 pointer-events-none"
+  style={{
+    top: `${latestY}px`,
+    boxShadow: '0 0 12px rgba(249, 115, 22, 0.8)',
+  }}
+/>
+```
+
+### Drop Validation
+
+- **Above purple line:** Drop snaps to purple line (auto-correct to earliest valid)
+- **Between lines:** Valid drop zone (green border)
+- **Below orange line:** Drop blocked (red border, successor constraint violation)
+- **No valid zone (orange above purple):** Drop blocked entirely
+
+### Dry Time Integration
+
+Printing tasks (offset press category) add 4-hour dry time:
+- Purple line: predecessor end + 4h (if predecessor is printing)
+- Orange line: successor start - task duration - 4h (if current task is printing)
+
+---
+
 ## Related Documents
 
 - [Business Rules](../../domain-model/business-rules.md) — Validation rules

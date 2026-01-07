@@ -35,3 +35,4 @@ export {
   getSubcolumnLayout,
 } from './subcolumnLayout';
 export type { SubcolumnLayout } from './subcolumnLayout';
+export { getPredecessorConstraint, getSuccessorConstraint } from './precedenceConstraints';
