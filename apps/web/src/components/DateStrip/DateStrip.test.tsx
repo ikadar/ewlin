@@ -125,12 +125,19 @@ describe('DateStrip', () => {
     expect(clickedDate.getMonth()).toBe(11); // December
   });
 
-  it('uses default dayCount of 365 (REQ-09.1: extended range)', () => {
+  it('uses default dayCount of 365 with virtual scrolling (REQ-09.1: extended range, v0.3.46)', () => {
     const startDate = new Date(2024, 11, 9);
-    render(<DateStrip startDate={startDate} />);
+    const { container } = render(<DateStrip startDate={startDate} />);
 
+    // v0.3.46: Virtual scrolling - only visible cells are rendered
+    // Total virtual height should be 365 days * 40px = 14600px
+    const virtualContainer = container.querySelector('[class*="relative"]');
+    expect(virtualContainer).toHaveStyle({ height: '14600px' });
+
+    // Only a subset of buttons should be rendered (bufferDays=10 means ~21 visible cells)
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(365);
+    expect(buttons.length).toBeLessThan(50); // Much less than 365
+    expect(buttons.length).toBeGreaterThan(10); // But still a reasonable amount
   });
 
   it('has correct container styling', () => {

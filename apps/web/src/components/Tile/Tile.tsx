@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, memo } from 'react';
 import { Circle, CircleCheck } from 'lucide-react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
@@ -63,8 +63,9 @@ function minutesToPixels(minutes: number, pixelsPerHour: number = PIXELS_PER_HOU
  * Tile - Visual representation of a scheduled task assignment.
  * Shows job color, setup/run sections, completion status, and swap buttons.
  * Draggable within its station column for repositioning.
+ * v0.3.46: Memoized to prevent unnecessary re-renders during drag.
  */
-export function Tile({
+export const Tile = memo(function Tile({
   assignment,
   task,
   job,
@@ -366,4 +367,38 @@ export function Tile({
       />
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // v0.3.46: Custom comparison to prevent unnecessary re-renders
+  // For selectedJobId/activeJobId, compare the computed mute state, not raw values
+  const prevMutedBySelection = prevProps.selectedJobId !== undefined && prevProps.selectedJobId !== prevProps.job.id;
+  const nextMutedBySelection = nextProps.selectedJobId !== undefined && nextProps.selectedJobId !== nextProps.job.id;
+  const prevMutedByDrag = prevProps.activeJobId !== undefined && prevProps.activeJobId !== prevProps.job.id;
+  const nextMutedByDrag = nextProps.activeJobId !== undefined && nextProps.activeJobId !== nextProps.job.id;
+
+  // Check if mute state changed
+  if (prevMutedBySelection !== nextMutedBySelection) return false;
+  if (prevMutedByDrag !== nextMutedByDrag) return false;
+
+  // Compare other props normally (shallow comparison)
+  if (prevProps.assignment !== nextProps.assignment) return false;
+  if (prevProps.task !== nextProps.task) return false;
+  if (prevProps.job !== nextProps.job) return false;
+  if (prevProps.top !== nextProps.top) return false;
+  if (prevProps.isSelected !== nextProps.isSelected) return false;
+  if (prevProps.showSwapUp !== nextProps.showSwapUp) return false;
+  if (prevProps.showSwapDown !== nextProps.showSwapDown) return false;
+  if (prevProps.hasConflict !== nextProps.hasConflict) return false;
+  if (prevProps.pixelsPerHour !== nextProps.pixelsPerHour) return false;
+  if (prevProps.isOutsourced !== nextProps.isOutsourced) return false;
+  if (prevProps.similarityResults !== nextProps.similarityResults) return false;
+  if (prevProps.subcolumnLayout !== nextProps.subcolumnLayout) return false;
+
+  // Callbacks - compare by reference
+  if (prevProps.onSelect !== nextProps.onSelect) return false;
+  if (prevProps.onRecall !== nextProps.onRecall) return false;
+  if (prevProps.onSwapUp !== nextProps.onSwapUp) return false;
+  if (prevProps.onSwapDown !== nextProps.onSwapDown) return false;
+  if (prevProps.onToggleComplete !== nextProps.onToggleComplete) return false;
+
+  return true; // Props are equal, skip re-render
+});

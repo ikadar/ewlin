@@ -863,6 +863,20 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Quick Placement Mode: lines and validation while hovering
 - [x] E2E tests for precedence visualization
 
+#### v0.3.46 - Virtual Scrolling for Multi-Day Grid 🔴
+> **Fixes:** Performance regression from v0.3.44 (DateStrip Redesign)
+> **Completes:** REQ-09.1 (Infinite scroll) properly
+> **Target:** 2026-01-08
+
+- [ ] `useVirtualScroll` hook: calculate visible day range from scroll position
+- [ ] Virtual scroll container: full height maintained, content rendered with transform
+- [ ] Grid windowing: only render ±3 days around focused day (7 days DOM vs 365)
+- [ ] DateStrip windowing: only render visible date cells
+- [ ] Station column day-slice rendering
+- [ ] Scroll synchronization preserved between Grid and DateStrip
+- [ ] Performance targets: DOM <1500 elements, drag 60 FPS
+- [ ] E2E tests for virtual scroll behavior
+
 ### Phase 3I: Backend API Integration
 
 #### v0.3.51 - Validator Package Integration

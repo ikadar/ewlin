@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Task, TaskAssignment } from '@flux/types';
 import { AlertCircle, Shuffle } from 'lucide-react';
 import { ProgressSegments } from './ProgressSegments';
@@ -30,8 +31,9 @@ export interface JobCardProps {
 /**
  * Individual job card with reference, client, description, and progress segments.
  * Supports normal, late, conflict, and selected states.
+ * v0.3.46: Memoized to prevent unnecessary re-renders during selection changes.
  */
-export function JobCard({
+export const JobCard = memo(function JobCard({
   id,
   reference,
   client,
@@ -109,4 +111,4 @@ export function JobCard({
       </div>
     </button>
   );
-}
+});

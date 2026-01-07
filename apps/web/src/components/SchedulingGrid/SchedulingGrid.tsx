@@ -10,6 +10,7 @@ import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef }
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { calculateSubcolumnLayout, getSubcolumnLayout } from '../../utils/subcolumnLayout';
+import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -125,6 +126,10 @@ export interface SchedulingGridProps {
   onScroll?: (scrollTop: number) => void;
   /** REQ-10: Precedence constraint Y positions for visualization */
   precedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** v0.3.46: Total number of days for virtual scrolling (default: 365) */
+  totalDays?: number;
+  /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
+  bufferDays?: number;
 }
 
 /**
@@ -169,11 +174,29 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       providers = [],
       onScroll,
       precedenceConstraints,
+      totalDays = 365,
+      bufferDays = 3,
     },
     ref
   ) {
     const [now, setNow] = useState(() => new Date());
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // v0.3.46: Track scroll position and viewport for virtual scrolling
+    const [scrollTop, setScrollTop] = useState(0);
+    const [viewportHeight, setViewportHeight] = useState(600);
+
+    // v0.3.46: Calculate day height from pixels per hour
+    const dayHeightPx = 24 * pixelsPerHour;
+
+    // v0.3.46: Virtual scroll calculation
+    const virtualScroll = useVirtualScroll({
+      totalDays,
+      bufferDays,
+      dayHeightPx,
+      scrollTop,
+      viewportHeight,
+    });
 
     // Expose scroll methods via ref
     useImperativeHandle(ref, () => ({
@@ -207,24 +230,39 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return () => clearInterval(interval);
   }, []);
 
-  // REQ-09.2: Notify parent of scroll position for DateStrip sync
+  // v0.3.46: Track scroll position and viewport size for virtual scrolling
+  // Also REQ-09.2: Notify parent of scroll position for DateStrip sync
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || !onScroll) return;
+    if (!container) return;
+
+    // Update viewport height
+    setViewportHeight(container.clientHeight);
 
     const handleScroll = () => {
-      onScroll(container.scrollTop);
+      const newScrollTop = container.scrollTop;
+      setScrollTop(newScrollTop);
+      onScroll?.(newScrollTop);
+    };
+
+    const handleResize = () => {
+      setViewportHeight(container.clientHeight);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize);
+
     // Report initial scroll position
     handleScroll();
 
-    return () => container.removeEventListener('scroll', handleScroll);
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [onScroll]);
 
-  // Calculate total height
-  const totalHeight = hoursToDisplay * pixelsPerHour;
+  // v0.3.46: Use virtual scroll total height for proper scrollbar sizing
+  const totalHeight = virtualScroll.totalHeight;
 
   // Calculate now line position (multi-day aware)
   const nowPosition = timeToYPosition(now, startHour, pixelsPerHour, startDate);
@@ -270,14 +308,27 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return taskIds;
   }, [conflicts]);
 
-  // Group assignments by station (internal assignments only, not outsourced)
+  // v0.3.46: Group assignments by station, filtering to only visible ones
   const assignmentsByStation = useMemo(() => {
     const grouped = new Map<string, TaskAssignment[]>();
     stations.forEach((station) => grouped.set(station.id, []));
 
+    // Calculate grid start date for visibility check
+    const gridStart = startDate || new Date();
+
     assignments.forEach((assignment) => {
       // Skip outsourced assignments - they go to providers, not stations
       if (assignment.isOutsourced) return;
+
+      // v0.3.46: Skip assignments outside visible range
+      if (!isAssignmentVisible(
+        assignment.scheduledStart,
+        assignment.scheduledEnd,
+        gridStart,
+        virtualScroll.visibleRange
+      )) {
+        return;
+      }
 
       const stationAssignments = grouped.get(assignment.targetId);
       if (stationAssignments) {
@@ -293,16 +344,29 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     });
 
     return grouped;
-  }, [assignments, stations]);
+  }, [assignments, stations, startDate, virtualScroll.visibleRange]);
 
-  // REQ-19: Group outsourced assignments by provider
+  // REQ-19: Group outsourced assignments by provider, v0.3.46: filtered to visible range
   const assignmentsByProvider = useMemo(() => {
     const grouped = new Map<string, TaskAssignment[]>();
     providers.forEach((provider) => grouped.set(provider.id, []));
 
+    // Calculate grid start date for visibility check
+    const gridStart = startDate || new Date();
+
     assignments.forEach((assignment) => {
       // Only include outsourced assignments
       if (!assignment.isOutsourced) return;
+
+      // v0.3.46: Skip assignments outside visible range
+      if (!isAssignmentVisible(
+        assignment.scheduledStart,
+        assignment.scheduledEnd,
+        gridStart,
+        virtualScroll.visibleRange
+      )) {
+        return;
+      }
 
       const providerAssignments = grouped.get(assignment.targetId);
       if (providerAssignments) {
@@ -318,7 +382,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     });
 
     return grouped;
-  }, [assignments, providers]);
+  }, [assignments, providers, startDate, virtualScroll.visibleRange]);
 
   // REQ-19: Calculate subcolumn layouts for each provider
   const providerSubcolumnLayouts = useMemo(() => {
@@ -411,6 +475,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               currentTime={now}
               showNowLine={false}
               pixelsPerHour={pixelsPerHour}
+              visibleDayRange={virtualScroll.visibleRange}
             />
           </div>
 
@@ -503,6 +568,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
                   onQuickPlacementClick={onQuickPlacementClick}
                   precedenceConstraints={effectivePrecedenceConstraints}
+                  visibleDayRange={virtualScroll.visibleRange}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);

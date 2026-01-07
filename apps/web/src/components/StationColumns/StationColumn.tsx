@@ -1,4 +1,4 @@
-import { type ReactNode, type MouseEvent, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type MouseEvent, useEffect, useRef, useState, useMemo, memo } from 'react';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { Station, DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
@@ -46,6 +46,8 @@ export interface StationColumnProps {
   onQuickPlacementClick?: (stationId: string, y: number) => void;
   /** REQ-10: Precedence constraint Y positions for visualization */
   precedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** v0.3.46: Visible day range for virtual scrolling (only render overlays/lines for these days) */
+  visibleDayRange?: { start: number; end: number };
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -69,8 +71,9 @@ function getDaySchedule(station: Station, dayOfWeek: number): DaySchedule {
 /**
  * StationColumn - Individual station column with grid lines and unavailability overlay.
  * Acts as a drop target for task tiles.
+ * v0.3.46: Memoized to prevent unnecessary re-renders during drag.
  */
-export function StationColumn({
+export const StationColumn = memo(function StationColumn({
   station,
   startHour = 6,
   hoursToDisplay = 24,
@@ -90,6 +93,7 @@ export function StationColumn({
   onQuickPlacementMouseLeave,
   onQuickPlacementClick,
   precedenceConstraints,
+  visibleDayRange,
 }: StationColumnProps) {
   // Ref for the drop target element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -146,11 +150,24 @@ export function StationColumn({
   // Calculate total height
   const totalHeight = hoursToDisplay * pixelsPerHour;
 
-  // Generate hour grid lines
-  const gridLines: number[] = [];
-  for (let i = 0; i <= hoursToDisplay; i++) {
-    gridLines.push(i * pixelsPerHour);
-  }
+  // v0.3.46: Generate hour grid lines only for visible day range (memoized for performance)
+  const gridLines = useMemo(() => {
+    const lines: number[] = [];
+    if (visibleDayRange) {
+      // Virtual scroll mode: only render grid lines for visible days
+      const startHourIndex = visibleDayRange.start * 24;
+      const endHourIndex = (visibleDayRange.end + 1) * 24;
+      for (let i = startHourIndex; i <= endHourIndex; i++) {
+        lines.push(i * pixelsPerHour);
+      }
+    } else {
+      // Legacy mode: render all grid lines
+      for (let i = 0; i <= hoursToDisplay; i++) {
+        lines.push(i * pixelsPerHour);
+      }
+    }
+    return lines;
+  }, [visibleDayRange, pixelsPerHour, hoursToDisplay]);
 
   // Determine highlight style based on drag state and validation
   const getHighlightClass = () => {
@@ -228,27 +245,36 @@ export function StationColumn({
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
     >
-      {/* Unavailability overlay - REQ-04: Multi-day support */}
+      {/* Unavailability overlay - REQ-04: Multi-day support, v0.3.46: virtual scroll optimization */}
       {isMultiDayGrid ? (
-        // Multi-day mode: render overlay for each day
-        Array.from({ length: numberOfDays }).map((_, dayIndex) => {
-          // Calculate the date for this day
-          const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
-          const dayOfWeekForDay = currentDate.getDay();
-          const dayScheduleForDay = getDaySchedule(station, dayOfWeekForDay);
-          const dayYOffset = dayIndex * 24 * pixelsPerHour;
+        // Multi-day mode: render overlay for each visible day only
+        (() => {
+          // v0.3.46: Only render overlays for visible days
+          const startDay = visibleDayRange?.start ?? 0;
+          const endDay = visibleDayRange?.end ?? (numberOfDays - 1);
+          const visibleDays = [];
 
-          return (
-            <UnavailabilityOverlay
-              key={`overlay-day-${dayIndex}`}
-              daySchedule={dayScheduleForDay}
-              startHour={startHour} // Use same startHour as grid (e.g., 6 for 06:00)
-              hoursToDisplay={24} // Each overlay covers 24 hours from startHour
-              pixelsPerHour={pixelsPerHour}
-              yOffset={dayYOffset}
-            />
-          );
-        })
+          for (let dayIndex = startDay; dayIndex <= endDay && dayIndex < numberOfDays; dayIndex++) {
+            // Calculate the date for this day
+            const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
+            const dayOfWeekForDay = currentDate.getDay();
+            const dayScheduleForDay = getDaySchedule(station, dayOfWeekForDay);
+            const dayYOffset = dayIndex * 24 * pixelsPerHour;
+
+            visibleDays.push(
+              <UnavailabilityOverlay
+                key={`overlay-day-${dayIndex}`}
+                daySchedule={dayScheduleForDay}
+                startHour={startHour}
+                hoursToDisplay={24}
+                pixelsPerHour={pixelsPerHour}
+                yOffset={dayYOffset}
+              />
+            );
+          }
+
+          return visibleDays;
+        })()
       ) : (
         // Single-day mode: original behavior
         <UnavailabilityOverlay
@@ -287,4 +313,4 @@ export function StationColumn({
       {children}
     </div>
   );
-}
+});

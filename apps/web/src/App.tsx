@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, useTransition, useDeferredValue } from 'react';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR } from './components';
 import type { SchedulingGridHandle } from './components';
@@ -19,7 +19,8 @@ import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station
 import { validateAssignment } from '@flux/schedule-validator';
 
 const START_HOUR = 6;
-const DAY_COUNT = 31; // Reduced from 365 for performance - infinite scroll TBD
+// v0.3.46: Restored to 365 days with virtual scrolling for performance
+const DAY_COUNT = 365;
 
 // ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
@@ -369,6 +370,8 @@ function AppContent() {
   const snapshot = useMemo(() => getSnapshot(), [snapshotVersion]);
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  // v0.3.46: Use deferred value for grid to keep sidebar responsive during selection
+  const deferredSelectedJobId = useDeferredValue(selectedJobId);
 
   // Get drag state from context (replaces local activeTask/activeJob state)
   const { state: dragState } = useDragState();
@@ -419,22 +422,23 @@ function AppContent() {
     bypassPrecedence: isAltPressed,
   });
 
-  // DEBUG: Log validation state during drag
-  useEffect(() => {
-    if (activeTask && dragValidation.targetStationId) {
-      console.log('[Validation Debug]', {
-        targetStationId: dragValidation.targetStationId,
-        scheduledStart: dragValidation.scheduledStart,
-        isValid: validation.isValid,
-        hasPrecedenceConflict: validation.hasPrecedenceConflict,
-        hasWarningOnly: validation.hasWarningOnly,
-        hasGroupCapacityConflict: validation.hasGroupCapacityConflict,
-        suggestedStart: validation.suggestedStart,
-        conflicts: validation.conflicts.map(c => ({ type: c.type, message: c.message, details: c.details })),
-        isAltPressed,
-      });
-    }
-  }, [activeTask, dragValidation.targetStationId, dragValidation.scheduledStart, validation, isAltPressed]);
+  // DEBUG: Log validation state during drag (disabled for performance - v0.3.46)
+  // Uncomment for debugging validation issues:
+  // useEffect(() => {
+  //   if (activeTask && dragValidation.targetStationId) {
+  //     console.log('[Validation Debug]', {
+  //       targetStationId: dragValidation.targetStationId,
+  //       scheduledStart: dragValidation.scheduledStart,
+  //       isValid: validation.isValid,
+  //       hasPrecedenceConflict: validation.hasPrecedenceConflict,
+  //       hasWarningOnly: validation.hasWarningOnly,
+  //       hasGroupCapacityConflict: validation.hasGroupCapacityConflict,
+  //       suggestedStart: validation.suggestedStart,
+  //       conflicts: validation.conflicts.map(c => ({ type: c.type, message: c.message, details: c.details })),
+  //       isAltPressed,
+  //     });
+  //   }
+  // }, [activeTask, dragValidation.targetStationId, dragValidation.scheduledStart, validation, isAltPressed]);
 
   // Create lookup maps
   const jobMap = useMemo(() => {
@@ -641,12 +645,22 @@ function AppContent() {
         const stationId = getStationIdFromElement(stationElement);
 
         if (!stationElement || !activeTask) {
-          setDragValidation((prev) => ({ ...prev, targetStationId: null, scheduledStart: null }));
+          // v0.3.46: Only update if values actually changed
+          setDragValidation((prev) => {
+            if (prev.targetStationId === null && prev.scheduledStart === null) return prev;
+            return { ...prev, targetStationId: null, scheduledStart: null };
+          });
           return;
         }
 
         const scheduledStart = calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate, pixelsPerHour);
-        setDragValidation((prev) => ({ ...prev, targetStationId: stationId, scheduledStart }));
+        // v0.3.46: Only update state if values actually changed (performance optimization)
+        setDragValidation((prev) => {
+          if (prev.targetStationId === stationId && prev.scheduledStart === scheduledStart) {
+            return prev; // No change, skip re-render
+          }
+          return { ...prev, targetStationId: stationId, scheduledStart };
+        });
       },
       onDrop: ({ source, location }) => {
         // Capture current state before reset
@@ -1213,11 +1227,12 @@ function AppContent() {
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
           assignments={snapshot.assignments}
-          selectedJobId={selectedJobId}
+          selectedJobId={deferredSelectedJobId}
           startHour={START_HOUR}
           hoursToDisplay={DAY_COUNT * 24}
           onScroll={handleGridScroll}
           startDate={gridStartDate}
+          totalDays={DAY_COUNT}
           onSelectJob={setSelectedJobId}
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}

@@ -109,6 +109,60 @@ Located in the Top Navigation Bar:
 
 ---
 
+## Virtual Scrolling (Performance)
+
+> Implemented from REQ-09 in v0.3.46
+
+The scheduling grid uses virtual scrolling to handle large time ranges (365 days) without performance degradation.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────┐
+│                 365 Days Total                       │
+│  ┌────────────────────────────────────────────────┐ │
+│  │ Day 0-2    (off-screen, not rendered)          │ │
+│  ├────────────────────────────────────────────────┤ │
+│  │ Day 3-9    ← VISIBLE + BUFFER (rendered)       │ │
+│  ├────────────────────────────────────────────────┤ │
+│  │ Day 10-364 (off-screen, not rendered)          │ │
+│  └────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+### Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| **totalDays** | 365 | Full scrollable range |
+| **bufferDays** | 3 | Days rendered around focused day |
+| **Rendered days** | ~7 | bufferDays × 2 + 1 |
+
+### DOM Element Reduction
+
+| Component | Without Virtual Scroll | With Virtual Scroll |
+|-----------|----------------------|---------------------|
+| Hour markers | 8,760 | ~168 |
+| Grid lines per station | 8,760 | ~168 |
+| Total elements | ~50,000+ | ~1,500 |
+
+### Performance Targets
+
+| Metric | Target | Without VS | With VS |
+|--------|--------|------------|---------|
+| **Drag FPS** | 60 FPS | <10 FPS | 60 FPS |
+| **INP** | <200ms | >400ms | <200ms |
+| **DOM count** | <2,000 | ~50,000 | ~1,500 |
+
+### Implementation Details
+
+- **useVirtualScroll hook:** Calculates visible day range from scroll position
+- **visibleDayRange prop:** Passed to TimelineColumn, StationColumn
+- **Stable references:** visibleRange object stabilized with useRef to prevent unnecessary re-renders
+- **React.memo:** Components memoized with custom comparison functions
+
+---
+
 ## Related Documents
 
 - [Date Navigation Strip](date-navigation-strip.md) — Quick day navigation
