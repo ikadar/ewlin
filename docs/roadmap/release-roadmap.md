@@ -849,16 +849,19 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Update `DateCell.tsx` styling
 - [x] E2E tests for DateStrip interactions (6 tests)
 
-#### v0.3.45 - Precedence Constraint Visualization
+#### v0.3.45 - Precedence Constraint Visualization ✅
 > **Implements:** [REQ-10](../ux-ui/tmp/new-requirements-02.md#req-10-precedence-constraint-vizualizáció)
+> **Released:** 2026-01-07
 
-- [ ] Purple line: earliest possible start (predecessor end + dry time)
-- [ ] Orange line: latest possible start (successor start - task duration)
-- [ ] Lines visible only during drag, only in hovered column
-- [ ] No lines if no scheduled predecessor/successor
-- [ ] Reuse `getEffectivePredecessorEnd` from validator
-- [ ] New `PrecedenceLines` component
-- [ ] E2E tests for precedence visualization
+- [x] Purple line: earliest possible start (predecessor end + dry time)
+- [x] Orange line: latest possible start (successor start - task duration)
+- [x] Lines visible during drag and quick placement mode
+- [x] No lines if no scheduled predecessor/successor
+- [x] Reuse `getEffectivePredecessorEnd` from validator
+- [x] New `PrecedenceLines` component
+- [x] Successor constraint validation (blocks drops below orange line)
+- [x] Quick Placement Mode: lines and validation while hovering
+- [x] E2E tests for precedence visualization
 
 ### Phase 3I: Backend API Integration
 
