@@ -71,7 +71,7 @@ export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResu
     // Calculate total virtual height
     const totalHeight = totalDays * dayHeightPx;
 
-    // Calculate focused day index from scroll position
+    // Calculate focused day index from scroll position (for reference/sync purposes)
     // The focused day is the one at the center of the viewport
     const centerY = scrollTop + viewportHeight / 2;
     const focusedDayIndex = Math.floor(centerY / dayHeightPx);
@@ -79,9 +79,14 @@ export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResu
     // Clamp to valid range
     const clampedFocusedDay = Math.max(0, Math.min(totalDays - 1, focusedDayIndex));
 
-    // Calculate visible range with buffer
-    const start = Math.max(0, clampedFocusedDay - bufferDays);
-    const end = Math.min(totalDays - 1, clampedFocusedDay + bufferDays);
+    // Calculate visible range based on actual viewport bounds
+    // This ensures the entire viewport is always covered with content
+    const firstVisibleDay = Math.floor(scrollTop / dayHeightPx);
+    const lastVisibleDay = Math.ceil((scrollTop + viewportHeight) / dayHeightPx);
+
+    // Add buffer around the actual visible range (not around center)
+    const start = Math.max(0, firstVisibleDay - bufferDays);
+    const end = Math.min(totalDays - 1, lastVisibleDay + bufferDays);
 
     // Calculate Y offset for positioning rendered content
     const offsetY = start * dayHeightPx;

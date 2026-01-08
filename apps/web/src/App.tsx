@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useCallback, useRef, useTransition, useDeferredValue } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR } from './components';
-import type { SchedulingGridHandle } from './components';
+import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
@@ -410,6 +410,31 @@ function AppContent() {
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
 
+  // v0.3.47: Zoom handler that maintains grid center position
+  const handleZoomChange = useCallback((newPixelsPerHour: number) => {
+    const grid = gridRef.current;
+    if (!grid) {
+      setPixelsPerHour(newPixelsPerHour);
+      return;
+    }
+
+    // Calculate the current center hour before zoom
+    const currentScrollTop = grid.getScrollY();
+    const viewportHeight = grid.getViewportHeight();
+    const centerY = currentScrollTop + viewportHeight / 2;
+    const centerHour = centerY / pixelsPerHour;
+
+    // Update zoom level
+    setPixelsPerHour(newPixelsPerHour);
+
+    // After React updates, scroll to keep the same center hour visible
+    requestAnimationFrame(() => {
+      const newCenterY = centerHour * newPixelsPerHour;
+      const newScrollTop = newCenterY - viewportHeight / 2;
+      grid.scrollToY(Math.max(0, newScrollTop), 'instant');
+    });
+  }, [pixelsPerHour]);
+
   // Track current mouse position during drag
   const currentPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -513,17 +538,94 @@ function AppContent() {
     return days;
   }, [selectedJobId, snapshot.tasks, snapshot.assignments]);
 
+  // v0.3.47: Task markers per day for DateStrip
+  // Groups tasks by date and determines their status (completed, late, conflict, scheduled)
+  const taskMarkersPerDay = useMemo((): Map<string, TaskMarker[]> => {
+    const markers = new Map<string, TaskMarker[]>();
+    if (!selectedJobId) return markers;
+
+    const now = new Date();
+    const conflictTaskIds = new Set(snapshot.conflicts.map((c) => c.taskId));
+
+    // Get all tasks for the selected job
+    const jobTasks = snapshot.tasks.filter((t) => t.jobId === selectedJobId);
+    const taskIds = new Set(jobTasks.map((t) => t.id));
+
+    // Process assignments for selected job
+    snapshot.assignments
+      .filter((a) => taskIds.has(a.taskId))
+      .forEach((assignment) => {
+        const scheduledEnd = new Date(assignment.scheduledEnd);
+        const dateKey = new Date(assignment.scheduledStart).toISOString().split('T')[0];
+
+        // Determine task marker status
+        let status: TaskMarker['status'] = 'scheduled';
+        if (assignment.isCompleted) {
+          status = 'completed';
+        } else if (conflictTaskIds.has(assignment.taskId)) {
+          status = 'conflict';
+        } else if (scheduledEnd < now) {
+          status = 'late';
+        }
+
+        const marker: TaskMarker = {
+          taskId: assignment.taskId,
+          status,
+        };
+
+        const existing = markers.get(dateKey) ?? [];
+        existing.push(marker);
+        markers.set(dateKey, existing);
+      });
+
+    return markers;
+  }, [selectedJobId, snapshot.tasks, snapshot.assignments, snapshot.conflicts]);
+
+  // v0.3.47: Earliest task date for timeline (first scheduled task)
+  const earliestTaskDate = useMemo((): Date | null => {
+    if (!selectedJobId) return null;
+
+    const jobTaskIds = new Set(
+      snapshot.tasks.filter((t) => t.jobId === selectedJobId).map((t) => t.id)
+    );
+
+    let earliest: Date | null = null;
+    snapshot.assignments
+      .filter((a) => jobTaskIds.has(a.taskId))
+      .forEach((a) => {
+        const startDate = new Date(a.scheduledStart);
+        if (!earliest || startDate < earliest) {
+          earliest = startDate;
+        }
+      });
+
+    return earliest;
+  }, [selectedJobId, snapshot.tasks, snapshot.assignments]);
+
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(null);
   const scrollTimeoutRef = useRef<number | null>(null);
+
+  // v0.3.47: Viewport hours for DateStrip indicator
+  const [viewportStartHour, setViewportStartHour] = useState<number>(0);
+  const [viewportEndHour, setViewportEndHour] = useState<number>(8);
+  const lastScrollTopRef = useRef<number>(0);
 
   // Ref to track drag state without causing callback recreation
   const isDraggingRef = useRef(false);
   isDraggingRef.current = activeTask !== null;
 
+  // Ref to avoid stale closure in scroll handler when zoom changes
+  const pixelsPerHourRef = useRef(pixelsPerHour);
+  pixelsPerHourRef.current = pixelsPerHour;
+
   // REQ-09.2: Handle grid scroll to calculate focused date
+  // v0.3.47: Also calculate viewport hours for DateStrip indicator
   // CRITICAL: Skip updates during drag to prevent performance degradation
   const handleGridScroll = useCallback((scrollTop: number) => {
+    // Store scrollTop for recalculation on zoom change
+    lastScrollTopRef.current = scrollTop;
+
     // Skip focusedDate updates during drag operations - this is the primary performance fix
     // Use ref to avoid adding activeTask to dependencies (which would cause callback recreation)
     if (isDraggingRef.current) {
@@ -536,16 +638,37 @@ function AppContent() {
     }
 
     scrollTimeoutRef.current = requestAnimationFrame(() => {
+      // Use ref to get current pixelsPerHour (avoids stale closure on zoom change)
+      const currentPixelsPerHour = pixelsPerHourRef.current;
+
       // Calculate focused date from scroll position
       // The focused date is the one visible at the center of the viewport
       const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
       const centerY = scrollTop + viewportHeight / 2;
-      const hoursFromStart = centerY / pixelsPerHour;
+      const hoursFromStart = centerY / currentPixelsPerHour;
       const focusedTime = new Date(gridStartDate);
       focusedTime.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
       setFocusedDate(focusedTime);
+
+      // v0.3.47: Calculate viewport hours from grid start (not clamped to single day)
+      // This allows viewport indicator to span multiple days
+      const startHourFromGridStart = scrollTop / currentPixelsPerHour;
+      const endHourFromGridStart = (scrollTop + viewportHeight) / currentPixelsPerHour;
+
+      setViewportStartHour(startHourFromGridStart);
+      setViewportEndHour(endHourFromGridStart);
     });
-  }, [pixelsPerHour, gridStartDate]);
+  }, [gridStartDate]);
+
+  // v0.3.47: Recalculate viewport when zoom (pixelsPerHour) changes
+  // This ensures the viewport indicator stays on the correct day after zoom
+  useEffect(() => {
+    if (lastScrollTopRef.current > 0) {
+      // Trigger recalculation with the stored scrollTop
+      handleGridScroll(lastScrollTopRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixelsPerHour]); // handleGridScroll is stable, pixelsPerHour triggers recalc
 
   // Get ordered job IDs for navigation (matching JobsList display order)
   // Problems first (late, then conflicts), then normal jobs
@@ -1187,7 +1310,7 @@ function AppContent() {
             onToggleQuickPlacement={handleToggleQuickPlacement}
             canEnableQuickPlacement={selectedJobId !== null}
             pixelsPerHour={pixelsPerHour}
-            onZoomChange={setPixelsPerHour}
+            onZoomChange={handleZoomChange}
             onCompactTimeline={handleCompactTimeline}
             isCompacting={isCompactingTimeline}
           />
@@ -1219,6 +1342,10 @@ function AppContent() {
           departureDate={departureDate}
           scheduledDays={scheduledDays}
           focusedDate={focusedDate}
+          viewportStartHour={viewportStartHour}
+          viewportEndHour={viewportEndHour}
+          taskMarkersPerDay={taskMarkersPerDay}
+          earliestTaskDate={earliestTaskDate}
         />
         <SchedulingGrid
           ref={gridRef}

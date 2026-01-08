@@ -7,8 +7,8 @@ export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSect
 export { JobDetailsPanel, JobInfo, JobStatus, InfoField, TaskList, TaskTile } from './JobDetailsPanel';
 export type { JobDetailsPanelProps, JobInfoProps, JobStatusProps, InfoFieldProps, TaskListProps, TaskTileProps } from './JobDetailsPanel';
 
-export { DateStrip, DateCell } from './DateStrip';
-export type { DateStripProps, DateCellProps } from './DateStrip';
+export { DateStrip, DateCell, TaskMarkers, ViewportIndicator, ExitTriangle } from './DateStrip';
+export type { DateStripProps, DateCellProps, TaskMarker, TaskMarkerStatus, TaskMarkersProps, ViewportIndicatorProps, ExitTriangleProps } from './DateStrip';
 
 export { TimelineColumn, HourMarker, NowLine, PIXELS_PER_HOUR, timeToYPosition } from './TimelineColumn';
 export type { TimelineColumnProps, HourMarkerProps, NowLineProps } from './TimelineColumn';

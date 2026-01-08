@@ -880,6 +880,21 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] useDeferredValue for non-blocking selection
 - [x] E2E tests for virtual scroll behavior
 
+#### v0.3.47 - DateStrip Task Markers ✅
+> **Implements:** DateStrip visual enhancements for task status overview
+
+- [x] **Viewport Indicator (A):** Light gray rectangle showing visible portion of day
+- [x] **"Now" Line (B):** Red line within viewport indicator at current time
+- [x] **Exit Triangle (C):** White triangle at workshop exit date (departure)
+- [x] **Task Timeline (D):** Dotted line from earliest task to exit date
+- [x] **Task Markers (E):** Colored horizontal lines for task status:
+  - Gray: scheduled (future)
+  - Orange: precedence conflict
+  - Red: late (past incomplete)
+  - Green: completed
+- [x] New components: ViewportIndicator, TaskMarkers, ExitTriangle
+- [x] E2E tests for marker functionality
+
 ### Phase 3I: Backend API Integration
 
 #### v0.3.51 - Validator Package Integration

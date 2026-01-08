@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { DateCell } from './DateCell';
 import { useVirtualScroll, getVisibleDates } from '../../hooks';
+import type { TaskMarker } from './TaskMarkers';
+
+/** Task marker data for a specific day */
+export interface DayTaskMarkers {
+  /** Date key in YYYY-MM-DD format */
+  dateKey: string;
+  /** Task markers for this day */
+  markers: TaskMarker[];
+}
 
 export interface DateStripProps {
   /** Start date for the range */
@@ -17,6 +26,14 @@ export interface DateStripProps {
   focusedDate?: Date | null;
   /** v0.3.46: Number of buffer days to render around focused day (default: 10 for DateStrip) */
   bufferDays?: number;
+  /** v0.3.47: Viewport start hour (0-24) for viewport indicator */
+  viewportStartHour?: number;
+  /** v0.3.47: Viewport end hour (0-24) for viewport indicator */
+  viewportEndHour?: number;
+  /** v0.3.47: Task markers per day (Map from dateKey to markers) */
+  taskMarkersPerDay?: Map<string, TaskMarker[]>;
+  /** v0.3.47: Earliest task date for timeline */
+  earliestTaskDate?: Date | null;
 }
 
 /**
@@ -56,6 +73,10 @@ export function DateStrip({
   scheduledDays,
   focusedDate,
   bufferDays = 10, // More buffer for DateStrip since cells are small
+  viewportStartHour,
+  viewportEndHour,
+  taskMarkersPerDay,
+  earliestTaskDate,
 }: DateStripProps) {
   const today = new Date();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -126,7 +147,7 @@ export function DateStrip({
   return (
     <div
       ref={containerRef}
-      className="w-12 shrink-0 bg-zinc-950 overflow-y-auto border-r border-white/5"
+      className="w-12 h-full shrink-0 bg-zinc-950 overflow-y-auto border-r border-white/5"
       data-testid="datestrip-container"
     >
       {/* v0.3.46: Virtual scroll container with full height */}
@@ -139,21 +160,49 @@ export function DateStrip({
           className="absolute left-0 right-0 flex flex-col"
           style={{ top: `${virtualScroll.offsetY}px` }}
         >
-          {visibleDates.map((date) => {
+          {visibleDates.map((date, index) => {
+            // Calculate day index from grid start (for viewport indicator positioning)
+            const dayIndex = virtualScroll.visibleRange.start + index;
+
             const dateKey = formatDateKey(date);
-            const isDepartureDate = departureDate ? isSameDay(date, departureDate) : false;
+            const isDateDepartureDate = departureDate ? isSameDay(date, departureDate) : false;
             const hasScheduledTasks = scheduledDays?.has(dateKey) ?? false;
             const isFocused = focusedDate ? isSameDay(date, focusedDate) : false;
+            const isToday = isSameDay(date, today);
+
+            // v0.3.47: Get task markers for this day
+            const taskMarkers = taskMarkersPerDay?.get(dateKey) ?? [];
+
+            // v0.3.47: Check if this day is on the timeline (between earliest task and departure)
+            // Compare dates only (ignoring time), so normalize to start of day
+            const isOnTimeline = (() => {
+              if (!earliestTaskDate || !departureDate) return false;
+              const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+              const earliestDateOnly = new Date(earliestTaskDate.getFullYear(), earliestTaskDate.getMonth(), earliestTaskDate.getDate()).getTime();
+              const departureDateOnly = new Date(departureDate.getFullYear(), departureDate.getMonth(), departureDate.getDate()).getTime();
+              return dateOnly >= earliestDateOnly && dateOnly <= departureDateOnly;
+            })();
+
+            // v0.3.47: Calculate current hour for "now" line
+            const currentHour = isToday
+              ? today.getHours() + today.getMinutes() / 60
+              : undefined;
 
             return (
               <DateCell
                 key={date.toISOString()}
                 date={date}
-                isToday={isSameDay(date, today)}
+                dayIndex={dayIndex}
+                isToday={isToday}
                 isFocused={isFocused}
-                isDepartureDate={isDepartureDate}
+                isDepartureDate={isDateDepartureDate}
                 hasScheduledTasks={hasScheduledTasks}
                 onClick={() => onDateClick?.(date)}
+                viewportStartHour={viewportStartHour}
+                viewportEndHour={viewportEndHour}
+                currentHour={currentHour}
+                taskMarkers={taskMarkers}
+                isOnTimeline={isOnTimeline}
               />
             );
           })}

@@ -19,11 +19,14 @@ describe('useVirtualScroll', () => {
 
     it('should return correct visible range at scroll position 0', () => {
       const { result } = renderHook(() => useVirtualScroll(defaultConfig));
-      // At scrollTop 0, viewport center is at 300px
-      // focusedDayIndex = Math.floor(300 / 1920) = 0
+      // At scrollTop 0, viewport covers 0-600px
+      // firstVisibleDay = floor(0 / 1920) = 0
+      // lastVisibleDay = ceil(600 / 1920) = 1
+      // start = max(0, 0 - 3) = 0
+      // end = min(364, 1 + 3) = 4
       expect(result.current.focusedDayIndex).toBe(0);
       expect(result.current.visibleRange.start).toBe(0);
-      expect(result.current.visibleRange.end).toBe(3); // 0 + bufferDays
+      expect(result.current.visibleRange.end).toBe(4); // lastVisibleDay(1) + bufferDays(3)
     });
 
     it('should return correct visible range in the middle', () => {
@@ -32,10 +35,13 @@ describe('useVirtualScroll', () => {
       const { result } = renderHook(() =>
         useVirtualScroll({ ...defaultConfig, scrollTop })
       );
-
+      // firstVisibleDay = floor(192660 / 1920) = 100
+      // lastVisibleDay = ceil(193260 / 1920) = 101
+      // start = max(0, 100 - 3) = 97
+      // end = min(364, 101 + 3) = 104
       expect(result.current.focusedDayIndex).toBe(100);
-      expect(result.current.visibleRange.start).toBe(97); // 100 - 3
-      expect(result.current.visibleRange.end).toBe(103); // 100 + 3
+      expect(result.current.visibleRange.start).toBe(97); // firstVisibleDay(100) - 3
+      expect(result.current.visibleRange.end).toBe(104); // lastVisibleDay(101) + 3
     });
 
     it('should clamp visible range at the end', () => {
@@ -69,19 +75,23 @@ describe('useVirtualScroll', () => {
   });
 
   describe('rendered day count', () => {
-    it('should render 2*bufferDays+1 days in the middle', () => {
+    it('should render enough days to cover viewport plus buffer', () => {
       const scrollTop = 100 * 1920;
       const { result } = renderHook(() =>
         useVirtualScroll({ ...defaultConfig, scrollTop })
       );
-
-      expect(result.current.renderedDayCount).toBe(7); // 3 + 1 + 3
+      // firstVisibleDay = 100, lastVisibleDay = 101
+      // start = 97, end = 104
+      // renderedDayCount = 104 - 97 + 1 = 8
+      expect(result.current.renderedDayCount).toBe(8);
     });
 
-    it('should render fewer days at the start', () => {
+    it('should render days at the start covering viewport', () => {
       const { result } = renderHook(() => useVirtualScroll(defaultConfig));
-      // At start: focusedDay=0, start=0, end=3
-      expect(result.current.renderedDayCount).toBe(4); // 0 to 3 inclusive
+      // At start: firstVisibleDay=0, lastVisibleDay=1
+      // start=0, end=4
+      // renderedDayCount = 4 - 0 + 1 = 5
+      expect(result.current.renderedDayCount).toBe(5);
     });
   });
 
