@@ -895,6 +895,22 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] New components: ViewportIndicator, TaskMarkers, ExitTriangle
 - [x] E2E tests for marker functionality
 
+#### v0.3.48 - Zoom-Aware Tile Snapping (Bugfix)
+> **Bug:** Tile snapping works at 100% zoom but breaks at other zoom levels
+
+**Root cause:** `snapToGrid` and `yPositionToTime` support `pixelsPerHour` parameter, but several call sites use default value instead of current zoom level.
+
+**Affected code:**
+- [ ] `DragLayer.tsx:74` - `snapToGrid(contentY)` missing pixelsPerHour
+- [ ] `DragLayer.tsx:79` - `snapToGrid(position.y - grabOffset.y)` missing pixelsPerHour
+- [ ] `App.tsx` - `handleQuickPlacementMouseMove` missing pixelsPerHour
+- [ ] `App.tsx` - `handleQuickPlacementClick` missing pixelsPerHour for snapToGrid and yPositionToTime
+
+**Solution:**
+- [ ] Add `pixelsPerHour` to DragStateContext or pass via props to DragLayer
+- [ ] Update Quick Placement handlers to use current pixelsPerHour state
+- [ ] Add E2E test for snapping at different zoom levels
+
 ### Phase 3I: Backend API Integration
 
 #### v0.3.51 - Validator Package Integration
