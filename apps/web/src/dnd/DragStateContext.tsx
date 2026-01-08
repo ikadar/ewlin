@@ -22,7 +22,8 @@ type DragAction =
     }
   | { type: 'DRAG_END' }
   | { type: 'UPDATE_VALIDATION'; payload: Partial<DragValidationState> }
-  | { type: 'UPDATE_GRAB_OFFSET'; payload: { x: number; y: number } };
+  | { type: 'UPDATE_GRAB_OFFSET'; payload: { x: number; y: number } }
+  | { type: 'SET_PIXELS_PER_HOUR'; payload: number };
 
 // Reducer for drag state
 function dragReducer(state: DragState, action: DragAction): DragState {
@@ -52,6 +53,11 @@ function dragReducer(state: DragState, action: DragAction): DragState {
         ...state,
         grabOffset: action.payload,
       };
+    case 'SET_PIXELS_PER_HOUR':
+      return {
+        ...state,
+        pixelsPerHour: action.payload,
+      };
     default:
       return state;
   }
@@ -64,6 +70,7 @@ interface DragStateContextType {
   endDrag: () => void;
   updateValidation: (validation: Partial<DragValidationState>) => void;
   updateGrabOffset: (offset: { x: number; y: number }) => void;
+  setPixelsPerHour: (pixelsPerHour: number) => void;
 }
 
 // Create context
@@ -99,9 +106,13 @@ export function DragStateProvider({ children }: DragStateProviderProps) {
     dispatch({ type: 'UPDATE_GRAB_OFFSET', payload: offset });
   }, []);
 
+  const setPixelsPerHour = useCallback((pixelsPerHour: number) => {
+    dispatch({ type: 'SET_PIXELS_PER_HOUR', payload: pixelsPerHour });
+  }, []);
+
   const contextValue = useMemo(
-    () => ({ state, startDrag, endDrag, updateValidation, updateGrabOffset }),
-    [state, startDrag, endDrag, updateValidation, updateGrabOffset]
+    () => ({ state, startDrag, endDrag, updateValidation, updateGrabOffset, setPixelsPerHour }),
+    [state, startDrag, endDrag, updateValidation, updateGrabOffset, setPixelsPerHour]
   );
 
   return (

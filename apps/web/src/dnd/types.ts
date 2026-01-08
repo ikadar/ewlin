@@ -49,7 +49,12 @@ export interface DragState {
   grabOffset: { x: number; y: number };
   /** Current drag validation state */
   validation: DragValidationState;
+  /** Current pixels per hour (for zoom-aware snapping) */
+  pixelsPerHour: number;
 }
+
+/** Default pixels per hour (100% zoom) */
+export const DEFAULT_PIXELS_PER_HOUR = 80;
 
 /** Initial drag state when no drag is active */
 export const INITIAL_DRAG_STATE: DragState = {
@@ -67,4 +72,5 @@ export const INITIAL_DRAG_STATE: DragState = {
     suggestedStart: null,
     hasWarningOnly: false,
   },
+  pixelsPerHour: DEFAULT_PIXELS_PER_HOUR,
 };

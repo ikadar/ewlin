@@ -374,7 +374,7 @@ function AppContent() {
   const deferredSelectedJobId = useDeferredValue(selectedJobId);
 
   // Get drag state from context (replaces local activeTask/activeJob state)
-  const { state: dragState } = useDragState();
+  const { state: dragState, setPixelsPerHour: setContextPixelsPerHour } = useDragState();
   const { activeTask, activeJob, isRescheduleDrag, grabOffset } = dragState;
 
   // Alt key state for precedence bypass
@@ -406,6 +406,11 @@ function AppContent() {
 
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
+
+  // v0.3.48: Sync pixelsPerHour to DragStateContext for zoom-aware snapping
+  useEffect(() => {
+    setContextPixelsPerHour(pixelsPerHour);
+  }, [pixelsPerHour, setContextPixelsPerHour]);
 
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
@@ -1126,10 +1131,11 @@ function AppContent() {
   }, [quickPlacementTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // Quick Placement: handle mouse move in station column
+  // v0.3.48: Use pixelsPerHour for zoom-aware snapping
   const handleQuickPlacementMouseMove = useCallback((stationId: string, y: number) => {
-    const snappedY = snapToGrid(Math.max(0, y));
+    const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
     setQuickPlacementHover({ stationId, y, snappedY });
-  }, []);
+  }, [pixelsPerHour]);
 
   // Quick Placement: handle mouse leave from station column
   const handleQuickPlacementMouseLeave = useCallback(() => {
@@ -1154,8 +1160,9 @@ function AppContent() {
     }
 
     // Calculate the time from Y position (multi-day aware)
-    const snappedY = snapToGrid(Math.max(0, y));
-    const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate);
+    // v0.3.48: Use pixelsPerHour for zoom-aware snapping
+    const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
+    const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate, pixelsPerHour);
     const scheduledStart = dropTime.toISOString();
     const station = snapshot.stations.find((s) => s.id === stationId);
     const scheduledEnd = calculateEndTime(taskToPlace, scheduledStart, station);
@@ -1228,7 +1235,7 @@ function AppContent() {
       scheduledStart,
       scheduledEnd,
     });
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, gridStartDate]);
+  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, gridStartDate, pixelsPerHour]);
 
   // Calculate which stations have available tasks (for quick placement cursor)
   const stationsWithAvailableTasks = useMemo(() => {
