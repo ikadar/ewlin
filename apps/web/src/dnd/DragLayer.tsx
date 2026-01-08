@@ -22,7 +22,7 @@ interface DragPosition {
  * Must be placed inside DragStateProvider.
  */
 export function DragLayer() {
-  const { isDragging, activeTask, activeJob, grabOffset } = useDragStateValue();
+  const { isDragging, activeTask, activeJob, grabOffset, pixelsPerHour } = useDragStateValue();
   const [position, setPosition] = useState<DragPosition | null>(null);
 
   useEffect(() => {
@@ -70,13 +70,13 @@ export function DragLayer() {
     const stationRect = stationColumn.getBoundingClientRect();
     // Calculate content position: cursor relative to station top, minus grab offset
     const contentY = position.y - stationRect.top - grabOffset.y;
-    // Snap in content coordinates
-    const snappedContentY = snapToGrid(contentY);
+    // Snap in content coordinates (use current zoom level)
+    const snappedContentY = snapToGrid(contentY, pixelsPerHour);
     // Convert back to viewport: station top + snapped content position
     snappedViewportY = stationRect.top + snappedContentY;
   } else {
     // Fallback: simple viewport snap when not over a station
-    snappedViewportY = snapToGrid(position.y - grabOffset.y);
+    snappedViewportY = snapToGrid(position.y - grabOffset.y, pixelsPerHour);
   }
 
   const previewStyle: React.CSSProperties = {

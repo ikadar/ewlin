@@ -1837,10 +1837,63 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
 }
 
 // ============================================================================
+// Fixture: zoom-snapping
+// For v0.3.48 (Zoom-Aware Tile Snapping Bugfix)
+// Simple job with one unscheduled task for testing snapping at different zoom levels
+// ============================================================================
+
+export function createZoomSnappingFixture(): ScheduleSnapshot {
+  const jobs: Job[] = [
+    {
+      id: 'job-zoom-1',
+      reference: 'ZOOM-001',
+      client: 'Zoom Test Client',
+      description: 'Job for testing tile snapping at different zoom levels',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 7),
+      color: '#3b82f6', // Blue
+      paperPurchaseStatus: 'InStock',
+      platesStatus: 'Done',
+      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
+      requiredJobIds: [],
+      comments: [],
+      taskIds: ['task-z1'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  const tasks: Task[] = [
+    {
+      id: 'task-z1',
+      jobId: 'job-zoom-1',
+      sequenceOrder: 0,
+      status: 'Ready', // Unscheduled, ready to place
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 30 }, // 1h total
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+  ];
+
+  // No assignments - task is unscheduled for drag testing at different zoom levels
+  return {
+    ...baseSnapshot(),
+    jobs,
+    tasks,
+    assignments: [],
+    conflicts: [],
+    lateJobs: [],
+  };
+}
+
+// ============================================================================
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -1857,6 +1910,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'precedence-visualization': createPrecedenceVisualizationFixture,
   'virtual-scroll': createVirtualScrollFixture,
   'datestrip-markers': createDatestripMarkersFixture,
+  'zoom-snapping': createZoomSnappingFixture,
 };
 
 /**
