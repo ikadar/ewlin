@@ -1342,6 +1342,7 @@ function AppContent() {
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
           onClose={() => setSelectedJobId(null)}
+          onDateClick={handleDateClick}
         />
         <DateStrip
           startDate={gridStartDate}

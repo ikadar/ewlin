@@ -21,6 +21,8 @@ export interface JobDetailsPanelProps {
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when close button is clicked (REQ-02) */
   onClose?: () => void;
+  /** REQ-02: Callback when departure date is clicked (scrolls grid to date) */
+  onDateClick?: (date: Date) => void;
 }
 
 /**
@@ -36,6 +38,7 @@ export function JobDetailsPanel({
   onJumpToTask,
   onRecallTask,
   onClose,
+  onDateClick,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -66,12 +69,12 @@ export function JobDetailsPanel({
 
       {/* Job details - simple key-value list */}
       <div className="px-3 pb-3 border-b border-white/5 space-y-2.5 text-sm">
-        <JobInfo job={job} />
+        <JobInfo job={job} onDateClick={onDateClick} />
 
         {/* Separator between info and status */}
         <div className="border-t border-white/5 pt-2.5" />
 
-        <JobStatus job={job} />
+        <JobStatus job={job} onDateClick={onDateClick} />
       </div>
 
       {/* Task tiles */}
