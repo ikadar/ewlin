@@ -975,20 +975,21 @@ This document contains the development roadmap for the Flux print shop schedulin
 - `apps/web/src/dnd/DragLayer.tsx`
 - `apps/web/src/hooks/useDropValidation.ts`
 
-#### v0.3.53 - Precedence Lines + Working Hours
+#### v0.3.53 - Precedence Lines + Working Hours ✅
 > **Implements:** [REQ-03](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-03-precedence-lines-should-respect-non-working-hours)
 
-- [ ] `addWorkingTime` utility function
-- [ ] Account for lunch breaks in constraint calculation
-- [ ] Account for non-working hours (before/after business hours)
-- [ ] Account for weekends and station exceptions
-- [ ] Update precedence line positions
-- [ ] E2E tests
+- [x] `snapToNextWorkingTime` utility function - snap to next working slot
+- [x] `addWorkingTime` / `subtractWorkingTime` utilities
+- [x] Drying time uses simple addition (physical process)
+- [x] Work start snaps to working hours if drying ends outside
+- [x] Update precedence line positions
+- [x] Test fixture: `?fixture=precedence-working-hours`
+
+**Key insight:** Drying is physical (continues during lunch), work requires humans (working hours only).
 
 **Affected files:**
-- `apps/web/src/App.tsx` - constraint calculation
-- `packages/validator/src/validators/precedence.ts`
-- New utility: `addWorkingTime.ts`
+- `apps/web/src/utils/workingTime.ts` - new utility functions
+- `apps/web/src/utils/precedenceConstraints.ts` - updated calculations
 
 #### v0.3.54 - Dragover Performance Optimization
 > **Implements:** [REQ-05](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-05-dragover-performance-with-many-tiles)
