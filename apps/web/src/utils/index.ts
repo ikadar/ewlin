@@ -38,3 +38,4 @@ export type { SubcolumnLayout } from './subcolumnLayout';
 export { getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo } from './precedenceConstraints';
 export type { DryingTimeInfo } from './precedenceConstraints';
 export { getValidationMessage, getPrimaryValidationMessage } from './validationMessages';
+export { addWorkingTime, subtractWorkingTime, getDayScheduleForDate, isWithinWorkingHours, snapToNextWorkingTime } from './workingTime';
