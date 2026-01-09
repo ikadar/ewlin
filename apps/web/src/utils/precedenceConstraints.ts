@@ -3,11 +3,13 @@
  *
  * Calculate Y positions for precedence constraint visualization lines.
  * REQ-10: Precedence Constraint Visualization
+ * v0.3.53: Precedence Lines + Working Hours (REQ-03)
  */
 
-import type { ScheduleSnapshot, Task, TaskAssignment } from '@flux/types';
-import { getEffectivePredecessorEnd, parseTimestamp } from '@flux/schedule-validator';
+import type { ScheduleSnapshot, Task, TaskAssignment, Station } from '@flux/types';
+import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
+import { subtractWorkingTime, snapToNextWorkingTime } from './workingTime';
 
 /**
  * Get all tasks for a job in sequence order.
@@ -53,10 +55,22 @@ function findAssignmentByTaskId(
 }
 
 /**
+ * Find a station by ID.
+ */
+function findStationById(snapshot: ScheduleSnapshot, stationId: string): Station | undefined {
+  return snapshot.stations.find((s) => s.id === stationId);
+}
+
+/**
  * Calculate the Y position for the predecessor constraint line (purple).
  *
  * This represents the earliest possible start time for a task based on
  * its predecessor's end time plus any required dry time for printing tasks.
+ *
+ * v0.3.53: Drying is a physical process that continues regardless of working hours.
+ * However, work can only START during working hours. So:
+ * 1. Calculate drying end = predecessor end + dry time (simple addition)
+ * 2. If drying ends outside working hours, snap to next working time
  *
  * @returns Y position in pixels, or null if no constraint
  */
@@ -79,12 +93,37 @@ export function getPredecessorConstraint(
     return null; // Predecessor not scheduled = no constraint
   }
 
-  // Get effective end time (includes dry time for printing tasks)
-  const earliestStart = getEffectivePredecessorEnd(snapshot, {
-    scheduledEnd: predecessorAssignment.scheduledEnd,
-    targetId: predecessorAssignment.targetId,
-    isOutsourced: predecessorAssignment.isOutsourced,
-  });
+  // Get predecessor end time
+  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+
+  // Check if dry time applies (printing/offset station, not outsourced)
+  let earliestStart: Date;
+  if (!predecessorAssignment.isOutsourced && isPrintingStation(snapshot, predecessorAssignment.targetId)) {
+    // Drying is a physical process - it continues regardless of working hours
+    // So we use simple addition for dry time
+    const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+
+    // But work can only START during working hours
+    // If drying ends outside working hours, snap to next working time
+    const station = findStationById(snapshot, predecessorAssignment.targetId);
+    if (station) {
+      earliestStart = snapToNextWorkingTime(dryingEnd, station);
+    } else {
+      // Fallback if station not found
+      earliestStart = dryingEnd;
+    }
+  } else {
+    // No dry time, earliest start is right after predecessor ends
+    // But still need to snap to working hours
+    const station = predecessorAssignment.isOutsourced
+      ? undefined
+      : findStationById(snapshot, predecessorAssignment.targetId);
+    if (station) {
+      earliestStart = snapToNextWorkingTime(predecessorEnd, station);
+    } else {
+      earliestStart = predecessorEnd;
+    }
+  }
 
   // Convert to Y position
   return timeToYPosition(earliestStart, startHour, pixelsPerHour, gridStartDate);
@@ -123,6 +162,11 @@ function isPrintingStation(snapshot: ScheduleSnapshot, stationId: string): boole
  * This represents the latest possible start time for a task such that
  * it will finish (including any required dry time) before its successor's scheduled start time.
  *
+ * v0.3.53: Drying is a physical process that continues regardless of working hours.
+ * But task execution happens during working hours. So:
+ * 1. Subtract dry time from successor start (simple subtraction - physical process)
+ * 2. Subtract task duration using working time (actual work)
+ *
  * @returns Y position in pixels, or null if no constraint
  */
 export function getSuccessorConstraint(
@@ -144,7 +188,7 @@ export function getSuccessorConstraint(
     return null; // Successor not scheduled = no constraint
   }
 
-  // Calculate latest start time
+  // Start from successor's scheduled start time
   const successorStart = parseTimestamp(successorAssignment.scheduledStart);
 
   // Get task duration - for internal tasks it's setupMinutes + runMinutes
@@ -163,8 +207,22 @@ export function getSuccessorConstraint(
     }
   }
 
-  // Latest start = successor start - dry time - task duration
-  const latestStart = new Date(successorStart.getTime() - dryTimeMs - taskDurationMs);
+  // Calculate latest end time for this task:
+  // Drying is physical - simple subtraction from successor start
+  const latestEnd = dryTimeMs > 0
+    ? new Date(successorStart.getTime() - dryTimeMs)
+    : successorStart;
+
+  // Calculate latest start by subtracting task duration (actual work - uses working hours)
+  const station = task.type === 'Internal' ? findStationById(snapshot, task.stationId) : undefined;
+
+  let latestStart: Date;
+  if (station) {
+    latestStart = subtractWorkingTime(latestEnd, taskDurationMs, station);
+  } else {
+    // Fallback: subtract directly (for outsourced tasks or missing station)
+    latestStart = new Date(latestEnd.getTime() - taskDurationMs);
+  }
 
   // Convert to Y position
   return timeToYPosition(latestStart, startHour, pixelsPerHour, gridStartDate);
@@ -177,6 +235,10 @@ export function getSuccessorConstraint(
  * - Station ID where predecessor is scheduled
  * - Y position of predecessor end
  * - Y position where drying ends
+ *
+ * v0.3.53: Drying is a physical process - the indicator shows the actual
+ * physical end of drying (simple addition), not when work can start.
+ * The purple precedence line shows when work can actually start.
  *
  * @returns DryingTimeInfo or null if no drying time applies
  */
@@ -210,6 +272,9 @@ export function getDryingTimeInfo(
 
   // Calculate positions
   const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+
+  // Drying is a physical process - simple addition
+  // The yellow arrow shows when drying physically ends
   const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
 
   const predecessorEndY = timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate);
