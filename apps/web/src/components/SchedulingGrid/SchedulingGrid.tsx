@@ -1,4 +1,5 @@
 import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider } from '@flux/types';
+import type { DryingTimeInfo } from '../../utils';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
@@ -126,6 +127,8 @@ export interface SchedulingGridProps {
   onScroll?: (scrollTop: number) => void;
   /** REQ-10: Precedence constraint Y positions for visualization */
   precedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** v0.3.51: Drying time visualization info during drag */
+  dryingTimeInfo?: DryingTimeInfo | null;
   /** v0.3.46: Total number of days for virtual scrolling (default: 365) */
   totalDays?: number;
   /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
@@ -174,6 +177,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       providers = [],
       onScroll,
       precedenceConstraints,
+      dryingTimeInfo,
       totalDays = 365,
       bufferDays = 3,
     },
@@ -548,6 +552,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     ? quickPlacementPrecedenceConstraints
                     : undefined);
 
+              // v0.3.51: Drying time info - show only on the predecessor's station
+              const effectiveDryingTimeInfo = dryingTimeInfo?.predecessorStationId === station.id
+                ? dryingTimeInfo
+                : undefined;
+
               return (
                 <StationColumn
                   key={station.id}
@@ -568,6 +577,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
                   onQuickPlacementClick={onQuickPlacementClick}
                   precedenceConstraints={effectivePrecedenceConstraints}
+                  dryingTimeInfo={effectiveDryingTimeInfo}
                   visibleDayRange={virtualScroll.visibleRange}
                 >
                   {stationAssignments.map((assignment, index) => {

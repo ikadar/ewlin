@@ -5,7 +5,8 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo } from './utils';
+import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
 import {
   DragStateProvider,
@@ -496,6 +497,14 @@ function AppContent() {
     const earliestY = getPredecessorConstraint(activeTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
     const latestY = getSuccessorConstraint(activeTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
     return { earliestY, latestY };
+  }, [activeTask, snapshot, pixelsPerHour, gridStartDate]);
+
+  // v0.3.51: Calculate drying time info during drag
+  const dryingTimeInfo = useMemo((): DryingTimeInfo | null => {
+    if (!activeTask) {
+      return null;
+    }
+    return getDryingTimeInfo(activeTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
   }, [activeTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // REQ-14: Auto-scroll to today on initial load
@@ -1406,6 +1415,7 @@ function AppContent() {
           groups={snapshot.groups}
           providers={snapshot.providers}
           precedenceConstraints={precedenceConstraints}
+          dryingTimeInfo={dryingTimeInfo}
         />
           </div>
         </div>

@@ -93,6 +93,16 @@ export function getPredecessorConstraint(
 // Dry time in milliseconds (4 hours) - same as in @flux/schedule-validator
 const DRY_TIME_MS = 4 * 60 * 60 * 1000;
 
+/** Information about drying time for visualization */
+export interface DryingTimeInfo {
+  /** Station ID where the predecessor is scheduled (where to show the indicator) */
+  predecessorStationId: string;
+  /** Y position of predecessor task end */
+  predecessorEndY: number;
+  /** Y position where drying time ends */
+  dryingEndY: number;
+}
+
 /**
  * Check if a station is a printing (offset) station that requires dry time.
  */
@@ -158,4 +168,56 @@ export function getSuccessorConstraint(
 
   // Convert to Y position
   return timeToYPosition(latestStart, startHour, pixelsPerHour, gridStartDate);
+}
+
+/**
+ * Get drying time visualization info for a task.
+ *
+ * Returns information needed to render the drying time indicator:
+ * - Station ID where predecessor is scheduled
+ * - Y position of predecessor end
+ * - Y position where drying ends
+ *
+ * @returns DryingTimeInfo or null if no drying time applies
+ */
+export function getDryingTimeInfo(
+  task: Task,
+  snapshot: ScheduleSnapshot,
+  startHour: number,
+  pixelsPerHour: number,
+  gridStartDate?: Date
+): DryingTimeInfo | null {
+  // Find predecessor task
+  const predecessor = getPredecessorTask(snapshot, task);
+  if (!predecessor) {
+    return null; // No predecessor = no drying time to show
+  }
+
+  // Find predecessor's assignment
+  const predecessorAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
+  if (!predecessorAssignment) {
+    return null; // Predecessor not scheduled = no drying time to show
+  }
+
+  // Check if predecessor requires dry time
+  if (predecessorAssignment.isOutsourced) {
+    return null; // Outsourced tasks don't have dry time
+  }
+
+  if (!isPrintingStation(snapshot, predecessorAssignment.targetId)) {
+    return null; // Not a printing station = no dry time
+  }
+
+  // Calculate positions
+  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+  const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+
+  const predecessorEndY = timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate);
+  const dryingEndY = timeToYPosition(dryingEnd, startHour, pixelsPerHour, gridStartDate);
+
+  return {
+    predecessorStationId: predecessorAssignment.targetId,
+    predecessorEndY,
+    dryingEndY,
+  };
 }

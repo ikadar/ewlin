@@ -944,17 +944,21 @@ This document contains the development roadmap for the Flux print shop schedulin
 - `apps/web/src/components/StationHeaders/StationHeader.tsx`
 - `apps/web/src/App.tsx`
 
-#### v0.3.51 - Impossible Placement Visual Hint
-> **Implements:** [REQ-04](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-04-visual-hint-for-impossible-placement)
+#### v0.3.51 - Drying Time Visualization ✅
+> **Implements:** Visual enhancement for precedence understanding
 
-- [ ] Detect when earliest start > latest start (impossible placement)
-- [ ] Red/striped zone between inverted constraint lines
-- [ ] Warning icon or tooltip: "Task cannot fit"
-- [ ] E2E tests
+- [x] Yellow arrow from predecessor task end to "End of drying" position
+- [x] Dashed horizontal line at drying end
+- [x] "End of drying" label
+- [x] Only when there is drying time required
+- [x] Test fixture
 
 **Affected files:**
-- `apps/web/src/components/PrecedenceLines/PrecedenceLines.tsx`
-- `apps/web/src/App.tsx` - constraint calculation
+- `apps/web/src/components/DryingTimeIndicator/DryingTimeIndicator.tsx` (new)
+- `apps/web/src/components/StationColumns/StationColumn.tsx`
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
+- `apps/web/src/utils/precedenceConstraints.ts`
+- `apps/web/src/App.tsx`
 
 #### v0.3.52 - Human-Readable Validation Messages
 > **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-07-human-readable-validation-messages)
