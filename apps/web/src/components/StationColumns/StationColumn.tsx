@@ -5,6 +5,8 @@ import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import { PlacementIndicator } from '../PlacementIndicator';
 import { PrecedenceLines } from '../PrecedenceLines';
+import { DryingTimeIndicator } from '../DryingTimeIndicator';
+import type { DryingTimeInfo } from '../../utils';
 import { useDragStateValue, type TaskDragData, type StationDropData } from '../../dnd';
 
 export interface StationColumnProps {
@@ -46,6 +48,8 @@ export interface StationColumnProps {
   onQuickPlacementClick?: (stationId: string, y: number) => void;
   /** REQ-10: Precedence constraint Y positions for visualization */
   precedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** v0.3.51: Drying time visualization info during drag */
+  dryingTimeInfo?: DryingTimeInfo;
   /** v0.3.46: Visible day range for virtual scrolling (only render overlays/lines for these days) */
   visibleDayRange?: { start: number; end: number };
 }
@@ -93,6 +97,7 @@ export const StationColumn = memo(function StationColumn({
   onQuickPlacementMouseLeave,
   onQuickPlacementClick,
   precedenceConstraints,
+  dryingTimeInfo,
   visibleDayRange,
 }: StationColumnProps) {
   // Ref for the drop target element
@@ -306,6 +311,15 @@ export const StationColumn = memo(function StationColumn({
           earliestY={precedenceConstraints.earliestY}
           latestY={precedenceConstraints.latestY}
           isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask)}
+        />
+      )}
+
+      {/* v0.3.51: Drying Time Indicator (during drag) */}
+      {dryingTimeInfo && (
+        <DryingTimeIndicator
+          predecessorEndY={dryingTimeInfo.predecessorEndY}
+          dryingEndY={dryingTimeInfo.dryingEndY}
+          isVisible={isDragging}
         />
       )}
 

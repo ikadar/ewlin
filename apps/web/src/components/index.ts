@@ -37,5 +37,8 @@ export type { PlacementIndicatorProps } from './PlacementIndicator';
 export { PrecedenceLines } from './PrecedenceLines';
 export type { PrecedenceLinesProps } from './PrecedenceLines';
 
+export { DryingTimeIndicator } from './DryingTimeIndicator';
+export type { DryingTimeIndicatorProps } from './DryingTimeIndicator';
+
 export { TopNavBar, ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from './TopNavBar';
 export type { TopNavBarProps } from './TopNavBar';

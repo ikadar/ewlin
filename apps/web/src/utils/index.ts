@@ -35,4 +35,5 @@ export {
   getSubcolumnLayout,
 } from './subcolumnLayout';
 export type { SubcolumnLayout } from './subcolumnLayout';
-export { getPredecessorConstraint, getSuccessorConstraint } from './precedenceConstraints';
+export { getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo } from './precedenceConstraints';
+export type { DryingTimeInfo } from './precedenceConstraints';
