@@ -1422,7 +1422,8 @@ function AppContent() {
       </div>
 
       {/* Drag layer - portal-based preview of dragged tile */}
-      <DragLayer />
+      {/* v0.3.52: Pass validation message for display during invalid drag */}
+      <DragLayer validationMessage={validation.message} />
     </>
   );
 }
