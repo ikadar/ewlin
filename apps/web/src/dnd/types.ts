@@ -31,6 +31,8 @@ export interface DragValidationState {
   hasPrecedenceConflict: boolean;
   suggestedStart: string | null;
   hasWarningOnly: boolean;
+  /** v0.3.52: Human-readable validation message (French) */
+  message: string | null;
 }
 
 /** Global drag state shared via context */
@@ -71,6 +73,7 @@ export const INITIAL_DRAG_STATE: DragState = {
     hasPrecedenceConflict: false,
     suggestedStart: null,
     hasWarningOnly: false,
+    message: null,
   },
   pixelsPerHour: DEFAULT_PIXELS_PER_HOUR,
 };

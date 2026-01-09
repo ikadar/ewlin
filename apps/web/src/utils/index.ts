@@ -37,3 +37,4 @@ export {
 export type { SubcolumnLayout } from './subcolumnLayout';
 export { getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo } from './precedenceConstraints';
 export type { DryingTimeInfo } from './precedenceConstraints';
+export { getValidationMessage, getPrimaryValidationMessage } from './validationMessages';

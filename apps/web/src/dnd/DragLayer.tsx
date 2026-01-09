@@ -4,12 +4,14 @@
  * Replaces dnd-kit's DragOverlay component.
  * Uses monitorForElements to track drag position and renders
  * the DragPreview component at the cursor position.
+ *
+ * v0.3.52: Added validation message display below drag preview.
  */
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { DragPreview, snapToGrid } from '../components/DragPreview';
+import { DragPreview, ValidationMessage, snapToGrid } from '../components/DragPreview';
 import { useDragStateValue } from './DragStateContext';
 
 interface DragPosition {
@@ -17,11 +19,16 @@ interface DragPosition {
   y: number;
 }
 
+export interface DragLayerProps {
+  /** v0.3.52: Validation message to display (French) */
+  validationMessage?: string | null;
+}
+
 /**
  * DragLayer component that renders a drag preview at the cursor position.
  * Must be placed inside DragStateProvider.
  */
-export function DragLayer() {
+export function DragLayer({ validationMessage }: DragLayerProps) {
   const { isDragging, activeTask, activeJob, grabOffset, pixelsPerHour } = useDragStateValue();
   const [position, setPosition] = useState<DragPosition | null>(null);
 
@@ -90,6 +97,10 @@ export function DragLayer() {
   return createPortal(
     <div style={previewStyle}>
       <DragPreview task={activeTask} job={activeJob} />
+      {/* v0.3.52: Validation message below drag preview */}
+      {validationMessage && (
+        <ValidationMessage message={validationMessage} />
+      )}
     </div>,
     document.body
   );

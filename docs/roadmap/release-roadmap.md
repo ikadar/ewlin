@@ -960,19 +960,20 @@ This document contains the development roadmap for the Flux print shop schedulin
 - `apps/web/src/utils/precedenceConstraints.ts`
 - `apps/web/src/App.tsx`
 
-#### v0.3.52 - Human-Readable Validation Messages
+#### v0.3.52 - Human-Readable Validation Messages ✅
 > **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-07-human-readable-validation-messages)
 
-- [ ] Generate human-readable messages for each conflict type
-- [ ] Display validation message during drag (tooltip or overlay)
-- [ ] Message types: station unavailable, task conflict, precedence, BAT, group capacity
-- [ ] French localization
-- [ ] E2E tests
+- [x] Generate human-readable messages for each conflict type
+- [x] Display validation message during drag (tooltip below preview)
+- [x] Message types: station unavailable, precedence, BAT, group capacity, deadline
+- [x] French localization
+- [x] Test fixture
 
 **Affected files:**
-- `apps/web/src/components/DragPreview/DragPreview.tsx`
-- `packages/validator/` - message generation
-- `apps/web/src/dnd/` - validation hooks
+- `apps/web/src/components/DragPreview/ValidationMessage.tsx` (new)
+- `apps/web/src/utils/validationMessages.ts` (new)
+- `apps/web/src/dnd/DragLayer.tsx`
+- `apps/web/src/hooks/useDropValidation.ts`
 
 #### v0.3.53 - Precedence Lines + Working Hours
 > **Implements:** [REQ-03](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-03-precedence-lines-should-respect-non-working-hours)

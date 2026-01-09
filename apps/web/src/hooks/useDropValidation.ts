@@ -6,6 +6,7 @@ import type {
   ValidationResult,
   Task,
 } from '@flux/types';
+import { getPrimaryValidationMessage } from '../utils';
 
 export interface DropValidationParams {
   /** Current schedule snapshot */
@@ -35,6 +36,8 @@ export interface DropValidationResult {
   hasWarningOnly: boolean;
   /** Whether there's a group capacity conflict (REQ-18) */
   hasGroupCapacityConflict: boolean;
+  /** v0.3.52: Human-readable validation message (French) */
+  message: string | null;
 }
 
 /**
@@ -112,6 +115,7 @@ export function useDropValidation({
         conflicts: [],
         hasWarningOnly: false,
         hasGroupCapacityConflict: false,
+        message: null,
       };
     }
 
@@ -138,6 +142,13 @@ export function useDropValidation({
     );
     const hasWarningOnly = hasConflicts && blockingConflicts.length === 0 && warningConflicts.length > 0;
 
+    // v0.3.52: Get primary validation message (French)
+    const message = getPrimaryValidationMessage(
+      validationResult.conflicts,
+      validationResult.valid,
+      hasWarningOnly
+    );
+
     return {
       isValid: validationResult.valid,
       hasPrecedenceConflict,
@@ -146,6 +157,7 @@ export function useDropValidation({
       conflicts: validationResult.conflicts,
       hasWarningOnly,
       hasGroupCapacityConflict,
+      message,
     };
   }, [validationResult, hasPrecedenceConflictWithoutBypass]);
 

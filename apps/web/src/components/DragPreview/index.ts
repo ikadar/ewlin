@@ -1,6 +1,9 @@
 export { DragPreview } from './DragPreview';
 export type { DragPreviewProps } from './DragPreview';
 
+export { ValidationMessage } from './ValidationMessage';
+export type { ValidationMessageProps } from './ValidationMessage';
+
 export {
   snapToGrid,
   yPositionToTime,
