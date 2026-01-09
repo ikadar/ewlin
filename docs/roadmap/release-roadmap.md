@@ -927,20 +927,22 @@ This document contains the development roadmap for the Flux print shop schedulin
 **Affected files:**
 - `apps/web/src/components/DateStrip/DateStrip.tsx`
 
-#### v0.3.50 - DateStrip & UX Improvements
-> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-01-month-visibility-in-datestrip), [REQ-02](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-02-clickable-dates-in-job-details-panel), [REQ-06](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-06-clarify-group-capacity-display)
+#### v0.3.50 - DateStrip & UX Improvements ✅
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-01-month-visibility-in-datestrip) (tooltip), [REQ-02](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-02-clickable-dates-in-job-details-panel)
 
-- [ ] **REQ-01:** Month visibility in DateStrip (sticky header or tooltip)
-- [ ] **REQ-02:** Clickable dates in Job Details Panel (Départ, BAT Approuvé)
-- [ ] **REQ-02:** DateStrip `scrollToDate` API
-- [ ] **REQ-06:** Improved group capacity tooltip text
-- [ ] E2E tests
+- [x] **REQ-01:** Date tooltip on hover (custom, instant appearance, French locale)
+- [x] **REQ-02:** Clickable Départ date in Job Details Panel
+- [x] **REQ-02:** Clickable BAT approval date when approved
+- [x] Station header cleanup (removed group capacity display)
 
 **Affected files:**
-- `apps/web/src/components/DateStrip/DateStrip.tsx`
 - `apps/web/src/components/DateStrip/DateCell.tsx`
+- `apps/web/src/components/JobDetailsPanel/InfoField.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobInfo.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobStatus.tsx`
 - `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
 - `apps/web/src/components/StationHeaders/StationHeader.tsx`
+- `apps/web/src/App.tsx`
 
 #### v0.3.51 - Impossible Placement Visual Hint
 > **Implements:** [REQ-04](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-04-visual-hint-for-impossible-placement)
