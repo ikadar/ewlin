@@ -4,12 +4,14 @@ import { InfoField } from './InfoField';
 export interface JobStatusProps {
   /** The job to display status for */
   job: Job;
+  /** REQ-02: Callback when BAT approval date is clicked */
+  onDateClick?: (date: Date) => void;
 }
 
 /**
  * Job status section displaying BAT, Papier, Plaques.
  */
-export function JobStatus({ job }: JobStatusProps) {
+export function JobStatus({ job, onDateClick }: JobStatusProps) {
   // Format BAT (proof) status
   const formatBatStatus = (): string => {
     const { proofApproval } = job;
@@ -43,6 +45,11 @@ export function JobStatus({ job }: JobStatusProps) {
     return 'En attente';
   };
 
+  // REQ-02: Handle BAT date click (only when approved)
+  const handleBatDateClick = onDateClick && job.proofApproval.approvedAt
+    ? () => onDateClick(new Date(job.proofApproval.approvedAt!))
+    : undefined;
+
   // Format paper status
   const formatPaperStatus = (): string => {
     const statusMap: Record<string, string> = {
@@ -65,7 +72,7 @@ export function JobStatus({ job }: JobStatusProps) {
 
   return (
     <>
-      <InfoField label="BAT" value={formatBatStatus()} />
+      <InfoField label="BAT" value={formatBatStatus()} onClick={handleBatDateClick} />
       <InfoField label="Papier" value={formatPaperStatus()} />
       <InfoField label="Plaques" value={formatPlatesStatus()} />
     </>

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ViewportIndicator } from './ViewportIndicator';
 import { TaskMarkers, type TaskMarker } from './TaskMarkers';
 import { ExitTriangle } from './ExitTriangle';
@@ -65,6 +66,30 @@ export function DateCell({
   const dayAbbrev = getFrenchDayAbbrev(date);
   const dayNumber = date.getDate().toString().padStart(2, '0');
 
+  // REQ-01: Full date tooltip in French (e.g., "Vendredi 9 janvier 2026")
+  const fullDateString = date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  // Capitalize first letter (toLocaleDateString returns lowercase weekday)
+  const tooltipDate = fullDateString.charAt(0).toUpperCase() + fullDateString.slice(1);
+
+  // Custom tooltip state for fast appearance
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+
+  // Calculate tooltip position on mouse enter
+  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipPosition({
+      top: rect.top + rect.height / 2,
+      left: rect.right + 8, // 8px gap from the cell
+    });
+    setShowTooltip(true);
+  };
+
   // Determine styling based on state (priority: departure > focused > normal)
   // REQ-09.3: Today is now indicated by a thin line, not background color
   let textColor = 'text-zinc-500';
@@ -110,8 +135,20 @@ export function DateCell({
       type="button"
       className={`h-10 w-full flex flex-col items-center justify-center text-xs font-mono ${textColor} border-b ${borderColor} cursor-pointer hover:bg-white/5 transition-colors ${bgColor} relative overflow-visible`}
       onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowTooltip(false)}
       data-testid={`date-cell-${date.toISOString().split('T')[0]}`}
     >
+      {/* REQ-01: Custom tooltip with fast appearance - uses fixed position to escape overflow */}
+      {showTooltip && (
+        <div
+          className="fixed z-50 px-2 py-1 bg-zinc-800 text-zinc-200 text-xs rounded shadow-lg whitespace-nowrap pointer-events-none -translate-y-1/2"
+          style={{ top: tooltipPosition.top, left: tooltipPosition.left }}
+          role="tooltip"
+        >
+          {tooltipDate}
+        </div>
+      )}
       {/* v0.3.47: Viewport indicator (gray rectangle showing visible portion) */}
       {/* Shows on all days that overlap with the viewport, not just the focused day */}
       {hasViewportOverlap && (
