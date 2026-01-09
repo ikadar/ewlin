@@ -46,7 +46,9 @@ This document contains the development roadmap for the Flux print shop schedulin
 | **M1** | Core Domain MVP (Station + Job Management) |
 | **M2** | Scheduling Core (Assignment + Validation) |
 | **M3** | Frontend Integration |
-| **M4** | Production Readiness |
+| **M4** | Backend API Integration |
+| **M5** | DSL Editor (Post-MVP) |
+| **M6** | Production Readiness |
 | **Post-MVP** | Schedule Branching, Optimization |
 
 ---
@@ -911,53 +913,146 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] Update Quick Placement handlers to use current pixelsPerHour state
 - [x] Add E2E test for snapping at different zoom levels
 
-### Phase 3I: Backend API Integration
+### Phase 3I: UX Polish & Performance
 
-#### v0.3.51 - Validator Package Integration
+> **Reference:** [Refactored Requirements Part 3](../ux-ui/tmp/refactored-new-requirements-03-en.md)
+
+#### v0.3.49 - Hide DateStrip Scrollbar ✅
+> **Implements:** [REQ-08](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-08-hide-datestrip-scrollbar)
+
+- [x] Hide scrollbar with CSS (webkit, Firefox, Edge)
+- [x] Maintain scroll functionality (mouse wheel, touch)
+- [x] Tailwind arbitrary value CSS classes
+
+**Affected files:**
+- `apps/web/src/components/DateStrip/DateStrip.tsx`
+
+#### v0.3.50 - DateStrip & UX Improvements
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-01-month-visibility-in-datestrip), [REQ-02](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-02-clickable-dates-in-job-details-panel), [REQ-06](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-06-clarify-group-capacity-display)
+
+- [ ] **REQ-01:** Month visibility in DateStrip (sticky header or tooltip)
+- [ ] **REQ-02:** Clickable dates in Job Details Panel (Départ, BAT Approuvé)
+- [ ] **REQ-02:** DateStrip `scrollToDate` API
+- [ ] **REQ-06:** Improved group capacity tooltip text
+- [ ] E2E tests
+
+**Affected files:**
+- `apps/web/src/components/DateStrip/DateStrip.tsx`
+- `apps/web/src/components/DateStrip/DateCell.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
+- `apps/web/src/components/StationHeaders/StationHeader.tsx`
+
+#### v0.3.51 - Impossible Placement Visual Hint
+> **Implements:** [REQ-04](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-04-visual-hint-for-impossible-placement)
+
+- [ ] Detect when earliest start > latest start (impossible placement)
+- [ ] Red/striped zone between inverted constraint lines
+- [ ] Warning icon or tooltip: "Task cannot fit"
+- [ ] E2E tests
+
+**Affected files:**
+- `apps/web/src/components/PrecedenceLines/PrecedenceLines.tsx`
+- `apps/web/src/App.tsx` - constraint calculation
+
+#### v0.3.52 - Human-Readable Validation Messages
+> **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-07-human-readable-validation-messages)
+
+- [ ] Generate human-readable messages for each conflict type
+- [ ] Display validation message during drag (tooltip or overlay)
+- [ ] Message types: station unavailable, task conflict, precedence, BAT, group capacity
+- [ ] French localization
+- [ ] E2E tests
+
+**Affected files:**
+- `apps/web/src/components/DragPreview/DragPreview.tsx`
+- `packages/validator/` - message generation
+- `apps/web/src/dnd/` - validation hooks
+
+#### v0.3.53 - Precedence Lines + Working Hours
+> **Implements:** [REQ-03](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-03-precedence-lines-should-respect-non-working-hours)
+
+- [ ] `addWorkingTime` utility function
+- [ ] Account for lunch breaks in constraint calculation
+- [ ] Account for non-working hours (before/after business hours)
+- [ ] Account for weekends and station exceptions
+- [ ] Update precedence line positions
+- [ ] E2E tests
+
+**Affected files:**
+- `apps/web/src/App.tsx` - constraint calculation
+- `packages/validator/src/validators/precedence.ts`
+- New utility: `addWorkingTime.ts`
+
+#### v0.3.54 - Dragover Performance Optimization
+> **Implements:** [REQ-05](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-05-dragover-performance-with-many-tiles)
+
+- [ ] Profile with React DevTools Profiler
+- [ ] Memoize StationColumn with custom comparison
+- [ ] Optimize constraint line calculation (only when target changes)
+- [ ] Use refs for high-frequency drag state updates
+- [ ] Throttle dragover handler (~60fps)
+- [ ] Performance tests: 20+ tiles without lag
+
+**Affected files:**
+- `apps/web/src/components/StationColumns/StationColumn.tsx`
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/dnd/DragStateContext.tsx`
+
+---
+
+## Milestone 4: Backend API Integration (v0.4.x)
+
+### Phase 4A: Validator & API Setup
+
+#### v0.4.0 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-#### v0.3.52 - API Client Setup
+#### v0.4.1 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.3.53 - Snapshot Loading
+#### v0.4.2 - Snapshot Loading
 - [ ] Replace mock with real API
 - [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.3.54 - Assignment Operations Integration
+#### v0.4.3 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
 - [ ] Toggle completion via API
 - [ ] Server validation response handling
 
-### Phase 3J: DSL Editor (Post-MVP scope)
+---
+
+## Milestone 5: DSL Editor (v0.5.x, Post-MVP)
 
 > **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
 
-#### v0.3.55 - DSL Parser Package (Post-MVP)
+### Phase 5A: DSL Parser & Job Creation
+
+#### v0.5.0 - DSL Parser Package
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition
 - [ ] CodeMirror 6 integration
 - [ ] Syntax highlighting
 
-#### v0.3.56 - Job Creation Modal (Post-MVP)
+#### v0.5.1 - Job Creation Modal
 - [ ] Modal component
 - [ ] DSL textarea with highlighting
 - [ ] Autocomplete integration
 
 ---
 
-## Milestone 4: Production Readiness (v1.0.x)
+## Milestone 6: Production Readiness (v1.0.x)
 
-### Phase 4A: Security & Auth
+### Phase 6A: Security & Auth
 
 #### v1.0.0 - Authentication
 - [ ] JWT authentication implementation
@@ -971,7 +1066,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Permission checks on endpoints
 - [ ] Frontend permission guards
 
-### Phase 4B: Performance & Reliability
+### Phase 6B: Performance & Reliability
 
 #### v1.0.2 - Caching Layer
 - [ ] Redis cache integration
@@ -991,7 +1086,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Memoization optimization
 - [ ] 60 FPS verification
 
-### Phase 4C: Operations
+### Phase 6C: Operations
 
 #### v1.0.5 - Monitoring & Logging
 - [ ] Prometheus metrics endpoints
@@ -1056,7 +1151,9 @@ This document contains the development roadmap for the Flux print shop schedulin
 | M1 | v0.1.x | Core Domain (Station + Job) |
 | M2 | v0.2.x | Scheduling Core (Assignment + Validation) |
 | M3 | v0.3.x | Frontend Integration |
-| M4 | v1.0.x | Production Readiness |
+| M4 | v0.4.x | Backend API Integration |
+| M5 | v0.5.x | DSL Editor (Post-MVP) |
+| M6 | v1.0.x | Production Readiness |
 | Post-MVP | v1.1+ | Branching, Optimization, Reporting |
 
 ---

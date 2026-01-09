@@ -147,7 +147,7 @@ export function DateStrip({
   return (
     <div
       ref={containerRef}
-      className="w-12 h-full shrink-0 bg-zinc-950 overflow-y-auto border-r border-white/5"
+      className="w-12 h-full shrink-0 bg-zinc-950 overflow-y-auto border-r border-white/5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       data-testid="datestrip-container"
     >
       {/* v0.3.46: Virtual scroll container with full height */}
