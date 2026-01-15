@@ -419,7 +419,7 @@ function AppContent() {
 
   // Get pick state from context (Pick & Place mode)
   const { state: pickState, pickTask, cancelPick, updateHover: _updatePickHover, placeTask } = usePickState();
-  const { isPicking, pickedTask, pickedJob, hoverPosition: _pickHoverPosition } = pickState;
+  const { isPicking, pickedTask, pickedJob, hoverPosition: _pickHoverPosition, pickSource, originalAssignmentId } = pickState;
 
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
@@ -1115,8 +1115,8 @@ function AppContent() {
       };
     }
 
-    // Start pick mode
-    pickTask(task, job);
+    // Start pick mode (source = 'sidebar' for unscheduled tasks)
+    pickTask(task, job, 'sidebar');
 
     // v0.3.55: Scroll to target station column (300ms animation)
     const stationId = task.stationId;
@@ -1131,7 +1131,33 @@ function AppContent() {
       gridRef.current.scrollTo(scrollTargetX, gridRef.current.getScrollY(), 'smooth');
     }
 
-    console.log('Pick task:', { taskId: task.id, jobId: job.id, stationId });
+    console.log('Pick task from sidebar:', { taskId: task.id, jobId: job.id, stationId });
+  }, [pickTask, snapshot.stations]);
+
+  // v0.3.57: Handle pick task from grid tile (for reschedule)
+  const handlePickTileFromGrid = useCallback((assignmentId: string, task: InternalTask, job: Job) => {
+    // v0.3.55: Save current scroll position for restoration on cancel
+    if (gridRef.current) {
+      savedScrollPositionRef.current = {
+        x: gridRef.current.getScrollX(),
+        y: gridRef.current.getScrollY(),
+      };
+    }
+
+    // Start pick mode with source='grid' and assignmentId for reschedule
+    pickTask(task, job, 'grid', assignmentId);
+
+    // Scroll to target station column (300ms animation)
+    const stationId = task.stationId;
+    const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
+
+    if (stationIndex >= 0 && gridRef.current) {
+      const stationX = LAYOUT.PADDING_LEFT + stationIndex * (LAYOUT.STATION_WIDTH + LAYOUT.GAP);
+      const scrollTargetX = Math.max(0, stationX - LAYOUT.TIMELINE_WIDTH - 20);
+      gridRef.current.scrollTo(scrollTargetX, gridRef.current.getScrollY(), 'smooth');
+    }
+
+    console.log('Pick task from grid (reschedule):', { assignmentId, taskId: task.id, jobId: job.id, stationId });
   }, [pickTask, snapshot.stations]);
 
   // Handle recall - remove assignment (double-click on tile)
@@ -1471,24 +1497,18 @@ function AppContent() {
       return;
     }
 
-    // Create the assignment
-    const newAssignment: TaskAssignment = {
-      id: generateId(),
-      taskId: pickedTask.id,
-      targetId: stationId,
-      isOutsourced: false,
-      scheduledStart,
-      scheduledEnd,
-      isCompleted: false,
-      completedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    // v0.3.57: Handle reschedule (grid pick) vs new placement (sidebar pick)
+    const isReschedule = pickSource === 'grid' && originalAssignmentId;
 
-    // Update snapshot with new assignment and push-down logic
+    // Update snapshot with assignment and push-down logic
     updateSnapshot((currentSnapshot) => {
+      // For reschedule, exclude the original assignment from push-down calculation
+      const assignmentsForPushDown = isReschedule
+        ? currentSnapshot.assignments.filter((a) => a.id !== originalAssignmentId)
+        : currentSnapshot.assignments;
+
       const { updatedAssignments, shiftedIds } = applyPushDown(
-        currentSnapshot.assignments,
+        assignmentsForPushDown,
         stationId,
         scheduledStart,
         scheduledEnd,
@@ -1513,9 +1533,52 @@ function AppContent() {
         });
       }
 
+      // Create or update assignment
+      let finalAssignment: TaskAssignment;
+      if (isReschedule) {
+        // Reschedule: update existing assignment
+        const existingAssignment = currentSnapshot.assignments.find((a) => a.id === originalAssignmentId);
+        if (existingAssignment) {
+          finalAssignment = {
+            ...existingAssignment,
+            scheduledStart,
+            scheduledEnd,
+            updatedAt: new Date().toISOString(),
+          };
+        } else {
+          // Fallback: create new if original not found
+          finalAssignment = {
+            id: generateId(),
+            taskId: pickedTask.id,
+            targetId: stationId,
+            isOutsourced: false,
+            scheduledStart,
+            scheduledEnd,
+            isCompleted: false,
+            completedAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      } else {
+        // New placement: create new assignment
+        finalAssignment = {
+          id: generateId(),
+          taskId: pickedTask.id,
+          targetId: stationId,
+          isOutsourced: false,
+          scheduledStart,
+          scheduledEnd,
+          isCompleted: false,
+          completedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
       return {
         ...currentSnapshot,
-        assignments: [...updatedAssignments, newAssignment],
+        assignments: [...updatedAssignments, finalAssignment],
         conflicts: newConflicts,
       };
     });
@@ -1524,14 +1587,15 @@ function AppContent() {
     setSnapshotVersion((v) => v + 1);
     placeTask();
 
-    console.log('Pick & Place assignment created:', {
-      assignmentId: newAssignment.id,
+    console.log(isReschedule ? 'Pick & Place reschedule completed:' : 'Pick & Place assignment created:', {
+      assignmentId: isReschedule ? originalAssignmentId : 'new',
       taskId: pickedTask.id,
       stationId,
       scheduledStart,
       scheduledEnd,
+      pickSource,
     });
-  }, [isPicking, pickedTask, pickedJob, isAltPressed, snapshot, gridStartDate, pixelsPerHour, placeTask]);
+  }, [isPicking, pickedTask, pickedJob, isAltPressed, snapshot, gridStartDate, pixelsPerHour, placeTask, pickSource, originalAssignmentId]);
 
   // Global click handler for Pick & Place mode
   useEffect(() => {
@@ -1748,6 +1812,8 @@ function AppContent() {
           onPickMouseMove={handlePickMouseMove}
           onPickMouseLeave={handlePickMouseLeave}
           pickValidation={pickValidation}
+          onPickTile={handlePickTileFromGrid}
+          pickedAssignmentId={originalAssignmentId}
         />
           </div>
         </div>

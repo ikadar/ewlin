@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, memo } from 'react';
-import { Circle, CircleCheck } from 'lucide-react';
+import { Circle, CircleCheck, Info } from 'lucide-react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
 import type { TaskAssignment, Job, InternalTask } from '@flux/types';
@@ -50,6 +50,12 @@ export interface TileProps {
   isOutsourced?: boolean;
   /** Subcolumn layout for provider columns (REQ-19) */
   subcolumnLayout?: SubcolumnLayout;
+  /** v0.3.57: Callback when tile is picked for placement */
+  onPick?: (assignmentId: string, task: InternalTask, job: Job) => void;
+  /** v0.3.57: Whether this tile is currently picked (in pick mode) */
+  isPicked?: boolean;
+  /** v0.3.57: Callback when info button is clicked (opens job details) */
+  onInfoClick?: (jobId: string) => void;
 }
 
 /**
@@ -85,6 +91,9 @@ export const Tile = memo(function Tile({
   pixelsPerHour = PIXELS_PER_HOUR,
   isOutsourced = false,
   subcolumnLayout,
+  onPick,
+  isPicked = false,
+  onInfoClick,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
@@ -168,14 +177,35 @@ export const Tile = memo(function Tile({
     ? 'linear-gradient(to right, rgba(34,197,94,0.6) 0%, rgba(34,197,94,0.2) 50%, transparent 100%)'
     : undefined;
 
-  // Handle click (select job)
+  // v0.3.57: Handle click - pick for placement (if not completed and onPick provided)
+  // Falls back to select if onPick not provided
   const handleClick = () => {
-    onSelect?.(job.id);
+    // Don't pick if completed
+    if (isCompleted) {
+      onSelect?.(job.id);
+      return;
+    }
+    // If pick is available, use it; otherwise fallback to select
+    if (onPick) {
+      onPick(assignment.id, task, job);
+    } else {
+      onSelect?.(job.id);
+    }
   };
 
   // Handle double click (recall)
   const handleDoubleClick = () => {
     onRecall?.(assignment.id);
+  };
+
+  // v0.3.57: Handle info button click (opens job details)
+  const handleInfoClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger tile click (pick)
+    if (onInfoClick) {
+      onInfoClick(job.id);
+    } else {
+      onSelect?.(job.id); // Fallback to select
+    }
   };
 
   // Handle swap
@@ -240,9 +270,11 @@ export const Tile = memo(function Tile({
 
   // REQ-19: Outsourced tile styling
   const outsourcedBorderClass = isOutsourced ? 'border-2 border-dashed' : 'border-l-4';
-  const cursorClass = isOutsourced ? 'cursor-default' : 'cursor-grab';
+  // v0.3.57: Cursor grab for pickable tiles (non-completed, non-outsourced)
+  const isPickable = !isOutsourced && !isCompleted && onPick;
+  const cursorClass = isOutsourced ? 'cursor-default' : isPickable ? 'cursor-grab' : 'cursor-default';
 
-  // Ghost placeholder shown at original position when tile is being dragged
+  // Ghost placeholder shown at original position when tile is being dragged or picked
   if (isDragging) {
     return (
       <div
@@ -250,6 +282,17 @@ export const Tile = memo(function Tile({
         className="absolute left-0 right-0 border-2 border-dashed border-zinc-600 bg-zinc-800/30 rounded pointer-events-none"
         style={{ top: `${top}px`, height: `${totalHeight}px`, ...subcolumnStyle }}
         data-testid={`tile-ghost-${assignment.id}`}
+      />
+    );
+  }
+
+  // v0.3.57: Show ghost placeholder when picked (similar to drag)
+  if (isPicked) {
+    return (
+      <div
+        className="absolute left-0 right-0 border-2 border-dashed border-zinc-500 bg-zinc-700/40 rounded pointer-events-none animate-pulse-opacity"
+        style={{ top: `${top}px`, height: `${totalHeight}px`, ...subcolumnStyle }}
+        data-testid={`tile-picked-${assignment.id}`}
       />
     );
   }
@@ -365,6 +408,18 @@ export const Tile = memo(function Tile({
         showUp={showSwapUp}
         showDown={showSwapDown}
       />
+
+      {/* v0.3.57: Info button (visible on hover, for opening job details) */}
+      {!isOutsourced && (
+        <button
+          className="absolute top-0.5 right-0.5 p-0.5 rounded opacity-30 group-hover:opacity-100 transition-opacity duration-150 hover:bg-zinc-800/50 cursor-pointer z-10"
+          onClick={handleInfoClick}
+          data-testid="tile-info-button"
+          aria-label="View job details"
+        >
+          <Info className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
+        </button>
+      )}
     </div>
   );
 }, (prevProps, nextProps) => {
@@ -393,12 +448,17 @@ export const Tile = memo(function Tile({
   if (prevProps.similarityResults !== nextProps.similarityResults) return false;
   if (prevProps.subcolumnLayout !== nextProps.subcolumnLayout) return false;
 
+  // v0.3.57: Check pick-related props
+  if (prevProps.isPicked !== nextProps.isPicked) return false;
+
   // Callbacks - compare by reference
   if (prevProps.onSelect !== nextProps.onSelect) return false;
   if (prevProps.onRecall !== nextProps.onRecall) return false;
   if (prevProps.onSwapUp !== nextProps.onSwapUp) return false;
   if (prevProps.onSwapDown !== nextProps.onSwapDown) return false;
   if (prevProps.onToggleComplete !== nextProps.onToggleComplete) return false;
+  if (prevProps.onPick !== nextProps.onPick) return false;
+  if (prevProps.onInfoClick !== nextProps.onInfoClick) return false;
 
   return true; // Props are equal, skip re-render
 });

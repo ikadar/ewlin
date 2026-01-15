@@ -1,4 +1,4 @@
-import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider } from '@flux/types';
 import type { DryingTimeInfo } from '../../utils';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
@@ -145,6 +145,17 @@ export interface SchedulingGridProps {
   onPickMouseMove?: (stationId: string, y: number) => void;
   /** v0.3.54: Callback when mouse leaves a station column during pick mode */
   onPickMouseLeave?: () => void;
+  /** v0.3.55: Pick mode validation state for real-time ring color feedback */
+  pickValidation?: {
+    isValid: boolean;
+    hasPrecedenceConflict: boolean;
+    suggestedStart: string | null;
+    hasWarningOnly: boolean;
+  };
+  /** v0.3.57: Callback when a tile is picked from the grid (for reschedule) */
+  onPickTile?: (assignmentId: string, task: InternalTask, job: Job) => void;
+  /** v0.3.57: Assignment ID of the currently picked tile (for visual state) */
+  pickedAssignmentId?: string | null;
 }
 
 /**
@@ -198,6 +209,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       pickIndicatorY,
       onPickMouseMove,
       onPickMouseLeave,
+      pickValidation,
+      onPickTile,
+      pickedAssignmentId,
     },
     ref
   ) {
@@ -484,6 +498,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 provider={provider}
               />
             ))}
+
+            {/* v0.3.55: Matching padding for header row */}
+            <div
+              className="shrink-0"
+              style={{ minWidth: 'calc(100vw - 400px)' }}
+              aria-hidden="true"
+            />
           </div>
         </div>
 
@@ -607,6 +628,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   isPickTargetStation={isPickTargetStation}
                   onPickMouseMove={onPickMouseMove}
                   onPickMouseLeave={onPickMouseLeave}
+                  pickValidation={isPickTargetStation ? pickValidation : undefined}
                   precedenceConstraints={effectivePrecedenceConstraints}
                   dryingTimeInfo={effectiveDryingTimeInfo}
                   visibleDayRange={virtualScroll.visibleRange}
@@ -658,6 +680,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         selectedJobId={selectedJobId ?? undefined}
                         hasConflict={conflictTaskIds.has(task.id)}
                         pixelsPerHour={pixelsPerHour}
+                        onPick={onPickTile}
+                        isPicked={pickedAssignmentId === assignment.id}
+                        onInfoClick={onSelectJob}
                       />
                     );
                   })}
@@ -710,12 +735,20 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         pixelsPerHour={pixelsPerHour}
                         isOutsourced={true}
                         subcolumnLayout={layout}
+                        onInfoClick={onSelectJob}
                       />
                     );
                   })}
                 </ProviderColumn>
               );
             })}
+
+            {/* v0.3.55: Dynamic padding to allow scrolling any column to a fixed position */}
+            <div
+              className="shrink-0"
+              style={{ minWidth: 'calc(100vw - 400px)' }}
+              aria-hidden="true"
+            />
           </div>
         </div>
       </div>

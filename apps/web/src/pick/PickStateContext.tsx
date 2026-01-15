@@ -3,10 +3,15 @@
  *
  * Replaces drag & drop from sidebar with a click-to-pick, click-to-place pattern.
  * Like a painter dipping their brush in paint, then placing it on canvas.
+ *
+ * v0.3.57: Extended to support pick from grid tiles (reschedule flow)
  */
 
 import { createContext, useContext, useReducer, useCallback, useMemo, type ReactNode } from 'react';
 import type { Task, Job } from '@flux/types';
+
+/** Source of the pick operation */
+export type PickSource = 'sidebar' | 'grid';
 
 /** Pick mode state */
 export interface PickState {
@@ -16,6 +21,10 @@ export interface PickState {
   pickedTask: Task | null;
   /** The job the picked task belongs to (null when not picking) */
   pickedJob: Job | null;
+  /** v0.3.57: Source of the pick (sidebar = new placement, grid = reschedule) */
+  pickSource: PickSource | null;
+  /** v0.3.57: Original assignment ID when picking from grid (for reschedule) */
+  originalAssignmentId: string | null;
   /** Current hover position over grid */
   hoverPosition: {
     stationId: string | null;
@@ -28,6 +37,8 @@ export const INITIAL_PICK_STATE: PickState = {
   isPicking: false,
   pickedTask: null,
   pickedJob: null,
+  pickSource: null,
+  originalAssignmentId: null,
   hoverPosition: {
     stationId: null,
     snappedY: 0,
@@ -36,7 +47,7 @@ export const INITIAL_PICK_STATE: PickState = {
 
 // Action types
 type PickAction =
-  | { type: 'PICK_TASK'; payload: { task: Task; job: Job } }
+  | { type: 'PICK_TASK'; payload: { task: Task; job: Job; source: PickSource; assignmentId?: string } }
   | { type: 'CANCEL_PICK' }
   | { type: 'UPDATE_HOVER'; payload: { stationId: string | null; snappedY: number } }
   | { type: 'PLACE_TASK' };
@@ -50,6 +61,8 @@ function pickReducer(state: PickState, action: PickAction): PickState {
         isPicking: true,
         pickedTask: action.payload.task,
         pickedJob: action.payload.job,
+        pickSource: action.payload.source,
+        originalAssignmentId: action.payload.assignmentId ?? null,
         hoverPosition: { stationId: null, snappedY: 0 },
       };
     case 'CANCEL_PICK':
@@ -68,7 +81,8 @@ function pickReducer(state: PickState, action: PickAction): PickState {
 // Context type
 interface PickStateContextType {
   state: PickState;
-  pickTask: (task: Task, job: Job) => void;
+  /** Pick a task. For grid picks, provide assignmentId for reschedule. */
+  pickTask: (task: Task, job: Job, source?: PickSource, assignmentId?: string) => void;
   cancelPick: () => void;
   updateHover: (stationId: string | null, snappedY: number) => void;
   placeTask: () => void;
@@ -85,8 +99,8 @@ interface PickStateProviderProps {
 export function PickStateProvider({ children }: PickStateProviderProps) {
   const [state, dispatch] = useReducer(pickReducer, INITIAL_PICK_STATE);
 
-  const pickTask = useCallback((task: Task, job: Job) => {
-    dispatch({ type: 'PICK_TASK', payload: { task, job } });
+  const pickTask = useCallback((task: Task, job: Job, source: PickSource = 'sidebar', assignmentId?: string) => {
+    dispatch({ type: 'PICK_TASK', payload: { task, job, source, assignmentId } });
   }, []);
 
   const cancelPick = useCallback(() => {
