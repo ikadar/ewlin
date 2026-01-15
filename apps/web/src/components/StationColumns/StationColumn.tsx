@@ -47,7 +47,13 @@ export interface StationColumnProps {
   /** Callback when user clicks to place a task */
   onQuickPlacementClick?: (stationId: string, y: number) => void;
   /** REQ-10: Precedence constraint Y positions for visualization */
-  precedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** v0.3.56: Extended with label info for contextual display */
+  precedenceConstraints?: {
+    earliestY: number | null;
+    latestY: number | null;
+    earliestLabel?: { taskName: string; time: string } | null;
+    latestLabel?: { taskName: string; time: string } | null;
+  };
   /** v0.3.51: Drying time visualization info during drag */
   dryingTimeInfo?: DryingTimeInfo;
   /** v0.3.46: Visible day range for virtual scrolling (only render overlays/lines for these days) */
@@ -60,6 +66,13 @@ export interface StationColumnProps {
   onPickMouseMove?: (stationId: string, y: number) => void;
   /** v0.3.54: Callback when mouse leaves the column during pick mode */
   onPickMouseLeave?: () => void;
+  /** v0.3.55: Pick mode validation state for real-time ring color feedback */
+  pickValidation?: {
+    isValid: boolean;
+    hasPrecedenceConflict: boolean;
+    suggestedStart: string | null;
+    hasWarningOnly: boolean;
+  };
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -111,6 +124,7 @@ export const StationColumn = memo(function StationColumn({
   isPickTargetStation = false,
   onPickMouseMove,
   onPickMouseLeave,
+  pickValidation,
 }: StationColumnProps) {
   // Ref for the drop target element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -186,8 +200,29 @@ export const StationColumn = memo(function StationColumn({
     return lines;
   }, [visibleDayRange, pixelsPerHour, hoursToDisplay]);
 
-  // Determine highlight style based on drag state and validation
-  const getHighlightClass = () => {
+  // Determine highlight style based on drag state and validation (memoized for performance)
+  const highlightClass = useMemo(() => {
+    // v0.3.55: Pick mode styling with validation-based ring color
+    if (isPickMode && !isDragging) {
+      if (isPickTargetStation) {
+        // Target station - ring color based on validation
+        if (pickValidation?.hasWarningOnly) {
+          return 'ring-2 ring-orange-500 bg-orange-500/10';
+        }
+        if (pickValidation?.hasPrecedenceConflict && !pickValidation.isValid) {
+          return 'ring-2 ring-red-500 bg-red-500/10';
+        }
+        if (pickValidation?.isValid) {
+          return 'ring-2 ring-green-500 bg-green-500/10';
+        }
+        // Default: green ring when hovering (no validation yet or valid)
+        return 'ring-2 ring-green-500 bg-green-500/10';
+      } else {
+        // v0.3.55: Non-target stations fade out during pick mode
+        return 'opacity-0 pointer-events-none';
+      }
+    }
+
     // Priority: validation-based highlighting over basic drag state
     if (showBypassWarning) {
       // Alt-key bypass with precedence conflict - amber warning
@@ -221,7 +256,11 @@ export const StationColumn = memo(function StationColumn({
       return isOver ? 'ring-2 ring-green-500/50 bg-green-500/5' : 'ring-1 ring-green-500/30';
     }
     return '';
-  };
+  }, [
+    isPickMode, isDragging, isPickTargetStation, pickValidation,
+    showBypassWarning, isInvalidDrop, isWarningDrop, isValidDrop,
+    isQuickPlacementMode, hasAvailableTask, isValidDropTarget, isOver
+  ]);
 
   // Column width: full (240px / w-60) or collapsed (120px / w-30)
   const widthClass = isCollapsed ? 'w-30' : 'w-60';
@@ -273,7 +312,7 @@ export const StationColumn = memo(function StationColumn({
   return (
     <div
       ref={columnRef}
-      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${getHighlightClass()} ${getCursorClass()}`}
+      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${highlightClass} ${getCursorClass()}`}
       style={{ height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
       onMouseMove={handleMouseMove}
@@ -336,10 +375,13 @@ export const StationColumn = memo(function StationColumn({
       )}
 
       {/* REQ-10: Precedence Constraint Lines (during drag, quick placement, or pick mode) */}
+      {/* v0.3.56: Now includes contextual labels */}
       {precedenceConstraints && (
         <PrecedenceLines
           earliestY={precedenceConstraints.earliestY}
           latestY={precedenceConstraints.latestY}
+          earliestLabel={precedenceConstraints.earliestLabel}
+          latestLabel={precedenceConstraints.latestLabel}
           isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask) || (isPickMode && isPickTargetStation)}
         />
       )}

@@ -142,6 +142,14 @@ export interface DryingTimeInfo {
   dryingEndY: number;
 }
 
+/** v0.3.56: Label info for precedence constraint visualization */
+export interface PrecedenceLabelInfo {
+  /** Name of the constraining task */
+  taskName: string;
+  /** Effective time (HH:MM format) - includes drying time for earliest */
+  time: string;
+}
+
 /**
  * Check if a station is a printing (offset) station that requires dry time.
  */
@@ -284,5 +292,118 @@ export function getDryingTimeInfo(
     predecessorStationId: predecessorAssignment.targetId,
     predecessorEndY,
     dryingEndY,
+  };
+}
+
+/**
+ * Format a Date to HH:MM string.
+ */
+function formatTimeHHMM(date: Date): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+/**
+ * v0.3.56: Get label info for predecessor constraint line.
+ *
+ * Returns the predecessor task name and the effective time when work can start
+ * (includes drying time if applicable).
+ *
+ * @returns PrecedenceLabelInfo or null if no predecessor constraint
+ */
+export function getPredecessorLabelInfo(
+  task: Task,
+  snapshot: ScheduleSnapshot
+): PrecedenceLabelInfo | null {
+  // Find predecessor task
+  const predecessor = getPredecessorTask(snapshot, task);
+  if (!predecessor) {
+    return null;
+  }
+
+  // Find predecessor's assignment
+  const predecessorAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
+  if (!predecessorAssignment) {
+    return null;
+  }
+
+  // Get predecessor end time
+  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+
+  // Calculate effective time (includes drying if applicable)
+  let effectiveTime: Date;
+  if (!predecessorAssignment.isOutsourced && isPrintingStation(snapshot, predecessorAssignment.targetId)) {
+    // Add drying time
+    const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+    // Snap to working hours
+    const station = findStationById(snapshot, predecessorAssignment.targetId);
+    effectiveTime = station ? snapToNextWorkingTime(dryingEnd, station) : dryingEnd;
+  } else {
+    // No drying, snap to working hours
+    const station = predecessorAssignment.isOutsourced
+      ? undefined
+      : findStationById(snapshot, predecessorAssignment.targetId);
+    effectiveTime = station ? snapToNextWorkingTime(predecessorEnd, station) : predecessorEnd;
+  }
+
+  return {
+    taskName: predecessor.name,
+    time: formatTimeHHMM(effectiveTime),
+  };
+}
+
+/**
+ * v0.3.56: Get label info for successor constraint line.
+ *
+ * Returns the successor task name and the latest start time for the current task.
+ *
+ * @returns PrecedenceLabelInfo or null if no successor constraint
+ */
+export function getSuccessorLabelInfo(
+  task: Task,
+  snapshot: ScheduleSnapshot
+): PrecedenceLabelInfo | null {
+  // Find successor task
+  const successor = getSuccessorTask(snapshot, task);
+  if (!successor) {
+    return null;
+  }
+
+  // Find successor's assignment
+  const successorAssignment = findAssignmentByTaskId(snapshot, successor.id);
+  if (!successorAssignment) {
+    return null;
+  }
+
+  // Start from successor's scheduled start time
+  const successorStart = parseTimestamp(successorAssignment.scheduledStart);
+
+  // Get task duration
+  const taskDurationMinutes = task.type === 'Internal'
+    ? task.duration.setupMinutes + task.duration.runMinutes
+    : 0;
+  const taskDurationMs = taskDurationMinutes * 60 * 1000;
+
+  // Check if current task requires dry time
+  let dryTimeMs = 0;
+  if (task.type === 'Internal' && isPrintingStation(snapshot, task.stationId)) {
+    dryTimeMs = DRY_TIME_MS;
+  }
+
+  // Calculate latest end time (subtract drying)
+  const latestEnd = dryTimeMs > 0
+    ? new Date(successorStart.getTime() - dryTimeMs)
+    : successorStart;
+
+  // Calculate latest start (subtract task duration using working hours)
+  const station = task.type === 'Internal' ? findStationById(snapshot, task.stationId) : undefined;
+  const latestStart = station
+    ? subtractWorkingTime(latestEnd, taskDurationMs, station)
+    : new Date(latestEnd.getTime() - taskDurationMs);
+
+  return {
+    taskName: successor.name,
+    time: formatTimeHHMM(latestStart),
   };
 }

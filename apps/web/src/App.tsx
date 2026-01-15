@@ -5,7 +5,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPredecessorLabelInfo, getSuccessorLabelInfo } from './utils';
 import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
 import {
@@ -24,9 +24,37 @@ const START_HOUR = 6;
 // v0.3.46: Restored to 365 days with virtual scrolling for performance
 const DAY_COUNT = 365;
 
+// v0.3.55: Layout constants for scroll calculations
+const LAYOUT = {
+  STATION_WIDTH: 240,  // w-60 = 15rem = 240px
+  GAP: 12,             // gap-3 = 0.75rem = 12px
+  PADDING_LEFT: 12,    // px-3 = 0.75rem = 12px
+  TIMELINE_WIDTH: 48,  // w-12 = 3rem = 48px
+} as const;
+
+// v0.3.55: Throttle delay for pick mode validation (ms)
+const PICK_VALIDATION_THROTTLE_MS = 50;
+
 // ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
 // ============================================================================
+
+/**
+ * Filter conflicts to get only blocking ones (excludes auto-resolvable conflicts).
+ * Used consistently in drag & drop and pick & place validation.
+ */
+function getBlockingConflicts(
+  conflicts: Array<{ type: string; details?: { constraintType?: string; gate?: string } }>,
+  isAltPressed: boolean,
+  suggestedStart: string | null
+) {
+  return conflicts.filter(
+    (c) => c.type !== 'StationConflict' &&
+           !(c.type === 'PrecedenceConflict' &&
+             (isAltPressed || (c.details?.constraintType === 'predecessor' && suggestedStart))) &&
+           !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+  );
+}
 
 /**
  * Options for processing a drop assignment.
@@ -271,7 +299,7 @@ interface KeyboardContext {
   setSelectedJobId: (id: string | null) => void;
   setIsQuickPlacementMode: (fn: (prev: boolean) => boolean) => void;
   setQuickPlacementHover: (v: { stationId: string | null; y: number; snappedY: number }) => void;
-  cancelPick: () => void;
+  handleCancelPick: () => void;
 }
 
 function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
@@ -299,7 +327,7 @@ function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boo
   if (e.key === 'Escape') {
     // Cancel Pick & Place mode first (higher priority)
     if (ctx.isPicking) {
-      ctx.cancelPick();
+      ctx.handleCancelPick();
       return true;
     }
     // Cancel Quick Placement mode
@@ -390,8 +418,8 @@ function AppContent() {
   const { activeTask, activeJob, isRescheduleDrag, grabOffset } = dragState;
 
   // Get pick state from context (Pick & Place mode)
-  const { state: pickState, pickTask, cancelPick, updateHover: updatePickHover, placeTask } = usePickState();
-  const { isPicking, pickedTask, pickedJob, hoverPosition: pickHoverPosition } = pickState;
+  const { state: pickState, pickTask, cancelPick, updateHover: _updatePickHover, placeTask } = usePickState();
+  const { isPicking, pickedTask, pickedJob, hoverPosition: _pickHoverPosition } = pickState;
 
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
@@ -420,6 +448,45 @@ function AppContent() {
     stationId: string | null;
     snappedY: number;
   }>({ stationId: null, snappedY: 0 });
+
+  // v0.3.55: Saved scroll position for pick mode cancel restoration
+  const savedScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
+
+  // v0.3.55: Throttle ref for pick validation (performance optimization)
+  const pickValidationThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // v0.3.55: Pick validation state (for real-time ring color feedback)
+  const [pickValidation, setPickValidation] = useState<{
+    isValid: boolean;
+    hasPrecedenceConflict: boolean;
+    suggestedStart: string | null;
+    hasWarningOnly: boolean;
+  }>({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false });
+
+  // v0.3.55: Handle cancel pick - restore scroll position
+  // NOTE: Defined early because it's used in keyboard shortcuts useEffect
+  const handleCancelPick = useCallback(() => {
+    // Restore scroll position if saved
+    if (savedScrollPositionRef.current && gridRef.current) {
+      const { x, y } = savedScrollPositionRef.current;
+      gridRef.current.scrollTo(x, y, 'smooth');
+      savedScrollPositionRef.current = null;
+    }
+    cancelPick();
+    console.log('Pick cancelled - scroll position restored');
+  }, [cancelPick]);
+
+  // v0.3.55: Toggle body cursor class during pick mode
+  useEffect(() => {
+    if (isPicking) {
+      document.body.classList.add('pick-mode-active');
+    } else {
+      document.body.classList.remove('pick-mode-active');
+    }
+    return () => {
+      document.body.classList.remove('pick-mode-active');
+    };
+  }, [isPicking]);
 
   // Compact station loading state
   const [compactingStationId, setCompactingStationId] = useState<string | null>(null);
@@ -513,14 +580,18 @@ function AppContent() {
 
   // REQ-10: Calculate precedence constraint Y positions during drag
   // Calculate precedence constraints for drag OR pick mode
+  // v0.3.56: Now includes label info for contextual display
   const constraintTask = activeTask || (isPicking ? pickedTask : null);
   const precedenceConstraints = useMemo(() => {
     if (!constraintTask) {
-      return { earliestY: null, latestY: null };
+      return { earliestY: null, latestY: null, earliestLabel: null, latestLabel: null };
     }
     const earliestY = getPredecessorConstraint(constraintTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
     const latestY = getSuccessorConstraint(constraintTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    return { earliestY, latestY };
+    // v0.3.56: Get label info for contextual display
+    const earliestLabel = getPredecessorLabelInfo(constraintTask, snapshot);
+    const latestLabel = getSuccessorLabelInfo(constraintTask, snapshot);
+    return { earliestY, latestY, earliestLabel, latestLabel };
   }, [constraintTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // v0.3.51: Calculate drying time info during drag OR pick mode
@@ -756,7 +827,7 @@ function AppContent() {
       setSelectedJobId,
       setIsQuickPlacementMode,
       setQuickPlacementHover,
-      cancelPick,
+      handleCancelPick,
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -783,7 +854,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isPicking, cancelPick, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate]);
+  }, [selectedJobId, isQuickPlacementMode, isPicking, handleCancelPick, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate]);
 
   // Set up global drag monitoring using pragmatic-drag-and-drop
   // Handles: position tracking during drag, drop processing
@@ -885,18 +956,14 @@ function AppContent() {
         // Determine if this is a reschedule
         const isRescheduleOp = !!dragData.assignmentId;
 
-        // Check for blocking conflicts
-        // Predecessor conflicts with suggestedStart can be auto-resolved by snapping
-        // Successor conflicts are always blocking (no valid position exists)
-        const blockingConflicts = currentValidation.conflicts.filter(
-          (c) => c.type !== 'StationConflict' &&
-                 !(c.type === 'PrecedenceConflict' &&
-                   c.details?.constraintType === 'predecessor' &&
-                   currentValidation.suggestedStart) &&
-                 !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+        // Check for blocking conflicts using centralized logic
+        const blockingConflicts = getBlockingConflicts(
+          currentValidation.conflicts,
+          wasAltPressed,
+          currentValidation.suggestedStart
         );
 
-        if (blockingConflicts.length > 0 && !wasAltPressed) {
+        if (blockingConflicts.length > 0) {
           console.log('Invalid drop: validation failed', JSON.stringify(blockingConflicts), JSON.stringify({
             currentValidation,
             currentDragValidation,
@@ -1014,17 +1081,12 @@ function AppContent() {
     let scrollTargetX = gridRef.current.getScrollX(); // Default: keep current X
 
     if (stationIndex >= 0) {
-      const STATION_WIDTH = 240; // w-60
-      const GAP = 12; // gap-3
-      const PADDING_LEFT = 12; // px-3
-
       // Calculate station's X position
-      const stationX = PADDING_LEFT + stationIndex * (STATION_WIDTH + GAP);
+      const stationX = LAYOUT.PADDING_LEFT + stationIndex * (LAYOUT.STATION_WIDTH + LAYOUT.GAP);
 
       // Center the station in the viewport (accounting for timeline column width)
-      const TIMELINE_WIDTH = 48; // w-12
       const viewportWidth = gridRef.current.getViewportWidth();
-      scrollTargetX = Math.max(0, stationX - (viewportWidth - TIMELINE_WIDTH - STATION_WIDTH) / 2);
+      scrollTargetX = Math.max(0, stationX - (viewportWidth - LAYOUT.TIMELINE_WIDTH - LAYOUT.STATION_WIDTH) / 2);
     }
 
     // Scroll both X and Y at once
@@ -1045,10 +1107,32 @@ function AppContent() {
     // Only allow picking internal tasks (outsourced handled differently)
     if (task.type !== 'Internal') return;
 
+    // v0.3.55: Save current scroll position for restoration on cancel
+    if (gridRef.current) {
+      savedScrollPositionRef.current = {
+        x: gridRef.current.getScrollX(),
+        y: gridRef.current.getScrollY(),
+      };
+    }
+
     // Start pick mode
     pickTask(task, job);
-    console.log('Pick task:', { taskId: task.id, jobId: job.id });
-  }, [pickTask]);
+
+    // v0.3.55: Scroll to target station column (300ms animation)
+    const stationId = task.stationId;
+    const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
+
+    if (stationIndex >= 0 && gridRef.current) {
+      // Calculate station's X position (scroll to left edge with some padding)
+      const stationX = LAYOUT.PADDING_LEFT + stationIndex * (LAYOUT.STATION_WIDTH + LAYOUT.GAP);
+      const scrollTargetX = Math.max(0, stationX - LAYOUT.TIMELINE_WIDTH - 20);
+
+      // Smooth scroll to target column (300ms)
+      gridRef.current.scrollTo(scrollTargetX, gridRef.current.getScrollY(), 'smooth');
+    }
+
+    console.log('Pick task:', { taskId: task.id, jobId: job.id, stationId });
+  }, [pickTask, snapshot.stations]);
 
   // Handle recall - remove assignment (double-click on tile)
   const handleRecallAssignment = useCallback((assignmentId: string) => {
@@ -1189,15 +1273,62 @@ function AppContent() {
     setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
   }, []);
 
-  // v0.3.54: Pick mode mouse move handler
+  // v0.3.54/v0.3.55: Pick mode mouse move handler with throttled real-time validation
   const handlePickMouseMove = useCallback((stationId: string, y: number) => {
     const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
     setPickHover({ stationId, snappedY });
-  }, [pixelsPerHour]);
+
+    // v0.3.55: Throttled validation for ring color feedback (performance optimization)
+    if (pickedTask && pickedTask.type === 'Internal') {
+      // Clear previous throttle timer
+      if (pickValidationThrottleRef.current) {
+        clearTimeout(pickValidationThrottleRef.current);
+      }
+
+      pickValidationThrottleRef.current = setTimeout(() => {
+        const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate, pixelsPerHour);
+        const scheduledStart = dropTime.toISOString();
+
+        const proposedAssignment: ProposedAssignment = {
+          taskId: pickedTask.id,
+          targetId: stationId,
+          isOutsourced: false,
+          scheduledStart,
+          bypassPrecedence: isAltPressed,
+        };
+        const validationResult = validateAssignment(proposedAssignment, snapshot);
+
+        // Use centralized blocking conflicts logic
+        const blockingConflicts = getBlockingConflicts(
+          validationResult.conflicts,
+          isAltPressed,
+          validationResult.suggestedStart
+        );
+
+        const hasPrecedenceConflict = validationResult.conflicts.some((c) => c.type === 'PrecedenceConflict');
+        const hasWarningOnly = validationResult.conflicts.some(
+          (c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates'
+        ) && blockingConflicts.length === 0;
+
+        setPickValidation({
+          isValid: blockingConflicts.length === 0,
+          hasPrecedenceConflict,
+          suggestedStart: validationResult.suggestedStart,
+          hasWarningOnly,
+        });
+      }, PICK_VALIDATION_THROTTLE_MS);
+    }
+  }, [pixelsPerHour, pickedTask, gridStartDate, isAltPressed, snapshot]);
 
   // v0.3.54: Pick mode mouse leave handler
   const handlePickMouseLeave = useCallback(() => {
     setPickHover({ stationId: null, snappedY: 0 });
+    // v0.3.55: Clear throttle timer and reset validation
+    if (pickValidationThrottleRef.current) {
+      clearTimeout(pickValidationThrottleRef.current);
+      pickValidationThrottleRef.current = null;
+    }
+    setPickValidation({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false });
   }, []);
 
   // Quick Placement: handle click to place task
@@ -1235,13 +1366,11 @@ function AppContent() {
     };
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
-    // Check for blocking conflicts (same logic as drag & drop)
-    const blockingConflicts = validationResult.conflicts.filter(
-      (c) => c.type !== 'StationConflict' &&
-             !(c.type === 'PrecedenceConflict' &&
-               c.details?.constraintType === 'predecessor' &&
-               validationResult.suggestedStart) &&
-             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+    // Check for blocking conflicts using centralized logic (no Alt bypass in quick placement)
+    const blockingConflicts = getBlockingConflicts(
+      validationResult.conflicts,
+      false, // No Alt bypass in quick placement mode
+      validationResult.suggestedStart
     );
 
     if (blockingConflicts.length > 0) {
@@ -1306,7 +1435,8 @@ function AppContent() {
     }
 
     // Find the station column element to calculate Y position
-    const stationColumn = document.querySelector(`[data-testid="station-column-${stationId}"]`);
+    // Use CSS.escape for safety in case stationId contains special characters
+    const stationColumn = document.querySelector(`[data-testid="station-column-${CSS.escape(stationId)}"]`);
     if (!stationColumn) return;
 
     const rect = stationColumn.getBoundingClientRect();
@@ -1329,12 +1459,11 @@ function AppContent() {
     };
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
-    // Check for blocking conflicts (same logic as drag & drop)
-    const blockingConflicts = validationResult.conflicts.filter(
-      (c) => c.type !== 'StationConflict' &&
-             !(c.type === 'PrecedenceConflict' &&
-               (isAltPressed || (c.details?.constraintType === 'predecessor' && validationResult.suggestedStart))) &&
-             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+    // Check for blocking conflicts using centralized logic
+    const blockingConflicts = getBlockingConflicts(
+      validationResult.conflicts,
+      isAltPressed,
+      validationResult.suggestedStart
     );
 
     if (blockingConflicts.length > 0) {
@@ -1371,7 +1500,7 @@ function AppContent() {
       }
 
       // Handle precedence conflict recording if Alt was pressed
-      let newConflicts = currentSnapshot.conflicts.filter(
+      const newConflicts = currentSnapshot.conflicts.filter(
         (c) => !(c.type === 'PrecedenceConflict' && c.taskId === pickedTask.id)
       );
       if (isAltPressed && validationResult.conflicts.some((c) => c.type === 'PrecedenceConflict')) {
@@ -1429,9 +1558,8 @@ function AppContent() {
         const isJobDetailsPanel = target.closest('[data-testid="job-details-panel"]');
 
         if (!isTaskTile && !isJobDetailsPanel) {
-          // Cancel pick mode
-          cancelPick();
-          console.log('Pick cancelled - clicked outside grid');
+          // v0.3.55: Cancel pick mode with scroll restoration
+          handleCancelPick();
         }
       }
     };
@@ -1439,7 +1567,7 @@ function AppContent() {
     // Use capture phase to intercept clicks before other handlers
     document.addEventListener('click', handleGlobalClick, true);
     return () => document.removeEventListener('click', handleGlobalClick, true);
-  }, [isPicking, handlePickPlaceClick, cancelPick]);
+  }, [isPicking, handlePickPlaceClick, handleCancelPick]);
 
   // Calculate which stations have available tasks (for quick placement cursor)
   const stationsWithAvailableTasks = useMemo(() => {
@@ -1619,6 +1747,7 @@ function AppContent() {
           pickIndicatorY={pickHover.snappedY}
           onPickMouseMove={handlePickMouseMove}
           onPickMouseLeave={handlePickMouseLeave}
+          pickValidation={pickValidation}
         />
           </div>
         </div>
