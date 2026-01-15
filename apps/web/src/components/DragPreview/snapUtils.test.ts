@@ -12,46 +12,49 @@ import { PIXELS_PER_HOUR } from '../TimelineColumn';
 describe('snapUtils', () => {
   describe('constants', () => {
     it('has correct snap interval', () => {
-      expect(SNAP_INTERVAL_MINUTES).toBe(30);
+      expect(SNAP_INTERVAL_MINUTES).toBe(15);
     });
 
     it('has correct pixels per snap', () => {
-      // 30 minutes = half hour = 40px at 80px/hour
-      expect(PIXELS_PER_SNAP).toBe(PIXELS_PER_HOUR / 2);
-      expect(PIXELS_PER_SNAP).toBe(40);
+      // 15 minutes = quarter hour = 20px at 80px/hour
+      expect(PIXELS_PER_SNAP).toBe(PIXELS_PER_HOUR / 4);
+      expect(PIXELS_PER_SNAP).toBe(20);
     });
   });
 
   describe('snapToGrid', () => {
     it('snaps to exact grid positions', () => {
       expect(snapToGrid(0)).toBe(0);
+      expect(snapToGrid(20)).toBe(20);
       expect(snapToGrid(40)).toBe(40);
+      expect(snapToGrid(60)).toBe(60);
       expect(snapToGrid(80)).toBe(80);
-      expect(snapToGrid(120)).toBe(120);
     });
 
-    it('rounds to nearest 30-minute boundary', () => {
-      // Below midpoint (20px) rounds down
-      expect(snapToGrid(10)).toBe(0);
-      expect(snapToGrid(19)).toBe(0);
+    it('rounds to nearest 15-minute boundary', () => {
+      // Below midpoint (10px) rounds down
+      expect(snapToGrid(5)).toBe(0);
+      expect(snapToGrid(9)).toBe(0);
 
       // At or above midpoint rounds up
-      expect(snapToGrid(20)).toBe(40);
-      expect(snapToGrid(30)).toBe(40);
-      expect(snapToGrid(39)).toBe(40);
+      expect(snapToGrid(10)).toBe(20);
+      expect(snapToGrid(15)).toBe(20);
+      expect(snapToGrid(19)).toBe(20);
     });
 
     it('handles positions between grid lines', () => {
-      expect(snapToGrid(45)).toBe(40);
-      expect(snapToGrid(55)).toBe(40);
-      expect(snapToGrid(60)).toBe(80);
-      expect(snapToGrid(65)).toBe(80);
+      expect(snapToGrid(22)).toBe(20);
+      expect(snapToGrid(28)).toBe(20);
+      expect(snapToGrid(30)).toBe(40);
+      expect(snapToGrid(35)).toBe(40);
     });
 
     it('handles large positions', () => {
-      // 10 hours = 800px, 10.5 hours = 840px
+      // 10 hours = 800px, 10.25 hours = 820px, 10.5 hours = 840px
       expect(snapToGrid(800)).toBe(800);
-      expect(snapToGrid(820)).toBe(840);
+      expect(snapToGrid(820)).toBe(820); // exact 15-min position
+      expect(snapToGrid(825)).toBe(820); // rounds down
+      expect(snapToGrid(830)).toBe(840); // rounds up
       expect(snapToGrid(840)).toBe(840);
     });
   });

@@ -52,6 +52,14 @@ export interface StationColumnProps {
   dryingTimeInfo?: DryingTimeInfo;
   /** v0.3.46: Visible day range for virtual scrolling (only render overlays/lines for these days) */
   visibleDayRange?: { start: number; end: number };
+  /** v0.3.54: Whether pick mode is active (Pick & Place) */
+  isPickMode?: boolean;
+  /** v0.3.54: Whether this is the target station for the picked task */
+  isPickTargetStation?: boolean;
+  /** v0.3.54: Callback when mouse moves in the column during pick mode */
+  onPickMouseMove?: (stationId: string, y: number) => void;
+  /** v0.3.54: Callback when mouse leaves the column during pick mode */
+  onPickMouseLeave?: () => void;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -99,6 +107,10 @@ export const StationColumn = memo(function StationColumn({
   precedenceConstraints,
   dryingTimeInfo,
   visibleDayRange,
+  isPickMode = false,
+  isPickTargetStation = false,
+  onPickMouseMove,
+  onPickMouseLeave,
 }: StationColumnProps) {
   // Ref for the drop target element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -214,17 +226,32 @@ export const StationColumn = memo(function StationColumn({
   // Column width: full (240px / w-60) or collapsed (120px / w-30)
   const widthClass = isCollapsed ? 'w-30' : 'w-60';
 
-  // Quick placement mode handlers
+  // Quick placement mode and pick mode handlers
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (!isQuickPlacementMode || !onQuickPlacementMouseMove) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const relativeY = e.clientY - rect.top;
-    onQuickPlacementMouseMove(station.id, relativeY);
+
+    // Quick placement mode
+    if (isQuickPlacementMode && onQuickPlacementMouseMove) {
+      onQuickPlacementMouseMove(station.id, relativeY);
+    }
+
+    // v0.3.54: Pick mode - only track on target station
+    if (isPickMode && isPickTargetStation && onPickMouseMove) {
+      onPickMouseMove(station.id, relativeY);
+    }
   };
 
   const handleMouseLeave = () => {
-    if (!isQuickPlacementMode || !onQuickPlacementMouseLeave) return;
-    onQuickPlacementMouseLeave();
+    // Quick placement mode
+    if (isQuickPlacementMode && onQuickPlacementMouseLeave) {
+      onQuickPlacementMouseLeave();
+    }
+
+    // v0.3.54: Pick mode
+    if (isPickMode && onPickMouseLeave) {
+      onPickMouseLeave();
+    }
   };
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -234,8 +261,11 @@ export const StationColumn = memo(function StationColumn({
     onQuickPlacementClick(station.id, relativeY);
   };
 
-  // Cursor style for quick placement mode
+  // Cursor style for quick placement mode or pick mode
   const getCursorClass = () => {
+    if (isPickMode) {
+      return isPickTargetStation ? 'cursor-pointer' : 'cursor-not-allowed';
+    }
     if (!isQuickPlacementMode) return '';
     return hasAvailableTask ? 'cursor-pointer' : 'cursor-not-allowed';
   };
@@ -300,17 +330,17 @@ export const StationColumn = memo(function StationColumn({
         />
       ))}
 
-      {/* Quick Placement Indicator */}
-      {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && (
+      {/* Quick Placement / Pick Mode Indicator (white snap bar) */}
+      {((isQuickPlacementMode && hasAvailableTask) || (isPickMode && isPickTargetStation)) && placementIndicatorY !== undefined && (
         <PlacementIndicator y={placementIndicatorY} isVisible={true} />
       )}
 
-      {/* REQ-10: Precedence Constraint Lines (during drag or quick placement) */}
+      {/* REQ-10: Precedence Constraint Lines (during drag, quick placement, or pick mode) */}
       {precedenceConstraints && (
         <PrecedenceLines
           earliestY={precedenceConstraints.earliestY}
           latestY={precedenceConstraints.latestY}
-          isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask)}
+          isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask) || (isPickMode && isPickTargetStation)}
         />
       )}
 

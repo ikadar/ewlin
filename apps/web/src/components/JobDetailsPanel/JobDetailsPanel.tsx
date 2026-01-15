@@ -15,10 +15,14 @@ export interface JobDetailsPanelProps {
   stations: Station[];
   /** Task ID that is the active placement target in Quick Placement Mode */
   activeTaskId?: string | null;
+  /** Task ID that is currently picked (Pick & Place mode) */
+  pickedTaskId?: string | null;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
+  /** Callback when an unscheduled task is clicked (Pick & Place mode) */
+  onPickTask?: (task: Task, job: Job) => void;
   /** Callback when close button is clicked (REQ-02) */
   onClose?: () => void;
   /** REQ-02: Callback when departure date is clicked (scrolls grid to date) */
@@ -35,8 +39,10 @@ export function JobDetailsPanel({
   assignments,
   stations,
   activeTaskId,
+  pickedTaskId,
   onJumpToTask,
   onRecallTask,
+  onPickTask,
   onClose,
   onDateClick,
 }: JobDetailsPanelProps) {
@@ -84,8 +90,10 @@ export function JobDetailsPanel({
         assignments={jobAssignments}
         stations={stations}
         activeTaskId={activeTaskId}
+        pickedTaskId={pickedTaskId}
         onJumpToTask={onJumpToTask}
         onRecallTask={onRecallTask}
+        onPickTask={onPickTask}
       />
     </div>
   );

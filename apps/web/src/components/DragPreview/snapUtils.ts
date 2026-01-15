@@ -1,20 +1,20 @@
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 
 /** Snap interval in minutes */
-export const SNAP_INTERVAL_MINUTES = 30;
+export const SNAP_INTERVAL_MINUTES = 15;
 
-/** Pixels per snap interval (30 min = half hour = 40px at 80px/hour) */
-export const PIXELS_PER_SNAP = PIXELS_PER_HOUR / 2;
+/** Pixels per snap interval (15 min = quarter hour = 20px at 80px/hour) */
+export const PIXELS_PER_SNAP = PIXELS_PER_HOUR / 4;
 
 /**
  * Calculate pixels per snap based on current pixelsPerHour.
  */
 export function getPixelsPerSnap(pixelsPerHour: number = PIXELS_PER_HOUR): number {
-  return pixelsPerHour / 2;
+  return pixelsPerHour / 4;
 }
 
 /**
- * Snap a Y position to the nearest 30-minute grid line.
+ * Snap a Y position to the nearest 15-minute grid line.
  * @param y - Y position in pixels
  * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
  * @returns Snapped Y position

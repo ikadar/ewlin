@@ -133,6 +133,18 @@ export interface SchedulingGridProps {
   totalDays?: number;
   /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
   bufferDays?: number;
+  /** v0.3.54: Whether pick mode is active (Pick & Place) */
+  isPickMode?: boolean;
+  /** v0.3.54: Station ID that the picked task belongs to (compatible station) */
+  pickTargetStationId?: string | null;
+  /** v0.3.54: Station ID currently being hovered in pick mode */
+  pickHoverStationId?: string | null;
+  /** v0.3.54: Y position for pick mode placement indicator */
+  pickIndicatorY?: number;
+  /** v0.3.54: Callback when mouse moves in a station column during pick mode */
+  onPickMouseMove?: (stationId: string, y: number) => void;
+  /** v0.3.54: Callback when mouse leaves a station column during pick mode */
+  onPickMouseLeave?: () => void;
 }
 
 /**
@@ -180,6 +192,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       dryingTimeInfo,
       totalDays = 365,
       bufferDays = 3,
+      isPickMode = false,
+      pickTargetStationId,
+      pickHoverStationId,
+      pickIndicatorY,
+      onPickMouseMove,
+      onPickMouseLeave,
     },
     ref
   ) {
@@ -541,16 +559,22 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 hasAvailableTaskForQuickPlacement &&
                 !quickPlacementValidation?.isValid;
 
+              // v0.3.54: Pick mode state for this column
+              const isPickTargetStation = isPickMode && pickTargetStationId === station.id;
+              const isHoveredForPick = isPickMode && pickHoverStationId === station.id;
+
               // Combine drag and quick placement validation for border display
               const effectiveIsValidDrop = isValidDrop || isQuickPlacementValid;
               const effectiveIsInvalidDrop = isInvalidDrop || isQuickPlacementInvalid;
 
-              // Precedence constraints: show for drag or quick placement
+              // Precedence constraints: show for drag, quick placement, OR pick mode
               const effectivePrecedenceConstraints = isValidationTarget
                 ? precedenceConstraints
                 : (isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement
                     ? quickPlacementPrecedenceConstraints
-                    : undefined);
+                    : (isHoveredForPick && isPickTargetStation
+                        ? precedenceConstraints
+                        : undefined));
 
               // v0.3.51: Drying time info - show only on the predecessor's station
               const effectiveDryingTimeInfo = dryingTimeInfo?.predecessorStationId === station.id
@@ -572,10 +596,17 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   showBypassWarning={showBypassWarning}
                   isQuickPlacementMode={isQuickPlacementMode}
                   hasAvailableTask={hasAvailableTaskForQuickPlacement}
-                  placementIndicatorY={isHoveredForQuickPlacement ? quickPlacementIndicatorY : undefined}
+                  placementIndicatorY={
+                    isHoveredForQuickPlacement ? quickPlacementIndicatorY
+                    : (isHoveredForPick && isPickTargetStation ? pickIndicatorY : undefined)
+                  }
                   onQuickPlacementMouseMove={onQuickPlacementMouseMove}
                   onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
                   onQuickPlacementClick={onQuickPlacementClick}
+                  isPickMode={isPickMode}
+                  isPickTargetStation={isPickTargetStation}
+                  onPickMouseMove={onPickMouseMove}
+                  onPickMouseLeave={onPickMouseLeave}
                   precedenceConstraints={effectivePrecedenceConstraints}
                   dryingTimeInfo={effectiveDryingTimeInfo}
                   visibleDayRange={virtualScroll.visibleRange}

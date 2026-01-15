@@ -1,8 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
-import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
 import type { Task, TaskAssignment, Station, Job } from '@flux/types';
-import { useDragState, type TaskDragData } from '../../dnd';
 
 export interface TaskTileProps {
   /** The task to display */
@@ -17,67 +13,23 @@ export interface TaskTileProps {
   station?: Station;
   /** Whether this task is the active placement target in Quick Placement Mode */
   isActivePlacement?: boolean;
+  /** Whether this task is currently being picked (Pick & Place mode) */
+  isPicked?: boolean;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
+  /** Callback when an unscheduled task is clicked (Pick & Place mode) */
+  onPickTask?: (task: Task, job: Job) => void;
 }
 
 /**
  * Individual task tile with state-based styling.
- * Unscheduled: job color, border-l-4, cursor-grab, draggable
+ * Unscheduled: job color, border-l-4, clickable for Pick & Place
  * Scheduled: dark placeholder with station + datetime
  */
-export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, onJumpToTask, onRecallTask }: TaskTileProps) {
+export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, isPicked = false, onJumpToTask, onRecallTask, onPickTask }: TaskTileProps) {
   const isScheduled = !!assignment;
-
-  // Ref for the draggable element
-  const tileRef = useRef<HTMLDivElement>(null);
-
-  // Local state for isDragging
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Get drag state methods from context
-  const { startDrag, endDrag } = useDragState();
-
-  // Set up draggable for unscheduled tasks only using pragmatic-drag-and-drop
-  useEffect(() => {
-    const element = tileRef.current;
-    if (!element || isScheduled) return; // Only unscheduled tasks are draggable
-
-    const dragData: TaskDragData = {
-      type: 'task',
-      task,
-      job,
-      // No assignmentId - this is a new placement, not reschedule
-    };
-
-    return draggable({
-      element,
-      getInitialData: () => dragData,
-      onGenerateDragPreview: ({ nativeSetDragImage }) => {
-        // Use pragmatic-dnd's official API to disable native drag preview
-        disableNativeDragPreview({ nativeSetDragImage });
-      },
-      onDragStart: ({ location }) => {
-        setIsDragging(true);
-        // Calculate grab offset (where user grabbed within the tile)
-        const rect = element.getBoundingClientRect();
-        const grabOffset = {
-          x: location.initial.input.clientX - rect.left,
-          y: location.initial.input.clientY - rect.top,
-        };
-        startDrag(task, job, undefined, grabOffset); // No assignmentId for new placement
-      },
-      onDrop: () => {
-        setIsDragging(false);
-        endDrag();
-      },
-    });
-  }, [task, job, isScheduled, startDrag, endDrag]);
-
-  // Note: We don't apply transform here because we use DragLayer for the preview.
-  // The source element stays in place while dragging.
 
   // Format duration as Xh YY
   const formatDuration = (): string => {
@@ -203,25 +155,42 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     );
   }
 
-  // Active placement styling (white ring/halo)
-  const activePlacementStyle = isActivePlacement
-    ? {
+  // Active placement styling (white ring/halo) - for Quick Placement Mode
+  // Picked styling (cyan ring) - for Pick & Place mode
+  const getHighlightStyle = () => {
+    if (isPicked) {
+      return {
+        boxShadow: '0 0 0 2px #22d3ee, 0 0 16px rgba(34, 211, 238, 0.5)',
+      };
+    }
+    if (isActivePlacement) {
+      return {
         boxShadow: '0 0 0 2px white, 0 0 16px rgba(255, 255, 255, 0.5)',
-      }
-    : undefined;
+      };
+    }
+    return undefined;
+  };
 
-  // Unscheduled task - job color styling, draggable
+  // Handle click to pick task
+  const handleClick = () => {
+    if (onPickTask) {
+      onPickTask(task, job);
+    }
+  };
+
+  // Unscheduled task - job color styling, clickable for Pick & Place
   return (
-    <div
-      ref={tileRef}
-      className={`pt-0.5 px-2 text-sm border-l-4 touch-none select-none ${
-        isDragging ? 'opacity-50 cursor-grabbing' : 'cursor-grab'
+    <button
+      type="button"
+      onClick={handleClick}
+      className={`pt-0.5 px-2 text-sm border-l-4 select-none text-left w-full transition-all ${
+        isPicked ? 'opacity-50' : 'cursor-pointer hover:brightness-110'
       }`}
       style={{
         height: `${height}px`,
         borderLeftColor: jobColor,
         backgroundColor: colorStyles.backgroundColor,
-        ...activePlacementStyle,
+        ...getHighlightStyle(),
       }}
       data-testid={`task-tile-${task.id}`}
     >
@@ -234,6 +203,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
         </span>
         <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
       </div>
-    </div>
+    </button>
   );
 }
