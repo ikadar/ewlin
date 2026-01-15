@@ -17,7 +17,7 @@ export { StationHeaders, StationHeader, OffScreenIndicator } from './StationHead
 export type { StationHeadersProps, StationHeaderProps, OffScreenInfo, OffScreenIndicatorProps } from './StationHeaders';
 
 export { StationColumns, StationColumn, UnavailabilityOverlay } from './StationColumns';
-export type { StationColumnsProps, StationColumnProps, StationDropData, UnavailabilityOverlayProps } from './StationColumns';
+export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProps } from './StationColumns';
 
 export { ProviderColumn, ProviderHeader } from './ProviderColumn';
 export type { ProviderColumnProps, ProviderHeaderProps } from './ProviderColumn';
@@ -28,8 +28,8 @@ export type { SchedulingGridProps, SchedulingGridHandle } from './SchedulingGrid
 export { Tile, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
 export type { TileProps, SwapButtonsProps, TailwindColor } from './Tile';
 
-export { DragPreview, snapToGrid, yPositionToTime, formatTime, getPixelsPerSnap, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
-export type { DragPreviewProps } from './DragPreview';
+// Grid snap utilities (previously in DragPreview, now used by Pick & Place)
+export { snapToGrid, yPositionToTime, formatTime, getPixelsPerSnap, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
 
 export { PlacementIndicator } from './PlacementIndicator';
 export type { PlacementIndicatorProps } from './PlacementIndicator';

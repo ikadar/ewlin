@@ -1,21 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
-import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPredecessorLabelInfo, getSuccessorLabelInfo } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPredecessorLabelInfo, getSuccessorLabelInfo } from './utils';
 import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
-import {
-  DragStateProvider,
-  DragLayer,
-  useDragState,
-  type TaskDragData,
-  type StationDropData,
-  type DragValidationState,
-} from './dnd';
 import { PickStateProvider, usePickState, PickPreview } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
@@ -240,56 +231,6 @@ function compactStationAssignments(
 }
 
 // ============================================================================
-// Drag helper functions (extracted to reduce cognitive complexity S3776)
-// ============================================================================
-
-/**
- * Find station column element from pointer coordinates.
- */
-function findStationColumnFromPointer(clientX: number, clientY: number): HTMLElement | null {
-  const elements = document.elementsFromPoint(clientX, clientY);
-  return elements.find((el): el is HTMLElement =>
-    el instanceof HTMLElement && el.dataset.testid?.startsWith('station-column-') === true
-  ) || null;
-}
-
-/**
- * Extract station ID from station column element.
- */
-function getStationIdFromElement(element: HTMLElement | null): string | null {
-  if (!element) return null;
-  return element.dataset.testid?.replace('station-column-', '') || null;
-}
-
-/**
- * Calculate scheduled start time from pointer position on a station column.
- * REQ-01/02/03: Apply snapToGrid before converting Y to time for consistent validation.
- * @param startDate - Grid start date for multi-day calculations (REQ-14)
- * @param pixelsPerHour - Current zoom level (pixels per hour)
- */
-function calculateScheduledStartFromPointer(
-  clientX: number,
-  clientY: number,
-  grabOffsetY: number,
-  startDate?: Date,
-  pixelsPerHour: number = DEFAULT_PIXELS_PER_HOUR
-): string | null {
-  const stationElement = findStationColumnFromPointer(clientX, clientY);
-  if (!stationElement) return null;
-
-  const rect = stationElement.getBoundingClientRect();
-  // rect.top accounts for scroll position (becomes negative when scrolled)
-  // so clientY - rect.top gives the absolute position in grid content
-  const absoluteY = calculateTileTopPosition(clientY, rect.top, grabOffsetY);
-
-  // REQ-01/02/03: Snap Y position before converting to time
-  // This ensures validation uses the same snapped position as visual preview
-  const snappedY = snapToGrid(absoluteY, pixelsPerHour);
-  const dropTime = yPositionToTime(snappedY, START_HOUR, startDate, pixelsPerHour);
-  return dropTime.toISOString();
-}
-
-// ============================================================================
 // Keyboard shortcut handlers (extracted to reduce cognitive complexity S3776)
 // ============================================================================
 
@@ -423,27 +364,12 @@ function AppContent() {
   // v0.3.62: Calculate layout values dynamically based on rem size
   const LAYOUT = useMemo(() => getLayoutValues(), []);
 
-  // Get drag state from context (replaces local activeTask/activeJob state)
-  const { state: dragState, setPixelsPerHour: setContextPixelsPerHour } = useDragState();
-  const { activeTask, activeJob, isRescheduleDrag, grabOffset } = dragState;
-
   // Get pick state from context (Pick & Place mode)
   const { state: pickState, pickTask, cancelPick, updateHover: _updatePickHover, placeTask } = usePickState();
   const { isPicking, pickedTask, pickedJob, hoverPosition: _pickHoverPosition, pickSource, originalAssignmentId } = pickState;
 
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
-
-  // Drag validation state (for real-time position tracking)
-  const [dragValidation, setDragValidation] = useState<DragValidationState>({
-    targetStationId: null,
-    scheduledStart: null,
-    isValid: false,
-    hasPrecedenceConflict: false,
-    suggestedStart: null,
-    hasWarningOnly: false,
-    message: null,
-  });
 
   // Quick Placement Mode state
   const [isQuickPlacementMode, setIsQuickPlacementMode] = useState(false);
@@ -513,11 +439,6 @@ function AppContent() {
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
 
-  // v0.3.48: Sync pixelsPerHour to DragStateContext for zoom-aware snapping
-  useEffect(() => {
-    setContextPixelsPerHour(pixelsPerHour);
-  }, [pixelsPerHour, setContextPixelsPerHour]);
-
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
 
@@ -546,36 +467,6 @@ function AppContent() {
     });
   }, [pixelsPerHour]);
 
-  // Track current mouse position during drag
-  const currentPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // Use drop validation hook
-  const validation = useDropValidation({
-    snapshot,
-    task: activeTask,
-    targetStationId: dragValidation.targetStationId,
-    scheduledStart: dragValidation.scheduledStart,
-    bypassPrecedence: isAltPressed,
-  });
-
-  // DEBUG: Log validation state during drag (disabled for performance - v0.3.46)
-  // Uncomment for debugging validation issues:
-  // useEffect(() => {
-  //   if (activeTask && dragValidation.targetStationId) {
-  //     console.log('[Validation Debug]', {
-  //       targetStationId: dragValidation.targetStationId,
-  //       scheduledStart: dragValidation.scheduledStart,
-  //       isValid: validation.isValid,
-  //       hasPrecedenceConflict: validation.hasPrecedenceConflict,
-  //       hasWarningOnly: validation.hasWarningOnly,
-  //       hasGroupCapacityConflict: validation.hasGroupCapacityConflict,
-  //       suggestedStart: validation.suggestedStart,
-  //       conflicts: validation.conflicts.map(c => ({ type: c.type, message: c.message, details: c.details })),
-  //       isAltPressed,
-  //     });
-  //   }
-  // }, [activeTask, dragValidation.targetStationId, dragValidation.scheduledStart, validation, isAltPressed]);
-
   // Create lookup maps
   const jobMap = useMemo(() => {
     const map = new Map<string, Job>();
@@ -594,10 +485,9 @@ function AppContent() {
     return today;
   }, []);
 
-  // REQ-10: Calculate precedence constraint Y positions during drag
-  // Calculate precedence constraints for drag OR pick mode
+  // REQ-10: Calculate precedence constraint Y positions during pick mode
   // v0.3.56: Now includes label info for contextual display
-  const constraintTask = activeTask || (isPicking ? pickedTask : null);
+  const constraintTask = isPicking ? pickedTask : null;
   const precedenceConstraints = useMemo(() => {
     if (!constraintTask) {
       return { earliestY: null, latestY: null, earliestLabel: null, latestLabel: null };
@@ -736,26 +626,15 @@ function AppContent() {
   const [viewportEndHour, setViewportEndHour] = useState<number>(8);
   const lastScrollTopRef = useRef<number>(0);
 
-  // Ref to track drag state without causing callback recreation
-  const isDraggingRef = useRef(false);
-  isDraggingRef.current = activeTask !== null;
-
   // Ref to avoid stale closure in scroll handler when zoom changes
   const pixelsPerHourRef = useRef(pixelsPerHour);
   pixelsPerHourRef.current = pixelsPerHour;
 
   // REQ-09.2: Handle grid scroll to calculate focused date
   // v0.3.47: Also calculate viewport hours for DateStrip indicator
-  // CRITICAL: Skip updates during drag to prevent performance degradation
   const handleGridScroll = useCallback((scrollTop: number) => {
     // Store scrollTop for recalculation on zoom change
     lastScrollTopRef.current = scrollTop;
-
-    // Skip focusedDate updates during drag operations - this is the primary performance fix
-    // Use ref to avoid adding activeTask to dependencies (which would cause callback recreation)
-    if (isDraggingRef.current) {
-      return;
-    }
 
     // Debounce: cancel previous timeout and set new one
     if (scrollTimeoutRef.current !== null) {
@@ -871,179 +750,6 @@ function AppContent() {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [selectedJobId, isQuickPlacementMode, isPicking, handleCancelPick, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate]);
-
-  // Set up global drag monitoring using pragmatic-drag-and-drop
-  // Handles: position tracking during drag, drop processing
-  useEffect(() => {
-    return monitorForElements({
-      onDragStart: () => {
-        // Reset validation state when drag starts
-        setDragValidation({
-          targetStationId: null,
-          scheduledStart: null,
-          isValid: false,
-          hasPrecedenceConflict: false,
-          suggestedStart: null,
-          hasWarningOnly: false,
-          message: null,
-        });
-      },
-      onDrag: ({ location }) => {
-        const { clientX, clientY } = location.current.input;
-        currentPointerRef.current = { x: clientX, y: clientY };
-
-        const stationElement = findStationColumnFromPointer(clientX, clientY);
-        const stationId = getStationIdFromElement(stationElement);
-
-        if (!stationElement || !activeTask) {
-          // v0.3.46: Only update if values actually changed
-          setDragValidation((prev) => {
-            if (prev.targetStationId === null && prev.scheduledStart === null) return prev;
-            return { ...prev, targetStationId: null, scheduledStart: null };
-          });
-          return;
-        }
-
-        const scheduledStart = calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate, pixelsPerHour);
-        // v0.3.46: Only update state if values actually changed (performance optimization)
-        setDragValidation((prev) => {
-          if (prev.targetStationId === stationId && prev.scheduledStart === scheduledStart) {
-            return prev; // No change, skip re-render
-          }
-          return { ...prev, targetStationId: stationId, scheduledStart };
-        });
-      },
-      onDrop: ({ source, location }) => {
-        // Capture current state before reset
-        const currentDragValidation = { ...dragValidation };
-        const currentValidation = { ...validation };
-        const wasAltPressed = isAltPressed;
-
-        // Reset validation state
-        setDragValidation({
-          targetStationId: null,
-          scheduledStart: null,
-          isValid: false,
-          hasPrecedenceConflict: false,
-          suggestedStart: null,
-          hasWarningOnly: false,
-          message: null,
-        });
-
-        // Get drag data
-        const dragData = source.data as TaskDragData | undefined;
-        if (dragData?.type !== 'task') return;
-
-        // Find the drop target station
-        const { clientX, clientY } = location.current.input;
-        const dropTargets = location.current.dropTargets;
-
-        // Try pragmatic-dnd's dropTargets first
-        let targetStationId: string | null = null;
-        if (dropTargets.length > 0) {
-          const targetData = dropTargets[0].data as StationDropData | undefined;
-          if (targetData?.type === 'station-column') {
-            targetStationId = targetData.stationId;
-          }
-        }
-
-        // Fallback: use elementsFromPoint (for synthetic events in tests)
-        if (!targetStationId) {
-          targetStationId = getStationIdFromElement(findStationColumnFromPointer(clientX, clientY));
-        }
-
-        if (!targetStationId) {
-          console.log('Invalid drop: no station column found');
-          return;
-        }
-
-        const dropData: StationDropData = { type: 'station-column', stationId: targetStationId };
-
-        // Calculate scheduledStart (use cached or calculate from pointer)
-        const calculatedScheduledStart = currentDragValidation.scheduledStart
-          || calculateScheduledStartFromPointer(clientX, clientY, grabOffset.y, gridStartDate, pixelsPerHour);
-
-        // Verify the task belongs to this station
-        if (dragData.task.type !== 'Internal' || dragData.task.stationId !== dropData.stationId) {
-          console.log('Invalid drop: task does not belong to this station');
-          return;
-        }
-
-        // Determine if this is a reschedule
-        const isRescheduleOp = !!dragData.assignmentId;
-
-        // Check for blocking conflicts using centralized logic
-        const blockingConflicts = getBlockingConflicts(
-          currentValidation.conflicts,
-          wasAltPressed,
-          currentValidation.suggestedStart
-        );
-
-        if (blockingConflicts.length > 0) {
-          console.log('Invalid drop: validation failed', JSON.stringify(blockingConflicts), JSON.stringify({
-            currentValidation,
-            currentDragValidation,
-            calculatedScheduledStart,
-            targetStationId,
-          }));
-          return;
-        }
-
-        // Calculate drop position
-        const rawScheduledStart = currentValidation.hasPrecedenceConflict && !wasAltPressed && currentValidation.suggestedStart
-          ? currentValidation.suggestedStart
-          : calculatedScheduledStart;
-
-        if (!rawScheduledStart) {
-          console.log('Invalid drop: no scheduled start', { calculatedScheduledStart, currentDragValidation });
-          return;
-        }
-
-        // Snap to 30-minute grid
-        const startDate = new Date(rawScheduledStart);
-        const minutes = startDate.getMinutes();
-        const snappedMinutes = Math.round(minutes / 30) * 30;
-        startDate.setMinutes(snappedMinutes, 0, 0);
-        const scheduledStart = startDate.toISOString();
-
-        // Create the assignment
-        const task = dragData.task as InternalTask;
-        const station = snapshot.stations.find((s) => s.id === dropData.stationId);
-        const scheduledEnd = calculateEndTime(task, scheduledStart, station);
-
-        // Fix for REQ-13: Check for precedence conflict WITHOUT bypass
-        // The currentValidation may have been run with bypassPrecedence=true (when Alt pressed),
-        // which skips precedence validation. We need to check if there's actually a conflict.
-        let bypassedPrecedence = false;
-        if (wasAltPressed) {
-          const conflictCheckProposal: ProposedAssignment = {
-            taskId: task.id,
-            targetId: dropData.stationId,
-            isOutsourced: false,
-            scheduledStart,
-            bypassPrecedence: false, // Check WITHOUT bypass to detect actual conflict
-          };
-          const conflictCheckResult = validateAssignment(conflictCheckProposal, snapshot);
-          bypassedPrecedence = conflictCheckResult.conflicts.some(c => c.type === 'PrecedenceConflict');
-        }
-
-        // Update snapshot using extracted helper function
-        updateSnapshot((currentSnapshot) => processDropAssignment({
-          currentSnapshot,
-          task,
-          stationId: dropData.stationId,
-          scheduledStart,
-          scheduledEnd,
-          isRescheduleOp,
-          assignmentId: dragData.assignmentId,
-          bypassedPrecedence,
-        }));
-
-        setSnapshotVersion((v) => v + 1);
-        console.log(isRescheduleOp ? 'Rescheduled:' : 'Created:', { taskId: task.id, scheduledStart });
-      },
-    });
-  }, [activeTask, grabOffset, dragValidation, validation, isAltPressed, snapshot.stations, gridStartDate, pixelsPerHour]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {
@@ -1798,22 +1504,6 @@ function AppContent() {
           onSwapDown={handleSwapDown}
           onRecallAssignment={handleRecallAssignment}
           onToggleComplete={handleToggleComplete}
-          activeTask={activeTask}
-          activeJob={activeJob}
-          validationState={{
-            targetStationId: dragValidation.targetStationId,
-            // StationConflict is allowed because push-down will resolve it
-            isValid: validation.isValid ||
-              validation.conflicts.every((c) => c.type === 'StationConflict'),
-            hasPrecedenceConflict: validation.hasPrecedenceConflict,
-            suggestedStart: validation.suggestedStart,
-            isAltPressed,
-            // Warning-only if we have Plates approval conflict but no blocking conflicts
-            // Show warning even during reschedule for visual feedback
-            hasWarningOnly: validation.hasWarningOnly,
-            // REQ-18: Group capacity conflict
-            hasGroupCapacityConflict: validation.hasGroupCapacityConflict,
-          }}
           isQuickPlacementMode={isQuickPlacementMode}
           stationsWithAvailableTasks={stationsWithAvailableTasks}
           quickPlacementIndicatorY={quickPlacementHover.snappedY}
@@ -1825,7 +1515,6 @@ function AppContent() {
           quickPlacementPrecedenceConstraints={quickPlacementPrecedenceConstraints}
           compactingStationId={compactingStationId}
           onCompact={handleCompact}
-          isRescheduleDrag={isRescheduleDrag}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
@@ -1847,10 +1536,6 @@ function AppContent() {
         </div>
       </div>
 
-      {/* Drag layer - portal-based preview of dragged tile */}
-      {/* v0.3.52: Pass validation message for display during invalid drag */}
-      <DragLayer validationMessage={validation.message} />
-
       {/* Pick preview - WYSIWYG ghost tile when a task is picked from sidebar */}
       {/* v0.3.60: Pass conflicts for real-time message generation */}
       {isPicking && pickedTask && pickedJob && (
@@ -1870,14 +1555,12 @@ function AppContent() {
   );
 }
 
-// Main App component wrapping with DragStateProvider and PickStateProvider
+// Main App component wrapping with PickStateProvider
 function App() {
   return (
-    <DragStateProvider>
-      <PickStateProvider>
-        <AppContent />
-      </PickStateProvider>
-    </DragStateProvider>
+    <PickStateProvider>
+      <AppContent />
+    </PickStateProvider>
   );
 }
 

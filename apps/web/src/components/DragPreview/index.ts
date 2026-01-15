@@ -1,9 +1,4 @@
-export { DragPreview } from './DragPreview';
-export type { DragPreviewProps } from './DragPreview';
-
-export { ValidationMessage } from './ValidationMessage';
-export type { ValidationMessageProps } from './ValidationMessage';
-
+// Grid snap utilities (used by Pick & Place)
 export {
   snapToGrid,
   yPositionToTime,
