@@ -312,7 +312,7 @@ export const StationColumn = memo(function StationColumn({
   return (
     <div
       ref={columnRef}
-      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${highlightClass} ${getCursorClass()}`}
+      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out transition-[box-shadow,background-color] duration-100 ${highlightClass} ${getCursorClass()}`}
       style={{ height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
       onMouseMove={handleMouseMove}
@@ -386,12 +386,13 @@ export const StationColumn = memo(function StationColumn({
         />
       )}
 
-      {/* v0.3.51: Drying Time Indicator (during drag) */}
+      {/* v0.3.51: Drying Time Indicator (during drag or pick) */}
+      {/* v0.3.59: Added Pick mode support */}
       {dryingTimeInfo && (
         <DryingTimeIndicator
           predecessorEndY={dryingTimeInfo.predecessorEndY}
           dryingEndY={dryingTimeInfo.dryingEndY}
-          isVisible={isDragging}
+          isVisible={isDragging || (isPickMode && isPickTargetStation)}
         />
       )}
 

@@ -17,22 +17,25 @@ export function getDayScheduleForDate(date: Date, station: Station): DaySchedule
   const day = date.getDate().toString().padStart(2, '0');
   const dateStr = `${year}-${month}-${day}`;
 
-  // Check for schedule exception first
-  const exception = station.exceptions.find((e) => e.date === dateStr);
+  // Check for schedule exception first (guard against undefined exceptions array)
+  const exception = station.exceptions?.find((e) => e.date === dateStr);
   if (exception) {
     return exception.schedule;
   }
 
-  // Use regular schedule based on day of week
+  // Use regular schedule based on day of week (guard against undefined operatingSchedule)
+  if (!station.operatingSchedule) {
+    return { isOperating: false, slots: [] };
+  }
   const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
   switch (dayOfWeek) {
-    case 0: return station.operatingSchedule.sunday;
-    case 1: return station.operatingSchedule.monday;
-    case 2: return station.operatingSchedule.tuesday;
-    case 3: return station.operatingSchedule.wednesday;
-    case 4: return station.operatingSchedule.thursday;
-    case 5: return station.operatingSchedule.friday;
-    case 6: return station.operatingSchedule.saturday;
+    case 0: return station.operatingSchedule.sunday ?? { isOperating: false, slots: [] };
+    case 1: return station.operatingSchedule.monday ?? { isOperating: false, slots: [] };
+    case 2: return station.operatingSchedule.tuesday ?? { isOperating: false, slots: [] };
+    case 3: return station.operatingSchedule.wednesday ?? { isOperating: false, slots: [] };
+    case 4: return station.operatingSchedule.thursday ?? { isOperating: false, slots: [] };
+    case 5: return station.operatingSchedule.friday ?? { isOperating: false, slots: [] };
+    case 6: return station.operatingSchedule.saturday ?? { isOperating: false, slots: [] };
     default: return { isOperating: false, slots: [] };
   }
 }
@@ -108,6 +111,11 @@ export function addWorkingTime(
   // If no duration, return start time
   if (durationMs <= 0) {
     return new Date(startTime);
+  }
+
+  // If station has no operating schedule, assume 24/7 operation
+  if (!station.operatingSchedule) {
+    return new Date(startTime.getTime() + durationMs);
   }
 
   let current = new Date(startTime);
@@ -228,6 +236,11 @@ export function subtractWorkingTime(
     return new Date(endTime);
   }
 
+  // If station has no operating schedule, assume 24/7 operation
+  if (!station.operatingSchedule) {
+    return new Date(endTime.getTime() - durationMs);
+  }
+
   let current = new Date(endTime);
   let remainingMs = durationMs;
 
@@ -284,6 +297,11 @@ export function subtractWorkingTime(
  * Check if a time falls within working hours of a station.
  */
 export function isWithinWorkingHours(time: Date, station: Station): boolean {
+  // If station has no operating schedule, assume 24/7 operation
+  if (!station.operatingSchedule) {
+    return true;
+  }
+
   const daySchedule = getDayScheduleForDate(time, station);
 
   if (!daySchedule.isOperating || daySchedule.slots.length === 0) {
@@ -311,6 +329,11 @@ export function isWithinWorkingHours(time: Date, station: Station): boolean {
  * the earliest a task can start is 13:00 (when lunch ends).
  */
 export function snapToNextWorkingTime(time: Date, station: Station): Date {
+  // If station has no operating schedule, assume 24/7 operation (no snapping needed)
+  if (!station.operatingSchedule) {
+    return new Date(time);
+  }
+
   // If already within working hours, return as-is
   if (isWithinWorkingHours(time, station)) {
     return new Date(time);

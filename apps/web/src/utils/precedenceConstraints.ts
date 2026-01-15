@@ -347,8 +347,13 @@ export function getPredecessorLabelInfo(
     effectiveTime = station ? snapToNextWorkingTime(predecessorEnd, station) : predecessorEnd;
   }
 
+  // Get task name from stationId (Internal) or actionType (Outsourced)
+  const taskName = predecessor.type === 'Internal'
+    ? predecessor.stationId
+    : predecessor.actionType;
+
   return {
-    taskName: predecessor.name,
+    taskName,
     time: formatTimeHHMM(effectiveTime),
   };
 }
@@ -402,8 +407,13 @@ export function getSuccessorLabelInfo(
     ? subtractWorkingTime(latestEnd, taskDurationMs, station)
     : new Date(latestEnd.getTime() - taskDurationMs);
 
+  // Get task name from stationId (Internal) or actionType (Outsourced)
+  const taskName = successor.type === 'Internal'
+    ? successor.stationId
+    : successor.actionType;
+
   return {
-    taskName: successor.name,
+    taskName,
     time: formatTimeHHMM(latestStart),
   };
 }

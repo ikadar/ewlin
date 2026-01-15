@@ -107,9 +107,27 @@ export function StationHeader({
   hasTiles = false,
   isCompacting = false,
   onCompact,
-  groupCapacity: _groupCapacity, // REQ-06: Group capacity display removed from header
+  groupCapacity,
 }: StationHeaderProps) {
   const _hasIndicator = offScreen && (offScreen.above > 0 || offScreen.below > 0);
+
+  // REQ-18: Group capacity display
+  const showGroupCapacity =
+    !isCollapsed &&
+    groupCapacity &&
+    groupCapacity.maxConcurrent !== null;
+
+  const isCapacityExceeded =
+    showGroupCapacity &&
+    groupCapacity.currentUsage > groupCapacity.maxConcurrent!;
+
+  const getCapacityTooltip = (): string => {
+    if (!groupCapacity || groupCapacity.maxConcurrent === null) return '';
+    if (isCapacityExceeded) {
+      return `${groupCapacity.groupName} capacity exceeded: ${groupCapacity.currentUsage}/${groupCapacity.maxConcurrent}`;
+    }
+    return `${groupCapacity.groupName}: ${groupCapacity.currentUsage}/${groupCapacity.maxConcurrent} concurrent tasks`;
+  };
 
   // Width: full (240px / w-60) or collapsed (120px / w-30)
   const widthClass = isCollapsed ? 'w-30' : 'w-60';
@@ -136,6 +154,33 @@ export function StationHeader({
     >
       <span className="font-medium text-zinc-300 truncate">{station.name}</span>
       <div className="flex items-center gap-1">
+        {/* REQ-18: Group capacity display */}
+        {showGroupCapacity && groupCapacity && (
+          <div
+            className={`flex items-center gap-1 text-xs ${
+              isCapacityExceeded ? 'text-red-400' : 'text-zinc-500'
+            }`}
+            data-testid={`group-capacity-${station.id}`}
+            title={getCapacityTooltip()}
+          >
+            {isCapacityExceeded && (
+              <svg
+                className="w-3 h-3"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+                data-testid="capacity-warning-icon"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            )}
+            <span>{groupCapacity.groupName}</span>
+            <span>({groupCapacity.currentUsage}/{groupCapacity.maxConcurrent})</span>
+          </div>
+        )}
         {/* Off-screen indicators */}
         {offScreen && offScreen.above > 0 && (
           <OffScreenIndicator

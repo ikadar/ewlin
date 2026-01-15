@@ -49,8 +49,9 @@ export function PrecedenceLines({
       {/* Purple line - Earliest possible start (predecessor constraint) */}
       {earliestY !== null && (
         <div
-          className="absolute left-0 right-0 z-30 pointer-events-none"
-          style={{ top: `${earliestY}px` }}
+          className="absolute left-0 right-0 z-30 pointer-events-none h-1 bg-purple-500"
+          style={{ top: `${earliestY}px`, boxShadow: '0 0 12px rgba(168, 85, 247, 0.8)' }}
+          data-testid="precedence-line-earliest"
         >
           {/* v0.3.56: Label above the line */}
           {earliestLabel && (
@@ -63,27 +64,16 @@ export function PrecedenceLines({
               </span>
             </div>
           )}
-          {/* The line itself */}
-          <div
-            className="h-1 bg-purple-500"
-            style={{ boxShadow: '0 0 12px rgba(168, 85, 247, 0.8)' }}
-            data-testid="precedence-line-earliest"
-          />
         </div>
       )}
 
       {/* Orange line - Latest possible start (successor constraint) */}
       {latestY !== null && (
         <div
-          className="absolute left-0 right-0 z-30 pointer-events-none"
-          style={{ top: `${latestY}px` }}
+          className="absolute left-0 right-0 z-30 pointer-events-none h-1 bg-orange-500"
+          style={{ top: `${latestY}px`, boxShadow: '0 0 12px rgba(249, 115, 22, 0.8)' }}
+          data-testid="precedence-line-latest"
         >
-          {/* The line itself */}
-          <div
-            className="h-1 bg-orange-500"
-            style={{ boxShadow: '0 0 12px rgba(249, 115, 22, 0.8)' }}
-            data-testid="precedence-line-latest"
-          />
           {/* v0.3.56: Label below the line */}
           {latestLabel && (
             <div

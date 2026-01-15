@@ -156,13 +156,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   }
 
   // Active placement styling (white ring/halo) - for Quick Placement Mode
-  // Picked styling (cyan ring) - for Pick & Place mode
   const getHighlightStyle = () => {
-    if (isPicked) {
-      return {
-        boxShadow: '0 0 0 2px #22d3ee, 0 0 16px rgba(34, 211, 238, 0.5)',
-      };
-    }
     if (isActivePlacement) {
       return {
         boxShadow: '0 0 0 2px white, 0 0 16px rgba(255, 255, 255, 0.5)',
@@ -173,19 +167,43 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
 
   // Handle click to pick task
   const handleClick = () => {
-    if (onPickTask) {
+    if (onPickTask && !isPicked) {
       onPickTask(task, job);
     }
   };
 
+  // v0.3.55: Picked state - looks like scheduled task with pulse animation
+  if (isPicked) {
+    return (
+      <div
+        className="pt-0.5 px-2 pb-2 text-sm border-l-4 text-left w-full animate-pulse-opacity"
+        style={{
+          height: `${height}px`,
+          borderLeftColor: jobColor,
+          backgroundColor: colorStyles.backgroundColor,
+        }}
+        data-testid={`task-tile-${task.id}`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className={`font-medium truncate min-w-0 ${colorStyles.textColor}`}
+            style={colorStyles.textColor ? undefined : { color: jobColor }}
+          >
+            {displayName}
+          </span>
+          <span className="text-zinc-400 shrink-0">...</span>
+        </div>
+      </div>
+    );
+  }
+
   // Unscheduled task - job color styling, clickable for Pick & Place
+  // v0.3.55: cursor grab + hover effect (shadow + translateY)
   return (
     <button
       type="button"
       onClick={handleClick}
-      className={`pt-0.5 px-2 text-sm border-l-4 select-none text-left w-full transition-all ${
-        isPicked ? 'opacity-50' : 'cursor-pointer hover:brightness-110'
-      }`}
+      className="pt-0.5 px-2 text-sm border-l-4 touch-none select-none text-left w-full transition-all duration-150 cursor-grab hover:shadow-md hover:-translate-y-0.5 hover:brightness-110"
       style={{
         height: `${height}px`,
         borderLeftColor: jobColor,

@@ -43,3 +43,28 @@ body {
     rgba(255, 255, 255, 0.03) 20px
   );
 }
+
+/* v0.3.55: Pick & Place visual feedback */
+
+/* Pulse opacity animation for picked task */
+@keyframes pulse-opacity {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-opacity {
+  animation: pulse-opacity 1.5s ease-in-out infinite;
+}
+
+/* Cursor grabbing on body during pick mode */
+body.pick-mode-active {
+  cursor: grabbing !important;
+}
+
+body.pick-mode-active * {
+  cursor: grabbing !important;
+}

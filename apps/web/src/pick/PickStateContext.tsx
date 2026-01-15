@@ -5,10 +5,20 @@
  * Like a painter dipping their brush in paint, then placing it on canvas.
  *
  * v0.3.57: Extended to support pick from grid tiles (reschedule flow)
+ * v0.3.58: Added ghostPositionRef for real-time ghost positioning (bypass React re-renders)
  */
 
-import { createContext, useContext, useReducer, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useCallback, useMemo, useRef, type ReactNode, type MutableRefObject } from 'react';
 import type { Task, Job } from '@flux/types';
+
+/**
+ * v0.3.58: Ghost position stored in a ref for real-time updates without re-renders.
+ * PickPreview reads this via RAF for smooth 60fps tracking.
+ */
+export interface GhostPosition {
+  stationId: string | null;
+  y: number;
+}
 
 /** Source of the pick operation */
 export type PickSource = 'sidebar' | 'grid';
@@ -91,6 +101,13 @@ interface PickStateContextType {
 // Create context
 const PickStateContext = createContext<PickStateContextType | null>(null);
 
+/**
+ * v0.3.58: Separate context for ghost position ref.
+ * This ref is updated on every mouse move without causing re-renders.
+ * PickPreview reads it via requestAnimationFrame for smooth tracking.
+ */
+const GhostPositionRefContext = createContext<MutableRefObject<GhostPosition> | null>(null);
+
 // Provider component
 interface PickStateProviderProps {
   children: ReactNode;
@@ -99,12 +116,19 @@ interface PickStateProviderProps {
 export function PickStateProvider({ children }: PickStateProviderProps) {
   const [state, dispatch] = useReducer(pickReducer, INITIAL_PICK_STATE);
 
+  // v0.3.58: Ref for real-time ghost position (no re-renders on update)
+  const ghostPositionRef = useRef<GhostPosition>({ stationId: null, y: 0 });
+
   const pickTask = useCallback((task: Task, job: Job, source: PickSource = 'sidebar', assignmentId?: string) => {
     dispatch({ type: 'PICK_TASK', payload: { task, job, source, assignmentId } });
+    // Reset ghost position when picking a new task
+    ghostPositionRef.current = { stationId: null, y: 0 };
   }, []);
 
   const cancelPick = useCallback(() => {
     dispatch({ type: 'CANCEL_PICK' });
+    // Reset ghost position on cancel
+    ghostPositionRef.current = { stationId: null, y: 0 };
   }, []);
 
   const updateHover = useCallback((stationId: string | null, snappedY: number) => {
@@ -113,6 +137,8 @@ export function PickStateProvider({ children }: PickStateProviderProps) {
 
   const placeTask = useCallback(() => {
     dispatch({ type: 'PLACE_TASK' });
+    // Reset ghost position on place
+    ghostPositionRef.current = { stationId: null, y: 0 };
   }, []);
 
   const contextValue = useMemo(
@@ -120,7 +146,13 @@ export function PickStateProvider({ children }: PickStateProviderProps) {
     [state, pickTask, cancelPick, updateHover, placeTask]
   );
 
-  return <PickStateContext.Provider value={contextValue}>{children}</PickStateContext.Provider>;
+  return (
+    <PickStateContext.Provider value={contextValue}>
+      <GhostPositionRefContext.Provider value={ghostPositionRef}>
+        {children}
+      </GhostPositionRefContext.Provider>
+    </PickStateContext.Provider>
+  );
 }
 
 // Hook to access pick state
@@ -136,4 +168,17 @@ export function usePickState(): PickStateContextType {
 export function usePickStateValue(): PickState {
   const { state } = usePickState();
   return state;
+}
+
+/**
+ * v0.3.58: Hook to access ghost position ref for real-time updates.
+ * Used by PickPreview to read position via RAF without causing re-renders.
+ * Used by handlePickMouseMove to write position directly to ref.
+ */
+export function usePickGhostPosition(): MutableRefObject<GhostPosition> {
+  const ref = useContext(GhostPositionRefContext);
+  if (!ref) {
+    throw new Error('usePickGhostPosition must be used within a PickStateProvider');
+  }
+  return ref;
 }

@@ -5,7 +5,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPredecessorLabelInfo, getSuccessorLabelInfo } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPredecessorLabelInfo, getSuccessorLabelInfo, getPrimaryValidationMessage } from './utils';
 import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
 import {
@@ -33,7 +33,8 @@ const LAYOUT = {
 } as const;
 
 // v0.3.55: Throttle delay for pick mode validation (ms)
-const PICK_VALIDATION_THROTTLE_MS = 50;
+// v0.3.58: Increased from 50ms to 100ms for better performance
+const PICK_VALIDATION_THROTTLE_MS = 100;
 
 // ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
@@ -455,13 +456,18 @@ function AppContent() {
   // v0.3.55: Throttle ref for pick validation (performance optimization)
   const pickValidationThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // v0.3.58: Last validated Y position for early exit optimization
+  const lastValidatedYRef = useRef<number>(0);
+
   // v0.3.55: Pick validation state (for real-time ring color feedback)
+  // v0.3.59: Added message field for validation message display
   const [pickValidation, setPickValidation] = useState<{
     isValid: boolean;
     hasPrecedenceConflict: boolean;
     suggestedStart: string | null;
     hasWarningOnly: boolean;
-  }>({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false });
+    message: string | null;
+  }>({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false, message: null });
 
   // v0.3.55: Handle cancel pick - restore scroll position
   // NOTE: Defined early because it's used in keyboard shortcuts useEffect
@@ -1300,9 +1306,18 @@ function AppContent() {
   }, []);
 
   // v0.3.54/v0.3.55: Pick mode mouse move handler with throttled real-time validation
+  // v0.3.58: Ghost position is now handled by PickPreview via RAF (no setState here)
+  // v0.3.58: setPickHover is throttled to reduce re-renders (only for PlacementIndicator)
   const handlePickMouseMove = useCallback((stationId: string, y: number) => {
     const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
-    setPickHover({ stationId, snappedY });
+
+    // v0.3.58: Skip setPickHover if position is within same 15-min slot (reduce re-renders)
+    const validationThreshold = pixelsPerHour / 4; // ~15 min slot
+    const shouldUpdatePickHover = Math.abs(snappedY - lastValidatedYRef.current) >= validationThreshold;
+
+    if (shouldUpdatePickHover) {
+      setPickHover({ stationId, snappedY });
+    }
 
     // v0.3.55: Throttled validation for ring color feedback (performance optimization)
     if (pickedTask && pickedTask.type === 'Internal') {
@@ -1312,6 +1327,12 @@ function AppContent() {
       }
 
       pickValidationThrottleRef.current = setTimeout(() => {
+        // v0.3.58: Early exit if position is within the same 15-minute slot
+        if (Math.abs(snappedY - lastValidatedYRef.current) < validationThreshold) {
+          return;
+        }
+        lastValidatedYRef.current = snappedY;
+
         const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate, pixelsPerHour);
         const scheduledStart = dropTime.toISOString();
 
@@ -1336,11 +1357,19 @@ function AppContent() {
           (c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates'
         ) && blockingConflicts.length === 0;
 
+        // v0.3.59: Generate validation message for display on PickPreview
+        const message = getPrimaryValidationMessage(
+          validationResult.conflicts,
+          blockingConflicts.length === 0,
+          hasWarningOnly
+        );
+
         setPickValidation({
           isValid: blockingConflicts.length === 0,
           hasPrecedenceConflict,
           suggestedStart: validationResult.suggestedStart,
           hasWarningOnly,
+          message,
         });
       }, PICK_VALIDATION_THROTTLE_MS);
     }
@@ -1354,7 +1383,9 @@ function AppContent() {
       clearTimeout(pickValidationThrottleRef.current);
       pickValidationThrottleRef.current = null;
     }
-    setPickValidation({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false });
+    setPickValidation({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false, message: null });
+    // v0.3.58: Reset last validated position for fresh validation on re-enter
+    lastValidatedYRef.current = 0;
   }, []);
 
   // Quick Placement: handle click to place task
@@ -1824,6 +1855,7 @@ function AppContent() {
       <DragLayer validationMessage={validation.message} />
 
       {/* Pick preview - WYSIWYG ghost tile when a task is picked from sidebar */}
+      {/* v0.3.59: Added validationMessage prop for feature parity with DragLayer */}
       {isPicking && pickedTask && pickedJob && (
         <PickPreview
           task={pickedTask}
@@ -1832,6 +1864,7 @@ function AppContent() {
           startHour={START_HOUR}
           gridStartDate={gridStartDate}
           stations={snapshot.stations}
+          validationMessage={pickValidation.message}
         />
       )}
     </>
