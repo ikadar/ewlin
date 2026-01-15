@@ -5,7 +5,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPredecessorLabelInfo, getSuccessorLabelInfo, getPrimaryValidationMessage } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPredecessorLabelInfo, getSuccessorLabelInfo } from './utils';
 import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
 import {
@@ -461,13 +461,14 @@ function AppContent() {
 
   // v0.3.55: Pick validation state (for real-time ring color feedback)
   // v0.3.59: Added message field for validation message display
+  // v0.3.60: Added conflicts array for real-time message generation in PickPreview
   const [pickValidation, setPickValidation] = useState<{
     isValid: boolean;
     hasPrecedenceConflict: boolean;
     suggestedStart: string | null;
     hasWarningOnly: boolean;
-    message: string | null;
-  }>({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false, message: null });
+    conflicts: Array<{ type: string; details?: Record<string, unknown> }>;
+  }>({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false, conflicts: [] });
 
   // v0.3.55: Handle cancel pick - restore scroll position
   // NOTE: Defined early because it's used in keyboard shortcuts useEffect
@@ -1357,19 +1358,13 @@ function AppContent() {
           (c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates'
         ) && blockingConflicts.length === 0;
 
-        // v0.3.59: Generate validation message for display on PickPreview
-        const message = getPrimaryValidationMessage(
-          validationResult.conflicts,
-          blockingConflicts.length === 0,
-          hasWarningOnly
-        );
-
+        // v0.3.60: Pass conflicts to PickPreview for real-time message generation
         setPickValidation({
           isValid: blockingConflicts.length === 0,
           hasPrecedenceConflict,
           suggestedStart: validationResult.suggestedStart,
           hasWarningOnly,
-          message,
+          conflicts: validationResult.conflicts,
         });
       }, PICK_VALIDATION_THROTTLE_MS);
     }
@@ -1383,7 +1378,7 @@ function AppContent() {
       clearTimeout(pickValidationThrottleRef.current);
       pickValidationThrottleRef.current = null;
     }
-    setPickValidation({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false, message: null });
+    setPickValidation({ isValid: false, hasPrecedenceConflict: false, suggestedStart: null, hasWarningOnly: false, conflicts: [] });
     // v0.3.58: Reset last validated position for fresh validation on re-enter
     lastValidatedYRef.current = 0;
   }, []);
@@ -1855,7 +1850,7 @@ function AppContent() {
       <DragLayer validationMessage={validation.message} />
 
       {/* Pick preview - WYSIWYG ghost tile when a task is picked from sidebar */}
-      {/* v0.3.59: Added validationMessage prop for feature parity with DragLayer */}
+      {/* v0.3.60: Pass conflicts for real-time message generation */}
       {isPicking && pickedTask && pickedJob && (
         <PickPreview
           task={pickedTask}
@@ -1864,7 +1859,9 @@ function AppContent() {
           startHour={START_HOUR}
           gridStartDate={gridStartDate}
           stations={snapshot.stations}
-          validationMessage={pickValidation.message}
+          conflicts={pickValidation.conflicts}
+          isValid={pickValidation.isValid}
+          hasWarningOnly={pickValidation.hasWarningOnly}
         />
       )}
     </>

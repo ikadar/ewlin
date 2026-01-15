@@ -7,15 +7,24 @@
  *
  * v0.3.58: Refactored to use RAF for real-time cursor tracking (no React state updates).
  * The ghost position is read from ghostPositionRef for smooth 60fps rendering.
+ *
+ * v0.3.60: Message generation moved to RAF loop for real-time synchronization.
+ * Fixes bug where validation message showed stale time due to throttle desynchronization.
  */
 
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { Task, Job, Station } from '@flux/types';
 import { hexToTailwindColor, getColorClasses } from '../components/Tile';
-import { ValidationMessage, snapToGrid, yPositionToTime } from '../components/DragPreview';
-import { calculateEndTime } from '../utils';
+import { snapToGrid, yPositionToTime } from '../components/DragPreview';
+import { calculateEndTime, getPrimaryValidationMessage } from '../utils';
 import { usePickGhostPosition } from './PickStateContext';
+
+/** Conflict type for validation */
+interface ValidationConflict {
+  type: string;
+  details?: Record<string, unknown>;
+}
 
 export interface PickPreviewProps {
   /** The task being picked */
@@ -30,8 +39,12 @@ export interface PickPreviewProps {
   gridStartDate: Date;
   /** Available stations (for effective height calculation) */
   stations: Station[];
-  /** Validation message to display (French) */
-  validationMessage?: string | null;
+  /** v0.3.60: Validation conflicts for real-time message generation */
+  conflicts?: ValidationConflict[];
+  /** v0.3.60: Whether current position is valid */
+  isValid?: boolean;
+  /** v0.3.60: Whether only warnings (non-blocking) exist */
+  hasWarningOnly?: boolean;
 }
 
 interface CursorPosition {
@@ -46,6 +59,58 @@ interface CursorPosition {
  *
  * v0.3.58: Uses RAF for smooth real-time cursor tracking without React re-renders.
  */
+/**
+ * v0.3.60: Generate validation message with real-time time for AvailabilityConflict.
+ * This ensures the "Hors horaires (HH:MM)" message shows the time at the current
+ * ghost position, not the stale time from the throttled validation.
+ */
+function generateRealTimeMessage(
+  conflicts: ValidationConflict[],
+  isValid: boolean,
+  hasWarningOnly: boolean,
+  currentTime: Date
+): string | null {
+  // Don't show message if valid or only warnings
+  if (isValid || hasWarningOnly) {
+    return null;
+  }
+
+  // Filter to blocking conflicts only (same logic as getPrimaryValidationMessage)
+  const blockingConflicts = conflicts.filter(
+    (c) =>
+      c.type !== 'StationConflict' &&
+      !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+  );
+
+  if (blockingConflicts.length === 0) {
+    return null;
+  }
+
+  // Check for AvailabilityConflict with "outside operating hours"
+  const availabilityConflict = blockingConflicts.find(
+    (c) => c.type === 'AvailabilityConflict'
+  );
+
+  if (availabilityConflict) {
+    const reason = availabilityConflict.details?.reason as string | undefined;
+
+    if (reason?.includes('outside operating hours') || reason?.includes('outside station working hours')) {
+      // Generate message with real-time time
+      const hours = currentTime.getHours().toString().padStart(2, '0');
+      const minutes = currentTime.getMinutes().toString().padStart(2, '0');
+      return `Hors horaires (${hours}:${minutes})`;
+    }
+  }
+
+  // For other conflicts, use the standard message generation
+  // Cast conflicts to the type expected by getPrimaryValidationMessage
+  return getPrimaryValidationMessage(
+    conflicts as Array<{ type: string; details?: Record<string, unknown>; message?: string; taskId?: string; targetId?: string }>,
+    isValid,
+    hasWarningOnly
+  );
+}
+
 export function PickPreview({
   task,
   job,
@@ -53,7 +118,9 @@ export function PickPreview({
   startHour,
   gridStartDate,
   stations,
-  validationMessage
+  conflicts = [],
+  isValid = false,
+  hasWarningOnly = false,
 }: PickPreviewProps) {
   // v0.3.58: Ref for real-time cursor position (no setState = no re-renders)
   const cursorPositionRef = useRef<CursorPosition>({ x: 0, y: 0 });
@@ -64,6 +131,8 @@ export function PickPreview({
   // Ref to the ghost element for direct DOM manipulation
   const ghostElementRef = useRef<HTMLDivElement>(null);
   const indicatorElementRef = useRef<HTMLDivElement>(null);
+  // v0.3.60: Ref for validation message element (updated in RAF loop)
+  const messageElementRef = useRef<HTMLDivElement>(null);
 
 
   // v0.3.58: Track cursor position via RAF (no setState on every move)
@@ -139,6 +208,25 @@ export function PickPreview({
           // Update ghostPositionRef for validation (used by App.tsx)
           ghostPositionRef.current = { stationId: task.stationId, y: snappedY };
 
+          // v0.3.60: Generate validation message with real-time time
+          if (messageElementRef.current && conflicts.length > 0) {
+            const currentTime = yPositionToTime(snappedY, startHour, gridStartDate, pixelsPerHour);
+            const message = generateRealTimeMessage(conflicts, isValid, hasWarningOnly, currentTime);
+
+            if (message) {
+              messageElementRef.current.style.display = 'block';
+              // Update the text in the span element
+              const messageSpan = messageElementRef.current.querySelector('.message-text');
+              if (messageSpan) {
+                messageSpan.textContent = message;
+              }
+            } else {
+              messageElementRef.current.style.display = 'none';
+            }
+          } else if (messageElementRef.current) {
+            messageElementRef.current.style.display = 'none';
+          }
+
           // Hide indicator
           if (indicatorElementRef.current) {
             indicatorElementRef.current.style.display = 'none';
@@ -166,6 +254,11 @@ export function PickPreview({
 
           // Clear ghost position when not over valid station
           ghostPositionRef.current = { stationId: null, y: 0 };
+
+          // v0.3.60: Hide message when not over valid station
+          if (messageElementRef.current) {
+            messageElementRef.current.style.display = 'none';
+          }
         }
       }
 
@@ -181,7 +274,7 @@ export function PickPreview({
       window.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(rafId);
     };
-  }, [task, pixelsPerHour, ghostPositionRef, stations, startHour, gridStartDate]);
+  }, [task, pixelsPerHour, ghostPositionRef, stations, startHour, gridStartDate, conflicts, isValid, hasWarningOnly]);
 
   // Get color classes from job color
   const tailwindColor = hexToTailwindColor(job.color);
@@ -231,8 +324,30 @@ export function PickPreview({
             {job.reference} · {job.client}
           </div>
         </div>
-        {/* Validation message below preview */}
-        {validationMessage && <ValidationMessage message={validationMessage} />}
+        {/* v0.3.60: Validation message updated via RAF loop for real-time synchronization */}
+        <div
+          ref={messageElementRef}
+          className="mt-2 px-3 py-2 bg-red-950/95 border border-red-500/50 rounded-md shadow-lg backdrop-blur-sm"
+          style={{ display: 'none' }}
+          data-testid="validation-message"
+        >
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-4 h-4 text-red-400 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <span className="text-sm text-red-200 font-medium message-text"></span>
+          </div>
+        </div>
       </div>
 
       {/* Cursor indicator (shown when not over compatible station) */}
