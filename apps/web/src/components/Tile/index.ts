@@ -1,6 +1,13 @@
 export { Tile } from './Tile';
 export type { TileProps } from './Tile';
 
+export { TileContextMenu } from './TileContextMenu';
+export type { TileContextMenuProps } from './TileContextMenu';
+
+export { TileTooltip } from './TileTooltip';
+export type { TileTooltipProps } from './TileTooltip';
+
+// SwapButtons kept for backwards compatibility but no longer used in Tile
 export { SwapButtons } from './SwapButtons';
 export type { SwapButtonsProps } from './SwapButtons';
 

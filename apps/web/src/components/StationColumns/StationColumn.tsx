@@ -60,6 +60,8 @@ export interface StationColumnProps {
   visibleDayRange?: { start: number; end: number };
   /** v0.3.54: Whether pick mode is active (Pick & Place) */
   isPickMode?: boolean;
+  /** v0.3.61: Source of pick (sidebar = new, grid = reschedule) - controls column hiding */
+  pickSource?: 'sidebar' | 'grid' | null;
   /** v0.3.54: Whether this is the target station for the picked task */
   isPickTargetStation?: boolean;
   /** v0.3.54: Callback when mouse moves in the column during pick mode */
@@ -121,6 +123,7 @@ export const StationColumn = memo(function StationColumn({
   dryingTimeInfo,
   visibleDayRange,
   isPickMode = false,
+  pickSource = null,
   isPickTargetStation = false,
   onPickMouseMove,
   onPickMouseLeave,
@@ -218,8 +221,12 @@ export const StationColumn = memo(function StationColumn({
         // Default: green ring when hovering (no validation yet or valid)
         return 'ring-2 ring-green-500 bg-green-500/10';
       } else {
-        // v0.3.55: Non-target stations fade out during pick mode
-        return 'opacity-0 pointer-events-none';
+        // v0.3.55: Non-target stations fade out during pick mode (sidebar only)
+        // v0.3.61: When picking from grid (reschedule), keep all columns visible
+        if (pickSource === 'sidebar') {
+          return 'opacity-15 pointer-events-none';
+        }
+        return '';
       }
     }
 
@@ -257,7 +264,7 @@ export const StationColumn = memo(function StationColumn({
     }
     return '';
   }, [
-    isPickMode, isDragging, isPickTargetStation, pickValidation,
+    isPickMode, pickSource, isDragging, isPickTargetStation, pickValidation,
     showBypassWarning, isInvalidDrop, isWarningDrop, isValidDrop,
     isQuickPlacementMode, hasAvailableTask, isValidDropTarget, isOver
   ]);

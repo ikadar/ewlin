@@ -1006,6 +1006,37 @@ This document contains the development roadmap for the Flux print shop schedulin
 - `apps/web/src/components/Tile/Tile.tsx`
 - `apps/web/src/dnd/DragStateContext.tsx`
 
+#### v0.3.63 - Tile UX Refactor (Experimental) 🧪
+> **Branch:** `experiment/tile-ux-refactor`
+> **Target:** Power users (5h+/jour)
+
+Refonte majeure de l'UX des tuiles pour interface épurée et efficace.
+
+- [ ] **Phase 1: Context Menu**
+  - [ ] `TileContextMenu` component (View details, Mark as done, Move up, Move down)
+  - [ ] Right-click integration on Tile
+  - [ ] Remove SwapButtons (move to menu)
+  - [ ] Remove ViewButton/eye (move to menu)
+
+- [ ] **Phase 2: Checkbox Styling**
+  - [ ] Square checkbox style (instead of circle)
+  - [ ] Larger size (20x20px, 32px hit area)
+
+- [ ] **Phase 3: True Tile Sizes**
+  - [ ] Remove minimum height constraint
+  - [ ] Content visibility logic (hide text < 24px, hide checkbox < 32px)
+
+- [ ] **Phase 4: Smart Tooltip**
+  - [ ] `TileTooltip` component (job ref, client, station, duration, status)
+  - [ ] Show on hover for small tiles (< 32px)
+  - [ ] Instant appearance (no delay for power users)
+
+**Affected files:**
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/Tile/TileContextMenu.tsx` (new)
+- `apps/web/src/components/Tile/TileTooltip.tsx` (new)
+- `apps/web/src/components/Tile/SwapButtons.tsx` (remove usage)
+
 ---
 
 ## Milestone 4: Backend API Integration (v0.4.x)

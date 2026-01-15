@@ -135,6 +135,8 @@ export interface SchedulingGridProps {
   bufferDays?: number;
   /** v0.3.54: Whether pick mode is active (Pick & Place) */
   isPickMode?: boolean;
+  /** v0.3.61: Source of pick (sidebar = new, grid = reschedule) - controls column hiding */
+  pickSource?: 'sidebar' | 'grid' | null;
   /** v0.3.54: Station ID that the picked task belongs to (compatible station) */
   pickTargetStationId?: string | null;
   /** v0.3.54: Station ID currently being hovered in pick mode */
@@ -204,6 +206,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       totalDays = 365,
       bufferDays = 3,
       isPickMode = false,
+      pickSource = null,
       pickTargetStationId,
       pickHoverStationId,
       pickIndicatorY,
@@ -625,6 +628,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
                   onQuickPlacementClick={onQuickPlacementClick}
                   isPickMode={isPickMode}
+                  pickSource={pickSource}
                   isPickTargetStation={isPickTargetStation}
                   onPickMouseMove={onPickMouseMove}
                   onPickMouseLeave={onPickMouseLeave}

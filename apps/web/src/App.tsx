@@ -25,12 +25,18 @@ const START_HOUR = 6;
 const DAY_COUNT = 365;
 
 // v0.3.55: Layout constants for scroll calculations
-const LAYOUT = {
-  STATION_WIDTH: 240,  // w-60 = 15rem = 240px
-  GAP: 12,             // gap-3 = 0.75rem = 12px
-  PADDING_LEFT: 12,    // px-3 = 0.75rem = 12px
-  TIMELINE_WIDTH: 48,  // w-12 = 3rem = 48px
-} as const;
+// v0.3.62: Now calculated dynamically based on rem size (which depends on base font-size)
+function getLayoutValues() {
+  const remSize = typeof window !== 'undefined'
+    ? parseFloat(getComputedStyle(document.documentElement).fontSize)
+    : 16; // Fallback for SSR
+  return {
+    STATION_WIDTH: 15 * remSize,    // w-60 = 15rem
+    GAP: 0.75 * remSize,            // gap-3 = 0.75rem
+    PADDING_LEFT: 0.75 * remSize,   // px-3 = 0.75rem
+    TIMELINE_WIDTH: 3 * remSize,    // w-12 = 3rem
+  };
+}
 
 // v0.3.55: Throttle delay for pick mode validation (ms)
 // v0.3.58: Increased from 50ms to 100ms for better performance
@@ -413,6 +419,9 @@ function AppContent() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   // v0.3.46: Use deferred value for grid to keep sidebar responsive during selection
   const deferredSelectedJobId = useDeferredValue(selectedJobId);
+
+  // v0.3.62: Calculate layout values dynamically based on rem size
+  const LAYOUT = useMemo(() => getLayoutValues(), []);
 
   // Get drag state from context (replaces local activeTask/activeJob state)
   const { state: dragState, setPixelsPerHour: setContextPixelsPerHour } = useDragState();
@@ -1107,7 +1116,7 @@ function AppContent() {
       scrollTargetX,
       scrollTargetY,
     });
-  }, [snapshot.stations, pixelsPerHour, gridStartDate]);
+  }, [snapshot.stations, pixelsPerHour, gridStartDate, LAYOUT]);
 
   // Handle pick task - Pick & Place mode from sidebar
   const handlePickTask = useCallback((task: Task, job: Job) => {
@@ -1130,18 +1139,19 @@ function AppContent() {
     const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
 
     if (stationIndex >= 0 && gridRef.current) {
-      // Calculate station's X position (scroll to left edge with some padding)
+      // v0.3.61: Calculate station's X position - align column flush after timeline
       const stationX = LAYOUT.PADDING_LEFT + stationIndex * (LAYOUT.STATION_WIDTH + LAYOUT.GAP);
-      const scrollTargetX = Math.max(0, stationX - LAYOUT.TIMELINE_WIDTH - 20);
+      const scrollTargetX = Math.max(0, stationX - LAYOUT.PADDING_LEFT);
 
       // Smooth scroll to target column (300ms)
       gridRef.current.scrollTo(scrollTargetX, gridRef.current.getScrollY(), 'smooth');
     }
 
     console.log('Pick task from sidebar:', { taskId: task.id, jobId: job.id, stationId });
-  }, [pickTask, snapshot.stations]);
+  }, [pickTask, snapshot.stations, LAYOUT]);
 
   // v0.3.57: Handle pick task from grid tile (for reschedule)
+  // v0.3.61: No scroll or column hiding when picking from grid - user is already at the right location
   const handlePickTileFromGrid = useCallback((assignmentId: string, task: InternalTask, job: Job) => {
     // v0.3.55: Save current scroll position for restoration on cancel
     if (gridRef.current) {
@@ -1154,18 +1164,9 @@ function AppContent() {
     // Start pick mode with source='grid' and assignmentId for reschedule
     pickTask(task, job, 'grid', assignmentId);
 
-    // Scroll to target station column (300ms animation)
-    const stationId = task.stationId;
-    const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
-
-    if (stationIndex >= 0 && gridRef.current) {
-      const stationX = LAYOUT.PADDING_LEFT + stationIndex * (LAYOUT.STATION_WIDTH + LAYOUT.GAP);
-      const scrollTargetX = Math.max(0, stationX - LAYOUT.TIMELINE_WIDTH - 20);
-      gridRef.current.scrollTo(scrollTargetX, gridRef.current.getScrollY(), 'smooth');
-    }
-
-    console.log('Pick task from grid (reschedule):', { assignmentId, taskId: task.id, jobId: job.id, stationId });
-  }, [pickTask, snapshot.stations]);
+    // v0.3.61: No scroll needed - user is already looking at the tile they clicked
+    console.log('Pick task from grid (reschedule):', { assignmentId, taskId: task.id, jobId: job.id, stationId: task.stationId });
+  }, [pickTask]);
 
   // Handle recall - remove assignment (double-click on tile)
   const handleRecallAssignment = useCallback((assignmentId: string) => {
@@ -1832,6 +1833,7 @@ function AppContent() {
           precedenceConstraints={precedenceConstraints}
           dryingTimeInfo={dryingTimeInfo}
           isPickMode={isPicking}
+          pickSource={pickSource}
           pickTargetStationId={pickedTask?.type === 'Internal' ? pickedTask.stationId : null}
           pickHoverStationId={pickHover.stationId}
           pickIndicatorY={pickHover.snappedY}

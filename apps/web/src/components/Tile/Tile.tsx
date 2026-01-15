@@ -1,10 +1,11 @@
 import { useRef, useState, useEffect, memo } from 'react';
-import { Circle, CircleCheck, Info } from 'lucide-react';
+import { Square, CheckSquare } from 'lucide-react';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
 import type { TaskAssignment, Job, InternalTask } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
-import { SwapButtons } from './SwapButtons';
+import { TileContextMenu } from './TileContextMenu';
+import { TileTooltip } from './TileTooltip';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
@@ -104,6 +105,9 @@ export const Tile = memo(function Tile({
   // Local state for isDragging (replaces useDraggable's isDragging)
   const [isDragging, setIsDragging] = useState(false);
 
+  // v0.3.63: Context menu state
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+
   // Get drag state methods from context
   const { startDrag, endDrag } = useDragState();
 
@@ -159,6 +163,18 @@ export const Tile = memo(function Tile({
   // Get color classes
   const colorClasses = getJobColorClasses(job.color);
 
+  // v0.3.63: Content visibility thresholds (in pixels)
+  // These determine what content to show based on tile height
+  const SHOW_FULL_CONTENT_THRESHOLD = 32; // Show checkbox + full text
+  const SHOW_MINIMAL_CONTENT_THRESHOLD = 16; // Show truncated text only
+  const SHOW_BAR_ONLY_THRESHOLD = 8; // Show colored bar only
+
+  // Determine content visibility level
+  const showFullContent = totalHeight >= SHOW_FULL_CONTENT_THRESHOLD;
+  const showMinimalContent = totalHeight >= SHOW_MINIMAL_CONTENT_THRESHOLD && !showFullContent;
+  const showBarOnly = totalHeight < SHOW_MINIMAL_CONTENT_THRESHOLD;
+  const needsTooltip = !showFullContent; // Tooltip needed when content is truncated
+
   // Completion state
   const isCompleted = assignment.isCompleted;
 
@@ -198,14 +214,25 @@ export const Tile = memo(function Tile({
     onRecall?.(assignment.id);
   };
 
-  // v0.3.57: Handle info button click (opens job details)
-  const handleInfoClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Don't trigger tile click (pick)
+  // v0.3.63: Handle context menu (right-click)
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+  };
+
+  // v0.3.63: Handle view details (from context menu)
+  const handleViewDetails = () => {
     if (onInfoClick) {
       onInfoClick(job.id);
     } else {
-      onSelect?.(job.id); // Fallback to select
+      onSelect?.(job.id);
     }
+  };
+
+  // v0.3.63: Handle toggle complete (from context menu, without event)
+  const handleToggleCompleteFromMenu = () => {
+    onToggleComplete?.(assignment.id);
   };
 
   // Handle swap
@@ -297,7 +324,8 @@ export const Tile = memo(function Tile({
     );
   }
 
-  return (
+  // v0.3.63: Wrap with tooltip for small tiles
+  const tileContent = (
     <div
       ref={isOutsourced ? undefined : tileRef}
       className={`absolute text-sm ${outsourcedBorderClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
@@ -311,6 +339,7 @@ export const Tile = memo(function Tile({
       }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
       data-testid={`tile-${assignment.id}`}
       data-scheduled-start={assignment.scheduledStart}
       data-scheduled-end={assignment.scheduledEnd}
@@ -325,102 +354,144 @@ export const Tile = memo(function Tile({
       }}
     >
       {/* Similarity indicators (shown at top of tile, overlapping junction with previous tile) */}
-      {similarityResults && similarityResults.length > 0 && (
+      {similarityResults && similarityResults.length > 0 && !showBarOnly && (
         <SimilarityIndicators results={similarityResults} />
       )}
 
-      {/* Setup section (if has setup time) - contains the label */}
-      {hasSetup && (
+      {/* v0.3.63: Content rendering based on tile height */}
+      {showBarOnly ? (
+        /* Very small tile: colored bar only (setup + run as single block) */
         <div
-          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder} pt-0.5 px-2`}
-          style={{
-            top: 0,
-            height: `${setupHeight}px`,
-            backgroundImage: completedGradient,
-          }}
-          data-testid="tile-setup-section"
-        >
-          {/* Content: completion icon + reference + client */}
-          <div className="flex items-center gap-2">
-            {isCompleted ? (
-              <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-completed-icon"
-              />
-            ) : (
-              <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-incomplete-icon"
-              />
-            )}
-            <span
-              className={`${colorClasses.text} font-medium truncate min-w-0`}
-              data-testid="tile-content"
+          className={`absolute inset-0 ${colorClasses.runBg}`}
+          style={{ backgroundImage: completedGradient }}
+          data-testid="tile-bar-only"
+        />
+      ) : (
+        /* Normal rendering with optional content based on height */
+        <>
+          {/* Setup section (if has setup time) */}
+          {hasSetup && (
+            <div
+              className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder} ${showFullContent ? 'pt-0.5 px-2' : ''}`}
+              style={{
+                top: 0,
+                height: `${setupHeight}px`,
+                backgroundImage: completedGradient,
+              }}
+              data-testid="tile-setup-section"
             >
-              {job.reference} · {job.client}
-            </span>
+              {/* Full content: checkbox + reference + client */}
+              {showFullContent && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="p-1 -m-1 shrink-0 cursor-pointer"
+                    onClick={handleToggleComplete}
+                    data-testid={isCompleted ? 'tile-completed-icon' : 'tile-incomplete-icon'}
+                  >
+                    {isCompleted ? (
+                      <CheckSquare className="w-5 h-5 text-emerald-500 hover:text-emerald-400 transition-colors" />
+                    ) : (
+                      <Square className="w-5 h-5 text-zinc-500 hover:text-zinc-300 transition-colors" />
+                    )}
+                  </button>
+                  <span
+                    className={`${colorClasses.text} font-medium truncate min-w-0`}
+                    data-testid="tile-content"
+                  >
+                    {job.reference} · {job.client}
+                  </span>
+                </div>
+              )}
+              {/* Minimal content: reference only, no checkbox */}
+              {showMinimalContent && (
+                <div className="px-1 pt-0.5 overflow-hidden">
+                  <span
+                    className={`${colorClasses.text} text-xs font-medium truncate block`}
+                    data-testid="tile-content-minimal"
+                  >
+                    {job.reference}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Run section */}
+          <div
+            className={`absolute left-0 right-0 ${colorClasses.runBg} ${!hasSetup && showFullContent ? 'pt-0.5 px-2' : ''}`}
+            style={{
+              top: hasSetup ? `${setupHeight}px` : 0,
+              height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
+              backgroundImage: completedGradient,
+            }}
+            data-testid="tile-run-section"
+          >
+            {/* Content only if no setup section */}
+            {!hasSetup && showFullContent && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="p-1 -m-1 shrink-0 cursor-pointer"
+                  onClick={handleToggleComplete}
+                  data-testid={isCompleted ? 'tile-completed-icon' : 'tile-incomplete-icon'}
+                >
+                  {isCompleted ? (
+                    <CheckSquare className="w-5 h-5 text-emerald-500 hover:text-emerald-400 transition-colors" />
+                  ) : (
+                    <Square className="w-5 h-5 text-zinc-500 hover:text-zinc-300 transition-colors" />
+                  )}
+                </button>
+                <span
+                  className={`${colorClasses.text} font-medium truncate min-w-0`}
+                  data-testid="tile-content"
+                >
+                  {job.reference} · {job.client}
+                </span>
+              </div>
+            )}
+            {/* Minimal content: reference only, no checkbox */}
+            {!hasSetup && showMinimalContent && (
+              <div className="px-1 pt-0.5 overflow-hidden">
+                <span
+                  className={`${colorClasses.text} text-xs font-medium truncate block`}
+                  data-testid="tile-content-minimal"
+                >
+                  {job.reference}
+                </span>
+              </div>
+            )}
           </div>
-        </div>
+        </>
       )}
 
-      {/* Run section */}
-      <div
-        className={`absolute left-0 right-0 ${colorClasses.runBg} ${!hasSetup ? 'pt-0.5 px-2' : ''}`}
-        style={{
-          top: hasSetup ? `${setupHeight}px` : 0,
-          height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
-          backgroundImage: completedGradient,
-        }}
-        data-testid="tile-run-section"
-      >
-        {/* Content only if no setup section */}
-        {!hasSetup && (
-          <div className="flex items-center gap-2">
-            {isCompleted ? (
-              <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-completed-icon"
-              />
-            ) : (
-              <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-incomplete-icon"
-              />
-            )}
-            <span
-              className={`${colorClasses.text} font-medium truncate min-w-0`}
-              data-testid="tile-content"
-            >
-              {job.reference} · {job.client}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Swap buttons (visible on hover) */}
-      <SwapButtons
-        onSwapUp={handleSwapUp}
-        onSwapDown={handleSwapDown}
-        showUp={showSwapUp}
-        showDown={showSwapDown}
-      />
-
-      {/* v0.3.57: Info button (visible on hover, for opening job details) */}
-      {!isOutsourced && (
-        <button
-          className="absolute top-0.5 right-0.5 p-0.5 rounded opacity-30 group-hover:opacity-100 transition-opacity duration-150 hover:bg-zinc-800/50 cursor-pointer z-10"
-          onClick={handleInfoClick}
-          data-testid="tile-info-button"
-          aria-label="View job details"
-        >
-          <Info className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
-        </button>
+      {/* v0.3.63: Context menu (replaces swap buttons and view button) */}
+      {contextMenuPosition && (
+        <TileContextMenu
+          position={contextMenuPosition}
+          onClose={() => setContextMenuPosition(null)}
+          onViewDetails={handleViewDetails}
+          onToggleComplete={handleToggleCompleteFromMenu}
+          onMoveUp={handleSwapUp}
+          onMoveDown={handleSwapDown}
+          isCompleted={isCompleted}
+          showMoveUp={showSwapUp}
+          showMoveDown={showSwapDown}
+        />
       )}
     </div>
+  );
+
+  // v0.3.63: Wrap with tooltip when content is truncated
+  return (
+    <TileTooltip
+      job={job}
+      task={task}
+      assignment={assignment}
+      enabled={needsTooltip}
+    >
+      {tileContent}
+    </TileTooltip>
   );
 }, (prevProps, nextProps) => {
   // v0.3.46: Custom comparison to prevent unnecessary re-renders
