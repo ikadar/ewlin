@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, ViewportPositionProvider, useViewportPositionRef } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -619,11 +619,12 @@ function AppContent() {
 
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(null);
+  // v0.3.64: Deferred focusedDate to avoid blocking scroll
+  const deferredFocusedDate = useDeferredValue(focusedDate);
   const scrollTimeoutRef = useRef<number | null>(null);
 
-  // v0.3.47: Viewport hours for DateStrip indicator
-  const [viewportStartHour, setViewportStartHour] = useState<number>(0);
-  const [viewportEndHour, setViewportEndHour] = useState<number>(8);
+  // v0.3.64: Viewport position ref for direct DOM updates (no re-renders)
+  const viewportPositionRef = useViewportPositionRef();
   const lastScrollTopRef = useRef<number>(0);
 
   // Ref to avoid stale closure in scroll handler when zoom changes
@@ -631,48 +632,49 @@ function AppContent() {
   pixelsPerHourRef.current = pixelsPerHour;
 
   // REQ-09.2: Handle grid scroll to calculate focused date
-  // v0.3.47: Also calculate viewport hours for DateStrip indicator
+  // v0.3.64: Viewport hours now update via ref for direct DOM updates (no re-renders)
   const handleGridScroll = useCallback((scrollTop: number) => {
     // Store scrollTop for recalculation on zoom change
     lastScrollTopRef.current = scrollTop;
 
-    // Debounce: cancel previous timeout and set new one
+    // Use ref to get current pixelsPerHour (avoids stale closure on zoom change)
+    const currentPixelsPerHour = pixelsPerHourRef.current;
+    const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
+
+    // v0.3.64: Update viewport position ref immediately (no RAF, no state)
+    // ViewportIndicator reads this via RAF loop for smooth DOM updates
+    const startHourFromGridStart = scrollTop / currentPixelsPerHour;
+    const endHourFromGridStart = (scrollTop + viewportHeight) / currentPixelsPerHour;
+    viewportPositionRef.current.startHour = startHourFromGridStart;
+    viewportPositionRef.current.endHour = endHourFromGridStart;
+
+    // Debounce focusedDate updates (less critical, can be deferred)
     if (scrollTimeoutRef.current !== null) {
       cancelAnimationFrame(scrollTimeoutRef.current);
     }
 
     scrollTimeoutRef.current = requestAnimationFrame(() => {
-      // Use ref to get current pixelsPerHour (avoids stale closure on zoom change)
-      const currentPixelsPerHour = pixelsPerHourRef.current;
-
       // Calculate focused date from scroll position
       // The focused date is the one visible at the center of the viewport
-      const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
       const centerY = scrollTop + viewportHeight / 2;
       const hoursFromStart = centerY / currentPixelsPerHour;
       const focusedTime = new Date(gridStartDate);
       focusedTime.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
       setFocusedDate(focusedTime);
-
-      // v0.3.47: Calculate viewport hours from grid start (not clamped to single day)
-      // This allows viewport indicator to span multiple days
-      const startHourFromGridStart = scrollTop / currentPixelsPerHour;
-      const endHourFromGridStart = (scrollTop + viewportHeight) / currentPixelsPerHour;
-
-      setViewportStartHour(startHourFromGridStart);
-      setViewportEndHour(endHourFromGridStart);
     });
-  }, [gridStartDate]);
+  }, [gridStartDate, viewportPositionRef]);
 
-  // v0.3.47: Recalculate viewport when zoom (pixelsPerHour) changes
+  // v0.3.64: Recalculate viewport position when zoom (pixelsPerHour) changes
   // This ensures the viewport indicator stays on the correct day after zoom
   useEffect(() => {
     if (lastScrollTopRef.current > 0) {
-      // Trigger recalculation with the stored scrollTop
-      handleGridScroll(lastScrollTopRef.current);
+      const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
+      const startHourFromGridStart = lastScrollTopRef.current / pixelsPerHour;
+      const endHourFromGridStart = (lastScrollTopRef.current + viewportHeight) / pixelsPerHour;
+      viewportPositionRef.current.startHour = startHourFromGridStart;
+      viewportPositionRef.current.endHour = endHourFromGridStart;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pixelsPerHour]); // handleGridScroll is stable, pixelsPerHour triggers recalc
+  }, [pixelsPerHour, viewportPositionRef]);
 
   // Get ordered job IDs for navigation (matching JobsList display order)
   // Problems first (late, then conflicts), then normal jobs
@@ -1480,9 +1482,7 @@ function AppContent() {
           onDateClick={handleDateClick}
           departureDate={departureDate}
           scheduledDays={scheduledDays}
-          focusedDate={focusedDate}
-          viewportStartHour={viewportStartHour}
-          viewportEndHour={viewportEndHour}
+          focusedDate={deferredFocusedDate}
           taskMarkersPerDay={taskMarkersPerDay}
           earliestTaskDate={earliestTaskDate}
         />
@@ -1555,11 +1555,14 @@ function AppContent() {
   );
 }
 
-// Main App component wrapping with PickStateProvider
+// Main App component wrapping with providers
+// v0.3.64: Added ViewportPositionProvider for smooth viewport indicator updates
 function App() {
   return (
     <PickStateProvider>
-      <AppContent />
+      <ViewportPositionProvider>
+        <AppContent />
+      </ViewportPositionProvider>
     </PickStateProvider>
   );
 }

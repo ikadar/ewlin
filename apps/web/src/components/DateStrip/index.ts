@@ -10,5 +10,8 @@ export type { TaskMarker, TaskMarkerStatus, TaskMarkersProps } from './TaskMarke
 export { ViewportIndicator } from './ViewportIndicator';
 export type { ViewportIndicatorProps } from './ViewportIndicator';
 
+export { ViewportPositionProvider, useViewportPositionRef, useViewportPosition } from './ViewportPositionContext';
+export type { ViewportPosition } from './ViewportPositionContext';
+
 export { ExitTriangle } from './ExitTriangle';
 export type { ExitTriangleProps } from './ExitTriangle';

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { DateCell } from './DateCell';
-import { useVirtualScroll, getVisibleDates } from '../../hooks';
+import { useVirtualScroll, getVisibleDates, calculateVisibleRange } from '../../hooks';
 import type { TaskMarker } from './TaskMarkers';
 
 /** Task marker data for a specific day */
@@ -26,10 +26,6 @@ export interface DateStripProps {
   focusedDate?: Date | null;
   /** v0.3.46: Number of buffer days to render around focused day (default: 10 for DateStrip) */
   bufferDays?: number;
-  /** v0.3.47: Viewport start hour (0-24) for viewport indicator */
-  viewportStartHour?: number;
-  /** v0.3.47: Viewport end hour (0-24) for viewport indicator */
-  viewportEndHour?: number;
   /** v0.3.47: Task markers per day (Map from dateKey to markers) */
   taskMarkersPerDay?: Map<string, TaskMarker[]>;
   /** v0.3.47: Earliest task date for timeline */
@@ -73,25 +69,26 @@ export function DateStrip({
   scheduledDays,
   focusedDate,
   bufferDays = 10, // More buffer for DateStrip since cells are small
-  viewportStartHour,
-  viewportEndHour,
   taskMarkersPerDay,
   earliestTaskDate,
 }: DateStripProps) {
   const today = new Date();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // v0.3.46: Track scroll position and viewport for virtual scrolling
-  const [scrollTop, setScrollTop] = useState(0);
+  // v0.3.64: Use ref for scrollTop to avoid re-renders on every scroll pixel
+  const scrollTopRef = useRef(0);
   const [viewportHeight, setViewportHeight] = useState(400);
 
-  // v0.3.46: Virtual scroll calculation
+  // v0.3.64: Only store visibleRange in state - updates only when buffer changes
+  const [visibleRange, setVisibleRange] = useState(() =>
+    calculateVisibleRange(0, 400, CELL_HEIGHT, bufferDays, dayCount)
+  );
+
+  // v0.3.64: Virtual scroll calculation now uses visibleRange directly
   const virtualScroll = useVirtualScroll({
     totalDays: dayCount,
-    bufferDays,
     dayHeightPx: CELL_HEIGHT,
-    scrollTop,
-    viewportHeight,
+    visibleRange,
   });
 
   // v0.3.46: Get only the visible dates
@@ -99,19 +96,48 @@ export function DateStrip({
     return getVisibleDates(startDate, virtualScroll.visibleRange);
   }, [startDate, virtualScroll.visibleRange]);
 
-  // v0.3.46: Track scroll position
+  // v0.3.64: Optimized scroll handling - only re-render when visible range changes
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    setViewportHeight(container.clientHeight);
+    const currentViewportHeight = container.clientHeight;
+    setViewportHeight(currentViewportHeight);
 
     const handleScroll = () => {
-      setScrollTop(container.scrollTop);
+      const newScrollTop = container.scrollTop;
+      scrollTopRef.current = newScrollTop;
+
+      // Calculate new visible range
+      const newRange = calculateVisibleRange(
+        newScrollTop,
+        currentViewportHeight,
+        CELL_HEIGHT,
+        bufferDays,
+        dayCount
+      );
+
+      // Only update state if range actually changed
+      setVisibleRange(prevRange => {
+        if (prevRange.start !== newRange.start || prevRange.end !== newRange.end) {
+          return newRange;
+        }
+        return prevRange;
+      });
     };
 
     const handleResize = () => {
-      setViewportHeight(container.clientHeight);
+      const newViewportHeight = container.clientHeight;
+      setViewportHeight(newViewportHeight);
+      // Recalculate range on resize
+      const newRange = calculateVisibleRange(
+        scrollTopRef.current,
+        newViewportHeight,
+        CELL_HEIGHT,
+        bufferDays,
+        dayCount
+      );
+      setVisibleRange(newRange);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -121,7 +147,7 @@ export function DateStrip({
       container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [bufferDays, dayCount]);
 
   // REQ-09.2: Auto-scroll to center the focused date
   useEffect(() => {
@@ -198,8 +224,6 @@ export function DateStrip({
                 isDepartureDate={isDateDepartureDate}
                 hasScheduledTasks={hasScheduledTasks}
                 onClick={() => onDateClick?.(date)}
-                viewportStartHour={viewportStartHour}
-                viewportEndHour={viewportEndHour}
                 currentHour={currentHour}
                 taskMarkers={taskMarkers}
                 isOnTimeline={isOnTimeline}

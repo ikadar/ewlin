@@ -18,10 +18,6 @@ export interface DateCellProps {
   hasScheduledTasks?: boolean;
   /** Click handler */
   onClick?: () => void;
-  /** v0.3.47: Viewport indicator - start hour from grid start (can be any value) */
-  viewportStartHour?: number;
-  /** v0.3.47: Viewport indicator - end hour from grid start (can be any value) */
-  viewportEndHour?: number;
   /** v0.3.47: Current hour for "now" line (0-24, fractional) */
   currentHour?: number;
   /** v0.3.47: Task markers for this day */
@@ -57,8 +53,6 @@ export function DateCell({
   isDepartureDate = false,
   hasScheduledTasks = false,
   onClick,
-  viewportStartHour,
-  viewportEndHour,
   currentHour,
   taskMarkers = [],
   isOnTimeline = false,
@@ -110,26 +104,6 @@ export function DateCell({
     dayNumberColor = 'text-zinc-100';
   }
 
-  // Calculate viewport indicator position for this specific day
-  // The viewport can span multiple days, so we calculate the overlap with this day
-  const dayStartHour = dayIndex * 24;
-  const dayEndHour = dayStartHour + 24;
-
-  // Check if viewport overlaps with this day
-  const hasViewportOverlap =
-    viewportStartHour !== undefined &&
-    viewportEndHour !== undefined &&
-    viewportEndHour > dayStartHour &&
-    viewportStartHour < dayEndHour;
-
-  // Calculate the viewport position within this day (can be negative or >24)
-  const viewportStartWithinDay = hasViewportOverlap
-    ? (viewportStartHour ?? 0) - dayStartHour
-    : 0;
-  const viewportEndWithinDay = hasViewportOverlap
-    ? (viewportEndHour ?? 0) - dayStartHour
-    : 0;
-
   return (
     <button
       type="button"
@@ -149,16 +123,13 @@ export function DateCell({
           {tooltipDate}
         </div>
       )}
-      {/* v0.3.47: Viewport indicator (gray rectangle showing visible portion) */}
-      {/* Shows on all days that overlap with the viewport, not just the focused day */}
-      {hasViewportOverlap && (
-        <ViewportIndicator
-          viewportStartHour={viewportStartWithinDay}
-          viewportEndHour={viewportEndWithinDay}
-          isToday={isToday}
-          currentHour={currentHour}
-        />
-      )}
+      {/* v0.3.64: Viewport indicator - uses RAF loop for smooth updates */}
+      {/* Automatically hides when viewport doesn't overlap this day */}
+      <ViewportIndicator
+        dayIndex={dayIndex}
+        isToday={isToday}
+        currentHour={currentHour}
+      />
 
       {/* v0.3.47: Task timeline dotted line (from earliest task to exit) */}
       {isOnTimeline && (
@@ -169,8 +140,8 @@ export function DateCell({
       )}
 
       {/* REQ-09.3: Today indicator - thin red line (like grid's "now" line) */}
-      {/* Only show if viewport indicator is not present (viewport indicator has its own "now" line) */}
-      {isToday && !hasViewportOverlap && (
+      {/* ViewportIndicator has its own "now" line that covers this when viewport is over today */}
+      {isToday && (
         <div
           className="absolute left-1 right-1 top-1/2 h-0.5 bg-red-500 -translate-y-1/2 pointer-events-none"
           data-testid="today-indicator-line"

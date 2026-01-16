@@ -1,17 +1,13 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 /** Configuration for virtual scrolling */
 export interface VirtualScrollConfig {
   /** Total number of days in the virtual range */
   totalDays: number;
-  /** Number of days to render before and after the focused day */
-  bufferDays: number;
   /** Height of one day in pixels (24 * pixelsPerHour) */
   dayHeightPx: number;
-  /** Current scroll position */
-  scrollTop: number;
-  /** Viewport height for calculating visible range */
-  viewportHeight?: number;
+  /** Pre-calculated visible range (start/end day indices) */
+  visibleRange: { start: number; end: number };
 }
 
 /** Result of virtual scroll calculation */
@@ -38,18 +34,18 @@ export interface VirtualScrollResult {
 }
 
 /**
- * Calculate the visible day range for virtual scrolling.
+ * Calculate derived values for virtual scrolling from a pre-calculated visible range.
  *
- * Only days within the buffer around the focused day are rendered.
- * The content is positioned using CSS transform to maintain correct scroll position.
+ * v0.3.64: Refactored to accept visibleRange directly instead of scrollTop.
+ * This allows the scroll handler to update only when the range changes,
+ * eliminating unnecessary re-renders during native scroll.
  *
  * @example
  * ```tsx
  * const virtualScroll = useVirtualScroll({
  *   totalDays: 365,
- *   bufferDays: 3,
  *   dayHeightPx: 1920, // 24 * 80
- *   scrollTop: gridScrollTop,
+ *   visibleRange: { start: 5, end: 11 },
  * });
  *
  * // Render only visible days
@@ -61,32 +57,17 @@ export interface VirtualScrollResult {
  * ```
  */
 export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResult {
-  const { totalDays, bufferDays, dayHeightPx, scrollTop, viewportHeight = 600 } = config;
-
-  // Stabilize visibleRange reference to prevent unnecessary re-renders
-  // Only create new object when start/end actually change
-  const prevRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: bufferDays * 2 });
+  const { totalDays, dayHeightPx, visibleRange } = config;
 
   return useMemo(() => {
+    const { start, end } = visibleRange;
+
     // Calculate total virtual height
     const totalHeight = totalDays * dayHeightPx;
 
-    // Calculate focused day index from scroll position (for reference/sync purposes)
-    // The focused day is the one at the center of the viewport
-    const centerY = scrollTop + viewportHeight / 2;
-    const focusedDayIndex = Math.floor(centerY / dayHeightPx);
-
-    // Clamp to valid range
+    // Focused day is the middle of the visible range
+    const focusedDayIndex = Math.floor((start + end) / 2);
     const clampedFocusedDay = Math.max(0, Math.min(totalDays - 1, focusedDayIndex));
-
-    // Calculate visible range based on actual viewport bounds
-    // This ensures the entire viewport is always covered with content
-    const firstVisibleDay = Math.floor(scrollTop / dayHeightPx);
-    const lastVisibleDay = Math.ceil((scrollTop + viewportHeight) / dayHeightPx);
-
-    // Add buffer around the actual visible range (not around center)
-    const start = Math.max(0, firstVisibleDay - bufferDays);
-    const end = Math.min(totalDays - 1, lastVisibleDay + bufferDays);
 
     // Calculate Y offset for positioning rendered content
     const offsetY = start * dayHeightPx;
@@ -95,13 +76,6 @@ export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResu
     const hoursPerDay = 24;
     const visibleStartHour = start * hoursPerDay;
     const visibleEndHour = (end + 1) * hoursPerDay;
-
-    // Stabilize visibleRange reference - only change if values change
-    let visibleRange = prevRangeRef.current;
-    if (visibleRange.start !== start || visibleRange.end !== end) {
-      visibleRange = { start, end };
-      prevRangeRef.current = visibleRange;
-    }
 
     return {
       totalHeight,
@@ -112,7 +86,27 @@ export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResu
       visibleStartHour,
       visibleEndHour,
     };
-  }, [totalDays, bufferDays, dayHeightPx, scrollTop, viewportHeight]);
+  }, [totalDays, dayHeightPx, visibleRange]);
+}
+
+/**
+ * Calculate the visible range from scroll position.
+ * v0.3.64: Extracted for use in scroll handler to determine when re-render is needed.
+ */
+export function calculateVisibleRange(
+  scrollTop: number,
+  viewportHeight: number,
+  dayHeightPx: number,
+  bufferDays: number,
+  totalDays: number
+): { start: number; end: number } {
+  const firstVisibleDay = Math.floor(scrollTop / dayHeightPx);
+  const lastVisibleDay = Math.ceil((scrollTop + viewportHeight) / dayHeightPx);
+
+  const start = Math.max(0, firstVisibleDay - bufferDays);
+  const end = Math.min(totalDays - 1, lastVisibleDay + bufferDays);
+
+  return { start, end };
 }
 
 /**

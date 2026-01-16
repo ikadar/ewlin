@@ -7,11 +7,11 @@ import { StationColumn } from '../StationColumns/StationColumn';
 import { ProviderColumn } from '../ProviderColumn/ProviderColumn';
 import { ProviderHeader } from '../ProviderColumn/ProviderHeader';
 import { Tile, compareSimilarity } from '../Tile';
-import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef, useDeferredValue } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { calculateSubcolumnLayout, getSubcolumnLayout } from '../../utils/subcolumnLayout';
-import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
+import { useVirtualScroll, isAssignmentVisible, calculateVisibleRange } from '../../hooks';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -192,7 +192,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       precedenceConstraints,
       dryingTimeInfo,
       totalDays = 365,
-      bufferDays = 3,
+      bufferDays = 10, // v0.3.64: Large buffer to prevent visible loading on fast scroll
       isPickMode = false,
       pickSource = null,
       pickTargetStationId,
@@ -209,20 +209,27 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     const [now, setNow] = useState(() => new Date());
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // v0.3.46: Track scroll position and viewport for virtual scrolling
-    const [scrollTop, setScrollTop] = useState(0);
+    // v0.3.64: Use ref for scrollTop to avoid re-renders on every scroll pixel
+    const scrollTopRef = useRef(0);
     const [viewportHeight, setViewportHeight] = useState(600);
 
     // v0.3.46: Calculate day height from pixels per hour
     const dayHeightPx = 24 * pixelsPerHour;
 
-    // v0.3.46: Virtual scroll calculation
+    // v0.3.64: Only store visibleRange in state - updates only when buffer changes
+    const [visibleRange, setVisibleRange] = useState(() =>
+      calculateVisibleRange(0, 600, dayHeightPx, bufferDays, totalDays)
+    );
+
+    // v0.3.64: Defer visible range updates to keep scroll smooth
+    // React will update this in the background without blocking scroll
+    const deferredVisibleRange = useDeferredValue(visibleRange);
+
+    // v0.3.64: Virtual scroll calculation uses deferred range for smooth rendering
     const virtualScroll = useVirtualScroll({
       totalDays,
-      bufferDays,
       dayHeightPx,
-      scrollTop,
-      viewportHeight,
+      visibleRange: deferredVisibleRange,
     });
 
     // Expose scroll methods via ref
@@ -257,23 +264,53 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return () => clearInterval(interval);
   }, []);
 
-  // v0.3.46: Track scroll position and viewport size for virtual scrolling
-  // Also REQ-09.2: Notify parent of scroll position for DateStrip sync
+  // v0.3.64: Optimized scroll handling - only re-render when visible range changes
+  // REQ-09.2: Notify parent of scroll position for DateStrip sync
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     // Update viewport height
-    setViewportHeight(container.clientHeight);
+    const currentViewportHeight = container.clientHeight;
+    setViewportHeight(currentViewportHeight);
 
     const handleScroll = () => {
       const newScrollTop = container.scrollTop;
-      setScrollTop(newScrollTop);
+      scrollTopRef.current = newScrollTop;
+
+      // Calculate new visible range
+      const newRange = calculateVisibleRange(
+        newScrollTop,
+        currentViewportHeight,
+        dayHeightPx,
+        bufferDays,
+        totalDays
+      );
+
+      // v0.3.64: Only update state if range actually changed (prevents unnecessary re-renders)
+      setVisibleRange(prevRange => {
+        if (prevRange.start !== newRange.start || prevRange.end !== newRange.end) {
+          return newRange;
+        }
+        return prevRange;
+      });
+
+      // Callback to parent for DateStrip sync (debounced in App.tsx)
       onScroll?.(newScrollTop);
     };
 
     const handleResize = () => {
-      setViewportHeight(container.clientHeight);
+      const newViewportHeight = container.clientHeight;
+      setViewportHeight(newViewportHeight);
+      // Recalculate range on resize
+      const newRange = calculateVisibleRange(
+        scrollTopRef.current,
+        newViewportHeight,
+        dayHeightPx,
+        bufferDays,
+        totalDays
+      );
+      setVisibleRange(newRange);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -286,7 +323,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
     };
-  }, [onScroll]);
+  }, [onScroll, dayHeightPx, bufferDays, totalDays]);
 
   // v0.3.46: Use virtual scroll total height for proper scrollbar sizing
   const totalHeight = virtualScroll.totalHeight;
