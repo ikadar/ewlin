@@ -64,16 +64,8 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   };
   const displayName = getDisplayName();
 
-  // Calculate height based on duration (for visual representation)
-  // 1 hour = 100px, minimum 20px
-  const getHeight = (): number => {
-    if (task.type === 'Internal') {
-      const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-      const height = Math.max(20, Math.round((totalMinutes / 60) * 100));
-      return Math.min(height, 200); // Cap at 200px for list view
-    }
-    return 60; // Default for outsourced
-  };
+  // v0.3.70: Fixed height for all tasks (simpler, more practical list view)
+  const TASK_HEIGHT = 32;
 
   // Convert hex color to Tailwind-compatible classes
   // For now, we'll use inline styles for the job color
@@ -118,7 +110,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   };
 
   const colorStyles = getColorStyles();
-  const height = getHeight();
 
   if (isScheduled) {
     // Scheduled (placed) task - dark placeholder (not draggable)
@@ -140,7 +131,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
       <button
         type="button"
         className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full"
-        style={{ height: `${height}px` }}
+        style={{ height: `${TASK_HEIGHT}px` }}
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
@@ -178,7 +169,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
       <div
         className="pt-0.5 px-2 pb-2 text-sm border-l-4 text-left w-full animate-pulse-opacity"
         style={{
-          height: `${height}px`,
+          height: `${TASK_HEIGHT}px`,
           borderLeftColor: jobColor,
           backgroundColor: colorStyles.backgroundColor,
         }}
@@ -205,7 +196,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
       onClick={handleClick}
       className="pt-0.5 px-2 text-sm border-l-4 touch-none select-none text-left w-full transition-all duration-150 cursor-grab hover:shadow-md hover:-translate-y-0.5 hover:brightness-110"
       style={{
-        height: `${height}px`,
+        height: `${TASK_HEIGHT}px`,
         borderLeftColor: jobColor,
         backgroundColor: colorStyles.backgroundColor,
         ...getHighlightStyle(),

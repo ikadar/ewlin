@@ -22,9 +22,9 @@ export function ElementSection({
   isSingleElement = false,
   children,
 }: ElementSectionProps) {
-  // For single-element jobs, don't show the header
+  // For single-element jobs, don't show the header but still add spacing
   if (isSingleElement) {
-    return <>{children}</>;
+    return <div className="space-y-1.5">{children}</div>;
   }
 
   // Build prerequisite suffix list
@@ -59,7 +59,7 @@ export function ElementSection({
       </div>
 
       {/* Tasks */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {children}
       </div>
     </div>
