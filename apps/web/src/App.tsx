@@ -1467,6 +1467,7 @@ function AppContent() {
         <JobDetailsPanel
           job={selectedJob}
           tasks={snapshot.tasks}
+          elements={snapshot.elements}
           assignments={snapshot.assignments}
           stations={snapshot.stations}
           activeTaskId={lastUnscheduledTask?.id}

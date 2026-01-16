@@ -1,4 +1,4 @@
-import type { Job, Task, TaskAssignment, Station } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, Element } from '@flux/types';
 import { X } from 'lucide-react';
 import { JobInfo } from './JobInfo';
 import { JobStatus } from './JobStatus';
@@ -9,6 +9,8 @@ export interface JobDetailsPanelProps {
   job: Job | null;
   /** All tasks */
   tasks: Task[];
+  /** All elements */
+  elements: Element[];
   /** All assignments */
   assignments: TaskAssignment[];
   /** All stations */
@@ -36,6 +38,7 @@ export interface JobDetailsPanelProps {
 export function JobDetailsPanel({
   job,
   tasks,
+  elements,
   assignments,
   stations,
   activeTaskId,
@@ -53,6 +56,9 @@ export function JobDetailsPanel({
 
   // Filter tasks for this job
   const jobTasks = tasks.filter((t) => t.jobId === job.id);
+
+  // Filter elements for this job
+  const jobElements = elements.filter((e) => job.elementIds.includes(e.id));
 
   // Filter assignments for this job's tasks
   const jobTaskIds = new Set(jobTasks.map((t) => t.id));
@@ -83,9 +89,10 @@ export function JobDetailsPanel({
         <JobStatus job={job} onDateClick={onDateClick} />
       </div>
 
-      {/* Task tiles */}
+      {/* Task tiles grouped by element */}
       <TaskList
         tasks={jobTasks}
+        elements={jobElements}
         job={job}
         assignments={jobAssignments}
         stations={stations}
