@@ -1037,6 +1037,81 @@ Refonte majeure de l'UX des tuiles pour interface épurée et efficace.
 - `apps/web/src/components/Tile/TileTooltip.tsx` (new)
 - `apps/web/src/components/Tile/SwapButtons.tsx` (remove usage)
 
+### Phase 3J: Job Elements Model
+
+> **Reference:** [Brainstorm: Job Elements](../brainstorm/2026-01-16-job-element-model.md)
+
+#### v0.3.66 - Element Types
+> **Implements:** Data model foundation for job elements
+
+- [ ] Create `Element` type in `@flux/types`
+- [ ] `Element.suffix`: short identifier (couv, int, fin, ELT)
+- [ ] `Element.prerequisiteElementIds`: inter-element dependencies
+- [ ] `Element.taskIds`: tasks within element (strict sequence)
+- [ ] Update `Job`: `elementIds` replaces `taskIds`
+- [ ] Update `Task`: add `elementId` field
+- [ ] Update `ScheduleSnapshot`: add `elements` array
+
+**Affected files:**
+- `packages/types/src/element.ts` (new)
+- `packages/types/src/job.ts`
+- `packages/types/src/task.ts`
+- `packages/types/src/assignment.ts`
+
+#### v0.3.67 - Element Mock Generators
+> **Implements:** Mock data with element patterns
+
+- [ ] Element generator function
+- [ ] Single-element jobs (60%): "ELT" suffix
+- [ ] Multi-sheet jobs (20%): "F1", "F2", "FIN" with precedence
+- [ ] Brochure jobs (20%): "COUV", "INT1", "FIN" with precedence
+- [ ] Snapshot includes elements array
+
+**Affected files:**
+- `apps/web/src/mock/generators/elements.ts` (new)
+- `apps/web/src/mock/generators/jobs.ts`
+- `apps/web/src/mock/snapshot.ts`
+
+#### v0.3.68 - Job Details Elements
+> **Implements:** JobDetailsPanel grouped by element
+
+- [ ] Tasks grouped by element in JobDetailsPanel
+- [ ] Element section headers with suffix
+- [ ] Workflow icon + prerequisite suffixes for dependent elements
+- [ ] Maintain existing task interactions (Pick & Place)
+
+**Affected files:**
+- `apps/web/src/components/JobDetailsPanel/ElementSection.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/TaskList.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
+
+#### v0.3.69 - Tile Element Badge
+> **Implements:** Element suffix badge on grid tiles
+
+- [ ] Element suffix badge on Tile component
+- [ ] Badge styling: `bg-black/50 rounded-sm px-1 text-xs`
+- [ ] Badge position: right of job reference
+
+**Affected files:**
+- `apps/web/src/components/Tile/ElementBadge.tsx` (new)
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/StationColumns/StationColumn.tsx`
+
+#### v0.3.70 - Element Precedence Logic
+> **Implements:** Inter-element precedence validation
+
+- [ ] Update `getPredecessorConstraint` for inter-element precedence
+- [ ] Bound = MAX(end of last task of each prerequisite element)
+- [ ] Inter-element precedence applies only to first task of element
+- [ ] Conflict detection for inter-element violations
+- [ ] Precedence lines visualization for inter-element constraints
+
+**Affected files:**
+- `apps/web/src/utils/precedenceConstraints.ts`
+- `apps/web/src/utils/elementUtils.ts` (new)
+- `apps/web/src/hooks/useDropValidation.ts`
+- `apps/web/src/components/PrecedenceLines/PrecedenceLines.tsx`
+
 ---
 
 ## Milestone 4: Backend API Integration (v0.4.x)
