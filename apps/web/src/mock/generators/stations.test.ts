@@ -120,11 +120,11 @@ describe('generateStations', () => {
     }
   });
 
-  it('includes French press names', () => {
+  it('includes expected station names', () => {
     const stations = generateStations();
     const stationNames = stations.map((s) => s.name);
-    expect(stationNames).toContain('Komori G40');
-    expect(stationNames).toContain('Polar 137');
+    expect(stationNames).toContain('G37');
+    expect(stationNames).toContain('P137');
   });
 
   it('all stations have capacity 1', () => {

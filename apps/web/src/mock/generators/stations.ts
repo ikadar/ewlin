@@ -44,79 +44,121 @@ export function generateStationCategories(): StationCategory[] {
   return [
     {
       id: 'cat-offset',
-      name: 'Presses Offset',
-      description: 'Machines d\'impression offset',
+      name: 'Presse offset',
+      description: 'Presses offset',
       similarityCriteria: OFFSET_PRESS_CRITERIA,
     },
     {
       id: 'cat-digital',
-      name: 'Impression Numérique',
-      description: 'Machines d\'impression numérique',
+      name: 'Presse numérique',
+      description: 'Presses numériques',
       similarityCriteria: [
         { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'paperType' },
       ],
     },
     {
       id: 'cat-cutting',
-      name: 'Massicots',
-      description: 'Machines de découpe',
+      name: 'Massicot',
+      description: 'Massicots',
       similarityCriteria: CUTTING_CRITERIA,
     },
     {
-      id: 'cat-finishing',
-      name: 'Finition',
-      description: 'Machines de finition (pliage, reliure, etc.)',
+      id: 'cat-typo',
+      name: 'Typo',
+      description: 'Machines typographiques',
+      similarityCriteria: [],
+    },
+    {
+      id: 'cat-folding',
+      name: 'Plieuse',
+      description: 'Plieuses',
       similarityCriteria: FINISHING_CRITERIA,
     },
     {
-      id: 'cat-outsourced',
-      name: 'Sous-traitance',
-      description: 'Travaux externalisés',
+      id: 'cat-saddle-stitch',
+      name: 'Encarteuse-piqueuse',
+      description: 'Encarteuses-piqueuses',
+      similarityCriteria: [],
+    },
+    {
+      id: 'cat-booklet',
+      name: 'Assembleuse-piqueuse',
+      description: 'Assembleuses-piqueuses',
+      similarityCriteria: [],
+    },
+    {
+      id: 'cat-packaging',
+      name: 'Conditionnement',
+      description: 'Conditionnement',
       similarityCriteria: [],
     },
   ];
 }
 
 // ============================================================================
-// Station Groups
+// Station Groups (same as categories)
 // ============================================================================
 
 export function generateStationGroups(): StationGroup[] {
   return [
     {
       id: 'grp-offset',
-      name: 'Presses Offset',
+      name: 'Presse offset',
       maxConcurrent: 2,
       isOutsourcedProviderGroup: false,
     },
     {
       id: 'grp-digital',
-      name: 'Impression Numérique',
-      maxConcurrent: 2,
+      name: 'Presse numérique',
+      maxConcurrent: 1,
       isOutsourcedProviderGroup: false,
     },
     {
       id: 'grp-cutting',
-      name: 'Massicots',
+      name: 'Massicot',
       maxConcurrent: 2,
       isOutsourcedProviderGroup: false,
     },
     {
-      id: 'grp-finishing',
-      name: 'Finition',
-      maxConcurrent: 3,
+      id: 'grp-typo',
+      name: 'Typo',
+      maxConcurrent: 2,
       isOutsourcedProviderGroup: false,
     },
-    // Provider groups (unlimited capacity)
+    {
+      id: 'grp-folding',
+      name: 'Plieuse',
+      maxConcurrent: 2,
+      isOutsourcedProviderGroup: false,
+    },
+    {
+      id: 'grp-saddle-stitch',
+      name: 'Encarteuse-piqueuse',
+      maxConcurrent: 1,
+      isOutsourcedProviderGroup: false,
+    },
+    {
+      id: 'grp-booklet',
+      name: 'Assembleuse-piqueuse',
+      maxConcurrent: 2,
+      isOutsourcedProviderGroup: false,
+    },
+    {
+      id: 'grp-packaging',
+      name: 'Conditionnement',
+      maxConcurrent: 2,
+      isOutsourcedProviderGroup: false,
+    },
+    // Outsourced provider groups (unlimited capacity)
     {
       id: 'grp-clement',
-      name: 'Clément',
+      name: 'Clément (Sous-traitant)',
       maxConcurrent: null,
       isOutsourcedProviderGroup: true,
     },
     {
       id: 'grp-reliure',
-      name: 'Reliure Express',
+      name: 'Reliure Express (Sous-traitant)',
       maxConcurrent: null,
       isOutsourcedProviderGroup: true,
     },
@@ -222,23 +264,37 @@ interface StationDefinition {
 }
 
 const STATION_DEFINITIONS: StationDefinition[] = [
-  // Offset presses
-  { id: 'sta-komori-g40', name: 'Komori G40', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'extended' },
-  { id: 'sta-heidelberg-sm', name: 'Heidelberg Speedmaster', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'extended' },
-  { id: 'sta-komori-ls', name: 'Komori LS29', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'standard' },
+  // Presse offset
+  { id: 'sta-g37', name: 'G37', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'standard' },
+  { id: 'sta-754', name: '754', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'standard' },
+  { id: 'sta-gto', name: 'GTO', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'standard' },
 
-  // Digital presses
-  { id: 'sta-xerox', name: 'Xerox Versant', categoryId: 'cat-digital', groupId: 'grp-digital', scheduleType: 'standard' },
-  { id: 'sta-hp-indigo', name: 'HP Indigo 7900', categoryId: 'cat-digital', groupId: 'grp-digital', scheduleType: 'standard' },
+  // Presse numérique
+  { id: 'sta-c9500', name: 'C9500', categoryId: 'cat-digital', groupId: 'grp-digital', scheduleType: 'standard' },
 
-  // Cutters
-  { id: 'sta-polar-137', name: 'Polar 137', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
-  { id: 'sta-massicot', name: 'Massicot Ideal', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
+  // Massicot
+  { id: 'sta-p137', name: 'P137', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
+  { id: 'sta-vm', name: 'VM', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
 
-  // Finishing
-  { id: 'sta-stahl', name: 'Stahl TH82', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
-  { id: 'sta-muller', name: 'Muller Martini', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
-  { id: 'sta-horizon', name: 'Horizon BQ-270', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
+  // Typo
+  { id: 'sta-sbg', name: 'SBG', categoryId: 'cat-typo', groupId: 'grp-typo', scheduleType: 'standard' },
+  { id: 'sta-sbb', name: 'SBB', categoryId: 'cat-typo', groupId: 'grp-typo', scheduleType: 'standard' },
+
+  // Plieuse
+  { id: 'sta-stahl', name: 'Stahl', categoryId: 'cat-folding', groupId: 'grp-folding', scheduleType: 'standard' },
+  { id: 'sta-mbo', name: 'MBO', categoryId: 'cat-folding', groupId: 'grp-folding', scheduleType: 'standard' },
+  { id: 'sta-horizon', name: 'Horizon', categoryId: 'cat-folding', groupId: 'grp-folding', scheduleType: 'standard' },
+
+  // Encarteuse-piqueuse
+  { id: 'sta-h', name: 'H', categoryId: 'cat-saddle-stitch', groupId: 'grp-saddle-stitch', scheduleType: 'standard' },
+
+  // Assembleuse-piqueuse
+  { id: 'sta-duplo10', name: 'Duplo10', categoryId: 'cat-booklet', groupId: 'grp-booklet', scheduleType: 'standard' },
+  { id: 'sta-duplo20', name: 'Duplo20', categoryId: 'cat-booklet', groupId: 'grp-booklet', scheduleType: 'standard' },
+
+  // Conditionnement
+  { id: 'sta-carton', name: 'Carton', categoryId: 'cat-packaging', groupId: 'grp-packaging', scheduleType: 'standard' },
+  { id: 'sta-film', name: 'Film', categoryId: 'cat-packaging', groupId: 'grp-packaging', scheduleType: 'standard' },
 ];
 
 export function generateStations(): Station[] {
