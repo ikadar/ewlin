@@ -1,6 +1,6 @@
-import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider, Element } from '@flux/types';
 import type { DryingTimeInfo } from '../../utils';
-import { isInternalTask } from '@flux/types';
+import { isInternalTask, isMultiElementJob } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
@@ -60,6 +60,8 @@ export interface SchedulingGridProps {
   jobs?: Job[];
   /** All tasks (for looking up task data) */
   tasks?: Task[];
+  /** v0.3.69: All elements (for element badge display) */
+  elements?: Element[];
   /** Task assignments to display as tiles */
   assignments?: TaskAssignment[];
   /** Currently selected job ID */
@@ -163,6 +165,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       categories = [],
       jobs = [],
       tasks = [],
+      elements = [],
       assignments = [],
       selectedJobId,
       startHour = 6,
@@ -343,6 +346,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     tasks.forEach((task) => map.set(task.id, task));
     return map;
   }, [tasks]);
+
+  // v0.3.69: Element map for badge display
+  const elementMap = useMemo(() => {
+    const map = new Map<string, Element>();
+    elements.forEach((element) => map.set(element.id, element));
+    return map;
+  }, [elements]);
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, StationCategory>();
@@ -642,6 +652,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                       }
                     }
 
+                    // v0.3.69: Get element suffix for badge display
+                    const element = task.elementId ? elementMap.get(task.elementId) : undefined;
+                    const showMultiElementBadge = isMultiElementJob(job.elementIds);
+
                     return (
                       <Tile
                         key={assignment.id}
@@ -664,6 +678,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onPick={onPickTile}
                         isPicked={pickedAssignmentId === assignment.id}
                         onInfoClick={onSelectJob}
+                        elementSuffix={element?.suffix}
+                        isMultiElementJob={showMultiElementBadge}
                       />
                     );
                   })}
@@ -698,6 +714,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     // Get subcolumn layout for this assignment
                     const layout = getSubcolumnLayout(assignment.id, subcolumnLayoutMap);
 
+                    // v0.3.69: Get element suffix for badge display
+                    const element = task.elementId ? elementMap.get(task.elementId) : undefined;
+                    const showMultiElementBadge = isMultiElementJob(job.elementIds);
+
                     return (
                       <Tile
                         key={assignment.id}
@@ -716,6 +736,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         isOutsourced={true}
                         subcolumnLayout={layout}
                         onInfoClick={onSelectJob}
+                        elementSuffix={element?.suffix}
+                        isMultiElementJob={showMultiElementBadge}
                       />
                     );
                   })}

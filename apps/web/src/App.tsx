@@ -1493,6 +1493,7 @@ function AppContent() {
           categories={snapshot.categories}
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
+          elements={snapshot.elements}
           assignments={snapshot.assignments}
           selectedJobId={deferredSelectedJobId}
           startHour={START_HOUR}

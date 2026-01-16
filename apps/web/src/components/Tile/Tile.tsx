@@ -5,6 +5,7 @@ import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { TileContextMenu } from './TileContextMenu';
 import { TileTooltip } from './TileTooltip';
 import { SimilarityIndicators } from './SimilarityIndicators';
+import { ElementBadge } from './ElementBadge';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { SubcolumnLayout } from '../../utils/subcolumnLayout';
@@ -52,6 +53,10 @@ export interface TileProps {
   isPicked?: boolean;
   /** v0.3.57: Callback when info button is clicked (opens job details) */
   onInfoClick?: (jobId: string) => void;
+  /** v0.3.69: Element suffix to display as badge (e.g., "couv", "int", "fin") */
+  elementSuffix?: string;
+  /** v0.3.69: Whether this job has multiple elements (badge only shown if true) */
+  isMultiElementJob?: boolean;
 }
 
 /**
@@ -89,6 +94,8 @@ export const Tile = memo(function Tile({
   onPick,
   isPicked = false,
   onInfoClick,
+  elementSuffix,
+  isMultiElementJob = false,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
@@ -315,10 +322,14 @@ export const Tile = memo(function Tile({
                     )}
                   </button>
                   <span
-                    className={`${colorClasses.text} font-medium truncate min-w-0`}
+                    className={`${colorClasses.text} font-medium truncate min-w-0 flex items-center gap-1`}
                     data-testid="tile-content"
                   >
-                    {job.reference} · {job.client}
+                    {job.reference}
+                    {isMultiElementJob && elementSuffix && (
+                      <ElementBadge suffix={elementSuffix} />
+                    )}
+                    <span className="shrink-0"> · {job.client}</span>
                   </span>
                 </div>
               )}
@@ -326,10 +337,13 @@ export const Tile = memo(function Tile({
               {showMinimalContent && (
                 <div className="px-1 pt-0.5 overflow-hidden">
                   <span
-                    className={`${colorClasses.text} text-xs font-medium truncate block`}
+                    className={`${colorClasses.text} text-xs font-medium truncate flex items-center gap-1`}
                     data-testid="tile-content-minimal"
                   >
                     {job.reference}
+                    {isMultiElementJob && elementSuffix && (
+                      <ElementBadge suffix={elementSuffix} />
+                    )}
                   </span>
                 </div>
               )}
@@ -362,10 +376,14 @@ export const Tile = memo(function Tile({
                   )}
                 </button>
                 <span
-                  className={`${colorClasses.text} font-medium truncate min-w-0`}
+                  className={`${colorClasses.text} font-medium truncate min-w-0 flex items-center gap-1`}
                   data-testid="tile-content"
                 >
-                  {job.reference} · {job.client}
+                  {job.reference}
+                  {isMultiElementJob && elementSuffix && (
+                    <ElementBadge suffix={elementSuffix} />
+                  )}
+                  <span className="shrink-0"> · {job.client}</span>
                 </span>
               </div>
             )}
@@ -373,10 +391,13 @@ export const Tile = memo(function Tile({
             {!hasSetup && showMinimalContent && (
               <div className="px-1 pt-0.5 overflow-hidden">
                 <span
-                  className={`${colorClasses.text} text-xs font-medium truncate block`}
+                  className={`${colorClasses.text} text-xs font-medium truncate flex items-center gap-1`}
                   data-testid="tile-content-minimal"
                 >
                   {job.reference}
+                  {isMultiElementJob && elementSuffix && (
+                    <ElementBadge suffix={elementSuffix} />
+                  )}
                 </span>
               </div>
             )}
@@ -437,6 +458,10 @@ export const Tile = memo(function Tile({
 
   // v0.3.57: Check pick-related props
   if (prevProps.isPicked !== nextProps.isPicked) return false;
+
+  // v0.3.69: Check element-related props
+  if (prevProps.elementSuffix !== nextProps.elementSuffix) return false;
+  if (prevProps.isMultiElementJob !== nextProps.isMultiElementJob) return false;
 
   // Callbacks - compare by reference
   if (prevProps.onSelect !== nextProps.onSelect) return false;
