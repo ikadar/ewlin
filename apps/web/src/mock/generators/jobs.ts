@@ -145,13 +145,13 @@ function generateInternalTask(
 ): InternalTask {
   const now = new Date();
 
-  // Generate total duration as multiple of 15 minutes (45min to 3h range)
+  // Generate TOTAL duration as multiple of 15 minutes (45min to 3h range)
   const totalMinutes = randomInt(3, 12) * 15; // 45, 60, 75, ..., 180
 
-  // Setup is roughly 15-30% of total, rounded to 15 minutes
+  // Setup is roughly 15-30% of total (NOT rounded - only total is rounded)
   const setupPercent = randomInt(15, 30) / 100;
-  const rawSetup = totalMinutes * setupPercent;
-  const setupMinutes = Math.round(rawSetup / 15) * 15 || 15; // At least 15 min
+  const setupMinutes = Math.round(totalMinutes * setupPercent) || 10; // At least 10 min
+  // Run minutes: remaining time to reach the rounded total
   const runMinutes = totalMinutes - setupMinutes;
 
   return {

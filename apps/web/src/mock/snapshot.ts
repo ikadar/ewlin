@@ -11,6 +11,7 @@ import {
   identifyLateJobs,
 } from './generators';
 import { getFixtureFromUrl, shouldUseFixture } from './testFixtures';
+import { shouldUseScenario, createScenarioSnapshot } from './scenarios';
 
 // ============================================================================
 // Snapshot Creation
@@ -77,6 +78,16 @@ let cacheOptions: SnapshotOptions = {};
  * @returns The cached or newly created snapshot
  */
 export function getSnapshot(options?: SnapshotOptions): ScheduleSnapshot {
+  // Check for test scenario mode (URL parameter ?scenario=<name>)
+  if (shouldUseScenario()) {
+    if (!cachedSnapshot) {
+      cachedSnapshot = createScenarioSnapshot();
+    }
+    if (cachedSnapshot) {
+      return cachedSnapshot;
+    }
+  }
+
   // Check for test fixture mode (URL parameter ?fixture=<name>)
   if (shouldUseFixture()) {
     if (!cachedSnapshot) {
