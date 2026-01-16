@@ -10,6 +10,7 @@ import type { ScheduleSnapshot, Task, TaskAssignment, Station } from '@flux/type
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
 import { subtractWorkingTime, snapToNextWorkingTime } from './workingTime';
+import { getInterElementBound } from './elementUtils';
 
 /**
  * Get all tasks for a job in sequence order.
@@ -64,13 +65,17 @@ function findStationById(snapshot: ScheduleSnapshot, stationId: string): Station
 /**
  * Calculate the Y position for the predecessor constraint line (purple).
  *
- * This represents the earliest possible start time for a task based on
- * its predecessor's end time plus any required dry time for printing tasks.
+ * This represents the earliest possible start time for a task based on:
+ * 1. Intra-element precedence: its predecessor's end time plus any required dry time
+ * 2. Inter-element precedence: for first task of element with prerequisites,
+ *    the MAX of all prerequisite elements' completion times
  *
  * v0.3.53: Drying is a physical process that continues regardless of working hours.
  * However, work can only START during working hours. So:
  * 1. Calculate drying end = predecessor end + dry time (simple addition)
  * 2. If drying ends outside working hours, snap to next working time
+ *
+ * v0.3.70: Inter-element precedence for first task of elements with prerequisites.
  *
  * @returns Y position in pixels, or null if no constraint
  */
@@ -81,48 +86,66 @@ export function getPredecessorConstraint(
   pixelsPerHour: number,
   gridStartDate?: Date
 ): number | null {
-  // Find predecessor task
+  // v0.3.70: Calculate inter-element bound (for first task of element with prerequisites)
+  const interElementBound = getInterElementBound(task, snapshot.elements, snapshot.assignments);
+
+  // Calculate intra-element bound (previous task in job sequence)
+  let intraElementBound: Date | null = null;
+
+  // Find predecessor task (previous in job sequence)
   const predecessor = getPredecessorTask(snapshot, task);
-  if (!predecessor) {
-    return null; // No predecessor = no constraint
+  if (predecessor) {
+    // Find predecessor's assignment
+    const predecessorAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
+    if (predecessorAssignment) {
+      // Get predecessor end time
+      const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+
+      // Check if dry time applies (printing/offset station, not outsourced)
+      if (!predecessorAssignment.isOutsourced && isPrintingStation(snapshot, predecessorAssignment.targetId)) {
+        // Drying is a physical process - it continues regardless of working hours
+        // So we use simple addition for dry time
+        const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+
+        // But work can only START during working hours
+        // If drying ends outside working hours, snap to next working time
+        const station = findStationById(snapshot, predecessorAssignment.targetId);
+        if (station) {
+          intraElementBound = snapToNextWorkingTime(dryingEnd, station);
+        } else {
+          // Fallback if station not found
+          intraElementBound = dryingEnd;
+        }
+      } else {
+        // No dry time, earliest start is right after predecessor ends
+        // But still need to snap to working hours
+        const station = predecessorAssignment.isOutsourced
+          ? undefined
+          : findStationById(snapshot, predecessorAssignment.targetId);
+        if (station) {
+          intraElementBound = snapToNextWorkingTime(predecessorEnd, station);
+        } else {
+          intraElementBound = predecessorEnd;
+        }
+      }
+    }
   }
 
-  // Find predecessor's assignment
-  const predecessorAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
-  if (!predecessorAssignment) {
-    return null; // Predecessor not scheduled = no constraint
+  // No constraints at all
+  if (!interElementBound && !intraElementBound) {
+    return null;
   }
 
-  // Get predecessor end time
-  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
-
-  // Check if dry time applies (printing/offset station, not outsourced)
+  // v0.3.70: Return MAX of both bounds
   let earliestStart: Date;
-  if (!predecessorAssignment.isOutsourced && isPrintingStation(snapshot, predecessorAssignment.targetId)) {
-    // Drying is a physical process - it continues regardless of working hours
-    // So we use simple addition for dry time
-    const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-
-    // But work can only START during working hours
-    // If drying ends outside working hours, snap to next working time
-    const station = findStationById(snapshot, predecessorAssignment.targetId);
-    if (station) {
-      earliestStart = snapToNextWorkingTime(dryingEnd, station);
-    } else {
-      // Fallback if station not found
-      earliestStart = dryingEnd;
-    }
+  if (interElementBound && intraElementBound) {
+    earliestStart = interElementBound.getTime() > intraElementBound.getTime()
+      ? interElementBound
+      : intraElementBound;
+  } else if (interElementBound) {
+    earliestStart = interElementBound;
   } else {
-    // No dry time, earliest start is right after predecessor ends
-    // But still need to snap to working hours
-    const station = predecessorAssignment.isOutsourced
-      ? undefined
-      : findStationById(snapshot, predecessorAssignment.targetId);
-    if (station) {
-      earliestStart = snapToNextWorkingTime(predecessorEnd, station);
-    } else {
-      earliestStart = predecessorEnd;
-    }
+    earliestStart = intraElementBound!;
   }
 
   // Convert to Y position
