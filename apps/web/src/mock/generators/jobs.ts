@@ -73,6 +73,29 @@ const PROVIDER_ACTION_TYPES: Record<string, string[]> = {
 };
 
 // ============================================================================
+// Station IDs by Production Step
+// ============================================================================
+
+/** Printing stations (offset + digital) */
+const PRINTING_STATIONS = ['sta-g37', 'sta-754', 'sta-gto', 'sta-c9500'];
+/** Offset-only stations (for dry time tests) */
+const OFFSET_STATIONS = ['sta-g37', 'sta-754', 'sta-gto'];
+/** Cutting stations (massicot) */
+const CUTTING_STATIONS = ['sta-p137', 'sta-vm'];
+/** Folding stations (plieuse) */
+const FOLDING_STATIONS = ['sta-stahl', 'sta-mbo', 'sta-horizon'];
+/** Typo stations */
+const TYPO_STATIONS = ['sta-sbg', 'sta-sbb'];
+/** Saddle-stitch station (encarteuse-piqueuse) */
+const SADDLE_STITCH_STATIONS = ['sta-h'];
+/** Booklet assembly stations (assembleuse-piqueuse) */
+const BOOKLET_STATIONS = ['sta-duplo10', 'sta-duplo20'];
+/** Packaging stations (conditionnement) */
+const PACKAGING_STATIONS = ['sta-carton', 'sta-film'];
+/** All finishing stations (for intermediate tasks) */
+const FINISHING_STATIONS = [...FOLDING_STATIONS, ...TYPO_STATIONS, ...SADDLE_STITCH_STATIONS, ...BOOKLET_STATIONS];
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -190,26 +213,41 @@ export function generateTasksForElement(options: TaskGeneratorOptions): Task[] {
   const tasks: Task[] = [];
   let seq = startSequence;
 
-  // Generate the requested number of tasks
+  // Generate the requested number of tasks following realistic production flow:
+  // 1. Printing (offset or digital)
+  // 2. Cutting (massicot)
+  // 3. Finishing (folding, typo, assembly, etc.)
+  // 4. Packaging or outsourced (optional)
+
   for (let i = 0; i < taskCount; i++) {
     if (i === 0) {
-      // First task: Printing
-      const printStation =
-        forceFirstStation || randomElement(['sta-komori-g40', 'sta-heidelberg-sm', 'sta-xerox', 'sta-hp-indigo']);
+      // First task: Printing (offset or digital)
+      const printStation = forceFirstStation || randomElement(PRINTING_STATIONS);
       tasks.push(generateInternalTask(jobId, elementId, seq++, printStation));
     } else if (i === 1) {
-      // Second task: Cutting
-      const cutStation = randomElement(['sta-polar-137', 'sta-massicot']);
+      // Second task: Cutting (massicot)
+      const cutStation = randomElement(CUTTING_STATIONS);
       tasks.push(generateInternalTask(jobId, elementId, seq++, cutStation));
-    } else if (i === taskCount - 1 && includeOutsourced && Math.random() > 0.7) {
-      // Last task might be outsourced
-      const providerId = randomElement(PROVIDER_IDS);
-      const actionTypes = PROVIDER_ACTION_TYPES[providerId];
-      const actionType = randomElement(actionTypes);
-      tasks.push(generateOutsourcedTask(jobId, elementId, seq++, providerId, actionType));
+    } else if (i === taskCount - 1) {
+      // Last task: outsourced, packaging, or finishing
+      if (includeOutsourced && Math.random() > 0.7) {
+        // Outsourced finishing (pelliculage, reliure, etc.)
+        const providerId = randomElement(PROVIDER_IDS);
+        const actionTypes = PROVIDER_ACTION_TYPES[providerId];
+        const actionType = randomElement(actionTypes);
+        tasks.push(generateOutsourcedTask(jobId, elementId, seq++, providerId, actionType));
+      } else if (Math.random() > 0.5) {
+        // Packaging (conditionnement)
+        const packStation = randomElement(PACKAGING_STATIONS);
+        tasks.push(generateInternalTask(jobId, elementId, seq++, packStation));
+      } else {
+        // Final finishing (assembly, folding)
+        const finishStation = randomElement([...BOOKLET_STATIONS, ...FOLDING_STATIONS]);
+        tasks.push(generateInternalTask(jobId, elementId, seq++, finishStation));
+      }
     } else {
-      // Other tasks: finishing
-      const finishStation = randomElement(['sta-stahl', 'sta-muller', 'sta-horizon']);
+      // Intermediate tasks: finishing operations
+      const finishStation = randomElement(FINISHING_STATIONS);
       tasks.push(generateInternalTask(jobId, elementId, seq++, finishStation));
     }
   }
@@ -395,11 +433,11 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   const elements: Element[] = [];
   const tasks: Task[] = [];
 
-  // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved)
+  // First, generate the QA test job (non-late, with offset press G37, unscheduled, approved)
   const qaResult = generateJob({
     index: 1,
     isLate: false, // NOT late so deadline is in the future
-    forceFirstStation: 'sta-komori-g40',
+    forceFirstStation: 'sta-g37',
     keepFirstUnscheduled: true,
     forceApproved: true,
   });

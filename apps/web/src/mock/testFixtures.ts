@@ -40,14 +40,14 @@ const closedDaySchedule: DaySchedule = {
 const categories: StationCategory[] = [
   {
     id: 'cat-offset',
-    name: 'Presses Offset',
-    description: 'Machines d\'impression offset',
+    name: 'Presse offset',
+    description: 'Presses offset',
     similarityCriteria: [],
   },
   {
     id: 'cat-cutting',
-    name: 'Massicots',
-    description: 'Machines de découpe',
+    name: 'Massicot',
+    description: 'Massicots',
     similarityCriteria: [],
   },
 ];
@@ -55,22 +55,22 @@ const categories: StationCategory[] = [
 const groups: StationGroup[] = [
   {
     id: 'grp-offset',
-    name: 'Presses Offset',
-    maxConcurrent: 10,
+    name: 'Presse offset',
+    maxConcurrent: 2,
     isOutsourcedProviderGroup: false,
   },
   {
     id: 'grp-cutting',
-    name: 'Massicots',
-    maxConcurrent: 10,
+    name: 'Massicot',
+    maxConcurrent: 2,
     isOutsourcedProviderGroup: false,
   },
 ];
 
 const stations: Station[] = [
   {
-    id: 'station-komori',
-    name: 'Komori G40',
+    id: 'sta-g37',
+    name: 'G37',
     status: 'Available',
     categoryId: 'cat-offset',
     groupId: 'grp-offset',
@@ -87,8 +87,8 @@ const stations: Station[] = [
     exceptions: [],
   },
   {
-    id: 'station-heidelberg',
-    name: 'Heidelberg Speedmaster',
+    id: 'sta-754',
+    name: '754',
     status: 'Available',
     categoryId: 'cat-offset',
     groupId: 'grp-offset',
@@ -105,8 +105,8 @@ const stations: Station[] = [
     exceptions: [],
   },
   {
-    id: 'station-polar',
-    name: 'Polar 137',
+    id: 'sta-p137',
+    name: 'P137',
     status: 'Available',
     categoryId: 'cat-cutting',
     groupId: 'grp-cutting',
@@ -225,7 +225,7 @@ export function createBasicFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -236,7 +236,7 @@ export function createBasicFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 30 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -247,7 +247,7 @@ export function createBasicFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 90 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -258,7 +258,7 @@ export function createBasicFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -269,7 +269,7 @@ export function createBasicFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'sta-754',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -280,7 +280,7 @@ export function createBasicFixture(): ScheduleSnapshot {
     {
       id: 'assign-test-1-print',
       taskId: 'task-test-1-print',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 30),
@@ -292,7 +292,7 @@ export function createBasicFixture(): ScheduleSnapshot {
     {
       id: 'assign-test-2-print',
       taskId: 'task-test-2-print',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(11, 0),
@@ -304,7 +304,7 @@ export function createBasicFixture(): ScheduleSnapshot {
     {
       id: 'assign-test-3-print',
       taskId: 'task-test-3-print',
-      targetId: 'station-heidelberg',
+      targetId: 'sta-754',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(9, 30),
@@ -396,7 +396,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -407,7 +407,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -418,7 +418,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -430,7 +430,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
     {
       id: 'assign-pd-1',
       taskId: 'task-pd-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 30),
@@ -442,7 +442,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
     {
       id: 'assign-pd-2',
       taskId: 'task-pd-2',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(8, 30),
       scheduledEnd: isoDate(10, 0),
@@ -454,7 +454,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
     {
       id: 'assign-pd-3',
       taskId: 'task-pd-3',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0),
       scheduledEnd: isoDate(11, 30),
@@ -510,7 +510,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,  // First task
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -521,7 +521,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 1,  // Second task (must wait for first)
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 30 }, // 45min
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -534,7 +534,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-1',
       taskId: 'task-prec-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 30),
@@ -629,7 +629,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -640,7 +640,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -651,7 +651,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -739,7 +739,7 @@ export function createSwapFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -750,7 +750,7 @@ export function createSwapFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -761,7 +761,7 @@ export function createSwapFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -773,7 +773,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     {
       id: 'assign-swap-1',
       taskId: 'task-swap-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 0),
@@ -785,7 +785,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     {
       id: 'assign-swap-2',
       taskId: 'task-swap-2',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(9, 0),
@@ -797,7 +797,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     {
       id: 'assign-swap-3',
       taskId: 'task-swap-3',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(10, 0),
@@ -853,7 +853,7 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -906,7 +906,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
       sequenceOrder: 0,  // First task
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h total (10:00-11:00)
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -917,7 +917,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
       sequenceOrder: 1,  // Second task (must wait for first to complete at 11:00)
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar', // Different station to allow placement
+      stationId: 'sta-p137', // Different station to allow placement
       duration: { setupMinutes: 15, runMinutes: 30 }, // 45min
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -931,7 +931,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
     {
       id: 'assign-bypass-1',
       taskId: 'task-bypass-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0),
       scheduledEnd: isoDate(11, 0),
@@ -987,7 +987,7 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1100,7 +1100,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1111,7 +1111,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1122,7 +1122,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1133,7 +1133,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1145,7 +1145,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     {
       id: 'assign-a',
       taskId: 'task-a',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 30),
@@ -1157,7 +1157,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     {
       id: 'assign-b',
       taskId: 'task-b',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(10, 30),
@@ -1169,7 +1169,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     {
       id: 'assign-c',
       taskId: 'task-c',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 1), // Tomorrow at 8:00
       scheduledEnd: isoDate(9, 30, 1),   // Tomorrow at 9:30
@@ -1256,7 +1256,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1267,7 +1267,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 30 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1278,7 +1278,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'sta-754',
       duration: { setupMinutes: 30, runMinutes: 90 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1291,7 +1291,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     {
       id: 'assign-ds-1-a',
       taskId: 'task-ds-1-a',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 0), // Today at 8:00
       scheduledEnd: isoDate(9, 30, 0),
@@ -1304,7 +1304,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     {
       id: 'assign-ds-1-b',
       taskId: 'task-ds-1-b',
-      targetId: 'station-polar',
+      targetId: 'sta-p137',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, 3), // Day 3 at 10:00
       scheduledEnd: isoDate(10, 45, 3),
@@ -1317,7 +1317,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     {
       id: 'assign-ds-2',
       taskId: 'task-ds-2',
-      targetId: 'station-heidelberg',
+      targetId: 'sta-754',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0, 10), // Day 10 at 7:00
       scheduledEnd: isoDate(9, 0, 10),
@@ -1374,7 +1374,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1387,7 +1387,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'sta-754',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1400,7 +1400,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1412,7 +1412,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     {
       id: 'assign-pv-1',
       taskId: 'task-pv-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(10, 0),
@@ -1425,7 +1425,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     {
       id: 'assign-pv-3',
       taskId: 'task-pv-3',
-      targetId: 'station-polar',
+      targetId: 'sta-p137',
       isOutsourced: false,
       scheduledStart: isoDate(18, 0),
       scheduledEnd: isoDate(19, 0),
@@ -1529,7 +1529,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
       sequenceOrder: i,
       status: 'Assigned',
       type: 'Internal',
-      stationId: i % 2 === 0 ? 'station-komori' : 'station-heidelberg',
+      stationId: i % 2 === 0 ? 'sta-g37' : 'sta-754',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1538,7 +1538,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     assignments.push({
       id: `assign-vs-1${job1TaskSuffixes[i]}`,
       taskId: `task-vs-1${job1TaskSuffixes[i]}`,
-      targetId: i % 2 === 0 ? 'station-komori' : 'station-heidelberg',
+      targetId: i % 2 === 0 ? 'sta-g37' : 'sta-754',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, dayOffset),
       scheduledEnd: isoDate(9, 30, dayOffset),
@@ -1559,7 +1559,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
       sequenceOrder: i,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1568,7 +1568,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     assignments.push({
       id: `assign-vs-2${job2TaskSuffixes[i]}`,
       taskId: `task-vs-2${job2TaskSuffixes[i]}`,
-      targetId: 'station-polar',
+      targetId: 'sta-p137',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, dayOffset),
       scheduledEnd: isoDate(11, 0, dayOffset),
@@ -1586,7 +1586,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     sequenceOrder: 0,
     status: 'Assigned',
     type: 'Internal',
-    stationId: 'station-heidelberg',
+    stationId: 'sta-754',
     duration: { setupMinutes: 30, runMinutes: 90 }, // 2h
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
@@ -1595,7 +1595,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
   assignments.push({
     id: 'assign-vs-3',
     taskId: 'task-vs-3',
-    targetId: 'station-heidelberg',
+    targetId: 'sta-754',
     isOutsourced: false,
     scheduledStart: isoDate(7, 0, 180),
     scheduledEnd: isoDate(9, 0, 180),
@@ -1675,7 +1675,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1687,7 +1687,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'sta-754',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1699,7 +1699,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1711,7 +1711,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 3,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1723,7 +1723,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 4,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'sta-754',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1735,7 +1735,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1747,7 +1747,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m1',
       taskId: 'task-m1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, -1), // Yesterday
       scheduledEnd: isoDate(11, 30, -1),
@@ -1760,7 +1760,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m2',
       taskId: 'task-m2',
-      targetId: 'station-heidelberg',
+      targetId: 'sta-754',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 0), // Today
       scheduledEnd: isoDate(9, 30, 0),
@@ -1773,7 +1773,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m3',
       taskId: 'task-m3',
-      targetId: 'station-polar',
+      targetId: 'sta-p137',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, 1), // Tomorrow
       scheduledEnd: isoDate(11, 0, 1),
@@ -1787,7 +1787,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m4',
       taskId: 'task-m4',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0, 2), // Day 2, before task-m3 ends
       scheduledEnd: isoDate(8, 0, 2),
@@ -1800,7 +1800,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m6',
       taskId: 'task-m6',
-      targetId: 'station-polar',
+      targetId: 'sta-p137',
       isOutsourced: false,
       scheduledStart: isoDate(14, 0, 0), // Today afternoon
       scheduledEnd: isoDate(15, 0, 0),
@@ -1870,7 +1870,7 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1925,7 +1925,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori', // OFFSET station - requires drying time
+      stationId: 'sta-g37', // OFFSET station - requires drying time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1939,7 +1939,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar', // Cutting station
+      stationId: 'sta-p137', // Cutting station
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -1952,7 +1952,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
     {
       id: 'assign-dry-1',
       taskId: 'task-dry-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(10, 0),
@@ -2048,7 +2048,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori', // Offset - has dry time
+      stationId: 'sta-g37', // Offset - has dry time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2060,7 +2060,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar', // Cutting
+      stationId: 'sta-p137', // Cutting
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2072,7 +2072,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'sta-g37',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2084,7 +2084,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2097,7 +2097,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     {
       id: 'assign-val-1',
       taskId: 'task-val-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(10, 0),
@@ -2178,7 +2178,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori', // OFFSET station - requires 4h drying time
+      stationId: 'sta-g37', // OFFSET station - requires 4h drying time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2190,7 +2190,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2207,7 +2207,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg', // OFFSET station - requires 4h drying time
+      stationId: 'sta-754', // OFFSET station - requires 4h drying time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2219,7 +2219,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'sta-p137',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -2231,7 +2231,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     {
       id: 'assign-pwh-1',
       taskId: 'task-pwh-1',
-      targetId: 'station-komori',
+      targetId: 'sta-g37',
       isOutsourced: false,
       scheduledStart: isoDate(6, 30),
       scheduledEnd: isoDate(8, 30),
@@ -2244,7 +2244,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     {
       id: 'assign-pwh-3',
       taskId: 'task-pwh-3',
-      targetId: 'station-heidelberg',
+      targetId: 'sta-754',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(11, 0),
