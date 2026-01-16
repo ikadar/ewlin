@@ -15,7 +15,15 @@ export {
 } from './stations';
 
 export {
+  generateElement,
+  getRandomJobPattern,
+  type JobPattern,
+  type JobPatternConfig,
+} from './elements';
+
+export {
   generateTasksForJob,
+  generateTasksForElement,
   generateJobs,
   identifyLateJobs,
   type JobData,

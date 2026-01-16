@@ -28,6 +28,7 @@ function createJob(id: string): Job {
     platesStatus: 'Done',
     requiredJobIds: [],
     comments: [],
+    elementIds: [],
     taskIds: [],
     createdAt: '2025-12-15T00:00:00Z',
     updatedAt: '2025-12-15T00:00:00Z',
@@ -43,6 +44,7 @@ function createInternalTask(
   return {
     id,
     jobId,
+    elementId: `elem-${jobId}-elt`,
     type: 'Internal',
     stationId,
     status: 'Ready',

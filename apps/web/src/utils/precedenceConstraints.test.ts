@@ -17,15 +17,17 @@ function createLocalTimeISO(hour: number, minute: number = 0): string {
 // Helper to create minimal snapshot
 function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnapshot {
   return {
-    timestamp: '2026-01-06T10:00:00Z',
+    version: 1,
+    generatedAt: '2026-01-06T10:00:00Z',
     jobs: [],
+    elements: [],
     tasks: [],
     assignments: [],
     stations: [],
     groups: [],
     categories: [
-      { id: 'cat-offset', name: 'Offset', colorCode: '#FF0000' },
-      { id: 'cat-cutting', name: 'Cutting', colorCode: '#00FF00' },
+      { id: 'cat-offset', name: 'Offset' },
+      { id: 'cat-cutting', name: 'Cutting' },
     ],
     providers: [],
     conflicts: [],
@@ -38,13 +40,22 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
 function createJob(id: string): Job {
   return {
     id,
-    jobNumber: '1234',
-    customerName: 'Test Customer',
-    customerPriority: 'normal',
-    requestedDelivery: '2026-01-10T17:00:00Z',
-    internalDeadline: '2026-01-10T17:00:00Z',
-    status: 'active',
+    reference: '2026-0001',
+    client: 'Test Customer',
+    description: 'Test job',
+    status: 'Planned',
+    workshopExitDate: '2026-01-10',
+    fullyScheduled: false,
+    color: '#3B82F6',
+    paperPurchaseStatus: 'InStock',
+    proofApproval: { sentAt: null, approvedAt: null },
+    platesStatus: 'Todo',
+    requiredJobIds: [],
+    comments: [],
+    elementIds: [],
     taskIds: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -61,6 +72,7 @@ function createTask(
   return {
     id,
     jobId,
+    elementId: `elem-${jobId}-elt`,
     sequenceOrder,
     type: 'Internal',
     stationId: 'station-1',
@@ -80,11 +92,16 @@ function createAssignment(
   isOutsourced: boolean = false
 ): TaskAssignment {
   return {
+    id: `assign-${taskId}`,
     taskId,
     targetId,
     isOutsourced,
     scheduledStart: start,
     scheduledEnd: end,
+    isCompleted: false,
+    completedAt: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -138,8 +155,8 @@ describe('getPredecessorConstraint', () => {
       tasks: [task1, task2],
       assignments: [assignment],
       stations: [
-        { id: 'station-cutting', name: 'Cutting', categoryId: 'cat-cutting', groupId: null },
-      ],
+        { id: 'station-cutting', name: 'Cutting', categoryId: 'cat-cutting', groupId: 'grp-1', status: 'Available', capacity: 1, operatingSchedule: {} as any, exceptions: [] },
+      ] as any,
     });
 
     const result = getPredecessorConstraint(task2, snapshot, 6, PIXELS_PER_HOUR);
@@ -170,11 +187,11 @@ describe('getPredecessorConstraint', () => {
       tasks: [printTask, cutTask],
       assignments: [assignment],
       stations: [
-        { id: 'station-offset', name: 'Offset Press', categoryId: 'cat-offset', groupId: null },
-      ],
+        { id: 'station-offset', name: 'Offset Press', categoryId: 'cat-offset', groupId: 'grp-1', status: 'Available', capacity: 1, operatingSchedule: {} as any, exceptions: [] },
+      ] as any,
       categories: [
-        { id: 'cat-offset', name: 'Offset', colorCode: '#FF0000' },
-        { id: 'cat-cutting', name: 'Cutting', colorCode: '#00FF00' },
+        { id: 'cat-offset', name: 'Offset', similarityCriteria: [] },
+        { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [] },
       ],
     });
 
@@ -205,7 +222,7 @@ describe('getPredecessorConstraint', () => {
       jobs: [job],
       tasks: [printTask, cutTask],
       assignments: [assignment],
-      providers: [{ id: 'provider-1', name: 'External Printer' }],
+      providers: [{ id: 'provider-1', name: 'External Printer', status: 'Active', supportedActionTypes: [], latestDepartureTime: '14:00', receptionTime: '09:00', groupId: 'grp-1' }] as any,
     });
 
     const result = getPredecessorConstraint(cutTask, snapshot, 6, PIXELS_PER_HOUR);

@@ -54,6 +54,7 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
     groups: stationData.groups,
     providers: stationData.providers,
     jobs: jobData.jobs,
+    elements: jobData.elements,
     tasks: jobData.tasks,
     assignments: assignmentData.assignments,
     conflicts: assignmentData.conflicts,

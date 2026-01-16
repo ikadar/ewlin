@@ -14,7 +14,9 @@ import type {
   OutsourcedTask,
   TaskStatus,
   LateJob,
+  Element,
 } from '@flux/types';
+import { generateElement, getRandomJobPattern, type JobPatternConfig } from './elements';
 
 // ============================================================================
 // Constants
@@ -102,14 +104,18 @@ function formatTimestamp(date: Date): string {
 
 interface TaskGeneratorOptions {
   jobId: string;
+  elementId: string;
   startSequence?: number;
   includeOutsourced?: boolean;
   /** Force the first task to use this station ID */
   forceFirstStation?: string;
+  /** Number of tasks to generate */
+  taskCount?: number;
 }
 
 function generateInternalTask(
   jobId: string,
+  elementId: string,
   sequenceOrder: number,
   stationId: string,
   status: TaskStatus = 'Ready'
@@ -128,6 +134,7 @@ function generateInternalTask(
   return {
     id: `task-${jobId}-${sequenceOrder}`,
     jobId,
+    elementId,
     sequenceOrder,
     status,
     type: 'Internal',
@@ -144,6 +151,7 @@ function generateInternalTask(
 
 function generateOutsourcedTask(
   jobId: string,
+  elementId: string,
   sequenceOrder: number,
   providerId: string,
   actionType: string,
@@ -153,6 +161,7 @@ function generateOutsourcedTask(
   return {
     id: `task-${jobId}-${sequenceOrder}`,
     jobId,
+    elementId,
     sequenceOrder,
     status,
     type: 'Outsourced',
@@ -169,36 +178,53 @@ function generateOutsourcedTask(
   };
 }
 
-export function generateTasksForJob(options: TaskGeneratorOptions): Task[] {
-  const { jobId, startSequence = 0, includeOutsourced = true, forceFirstStation } = options;
+export function generateTasksForElement(options: TaskGeneratorOptions): Task[] {
+  const {
+    jobId,
+    elementId,
+    startSequence = 0,
+    includeOutsourced = true,
+    forceFirstStation,
+    taskCount = randomInt(2, 4),
+  } = options;
   const tasks: Task[] = [];
   let seq = startSequence;
 
-  // Typical workflow: Print → Cut → (optional: Outsourced finishing) → Fold/Bind
-
-  // 1. Printing task (offset or digital)
-  const printStation = forceFirstStation || randomElement(['sta-komori-g40', 'sta-heidelberg-sm', 'sta-xerox', 'sta-hp-indigo']);
-  tasks.push(generateInternalTask(jobId, seq++, printStation));
-
-  // 2. Cutting task
-  const cutStation = randomElement(['sta-polar-137', 'sta-massicot']);
-  tasks.push(generateInternalTask(jobId, seq++, cutStation));
-
-  // 3. Optional outsourced finishing
-  if (includeOutsourced && Math.random() > 0.5) {
-    const providerId = randomElement(PROVIDER_IDS);
-    const actionTypes = PROVIDER_ACTION_TYPES[providerId];
-    const actionType = randomElement(actionTypes);
-    tasks.push(generateOutsourcedTask(jobId, seq++, providerId, actionType));
-  }
-
-  // 4. Final finishing task
-  if (Math.random() > 0.3) {
-    const finishStation = randomElement(['sta-stahl', 'sta-muller', 'sta-horizon']);
-    tasks.push(generateInternalTask(jobId, seq++, finishStation));
+  // Generate the requested number of tasks
+  for (let i = 0; i < taskCount; i++) {
+    if (i === 0) {
+      // First task: Printing
+      const printStation =
+        forceFirstStation || randomElement(['sta-komori-g40', 'sta-heidelberg-sm', 'sta-xerox', 'sta-hp-indigo']);
+      tasks.push(generateInternalTask(jobId, elementId, seq++, printStation));
+    } else if (i === 1) {
+      // Second task: Cutting
+      const cutStation = randomElement(['sta-polar-137', 'sta-massicot']);
+      tasks.push(generateInternalTask(jobId, elementId, seq++, cutStation));
+    } else if (i === taskCount - 1 && includeOutsourced && Math.random() > 0.7) {
+      // Last task might be outsourced
+      const providerId = randomElement(PROVIDER_IDS);
+      const actionTypes = PROVIDER_ACTION_TYPES[providerId];
+      const actionType = randomElement(actionTypes);
+      tasks.push(generateOutsourcedTask(jobId, elementId, seq++, providerId, actionType));
+    } else {
+      // Other tasks: finishing
+      const finishStation = randomElement(['sta-stahl', 'sta-muller', 'sta-horizon']);
+      tasks.push(generateInternalTask(jobId, elementId, seq++, finishStation));
+    }
   }
 
   return tasks;
+}
+
+/**
+ * @deprecated Use generateTasksForElement instead
+ */
+export function generateTasksForJob(options: Omit<TaskGeneratorOptions, 'elementId'> & { elementId?: string }): Task[] {
+  return generateTasksForElement({
+    ...options,
+    elementId: options.elementId || `elem-${options.jobId}-elt`,
+  });
 }
 
 // ============================================================================
@@ -220,10 +246,25 @@ interface GenerateJobOptions {
   keepFirstUnscheduled?: boolean;
   /** Ensure all approval gates are satisfied (BAT approved, Plates done) */
   forceApproved?: boolean;
+  /** Force a specific job pattern */
+  forcePattern?: JobPatternConfig;
 }
 
-function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
-  const { index, isLate = false, forceFirstStation, keepFirstUnscheduled = false, forceApproved = false } = options;
+interface GenerateJobResult {
+  job: Job;
+  elements: Element[];
+  tasks: Task[];
+}
+
+function generateJob(options: GenerateJobOptions): GenerateJobResult {
+  const {
+    index,
+    isLate = false,
+    forceFirstStation,
+    keepFirstUnscheduled = false,
+    forceApproved = false,
+    forcePattern,
+  } = options;
   const now = new Date();
   const jobId = `job-${String(index).padStart(5, '0')}`;
 
@@ -239,26 +280,66 @@ function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
     status = randomElement(['Planned', 'InProgress'] as JobStatus[]);
   }
 
-  // Generate tasks first to know if fully scheduled
-  const tasks = generateTasksForJob({
-    jobId,
-    includeOutsourced: Math.random() > 0.4,
-    forceFirstStation,
-  });
+  // Get job pattern (single-element, multi-sheet, or brochure)
+  const pattern = forcePattern || getRandomJobPattern();
+
+  // Generate elements and tasks
+  const elements: Element[] = [];
+  const allTasks: Task[] = [];
+  let globalSequence = 0;
+
+  // Create a map from suffix to element ID for prerequisite resolution
+  const suffixToElementId = new Map<string, string>();
+  for (const elemConfig of pattern.elements) {
+    suffixToElementId.set(elemConfig.suffix, `elem-${jobId}-${elemConfig.suffix.toLowerCase()}`);
+  }
+
+  for (const elemConfig of pattern.elements) {
+    const elementId = suffixToElementId.get(elemConfig.suffix)!;
+
+    // Resolve prerequisite element IDs
+    const prerequisiteElementIds = elemConfig.prerequisiteSuffixes.map(
+      (suffix) => suffixToElementId.get(suffix)!
+    );
+
+    // Generate tasks for this element
+    const tasks = generateTasksForElement({
+      jobId,
+      elementId,
+      startSequence: globalSequence,
+      includeOutsourced: Math.random() > 0.4,
+      forceFirstStation: elements.length === 0 ? forceFirstStation : undefined,
+      taskCount: elemConfig.taskCount,
+    });
+
+    globalSequence += tasks.length;
+
+    // Create element
+    const element = generateElement({
+      jobId,
+      suffix: elemConfig.suffix,
+      label: elemConfig.label,
+      prerequisiteElementIds,
+      taskIds: tasks.map((t) => t.id),
+    });
+
+    elements.push(element);
+    allTasks.push(...tasks);
+  }
 
   // Randomly assign some tasks as Assigned
   const fullyScheduled = !keepFirstUnscheduled && Math.random() > 0.6;
   if (fullyScheduled) {
-    tasks.forEach((task) => {
+    allTasks.forEach((task) => {
       (task as InternalTask | OutsourcedTask).status = 'Assigned';
     });
   } else if (Math.random() > 0.5) {
     // Partially scheduled - but keep first unscheduled if requested
     const startIndex = keepFirstUnscheduled ? 1 : 0;
-    const maxScheduled = tasks.length - (keepFirstUnscheduled ? 1 : 0);
+    const maxScheduled = allTasks.length - (keepFirstUnscheduled ? 1 : 0);
     const scheduledCount = randomInt(0, maxScheduled - 1);
-    for (let i = startIndex; i < startIndex + scheduledCount && i < tasks.length; i++) {
-      (tasks[i] as InternalTask | OutsourcedTask).status = 'Assigned';
+    for (let i = startIndex; i < startIndex + scheduledCount && i < allTasks.length; i++) {
+      (allTasks[i] as InternalTask | OutsourcedTask).status = 'Assigned';
     }
   }
 
@@ -292,16 +373,18 @@ function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
     platesStatus: forceApproved ? 'Done' : randomElement(['Todo', 'Done'] as PlatesStatus[]),
     requiredJobIds: [],
     comments: [],
-    taskIds: tasks.map((t) => t.id),
+    elementIds: elements.map((e) => e.id),
+    taskIds: allTasks.map((t) => t.id),
     createdAt: formatTimestamp(addDays(now, -randomInt(5, 30))),
     updatedAt: formatTimestamp(now),
   };
 
-  return { job, tasks };
+  return { job, elements, tasks: allTasks };
 }
 
 export interface JobData {
   jobs: Job[];
+  elements: Element[];
   tasks: Task[];
 }
 
@@ -309,39 +392,43 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   const { count = 15, includeLateJobs = 2, includeConflictJobs = 1 } = options;
 
   const jobs: Job[] = [];
+  const elements: Element[] = [];
   const tasks: Task[] = [];
 
   // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved)
-  const { job: qaJob, tasks: qaTasks } = generateJob({
+  const qaResult = generateJob({
     index: 1,
     isLate: false, // NOT late so deadline is in the future
     forceFirstStation: 'sta-komori-g40',
     keepFirstUnscheduled: true,
     forceApproved: true,
   });
-  jobs.push(qaJob);
-  tasks.push(...qaTasks);
+  jobs.push(qaResult.job);
+  elements.push(...qaResult.elements);
+  tasks.push(...qaResult.tasks);
 
   // Generate late jobs (starting from index 2)
   for (let i = 0; i < includeLateJobs && i + 1 < count; i++) {
-    const { job, tasks: jobTasks } = generateJob({
+    const result = generateJob({
       index: i + 2,
       isLate: true,
     });
-    jobs.push(job);
-    tasks.push(...jobTasks);
+    jobs.push(result.job);
+    elements.push(...result.elements);
+    tasks.push(...result.tasks);
   }
 
   // Generate normal jobs (after QA job and late jobs)
   // QA job = 1, late jobs = 2 to (includeLateJobs+1), normal jobs start after
   const normalStartIndex = 1 + includeLateJobs + 1; // +1 for QA job, +1 because indexes are 1-based
   for (let i = normalStartIndex; i <= count; i++) {
-    const { job, tasks: jobTasks } = generateJob({
+    const result = generateJob({
       index: i,
       isLate: false,
     });
-    jobs.push(job);
-    tasks.push(...jobTasks);
+    jobs.push(result.job);
+    elements.push(...result.elements);
+    tasks.push(...result.tasks);
   }
 
   // Mark some jobs for conflicts (will be handled in assignment generator)
@@ -350,7 +437,7 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
     jobs[i].notes = 'CONFLICT_TEST';
   }
 
-  return { jobs, tasks };
+  return { jobs, elements, tasks };
 }
 
 // ============================================================================
