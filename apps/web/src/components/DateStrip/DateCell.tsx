@@ -107,7 +107,7 @@ export function DateCell({
   return (
     <button
       type="button"
-      className={`h-10 w-full flex flex-col items-center justify-center text-xs font-mono ${textColor} border-b ${borderColor} cursor-pointer hover:bg-white/5 transition-colors ${bgColor} relative overflow-visible`}
+      className={`h-12 w-full flex flex-col items-center justify-center text-sm font-mono ${textColor} border-b ${borderColor} cursor-pointer hover:bg-white/5 transition-colors ${bgColor} relative overflow-visible`}
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowTooltip(false)}
@@ -116,7 +116,7 @@ export function DateCell({
       {/* REQ-01: Custom tooltip with fast appearance - uses fixed position to escape overflow */}
       {showTooltip && (
         <div
-          className="fixed z-50 px-2 py-1 bg-zinc-800 text-zinc-200 text-xs rounded shadow-lg whitespace-nowrap pointer-events-none -translate-y-1/2"
+          className="fixed z-50 px-2 py-1 bg-zinc-800 text-zinc-200 text-sm rounded shadow-lg whitespace-nowrap pointer-events-none -translate-y-1/2"
           style={{ top: tooltipPosition.top, left: tooltipPosition.left }}
           role="tooltip"
         >
@@ -139,16 +139,9 @@ export function DateCell({
         />
       )}
 
-      {/* REQ-09.3: Today indicator - thin red line (like grid's "now" line) */}
-      {/* ViewportIndicator has its own "now" line that covers this when viewport is over today */}
-      {isToday && (
-        <div
-          className="absolute left-1 right-1 top-1/2 h-0.5 bg-red-500 -translate-y-1/2 pointer-events-none"
-          data-testid="today-indicator-line"
-        />
-      )}
+      {/* v0.3.64: Today indicator removed - ViewportIndicator handles "now" line display */}
 
-      <span className="text-[10px] relative z-10">{dayAbbrev}</span>
+      <span className="text-xs relative z-10">{dayAbbrev}</span>
       <span className={`font-medium ${dayNumberColor} relative z-10`}>{dayNumber}</span>
 
       {/* v0.3.47: Task markers (colored lines for each task on this day) */}
