@@ -96,6 +96,22 @@ export function DateStrip({
     return getVisibleDates(startDate, virtualScroll.visibleRange);
   }, [startDate, virtualScroll.visibleRange]);
 
+  // v0.3.65: Calculate today's index and check if it's in visible range
+  const todayIndex = useMemo(() => {
+    const todayTime = today.getTime();
+    const startTime = startDate.getTime();
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const index = Math.floor((todayTime - startTime) / msPerDay);
+    // Return index only if within valid day range
+    return index >= 0 && index < dayCount ? index : null;
+  }, [today, startDate, dayCount]);
+
+  // v0.3.65: Check if today is outside visible range (needs separate rendering)
+  const isTodayOutsideVisibleRange = useMemo(() => {
+    if (todayIndex === null) return false;
+    return todayIndex < virtualScroll.visibleRange.start || todayIndex >= virtualScroll.visibleRange.end;
+  }, [todayIndex, virtualScroll.visibleRange]);
+
   // v0.3.64: Optimized scroll handling - only re-render when visible range changes
   useEffect(() => {
     const container = containerRef.current;
@@ -231,6 +247,48 @@ export function DateStrip({
             );
           })}
         </div>
+
+        {/* v0.3.65: Always render today cell even when outside visible range */}
+        {isTodayOutsideVisibleRange && todayIndex !== null && (() => {
+          const todayDate = new Date(startDate);
+          todayDate.setDate(todayDate.getDate() + todayIndex);
+          const dateKey = formatDateKey(todayDate);
+          const isDateDepartureDate = departureDate ? isSameDay(todayDate, departureDate) : false;
+          const hasScheduledTasks = scheduledDays?.has(dateKey) ?? false;
+          const isFocused = focusedDate ? isSameDay(todayDate, focusedDate) : false;
+          const taskMarkers = taskMarkersPerDay?.get(dateKey) ?? [];
+          const currentHour = today.getHours() + today.getMinutes() / 60;
+
+          // Check if on timeline
+          const isOnTimeline = (() => {
+            if (!earliestTaskDate || !departureDate) return false;
+            const dateOnly = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()).getTime();
+            const earliestDateOnly = new Date(earliestTaskDate.getFullYear(), earliestTaskDate.getMonth(), earliestTaskDate.getDate()).getTime();
+            const departureDateOnly = new Date(departureDate.getFullYear(), departureDate.getMonth(), departureDate.getDate()).getTime();
+            return dateOnly >= earliestDateOnly && dateOnly <= departureDateOnly;
+          })();
+
+          return (
+            <div
+              className="absolute left-0 right-0"
+              style={{ top: `${todayIndex * CELL_HEIGHT}px` }}
+            >
+              <DateCell
+                key={`today-${todayDate.toISOString()}`}
+                date={todayDate}
+                dayIndex={todayIndex}
+                isToday={true}
+                isFocused={isFocused}
+                isDepartureDate={isDateDepartureDate}
+                hasScheduledTasks={hasScheduledTasks}
+                onClick={() => onDateClick?.(todayDate)}
+                currentHour={currentHour}
+                taskMarkers={taskMarkers}
+                isOnTimeline={isOnTimeline}
+              />
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

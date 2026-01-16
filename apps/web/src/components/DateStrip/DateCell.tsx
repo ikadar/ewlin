@@ -125,11 +125,16 @@ export function DateCell({
       )}
       {/* v0.3.64: Viewport indicator - uses RAF loop for smooth updates */}
       {/* Automatically hides when viewport doesn't overlap this day */}
-      <ViewportIndicator
-        dayIndex={dayIndex}
-        isToday={isToday}
-        currentHour={currentHour}
-      />
+      <ViewportIndicator dayIndex={dayIndex} />
+
+      {/* v0.3.65: Fixed "now" line - always shows current time position in today's cell */}
+      {isToday && currentHour !== undefined && (
+        <div
+          className="absolute left-0 right-0 h-0.5 bg-red-500 pointer-events-none z-20"
+          style={{ top: `${(currentHour / 24) * 100}%` }}
+          data-testid="fixed-now-line"
+        />
+      )}
 
       {/* v0.3.47: Task timeline dotted line (from earliest task to exit) */}
       {isOnTimeline && (

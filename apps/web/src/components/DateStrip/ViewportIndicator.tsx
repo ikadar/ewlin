@@ -12,24 +12,15 @@ import { useViewportPosition } from './ViewportPositionContext';
 export interface ViewportIndicatorProps {
   /** Day index (0-based from grid start) for calculating position within this day */
   dayIndex: number;
-  /** Whether this day is today (show "now" line) */
-  isToday?: boolean;
-  /** Current hour for "now" line position (0-24, fractional) */
-  currentHour?: number;
 }
 
 /**
  * ViewportIndicator - Uses RAF loop to update position smoothly without React re-renders.
  * Automatically hides when viewport doesn't overlap this day.
  */
-export function ViewportIndicator({
-  dayIndex,
-  isToday = false,
-  currentHour = 0,
-}: ViewportIndicatorProps) {
+export function ViewportIndicator({ dayIndex }: ViewportIndicatorProps) {
   const positionRef = useViewportPosition();
   const elementRef = useRef<HTMLDivElement>(null);
-  const nowLineRef = useRef<HTMLDivElement>(null);
 
   // RAF loop to update position directly in DOM
   useEffect(() => {
@@ -74,20 +65,6 @@ export function ViewportIndicator({
             elementRef.current.style.top = `${topPercent}%`;
             elementRef.current.style.height = `${heightPercent}%`;
           }
-
-          // Update "now" line position if visible
-          if (nowLineRef.current && isToday) {
-            const isNowVisible = currentHour >= Math.max(0, viewportStartInDay) &&
-                                 currentHour <= Math.min(24, viewportEndInDay);
-
-            if (isNowVisible) {
-              const nowPositionPercent = ((currentHour - viewportStartInDay) / (viewportEndInDay - viewportStartInDay)) * 100;
-              nowLineRef.current.style.display = 'block';
-              nowLineRef.current.style.top = `${nowPositionPercent}%`;
-            } else {
-              nowLineRef.current.style.display = 'none';
-            }
-          }
         }
       }
 
@@ -99,7 +76,7 @@ export function ViewportIndicator({
     return () => {
       cancelAnimationFrame(rafId);
     };
-  }, [positionRef, dayIndex, isToday, currentHour]);
+  }, [positionRef, dayIndex]);
 
   return (
     <div
@@ -111,16 +88,6 @@ export function ViewportIndicator({
         height: '33%',
       }}
       data-testid="viewport-indicator"
-    >
-      {/* "Now" line within viewport (red horizontal line) */}
-      {isToday && (
-        <div
-          ref={nowLineRef}
-          className="absolute left-0 right-0 h-0.5 bg-red-500"
-          style={{ display: 'none', top: '0%' }}
-          data-testid="viewport-now-line"
-        />
-      )}
-    </div>
+    />
   );
 }
