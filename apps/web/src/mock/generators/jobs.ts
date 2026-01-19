@@ -273,6 +273,8 @@ interface JobGeneratorOptions {
   count?: number;
   includeLateJobs?: number;
   includeConflictJobs?: number;
+  /** Force all tasks to be assigned (fully scheduled jobs) */
+  allTasksAssigned?: boolean;
 }
 
 interface GenerateJobOptions {
@@ -286,6 +288,8 @@ interface GenerateJobOptions {
   forceApproved?: boolean;
   /** Force a specific job pattern */
   forcePattern?: JobPatternConfig;
+  /** Force all tasks to be assigned */
+  forceAllAssigned?: boolean;
 }
 
 interface GenerateJobResult {
@@ -302,6 +306,7 @@ function generateJob(options: GenerateJobOptions): GenerateJobResult {
     keepFirstUnscheduled = false,
     forceApproved = false,
     forcePattern,
+    forceAllAssigned = false,
   } = options;
   const now = new Date();
   const jobId = `job-${String(index).padStart(5, '0')}`;
@@ -366,7 +371,7 @@ function generateJob(options: GenerateJobOptions): GenerateJobResult {
   }
 
   // Randomly assign some tasks as Assigned
-  const fullyScheduled = !keepFirstUnscheduled && Math.random() > 0.6;
+  const fullyScheduled = forceAllAssigned || (!keepFirstUnscheduled && Math.random() > 0.6);
   if (fullyScheduled) {
     allTasks.forEach((task) => {
       (task as InternalTask | OutsourcedTask).status = 'Assigned';
@@ -427,7 +432,7 @@ export interface JobData {
 }
 
 export function generateJobs(options: JobGeneratorOptions = {}): JobData {
-  const { count = 15, includeLateJobs = 2, includeConflictJobs = 1 } = options;
+  const { count = 15, includeLateJobs = 2, includeConflictJobs = 1, allTasksAssigned = false } = options;
 
   const jobs: Job[] = [];
   const elements: Element[] = [];
@@ -438,8 +443,9 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
     index: 1,
     isLate: false, // NOT late so deadline is in the future
     forceFirstStation: 'sta-g37',
-    keepFirstUnscheduled: true,
+    keepFirstUnscheduled: !allTasksAssigned,
     forceApproved: true,
+    forceAllAssigned: allTasksAssigned,
   });
   jobs.push(qaResult.job);
   elements.push(...qaResult.elements);
@@ -450,6 +456,7 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
     const result = generateJob({
       index: i + 2,
       isLate: true,
+      forceAllAssigned: allTasksAssigned,
     });
     jobs.push(result.job);
     elements.push(...result.elements);
@@ -463,6 +470,7 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
     const result = generateJob({
       index: i,
       isLate: false,
+      forceAllAssigned: allTasksAssigned,
     });
     jobs.push(result.job);
     elements.push(...result.elements);

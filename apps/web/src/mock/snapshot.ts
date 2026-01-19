@@ -21,10 +21,12 @@ export interface SnapshotOptions {
   jobCount?: number;
   lateJobCount?: number;
   conflictJobCount?: number;
+  /** Force all tasks to be assigned (fully scheduled jobs) */
+  allTasksAssigned?: boolean;
 }
 
 export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot {
-  const { jobCount = 15, lateJobCount = 2, conflictJobCount = 1 } = options;
+  const { jobCount = 500, lateJobCount = 2, conflictJobCount = 1, allTasksAssigned = false } = options;
 
   // Generate station data
   const stationData = generateAllStationData();
@@ -34,6 +36,7 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
     count: jobCount,
     includeLateJobs: lateJobCount,
     includeConflictJobs: conflictJobCount,
+    allTasksAssigned,
   });
 
   // Generate assignments and conflicts
@@ -98,17 +101,46 @@ export function getSnapshot(options?: SnapshotOptions): ScheduleSnapshot {
     }
   }
 
+  // Check for URL parameters
+  const urlOptions = getOptionsFromUrl();
+  const mergedOptions = { ...cacheOptions, ...options, ...urlOptions };
+
   // If options changed, invalidate cache
-  if (options && JSON.stringify(options) !== JSON.stringify(cacheOptions)) {
+  if (JSON.stringify(mergedOptions) !== JSON.stringify(cacheOptions)) {
     cachedSnapshot = null;
-    cacheOptions = options;
+    cacheOptions = mergedOptions;
   }
 
   if (!cachedSnapshot) {
-    cachedSnapshot = createSnapshot(options || cacheOptions);
+    cachedSnapshot = createSnapshot(cacheOptions);
   }
 
   return cachedSnapshot;
+}
+
+/**
+ * Parse snapshot options from URL parameters.
+ * Supports: ?allAssigned=true, ?jobCount=100
+ */
+function getOptionsFromUrl(): Partial<SnapshotOptions> {
+  if (typeof window === 'undefined') return {};
+
+  const params = new URLSearchParams(window.location.search);
+  const options: Partial<SnapshotOptions> = {};
+
+  if (params.get('allAssigned') === 'true') {
+    options.allTasksAssigned = true;
+  }
+
+  const jobCount = params.get('jobCount');
+  if (jobCount) {
+    const count = parseInt(jobCount, 10);
+    if (!isNaN(count) && count > 0) {
+      options.jobCount = count;
+    }
+  }
+
+  return options;
 }
 
 /**
