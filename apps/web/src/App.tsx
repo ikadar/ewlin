@@ -1263,9 +1263,12 @@ function AppContent() {
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
     // Check for blocking conflicts
-    // StationConflict IS blocking in pick mode (means overlap with another task)
+    // StationConflict is NOT blocking - push-down will handle overlapping tiles
+    // PrecedenceConflict with suggestedStart is NOT blocking (can be placed at suggested time)
+    // ApprovalGateConflict for Plates is NOT blocking
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'PrecedenceConflict' &&
+      (c) => c.type !== 'StationConflict' &&
+             !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
              !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
@@ -1273,6 +1276,9 @@ function AppContent() {
 
     if (blockingConflicts.length > 0 && !isAltPressed) {
       console.log('Pick placement blocked: validation failed', blockingConflicts);
+      // Cancel pick so the tile returns to its original state
+      pickActions.cancelPick();
+      setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
       return;
     }
 

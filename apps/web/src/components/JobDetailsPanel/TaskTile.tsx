@@ -65,17 +65,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   };
   const displayName = getDisplayName();
 
-  // Calculate height based on duration (for visual representation)
-  // 1 hour = 100px, minimum 20px
-  const getHeight = (): number => {
-    if (task.type === 'Internal') {
-      const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-      const height = Math.max(20, Math.round((totalMinutes / 60) * 100));
-      return Math.min(height, 200); // Cap at 200px for list view
-    }
-    return 60; // Default for outsourced
-  };
-
   // Convert hex color to Tailwind-compatible classes
   // For now, we'll use inline styles for the job color
   const getColorStyles = () => {
@@ -119,7 +108,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   };
 
   const colorStyles = getColorStyles();
-  const height = getHeight();
 
   if (isScheduled) {
     // Scheduled (placed) task - dark placeholder (not draggable)
@@ -140,8 +128,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     return (
       <button
         type="button"
-        className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full"
-        style={{ height: `${height}px` }}
+        className="h-8 pt-0.5 px-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full"
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
@@ -188,9 +175,8 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   // Unscheduled task - job color styling, clickable for Pick & Place
   return (
     <div
-      className={`pt-0.5 px-2 text-sm border-l-4 select-none transition-all duration-150 ${getCursorClass()}`}
+      className={`h-8 pt-0.5 px-2 text-sm border-l-4 select-none transition-all duration-150 ${getCursorClass()}`}
       style={{
-        height: `${height}px`,
         borderLeftColor: jobColor,
         backgroundColor: colorStyles.backgroundColor,
         ...activePlacementStyle,
