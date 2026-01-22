@@ -1053,20 +1053,52 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 #### v0.3.57 - Pick & Place from Grid (REQ-01 complete)
 > **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (grid tiles)
 
+**Pick from Grid:**
 - [ ] Click handler on grid tiles (non-completed, non-outsourced)
 - [ ] `isPicked` prop on Tile for placeholder rendering
 - [ ] Pulsating placeholder at original position (uses CSS from v0.3.56)
 - [ ] No opacity change (all columns visible for grid picks)
 - [ ] No scroll (user is at tile location)
 - [ ] Place on same or different station
-- [ ] Remove drag & drop code (replaced by P&P)
-- [ ] Update E2E test suite (replace drag tests with pick tests)
+
+**Remove Drag & Drop:**
+- [ ] Delete `apps/web/src/dnd/` folder entirely
+  - `DragStateContext.tsx` - remove provider and hooks
+  - `DragLayer.tsx` - remove drag preview overlay
+  - `types.ts` - remove drag types
+  - `index.ts` - remove exports
+- [ ] Remove `pragmatic-drag-and-drop` from `package.json`
+- [ ] Clean up `App.tsx`:
+  - Remove `DragStateProvider` wrapper
+  - Remove `useDragMonitor` hook and related handlers
+  - Remove drag-related state (`dragValidation`, `grabOffset`, etc.)
+  - Remove `handleDragEnd` callback
+- [ ] Clean up `Tile.tsx`:
+  - Remove `draggable` prop and `draggableForElements` setup
+  - Remove drag-related data attributes
+  - Keep only click handler for pick
+- [ ] Clean up `StationColumn.tsx`:
+  - Remove `dropTargetForElements` setup
+  - Remove `useDragStateValue` hook
+  - Remove `isOver`, `isValidDropTarget` state
+  - Keep pick-related props only
+- [ ] Clean up `TaskTile.tsx` (Job Details Panel):
+  - Remove `draggableForElements` setup
+  - Keep only click handler for pick
+- [ ] Update E2E tests:
+  - Replace `drag-drop.spec.ts` with pick-based tests
+  - Update `sidebar-drag.spec.ts` → use pick interactions
+  - Remove drag helper functions from `helpers/drag.ts`
+  - Add pick helper functions to `helpers/pick.ts`
 
 **Affected files:**
-- `apps/web/src/components/Tile/Tile.tsx` (isPicked, placeholder)
-- `apps/web/src/components/StationColumns/StationColumn.tsx`
-- `apps/web/src/dnd/` - remove or refactor
-- `apps/web/src/App.tsx`
+- `apps/web/src/dnd/` - DELETE entire folder
+- `apps/web/src/components/Tile/Tile.tsx` (isPicked, remove draggable)
+- `apps/web/src/components/StationColumns/StationColumn.tsx` (remove drop target)
+- `apps/web/src/components/JobDetailsPanel/TaskTile.tsx` (remove draggable)
+- `apps/web/src/App.tsx` (remove DragStateProvider, drag handlers)
+- `apps/web/package.json` (remove pragmatic-drag-and-drop)
+- `apps/web/playwright/` (update drag tests → pick tests)
 
 #### v0.3.58 - Right Click Context Menu (REQ-02)
 > **Implements:** [REQ-02](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-02-right-click-context-menu)
