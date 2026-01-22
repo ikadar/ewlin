@@ -1,16 +1,16 @@
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 
 /** Snap interval in minutes */
-export const SNAP_INTERVAL_MINUTES = 30;
+export const SNAP_INTERVAL_MINUTES = 15;
 
-/** Pixels per snap interval (30 min = half hour = 40px at 80px/hour) */
-export const PIXELS_PER_SNAP = PIXELS_PER_HOUR / 2;
+/** Pixels per snap interval (calculated from SNAP_INTERVAL_MINUTES) */
+export const PIXELS_PER_SNAP = PIXELS_PER_HOUR * (SNAP_INTERVAL_MINUTES / 60);
 
 /**
- * Calculate pixels per snap based on current pixelsPerHour.
+ * Calculate pixels per snap based on current pixelsPerHour and SNAP_INTERVAL_MINUTES.
  */
 export function getPixelsPerSnap(pixelsPerHour: number = PIXELS_PER_HOUR): number {
-  return pixelsPerHour / 2;
+  return pixelsPerHour * (SNAP_INTERVAL_MINUTES / 60);
 }
 
 /**

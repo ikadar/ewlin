@@ -107,7 +107,28 @@ function getPrecedenceMessage(conflict: ScheduleConflict): string {
   if (details?.constraintType === 'predecessor') {
     const hasDryTime = details.hasDryTime as boolean;
     const predecessorEnd = details.predecessorEnd as string | undefined;
+    const suggestedStart = details.suggestedStart as string | undefined;
+    const proposedStart = details.proposedStart as string | undefined;
 
+    // Determine if we're before predecessor end or in drying time
+    if (predecessorEnd && proposedStart) {
+      const predecessorEndTime = new Date(predecessorEnd).getTime();
+      const proposedStartTime = new Date(proposedStart).getTime();
+
+      // If proposed start is before predecessor ends
+      if (proposedStartTime < predecessorEndTime) {
+        const time = formatTime(predecessorEnd);
+        return `Prédécesseur finit à ${time}`;
+      }
+
+      // If we're in drying time (after predecessor end but before suggested start)
+      if (hasDryTime && suggestedStart) {
+        const effectiveTime = formatTime(suggestedStart);
+        return `Séchage jusqu'à ${effectiveTime}`;
+      }
+    }
+
+    // Fallback
     if (predecessorEnd) {
       const time = formatTime(predecessorEnd);
       if (hasDryTime) {

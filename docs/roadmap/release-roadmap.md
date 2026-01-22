@@ -991,20 +991,120 @@ This document contains the development roadmap for the Flux print shop schedulin
 - `apps/web/src/utils/workingTime.ts` - new utility functions
 - `apps/web/src/utils/precedenceConstraints.ts` - updated calculations
 
-#### v0.3.54 - Dragover Performance Optimization
-> **Implements:** [REQ-05](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-05-dragover-performance-with-many-tiles)
+### Phase 3J: Pick & Place Interaction
+> **Reference:** [Refactored Requirements Part 4](../ux-ui/tmp/refactored-new-requirements-04-en.md)
 
-- [ ] Profile with React DevTools Profiler
-- [ ] Memoize StationColumn with custom comparison
-- [ ] Optimize constraint line calculation (only when target changes)
-- [ ] Use refs for high-frequency drag state updates
-- [ ] Throttle dragover handler (~60fps)
-- [ ] Performance tests: 20+ tiles without lag
+#### ✅ v0.3.54 - Pick & Place from Sidebar (REQ-01 partial)
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (sidebar tasks only)
+> **Replaces:** Dragover Performance Optimization (P&P solves the root cause)
+> **Released:** 2026-01-22
+
+Pick & Place is a two-click interaction replacing drag-and-drop for performance:
+- Drag-and-drop: ~60 validations/second (mousemove events)
+- Pick & Place: 2 validations total (pick + place)
+
+- [x] `PickStateContext.tsx` - State management (pickedTask, pickSource, ghostPositionRef)
+- [x] `PickPreview.tsx` - Ghost tile rendering (portal-based, RAF positioning)
+- [x] Click handler in Job Details Panel tasks (unscheduled only)
+- [x] Ghost tile follows cursor (direct DOM manipulation, no React re-renders)
+- [x] ESC key cancels pick (tile returns to unpicked state)
+- [x] Click on valid position places tile
+- [x] Click on invalid position returns tile to origin
+- [x] Ring color feedback (green/red/amber) on hover
+- [x] E2E tests for sidebar pick & place
 
 **Affected files:**
-- `apps/web/src/components/StationColumns/StationColumn.tsx`
+- `apps/web/src/pick/PickStateContext.tsx` (new)
+- `apps/web/src/pick/PickPreview.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/TaskTile.tsx`
+- `apps/web/src/App.tsx`
+
+#### v0.3.55 - Column Focus on Sidebar Pick (REQ-03)
+> **Implements:** [REQ-03](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-03-column-focus-during-pick-from-job-details)
+
+- [ ] Save scroll position on pick (for cancel restoration)
+- [ ] Scroll target station column to left edge (smooth, 300ms)
+- [ ] Fade non-target columns to 15% opacity
+- [ ] Disable pointer events on non-target columns
+- [ ] Restore scroll position on cancel (ESC)
+- [ ] Restore opacity on place/cancel
+- [ ] Only for sidebar picks (grid picks keep all columns visible)
+- [ ] E2E tests for column focus behavior
+
+**Affected files:**
+- `apps/web/src/App.tsx` - scroll/opacity logic
+- `apps/web/src/components/StationColumns/StationColumn.tsx` - opacity classes
+
+#### v0.3.56 - Pick Visual Feedback
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (visual refinements)
+
+- [ ] Pulsating animation on original position (grid picks)
+- [ ] Cursor states: default → grab (picked) → not-allowed (invalid)
+- [ ] Validation throttle to 100ms with early-exit
+- [ ] CSS transition masking for smooth ring color changes
+- [ ] Precedence lines during pick (reuse existing logic)
+- [ ] E2E tests for visual feedback states
+
+**Affected files:**
 - `apps/web/src/components/Tile/Tile.tsx`
-- `apps/web/src/dnd/DragStateContext.tsx`
+- `apps/web/src/pick/PickStateContext.tsx`
+- `apps/web/src/index.css` (pulsating animation)
+
+#### v0.3.57 - Pick & Place from Grid (REQ-01 complete)
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (grid tiles)
+
+- [ ] Click handler on grid tiles (non-completed, non-outsourced)
+- [ ] Pulsating placeholder at original position
+- [ ] No opacity change (all columns visible)
+- [ ] No scroll (user is at tile location)
+- [ ] Place on same or different station
+- [ ] Remove drag & drop code (replaced by P&P)
+- [ ] Update E2E test suite (replace drag tests with pick tests)
+
+**Affected files:**
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/StationColumns/StationColumn.tsx`
+- `apps/web/src/dnd/` - remove or refactor
+- `apps/web/src/App.tsx`
+
+#### v0.3.58 - Right Click Context Menu (REQ-02)
+> **Implements:** [REQ-02](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-02-right-click-context-menu)
+
+- [ ] `TileContextMenu.tsx` component (portal-based, z-9999)
+- [ ] Menu options: View details, Toggle completion, Move up, Move down
+- [ ] Position at cursor (x, y)
+- [ ] Auto-flip near viewport edges (right/bottom)
+- [ ] Close on: click outside, ESC, scroll
+- [ ] Only on tiles (not empty cells)
+- [ ] French labels (Voir détails, Marquer terminé, etc.)
+- [ ] E2E tests for context menu
+
+**Affected files:**
+- `apps/web/src/components/Tile/TileContextMenu.tsx` (new)
+- `apps/web/src/components/Tile/Tile.tsx`
+
+#### v0.3.59 - Job Details Panel Fixed Tile Height (REQ-04)
+> **Implements:** [REQ-04](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-04-job-details-panel---fixed-tile-height)
+
+- [ ] Change task tile height from proportional to fixed 32px
+- [ ] Remove duration-based height calculation
+- [ ] Ensure content fits within 32px (truncation if needed)
+- [ ] Visual test for consistent list appearance
+
+**Affected files:**
+- `apps/web/src/components/JobDetailsPanel/TaskTile.tsx`
+
+#### v0.3.60 - Unavailability Overlay SVG (REQ-05)
+> **Implements:** [REQ-05](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-05-unavailability-overlay---css-gradient-to-svg)
+
+- [ ] Create `stripes.svg` (45°, 10px stripe, rgba(255,255,255,0.03))
+- [ ] Update `.bg-stripes-dark` to use SVG instead of CSS gradient
+- [ ] Verify visual appearance matches current implementation
+- [ ] Performance comparison (optional)
+
+**Affected files:**
+- `apps/web/public/stripes.svg` (new)
+- `apps/web/src/index.css`
 
 ---
 

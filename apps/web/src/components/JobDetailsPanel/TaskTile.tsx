@@ -17,10 +17,14 @@ export interface TaskTileProps {
   station?: Station;
   /** Whether this task is the active placement target in Quick Placement Mode */
   isActivePlacement?: boolean;
+  /** Whether this task is currently picked (for Pick & Place) */
+  isPicked?: boolean;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
+  /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
+  onPick?: (task: Task, job: Job) => void;
 }
 
 /**
@@ -28,7 +32,7 @@ export interface TaskTileProps {
  * Unscheduled: job color, border-l-4, cursor-grab, draggable
  * Scheduled: dark placeholder with station + datetime
  */
-export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, onJumpToTask, onRecallTask }: TaskTileProps) {
+export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, isPicked = false, onJumpToTask, onRecallTask, onPick }: TaskTileProps) {
   const isScheduled = !!assignment;
 
   // Ref for the draggable element
@@ -210,20 +214,45 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
       }
     : undefined;
 
-  // Unscheduled task - job color styling, draggable
+  // Picked state styling (v0.3.54)
+  const pickedStyle = isPicked
+    ? {
+        boxShadow: '0 0 0 2px #3b82f6, 0 0 12px rgba(59, 130, 246, 0.4)',
+        opacity: 0.7,
+      }
+    : undefined;
+
+  // v0.3.54: Handle click for pick & place (when onPick is provided)
+  const handleClick = () => {
+    if (onPick && !isDragging) {
+      onPick(task, job);
+    }
+  };
+
+  // Determine cursor style
+  const getCursorClass = () => {
+    if (isPicked) return 'cursor-default';
+    if (isDragging) return 'cursor-grabbing';
+    if (onPick) return 'cursor-pointer'; // Pick mode
+    return 'cursor-grab'; // Drag mode
+  };
+
+  // Unscheduled task - job color styling, draggable or pickable
   return (
     <div
       ref={tileRef}
-      className={`pt-0.5 px-2 text-sm border-l-4 touch-none select-none ${
-        isDragging ? 'opacity-50 cursor-grabbing' : 'cursor-grab'
+      className={`pt-0.5 px-2 text-sm border-l-4 touch-none select-none transition-all duration-150 ${getCursorClass()} ${
+        isDragging ? 'opacity-50' : ''
       }`}
       style={{
         height: `${height}px`,
         borderLeftColor: jobColor,
         backgroundColor: colorStyles.backgroundColor,
         ...activePlacementStyle,
+        ...pickedStyle,
       }}
       data-testid={`task-tile-${task.id}`}
+      onClick={handleClick}
     >
       <div className="flex items-center justify-between gap-2">
         <span

@@ -133,6 +133,22 @@ export interface SchedulingGridProps {
   totalDays?: number;
   /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
   bufferDays?: number;
+  /** v0.3.54: Whether a task is currently picked (Pick & Place mode) */
+  isPicking?: boolean;
+  /** v0.3.54: Target station ID for the picked task */
+  pickTargetStationId?: string | null;
+  /** v0.3.54: Ring color state for pick operation */
+  pickRingState?: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
+  /** v0.3.54: Callback for mouse move during pick */
+  onPickMouseMove?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
+  /** v0.3.54: Callback for mouse leave during pick */
+  onPickMouseLeave?: () => void;
+  /** v0.3.54: Callback for click to place during pick */
+  onPickClick?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
+  /** v0.3.54: Precedence constraint Y positions during pick */
+  pickPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** v0.3.54: Drying time info during pick */
+  pickDryingTimeInfo?: DryingTimeInfo | null;
 }
 
 /**
@@ -180,6 +196,15 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       dryingTimeInfo,
       totalDays = 365,
       bufferDays = 3,
+      // v0.3.54: Pick & Place props
+      isPicking = false,
+      pickTargetStationId,
+      pickRingState = 'none',
+      onPickMouseMove,
+      onPickMouseLeave,
+      onPickClick,
+      pickPrecedenceConstraints,
+      pickDryingTimeInfo,
     },
     ref
   ) {
@@ -545,17 +570,18 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const effectiveIsValidDrop = isValidDrop || isQuickPlacementValid;
               const effectiveIsInvalidDrop = isInvalidDrop || isQuickPlacementInvalid;
 
-              // Precedence constraints: show for drag or quick placement
+              // Precedence constraints: show for drag, quick placement, or pick
+              const isPickTarget = isPicking && pickTargetStationId === station.id;
               const effectivePrecedenceConstraints = isValidationTarget
                 ? precedenceConstraints
                 : (isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement
                     ? quickPlacementPrecedenceConstraints
-                    : undefined);
+                    : (isPickTarget ? pickPrecedenceConstraints : undefined));
 
               // v0.3.51: Drying time info - show only on the predecessor's station
               const effectiveDryingTimeInfo = dryingTimeInfo?.predecessorStationId === station.id
                 ? dryingTimeInfo
-                : undefined;
+                : (pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined);
 
               return (
                 <StationColumn
@@ -579,6 +605,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   precedenceConstraints={effectivePrecedenceConstraints}
                   dryingTimeInfo={effectiveDryingTimeInfo}
                   visibleDayRange={virtualScroll.visibleRange}
+                  isPicking={isPicking}
+                  isPickTarget={isPickTarget}
+                  pickRingState={isPickTarget ? pickRingState : 'none'}
+                  onPickMouseMove={onPickMouseMove}
+                  onPickMouseLeave={onPickMouseLeave}
+                  onPickClick={onPickClick}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);

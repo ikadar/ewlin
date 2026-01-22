@@ -5,7 +5,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { useDropValidation } from './hooks';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, calculateTileTopPosition, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage } from './utils';
 import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
 import {
@@ -16,10 +16,17 @@ import {
   type StationDropData,
   type DragValidationState,
 } from './dnd';
+import {
+  PickStateProvider,
+  PickPreview,
+  usePickState,
+  PICK_CURSOR_OFFSET_Y,
+} from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 
-const START_HOUR = 6;
+// Multi-day grid starts at 00:00 (midnight) for each day
+const START_HOUR = 0;
 // v0.3.46: Restored to 365 days with virtual scrolling for performance
 const DAY_COUNT = 365;
 
@@ -301,6 +308,15 @@ function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boo
   return false;
 }
 
+// v0.3.54: Handle ESC to cancel pick
+function handleEscapePick(e: KeyboardEvent, cancelPick: () => void, isPicking: boolean): boolean {
+  if (e.key === 'Escape' && isPicking) {
+    cancelPick();
+    return true;
+  }
+  return false;
+}
+
 function handleJobNavigation(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) {
     return false;
@@ -378,6 +394,10 @@ function AppContent() {
   const { state: dragState, setPixelsPerHour: setContextPixelsPerHour } = useDragState();
   const { activeTask, activeJob, isRescheduleDrag, grabOffset } = dragState;
 
+  // v0.3.54: Pick & Place state
+  const { state: pickState, actions: pickActions } = usePickState();
+  const { pickedTask, pickedJob, isPicking, targetStationId: pickTargetStationId } = pickState;
+
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
 
@@ -399,6 +419,14 @@ function AppContent() {
     snappedY: number;
   }>({ stationId: null, y: 0, snappedY: 0 });
 
+  // v0.3.54: Pick & Place validation state
+  const [pickValidation, setPickValidation] = useState<{
+    scheduledStart: string | null;
+    ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
+    message: string | null;
+    debugConflicts: Array<{ type: string; message?: string }>;
+  }>({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+
   // Compact station loading state
   const [compactingStationId, setCompactingStationId] = useState<string | null>(null);
 
@@ -412,6 +440,11 @@ function AppContent() {
   useEffect(() => {
     setContextPixelsPerHour(pixelsPerHour);
   }, [pixelsPerHour, setContextPixelsPerHour]);
+
+  // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
+  useEffect(() => {
+    pickActions.setPixelsPerHour(pixelsPerHour);
+  }, [pixelsPerHour, pickActions]);
 
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
@@ -498,6 +531,24 @@ function AppContent() {
     const latestY = getSuccessorConstraint(activeTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
     return { earliestY, latestY };
   }, [activeTask, snapshot, pixelsPerHour, gridStartDate]);
+
+  // v0.3.54: Calculate precedence constraints for pick
+  const pickPrecedenceConstraints = useMemo(() => {
+    if (!pickedTask) {
+      return { earliestY: null, latestY: null };
+    }
+    const earliestY = getPredecessorConstraint(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    const latestY = getSuccessorConstraint(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    return { earliestY, latestY };
+  }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
+
+  // v0.3.54: Calculate drying time info during pick
+  const pickDryingTimeInfo = useMemo((): DryingTimeInfo | null => {
+    if (!pickedTask) {
+      return null;
+    }
+    return getDryingTimeInfo(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+  }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // v0.3.51: Calculate drying time info during drag
   const dryingTimeInfo = useMemo((): DryingTimeInfo | null => {
@@ -736,6 +787,11 @@ function AppContent() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Each handler returns true if it handled the event
       if (handleAltKey(e, ctx)) return;
+      // v0.3.54: Handle ESC to cancel pick (priority over quick placement)
+      if (handleEscapePick(e, () => {
+        pickActions.cancelPick();
+        setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+      }, isPicking)) return;
       if (handleQuickPlacementKeyboard(e, ctx)) return;
       if (handleEscapeQuickPlacement(e, ctx)) return;
       if (handleJobNavigation(e, ctx)) return;
@@ -757,7 +813,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions]);
 
   // Set up global drag monitoring using pragmatic-drag-and-drop
   // Handles: position tracking during drag, drop processing
@@ -1291,6 +1347,149 @@ function AppContent() {
     }
   }, [selectedJobId]);
 
+  // v0.3.54: Handle pick from sidebar (unscheduled task)
+  const handlePickTask = useCallback((task: Task, job: Job) => {
+    pickActions.pickFromSidebar(task, job);
+    // Initialize ghost position at cursor (will be updated on mouse move)
+    pickActions.updateGhostPosition(0, 0);
+  }, [pickActions]);
+
+  // v0.3.54: Handle mouse move during pick (update ghost position and validate)
+  const handlePickMouseMove = useCallback((stationId: string, clientX: number, clientY: number, relativeY: number) => {
+    // Update ghost position for RAF rendering (PickPreview handles offset internally)
+    pickActions.updateGhostPosition(clientX, clientY);
+
+    // Calculate tile top from cursor position (cursor is PICK_CURSOR_OFFSET_Y pixels inside the tile)
+    const tileTopY = relativeY - PICK_CURSOR_OFFSET_Y;
+    const snappedTileTop = snapToGrid(Math.max(0, tileTopY), pixelsPerHour);
+    const dropTime = yPositionToTime(snappedTileTop, START_HOUR, gridStartDate, pixelsPerHour);
+    const scheduledStart = dropTime.toISOString();
+
+    // Validate placement
+    const proposedAssignment: ProposedAssignment = {
+      taskId: pickedTask?.id || '',
+      targetId: stationId,
+      isOutsourced: false,
+      scheduledStart,
+      bypassPrecedence: isAltPressed,
+    };
+    const validationResult = pickedTask ? validateAssignment(proposedAssignment, snapshot) : { isValid: false, conflicts: [] };
+
+    // Check for blocking conflicts
+    // Note: Unlike drag-and-drop, pick mode does NOT auto-snap to suggestedStart,
+    // so PrecedenceConflict is always blocking (unless Alt-bypassed).
+    // StationConflict IS blocking in pick mode (means overlap with another task).
+    const blockingConflicts = validationResult.conflicts.filter(
+      (c) => !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+    );
+
+    // Determine ring state
+    let ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass' = 'none';
+    const hasWarningOnly = blockingConflicts.length === 0 &&
+      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates');
+
+    if (validationResult.isValid) {
+      ringState = 'valid';
+    } else if (blockingConflicts.length === 0) {
+      ringState = validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict') ? 'warning' : 'valid';
+    } else if (isAltPressed && validationResult.conflicts.some((c) => c.type === 'PrecedenceConflict')) {
+      ringState = 'bypass';
+    } else {
+      ringState = 'invalid';
+    }
+
+    // Get validation message for display
+    const message = getPrimaryValidationMessage(validationResult.conflicts, validationResult.isValid, hasWarningOnly);
+
+    // Debug: store conflicts for overlay
+    const debugConflicts = validationResult.conflicts.map(c => ({ type: c.type, message: c.message }));
+
+    setPickValidation({ scheduledStart, ringState, message, debugConflicts });
+  }, [pickActions, pickedTask, snapshot, isAltPressed, pixelsPerHour, gridStartDate]);
+
+  // v0.3.54: Handle mouse leave during pick
+  const handlePickMouseLeave = useCallback(() => {
+    setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+  }, []);
+
+  // v0.3.54: Handle click to place during pick
+  const handlePickClick = useCallback((stationId: string, clientX: number, clientY: number, relativeY: number) => {
+    if (!pickedTask || !pickedJob) return;
+
+    // Calculate tile top from cursor position (cursor is PICK_CURSOR_OFFSET_Y pixels inside the tile)
+    const tileTopY = relativeY - PICK_CURSOR_OFFSET_Y;
+    const snappedTileTop = snapToGrid(Math.max(0, tileTopY), pixelsPerHour);
+    const dropTime = yPositionToTime(snappedTileTop, START_HOUR, gridStartDate, pixelsPerHour);
+    const rawScheduledStart = dropTime.toISOString();
+
+    // Snap to 30-minute grid
+    const startDate = new Date(rawScheduledStart);
+    const minutes = startDate.getMinutes();
+    const snappedMinutes = Math.round(minutes / 30) * 30;
+    startDate.setMinutes(snappedMinutes, 0, 0);
+    const scheduledStart = startDate.toISOString();
+
+    // Validate
+    const proposedAssignment: ProposedAssignment = {
+      taskId: pickedTask.id,
+      targetId: stationId,
+      isOutsourced: false,
+      scheduledStart,
+      bypassPrecedence: isAltPressed,
+    };
+    const validationResult = validateAssignment(proposedAssignment, snapshot);
+
+    // Check for blocking conflicts
+    // StationConflict IS blocking in pick mode (means overlap with another task)
+    const blockingConflicts = validationResult.conflicts.filter(
+      (c) => !(c.type === 'PrecedenceConflict' &&
+               c.details?.constraintType === 'predecessor' &&
+               validationResult.suggestedStart) &&
+             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+    );
+
+    if (blockingConflicts.length > 0 && !isAltPressed) {
+      console.log('Pick placement blocked: validation failed', blockingConflicts);
+      return;
+    }
+
+    // Calculate end time
+    const task = pickedTask as InternalTask;
+    const station = snapshot.stations.find((s) => s.id === stationId);
+    const scheduledEnd = calculateEndTime(task, scheduledStart, station);
+
+    // Check for bypassed precedence
+    let bypassedPrecedence = false;
+    if (isAltPressed) {
+      const conflictCheckProposal: ProposedAssignment = {
+        taskId: task.id,
+        targetId: stationId,
+        isOutsourced: false,
+        scheduledStart,
+        bypassPrecedence: false,
+      };
+      const conflictCheckResult = validateAssignment(conflictCheckProposal, snapshot);
+      bypassedPrecedence = conflictCheckResult.conflicts.some(c => c.type === 'PrecedenceConflict');
+    }
+
+    // Create assignment
+    updateSnapshot((currentSnapshot) => processDropAssignment({
+      currentSnapshot,
+      task,
+      stationId,
+      scheduledStart,
+      scheduledEnd,
+      isRescheduleOp: false,
+      assignmentId: undefined,
+      bypassedPrecedence,
+    }));
+
+    setSnapshotVersion((v) => v + 1);
+    pickActions.completePlacement();
+    setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+    console.log('Pick placement created:', { taskId: task.id, scheduledStart });
+  }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions]);
+
   // Handle global timeline compaction (v0.3.35)
   const handleCompactTimeline = useCallback((horizonHours: CompactHorizon) => {
     setIsCompactingTimeline(true);
@@ -1348,8 +1547,10 @@ function AppContent() {
           assignments={snapshot.assignments}
           stations={snapshot.stations}
           activeTaskId={lastUnscheduledTask?.id}
+          pickedTaskId={pickedTask?.id}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
+          onPick={handlePickTask}
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
         />
@@ -1416,6 +1617,14 @@ function AppContent() {
           providers={snapshot.providers}
           precedenceConstraints={precedenceConstraints}
           dryingTimeInfo={dryingTimeInfo}
+          isPicking={isPicking}
+          pickTargetStationId={pickTargetStationId}
+          pickRingState={pickValidation.ringState}
+          onPickMouseMove={handlePickMouseMove}
+          onPickMouseLeave={handlePickMouseLeave}
+          onPickClick={handlePickClick}
+          pickPrecedenceConstraints={pickPrecedenceConstraints}
+          pickDryingTimeInfo={pickDryingTimeInfo}
         />
           </div>
         </div>
@@ -1424,15 +1633,27 @@ function AppContent() {
       {/* Drag layer - portal-based preview of dragged tile */}
       {/* v0.3.52: Pass validation message for display during invalid drag */}
       <DragLayer validationMessage={validation.message} />
+
+      {/* v0.3.54: Pick preview - ghost tile during pick */}
+      <PickPreview
+        validationMessage={pickValidation.message}
+        debugInfo={{
+          ringState: pickValidation.ringState,
+          scheduledStart: pickValidation.scheduledStart,
+          conflicts: pickValidation.debugConflicts,
+        }}
+      />
     </>
   );
 }
 
-// Main App component wrapping with DragStateProvider
+// Main App component wrapping with DragStateProvider and PickStateProvider
 function App() {
   return (
     <DragStateProvider>
-      <AppContent />
+      <PickStateProvider>
+        <AppContent />
+      </PickStateProvider>
     </DragStateProvider>
   );
 }

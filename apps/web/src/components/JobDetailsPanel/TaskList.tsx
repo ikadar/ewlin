@@ -16,16 +16,20 @@ export interface TaskListProps {
   stations: Station[];
   /** Task ID that is the active placement target in Quick Placement Mode */
   activeTaskId?: string | null;
+  /** Task ID that is currently picked (v0.3.54 Pick & Place) */
+  pickedTaskId?: string | null;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
+  /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
+  onPick?: (task: Task, job: Job) => void;
 }
 
 /**
  * Scrollable list of task tiles for the selected job.
  */
-export function TaskList({ tasks, job, assignments, stations, activeTaskId, onJumpToTask, onRecallTask }: TaskListProps) {
+export function TaskList({ tasks, job, assignments, stations, activeTaskId, pickedTaskId, onJumpToTask, onRecallTask, onPick }: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
     assignments.map((a) => [a.taskId, a])
@@ -78,8 +82,10 @@ export function TaskList({ tasks, job, assignments, stations, activeTaskId, onJu
               assignment={assignment}
               station={station}
               isActivePlacement={activeTaskId === task.id}
+              isPicked={pickedTaskId === task.id}
               onJumpToTask={onJumpToTask}
               onRecallTask={onRecallTask}
+              onPick={!assignment ? onPick : undefined}
             />
           </div>
         );

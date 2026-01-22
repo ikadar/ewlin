@@ -52,6 +52,18 @@ export interface StationColumnProps {
   dryingTimeInfo?: DryingTimeInfo;
   /** v0.3.46: Visible day range for virtual scrolling (only render overlays/lines for these days) */
   visibleDayRange?: { start: number; end: number };
+  /** v0.3.54: Whether a task is currently picked (Pick & Place mode) */
+  isPicking?: boolean;
+  /** v0.3.54: Whether this station is the target for the picked task */
+  isPickTarget?: boolean;
+  /** v0.3.54: Ring color state for pick operation (valid/invalid/warning/bypass) */
+  pickRingState?: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
+  /** v0.3.54: Callback for mouse move during pick (for ghost position and validation) */
+  onPickMouseMove?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
+  /** v0.3.54: Callback for mouse leave during pick */
+  onPickMouseLeave?: () => void;
+  /** v0.3.54: Callback for click to place during pick */
+  onPickClick?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -99,6 +111,13 @@ export const StationColumn = memo(function StationColumn({
   precedenceConstraints,
   dryingTimeInfo,
   visibleDayRange,
+  // v0.3.54: Pick & Place props
+  isPicking = false,
+  isPickTarget = false,
+  pickRingState = 'none',
+  onPickMouseMove,
+  onPickMouseLeave,
+  onPickClick,
 }: StationColumnProps) {
   // Ref for the drop target element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -176,6 +195,27 @@ export const StationColumn = memo(function StationColumn({
 
   // Determine highlight style based on drag state and validation
   const getHighlightClass = () => {
+    // v0.3.54: Pick & Place ring states (highest priority during pick)
+    if (isPicking && isPickTarget) {
+      switch (pickRingState) {
+        case 'valid':
+          return 'ring-2 ring-green-500 bg-green-500/10';
+        case 'invalid':
+          return 'ring-2 ring-red-500 bg-red-500/10';
+        case 'warning':
+          return 'ring-2 ring-orange-500 bg-orange-500/10';
+        case 'bypass':
+          return 'ring-2 ring-amber-500 bg-amber-500/10';
+        default:
+          // Target column but no specific state - subtle highlight
+          return 'ring-1 ring-green-500/30';
+      }
+    }
+    // v0.3.54: Non-target columns during pick are dimmed
+    if (isPicking && !isPickTarget) {
+      return 'opacity-50';
+    }
+
     // Priority: validation-based highlighting over basic drag state
     if (showBypassWarning) {
       // Alt-key bypass with precedence conflict - amber warning
@@ -216,6 +256,14 @@ export const StationColumn = memo(function StationColumn({
 
   // Quick placement mode handlers
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    // v0.3.54: Pick & Place mouse move handler
+    if (isPicking && isPickTarget && onPickMouseMove) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+      onPickMouseMove(station.id, e.clientX, e.clientY, relativeY);
+      return;
+    }
+    // Quick placement mode
     if (!isQuickPlacementMode || !onQuickPlacementMouseMove) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const relativeY = e.clientY - rect.top;
@@ -223,19 +271,41 @@ export const StationColumn = memo(function StationColumn({
   };
 
   const handleMouseLeave = () => {
+    // v0.3.54: Pick & Place mouse leave handler
+    if (isPicking && onPickMouseLeave) {
+      onPickMouseLeave();
+      return;
+    }
+    // Quick placement mode
     if (!isQuickPlacementMode || !onQuickPlacementMouseLeave) return;
     onQuickPlacementMouseLeave();
   };
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+    // v0.3.54: Pick & Place click handler (place the picked task)
+    if (isPicking && isPickTarget && onPickClick) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+      onPickClick(station.id, e.clientX, e.clientY, relativeY);
+      return;
+    }
+    // Quick placement mode
     if (!isQuickPlacementMode || !hasAvailableTask || !onQuickPlacementClick) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const relativeY = e.clientY - rect.top;
     onQuickPlacementClick(station.id, relativeY);
   };
 
-  // Cursor style for quick placement mode
+  // Cursor style for quick placement mode and pick mode
   const getCursorClass = () => {
+    // v0.3.54: Pick & Place cursor
+    if (isPicking) {
+      if (isPickTarget) {
+        return pickRingState === 'invalid' ? 'cursor-not-allowed' : 'cursor-pointer';
+      }
+      return 'cursor-not-allowed';
+    }
+    // Quick placement mode
     if (!isQuickPlacementMode) return '';
     return hasAvailableTask ? 'cursor-pointer' : 'cursor-not-allowed';
   };
@@ -270,7 +340,7 @@ export const StationColumn = memo(function StationColumn({
               <UnavailabilityOverlay
                 key={`overlay-day-${dayIndex}`}
                 daySchedule={dayScheduleForDay}
-                startHour={startHour}
+                startHour={0}
                 hoursToDisplay={24}
                 pixelsPerHour={pixelsPerHour}
                 yOffset={dayYOffset}
@@ -305,21 +375,22 @@ export const StationColumn = memo(function StationColumn({
         <PlacementIndicator y={placementIndicatorY} isVisible={true} />
       )}
 
-      {/* REQ-10: Precedence Constraint Lines (during drag or quick placement) */}
+      {/* REQ-10: Precedence Constraint Lines (during drag, quick placement, or pick) */}
       {precedenceConstraints && (
         <PrecedenceLines
           earliestY={precedenceConstraints.earliestY}
           latestY={precedenceConstraints.latestY}
-          isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask)}
+          isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask) || (isPicking && isPickTarget)}
         />
       )}
 
-      {/* v0.3.51: Drying Time Indicator (during drag) */}
+      {/* v0.3.51: Drying Time Indicator (during drag or pick) */}
+      {/* Note: dryingTimeInfo is only passed when this IS the predecessor station */}
       {dryingTimeInfo && (
         <DryingTimeIndicator
           predecessorEndY={dryingTimeInfo.predecessorEndY}
           dryingEndY={dryingTimeInfo.dryingEndY}
-          isVisible={isDragging}
+          isVisible={isDragging || isPicking}
         />
       )}
 
