@@ -1,8 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
-import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
 import type { Task, TaskAssignment, Station, Job } from '@flux/types';
-import { useDragState, type TaskDragData } from '../../dnd';
 
 export interface TaskTileProps {
   /** The task to display */
@@ -29,59 +25,12 @@ export interface TaskTileProps {
 
 /**
  * Individual task tile with state-based styling.
- * Unscheduled: job color, border-l-4, cursor-grab, draggable
+ * Unscheduled: job color, border-l-4, clickable for Pick & Place
  * Scheduled: dark placeholder with station + datetime
+ * v0.3.57: Drag & drop removed, now uses Pick & Place only
  */
 export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, isPicked = false, onJumpToTask, onRecallTask, onPick }: TaskTileProps) {
   const isScheduled = !!assignment;
-
-  // Ref for the draggable element
-  const tileRef = useRef<HTMLDivElement>(null);
-
-  // Local state for isDragging
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Get drag state methods from context
-  const { startDrag, endDrag } = useDragState();
-
-  // Set up draggable for unscheduled tasks only using pragmatic-drag-and-drop
-  useEffect(() => {
-    const element = tileRef.current;
-    if (!element || isScheduled) return; // Only unscheduled tasks are draggable
-
-    const dragData: TaskDragData = {
-      type: 'task',
-      task,
-      job,
-      // No assignmentId - this is a new placement, not reschedule
-    };
-
-    return draggable({
-      element,
-      getInitialData: () => dragData,
-      onGenerateDragPreview: ({ nativeSetDragImage }) => {
-        // Use pragmatic-dnd's official API to disable native drag preview
-        disableNativeDragPreview({ nativeSetDragImage });
-      },
-      onDragStart: ({ location }) => {
-        setIsDragging(true);
-        // Calculate grab offset (where user grabbed within the tile)
-        const rect = element.getBoundingClientRect();
-        const grabOffset = {
-          x: location.initial.input.clientX - rect.left,
-          y: location.initial.input.clientY - rect.top,
-        };
-        startDrag(task, job, undefined, grabOffset); // No assignmentId for new placement
-      },
-      onDrop: () => {
-        setIsDragging(false);
-        endDrag();
-      },
-    });
-  }, [task, job, isScheduled, startDrag, endDrag]);
-
-  // Note: We don't apply transform here because we use DragLayer for the preview.
-  // The source element stays in place while dragging.
 
   // Format duration as Xh YY
   const formatDuration = (): string => {
@@ -224,7 +173,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
 
   // v0.3.54: Handle click for pick & place (when onPick is provided)
   const handleClick = () => {
-    if (onPick && !isDragging) {
+    if (onPick) {
       onPick(task, job);
     }
   };
@@ -232,18 +181,14 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   // Determine cursor style
   const getCursorClass = () => {
     if (isPicked) return 'cursor-default';
-    if (isDragging) return 'cursor-grabbing';
     if (onPick) return 'cursor-pointer'; // Pick mode
-    return 'cursor-grab'; // Drag mode
+    return 'cursor-default';
   };
 
-  // Unscheduled task - job color styling, draggable or pickable
+  // Unscheduled task - job color styling, clickable for Pick & Place
   return (
     <div
-      ref={tileRef}
-      className={`pt-0.5 px-2 text-sm border-l-4 touch-none select-none transition-all duration-150 ${getCursorClass()} ${
-        isDragging ? 'opacity-50' : ''
-      }`}
+      className={`pt-0.5 px-2 text-sm border-l-4 select-none transition-all duration-150 ${getCursorClass()}`}
       style={{
         height: `${height}px`,
         borderLeftColor: jobColor,

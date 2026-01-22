@@ -19,7 +19,6 @@
     "sonar:coverage": "pnpm test:coverage && sonar-scanner"
   },
   "dependencies": {
-    "@atlaskit/pragmatic-drag-and-drop": "^1.5.2",
     "@faker-js/faker": "^10.1.0",
     "@flux/schedule-validator": "link:../../packages/validator",
     "@flux/types": "link:../../packages/types",

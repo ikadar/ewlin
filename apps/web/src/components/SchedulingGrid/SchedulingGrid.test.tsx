@@ -1,17 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, type RenderOptions } from '@testing-library/react';
-import { type ReactElement } from 'react';
+import { render, screen } from '@testing-library/react';
 import { SchedulingGrid } from './SchedulingGrid';
-import { DragStateProvider } from '../../dnd';
 import type { Station, Job } from '@flux/types';
-
-// Custom render that wraps components in DragStateProvider
-function renderWithDragContext(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
-  return render(ui, {
-    wrapper: ({ children }) => <DragStateProvider>{children}</DragStateProvider>,
-    ...options,
-  });
-}
 
 // Mock station with standard schedule
 const mockStation: Station = {
@@ -103,13 +93,13 @@ describe('SchedulingGrid', () => {
   });
 
   it('renders the scheduling grid container', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     expect(screen.getByTestId('scheduling-grid')).toBeInTheDocument();
   });
 
   it('renders all station headers', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     expect(screen.getByText('Komori G40')).toBeInTheDocument();
     expect(screen.getByText('Polar 137')).toBeInTheDocument();
@@ -117,7 +107,7 @@ describe('SchedulingGrid', () => {
   });
 
   it('renders all station columns', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     expect(screen.getByTestId('station-column-station-1')).toBeInTheDocument();
     expect(screen.getByTestId('station-column-station-2')).toBeInTheDocument();
@@ -125,7 +115,7 @@ describe('SchedulingGrid', () => {
   });
 
   it('renders the timeline column', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     // Timeline shows hour markers
     expect(screen.getByText('6h')).toBeInTheDocument();
@@ -133,7 +123,7 @@ describe('SchedulingGrid', () => {
   });
 
   it('renders the now line', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     const nowLine = screen.getByTestId('now-line');
     expect(nowLine).toBeInTheDocument();
@@ -146,7 +136,7 @@ describe('SchedulingGrid', () => {
       workshopExitDate: new Date('2025-12-15T14:00:00').toISOString(),
     };
 
-    renderWithDragContext(
+    render(
       <SchedulingGrid
         stations={mockStations}
         jobs={[jobToday]}
@@ -160,7 +150,7 @@ describe('SchedulingGrid', () => {
   });
 
   it('does not render departure marker when no job is selected', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     expect(screen.queryByTestId('departure-marker')).not.toBeInTheDocument();
   });
@@ -171,7 +161,7 @@ describe('SchedulingGrid', () => {
       workshopExitDate: new Date('2025-12-16T14:00:00').toISOString(),
     };
 
-    renderWithDragContext(
+    render(
       <SchedulingGrid
         stations={mockStations}
         jobs={[jobTomorrow]}
@@ -183,7 +173,7 @@ describe('SchedulingGrid', () => {
   });
 
   it('has scrollable container', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     const container = screen.getByTestId('scheduling-grid');
     expect(container).toHaveClass('overflow-auto');
@@ -191,7 +181,7 @@ describe('SchedulingGrid', () => {
 
   it('renders hour grid lines in station columns', () => {
     // v0.3.46: Virtual scrolling - pass small hoursToDisplay for single-day test
-    renderWithDragContext(<SchedulingGrid stations={mockStations} hoursToDisplay={24} totalDays={1} />);
+    render(<SchedulingGrid stations={mockStations} hoursToDisplay={24} totalDays={1} />);
 
     const gridLines = screen.getAllByTestId('hour-grid-line');
     // Each station has 25 lines (24 hours + 1), 3 stations = 75 lines
@@ -199,7 +189,7 @@ describe('SchedulingGrid', () => {
   });
 
   it('renders unavailability overlays', () => {
-    renderWithDragContext(<SchedulingGrid stations={mockStations} />);
+    render(<SchedulingGrid stations={mockStations} />);
 
     const overlays = screen.getAllByTestId('unavailability-overlay');
     expect(overlays.length).toBeGreaterThan(0);

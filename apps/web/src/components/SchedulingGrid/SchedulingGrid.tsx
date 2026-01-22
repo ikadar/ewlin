@@ -1,4 +1,4 @@
-import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider } from '@flux/types';
 import type { DryingTimeInfo } from '../../utils';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
@@ -33,24 +33,6 @@ export interface SchedulingGridHandle {
   scrollTo: (x: number, y: number, behavior?: ScrollBehavior) => void;
 }
 
-/** Validation state during drag */
-export interface ValidationState {
-  /** Target station ID being hovered */
-  targetStationId: string | null;
-  /** Whether the current drop position is valid */
-  isValid: boolean;
-  /** Whether there's a precedence conflict */
-  hasPrecedenceConflict: boolean;
-  /** Suggested start time if precedence conflict exists */
-  suggestedStart: string | null;
-  /** Whether Alt key is pressed (bypass precedence) */
-  isAltPressed: boolean;
-  /** Whether there are only warning conflicts (non-blocking, like Plates approval) */
-  hasWarningOnly: boolean;
-  /** Whether there's a group capacity conflict (REQ-18) */
-  hasGroupCapacityConflict?: boolean;
-}
-
 export interface SchedulingGridProps {
   /** Stations to display */
   stations: Station[];
@@ -82,12 +64,6 @@ export interface SchedulingGridProps {
   onSwapDown?: (assignmentId: string) => void;
   /** Callback when completion icon is clicked */
   onToggleComplete?: (assignmentId: string) => void;
-  /** Currently dragged task (for column focus) */
-  activeTask?: Task | null;
-  /** Job of the currently dragged task (for tile muting) */
-  activeJob?: Job | null;
-  /** Validation state during drag */
-  validationState?: ValidationState;
   /** Whether quick placement mode is active */
   isQuickPlacementMode?: boolean;
   /** Station IDs that have available tasks for quick placement */
@@ -115,8 +91,6 @@ export interface SchedulingGridProps {
   compactingStationId?: string | null;
   /** Callback when compact button is clicked */
   onCompact?: (stationId: string) => void;
-  /** Whether current drag is a reschedule (existing tile) - disables column collapse */
-  isRescheduleDrag?: boolean;
   /** Schedule conflicts for conflict visualization (REQ-12) */
   conflicts?: ScheduleConflict[];
   /** Station groups for capacity visualization (REQ-18) */
@@ -125,10 +99,6 @@ export interface SchedulingGridProps {
   providers?: OutsourcedProvider[];
   /** REQ-09.2: Callback when grid scrolls (for DateStrip sync) */
   onScroll?: (scrollTop: number) => void;
-  /** REQ-10: Precedence constraint Y positions for visualization */
-  precedenceConstraints?: { earliestY: number | null; latestY: number | null };
-  /** v0.3.51: Drying time visualization info during drag */
-  dryingTimeInfo?: DryingTimeInfo | null;
   /** v0.3.46: Total number of days for virtual scrolling (default: 365) */
   totalDays?: number;
   /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
@@ -151,6 +121,10 @@ export interface SchedulingGridProps {
   pickPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** v0.3.54: Drying time info during pick */
   pickDryingTimeInfo?: DryingTimeInfo | null;
+  /** v0.3.57: Assignment ID of picked tile (for showing placeholder) */
+  pickedAssignmentId?: string | null;
+  /** v0.3.57: Callback when tile is clicked to pick from grid */
+  onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
 }
 
 /**
@@ -175,9 +149,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onSwapUp,
       onSwapDown,
       onToggleComplete,
-      activeTask,
-      activeJob,
-      validationState,
       isQuickPlacementMode = false,
       stationsWithAvailableTasks = new Set(),
       quickPlacementIndicatorY,
@@ -189,13 +160,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       quickPlacementPrecedenceConstraints,
       compactingStationId,
       onCompact,
-      isRescheduleDrag = false,
       conflicts = [],
       groups = [],
       providers = [],
       onScroll,
-      precedenceConstraints,
-      dryingTimeInfo,
       totalDays = 365,
       bufferDays = 3,
       // v0.3.54: Pick & Place props
@@ -208,6 +176,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onPickClick,
       pickPrecedenceConstraints,
       pickDryingTimeInfo,
+      // v0.3.57: Pick from grid props
+      pickedAssignmentId,
+      onPickFromGrid,
     },
     ref
   ) {
@@ -463,11 +434,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           {/* Station headers */}
           <div className="flex gap-3 px-3 border-b border-white/10">
             {stations.map((station) => {
-              // Determine if this header should be collapsed during drag
-              // Don't collapse during reschedule (existing tile repositioning)
-              const targetStationId =
-                activeTask?.type === 'Internal' ? activeTask.stationId : null;
-              const isCollapsed = !isRescheduleDrag && targetStationId !== null && targetStationId !== station.id;
+              // v0.3.57: Column collapse removed (was only for drag & drop)
+              const isCollapsed = false;
               // Check if station has tiles
               const stationAssignments = assignmentsByStation.get(station.id) || [];
               const hasTiles = stationAssignments.length > 0;
@@ -537,33 +505,14 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const category = categoryMap.get(station.categoryId);
               const criteria = category?.similarityCriteria || [];
 
-              // Determine if this column should be collapsed during drag
-              // Target station stays full width, others collapse
-              // Don't collapse during reschedule (existing tile repositioning)
-              const targetStationId =
-                activeTask?.type === 'Internal' ? activeTask.stationId : null;
-              const isCollapsed = !isRescheduleDrag && targetStationId !== null && targetStationId !== station.id;
-
-              // Determine validation visual state for this column
-              const isValidationTarget = validationState?.targetStationId === station.id;
-              const isValidDrop = isValidationTarget && validationState?.isValid && !validationState?.hasWarningOnly;
-              const isWarningDrop = isValidationTarget && validationState?.hasWarningOnly;
-              const isInvalidDrop = isValidationTarget && !validationState?.isValid && !validationState?.hasWarningOnly;
-              // Bypass warning only shows when:
-              // 1. Hovering over this column
-              // 2. Has precedence conflict
-              // 3. Alt is pressed
-              // 4. Station is otherwise valid (compatible) - amber only for valid station with precedence issue
-              const showBypassWarning = isValidationTarget &&
-                validationState?.hasPrecedenceConflict &&
-                validationState?.isAltPressed &&
-                validationState?.isValid;
+              // v0.3.57: Column collapse removed (was only for drag & drop)
+              const isCollapsed = false;
 
               // Quick placement state for this column
               const isHoveredForQuickPlacement = quickPlacementHoverStationId === station.id;
               const hasAvailableTaskForQuickPlacement = stationsWithAvailableTasks.has(station.id);
 
-              // Quick placement validation (similar to drag validation)
+              // Quick placement validation
               const isQuickPlacementValid = isHoveredForQuickPlacement &&
                 hasAvailableTaskForQuickPlacement &&
                 quickPlacementValidation?.isValid;
@@ -571,22 +520,14 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 hasAvailableTaskForQuickPlacement &&
                 !quickPlacementValidation?.isValid;
 
-              // Combine drag and quick placement validation for border display
-              const effectiveIsValidDrop = isValidDrop || isQuickPlacementValid;
-              const effectiveIsInvalidDrop = isInvalidDrop || isQuickPlacementInvalid;
-
-              // Precedence constraints: show for drag, quick placement, or pick
+              // Precedence constraints: show for quick placement or pick
               const isPickTarget = isPicking && pickTargetStationId === station.id;
-              const effectivePrecedenceConstraints = isValidationTarget
-                ? precedenceConstraints
-                : (isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement
-                    ? quickPlacementPrecedenceConstraints
-                    : (isPickTarget ? pickPrecedenceConstraints : undefined));
+              const effectivePrecedenceConstraints = isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement
+                ? quickPlacementPrecedenceConstraints
+                : (isPickTarget ? pickPrecedenceConstraints : undefined);
 
               // v0.3.51: Drying time info - show only on the predecessor's station
-              const effectiveDryingTimeInfo = dryingTimeInfo?.predecessorStationId === station.id
-                ? dryingTimeInfo
-                : (pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined);
+              const effectiveDryingTimeInfo = pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined;
 
               return (
                 <StationColumn
@@ -597,10 +538,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   pixelsPerHour={pixelsPerHour}
                   gridStartDate={startDate}
                   isCollapsed={isCollapsed}
-                  isValidDrop={effectiveIsValidDrop}
-                  isWarningDrop={isWarningDrop}
-                  isInvalidDrop={effectiveIsInvalidDrop}
-                  showBypassWarning={showBypassWarning}
+                  isValidDrop={isQuickPlacementValid}
+                  isInvalidDrop={isQuickPlacementInvalid}
                   isQuickPlacementMode={isQuickPlacementMode}
                   hasAvailableTask={hasAvailableTaskForQuickPlacement}
                   placementIndicatorY={isHoveredForQuickPlacement ? quickPlacementIndicatorY : undefined}
@@ -661,10 +600,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
                         onToggleComplete={onToggleComplete}
-                        activeJobId={activeJob?.id}
                         selectedJobId={selectedJobId ?? undefined}
                         hasConflict={conflictTaskIds.has(task.id)}
                         pixelsPerHour={pixelsPerHour}
+                        isPicked={pickedAssignmentId === assignment.id}
+                        onPickFromGrid={onPickFromGrid}
+                        isPickingActive={isPicking}
                       />
                     );
                   })}
@@ -711,12 +652,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         showSwapDown={false}
                         onSelect={onSelectJob}
                         onRecall={onRecallAssignment}
-                        activeJobId={activeJob?.id}
                         selectedJobId={selectedJobId ?? undefined}
                         hasConflict={conflictTaskIds.has(task.id)}
                         pixelsPerHour={pixelsPerHour}
                         isOutsourced={true}
                         subcolumnLayout={layout}
+                        isPickingActive={isPicking}
                       />
                     );
                   })}

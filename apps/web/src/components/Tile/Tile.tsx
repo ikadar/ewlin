@@ -1,14 +1,11 @@
-import { useRef, useState, useEffect, memo } from 'react';
+import { memo } from 'react';
 import { Circle, CircleCheck } from 'lucide-react';
-import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { disableNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview';
 import type { TaskAssignment, Job, InternalTask } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
-import { useDragState, type TaskDragData } from '../../dnd';
 import type { SubcolumnLayout } from '../../utils/subcolumnLayout';
 
 export interface TileProps {
@@ -36,8 +33,6 @@ export interface TileProps {
   isSelected?: boolean;
   /** Similarity comparison results with previous tile (if any) */
   similarityResults?: SimilarityResult[];
-  /** ID of the job being dragged (for muting other jobs during drag) */
-  activeJobId?: string;
   /** ID of the currently selected job (for muting non-selected jobs - REQ-01) */
   selectedJobId?: string;
   /** Whether this tile has a conflict (precedence violation - REQ-12) */
@@ -50,6 +45,12 @@ export interface TileProps {
   isOutsourced?: boolean;
   /** Subcolumn layout for provider columns (REQ-19) */
   subcolumnLayout?: SubcolumnLayout;
+  /** v0.3.57: Whether this tile is currently picked (shows placeholder) */
+  isPicked?: boolean;
+  /** v0.3.57: Callback when tile is clicked to pick for reschedule */
+  onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
+  /** v0.3.57: Whether picking is active (for muting other tiles) */
+  isPickingActive?: boolean;
 }
 
 /**
@@ -78,61 +79,18 @@ export const Tile = memo(function Tile({
   showSwapDown = true,
   isSelected = false,
   similarityResults,
-  activeJobId,
   selectedJobId,
   hasConflict = false,
   onToggleComplete,
   pixelsPerHour = PIXELS_PER_HOUR,
   isOutsourced = false,
   subcolumnLayout,
+  isPicked = false,
+  onPickFromGrid,
+  isPickingActive = false,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
-
-  // Ref for the draggable element
-  const tileRef = useRef<HTMLDivElement>(null);
-
-  // Local state for isDragging (replaces useDraggable's isDragging)
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Get drag state methods from context
-  const { startDrag, endDrag } = useDragState();
-
-  // Set up draggable using pragmatic-drag-and-drop
-  useEffect(() => {
-    const element = tileRef.current;
-    if (!element) return;
-
-    const dragData: TaskDragData = {
-      type: 'task',
-      task,
-      job,
-      assignmentId: assignment.id, // Include assignment ID for reschedule detection
-    };
-
-    return draggable({
-      element,
-      getInitialData: () => dragData,
-      onGenerateDragPreview: ({ nativeSetDragImage }) => {
-        // Use pragmatic-dnd's official API to disable native drag preview
-        disableNativeDragPreview({ nativeSetDragImage });
-      },
-      onDragStart: ({ location }) => {
-        setIsDragging(true);
-        // Calculate grab offset (where user grabbed within the tile)
-        const rect = element.getBoundingClientRect();
-        const grabOffset = {
-          x: location.initial.input.clientX - rect.left,
-          y: location.initial.input.clientY - rect.top,
-        };
-        startDrag(task, job, assignment.id, grabOffset);
-      },
-      onDrop: () => {
-        setIsDragging(false);
-        endDrag();
-      },
-    });
-  }, [task, job, assignment.id, startDrag, endDrag]);
 
   // Calculate total height from scheduled time span (downtime-aware)
   // This reflects actual time on grid, including stretching across non-operating periods
@@ -153,23 +111,28 @@ export const Tile = memo(function Tile({
   // Completion state
   const isCompleted = assignment.isCompleted;
 
-  // Muting state: tile is muted during drag if it belongs to a different job
-  // REQ-01: Also mute when a job is selected (not just during drag)
-  const isMutedByDrag = activeJobId !== undefined && activeJobId !== job.id;
+  // Muting state: tile is muted when a job is selected (REQ-01)
   const isMutedBySelection = selectedJobId !== undefined && selectedJobId !== job.id;
-  const isMuted = isMutedByDrag || isMutedBySelection;
-
-  // During any drag operation, make tiles non-interactive so drops can pass through
-  // to the StationColumn droppable underneath (enables dropping onto existing tiles)
-  const isDragActive = activeJobId !== undefined;
+  const isMuted = isMutedBySelection;
 
   // Completed gradient style
   const completedGradient = isCompleted
     ? 'linear-gradient(to right, rgba(34,197,94,0.6) 0%, rgba(34,197,94,0.2) 50%, transparent 100%)'
     : undefined;
 
-  // Handle click (select job)
+  // Handle click - v0.3.57: Pick for reschedule or select job
   const handleClick = () => {
+    // If picking is active, this tile might be the target for placement (handled by StationColumn)
+    // Don't start a new pick from a tile while picking is active
+    if (isPickingActive) return;
+
+    // If not completed and not outsourced, pick for reschedule
+    if (!isCompleted && !isOutsourced && onPickFromGrid) {
+      onPickFromGrid(task, job, assignment.id);
+      return;
+    }
+
+    // Otherwise just select the job
     onSelect?.(job.id);
   };
 
@@ -211,18 +174,16 @@ export const Tile = memo(function Tile({
   };
   const glowStyle = getGlowStyle();
 
-  // Muting style: desaturate and reduce opacity for other jobs during drag or selection
-  // REQ-06: Keep tiles clickable when muted by selection - only disable pointer events during active drag
-  // Disable pointer events during drag so drops pass through to StationColumn
-  // But NOT for the tile being dragged itself (it needs to remain the drag source)
+  // Muting style: desaturate and reduce opacity for other jobs during selection
+  // v0.3.57: During pick, non-picked tiles remain clickable but placement goes to StationColumn
   const getMutingStyle = () => {
-    // During active drag: disable pointer events on non-dragging tiles (for drop-through)
-    if (isDragActive && !isDragging) {
-      // If muted, also apply visual muting
+    // v0.3.57: During active pick, disable pointer events on non-picked tiles
+    // so clicks pass through to StationColumn for placement
+    if (isPickingActive && !isPicked) {
       if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const };
       return { pointerEvents: 'none' as const };
     }
-    // When just muted by selection (not during drag): visual muting only, keep clickable
+    // When just muted by selection: visual muting only, keep clickable
     if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6 };
     return undefined;
   };
@@ -240,23 +201,23 @@ export const Tile = memo(function Tile({
 
   // REQ-19: Outsourced tile styling
   const outsourcedBorderClass = isOutsourced ? 'border-2 border-dashed' : 'border-l-4';
-  const cursorClass = isOutsourced ? 'cursor-default' : 'cursor-grab';
+  // v0.3.57: Cursor is pointer for pickable tiles (not completed, not outsourced)
+  const cursorClass = !isCompleted && !isOutsourced && onPickFromGrid ? 'cursor-pointer' : 'cursor-default';
 
-  // Ghost placeholder shown at original position when tile is being dragged
-  if (isDragging) {
+  // v0.3.57: Pulsating placeholder shown at original position when tile is picked
+  if (isPicked) {
     return (
       <div
-        ref={tileRef}
-        className="absolute left-0 right-0 border-2 border-dashed border-zinc-600 bg-zinc-800/30 rounded pointer-events-none"
+        className="absolute left-0 right-0 border-2 border-dashed border-zinc-500 bg-zinc-800/30 rounded pointer-events-none animate-pulse-opacity"
         style={{ top: `${top}px`, height: `${totalHeight}px`, ...subcolumnStyle }}
-        data-testid={`tile-ghost-${assignment.id}`}
+        data-testid={`tile-placeholder-${assignment.id}`}
+        aria-hidden="true"
       />
     );
   }
 
   return (
     <div
-      ref={isOutsourced ? undefined : tileRef}
       className={`absolute text-sm ${outsourcedBorderClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
         top: `${top}px`,
@@ -369,15 +330,17 @@ export const Tile = memo(function Tile({
   );
 }, (prevProps, nextProps) => {
   // v0.3.46: Custom comparison to prevent unnecessary re-renders
-  // For selectedJobId/activeJobId, compare the computed mute state, not raw values
+  // v0.3.57: Updated for pick instead of drag
+  // For selectedJobId, compare the computed mute state, not raw values
   const prevMutedBySelection = prevProps.selectedJobId !== undefined && prevProps.selectedJobId !== prevProps.job.id;
   const nextMutedBySelection = nextProps.selectedJobId !== undefined && nextProps.selectedJobId !== nextProps.job.id;
-  const prevMutedByDrag = prevProps.activeJobId !== undefined && prevProps.activeJobId !== prevProps.job.id;
-  const nextMutedByDrag = nextProps.activeJobId !== undefined && nextProps.activeJobId !== nextProps.job.id;
 
   // Check if mute state changed
   if (prevMutedBySelection !== nextMutedBySelection) return false;
-  if (prevMutedByDrag !== nextMutedByDrag) return false;
+
+  // v0.3.57: Pick-related props
+  if (prevProps.isPicked !== nextProps.isPicked) return false;
+  if (prevProps.isPickingActive !== nextProps.isPickingActive) return false;
 
   // Compare other props normally (shallow comparison)
   if (prevProps.assignment !== nextProps.assignment) return false;
@@ -399,6 +362,7 @@ export const Tile = memo(function Tile({
   if (prevProps.onSwapUp !== nextProps.onSwapUp) return false;
   if (prevProps.onSwapDown !== nextProps.onSwapDown) return false;
   if (prevProps.onToggleComplete !== nextProps.onToggleComplete) return false;
+  if (prevProps.onPickFromGrid !== nextProps.onPickFromGrid) return false;
 
   return true; // Props are equal, skip re-render
 });

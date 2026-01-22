@@ -1,5 +1,4 @@
-import { type ReactNode, type MouseEvent, useEffect, useRef, useState, useMemo, memo } from 'react';
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { type ReactNode, type MouseEvent, useRef, useMemo, memo } from 'react';
 import type { Station, DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
@@ -7,7 +6,6 @@ import { PlacementIndicator } from '../PlacementIndicator';
 import { PrecedenceLines } from '../PrecedenceLines';
 import { DryingTimeIndicator } from '../DryingTimeIndicator';
 import type { DryingTimeInfo } from '../../utils';
-import { useDragStateValue, type TaskDragData, type StationDropData } from '../../dnd';
 
 export interface StationColumnProps {
   /** Station to display */
@@ -24,16 +22,12 @@ export interface StationColumnProps {
   gridStartDate?: Date;
   /** Children (tiles) to render inside the column */
   children?: ReactNode;
-  /** Whether this column is collapsed (during drag to another station) */
+  /** Whether this column is collapsed (v0.3.57: always false, kept for API compatibility) */
   isCollapsed?: boolean;
-  /** Whether a valid drop is being hovered over this column */
+  /** Whether a valid drop is being hovered over this column (quick placement) */
   isValidDrop?: boolean;
-  /** Whether a warning-only drop (non-blocking, like Plates approval) is being hovered */
-  isWarningDrop?: boolean;
-  /** Whether an invalid drop is being hovered over this column */
+  /** Whether an invalid drop is being hovered over this column (quick placement) */
   isInvalidDrop?: boolean;
-  /** Whether to show bypass warning (Alt key + precedence conflict) */
-  showBypassWarning?: boolean;
   /** Whether quick placement mode is active */
   isQuickPlacementMode?: boolean;
   /** Whether there's an available task for this station in quick placement mode */
@@ -101,9 +95,7 @@ export const StationColumn = memo(function StationColumn({
   children,
   isCollapsed = false,
   isValidDrop = false,
-  isWarningDrop = false,
   isInvalidDrop = false,
-  showBypassWarning = false,
   isQuickPlacementMode = false,
   hasAvailableTask = false,
   placementIndicatorY,
@@ -122,48 +114,8 @@ export const StationColumn = memo(function StationColumn({
   onPickMouseLeave,
   onPickClick,
 }: StationColumnProps) {
-  // Ref for the drop target element
+  // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
-
-  // Local state for isOver (replaces useDroppable's isOver)
-  const [isOver, setIsOver] = useState(false);
-
-  // Get drag state from context (replaces useDroppable's active)
-  const { isDragging, activeTask } = useDragStateValue();
-
-  // Set up drop target using pragmatic-drag-and-drop
-  useEffect(() => {
-    const element = columnRef.current;
-    if (!element) return;
-
-    const dropData: StationDropData = {
-      type: 'station-column',
-      stationId: station.id,
-    };
-
-    return dropTargetForElements({
-      element,
-      getData: () => dropData,
-      canDrop: ({ source }) => {
-        // Only accept task drags for this station
-        const data = source.data as TaskDragData;
-        return (
-          data.type === 'task' &&
-          data.task.type === 'Internal' &&
-          data.task.stationId === station.id
-        );
-      },
-      onDragEnter: () => setIsOver(true),
-      onDragLeave: () => setIsOver(false),
-      onDrop: () => setIsOver(false),
-    });
-  }, [station.id]);
-
-  // Check if the dragged task belongs to this station
-  const isValidDropTarget =
-    isDragging &&
-    activeTask?.type === 'Internal' &&
-    activeTask.stationId === station.id;
 
   // REQ-04: Calculate number of days for multi-day grid
   // When gridStartDate is provided, render overlays for each day
@@ -196,7 +148,7 @@ export const StationColumn = memo(function StationColumn({
     return lines;
   }, [visibleDayRange, pixelsPerHour, hoursToDisplay]);
 
-  // Determine highlight style based on drag state and validation
+  // Determine highlight style based on pick/quick placement state
   const getHighlightClass = () => {
     // v0.3.54: Pick & Place ring states (highest priority during pick)
     if (isPicking && isPickTarget) {
@@ -215,30 +167,22 @@ export const StationColumn = memo(function StationColumn({
       }
     }
     // v0.3.55: Non-target columns during sidebar pick are faded and disabled
-    // Grid picks (future) will keep all columns visible
+    // v0.3.57: Grid picks keep all columns visible
     if (isPicking && !isPickTarget && pickSource === 'sidebar') {
       return 'opacity-15 pointer-events-none';
     }
 
-    // Priority: validation-based highlighting over basic drag state
-    if (showBypassWarning) {
-      // Alt-key bypass with precedence conflict - amber warning
-      return 'ring-2 ring-amber-500 bg-amber-500/10';
-    }
+    // Quick placement validation highlighting
     if (isInvalidDrop) {
       // Invalid drop zone - red indicator (blocking conflicts)
       return 'ring-2 ring-red-500 bg-red-500/10';
-    }
-    if (isWarningDrop) {
-      // Warning-only drop zone - orange indicator (non-blocking, like Plates approval)
-      return 'ring-2 ring-orange-500 bg-orange-500/10';
     }
     if (isValidDrop) {
       // Valid drop zone - green indicator
       return 'ring-2 ring-green-500 bg-green-500/10';
     }
-    // Quick Placement Mode highlighting (only when not dragging)
-    if (isQuickPlacementMode && !isDragging) {
+    // Quick Placement Mode highlighting
+    if (isQuickPlacementMode) {
       if (hasAvailableTask) {
         // Available column - green highlight
         return 'ring-2 ring-green-500 bg-green-500/10';
@@ -246,11 +190,6 @@ export const StationColumn = memo(function StationColumn({
         // Unavailable column - subtle dimming
         return 'opacity-50';
       }
-    }
-    // Fallback to basic drag state highlighting
-    if (!isDragging) return '';
-    if (isValidDropTarget) {
-      return isOver ? 'ring-2 ring-green-500/50 bg-green-500/5' : 'ring-1 ring-green-500/30';
     }
     return '';
   };
@@ -375,22 +314,22 @@ export const StationColumn = memo(function StationColumn({
         <PlacementIndicator y={placementIndicatorY} isVisible={true} />
       )}
 
-      {/* REQ-10: Precedence Constraint Lines (during drag, quick placement, or pick) */}
+      {/* REQ-10: Precedence Constraint Lines (during quick placement or pick) */}
       {precedenceConstraints && (
         <PrecedenceLines
           earliestY={precedenceConstraints.earliestY}
           latestY={precedenceConstraints.latestY}
-          isVisible={isDragging || (isQuickPlacementMode && hasAvailableTask) || (isPicking && isPickTarget)}
+          isVisible={(isQuickPlacementMode && hasAvailableTask) || (isPicking && isPickTarget)}
         />
       )}
 
-      {/* v0.3.51: Drying Time Indicator (during drag or pick) */}
+      {/* v0.3.51: Drying Time Indicator (during pick) */}
       {/* Note: dryingTimeInfo is only passed when this IS the predecessor station */}
       {dryingTimeInfo && (
         <DryingTimeIndicator
           predecessorEndY={dryingTimeInfo.predecessorEndY}
           dryingEndY={dryingTimeInfo.dryingEndY}
-          isVisible={isDragging || isPicking}
+          isVisible={isPicking}
         />
       )}
 
