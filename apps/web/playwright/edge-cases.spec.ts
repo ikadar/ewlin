@@ -2,30 +2,77 @@
  * Playwright Edge Case Tests
  *
  * Tests for edge cases EC-01 to EC-04:
- * - EC-01: Drag to past time
- * - EC-02: Drag outside station column (cancel)
- * - EC-03: Very long task (overnight)
+ * - EC-02: Cancel pick (ESC key)
  * - EC-04: Multiple tiles push-down chain
+ *
+ * Updated for v0.3.57: Uses Pick & Place instead of drag & drop
  */
 
 import { test, expect } from '@playwright/test';
 import {
   parseTime,
   toTotalMinutes,
-  dragTileByDelta,
-  dragTileOutsideColumn,
   getTileScheduledStart,
   waitForAppReady,
 } from './helpers/drag';
 
+/**
+ * Helper: Pick a scheduled tile from grid and place it at a new Y position on same station
+ */
+async function pickAndPlaceOnStation(
+  page: import('@playwright/test').Page,
+  tileSelector: string,
+  stationId: string,
+  targetY: number
+): Promise<void> {
+  // Click tile to pick it
+  await page.locator(tileSelector).click();
+
+  // Wait for pick preview to appear
+  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 2000 }).catch(() => null);
+
+  // Get column position and move to new Y
+  const targetColumn = page.locator(`[data-testid="station-column-${stationId}"]`);
+  const box = await targetColumn.boundingBox();
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + targetY);
+  }
+
+  // Click to place
+  await targetColumn.click();
+
+  // Wait for state update
+  await page.waitForTimeout(300);
+}
+
+/**
+ * Helper: Pick a tile and cancel with ESC
+ */
+async function pickAndCancelWithEsc(
+  page: import('@playwright/test').Page,
+  tileSelector: string
+): Promise<void> {
+  // Click tile to pick it
+  await page.locator(tileSelector).click();
+
+  // Wait for pick preview to appear
+  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 2000 }).catch(() => null);
+
+  // Press ESC to cancel
+  await page.keyboard.press('Escape');
+
+  // Wait for state update
+  await page.waitForTimeout(300);
+}
+
 test.describe('Edge Cases', () => {
-  test.describe('EC-02: Drag Outside Station Column', () => {
+  test.describe('EC-02: Cancel Pick (ESC key)', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/?fixture=test');
       await waitForAppReady(page);
     });
 
-    test('EC-02.1: Dropping outside any column cancels drag', async ({ page }) => {
+    test('EC-02.1: Pressing ESC cancels pick', async ({ page }) => {
       // ARRANGE: Find a tile
       const tile = page.locator('[data-testid^="tile-assign-"]').first();
       const testId = await tile.getAttribute('data-testid');
@@ -34,42 +81,42 @@ test.describe('Edge Cases', () => {
       expect(testId).toBeTruthy();
       expect(originalScheduledStart).toBeTruthy();
 
-      console.log(`Before cancel drag: testId=${testId}, time=${originalScheduledStart}`);
+      console.log(`Before cancel: testId=${testId}, time=${originalScheduledStart}`);
 
-      // ACT: Drag tile outside the station column
-      await dragTileOutsideColumn(page, `[data-testid="${testId}"]`);
+      // ACT: Pick tile and cancel with ESC
+      await pickAndCancelWithEsc(page, `[data-testid="${testId}"]`);
 
       // ASSERT: Tile should remain at original position
       const newScheduledStart = await getTileScheduledStart(page, `[data-testid="${testId}"]`);
 
-      console.log(`After cancel drag: time=${newScheduledStart}`);
+      console.log(`After cancel: time=${newScheduledStart}`);
 
       expect(newScheduledStart).toBe(originalScheduledStart);
     });
 
-    test('EC-02.2: Tile returns to original position', async ({ page }) => {
-      // ARRANGE: Find a tile and record its position
+    test('EC-02.2: Tile returns to original state after cancel', async ({ page }) => {
+      // ARRANGE: Find a tile and record its scheduled start
       const tile = page.locator('[data-testid^="tile-assign-"]').first();
       const testId = await tile.getAttribute('data-testid');
-      const originalBox = await tile.boundingBox();
+      const originalScheduledStart = await tile.getAttribute('data-scheduled-start');
 
       expect(testId).toBeTruthy();
-      expect(originalBox).toBeTruthy();
+      expect(originalScheduledStart).toBeTruthy();
 
-      const originalY = originalBox!.y;
-      console.log(`Before cancel drag: y=${originalY}`);
+      console.log(`Before cancel: scheduledStart=${originalScheduledStart}`);
 
-      // ACT: Drag tile outside column
-      await dragTileOutsideColumn(page, `[data-testid="${testId}"]`);
+      // ACT: Pick tile and cancel with ESC
+      await pickAndCancelWithEsc(page, `[data-testid="${testId}"]`);
 
-      // ASSERT: Position should be unchanged
-      const newBox = await page.locator(`[data-testid="${testId}"]`).boundingBox();
+      // ASSERT: Tile should still exist with same scheduled start
+      const tileAfter = page.locator(`[data-testid="${testId}"]`);
+      await expect(tileAfter).toBeVisible();
 
-      expect(newBox).toBeTruthy();
-      console.log(`After cancel drag: y=${newBox!.y}`);
+      const newScheduledStart = await tileAfter.getAttribute('data-scheduled-start');
+      console.log(`After cancel: scheduledStart=${newScheduledStart}`);
 
-      // Allow small tolerance for rendering
-      expect(Math.abs(newBox!.y - originalY)).toBeLessThan(5);
+      // Scheduled start should be unchanged
+      expect(newScheduledStart).toBe(originalScheduledStart);
     });
   });
 
@@ -80,7 +127,7 @@ test.describe('Edge Cases', () => {
       await waitForAppReady(page);
     });
 
-    test('EC-04.1: Dropping on first tile pushes entire chain', async ({ page }) => {
+    test('EC-04.1: Placing on first tile pushes entire chain', async ({ page }) => {
       // ARRANGE: Get all tiles on Komori station
       const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
       const tiles = stationColumn.locator('[data-testid^="tile-assign-"]');
@@ -101,10 +148,10 @@ test.describe('Edge Cases', () => {
       const firstTile = tiles.first();
       const firstTileTestId = await firstTile.getAttribute('data-testid');
 
-      // ACT: Drag first tile down significantly (e.g., 150px = 1.5 hours)
-      await dragTileByDelta(page, `[data-testid="${firstTileTestId}"]`, 150);
+      // ACT: Pick first tile and place it at a later position (Y=200 is ~1.5 hours later)
+      await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 200);
 
-      // ASSERT: All tiles should have moved down
+      // ASSERT: First tile should have moved to a later time
       const newTimes: string[] = [];
       for (let i = 0; i < count; i++) {
         const tileTestId = await tiles.nth(i).getAttribute('data-testid');
@@ -113,7 +160,6 @@ test.describe('Edge Cases', () => {
         console.log(`After - Tile ${i}: testId=${tileTestId}, time=${time}`);
       }
 
-      // First tile should have moved to a later time
       const firstOriginalMinutes = toTotalMinutes(parseTime(initialTimes[0]));
       const firstNewMinutes = toTotalMinutes(parseTime(newTimes[0]));
       expect(firstNewMinutes).toBeGreaterThan(firstOriginalMinutes);
@@ -130,8 +176,8 @@ test.describe('Edge Cases', () => {
       // Get the first tile
       const firstTileTestId = await tiles.first().getAttribute('data-testid');
 
-      // ACT: Drag first tile down
-      await dragTileByDelta(page, `[data-testid="${firstTileTestId}"]`, 150);
+      // ACT: Pick first tile and place it at a later position
+      await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 200);
 
       // ASSERT: Tiles should maintain order (each subsequent tile is at a later time)
       const newTimes: number[] = [];

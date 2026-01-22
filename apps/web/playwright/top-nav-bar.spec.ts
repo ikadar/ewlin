@@ -20,10 +20,10 @@ test.describe('v0.3.34: Top Navigation Bar', () => {
       await expect(navBar).toBeVisible();
     });
 
-    test('displays the logo', async ({ page }) => {
+    test('logo is not displayed (REQ-07.2)', async ({ page }) => {
+      // Logo was removed in REQ-07.2
       const logo = page.locator('[data-testid="nav-logo"]');
-      await expect(logo).toBeVisible();
-      await expect(logo).toHaveText('Flux');
+      await expect(logo).not.toBeVisible();
     });
 
     test('displays Quick Placement button', async ({ page }) => {
@@ -120,7 +120,8 @@ test.describe('v0.3.34: Top Navigation Bar', () => {
     test('zoom out button is disabled at minimum zoom', async ({ page }) => {
       const zoomOutButton = page.locator('[data-testid="zoom-out-button"]');
 
-      // Zoom out to minimum (50%)
+      // Zoom out to minimum (25%) - 3 clicks from 100%: 100% -> 75% -> 50% -> 25%
+      await zoomOutButton.click();
       await zoomOutButton.click();
       await zoomOutButton.click();
 

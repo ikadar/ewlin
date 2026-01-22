@@ -3,14 +3,44 @@
  *
  * Tests for UC-07: Approval Gate Validation (BAT/Plates)
  * Tasks require approval gates before scheduling.
+ *
+ * Updated for v0.3.57: Uses Pick & Place instead of drag & drop
  */
 
 import { test, expect } from '@playwright/test';
 import {
-  dragFromSidebarToStation,
   waitForAppReady,
   countTilesOnStation,
 } from './helpers/drag';
+
+/**
+ * Helper: Pick task from sidebar and place on station using Pick & Place
+ */
+async function pickAndPlace(
+  page: import('@playwright/test').Page,
+  taskTileSelector: string,
+  stationId: string,
+  targetY: number
+): Promise<void> {
+  // Click task tile to pick it
+  await page.locator(taskTileSelector).click();
+
+  // Wait for pick preview to appear
+  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 2000 }).catch(() => null);
+
+  // Move to target station at specified Y position
+  const targetColumn = page.locator(`[data-testid="station-column-${stationId}"]`);
+  const box = await targetColumn.boundingBox();
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + targetY);
+  }
+
+  // Click to place
+  await targetColumn.click();
+
+  // Wait for state update
+  await page.waitForTimeout(300);
+}
 
 test.describe('UC-07: Approval Gate Validation', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,11 +62,11 @@ test.describe('UC-07: Approval Gate Validation', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-gate-no-bat"]');
     await expect(taskTile).toBeVisible();
 
-    // Count tiles before drag
+    // Count tiles before pick & place
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
 
-    // ACT: Try to drag the task to Komori station
-    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-gate-no-bat"]', 'station-komori', 200);
+    // ACT: Try to pick & place the task to Komori station
+    await pickAndPlace(page, '[data-testid="task-tile-task-gate-no-bat"]', 'station-komori', 200);
 
     // ASSERT: Task should NOT be placed (BAT not approved is a hard block)
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
@@ -69,11 +99,11 @@ test.describe('UC-07: Approval Gate Validation', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-gate-bat-ok"]');
     await expect(taskTile).toBeVisible();
 
-    // Count tiles before drag
+    // Count tiles before pick & place
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
 
-    // ACT: Drag the task to Komori station
-    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-gate-bat-ok"]', 'station-komori', 200);
+    // ACT: Pick & place the task to Komori station
+    await pickAndPlace(page, '[data-testid="task-tile-task-gate-bat-ok"]', 'station-komori', 200);
 
     // ASSERT: Task should be placed successfully
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
@@ -92,11 +122,11 @@ test.describe('UC-07: Approval Gate Validation', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-gate-plates-pending"]');
     await expect(taskTile).toBeVisible();
 
-    // Count tiles before drag
+    // Count tiles before pick & place
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
 
-    // ACT: Drag the task to Komori station
-    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-gate-plates-pending"]', 'station-komori', 200);
+    // ACT: Pick & place the task to Komori station
+    await pickAndPlace(page, '[data-testid="task-tile-task-gate-plates-pending"]', 'station-komori', 200);
 
     // ASSERT: Task should be placed (Plates is warning-only, not blocking)
     const tilesAfter = await countTilesOnStation(page, 'station-komori');

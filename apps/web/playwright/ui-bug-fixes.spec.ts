@@ -13,13 +13,11 @@ test.describe('v0.3.42 - UI Bug Fixes', () => {
   });
 
   test.describe('REQ-06: Non-selected tiles should be clickable', () => {
-    test('clicking muted tile selects its job', async ({ page }) => {
-      // First, select job-a by clicking its tile
-      const tileA = page.locator('[data-testid="tile-assign-a"]');
-      await tileA.click();
-
-      // Verify job-a is selected (has glow effect) - rgba format with blue color
-      await expect(tileA).toHaveCSS('box-shadow', /rgba?\(59,\s*130,\s*246/); // Blue glow
+    test('clicking muted tile is interactive (starts pick mode - v0.3.57)', async ({ page }) => {
+      // First, select job-a by clicking its job card
+      const jobCardA = page.locator('[data-testid="job-card-job-a"]');
+      await jobCardA.click();
+      await page.waitForTimeout(100);
 
       // Now tile-b should be muted (desaturated) but still clickable
       const tileB = page.locator('[data-testid="tile-assign-b"]');
@@ -28,25 +26,27 @@ test.describe('v0.3.42 - UI Bug Fixes', () => {
       await expect(tileB).toHaveCSS('filter', /saturate/);
       await expect(tileB).toHaveCSS('opacity', '0.6');
 
-      // Click the muted tile
+      // Click the muted tile - this should start pick mode (v0.3.57 behavior)
       await tileB.click();
 
-      // Verify job-b is now selected (has glow effect) - rgba format with green color
-      await expect(tileB).toHaveCSS('box-shadow', /rgba?\(34,\s*197,\s*94/); // Green glow
+      // v0.3.57: Clicking a tile now starts pick mode (not job selection)
+      // Verify pick mode is active by checking for pick preview
+      const pickPreview = page.locator('[data-testid="pick-preview"]');
+      await expect(pickPreview).toBeVisible({ timeout: 2000 });
 
-      // Verify tile-a is now muted
-      await expect(tileA).toHaveCSS('filter', /saturate/);
-      await expect(tileA).toHaveCSS('opacity', '0.6');
+      // Cancel pick mode
+      await page.keyboard.press('Escape');
     });
 
     test('muted tile shows pointer cursor (clickable)', async ({ page }) => {
-      // Select job-a
-      const tileA = page.locator('[data-testid="tile-assign-a"]');
-      await tileA.click();
+      // Select job-a via job card
+      const jobCardA = page.locator('[data-testid="job-card-job-a"]');
+      await jobCardA.click();
+      await page.waitForTimeout(100);
 
-      // Verify muted tile-b has grab cursor (not none/default)
+      // Verify muted tile-b has pointer cursor (clickable for pick - v0.3.57)
       const tileB = page.locator('[data-testid="tile-assign-b"]');
-      await expect(tileB).toHaveCSS('cursor', 'grab');
+      await expect(tileB).toHaveCSS('cursor', 'pointer');
     });
   });
 

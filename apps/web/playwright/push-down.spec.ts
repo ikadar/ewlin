@@ -2,18 +2,48 @@
  * Playwright Push-Down Tests
  *
  * Tests for UC-04: Push-Down on Collision
- * When a tile is dropped onto another tile's time slot, the overlapped tiles are pushed down.
+ * When a tile is placed onto another tile's time slot, the overlapped tiles are pushed down.
+ *
+ * Updated for v0.3.57: Uses Pick & Place instead of drag & drop
  */
 
 import { test, expect } from '@playwright/test';
 import {
   parseTime,
   toTotalMinutes,
-  dragTileByDelta,
   getTileScheduledStart,
   waitForAppReady,
   countTilesOnStation,
 } from './helpers/drag';
+
+/**
+ * Helper: Pick a scheduled tile from grid and place it at a new Y position on same station
+ */
+async function pickAndPlaceOnStation(
+  page: import('@playwright/test').Page,
+  tileSelector: string,
+  stationId: string,
+  targetY: number
+): Promise<void> {
+  // Click tile to pick it
+  await page.locator(tileSelector).click();
+
+  // Wait for pick preview to appear
+  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 2000 }).catch(() => null);
+
+  // Get column position and move to new Y
+  const targetColumn = page.locator(`[data-testid="station-column-${stationId}"]`);
+  const box = await targetColumn.boundingBox();
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + targetY);
+  }
+
+  // Click to place
+  await targetColumn.click();
+
+  // Wait for state update
+  await page.waitForTimeout(300);
+}
 
 test.describe('UC-04: Push-Down on Collision', () => {
   test.beforeEach(async ({ page }) => {
@@ -22,7 +52,7 @@ test.describe('UC-04: Push-Down on Collision', () => {
     await waitForAppReady(page);
   });
 
-  test('AC-04.1: Dropping on existing tile pushes it down', async ({ page }) => {
+  test('AC-04.1: Placing on existing tile pushes it down', async ({ page }) => {
     // ARRANGE: Get tiles on Komori station (should have 3 consecutive tiles)
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const tiles = stationColumn.locator('[data-testid^="tile-assign-"]');
@@ -31,11 +61,8 @@ test.describe('UC-04: Push-Down on Collision', () => {
     expect(count).toBeGreaterThanOrEqual(2);
 
     // Get the first two tiles
-    const firstTile = tiles.nth(0);
-    const secondTile = tiles.nth(1);
-
-    const firstTileTestId = await firstTile.getAttribute('data-testid');
-    const secondTileTestId = await secondTile.getAttribute('data-testid');
+    const firstTileTestId = await tiles.nth(0).getAttribute('data-testid');
+    const secondTileTestId = await tiles.nth(1).getAttribute('data-testid');
 
     const secondOriginalTime = await getTileScheduledStart(page, `[data-testid="${secondTileTestId}"]`);
     expect(secondOriginalTime).toBeTruthy();
@@ -43,9 +70,9 @@ test.describe('UC-04: Push-Down on Collision', () => {
     const secondOriginalMinutes = toTotalMinutes(parseTime(secondOriginalTime!));
     console.log(`Before: second tile at ${secondOriginalTime} (${secondOriginalMinutes} min)`);
 
-    // ACT: Drag first tile down onto second tile's position
-    // This should push the second tile down
-    await dragTileByDelta(page, `[data-testid="${firstTileTestId}"]`, 100);
+    // ACT: Pick first tile and place it at a later position (onto second tile's position)
+    // Calculate Y position for ~1.5 hours later (100px at 80px/hour)
+    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 200);
 
     // Wait for push-down to complete
     await page.waitForTimeout(200);
@@ -80,9 +107,9 @@ test.describe('UC-04: Push-Down on Collision', () => {
 
     console.log(`Before: second=${secondOriginalTime}, third=${thirdOriginalTime}`);
 
-    // ACT: Drag first tile down significantly to cause chain push
+    // ACT: Pick first tile and place it significantly later to cause chain push
     const firstTileTestId = await tiles.nth(0).getAttribute('data-testid');
-    await dragTileByDelta(page, `[data-testid="${firstTileTestId}"]`, 200);
+    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 300);
 
     // Wait for push-down chain to complete
     await page.waitForTimeout(300);
@@ -119,8 +146,8 @@ test.describe('UC-04: Push-Down on Collision', () => {
 
     console.log('Original order:', originalOrder);
 
-    // ACT: Drag first tile down
-    await dragTileByDelta(page, `[data-testid="${originalOrder[0]}"]`, 150);
+    // ACT: Pick first tile and place it later
+    await pickAndPlaceOnStation(page, `[data-testid="${originalOrder[0]}"]`, 'station-komori', 250);
     await page.waitForTimeout(300);
 
     // ASSERT: Check the order is maintained (first tile moved, others pushed but kept order)
@@ -152,12 +179,12 @@ test.describe('UC-04: Push-Down on Collision', () => {
 
     console.log(`Tile count before: ${countBefore}`);
 
-    // Get first tile for drag
+    // Get first tile for pick
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const firstTileTestId = await stationColumn.locator('[data-testid^="tile-assign-"]').first().getAttribute('data-testid');
 
-    // ACT: Drag to cause push-down
-    await dragTileByDelta(page, `[data-testid="${firstTileTestId}"]`, 150);
+    // ACT: Pick and place to cause push-down
+    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 250);
     await page.waitForTimeout(300);
 
     // ASSERT: Tile count should be the same

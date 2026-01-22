@@ -30,11 +30,20 @@ test.describe('v0.3.37: Multi-Day Grid Navigation', () => {
       expect(boundingBox?.height).toBeGreaterThan(1000);
     });
 
-    test('DateStrip shows 21 days', async ({ page }) => {
-      // Count the date cells in DateStrip
+    test('DateStrip shows multiple days with virtual scrolling', async ({ page }) => {
+      // DateStrip now uses virtual scrolling with 365 days
+      // Only a subset of date cells are rendered at any time
+      const datestripContainer = page.locator('[data-testid="datestrip-container"]');
+      await expect(datestripContainer).toBeVisible();
+
+      // Check that some date cells are visible
       const dateCells = page.locator('[data-testid^="date-cell-"]');
       const count = await dateCells.count();
-      expect(count).toBe(21);
+      expect(count).toBeGreaterThan(10); // At least some visible
+
+      // Verify extended range via scrollable height (365 days at ~40px each)
+      const scrollInfo = await datestripContainer.evaluate((el) => el.scrollHeight);
+      expect(scrollInfo).toBeGreaterThan(5000); // 365 days worth
     });
 
     test('clicking DateStrip date scrolls grid', async ({ page }) => {
