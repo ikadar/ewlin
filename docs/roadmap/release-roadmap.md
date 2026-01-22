@@ -1121,16 +1121,18 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - `apps/web/src/App.tsx`
 - `apps/web/playwright/context-menu.spec.ts` (new)
 
-#### v0.3.59 - Job Details Panel Fixed Tile Height (REQ-04)
+#### v0.3.59 - Job Details Panel Fixed Tile Height (REQ-04) ✅
 > **Implements:** [REQ-04](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-04-job-details-panel---fixed-tile-height)
+> **Released:** 2026-01-22
 
-- [ ] Change task tile height from proportional to fixed 32px
-- [ ] Remove duration-based height calculation
-- [ ] Ensure content fits within 32px (truncation if needed)
-- [ ] Visual test for consistent list appearance
+- [x] Change task tile height from proportional to fixed 32px
+- [x] Remove duration-based height calculation
+- [x] Ensure content fits within 32px (truncation if needed)
+- [x] Visual test for consistent list appearance
 
 **Affected files:**
 - `apps/web/src/components/JobDetailsPanel/TaskTile.tsx`
+- `apps/web/src/components/JobDetailsPanel/TaskList.tsx`
 
 #### v0.3.60 - Unavailability Overlay SVG (REQ-05)
 > **Implements:** [REQ-05](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-05-unavailability-overlay---css-gradient-to-svg)
