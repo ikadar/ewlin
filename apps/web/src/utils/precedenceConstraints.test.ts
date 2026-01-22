@@ -14,6 +14,17 @@ function createLocalTimeISO(hour: number, minute: number = 0): string {
   return date.toISOString();
 }
 
+// Default operating schedule for test stations (24/7 operation to simplify tests)
+const DEFAULT_OPERATING_SCHEDULE = {
+  monday: { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] },
+  tuesday: { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] },
+  wednesday: { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] },
+  thursday: { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] },
+  friday: { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] },
+  saturday: { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] },
+  sunday: { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] },
+};
+
 // Helper to create minimal snapshot
 function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnapshot {
   return {
@@ -138,7 +149,7 @@ describe('getPredecessorConstraint', () => {
       tasks: [task1, task2],
       assignments: [assignment],
       stations: [
-        { id: 'station-cutting', name: 'Cutting', categoryId: 'cat-cutting', groupId: null },
+        { id: 'station-cutting', name: 'Cutting', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
       ],
     });
 
@@ -171,7 +182,7 @@ describe('getPredecessorConstraint', () => {
       tasks: [printTask, cutTask],
       assignments: [assignment],
       stations: [
-        { id: 'station-offset', name: 'Offset Press', categoryId: 'cat-offset', groupId: null },
+        { id: 'station-offset', name: 'Offset Press', categoryId: 'cat-offset', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
       ],
       categories: [
         { id: 'cat-offset', name: 'Offset', colorCode: '#FF0000' },
@@ -266,7 +277,7 @@ describe('getSuccessorConstraint', () => {
       jobs: [job],
       tasks: [task1, task2],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null }],
+      stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
     const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR);
@@ -295,7 +306,7 @@ describe('getSuccessorConstraint', () => {
       jobs: [job],
       tasks: [task1, task2],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null }],
+      stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
     const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR);

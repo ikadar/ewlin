@@ -82,8 +82,11 @@ describe('StationHeader', () => {
     });
   });
 
-  describe('Group Capacity Display (REQ-18)', () => {
-    it('shows group capacity info when provided', () => {
+  // NOTE: Group Capacity Display (REQ-18) was removed from StationHeader in REQ-06
+  // The groupCapacity prop is still accepted but not rendered in the current implementation.
+  // These tests are kept but updated to verify the current behavior.
+  describe('Group Capacity Display (REQ-18 - removed in REQ-06)', () => {
+    it('does not show group capacity even when provided (removed feature)', () => {
       const groupCapacity: GroupCapacityInfo = {
         groupId: 'grp-1',
         groupName: 'Offset Press',
@@ -98,26 +101,7 @@ describe('StationHeader', () => {
         />
       );
 
-      expect(screen.getByTestId('group-capacity-sta-1')).toBeInTheDocument();
-      expect(screen.getByText('Offset Press')).toBeInTheDocument();
-      expect(screen.getByText('(2/3)')).toBeInTheDocument();
-    });
-
-    it('does not show group capacity when maxConcurrent is null', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Provider Group',
-        maxConcurrent: null,
-        currentUsage: 5,
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-        />
-      );
-
+      // Group capacity display was removed from header
       expect(screen.queryByTestId('group-capacity-sta-1')).not.toBeInTheDocument();
     });
 
@@ -125,137 +109,6 @@ describe('StationHeader', () => {
       render(<StationHeader station={createStation('sta-1')} />);
 
       expect(screen.queryByTestId('group-capacity-sta-1')).not.toBeInTheDocument();
-    });
-
-    it('shows warning icon when capacity exceeded', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Offset Press',
-        maxConcurrent: 2,
-        currentUsage: 3, // exceeded
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-        />
-      );
-
-      expect(screen.getByTestId('capacity-warning-icon')).toBeInTheDocument();
-    });
-
-    it('does not show warning icon when capacity not exceeded', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Offset Press',
-        maxConcurrent: 3,
-        currentUsage: 2, // not exceeded
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-        />
-      );
-
-      expect(screen.queryByTestId('capacity-warning-icon')).not.toBeInTheDocument();
-    });
-
-    it('uses red text when capacity exceeded', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Offset Press',
-        maxConcurrent: 2,
-        currentUsage: 3,
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-        />
-      );
-
-      const capacityDiv = screen.getByTestId('group-capacity-sta-1');
-      expect(capacityDiv).toHaveClass('text-red-400');
-    });
-
-    it('uses normal text when capacity not exceeded', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Offset Press',
-        maxConcurrent: 3,
-        currentUsage: 2,
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-        />
-      );
-
-      const capacityDiv = screen.getByTestId('group-capacity-sta-1');
-      expect(capacityDiv).toHaveClass('text-zinc-500');
-    });
-
-    it('hides group capacity when collapsed', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Offset Press',
-        maxConcurrent: 3,
-        currentUsage: 2,
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-          isCollapsed={true}
-        />
-      );
-
-      expect(screen.queryByTestId('group-capacity-sta-1')).not.toBeInTheDocument();
-    });
-
-    it('shows correct tooltip when capacity exceeded', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Offset Press',
-        maxConcurrent: 2,
-        currentUsage: 3,
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-        />
-      );
-
-      const capacityDiv = screen.getByTestId('group-capacity-sta-1');
-      expect(capacityDiv).toHaveAttribute('title', 'Offset Press capacity exceeded: 3/2');
-    });
-
-    it('shows correct tooltip when capacity not exceeded', () => {
-      const groupCapacity: GroupCapacityInfo = {
-        groupId: 'grp-1',
-        groupName: 'Offset Press',
-        maxConcurrent: 3,
-        currentUsage: 2,
-      };
-
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          groupCapacity={groupCapacity}
-        />
-      );
-
-      const capacityDiv = screen.getByTestId('group-capacity-sta-1');
-      expect(capacityDiv).toHaveAttribute('title', 'Offset Press: 2/3 concurrent tasks');
     });
   });
 });

@@ -51,6 +51,8 @@ export interface TileProps {
   onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
   /** v0.3.57: Whether picking is active (for muting other tiles) */
   isPickingActive?: boolean;
+  /** v0.3.58: Callback when tile is right-clicked (context menu) */
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
 }
 
 /**
@@ -88,6 +90,7 @@ export const Tile = memo(function Tile({
   isPicked = false,
   onPickFromGrid,
   isPickingActive = false,
+  onContextMenu,
 }: TileProps) {
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
@@ -154,6 +157,13 @@ export const Tile = memo(function Tile({
   const handleToggleComplete = (e: React.MouseEvent) => {
     e.stopPropagation(); // Don't trigger job selection
     onToggleComplete?.(assignment.id);
+  };
+
+  // Handle right-click context menu (v0.3.58)
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu?.(e.clientX, e.clientY, assignment.id, isCompleted);
   };
 
   // Determine if we have setup time to show
@@ -229,6 +239,7 @@ export const Tile = memo(function Tile({
       }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
       data-testid={`tile-${assignment.id}`}
       data-scheduled-start={assignment.scheduledStart}
       data-scheduled-end={assignment.scheduledEnd}
@@ -363,6 +374,7 @@ export const Tile = memo(function Tile({
   if (prevProps.onSwapDown !== nextProps.onSwapDown) return false;
   if (prevProps.onToggleComplete !== nextProps.onToggleComplete) return false;
   if (prevProps.onPickFromGrid !== nextProps.onPickFromGrid) return false;
+  if (prevProps.onContextMenu !== nextProps.onContextMenu) return false;
 
   return true; // Props are equal, skip re-render
 });

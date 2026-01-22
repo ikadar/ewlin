@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -363,6 +363,14 @@ function AppContent() {
 
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
+
+  // v0.3.58: Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    assignmentId: string;
+    isCompleted: boolean;
+  } | null>(null);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
   useEffect(() => {
@@ -734,6 +742,28 @@ function AppContent() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
+  // v0.3.58: Handle context menu open
+  const handleContextMenuOpen = useCallback((x: number, y: number, assignmentId: string, isCompleted: boolean) => {
+    setContextMenu({ x, y, assignmentId, isCompleted });
+  }, []);
+
+  // v0.3.58: Handle context menu close
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // v0.3.58: Handle context menu "View details" action
+  const handleContextMenuViewDetails = useCallback(() => {
+    if (!contextMenu) return;
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (assignment) {
+      const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
+      if (task) {
+        setSelectedJobId(task.jobId);
+      }
+    }
+  }, [contextMenu, snapshot.assignments, snapshot.tasks]);
+
   // Handle jump to task - scroll grid to assignment position (single-click in Job Details Panel)
   const handleJumpToTask = useCallback((assignment: TaskAssignment) => {
     if (!gridRef.current) return;
@@ -856,6 +886,44 @@ function AppContent() {
     });
     setSnapshotVersion((v) => v + 1);
   }, []);
+
+  // v0.3.58: Handle context menu "Toggle completion" action
+  const handleContextMenuToggleComplete = useCallback(() => {
+    if (!contextMenu) return;
+    handleToggleComplete(contextMenu.assignmentId);
+  }, [contextMenu, handleToggleComplete]);
+
+  // v0.3.58: Handle context menu "Move up" action
+  const handleContextMenuMoveUp = useCallback(() => {
+    if (!contextMenu) return;
+    handleSwapUp(contextMenu.assignmentId);
+  }, [contextMenu, handleSwapUp]);
+
+  // v0.3.58: Handle context menu "Move down" action
+  const handleContextMenuMoveDown = useCallback(() => {
+    if (!contextMenu) return;
+    handleSwapDown(contextMenu.assignmentId);
+  }, [contextMenu, handleSwapDown]);
+
+  // v0.3.58: Calculate if swap is available for context menu
+  const getContextMenuSwapAvailability = useCallback(() => {
+    if (!contextMenu) return { canSwapUp: false, canSwapDown: false };
+
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return { canSwapUp: false, canSwapDown: false };
+
+    // Find adjacent tiles on the same station
+    const stationAssignments = snapshot.assignments
+      .filter((a) => a.targetId === assignment.targetId)
+      .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
+
+    const currentIndex = stationAssignments.findIndex((a) => a.id === contextMenu.assignmentId);
+
+    return {
+      canSwapUp: currentIndex > 0,
+      canSwapDown: currentIndex < stationAssignments.length - 1,
+    };
+  }, [contextMenu, snapshot.assignments]);
 
   // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
   // In backward scheduling, we always show the last task as the one to place
@@ -1368,6 +1436,7 @@ function AppContent() {
           pickDryingTimeInfo={pickDryingTimeInfo}
           pickedAssignmentId={pickedAssignmentId}
           onPickFromGrid={handlePickFromGrid}
+          onContextMenu={handleContextMenuOpen}
         />
           </div>
         </div>
@@ -1382,6 +1451,22 @@ function AppContent() {
           conflicts: pickValidation.debugConflicts,
         }}
       />
+
+      {/* v0.3.58: Context menu for tiles */}
+      {contextMenu && (
+        <TileContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          isCompleted={contextMenu.isCompleted}
+          canSwapUp={getContextMenuSwapAvailability().canSwapUp}
+          canSwapDown={getContextMenuSwapAvailability().canSwapDown}
+          onViewDetails={handleContextMenuViewDetails}
+          onToggleComplete={handleContextMenuToggleComplete}
+          onSwapUp={handleContextMenuMoveUp}
+          onSwapDown={handleContextMenuMoveDown}
+          onClose={handleContextMenuClose}
+        />
+      )}
     </>
   );
 }
