@@ -1101,21 +1101,25 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - `apps/web/package.json` (removed pragmatic-drag-and-drop)
 - `apps/web/playwright/pick-from-grid.spec.ts` (new E2E tests)
 
-#### v0.3.58 - Right Click Context Menu (REQ-02)
+#### v0.3.58 - Right Click Context Menu (REQ-02) ✅
 > **Implements:** [REQ-02](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-02-right-click-context-menu)
+> **Released:** 2026-01-22
 
-- [ ] `TileContextMenu.tsx` component (portal-based, z-9999)
-- [ ] Menu options: View details, Toggle completion, Move up, Move down
-- [ ] Position at cursor (x, y)
-- [ ] Auto-flip near viewport edges (right/bottom)
-- [ ] Close on: click outside, ESC, scroll
-- [ ] Only on tiles (not empty cells)
-- [ ] French labels (Voir détails, Marquer terminé, etc.)
-- [ ] E2E tests for context menu
+- [x] `TileContextMenu.tsx` component (portal-based, z-9999)
+- [x] Menu options: View details, Toggle completion, Move up, Move down
+- [x] Position at cursor (x, y)
+- [x] Auto-flip near viewport edges (right/bottom)
+- [x] Close on: click outside, ESC, scroll
+- [x] Only on tiles (not empty cells)
+- [x] French labels (Voir détails, Marquer terminé, etc.)
+- [x] E2E tests for context menu (13 tests)
 
 **Affected files:**
 - `apps/web/src/components/Tile/TileContextMenu.tsx` (new)
 - `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
+- `apps/web/src/App.tsx`
+- `apps/web/playwright/context-menu.spec.ts` (new)
 
 #### v0.3.59 - Job Details Panel Fixed Tile Height (REQ-04)
 > **Implements:** [REQ-04](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-04-job-details-panel---fixed-tile-height)
