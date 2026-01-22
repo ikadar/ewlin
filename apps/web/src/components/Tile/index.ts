@@ -1,6 +1,9 @@
 export { Tile } from './Tile';
 export type { TileProps } from './Tile';
 
+export { TileContextMenu } from './TileContextMenu';
+export type { TileContextMenuProps } from './TileContextMenu';
+
 export { SwapButtons } from './SwapButtons';
 export type { SwapButtonsProps } from './SwapButtons';
 

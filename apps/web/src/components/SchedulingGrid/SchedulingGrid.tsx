@@ -125,6 +125,8 @@ export interface SchedulingGridProps {
   pickedAssignmentId?: string | null;
   /** v0.3.57: Callback when tile is clicked to pick from grid */
   onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
+  /** v0.3.58: Callback when tile is right-clicked (context menu) */
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
 }
 
 /**
@@ -179,6 +181,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       // v0.3.57: Pick from grid props
       pickedAssignmentId,
       onPickFromGrid,
+      // v0.3.58: Context menu props
+      onContextMenu,
     },
     ref
   ) {
@@ -606,6 +610,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         isPicked={pickedAssignmentId === assignment.id}
                         onPickFromGrid={onPickFromGrid}
                         isPickingActive={isPicking}
+                        onContextMenu={onContextMenu}
                       />
                     );
                   })}
@@ -658,6 +663,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         isOutsourced={true}
                         subcolumnLayout={layout}
                         isPickingActive={isPicking}
+                        onContextMenu={onContextMenu}
+                        onToggleComplete={onToggleComplete}
                       />
                     );
                   })}
