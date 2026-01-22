@@ -446,11 +446,24 @@ function AppContent() {
     pickActions.setPixelsPerHour(pixelsPerHour);
   }, [pixelsPerHour, pickActions]);
 
+  // v0.3.56: Toggle body class for global grabbing cursor during pick mode
+  useEffect(() => {
+    if (isPicking) {
+      document.body.classList.add('pick-mode-active');
+    } else {
+      document.body.classList.remove('pick-mode-active');
+    }
+    return () => document.body.classList.remove('pick-mode-active');
+  }, [isPicking]);
+
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
 
   // v0.3.55: Saved scroll position for sidebar pick cancel restoration
   const savedScrollRef = useRef<{ x: number; y: number } | null>(null);
+
+  // v0.3.56: Track last validated slot for early-exit optimization
+  const lastPickSlotRef = useRef<string | null>(null);
 
   // v0.3.47: Zoom handler that maintains grid center position
   const handleZoomChange = useCallback((newPixelsPerHour: number) => {
@@ -798,6 +811,7 @@ function AppContent() {
           gridRef.current.scrollTo(savedScrollRef.current.x, savedScrollRef.current.y, 'smooth');
           savedScrollRef.current = null;
         }
+        lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking
         pickActions.cancelPick();
         setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
       }, isPicking)) return;
@@ -1387,6 +1401,7 @@ function AppContent() {
   }, [pickActions, snapshot.stations]);
 
   // v0.3.54: Handle mouse move during pick (update ghost position and validate)
+  // v0.3.56: Added early-exit optimization when cursor stays in same slot
   const handlePickMouseMove = useCallback((stationId: string, clientX: number, clientY: number, relativeY: number) => {
     // Update ghost position for RAF rendering (PickPreview handles offset internally)
     pickActions.updateGhostPosition(clientX, clientY);
@@ -1394,6 +1409,14 @@ function AppContent() {
     // Calculate tile top from cursor position (cursor is PICK_CURSOR_OFFSET_Y pixels inside the tile)
     const tileTopY = relativeY - PICK_CURSOR_OFFSET_Y;
     const snappedTileTop = snapToGrid(Math.max(0, tileTopY), pixelsPerHour);
+
+    // v0.3.56: Early-exit if cursor is in the same slot (skip redundant validation)
+    const slotKey = `${stationId}-${snappedTileTop}`;
+    if (slotKey === lastPickSlotRef.current) {
+      return; // Ghost position already updated, skip validation
+    }
+    lastPickSlotRef.current = slotKey;
+
     const dropTime = yPositionToTime(snappedTileTop, START_HOUR, gridStartDate, pixelsPerHour);
     const scheduledStart = dropTime.toISOString();
 
@@ -1518,6 +1541,7 @@ function AppContent() {
 
     setSnapshotVersion((v) => v + 1);
     pickActions.completePlacement();
+    lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking on successful placement
     setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
     console.log('Pick placement created:', { taskId: task.id, scheduledStart });
   }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions]);

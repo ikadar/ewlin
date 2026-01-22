@@ -129,9 +129,9 @@ test.describe('Pick & Place from Sidebar', () => {
     // Wait for pick preview to appear (confirms pick started)
     await expect(page.locator('[data-testid="pick-preview"]')).toBeVisible();
 
-    // Task should have picked styling - check for ring or outline class
-    // The isPicked state adds visual feedback via inline styles or classes
-    await expect(unscheduledTask).toHaveCSS('cursor', 'default');
+    // Task should have picked styling
+    // v0.3.56: Global grabbing cursor applies to all elements via body.pick-mode-active
+    await expect(unscheduledTask).toHaveCSS('cursor', 'grabbing');
   });
 
   test('should fade non-target columns to 15% opacity during sidebar pick', async ({ page }) => {

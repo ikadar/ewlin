@@ -43,3 +43,28 @@ body {
     rgba(255, 255, 255, 0.03) 20px
   );
 }
+
+/* v0.3.56: Pick & Place visual feedback */
+
+/* Pulse opacity animation for picked tile placeholder (v0.3.57) */
+@keyframes pulse-opacity {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-opacity {
+  animation: pulse-opacity 1.5s ease-in-out infinite;
+}
+
+/* Global cursor during pick mode */
+body.pick-mode-active {
+  cursor: grabbing !important;
+}
+
+body.pick-mode-active * {
+  cursor: grabbing !important;
+}

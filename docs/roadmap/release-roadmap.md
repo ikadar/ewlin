@@ -1040,31 +1040,30 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 #### v0.3.56 - Pick Visual Feedback
 > **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (visual refinements)
 
-- [ ] Pulsating animation on original position (grid picks)
-- [ ] Cursor states: default → grab (picked) → not-allowed (invalid)
-- [ ] Validation throttle to 100ms with early-exit
-- [ ] CSS transition masking for smooth ring color changes
-- [ ] Precedence lines during pick (reuse existing logic)
-- [ ] E2E tests for visual feedback states
+- [ ] Global `cursor: grabbing` during pick mode (body.pick-mode-active)
+- [ ] CSS animation preparation: `@keyframes pulse-opacity` + `.animate-pulse-opacity`
+- [ ] Validation throttle with early-exit (same 15-min slot)
+- [ ] E2E tests for cursor state
 
 **Affected files:**
-- `apps/web/src/components/Tile/Tile.tsx`
-- `apps/web/src/pick/PickStateContext.tsx`
-- `apps/web/src/index.css` (pulsating animation)
+- `apps/web/src/index.css` (CSS animation, cursor)
+- `apps/web/src/App.tsx` (body class toggle, validation throttle)
+- `apps/web/src/components/StationColumns/StationColumn.tsx` (remove per-column cursor)
 
 #### v0.3.57 - Pick & Place from Grid (REQ-01 complete)
 > **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (grid tiles)
 
 - [ ] Click handler on grid tiles (non-completed, non-outsourced)
-- [ ] Pulsating placeholder at original position
-- [ ] No opacity change (all columns visible)
+- [ ] `isPicked` prop on Tile for placeholder rendering
+- [ ] Pulsating placeholder at original position (uses CSS from v0.3.56)
+- [ ] No opacity change (all columns visible for grid picks)
 - [ ] No scroll (user is at tile location)
 - [ ] Place on same or different station
 - [ ] Remove drag & drop code (replaced by P&P)
 - [ ] Update E2E test suite (replace drag tests with pick tests)
 
 **Affected files:**
-- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/Tile/Tile.tsx` (isPicked, placeholder)
 - `apps/web/src/components/StationColumns/StationColumn.tsx`
 - `apps/web/src/dnd/` - remove or refactor
 - `apps/web/src/App.tsx`

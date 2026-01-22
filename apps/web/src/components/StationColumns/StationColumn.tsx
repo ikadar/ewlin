@@ -300,15 +300,11 @@ export const StationColumn = memo(function StationColumn({
     onQuickPlacementClick(station.id, relativeY);
   };
 
-  // Cursor style for quick placement mode and pick mode
+  // Cursor style for quick placement mode
+  // v0.3.56: Pick mode cursor is now handled globally via body.pick-mode-active
   const getCursorClass = () => {
-    // v0.3.54: Pick & Place cursor
-    if (isPicking) {
-      if (isPickTarget) {
-        return pickRingState === 'invalid' ? 'cursor-not-allowed' : 'cursor-pointer';
-      }
-      return 'cursor-not-allowed';
-    }
+    // Pick mode: global cursor handles this via body.pick-mode-active
+    if (isPicking) return '';
     // Quick placement mode
     if (!isQuickPlacementMode) return '';
     return hasAvailableTask ? 'cursor-pointer' : 'cursor-not-allowed';
