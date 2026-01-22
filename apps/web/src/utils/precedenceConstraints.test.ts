@@ -153,6 +153,7 @@ describe('getPredecessorConstraint', () => {
     const job = createJob('job-1');
     // Print task (on offset station which is printing)
     const printTask = createTask('task-print', 'job-1', 1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test helper override
     (printTask as any).stationId = 'station-offset'; // Override to offset station
     const cutTask = createTask('task-cut', 'job-1', 2);
     job.taskIds = ['task-print', 'task-cut'];
@@ -188,6 +189,7 @@ describe('getPredecessorConstraint', () => {
   it('does not add dry time for outsourced printing', () => {
     const job = createJob('job-1');
     const printTask = createTask('task-print', 'job-1', 1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test helper override
     (printTask as any).stationId = 'station-offset'; // Override to offset station
     const cutTask = createTask('task-cut', 'job-1', 2);
     job.taskIds = ['task-print', 'task-cut'];

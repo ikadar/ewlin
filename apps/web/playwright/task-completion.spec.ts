@@ -21,7 +21,7 @@ test.describe('v0.3.33: Task Completion Toggle', () => {
 
     // Get the parent tile's testid from a nearby element
     // The icon is inside a tile, we can find tiles with incomplete icons
-    const tilesWithIncomplete = page.locator('[data-testid^="tile-"][data-testid$="-1"]:has([data-testid="tile-incomplete-icon"])').first();
+    const _tilesWithIncomplete = page.locator('[data-testid^="tile-"][data-testid$="-1"]:has([data-testid="tile-incomplete-icon"])').first();
 
     // Just verify the icon is clickable and changes state
     // ACT: Click the incomplete icon
@@ -69,7 +69,7 @@ test.describe('v0.3.33: Task Completion Toggle', () => {
     await page.waitForTimeout(100);
 
     // Check no job is selected (no box-shadow glow on tiles from selection)
-    const tilesWithGlow = page.locator('[data-testid^="tile-"]').filter({
+    const _tilesWithGlow = page.locator('[data-testid^="tile-"]').filter({
       has: page.locator(':scope'),
     });
 

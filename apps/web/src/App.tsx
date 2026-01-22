@@ -1011,6 +1011,7 @@ function AppContent() {
         console.log(isRescheduleOp ? 'Rescheduled:' : 'Created:', { taskId: task.id, scheduledStart });
       },
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
   }, [activeTask, grabOffset, dragValidation, validation, isAltPressed, snapshot.stations, gridStartDate, pixelsPerHour]);
 
   // Handle swap up - exchange position with tile above
@@ -1323,6 +1324,7 @@ function AppContent() {
       scheduledStart,
       scheduledEnd,
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
   }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, gridStartDate, pixelsPerHour]);
 
   // Calculate which stations have available tasks (for quick placement cursor)

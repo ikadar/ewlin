@@ -66,7 +66,7 @@ test.describe('v0.3.37: Multi-Day Grid Navigation', () => {
       const jobCount = await jobCards.count();
 
       // Click through jobs looking for departure date highlight
-      let foundDepartureHighlight = false;
+      let _foundDepartureHighlight = false;
       for (let i = 0; i < Math.min(jobCount, 5); i++) {
         await jobCards.nth(i).click();
         await page.waitForTimeout(100);
@@ -74,7 +74,7 @@ test.describe('v0.3.37: Multi-Day Grid Navigation', () => {
         // Look for a date cell with departure styling (red classes)
         const departureCells = page.locator('[data-testid^="date-cell-"].bg-red-500\\/10');
         if ((await departureCells.count()) > 0) {
-          foundDepartureHighlight = true;
+          _foundDepartureHighlight = true;
           break;
         }
       }

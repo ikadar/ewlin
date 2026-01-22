@@ -63,7 +63,7 @@ test.describe('DateStrip Redesign (REQ-09)', () => {
     await expect(datestripContainer).toBeVisible();
 
     // Find a cell with the focused styling (bg-white/10)
-    const focusedCell = datestripContainer.locator('button').filter({
+    const _focusedCell = datestripContainer.locator('button').filter({
       has: page.locator('text=/\\d{2}/'), // Has a day number
     }).filter({
       hasNot: page.locator('[data-testid="today-indicator-line"]'), // Not today (unless today is focused)

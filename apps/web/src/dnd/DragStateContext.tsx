@@ -123,6 +123,7 @@ export function DragStateProvider({ children }: DragStateProviderProps) {
 }
 
 // Hook to access drag state
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDragState(): DragStateContextType {
   const context = useContext(DragStateContext);
   if (!context) {
@@ -132,6 +133,7 @@ export function useDragState(): DragStateContextType {
 }
 
 // Convenience hook for read-only state access
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDragStateValue(): DragState {
   const { state } = useDragState();
   return state;

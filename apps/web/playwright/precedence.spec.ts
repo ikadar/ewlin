@@ -11,7 +11,6 @@ import {
   parseTime,
   toTotalMinutes,
   dragFromSidebarToStation,
-  getTileScheduledStart,
   waitForAppReady,
   countTilesOnStation,
 } from './helpers/drag';

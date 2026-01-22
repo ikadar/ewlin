@@ -103,7 +103,7 @@ export function calculateEndTime(
 
   // Implement BR-ASSIGN-003b: Task stretching algorithm
   let remainingMinutes = totalMinutes;
-  let currentDate = new Date(startDate);
+  const currentDate = new Date(startDate);
   let iterations = 0;
   const maxIterations = 365 * 24; // Safety limit
 

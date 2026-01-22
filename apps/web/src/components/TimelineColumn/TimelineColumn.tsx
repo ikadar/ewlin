@@ -18,18 +18,6 @@ export interface TimelineColumnProps {
 }
 
 /**
- * Generate hour sequence starting from startHour.
- * E.g., startHour=6, count=24 => [6,7,8,...,23,0,1,2,3,4,5]
- */
-function generateHourSequence(startHour: number, count: number): number[] {
-  const hours: number[] = [];
-  for (let i = 0; i < count; i++) {
-    hours.push((startHour + i) % 24);
-  }
-  return hours;
-}
-
-/**
  * TimelineColumn - Displays hour markers and now line.
  * Used alongside station columns in the scheduling grid.
  * v0.3.46: Supports virtual scrolling to only render visible hour markers.

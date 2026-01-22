@@ -50,7 +50,7 @@ test.describe('UC-07: Approval Gate Validation', () => {
     if (tilesAfter > tilesBefore) {
       // Check for conflict indicator - task was placed but flagged
       const conflictSection = page.locator('[data-testid="problems-section"]');
-      const isConflictVisible = await conflictSection.isVisible().catch(() => false);
+      const _isConflictVisible = await conflictSection.isVisible().catch(() => false);
       console.log('Task was placed but may have conflict indicator');
     } else {
       // Task was blocked - this is the expected behavior

@@ -70,13 +70,18 @@ export const JobCard = memo(function JobCard({
     return 'text-zinc-500';
   })();
 
-  const getProblemIcon = () => {
-    if (problemType === 'late') return AlertCircle;
-    if (problemType === 'conflict') return Shuffle;
+  const iconColor = problemType === 'late' ? 'text-red-400' : 'text-amber-400';
+
+  // Render problem icon based on type (avoids creating component during render)
+  const renderProblemIcon = () => {
+    if (problemType === 'late') {
+      return <AlertCircle className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />;
+    }
+    if (problemType === 'conflict') {
+      return <Shuffle className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />;
+    }
     return null;
   };
-  const ProblemIcon = getProblemIcon();
-  const iconColor = problemType === 'late' ? 'text-red-400' : 'text-amber-400';
 
   return (
     <button
@@ -90,8 +95,8 @@ export const JobCard = memo(function JobCard({
         <span className={`font-mono text-[13px] shrink-0 ${referenceColor}`}>{reference}</span>
         <span className="text-zinc-600 shrink-0">·</span>
         <span className="text-zinc-400 truncate min-w-0">{client}</span>
-        {ProblemIcon && <ProblemIcon className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />}
-        {!ProblemIcon && deadline && <span className="text-zinc-600 text-xs ml-auto shrink-0">{deadline}</span>}
+        {renderProblemIcon()}
+        {!problemType && deadline && <span className="text-zinc-600 text-xs ml-auto shrink-0">{deadline}</span>}
       </div>
 
       {/* Description */}

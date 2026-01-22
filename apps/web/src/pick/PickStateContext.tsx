@@ -163,6 +163,7 @@ export function PickStateProvider({ children }: PickStateProviderProps) {
 /**
  * Hook to access full pick context (state + actions + ref).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePickState(): PickContextValue {
   const context = useContext(PickStateContext);
   if (!context) {
@@ -174,6 +175,7 @@ export function usePickState(): PickContextValue {
 /**
  * Hook to access pick state only (for components that don't need actions).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePickStateValue(): PickState {
   const context = useContext(PickStateContext);
   if (!context) {

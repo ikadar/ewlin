@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 /** Configuration for virtual scrolling */
 export interface VirtualScrollConfig {
@@ -63,56 +63,47 @@ export interface VirtualScrollResult {
 export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResult {
   const { totalDays, bufferDays, dayHeightPx, scrollTop, viewportHeight = 600 } = config;
 
-  // Stabilize visibleRange reference to prevent unnecessary re-renders
-  // Only create new object when start/end actually change
-  const prevRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: bufferDays * 2 });
+  // Calculate total virtual height
+  const totalHeight = totalDays * dayHeightPx;
 
-  return useMemo(() => {
-    // Calculate total virtual height
-    const totalHeight = totalDays * dayHeightPx;
+  // Calculate focused day index from scroll position (for reference/sync purposes)
+  // The focused day is the one at the center of the viewport
+  const centerY = scrollTop + viewportHeight / 2;
+  const focusedDayIndex = Math.floor(centerY / dayHeightPx);
 
-    // Calculate focused day index from scroll position (for reference/sync purposes)
-    // The focused day is the one at the center of the viewport
-    const centerY = scrollTop + viewportHeight / 2;
-    const focusedDayIndex = Math.floor(centerY / dayHeightPx);
+  // Clamp to valid range
+  const clampedFocusedDay = Math.max(0, Math.min(totalDays - 1, focusedDayIndex));
 
-    // Clamp to valid range
-    const clampedFocusedDay = Math.max(0, Math.min(totalDays - 1, focusedDayIndex));
+  // Calculate visible range based on actual viewport bounds
+  // This ensures the entire viewport is always covered with content
+  const firstVisibleDay = Math.floor(scrollTop / dayHeightPx);
+  const lastVisibleDay = Math.ceil((scrollTop + viewportHeight) / dayHeightPx);
 
-    // Calculate visible range based on actual viewport bounds
-    // This ensures the entire viewport is always covered with content
-    const firstVisibleDay = Math.floor(scrollTop / dayHeightPx);
-    const lastVisibleDay = Math.ceil((scrollTop + viewportHeight) / dayHeightPx);
+  // Add buffer around the actual visible range (not around center)
+  const start = Math.max(0, firstVisibleDay - bufferDays);
+  const end = Math.min(totalDays - 1, lastVisibleDay + bufferDays);
 
-    // Add buffer around the actual visible range (not around center)
-    const start = Math.max(0, firstVisibleDay - bufferDays);
-    const end = Math.min(totalDays - 1, lastVisibleDay + bufferDays);
+  // Calculate Y offset for positioning rendered content
+  const offsetY = start * dayHeightPx;
 
-    // Calculate Y offset for positioning rendered content
-    const offsetY = start * dayHeightPx;
+  // Calculate hours for filtering assignments
+  const hoursPerDay = 24;
+  const visibleStartHour = start * hoursPerDay;
+  const visibleEndHour = (end + 1) * hoursPerDay;
 
-    // Calculate hours for filtering assignments
-    const hoursPerDay = 24;
-    const visibleStartHour = start * hoursPerDay;
-    const visibleEndHour = (end + 1) * hoursPerDay;
+  // Memoize visibleRange to prevent unnecessary re-renders
+  const visibleRange = useMemo(() => ({ start, end }), [start, end]);
 
-    // Stabilize visibleRange reference - only change if values change
-    let visibleRange = prevRangeRef.current;
-    if (visibleRange.start !== start || visibleRange.end !== end) {
-      visibleRange = { start, end };
-      prevRangeRef.current = visibleRange;
-    }
-
-    return {
-      totalHeight,
-      focusedDayIndex: clampedFocusedDay,
-      visibleRange,
-      offsetY,
-      renderedDayCount: end - start + 1,
-      visibleStartHour,
-      visibleEndHour,
-    };
-  }, [totalDays, bufferDays, dayHeightPx, scrollTop, viewportHeight]);
+  // Memoize the full result
+  return useMemo(() => ({
+    totalHeight,
+    focusedDayIndex: clampedFocusedDay,
+    visibleRange,
+    offsetY,
+    renderedDayCount: end - start + 1,
+    visibleStartHour,
+    visibleEndHour,
+  }), [totalHeight, clampedFocusedDay, visibleRange, offsetY, start, end, visibleStartHour, visibleEndHour]);
 }
 
 /**
