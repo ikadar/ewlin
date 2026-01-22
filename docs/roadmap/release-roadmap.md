@@ -1019,20 +1019,22 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - `apps/web/src/components/JobDetailsPanel/TaskTile.tsx`
 - `apps/web/src/App.tsx`
 
-#### v0.3.55 - Column Focus on Sidebar Pick (REQ-03)
+#### ✅ v0.3.55 - Column Focus on Sidebar Pick (REQ-03)
 > **Implements:** [REQ-03](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-03-column-focus-during-pick-from-job-details)
 
-- [ ] Save scroll position on pick (for cancel restoration)
-- [ ] Scroll target station column to left edge (smooth, 300ms)
-- [ ] Fade non-target columns to 15% opacity
-- [ ] Disable pointer events on non-target columns
-- [ ] Restore scroll position on cancel (ESC)
-- [ ] Restore opacity on place/cancel
-- [ ] Only for sidebar picks (grid picks keep all columns visible)
-- [ ] E2E tests for column focus behavior
+- [x] Save scroll position on pick (for cancel restoration)
+- [x] Scroll target station column to left edge (smooth, 300ms)
+- [x] Fade non-target columns to 15% opacity
+- [x] Disable pointer events on non-target columns
+- [x] Restore scroll position on cancel (ESC)
+- [x] Restore opacity on place/cancel
+- [x] Only for sidebar picks (grid picks keep all columns visible)
+- [x] Grid spacer to ensure rightmost column can scroll to left edge
+- [x] E2E tests for column focus behavior
 
 **Affected files:**
 - `apps/web/src/App.tsx` - scroll/opacity logic
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx` - pickSource prop, spacer
 - `apps/web/src/components/StationColumns/StationColumn.tsx` - opacity classes
 
 #### v0.3.56 - Pick Visual Feedback
