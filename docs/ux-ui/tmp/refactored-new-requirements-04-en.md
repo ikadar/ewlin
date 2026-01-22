@@ -144,6 +144,8 @@ Original position (when picking from grid):
 
 ## REQ-02: Right Click Context Menu
 
+> ✅ Implemented in v0.3.58
+
 **Description:**
 Add a right-click context menu on tiles that provides quick access to common actions. The menu replaces visible buttons (eye, swap arrows) for a cleaner interface optimized for power users.
 
