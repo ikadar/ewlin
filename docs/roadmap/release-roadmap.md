@@ -1134,17 +1134,19 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - `apps/web/src/components/JobDetailsPanel/TaskTile.tsx`
 - `apps/web/src/components/JobDetailsPanel/TaskList.tsx`
 
-#### v0.3.60 - Unavailability Overlay SVG (REQ-05)
+#### v0.3.60 - Unavailability Overlay SVG (REQ-05) ✅
 > **Implements:** [REQ-05](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-05-unavailability-overlay---css-gradient-to-svg)
+> **Released:** 2026-01-22
 
-- [ ] Create `stripes.svg` (45°, 10px stripe, rgba(255,255,255,0.03))
-- [ ] Update `.bg-stripes-dark` to use SVG instead of CSS gradient
-- [ ] Verify visual appearance matches current implementation
-- [ ] Performance comparison (optional)
+- [x] Create `stripes.svg` (45°, 10px stripe, rgba(255,255,255,0.03))
+- [x] Update `.bg-stripes-dark` to use SVG instead of CSS gradient
+- [x] Verify visual appearance matches current implementation
+- [x] Test fixture: `?fixture=unavailability-overlay`
 
 **Affected files:**
 - `apps/web/public/stripes.svg` (new)
 - `apps/web/src/index.css`
+- `apps/web/src/mock/testFixtures.ts`
 
 ---
 
