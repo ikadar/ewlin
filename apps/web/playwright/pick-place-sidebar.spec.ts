@@ -71,8 +71,14 @@ test.describe('Pick & Place from Sidebar', () => {
     // Move to the target station column (Heidelberg)
     const targetColumn = page.locator('[data-testid="station-column-station-heidelberg"]');
 
-    // Hover over the column
-    await targetColumn.hover();
+    // Get column bounding box and hover at a valid time position
+    // Operating hours are 06:00-12:00 and 13:00-22:00
+    // We hover at Y position corresponding to ~8:00 AM (within operating hours)
+    const box = await targetColumn.boundingBox();
+    if (box) {
+      // Hover at 100px from top of column (early morning, within operating hours)
+      await page.mouse.move(box.x + box.width / 2, box.y + 100);
+    }
 
     // Column should have green ring (ring-green-500 class)
     await expect(targetColumn).toHaveClass(/ring-green-500/);
@@ -91,16 +97,21 @@ test.describe('Pick & Place from Sidebar', () => {
     // Verify pick started
     await expect(page.locator('[data-testid="pick-preview"]')).toBeVisible();
 
-    // Move mouse to target station - it should respond (not be blocked)
+    // Move mouse to target station at a valid time position
     const targetColumn = page.locator('[data-testid="station-column-station-heidelberg"]');
-    await targetColumn.hover();
+    const box = await targetColumn.boundingBox();
+    if (box) {
+      // Hover at 100px from top (within operating hours)
+      await page.mouse.move(box.x + box.width / 2, box.y + 100);
+    }
 
     // Target column should have valid ring (green)
     await expect(targetColumn).toHaveClass(/ring-green-500/);
 
-    // Non-target column should be dimmed
+    // Non-target column should be faded (15% opacity) with pointer-events disabled
     const nonTargetColumn = page.locator('[data-testid="station-column-station-polar"]');
-    await expect(nonTargetColumn).toHaveClass(/opacity-50/);
+    await expect(nonTargetColumn).toHaveClass(/opacity-15/);
+    await expect(nonTargetColumn).toHaveClass(/pointer-events-none/);
   });
 
   test('should show picked state styling on sidebar task', async ({ page }) => {
@@ -123,7 +134,7 @@ test.describe('Pick & Place from Sidebar', () => {
     await expect(unscheduledTask).toHaveCSS('cursor', 'default');
   });
 
-  test('should dim non-target columns during pick', async ({ page }) => {
+  test('should fade non-target columns to 15% opacity during sidebar pick', async ({ page }) => {
     // Select job-pick-2 which has task for station-heidelberg first
     const jobCard = page.locator('[data-testid="job-card-job-pick-2"]');
     await jobCard.click();
@@ -133,12 +144,36 @@ test.describe('Pick & Place from Sidebar', () => {
     const unscheduledTask = page.locator('[data-testid="task-tile-task-pick-2a"]');
     await unscheduledTask.click();
 
-    // Non-target columns should be dimmed (opacity-50)
+    // Non-target columns should be faded (opacity-15) with pointer-events disabled
     const nonTargetColumn = page.locator('[data-testid="station-column-station-polar"]');
-    await expect(nonTargetColumn).toHaveClass(/opacity-50/);
+    await expect(nonTargetColumn).toHaveClass(/opacity-15/);
+    await expect(nonTargetColumn).toHaveClass(/pointer-events-none/);
 
-    // Target column should NOT be dimmed
+    // Target column should NOT be faded
     const targetColumn = page.locator('[data-testid="station-column-station-heidelberg"]');
-    await expect(targetColumn).not.toHaveClass(/opacity-50/);
+    await expect(targetColumn).not.toHaveClass(/opacity-15/);
+    await expect(targetColumn).not.toHaveClass(/pointer-events-none/);
+  });
+
+  test('should restore column opacity when pick is cancelled', async ({ page }) => {
+    // Select job-pick-2
+    const jobCard = page.locator('[data-testid="job-card-job-pick-2"]');
+    await jobCard.click();
+    await page.waitForSelector('[data-testid="job-details-panel"]');
+
+    // Pick the first task
+    const unscheduledTask = page.locator('[data-testid="task-tile-task-pick-2a"]');
+    await unscheduledTask.click();
+
+    // Verify columns are faded
+    const nonTargetColumn = page.locator('[data-testid="station-column-station-polar"]');
+    await expect(nonTargetColumn).toHaveClass(/opacity-15/);
+
+    // Cancel with ESC
+    await page.keyboard.press('Escape');
+
+    // Columns should return to normal opacity
+    await expect(nonTargetColumn).not.toHaveClass(/opacity-15/);
+    await expect(nonTargetColumn).not.toHaveClass(/pointer-events-none/);
   });
 });

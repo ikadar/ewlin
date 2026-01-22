@@ -396,7 +396,7 @@ function AppContent() {
 
   // v0.3.54: Pick & Place state
   const { state: pickState, actions: pickActions } = usePickState();
-  const { pickedTask, pickedJob, isPicking, targetStationId: pickTargetStationId } = pickState;
+  const { pickedTask, pickedJob, isPicking, targetStationId: pickTargetStationId, pickSource } = pickState;
 
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
@@ -448,6 +448,9 @@ function AppContent() {
 
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
+
+  // v0.3.55: Saved scroll position for sidebar pick cancel restoration
+  const savedScrollRef = useRef<{ x: number; y: number } | null>(null);
 
   // v0.3.47: Zoom handler that maintains grid center position
   const handleZoomChange = useCallback((newPixelsPerHour: number) => {
@@ -788,7 +791,13 @@ function AppContent() {
       // Each handler returns true if it handled the event
       if (handleAltKey(e, ctx)) return;
       // v0.3.54: Handle ESC to cancel pick (priority over quick placement)
+      // v0.3.55: Also restore scroll position for sidebar picks
       if (handleEscapePick(e, () => {
+        // Restore scroll position for sidebar picks
+        if (pickSource === 'sidebar' && savedScrollRef.current && gridRef.current) {
+          gridRef.current.scrollTo(savedScrollRef.current.x, savedScrollRef.current.y, 'smooth');
+          savedScrollRef.current = null;
+        }
         pickActions.cancelPick();
         setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
       }, isPicking)) return;
@@ -813,7 +822,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource]);
 
   // Set up global drag monitoring using pragmatic-drag-and-drop
   // Handles: position tracking during drag, drop processing
@@ -1348,11 +1357,34 @@ function AppContent() {
   }, [selectedJobId]);
 
   // v0.3.54: Handle pick from sidebar (unscheduled task)
+  // v0.3.55: Added scroll to target column and save scroll position
   const handlePickTask = useCallback((task: Task, job: Job) => {
     pickActions.pickFromSidebar(task, job);
     // Initialize ghost position at cursor (will be updated on mouse move)
     pickActions.updateGhostPosition(0, 0);
-  }, [pickActions]);
+
+    // v0.3.55: Save current scroll position for cancel restoration
+    if (gridRef.current) {
+      savedScrollRef.current = {
+        x: gridRef.current.getScrollX(),
+        y: gridRef.current.getScrollY(),
+      };
+
+      // Scroll to target station column (for internal tasks)
+      if (task.type === 'Internal') {
+        const targetStationId = task.stationId;
+        const stationIndex = snapshot.stations.findIndex((s) => s.id === targetStationId);
+        if (stationIndex >= 0) {
+          // Calculate X position: padding (12px) + index * (column width 240px + gap 12px)
+          const PADDING = 12;
+          const COLUMN_WIDTH = 240;
+          const GAP = 12;
+          const targetX = PADDING + stationIndex * (COLUMN_WIDTH + GAP);
+          gridRef.current.scrollToX(targetX, 'smooth');
+        }
+      }
+    }
+  }, [pickActions, snapshot.stations]);
 
   // v0.3.54: Handle mouse move during pick (update ghost position and validate)
   const handlePickMouseMove = useCallback((stationId: string, clientX: number, clientY: number, relativeY: number) => {
@@ -1620,6 +1652,7 @@ function AppContent() {
           isPicking={isPicking}
           pickTargetStationId={pickTargetStationId}
           pickRingState={pickValidation.ringState}
+          pickSource={pickSource}
           onPickMouseMove={handlePickMouseMove}
           onPickMouseLeave={handlePickMouseLeave}
           onPickClick={handlePickClick}

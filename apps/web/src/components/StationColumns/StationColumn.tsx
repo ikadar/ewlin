@@ -58,6 +58,8 @@ export interface StationColumnProps {
   isPickTarget?: boolean;
   /** v0.3.54: Ring color state for pick operation (valid/invalid/warning/bypass) */
   pickRingState?: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
+  /** v0.3.55: Source of the pick operation (sidebar vs grid) */
+  pickSource?: 'sidebar' | 'grid' | null;
   /** v0.3.54: Callback for mouse move during pick (for ghost position and validation) */
   onPickMouseMove?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
   /** v0.3.54: Callback for mouse leave during pick */
@@ -115,6 +117,7 @@ export const StationColumn = memo(function StationColumn({
   isPicking = false,
   isPickTarget = false,
   pickRingState = 'none',
+  pickSource,
   onPickMouseMove,
   onPickMouseLeave,
   onPickClick,
@@ -211,9 +214,10 @@ export const StationColumn = memo(function StationColumn({
           return 'ring-1 ring-green-500/30';
       }
     }
-    // v0.3.54: Non-target columns during pick are dimmed
-    if (isPicking && !isPickTarget) {
-      return 'opacity-50';
+    // v0.3.55: Non-target columns during sidebar pick are faded and disabled
+    // Grid picks (future) will keep all columns visible
+    if (isPicking && !isPickTarget && pickSource === 'sidebar') {
+      return 'opacity-15 pointer-events-none';
     }
 
     // Priority: validation-based highlighting over basic drag state

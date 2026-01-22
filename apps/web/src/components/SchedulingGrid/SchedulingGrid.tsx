@@ -139,6 +139,8 @@ export interface SchedulingGridProps {
   pickTargetStationId?: string | null;
   /** v0.3.54: Ring color state for pick operation */
   pickRingState?: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
+  /** v0.3.55: Source of the pick operation (sidebar vs grid) */
+  pickSource?: 'sidebar' | 'grid' | null;
   /** v0.3.54: Callback for mouse move during pick */
   onPickMouseMove?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
   /** v0.3.54: Callback for mouse leave during pick */
@@ -200,6 +202,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       isPicking = false,
       pickTargetStationId,
       pickRingState = 'none',
+      pickSource,
       onPickMouseMove,
       onPickMouseLeave,
       onPickClick,
@@ -491,6 +494,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 provider={provider}
               />
             ))}
+            {/* v0.3.55: Spacer to allow rightmost column to scroll to left edge */}
+            <div className="shrink-0" style={{ width: 'calc(100vw - 300px)' }} aria-hidden="true" />
           </div>
         </div>
 
@@ -608,6 +613,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   isPicking={isPicking}
                   isPickTarget={isPickTarget}
                   pickRingState={isPickTarget ? pickRingState : 'none'}
+                  pickSource={pickSource}
                   onPickMouseMove={onPickMouseMove}
                   onPickMouseLeave={onPickMouseLeave}
                   onPickClick={onPickClick}
@@ -717,6 +723,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 </ProviderColumn>
               );
             })}
+            {/* v0.3.55: Spacer to allow rightmost column to scroll to left edge */}
+            <div className="shrink-0" style={{ width: 'calc(100vw - 300px)' }} aria-hidden="true" />
           </div>
         </div>
       </div>
