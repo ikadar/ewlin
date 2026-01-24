@@ -1150,29 +1150,94 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ---
 
-## Milestone 4: Backend API Integration (v0.4.x)
+## Milestone 4: Job Creation Form Implementation (v0.4.x)
 
-### Phase 4A: Validator & API Setup
+> **Context:** JCF (Job Creation Form) integration from `reference/jcf/`
+> **Reference:** [Implicit Logic Specification](../../reference/jcf/docs/implicit-logic-specification.md)
+>
+> **Strategy:** Incremental Element layer introduction to minimize risk:
+> 1. Frontend types + tests first (v0.4.0)
+> 2. Documentation update (v0.4.1)
+> 3. Backend implementation (v0.4.2)
 
-#### v0.4.0 - Validator Package Integration
+### Phase 4A: Element Entity Foundation
+
+#### v0.4.0 - Element Layer: Frontend Types & Tests ✅
+- [x] TypeScript types update (@flux/types)
+  - [x] Element interface (id, jobId, taskIds)
+  - [x] Task.elementId added (jobId kept for backward compatibility)
+  - [x] ScheduleSnapshot includes elements
+- [x] Frontend mock data update
+  - [x] Mock generators create Elements (1:1 Job-Element for now)
+  - [x] Snapshot includes elements array
+- [x] Frontend unit tests update
+  - [x] All 638 tests pass with Element layer
+- [x] Playwright E2E tests update
+  - [x] All test fixtures include Elements
+  - [x] 7-day operating schedules for weekend-proof testing
+  - [x] SNAP_INTERVAL_MINUTES used consistently (15 min)
+- [x] Test fixtures update
+  - [x] All fixtures include Element data
+
+> **Note:** Task.jobId kept for backward compatibility. Can be removed in future cleanup when all code migrated to use elementId → element.jobId path.
+
+#### v0.4.1 - Element Layer: Documentation
+- [ ] Domain vocabulary update (domain-vocabulary.md)
+  - [ ] New Element section
+  - [ ] Job section update (Job → Element relationship)
+  - [ ] Task section update (Element → Task relationship)
+- [ ] Business rules update (business-rules.md)
+  - [ ] BR-ELEM-* rules
+- [ ] Other specification documents review and update
+  - [ ] SimilarityCriterion fieldPath updates
+  - [ ] Any Job/Task references that need Element context
+
+#### v0.4.2 - Element Layer: Backend Implementation
+- [ ] Element entity (PHP)
+  - [ ] Entity class with id, job relationship
+  - [ ] ElementRepository
+- [ ] Job-Element relationship
+  - [ ] Job.elements (OneToMany)
+  - [ ] Job.addElement() method
+- [ ] Element-Task relationship
+  - [ ] Task.element (ManyToOne)
+  - [ ] Task.job removed, accessible via element.job
+- [ ] Database migration
+  - [ ] Create elements table
+  - [ ] Migrate existing data (create Element per Job)
+  - [ ] Update tasks.job_id → tasks.element_id
+- [ ] Service updates
+  - [ ] JobService creates Element with Job
+  - [ ] ScheduleSnapshotService includes elements
+- [ ] Unit tests
+- [ ] Integration tests
+- [ ] PHPStan level 8
+
+---
+
+## Milestone 5: Backend API Integration (v0.5.x)
+
+### Phase 5A: Validator & API Setup
+
+#### v0.5.0 - Validator Package Integration
 - [ ] Install @flux/schedule-validator in frontend
 - [ ] Validation utility wrapper
 - [ ] Error message formatting (French)
 - [ ] Conflict type to visual mapping
 
-#### v0.4.1 - API Client Setup
+#### v0.5.1 - API Client Setup
 - [ ] API client configuration (RTK Query)
 - [ ] Environment-based URL configuration
 - [ ] Error handling utilities
 - [ ] Request/response interceptors
 
-#### v0.4.2 - Snapshot Loading
+#### v0.5.2 - Snapshot Loading
 - [ ] Replace mock with real API
 - [ ] Loading states (skeleton/spinner TBD post-MVP)
 - [ ] Error states
 - [ ] Retry logic
 
-#### v0.4.3 - Assignment Operations Integration
+#### v0.5.3 - Assignment Operations Integration
 - [ ] Create assignment via API
 - [ ] Recall via API
 - [ ] Reschedule via API
@@ -1181,28 +1246,28 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ---
 
-## Milestone 5: DSL Editor (v0.5.x, Post-MVP)
+## Milestone 6: DSL Editor (v0.6.x, Post-MVP)
 
 > **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
 
-### Phase 5A: DSL Parser & Job Creation
+### Phase 6A: DSL Parser & Job Creation
 
-#### v0.5.0 - DSL Parser Package
+#### v0.6.0 - DSL Parser Package
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition
 - [ ] CodeMirror 6 integration
 - [ ] Syntax highlighting
 
-#### v0.5.1 - Job Creation Modal
+#### v0.6.1 - Job Creation Modal
 - [ ] Modal component
 - [ ] DSL textarea with highlighting
 - [ ] Autocomplete integration
 
 ---
 
-## Milestone 6: Production Readiness (v1.0.x)
+## Milestone 7: Production Readiness (v1.0.x)
 
-### Phase 6A: Security & Auth
+### Phase 7A: Security & Auth
 
 #### v1.0.0 - Authentication
 - [ ] JWT authentication implementation
@@ -1216,7 +1281,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Permission checks on endpoints
 - [ ] Frontend permission guards
 
-### Phase 6B: Performance & Reliability
+### Phase 7B: Performance & Reliability
 
 #### v1.0.2 - Caching Layer
 - [ ] Redis cache integration
@@ -1236,7 +1301,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Memoization optimization
 - [ ] 60 FPS verification
 
-### Phase 6C: Operations
+### Phase 7C: Operations
 
 #### v1.0.5 - Monitoring & Logging
 - [ ] Prometheus metrics endpoints
@@ -1295,16 +1360,17 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ## Summary Table
 
-| Milestone | Version | Focus |
-|-----------|---------|-------|
-| M0 | v0.0.x | Infrastructure & Foundation |
-| M1 | v0.1.x | Core Domain (Station + Job) |
-| M2 | v0.2.x | Scheduling Core (Assignment + Validation) |
-| M3 | v0.3.x | Frontend Integration |
-| M4 | v0.4.x | Backend API Integration |
-| M5 | v0.5.x | DSL Editor (Post-MVP) |
-| M6 | v1.0.x | Production Readiness |
-| Post-MVP | v1.1+ | Branching, Optimization, Reporting |
+| Milestone | Version | Focus                                     |
+|-----------|---------|-------------------------------------------|
+| M0        | v0.0.x  | Infrastructure & Foundation               |
+| M1        | v0.1.x  | Core Domain (Station + Job)               |
+| M2        | v0.2.x  | Scheduling Core (Assignment + Validation) |
+| M3        | v0.3.x  | Frontend Integration                      |
+| M4        | v0.4.x  | Job creation form implementation          |
+| M5        | v0.5.x  | Backend API Integration                   |
+| M6        | v0.6.x  | DSL Editor (Post-MVP)                     |
+| M7        | v1.0.x  | Production Readiness                      |
+| Post-MVP  | v1.1+   | Branching, Optimization, Reporting        |
 
 ---
 
