@@ -14,7 +14,9 @@ import type {
   OutsourcedTask,
   TaskStatus,
   LateJob,
+  Element,
 } from '@flux/types';
+import { createElement, getElementIdForJob } from './elements';
 
 // ============================================================================
 // Constants
@@ -128,6 +130,7 @@ function generateInternalTask(
   return {
     id: `task-${jobId}-${sequenceOrder}`,
     jobId,
+    elementId: getElementIdForJob(jobId),
     sequenceOrder,
     status,
     type: 'Internal',
@@ -153,6 +156,7 @@ function generateOutsourcedTask(
   return {
     id: `task-${jobId}-${sequenceOrder}`,
     jobId,
+    elementId: getElementIdForJob(jobId),
     sequenceOrder,
     status,
     type: 'Outsourced',
@@ -222,7 +226,7 @@ interface GenerateJobOptions {
   forceApproved?: boolean;
 }
 
-function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
+function generateJob(options: GenerateJobOptions): { job: Job; element: Element; tasks: Task[] } {
   const { index, isLate = false, forceFirstStation, keepFirstUnscheduled = false, forceApproved = false } = options;
   const now = new Date();
   const jobId = `job-${String(index).padStart(5, '0')}`;
@@ -297,11 +301,18 @@ function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
     updatedAt: formatTimestamp(now),
   };
 
-  return { job, tasks };
+  // Create element for this job (1:1 relationship for v0.4.0)
+  const element = createElement({
+    jobId,
+    taskIds: tasks.map((t) => t.id),
+  });
+
+  return { job, element, tasks };
 }
 
 export interface JobData {
   jobs: Job[];
+  elements: Element[];
   tasks: Task[];
 }
 
@@ -309,10 +320,11 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   const { count = 15, includeLateJobs = 2, includeConflictJobs = 1 } = options;
 
   const jobs: Job[] = [];
+  const elements: Element[] = [];
   const tasks: Task[] = [];
 
   // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved)
-  const { job: qaJob, tasks: qaTasks } = generateJob({
+  const { job: qaJob, element: qaElement, tasks: qaTasks } = generateJob({
     index: 1,
     isLate: false, // NOT late so deadline is in the future
     forceFirstStation: 'sta-komori-g40',
@@ -320,15 +332,17 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
     forceApproved: true,
   });
   jobs.push(qaJob);
+  elements.push(qaElement);
   tasks.push(...qaTasks);
 
   // Generate late jobs (starting from index 2)
   for (let i = 0; i < includeLateJobs && i + 1 < count; i++) {
-    const { job, tasks: jobTasks } = generateJob({
+    const { job, element, tasks: jobTasks } = generateJob({
       index: i + 2,
       isLate: true,
     });
     jobs.push(job);
+    elements.push(element);
     tasks.push(...jobTasks);
   }
 
@@ -336,11 +350,12 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   // QA job = 1, late jobs = 2 to (includeLateJobs+1), normal jobs start after
   const normalStartIndex = 1 + includeLateJobs + 1; // +1 for QA job, +1 because indexes are 1-based
   for (let i = normalStartIndex; i <= count; i++) {
-    const { job, tasks: jobTasks } = generateJob({
+    const { job, element, tasks: jobTasks } = generateJob({
       index: i,
       isLate: false,
     });
     jobs.push(job);
+    elements.push(element);
     tasks.push(...jobTasks);
   }
 
@@ -350,7 +365,7 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
     jobs[i].notes = 'CONFLICT_TEST';
   }
 
-  return { jobs, tasks };
+  return { jobs, elements, tasks };
 }
 
 // ============================================================================

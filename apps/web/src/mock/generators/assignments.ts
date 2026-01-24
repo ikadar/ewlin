@@ -13,6 +13,7 @@ import type {
 } from '@flux/types';
 import { isInternalTask, isOutsourcedTask } from '@flux/types';
 import { calculateEndTime } from '../../utils/timeCalculations';
+import { SNAP_INTERVAL_MINUTES } from '../../components/DragPreview';
 
 // ============================================================================
 // Helper Functions
@@ -106,10 +107,10 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
           scheduledStart = new Date(previousTaskEnd);
         }
 
-        // Snap to 30-minute grid
+        // Snap to grid interval (SNAP_INTERVAL_MINUTES)
         const minutes = scheduledStart.getMinutes();
-        if (minutes % 30 !== 0) {
-          scheduledStart.setMinutes(Math.ceil(minutes / 30) * 30);
+        if (minutes % SNAP_INTERVAL_MINUTES !== 0) {
+          scheduledStart.setMinutes(Math.ceil(minutes / SNAP_INTERVAL_MINUTES) * SNAP_INTERVAL_MINUTES);
         }
 
         // Calculate end time with operating hours stretching (BR-ASSIGN-003b)

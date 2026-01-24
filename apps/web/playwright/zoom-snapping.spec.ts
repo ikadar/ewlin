@@ -12,6 +12,7 @@ import {
   parseTime,
   waitForAppReady,
   countTilesOnStation,
+  isOnSnapBoundary,
 } from './helpers/drag';
 
 // Zoom levels and their corresponding pixels per hour
@@ -105,7 +106,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
     expect(tilesAfter).toBe(1);
 
-    // Verify snapping to 30-minute boundary
+    // Verify snapping to 15-minute boundary
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -114,7 +115,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const time = parseTime(scheduledStart!);
     console.log(`100% zoom: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 
   test('snapping works correctly at 50% zoom', async ({ page }) => {
@@ -141,7 +142,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
     expect(tilesAfter).toBe(1);
 
-    // Verify snapping to 30-minute boundary
+    // Verify snapping to 15-minute boundary
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -150,7 +151,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const time = parseTime(scheduledStart!);
     console.log(`50% zoom: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 
   test('snapping works correctly at 200% zoom', async ({ page }) => {
@@ -177,7 +178,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
     expect(tilesAfter).toBe(1);
 
-    // Verify snapping to 30-minute boundary
+    // Verify snapping to 15-minute boundary
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -186,12 +187,12 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const time = parseTime(scheduledStart!);
     console.log(`200% zoom: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 
   test('snapping at 50% zoom between grid lines rounds correctly', async ({ page }) => {
     // This test specifically targets the bug: at 50% zoom, dropping between
-    // grid lines should still snap to 30-minute boundaries
+    // grid lines should still snap to 15-minute boundaries
     await setZoomLevel(page, '50%');
 
     // Select the job
@@ -216,7 +217,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
     expect(tilesAfter).toBe(1);
 
-    // Verify snapping to 30-minute boundary
+    // Verify snapping to 15-minute boundary
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -225,8 +226,8 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const time = parseTime(scheduledStart!);
     console.log(`50% zoom at Y=55: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    // Must be on a 30-minute boundary
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    // Must be on a 15-minute boundary
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 
   test('snapping at 150% zoom between grid lines rounds correctly', async ({ page }) => {
@@ -254,7 +255,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
     expect(tilesAfter).toBe(1);
 
-    // Verify snapping to 30-minute boundary
+    // Verify snapping to 15-minute boundary
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -263,14 +264,14 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const time = parseTime(scheduledStart!);
     console.log(`150% zoom at Y=150: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    // Must be on a 30-minute boundary
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    // Must be on a 15-minute boundary
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 
   test('consistent snapping at multiple zoom levels', async ({ page }) => {
-    // Test that snapping to 30-minute boundaries works at different zoom levels
+    // Test that snapping to 15-minute boundaries works at different zoom levels
     // Note: Y position to time mapping depends on scroll position, so we just
-    // verify snapping works correctly (time is on 30-minute boundary)
+    // verify snapping works correctly (time is on 15-minute boundary)
 
     for (const { level, targetY } of [
       { level: '50%', targetY: 100 },
@@ -301,7 +302,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
       const tilesAfter = await countTilesOnStation(page, 'station-komori');
       expect(tilesAfter).toBe(1);
 
-      // Verify the time is on a 30-minute boundary
+      // Verify the time is on a 15-minute boundary
       const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
       const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
       const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -310,8 +311,8 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
       const time = parseTime(scheduledStart!);
       console.log(`${level}: Y=${targetY} → ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-      // Should be on a 30-minute boundary
-      expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+      // Should be on a 15-minute boundary
+      expect(isOnSnapBoundary(time)).toBe(true);
     }
   });
 });

@@ -5,6 +5,9 @@
  * Tasks require approval gates before scheduling.
  *
  * Updated for v0.3.57: Uses Pick & Place instead of drag & drop
+ * Updated for v0.4.0: Fixed targetY to be within operating hours (06:00-22:00)
+ *   - Previous targetY of 100 pixels mapped to 01:15 AM (outside operating hours)
+ *   - New targetY of 720 pixels maps to 09:00 AM (within operating hours)
  */
 
 import { test, expect } from '@playwright/test';
@@ -15,31 +18,40 @@ import {
 
 /**
  * Helper: Pick task from sidebar and place on station using Pick & Place
+ *
+ * IMPORTANT: targetY is in pixels from the top of the column.
+ * Operating hours are 06:00-12:00 and 13:00-22:00.
+ * At 80 pixels/hour: 06:00 = 480px, 09:00 = 720px, 12:00 = 960px
  */
 async function pickAndPlace(
   page: import('@playwright/test').Page,
   taskTileSelector: string,
   stationId: string,
   targetY: number
-): Promise<void> {
+): Promise<boolean> {
   // Click task tile to pick it
   await page.locator(taskTileSelector).click();
 
-  // Wait for pick preview to appear
-  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 2000 }).catch(() => null);
-
-  // Move to target station at specified Y position
-  const targetColumn = page.locator(`[data-testid="station-column-${stationId}"]`);
-  const box = await targetColumn.boundingBox();
-  if (box) {
-    await page.mouse.move(box.x + box.width / 2, box.y + targetY);
+  // Wait for pick preview to appear (indicates pick mode is active)
+  const pickPreview = page.locator('[data-testid="pick-preview"]');
+  try {
+    await pickPreview.waitFor({ state: 'visible', timeout: 2000 });
+  } catch {
+    // Pick mode didn't activate - task might be blocked
+    console.log('Pick preview did not appear - task may be blocked');
+    return false;
   }
 
-  // Click to place
-  await targetColumn.click();
+  // Click at specific position within the target column
+  // The click handler calculates relativeY from clientY - rect.top
+  const targetColumn = page.locator(`[data-testid="station-column-${stationId}"]`);
+
+  // Use click with position option to click at the correct Y offset
+  await targetColumn.click({ position: { x: 50, y: targetY } });
 
   // Wait for state update
   await page.waitForTimeout(300);
+  return true;
 }
 
 test.describe('UC-07: Approval Gate Validation', () => {
@@ -56,7 +68,9 @@ test.describe('UC-07: Approval Gate Validation', () => {
     // ARRANGE: Select the job without BAT approval
     const jobCard = page.locator('[data-testid="job-card-job-gate-no-bat"]');
     await jobCard.click();
-    await page.waitForTimeout(200);
+
+    // Wait for Job Details Panel to appear
+    await page.waitForSelector('[data-testid="job-details-panel"]');
 
     // Find the task tile in sidebar
     const taskTile = page.locator('[data-testid="task-tile-task-gate-no-bat"]');
@@ -65,27 +79,27 @@ test.describe('UC-07: Approval Gate Validation', () => {
     // Count tiles before pick & place
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
 
-    // ACT: Try to pick & place the task to Komori station
-    await pickAndPlace(page, '[data-testid="task-tile-task-gate-no-bat"]', 'station-komori', 200);
+    // ACT: Try to pick & place the task to Komori station (720px = 09:00 AM, within operating hours)
+    const pickSucceeded = await pickAndPlace(page, '[data-testid="task-tile-task-gate-no-bat"]', 'station-komori', 720);
 
     // ASSERT: Task should NOT be placed (BAT not approved is a hard block)
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
 
-    // The task should not be placed due to BAT validation
-    // Note: In some implementations, it might still be placed with a conflict
-    // We check that either it wasn't placed or there's a conflict indicator
-    console.log(`Tiles before: ${tilesBefore}, after: ${tilesAfter}`);
+    console.log(`Tiles before: ${tilesBefore}, after: ${tilesAfter}, pickSucceeded: ${pickSucceeded}`);
 
-    // If tile was placed, it should show as a conflict
-    if (tilesAfter > tilesBefore) {
-      // Check for conflict indicator - task was placed but flagged
-      const conflictSection = page.locator('[data-testid="problems-section"]');
-      const _isConflictVisible = await conflictSection.isVisible().catch(() => false);
-      console.log('Task was placed but may have conflict indicator');
-    } else {
-      // Task was blocked - this is the expected behavior
+    // Either the pick was blocked (pickSucceeded = false) or tile wasn't placed
+    if (!pickSucceeded) {
+      console.log('Task was blocked from picking due to missing BAT approval');
       expect(tilesAfter).toBe(tilesBefore);
-      console.log('Task was blocked due to missing BAT approval');
+    } else if (tilesAfter > tilesBefore) {
+      // Task was placed - check for conflict indicator
+      const conflictSection = page.locator('[data-testid="problems-section"]');
+      const isConflictVisible = await conflictSection.isVisible().catch(() => false);
+      console.log(`Task was placed with conflict indicator: ${isConflictVisible}`);
+    } else {
+      // Pick succeeded but task wasn't placed (validation blocked it)
+      expect(tilesAfter).toBe(tilesBefore);
+      console.log('Task was blocked during placement due to missing BAT approval');
     }
   });
 
@@ -93,7 +107,9 @@ test.describe('UC-07: Approval Gate Validation', () => {
     // ARRANGE: Select the job with BAT approved
     const jobCard = page.locator('[data-testid="job-card-job-gate-bat-ok"]');
     await jobCard.click();
-    await page.waitForTimeout(200);
+
+    // Wait for Job Details Panel to appear
+    await page.waitForSelector('[data-testid="job-details-panel"]');
 
     // Find the task tile in sidebar
     const taskTile = page.locator('[data-testid="task-tile-task-gate-bat-ok"]');
@@ -102,8 +118,9 @@ test.describe('UC-07: Approval Gate Validation', () => {
     // Count tiles before pick & place
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
 
-    // ACT: Pick & place the task to Komori station
-    await pickAndPlace(page, '[data-testid="task-tile-task-gate-bat-ok"]', 'station-komori', 200);
+    // ACT: Pick & place the task to Komori station (720px = 09:00 AM, within operating hours)
+    const pickSucceeded = await pickAndPlace(page, '[data-testid="task-tile-task-gate-bat-ok"]', 'station-komori', 720);
+    expect(pickSucceeded).toBe(true);
 
     // ASSERT: Task should be placed successfully
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
@@ -116,7 +133,9 @@ test.describe('UC-07: Approval Gate Validation', () => {
     // ARRANGE: Select the job with Plates pending
     const jobCard = page.locator('[data-testid="job-card-job-gate-plates-pending"]');
     await jobCard.click();
-    await page.waitForTimeout(200);
+
+    // Wait for Job Details Panel to appear
+    await page.waitForSelector('[data-testid="job-details-panel"]');
 
     // Find the task tile in sidebar
     const taskTile = page.locator('[data-testid="task-tile-task-gate-plates-pending"]');
@@ -125,8 +144,9 @@ test.describe('UC-07: Approval Gate Validation', () => {
     // Count tiles before pick & place
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
 
-    // ACT: Pick & place the task to Komori station
-    await pickAndPlace(page, '[data-testid="task-tile-task-gate-plates-pending"]', 'station-komori', 200);
+    // ACT: Pick & place the task to Komori station (720px = 09:00 AM, within operating hours)
+    const pickSucceeded = await pickAndPlace(page, '[data-testid="task-tile-task-gate-plates-pending"]', 'station-komori', 720);
+    expect(pickSucceeded).toBe(true);
 
     // ASSERT: Task should be placed (Plates is warning-only, not blocking)
     const tilesAfter = await countTilesOnStation(page, 'station-komori');

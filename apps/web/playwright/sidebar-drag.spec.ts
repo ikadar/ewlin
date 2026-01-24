@@ -14,6 +14,7 @@ import {
   toTotalMinutes,
   waitForAppReady,
   countTilesOnStation,
+  isOnSnapBoundary,
 } from './helpers/drag';
 
 /**
@@ -102,8 +103,8 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
     const time = parseTime(scheduledStart!);
     console.log(`New assignment scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    // Should be on a 30-minute boundary
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    // Should be on a 15-minute boundary
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 
   test('AC-01.3: Place only allowed on matching station', async ({ page }) => {
@@ -192,8 +193,8 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
 
     console.log(`Placed at Y=100, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')} (${minutes} min)`);
 
-    // Time should be snapped to 30-minute boundary
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    // Time should be snapped to 15-minute boundary
+    expect(isOnSnapBoundary(time)).toBe(true);
 
     // Time should be within working day (6:00 - 22:00 = 360-1320 minutes)
     expect(minutes).toBeGreaterThanOrEqual(360); // 6:00

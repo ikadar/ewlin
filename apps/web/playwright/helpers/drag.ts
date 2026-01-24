@@ -8,6 +8,12 @@
 import type { Page } from '@playwright/test';
 
 /**
+ * Snap interval in minutes - must match SNAP_INTERVAL_MINUTES in app code
+ * @see apps/web/src/components/DragPreview/snapUtils.ts
+ */
+export const SNAP_INTERVAL_MINUTES = 15;
+
+/**
  * Parse ISO date string to extract hours and minutes
  */
 export function parseTime(isoString: string): { hours: number; minutes: number } {
@@ -23,6 +29,13 @@ export function parseTime(isoString: string): { hours: number; minutes: number }
  */
 export function toTotalMinutes(time: { hours: number; minutes: number }): number {
   return time.hours * 60 + time.minutes;
+}
+
+/**
+ * Check if time is on a snap boundary (divisible by SNAP_INTERVAL_MINUTES)
+ */
+export function isOnSnapBoundary(time: { hours: number; minutes: number }): boolean {
+  return time.minutes % SNAP_INTERVAL_MINUTES === 0;
 }
 
 /**

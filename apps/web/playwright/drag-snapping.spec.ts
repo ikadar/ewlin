@@ -2,7 +2,7 @@
  * Playwright Pick & Place Snapping Tests
  *
  * Tests for:
- * - v0.3.31 (REQ-08/09): Real-time placement preview snapping to 30-minute grid, vertical-only placement
+ * - v0.3.31 (REQ-08/09): Real-time placement preview snapping to 15-minute grid, vertical-only placement
  * - v0.3.41 (REQ-01/02/03): Validation uses snapped position
  *
  * Updated for v0.3.57: Uses Pick & Place instead of drag & drop
@@ -13,6 +13,7 @@ import {
   parseTime,
   waitForAppReady,
   countTilesOnStation,
+  isOnSnapBoundary,
 } from './helpers/drag';
 
 /**
@@ -52,7 +53,7 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
   });
 
   test.describe('REQ-08: Grid Snapping', () => {
-    test('placement snaps to 30-minute grid boundary', async ({ page }) => {
+    test('placement snaps to 15-minute grid boundary', async ({ page }) => {
       // ARRANGE: Select the job
       const jobCard = page.locator('[data-testid="job-card-job-sidebar-1"]');
       await jobCard.click();
@@ -81,8 +82,8 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       const time = parseTime(scheduledStart!);
       console.log(`Placed at Y=185, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-      // Should be on a 30-minute boundary (snapped)
-      expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+      // Should be on a 15-minute boundary (snapped)
+      expect(isOnSnapBoundary(time)).toBe(true);
     });
 
     test('placement at exact grid line stays on grid', async ({ page }) => {
@@ -102,7 +103,7 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
         160
       );
 
-      // ASSERT: Tile should be at a 30-minute boundary
+      // ASSERT: Tile should be at a 15-minute boundary
       const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
       const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
       const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -111,8 +112,8 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       const time = parseTime(scheduledStart!);
       console.log(`Placed at Y=160, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-      // Should be on a 30-minute boundary
-      expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+      // Should be on a 15-minute boundary
+      expect(isOnSnapBoundary(time)).toBe(true);
     });
 
     test('placement near grid line rounds to nearest 30-min', async ({ page }) => {
@@ -132,7 +133,7 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
         195
       );
 
-      // ASSERT: Tile should be at a 30-minute boundary (snapped)
+      // ASSERT: Tile should be at a 15-minute boundary (snapped)
       const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
       const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
       const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -141,8 +142,8 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       const time = parseTime(scheduledStart!);
       console.log(`Placed at Y=195, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-      // Should be on a 30-minute boundary
-      expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+      // Should be on a 15-minute boundary
+      expect(isOnSnapBoundary(time)).toBe(true);
     });
   });
 
@@ -224,7 +225,7 @@ test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
       180 // 8:15 - between grid lines
     );
 
-    // ASSERT: Tile should be at a 30-minute boundary (snapped)
+    // ASSERT: Tile should be at a 15-minute boundary (snapped)
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -233,8 +234,8 @@ test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
     const time = parseTime(scheduledStart!);
     console.log(`REQ-03: Placed at Y=180 (8:15), scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    // Verify on 30-minute boundary
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    // Verify on 15-minute boundary
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 
   test('REQ-01/02: validation and visual snap are consistent', async ({ page }) => {
@@ -258,7 +259,7 @@ test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
     expect(tilesAfter).toBe(1);
 
-    // Verify the time is on a 30-minute boundary (snapped)
+    // Verify the time is on a 15-minute boundary (snapped)
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
@@ -267,7 +268,7 @@ test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
     const time = parseTime(scheduledStart!);
     console.log(`REQ-01/02: Placed, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
-    // Should be on a 30-minute boundary (validation and visual snap are consistent)
-    expect(time.minutes === 0 || time.minutes === 30).toBe(true);
+    // Should be on a 15-minute boundary (validation and visual snap are consistent)
+    expect(isOnSnapBoundary(time)).toBe(true);
   });
 });

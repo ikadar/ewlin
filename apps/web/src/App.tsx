@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
-import { snapToGrid, yPositionToTime } from './components/DragPreview';
+import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
@@ -1245,10 +1245,10 @@ function AppContent() {
     const dropTime = yPositionToTime(snappedTileTop, START_HOUR, gridStartDate, pixelsPerHour);
     const rawScheduledStart = dropTime.toISOString();
 
-    // Snap to 30-minute grid
+    // Snap to grid interval (SNAP_INTERVAL_MINUTES)
     const startDate = new Date(rawScheduledStart);
     const minutes = startDate.getMinutes();
-    const snappedMinutes = Math.round(minutes / 30) * 30;
+    const snappedMinutes = Math.round(minutes / SNAP_INTERVAL_MINUTES) * SNAP_INTERVAL_MINUTES;
     startDate.setMinutes(snappedMinutes, 0, 0);
     const scheduledStart = startDate.toISOString();
 

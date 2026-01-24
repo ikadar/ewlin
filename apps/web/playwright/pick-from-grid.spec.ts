@@ -167,14 +167,15 @@ test.describe('Pick from Grid - No Drag Behavior', () => {
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
 
-      // Move mouse (drag gesture)
-      await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2);
+      // Move mouse FAR away from the tile (drag gesture that leaves the element)
+      // Moving 500px ensures we're completely off the tile before mouse up
+      await page.mouse.move(box.x + box.width / 2 + 500, box.y + box.height / 2 + 500);
 
-      // Mouse up
+      // Mouse up - far from the original tile, so click should NOT fire
       await page.mouse.up();
 
-      // There should be no ghost preview (drag was removed)
-      // Click is required to pick
+      // There should be no ghost preview (drag was removed, and click didn't fire
+      // because mouse up happened far from the original mousedown location)
       await expect(page.locator('[data-testid="pick-preview"]')).not.toBeVisible();
     }
   });

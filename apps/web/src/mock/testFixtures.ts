@@ -13,6 +13,7 @@ import type {
   StationCategory,
   StationGroup,
   Job,
+  Element,
   Task,
   InternalTask,
   TaskAssignment,
@@ -35,6 +36,17 @@ const standardDaySchedule: DaySchedule = {
 const closedDaySchedule: DaySchedule = {
   isOperating: false,
   slots: [],
+};
+
+// 7-day operating schedule for tests that need to run on any day of the week
+const sevenDayOperatingSchedule = {
+  monday: standardDaySchedule,
+  tuesday: standardDaySchedule,
+  wednesday: standardDaySchedule,
+  thursday: standardDaySchedule,
+  friday: standardDaySchedule,
+  saturday: standardDaySchedule,
+  sunday: standardDaySchedule,
 };
 
 const categories: StationCategory[] = [
@@ -140,7 +152,7 @@ function isoDate(hours: number, minutes: number = 0, daysOffset: number = 0): st
   return d.toISOString();
 }
 
-function baseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'tasks' | 'assignments' | 'conflicts' | 'lateJobs'> {
+function baseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'elements' | 'tasks' | 'assignments' | 'conflicts' | 'lateJobs'> {
   return {
     version: 1,
     generatedAt: new Date().toISOString(),
@@ -149,6 +161,22 @@ function baseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'tasks' | 'assignments'
     groups,
     providers,
   };
+}
+
+/**
+ * Generate elements for jobs.
+ * For v0.4.0, creates one Element per Job (1:1 relationship).
+ */
+function generateElementsForJobs(jobs: Job[], tasks: Task[]): Element[] {
+  return jobs.map((job) => ({
+    id: `elem-${job.id}`,
+    jobId: job.id,
+    suffix: 'ELT',
+    prerequisiteElementIds: [],
+    taskIds: tasks.filter((t) => t.jobId === job.id).map((t) => t.id),
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  }));
 }
 
 // BAT approval dates (proof sent and approved yesterday)
@@ -318,6 +346,7 @@ export function createBasicFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -329,9 +358,24 @@ export function createBasicFixture(): ScheduleSnapshot {
 // Fixture: push-down
 // For UC-04 (Push-Down on Collision)
 // 3 consecutive tiles with no gaps for testing push-down chain
+// Uses 7-day operating schedule so tests pass on weekends
 // ============================================================================
 
 export function createPushDownFixture(): ScheduleSnapshot {
+  // Custom stations with 7-day operating schedule for weekend-proof testing
+  const pushDownStations: Station[] = [
+    {
+      id: 'station-komori',
+      name: 'Komori G40',
+      status: 'Available',
+      categoryId: 'cat-offset',
+      groupId: 'grp-offset',
+      capacity: 1,
+      operatingSchedule: sevenDayOperatingSchedule,
+      exceptions: [],
+    },
+  ];
+
   const jobs: Job[] = [
     {
       id: 'job-pd-1',
@@ -393,6 +437,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
     {
       id: 'task-pd-1',
       jobId: 'job-pd-1',
+      elementId: 'elem-job-pd-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -404,6 +449,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
     {
       id: 'task-pd-2',
       jobId: 'job-pd-2',
+      elementId: 'elem-job-pd-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -415,6 +461,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
     {
       id: 'task-pd-3',
       jobId: 'job-pd-3',
+      elementId: 'elem-job-pd-3',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -467,7 +514,9 @@ export function createPushDownFixture(): ScheduleSnapshot {
 
   return {
     ...baseSnapshot(),
+    stations: pushDownStations,
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -548,6 +597,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -559,9 +609,24 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
 // Fixture: approval-gates
 // For UC-07 (Approval Gate Validation)
 // Jobs with different approval states
+// Uses 7-day operating schedule so tests pass on weekends
 // ============================================================================
 
 export function createApprovalGatesFixture(): ScheduleSnapshot {
+  // Custom stations with 7-day operating schedule for weekend-proof testing
+  const approvalGatesStations: Station[] = [
+    {
+      id: 'station-komori',
+      name: 'Komori G40',
+      status: 'Available',
+      categoryId: 'cat-offset',
+      groupId: 'grp-offset',
+      capacity: 1,
+      operatingSchedule: sevenDayOperatingSchedule,
+      exceptions: [],
+    },
+  ];
+
   const jobs: Job[] = [
     // Job without BAT approval (cannot schedule)
     {
@@ -626,6 +691,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     {
       id: 'task-gate-no-bat',
       jobId: 'job-gate-no-bat',
+      elementId: 'elem-job-gate-no-bat',
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
@@ -637,6 +703,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     {
       id: 'task-gate-bat-ok',
       jobId: 'job-gate-bat-ok',
+      elementId: 'elem-job-gate-bat-ok',
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
@@ -648,6 +715,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     {
       id: 'task-gate-plates-pending',
       jobId: 'job-gate-plates-pending',
+      elementId: 'elem-job-gate-plates-pending',
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
@@ -660,7 +728,9 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
 
   return {
     ...baseSnapshot(),
+    stations: approvalGatesStations,
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments: [],
     conflicts: [],
@@ -811,6 +881,7 @@ export function createSwapFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -822,9 +893,34 @@ export function createSwapFixture(): ScheduleSnapshot {
 // Fixture: sidebar-drag
 // For UC-01 (New Task Placement from Sidebar)
 // Job with unscheduled task ready for placement
+// Uses 7-day operating schedule so tests pass on weekends
 // ============================================================================
 
 export function createSidebarDragFixture(): ScheduleSnapshot {
+  // Custom stations with 7-day operating schedule for weekend-proof testing
+  const sidebarDragStations: Station[] = [
+    {
+      id: 'station-komori',
+      name: 'Komori G40',
+      status: 'Available',
+      categoryId: 'cat-offset',
+      groupId: 'grp-offset',
+      capacity: 1,
+      operatingSchedule: sevenDayOperatingSchedule,
+      exceptions: [],
+    },
+    {
+      id: 'station-polar',
+      name: 'Polar 115',
+      status: 'Available',
+      categoryId: 'cat-finishing',
+      groupId: 'grp-finishing',
+      capacity: 1,
+      operatingSchedule: sevenDayOperatingSchedule,
+      exceptions: [],
+    },
+  ];
+
   const jobs: Job[] = [
     {
       id: 'job-sidebar-1',
@@ -850,6 +946,7 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
     {
       id: 'task-sidebar-1',
       jobId: 'job-sidebar-1',
+      elementId: 'elem-job-sidebar-1',
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
       type: 'Internal',
@@ -862,7 +959,9 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
 
   return {
     ...baseSnapshot(),
+    stations: sidebarDragStations,
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments: [], // No assignments - task is unscheduled
     conflicts: [],
@@ -945,6 +1044,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -956,9 +1056,24 @@ export function createAltBypassFixture(): ScheduleSnapshot {
 // Fixture: drag-snapping
 // For v0.3.41 (Drag Snapping Consistency - REQ-01/02/03)
 // Job with unscheduled task, tests snapping at lunch break boundary (12:00-13:00)
+// Uses 7-day operating schedule so tests pass on weekends
 // ============================================================================
 
 export function createDragSnappingFixture(): ScheduleSnapshot {
+  // Custom stations with 7-day operating schedule for weekend-proof testing
+  const dragSnappingStations: Station[] = [
+    {
+      id: 'station-komori',
+      name: 'Komori G40',
+      status: 'Available',
+      categoryId: 'cat-offset',
+      groupId: 'grp-offset',
+      capacity: 1,
+      operatingSchedule: sevenDayOperatingSchedule,
+      exceptions: [],
+    },
+  ];
+
   const jobs: Job[] = [
     {
       id: 'job-snap-1',
@@ -984,6 +1099,7 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
     {
       id: 'task-snap-1',
       jobId: 'job-snap-1',
+      elementId: 'elem-job-snap-1',
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
       type: 'Internal',
@@ -999,7 +1115,9 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
   // Dragging to 12:45 should snap to 13:00 and show GREEN border
   return {
     ...baseSnapshot(),
+    stations: dragSnappingStations,
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments: [],
     conflicts: [],
@@ -1183,6 +1301,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -1331,6 +1450,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -1439,6 +1559,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -1608,6 +1729,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -1828,6 +1950,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts,
@@ -1839,9 +1962,24 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
 // Fixture: zoom-snapping
 // For v0.3.48 (Zoom-Aware Tile Snapping Bugfix)
 // Simple job with one unscheduled task for testing snapping at different zoom levels
+// Uses 7-day operating schedule so tests pass on weekends
 // ============================================================================
 
 export function createZoomSnappingFixture(): ScheduleSnapshot {
+  // Custom stations with 7-day operating schedule for weekend-proof testing
+  const zoomSnappingStations: Station[] = [
+    {
+      id: 'station-komori',
+      name: 'Komori G40',
+      status: 'Available',
+      categoryId: 'cat-offset',
+      groupId: 'grp-offset',
+      capacity: 1,
+      operatingSchedule: sevenDayOperatingSchedule,
+      exceptions: [],
+    },
+  ];
+
   const jobs: Job[] = [
     {
       id: 'job-zoom-1',
@@ -1867,6 +2005,7 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
     {
       id: 'task-z1',
       jobId: 'job-zoom-1',
+      elementId: 'elem-job-zoom-1',
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
       type: 'Internal',
@@ -1880,7 +2019,9 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
   // No assignments - task is unscheduled for drag testing at different zoom levels
   return {
     ...baseSnapshot(),
+    stations: zoomSnappingStations,
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments: [],
     conflicts: [],
@@ -1966,6 +2107,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -2111,6 +2253,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -2258,6 +2401,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -2449,6 +2593,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -2609,6 +2754,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -2758,6 +2904,7 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
   return {
     ...baseSnapshot(),
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
@@ -2923,13 +3070,14 @@ function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
   ];
 
   return {
-    snapshotVersion: 1,
-    snapshotTimestamp: today.toISOString(),
+    version: 1,
+    generatedAt: today.toISOString(),
     stations: overlayStations,
     categories,
     groups,
     providers: [],
     jobs,
+    elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,
     conflicts: [],
