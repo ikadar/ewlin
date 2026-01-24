@@ -1,4 +1,4 @@
-import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider, Element } from '@flux/types';
 import type { DryingTimeInfo } from '../../utils';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
@@ -12,6 +12,7 @@ import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { calculateSubcolumnLayout, getSubcolumnLayout } from '../../utils/subcolumnLayout';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
+import { getJobIdForTask } from '../../utils/taskHelpers';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -40,6 +41,8 @@ export interface SchedulingGridProps {
   categories?: StationCategory[];
   /** All jobs (for looking up job data by ID) */
   jobs?: Job[];
+  /** All elements (for task-to-job lookup) */
+  elements?: Element[];
   /** All tasks (for looking up task data) */
   tasks?: Task[];
   /** Task assignments to display as tiles */
@@ -139,6 +142,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       stations,
       categories = [],
       jobs = [],
+      elements = [],
       tasks = [],
       assignments = [],
       selectedJobId,
@@ -563,7 +567,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
-                    const job = task ? jobMap.get(task.jobId) : null;
+                    const jobId = task ? getJobIdForTask(task, elements) : null;
+                    const job = jobId ? jobMap.get(jobId) : null;
 
                     // Skip if we don't have the task/job data or if task is not internal
                     if (!task || !job || !isInternalTask(task)) return null;
@@ -582,7 +587,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     if (index > 0 && criteria.length > 0) {
                       const prevAssignment = stationAssignments[index - 1];
                       const prevTask = taskMap.get(prevAssignment.taskId);
-                      const prevJob = prevTask ? jobMap.get(prevTask.jobId) : null;
+                      const prevJobId = prevTask ? getJobIdForTask(prevTask, elements) : null;
+                      const prevJob = prevJobId ? jobMap.get(prevJobId) : null;
                       if (prevJob) {
                         similarityResults = compareSimilarity(prevJob, job, criteria);
                       }
@@ -633,7 +639,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 >
                   {providerAssignments.map((assignment) => {
                     const task = taskMap.get(assignment.taskId);
-                    const job = task ? jobMap.get(task.jobId) : null;
+                    const jobId = task ? getJobIdForTask(task, elements) : null;
+                    const job = jobId ? jobMap.get(jobId) : null;
 
                     // Skip if we don't have the task/job data or if task is not internal
                     if (!task || !job || !isInternalTask(task)) return null;

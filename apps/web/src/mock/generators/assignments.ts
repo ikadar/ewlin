@@ -10,10 +10,12 @@ import type {
   ConflictType,
   Job,
   Station,
+  Element,
 } from '@flux/types';
 import { isInternalTask, isOutsourcedTask } from '@flux/types';
 import { calculateEndTime } from '../../utils/timeCalculations';
 import { SNAP_INTERVAL_MINUTES } from '../../components/DragPreview';
+import { groupTasksByJob, getTasksForJob } from '../../utils/taskHelpers';
 
 // ============================================================================
 // Helper Functions
@@ -53,6 +55,7 @@ function getNextWorkday(date: Date): Date {
 interface AssignmentGeneratorOptions {
   tasks: Task[];
   jobs: Job[];
+  elements: Element[];
   stations: Station[];
   baseDate?: Date;
 }
@@ -63,7 +66,7 @@ interface AssignmentResult {
 }
 
 export function generateAssignments(options: AssignmentGeneratorOptions): AssignmentResult {
-  const { tasks, jobs: _jobs, stations, baseDate = new Date() } = options;
+  const { tasks, jobs: _jobs, elements, stations, baseDate = new Date() } = options;
   const assignments: TaskAssignment[] = [];
 
   // Track next available time per station
@@ -75,21 +78,16 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
     stationNextAvailable.set(station.id, new Date(startTime));
   }
 
-  // Group tasks by job
-  const tasksByJob = new Map<string, Task[]>();
-  for (const task of tasks) {
-    const jobTasks = tasksByJob.get(task.jobId) || [];
-    jobTasks.push(task);
-    tasksByJob.set(task.jobId, jobTasks);
-  }
+  // Group tasks by job using element lookup
+  const tasksByJobMap = groupTasksByJob(tasks, elements);
 
   // Sort tasks within each job by sequence order
-  for (const jobTasks of tasksByJob.values()) {
+  for (const jobTasks of tasksByJobMap.values()) {
     jobTasks.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
   }
 
   // Process each job's tasks
-  for (const [_jobId, jobTasks] of tasksByJob.entries()) {
+  for (const [_jobId, jobTasks] of tasksByJobMap.entries()) {
     let previousTaskEnd: Date | null = null;
 
     for (const task of jobTasks) {
@@ -190,18 +188,19 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
 interface ConflictGeneratorOptions {
   jobs: Job[];
   tasks: Task[];
+  elements: Element[];
   assignments: TaskAssignment[];
 }
 
 export function generateConflicts(options: ConflictGeneratorOptions): ScheduleConflict[] {
-  const { jobs, tasks, assignments } = options;
+  const { jobs, tasks, elements, assignments } = options;
   const conflicts: ScheduleConflict[] = [];
 
   // Find jobs marked for conflict testing
   const conflictJobs = jobs.filter((job) => job.notes === 'CONFLICT_TEST');
 
   for (const job of conflictJobs) {
-    const jobTasks = tasks.filter((t) => t.jobId === job.id);
+    const jobTasks = getTasksForJob(job.id, tasks, elements);
 
     if (jobTasks.length > 1) {
       // Create a precedence conflict for the first task
@@ -224,7 +223,7 @@ export function generateConflicts(options: ConflictGeneratorOptions): ScheduleCo
   // Also detect deadline conflicts for late jobs
   for (const job of jobs) {
     if (job.status === 'Delayed') {
-      const jobTasks = tasks.filter((t) => t.jobId === job.id);
+      const jobTasks = getTasksForJob(job.id, tasks, elements);
       const lastTask = jobTasks[jobTasks.length - 1];
       const lastAssignment = assignments.find((a) => a.taskId === lastTask?.id);
 
@@ -296,10 +295,11 @@ export interface AssignmentData {
 export function generateAllAssignmentData(
   tasks: Task[],
   jobs: Job[],
+  elements: Element[],
   stations: Station[]
 ): AssignmentData {
-  const { assignments } = generateAssignments({ tasks, jobs, stations });
-  const conflicts = generateConflicts({ jobs, tasks, assignments });
+  const { assignments } = generateAssignments({ tasks, jobs, elements, stations });
+  const conflicts = generateConflicts({ jobs, tasks, elements, assignments });
 
   return { assignments, conflicts };
 }

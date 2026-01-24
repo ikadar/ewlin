@@ -6,7 +6,7 @@ import {
   calculateScrollToBottom,
   calculateScrollToCenter,
 } from './keyboardNavigation';
-import type { Job, Task, LateJob, ScheduleConflict, InternalTask } from '@flux/types';
+import type { Job, Task, LateJob, ScheduleConflict, InternalTask, Element } from '@flux/types';
 
 // Helper to create test data
 function createJob(id: string): Job {
@@ -18,6 +18,7 @@ function createJob(id: string): Job {
     color: '#8b5cf6',
     workshopEntryDate: '2025-12-16T08:00:00Z',
     workshopExitDate: '2025-12-20T17:00:00Z',
+    elementIds: [`element-${id}`],
     approvalGates: {
       bat: 'approved',
       paper: 'approved',
@@ -28,10 +29,21 @@ function createJob(id: string): Job {
   };
 }
 
-function createTask(id: string, jobId: string): InternalTask {
+function createElement(jobId: string, taskIds: string[] = []): Element {
+  return {
+    id: `element-${jobId}`,
+    jobId,
+    name: `Element for ${jobId}`,
+    taskIds,
+    createdAt: '2025-12-15T00:00:00Z',
+    updatedAt: '2025-12-15T00:00:00Z',
+  };
+}
+
+function createTask(id: string, elementId: string): InternalTask {
   return {
     id,
-    jobId,
+    elementId,
     type: 'Internal',
     stationId: 'station-1',
     sequence: 1,
@@ -70,36 +82,44 @@ describe('getOrderedJobIds', () => {
       createJob('conflict-1'),
       createJob('normal-2'),
     ];
-    const tasks: Task[] = [createTask('task-conflict', 'conflict-1')];
+    const elements = [
+      createElement('normal-1'),
+      createElement('late-1'),
+      createElement('conflict-1'),
+      createElement('normal-2'),
+    ];
+    const tasks: Task[] = [createTask('task-conflict', 'element-conflict-1')];
     const lateJobs: LateJob[] = [createLateJob('late-1')];
     const conflicts: ScheduleConflict[] = [createConflict('task-conflict')];
 
-    const result = getOrderedJobIds(jobs, tasks, lateJobs, conflicts);
+    const result = getOrderedJobIds(jobs, tasks, elements, lateJobs, conflicts);
 
     // Late jobs first, then conflict jobs, then normal jobs
     expect(result).toEqual(['late-1', 'conflict-1', 'normal-1', 'normal-2']);
   });
 
   it('returns empty array when no jobs', () => {
-    const result = getOrderedJobIds([], [], [], []);
+    const result = getOrderedJobIds([], [], [], [], []);
     expect(result).toEqual([]);
   });
 
   it('returns all normal jobs when no problems', () => {
     const jobs = [createJob('job-1'), createJob('job-2'), createJob('job-3')];
+    const elements = [createElement('job-1'), createElement('job-2'), createElement('job-3')];
 
-    const result = getOrderedJobIds(jobs, [], [], []);
+    const result = getOrderedJobIds(jobs, [], elements, [], []);
 
     expect(result).toEqual(['job-1', 'job-2', 'job-3']);
   });
 
   it('handles job that is both late and has conflict', () => {
     const jobs = [createJob('problem-job'), createJob('normal-job')];
-    const tasks: Task[] = [createTask('task-1', 'problem-job')];
+    const elements = [createElement('problem-job'), createElement('normal-job')];
+    const tasks: Task[] = [createTask('task-1', 'element-problem-job')];
     const lateJobs: LateJob[] = [createLateJob('problem-job')];
     const conflicts: ScheduleConflict[] = [createConflict('task-1')];
 
-    const result = getOrderedJobIds(jobs, tasks, lateJobs, conflicts);
+    const result = getOrderedJobIds(jobs, tasks, elements, lateJobs, conflicts);
 
     // Job should appear once (as late, which is higher priority)
     expect(result).toEqual(['problem-job', 'normal-job']);

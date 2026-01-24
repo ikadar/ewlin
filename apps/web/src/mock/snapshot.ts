@@ -11,6 +11,7 @@ import {
   identifyLateJobs,
 } from './generators';
 import { getFixtureFromUrl, shouldUseFixture } from './testFixtures';
+import { getTasksForJob as getTasksForJobHelper } from '../utils/taskHelpers';
 
 // ============================================================================
 // Snapshot Creation
@@ -39,6 +40,7 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
   const assignmentData = generateAllAssignmentData(
     jobData.tasks,
     jobData.jobs,
+    jobData.elements,
     stationData.stations
   );
 
@@ -138,7 +140,8 @@ export function getJobById(jobId: string): ReturnType<typeof getSnapshot>['jobs'
  * Get tasks for a specific job.
  */
 export function getTasksForJob(jobId: string): ReturnType<typeof getSnapshot>['tasks'] {
-  return getSnapshot().tasks.filter((task) => task.jobId === jobId);
+  const snapshot = getSnapshot();
+  return getTasksForJobHelper(jobId, snapshot.tasks, snapshot.elements);
 }
 
 /**

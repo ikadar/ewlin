@@ -6,7 +6,7 @@ import { JobStatus } from './JobStatus';
 import { InfoField } from './InfoField';
 import { TaskList } from './TaskList';
 import { TaskTile } from './TaskTile';
-import type { Job, Task, TaskAssignment, Station } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, Element } from '@flux/types';
 
 // Mock data
 const mockJob: Job = {
@@ -24,14 +24,26 @@ const mockJob: Job = {
   requiredJobIds: [],
   comments: [],
   taskIds: ['task-1', 'task-2'],
+  elementIds: ['element-1'],
   createdAt: '2025-12-15T10:00:00Z',
   updatedAt: '2025-12-15T10:00:00Z',
 };
 
+const mockElements: Element[] = [
+  {
+    id: 'element-1',
+    jobId: 'job-1',
+    name: 'Element 1',
+    taskIds: ['task-1', 'task-2'],
+    createdAt: '2025-12-15T10:00:00Z',
+    updatedAt: '2025-12-15T10:00:00Z',
+  },
+];
+
 const mockTasks: Task[] = [
   {
     id: 'task-1',
-    jobId: 'job-1',
+    elementId: 'element-1',
     sequenceOrder: 0,
     status: 'Assigned',
     type: 'Internal',
@@ -42,7 +54,7 @@ const mockTasks: Task[] = [
   },
   {
     id: 'task-2',
-    jobId: 'job-1',
+    elementId: 'element-1',
     sequenceOrder: 1,
     status: 'Ready',
     type: 'Internal',
@@ -113,6 +125,7 @@ describe('JobDetailsPanel', () => {
       <JobDetailsPanel
         job={null}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         stations={mockStations}
       />
@@ -125,6 +138,7 @@ describe('JobDetailsPanel', () => {
       <JobDetailsPanel
         job={mockJob}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         stations={mockStations}
       />
@@ -138,6 +152,7 @@ describe('JobDetailsPanel', () => {
       <JobDetailsPanel
         job={mockJob}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         stations={mockStations}
       />
@@ -153,6 +168,7 @@ describe('JobDetailsPanel', () => {
       <JobDetailsPanel
         job={mockJob}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         stations={mockStations}
       />
@@ -167,6 +183,7 @@ describe('JobDetailsPanel', () => {
       <JobDetailsPanel
         job={mockJob}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         stations={mockStations}
       />

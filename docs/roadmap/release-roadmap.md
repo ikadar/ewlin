@@ -1157,8 +1157,8 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 >
 > **Strategy:** Incremental Element layer introduction to minimize risk:
 > 1. Frontend types + tests first (v0.4.0)
-> 2. Documentation update (v0.4.1)
-> 3. Backend implementation (v0.4.2)
+> 2. Documentation update (v0.4.2)
+> 3. Backend implementation (v0.4.3)
 
 ### Phase 4A: Element Entity Foundation
 
@@ -1179,9 +1179,36 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Test fixtures update
   - [x] All fixtures include Element data
 
-> **Note:** Task.jobId kept for backward compatibility. Can be removed in future cleanup when all code migrated to use elementId → element.jobId path.
+#### v0.4.1 - Element Layer: Task.jobId Removal ✅
+- [x] Remove Task.jobId from @flux/types
+  - [x] Update BaseTask interface (remove jobId)
+  - [x] Rebuild types package
+- [x] Update all Task usages to use elementId → element.jobId path
+  - [x] App.tsx (~7 locations)
+  - [x] JobsList.tsx (~4 locations)
+  - [x] JobDetailsPanel.tsx (~1 location)
+  - [x] SchedulingGrid.tsx (~3 locations)
+  - [x] precedenceConstraints.ts
+  - [x] compactTimeline.ts
+  - [x] keyboardNavigation.ts
+  - [x] quickPlacement.ts
+- [x] Add taskHelpers.ts utility functions
+  - [x] getJobIdForTask(task, elements)
+  - [x] getTasksForJob(jobId, tasks, elements)
+  - [x] createTaskToJobMap(tasks, elements)
+  - [x] groupTasksByJob(tasks, elements)
+- [x] Update test fixtures (testFixtures.ts)
+  - [x] Replace jobId with elementId in all task definitions
+  - [x] Add elementIds to all Job definitions (via generateElementsForJobs mutation)
+- [x] Update mock generators
+  - [x] jobs.ts: Add elementIds to generated jobs
+  - [x] Remove jobId from generated tasks
+- [x] Update unit tests
+  - [x] Fix all test files with outdated mock data
+- [x] All tests pass (638 unit + 199 E2E)
+- [x] ESLint passes
 
-#### v0.4.1 - Element Layer: Documentation
+#### v0.4.2 - Element Layer: Documentation
 - [ ] Domain vocabulary update (domain-vocabulary.md)
   - [ ] New Element section
   - [ ] Job section update (Job → Element relationship)
@@ -1192,7 +1219,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
   - [ ] SimilarityCriterion fieldPath updates
   - [ ] Any Job/Task references that need Element context
 
-#### v0.4.2 - Element Layer: Backend Implementation
+#### v0.4.3 - Element Layer: Backend Implementation
 - [ ] Element entity (PHP)
   - [ ] Entity class with id, job relationship
   - [ ] ElementRepository

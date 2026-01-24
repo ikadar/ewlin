@@ -9,22 +9,22 @@ import { generateStations } from './stations';
 
 describe('generateAssignments', () => {
   it('returns assignments array', () => {
-    const { jobs, tasks } = generateJobs({ count: 5 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5 });
     const stations = generateStations();
 
-    const result = generateAssignments({ tasks, jobs, stations });
+    const result = generateAssignments({ tasks, jobs, elements, stations });
 
     expect(result).toHaveProperty('assignments');
     expect(Array.isArray(result.assignments)).toBe(true);
   });
 
   it('creates assignments only for tasks with Assigned status', () => {
-    const { jobs, tasks } = generateJobs({ count: 10 });
+    const { jobs, elements, tasks } = generateJobs({ count: 10 });
     const stations = generateStations();
 
     const assignedTaskIds = new Set(tasks.filter((t) => t.status === 'Assigned').map((t) => t.id));
 
-    const result = generateAssignments({ tasks, jobs, stations });
+    const result = generateAssignments({ tasks, jobs, elements, stations });
 
     for (const assignment of result.assignments) {
       expect(assignedTaskIds.has(assignment.taskId)).toBe(true);
@@ -32,10 +32,10 @@ describe('generateAssignments', () => {
   });
 
   it('each assignment has required fields', () => {
-    const { jobs, tasks } = generateJobs({ count: 5 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5 });
     const stations = generateStations();
 
-    const result = generateAssignments({ tasks, jobs, stations });
+    const result = generateAssignments({ tasks, jobs, elements, stations });
 
     for (const assignment of result.assignments) {
       expect(assignment).toHaveProperty('id');
@@ -51,10 +51,10 @@ describe('generateAssignments', () => {
   });
 
   it('scheduledStart is before scheduledEnd', () => {
-    const { jobs, tasks } = generateJobs({ count: 5 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5 });
     const stations = generateStations();
 
-    const result = generateAssignments({ tasks, jobs, stations });
+    const result = generateAssignments({ tasks, jobs, elements, stations });
 
     for (const assignment of result.assignments) {
       const start = new Date(assignment.scheduledStart);
@@ -64,10 +64,10 @@ describe('generateAssignments', () => {
   });
 
   it('timestamps are valid ISO strings', () => {
-    const { jobs, tasks } = generateJobs({ count: 5 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5 });
     const stations = generateStations();
 
-    const result = generateAssignments({ tasks, jobs, stations });
+    const result = generateAssignments({ tasks, jobs, elements, stations });
 
     for (const assignment of result.assignments) {
       expect(new Date(assignment.scheduledStart).toString()).not.toBe('Invalid Date');
@@ -77,10 +77,10 @@ describe('generateAssignments', () => {
   });
 
   it('completed assignments have completedAt timestamp', () => {
-    const { jobs, tasks } = generateJobs({ count: 10 });
+    const { jobs, elements, tasks } = generateJobs({ count: 10 });
     const stations = generateStations();
 
-    const result = generateAssignments({ tasks, jobs, stations });
+    const result = generateAssignments({ tasks, jobs, elements, stations });
     const completedAssignments = result.assignments.filter((a) => a.isCompleted);
 
     for (const assignment of completedAssignments) {
@@ -90,10 +90,10 @@ describe('generateAssignments', () => {
   });
 
   it('tracks station availability correctly', () => {
-    const { jobs, tasks } = generateJobs({ count: 5 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5 });
     const stations = generateStations();
 
-    const result = generateAssignments({ tasks, jobs, stations });
+    const result = generateAssignments({ tasks, jobs, elements, stations });
 
     expect(result).toHaveProperty('stationNextAvailable');
     expect(result.stationNextAvailable).toBeInstanceOf(Map);
@@ -102,24 +102,24 @@ describe('generateAssignments', () => {
 
 describe('generateConflicts', () => {
   it('returns conflicts array', () => {
-    const { jobs, tasks } = generateJobs({ count: 5, includeConflictJobs: 1 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5, includeConflictJobs: 1 });
     const stations = generateStations();
-    const { assignments } = generateAssignments({ tasks, jobs, stations });
+    const { assignments } = generateAssignments({ tasks, jobs, elements, stations });
 
-    const conflicts = generateConflicts({ jobs, tasks, assignments });
+    const conflicts = generateConflicts({ jobs, tasks, elements, assignments });
 
     expect(Array.isArray(conflicts)).toBe(true);
   });
 
   it('generates conflicts for jobs marked with CONFLICT_TEST', () => {
-    const { jobs, tasks } = generateJobs({ count: 5, includeConflictJobs: 2 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5, includeConflictJobs: 2 });
     const stations = generateStations();
-    const { assignments } = generateAssignments({ tasks, jobs, stations });
+    const { assignments } = generateAssignments({ tasks, jobs, elements, stations });
 
     const conflictJobs = jobs.filter((j) => j.notes === 'CONFLICT_TEST');
     expect(conflictJobs.length).toBe(2);
 
-    const conflicts = generateConflicts({ jobs, tasks, assignments });
+    const conflicts = generateConflicts({ jobs, tasks, elements, assignments });
 
     // Should have at least one conflict per conflict job (if tasks exist)
     const precedenceConflicts = conflicts.filter((c) => c.type === 'PrecedenceConflict');
@@ -127,11 +127,11 @@ describe('generateConflicts', () => {
   });
 
   it('generates deadline conflicts for delayed jobs', () => {
-    const { jobs, tasks } = generateJobs({ count: 5, includeLateJobs: 2 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5, includeLateJobs: 2 });
     const stations = generateStations();
-    const { assignments } = generateAssignments({ tasks, jobs, stations });
+    const { assignments } = generateAssignments({ tasks, jobs, elements, stations });
 
-    const conflicts = generateConflicts({ jobs, tasks, assignments });
+    const conflicts = generateConflicts({ jobs, tasks, elements, assignments });
     const deadlineConflicts = conflicts.filter((c) => c.type === 'DeadlineConflict');
 
     // Delayed jobs should generate deadline conflicts
@@ -139,11 +139,11 @@ describe('generateConflicts', () => {
   });
 
   it('each conflict has required fields', () => {
-    const { jobs, tasks } = generateJobs({ count: 5, includeConflictJobs: 1, includeLateJobs: 1 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5, includeConflictJobs: 1, includeLateJobs: 1 });
     const stations = generateStations();
-    const { assignments } = generateAssignments({ tasks, jobs, stations });
+    const { assignments } = generateAssignments({ tasks, jobs, elements, stations });
 
-    const conflicts = generateConflicts({ jobs, tasks, assignments });
+    const conflicts = generateConflicts({ jobs, tasks, elements, assignments });
 
     for (const conflict of conflicts) {
       expect(conflict).toHaveProperty('type');
@@ -156,10 +156,10 @@ describe('generateConflicts', () => {
 
 describe('generateAllAssignmentData', () => {
   it('returns both assignments and conflicts', () => {
-    const { jobs, tasks } = generateJobs({ count: 5 });
+    const { jobs, elements, tasks } = generateJobs({ count: 5 });
     const stations = generateStations();
 
-    const result = generateAllAssignmentData(tasks, jobs, stations);
+    const result = generateAllAssignmentData(tasks, jobs, elements, stations);
 
     expect(result).toHaveProperty('assignments');
     expect(result).toHaveProperty('conflicts');

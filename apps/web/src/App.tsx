@@ -3,7 +3,7 @@ import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYP
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage } from './utils';
+import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
@@ -113,6 +113,7 @@ function processDropAssignment(options: ProcessDropOptions): ScheduleSnapshot {
 
 /**
  * Find the earliest start time for a task based on predecessor constraints.
+ * Tasks in the same element (job) share the same elementId.
  */
 function findPredecessorEndTime(
   task: Task,
@@ -120,14 +121,15 @@ function findPredecessorEndTime(
   assignments: TaskAssignment[],
   updatedEndTimes: Map<string, Date>
 ): Date | null {
-  const jobTasks = tasks
-    .filter((t) => t.jobId === task.jobId)
+  // Tasks in the same element share the same elementId
+  const elementTasks = tasks
+    .filter((t) => t.elementId === task.elementId)
     .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-  const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
+  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
 
   if (taskIndex <= 0) return null;
 
-  const predecessorTask = jobTasks[taskIndex - 1];
+  const predecessorTask = elementTasks[taskIndex - 1];
   const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
 
   if (updatedPredecessorEnd) return updatedPredecessorEnd;
@@ -486,8 +488,7 @@ function AppContent() {
 
     const days = new Set<string>();
     const jobTaskIds = new Set(
-      snapshot.tasks
-        .filter((t) => t.jobId === selectedJobId)
+      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements)
         .map((t) => t.id)
     );
 
@@ -500,7 +501,7 @@ function AppContent() {
       });
 
     return days;
-  }, [selectedJobId, snapshot.tasks, snapshot.assignments]);
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // v0.3.47: Task markers per day for DateStrip
   // Groups tasks by date and determines their status (completed, late, conflict, scheduled)
@@ -512,7 +513,7 @@ function AppContent() {
     const conflictTaskIds = new Set(snapshot.conflicts.map((c) => c.taskId));
 
     // Get all tasks for the selected job
-    const jobTasks = snapshot.tasks.filter((t) => t.jobId === selectedJobId);
+    const jobTasks = getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements);
     const taskIds = new Set(jobTasks.map((t) => t.id));
 
     // Process assignments for selected job
@@ -543,14 +544,14 @@ function AppContent() {
       });
 
     return markers;
-  }, [selectedJobId, snapshot.tasks, snapshot.assignments, snapshot.conflicts]);
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, snapshot.conflicts]);
 
   // v0.3.47: Earliest task date for timeline (first scheduled task)
   const earliestTaskDate = useMemo((): Date | null => {
     if (!selectedJobId) return null;
 
     const jobTaskIds = new Set(
-      snapshot.tasks.filter((t) => t.jobId === selectedJobId).map((t) => t.id)
+      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
 
     let earliest: Date | null = null;
@@ -564,7 +565,7 @@ function AppContent() {
       });
 
     return earliest;
-  }, [selectedJobId, snapshot.tasks, snapshot.assignments]);
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(null);
@@ -630,7 +631,10 @@ function AppContent() {
     const conflictJobIds = new Set<string>();
     snapshot.conflicts.forEach((c) => {
       const task = snapshot.tasks.find((t) => t.id === c.taskId);
-      if (task) conflictJobIds.add(task.jobId);
+      if (task) {
+        const jobId = getJobIdForTask(task, snapshot.elements);
+        if (jobId) conflictJobIds.add(jobId);
+      }
     });
 
     const problems: Job[] = [];
@@ -654,7 +658,7 @@ function AppContent() {
     });
 
     return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
-  }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks]);
+  }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
 
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
@@ -759,10 +763,11 @@ function AppContent() {
     if (assignment) {
       const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
       if (task) {
-        setSelectedJobId(task.jobId);
+        const jobId = getJobIdForTask(task, snapshot.elements);
+        if (jobId) setSelectedJobId(jobId);
       }
     }
-  }, [contextMenu, snapshot.assignments, snapshot.tasks]);
+  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.elements]);
 
   // Handle jump to task - scroll grid to assignment position (single-click in Job Details Panel)
   const handleJumpToTask = useCallback((assignment: TaskAssignment) => {
@@ -931,8 +936,8 @@ function AppContent() {
     if (!isQuickPlacementMode || !selectedJob) {
       return null;
     }
-    return getLastUnscheduledTask(selectedJob, snapshot.tasks, snapshot.assignments);
-  }, [isQuickPlacementMode, selectedJob, snapshot.tasks, snapshot.assignments]);
+    return getLastUnscheduledTask(selectedJob, snapshot.tasks, snapshot.elements, snapshot.assignments);
+  }, [isQuickPlacementMode, selectedJob, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // Quick Placement: get the task for the hovered station (for validation)
   const quickPlacementTask = useMemo(() => {
@@ -942,10 +947,11 @@ function AppContent() {
     return getAvailableTaskForStation(
       selectedJob,
       snapshot.tasks,
+      snapshot.elements,
       snapshot.assignments,
       quickPlacementHover.stationId
     );
-  }, [isQuickPlacementMode, selectedJob, quickPlacementHover.stationId, snapshot.tasks, snapshot.assignments]);
+  }, [isQuickPlacementMode, selectedJob, quickPlacementHover.stationId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // Quick Placement: calculate scheduled start from Y position
   const quickPlacementScheduledStart = useMemo(() => {
@@ -995,6 +1001,7 @@ function AppContent() {
     const taskToPlace = getAvailableTaskForStation(
       selectedJob,
       snapshot.tasks,
+      snapshot.elements,
       snapshot.assignments,
       stationId
     );
@@ -1093,6 +1100,7 @@ function AppContent() {
       const task = getAvailableTaskForStation(
         selectedJob,
         snapshot.tasks,
+        snapshot.elements,
         snapshot.assignments,
         station.id
       );
@@ -1101,7 +1109,7 @@ function AppContent() {
       }
     });
     return stationIds;
-  }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.assignments]);
+  }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // Handle station compact - remove gaps between tiles (mock implementation)
   // Respects precedence: tasks cannot start before their predecessor ends
@@ -1195,7 +1203,7 @@ function AppContent() {
       scheduledStart,
       bypassPrecedence: isAltPressed,
     };
-    const validationResult = pickedTask ? validateAssignment(proposedAssignment, snapshot) : { isValid: false, conflicts: [] };
+    const validationResult = pickedTask ? validateAssignment(proposedAssignment, snapshot) : { valid: false, conflicts: [] };
 
     // Check for blocking conflicts
     // Note: Unlike drag-and-drop, pick mode does NOT auto-snap to suggestedStart,
@@ -1210,7 +1218,7 @@ function AppContent() {
     const hasWarningOnly = blockingConflicts.length === 0 &&
       validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates');
 
-    if (validationResult.isValid) {
+    if (validationResult.valid) {
       ringState = 'valid';
     } else if (blockingConflicts.length === 0) {
       ringState = validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict') ? 'warning' : 'valid';
@@ -1221,7 +1229,7 @@ function AppContent() {
     }
 
     // Get validation message for display
-    const message = getPrimaryValidationMessage(validationResult.conflicts, validationResult.isValid, hasWarningOnly);
+    const message = getPrimaryValidationMessage(validationResult.conflicts, validationResult.valid, hasWarningOnly);
 
     // Debug: store conflicts for overlay
     const debugConflicts = validationResult.conflicts.map(c => ({ type: c.type, message: c.message }));
@@ -1368,6 +1376,7 @@ function AppContent() {
           <JobsList
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
+          elements={snapshot.elements}
           assignments={snapshot.assignments}
           lateJobs={snapshot.lateJobs}
           conflicts={snapshot.conflicts}
@@ -1377,6 +1386,7 @@ function AppContent() {
         <JobDetailsPanel
           job={selectedJob}
           tasks={snapshot.tasks}
+          elements={snapshot.elements}
           assignments={snapshot.assignments}
           stations={snapshot.stations}
           activeTaskId={lastUnscheduledTask?.id}
@@ -1404,6 +1414,7 @@ function AppContent() {
           categories={snapshot.categories}
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
+          elements={snapshot.elements}
           assignments={snapshot.assignments}
           selectedJobId={deferredSelectedJobId}
           startHour={START_HOUR}

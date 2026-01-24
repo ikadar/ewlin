@@ -3,7 +3,8 @@
  * Functions for job navigation and grid scrolling calculations.
  */
 
-import type { Job, Task, LateJob, ScheduleConflict } from '@flux/types';
+import type { Job, Task, LateJob, ScheduleConflict, Element } from '@flux/types';
+import { getJobIdForTask } from './taskHelpers';
 
 /**
  * Get ordered job IDs for navigation (matching JobsList display order).
@@ -11,6 +12,7 @@ import type { Job, Task, LateJob, ScheduleConflict } from '@flux/types';
  *
  * @param jobs - All jobs
  * @param tasks - All tasks
+ * @param elements - All elements
  * @param lateJobs - Late job indicators
  * @param conflicts - Schedule conflicts
  * @returns Ordered array of job IDs
@@ -18,6 +20,7 @@ import type { Job, Task, LateJob, ScheduleConflict } from '@flux/types';
 export function getOrderedJobIds(
   jobs: Job[],
   tasks: Task[],
+  elements: Element[],
   lateJobs: LateJob[],
   conflicts: ScheduleConflict[]
 ): string[] {
@@ -27,7 +30,10 @@ export function getOrderedJobIds(
   const conflictJobIds = new Set<string>();
   conflicts.forEach((c) => {
     const task = tasks.find((t) => t.id === c.taskId);
-    if (task) conflictJobIds.add(task.jobId);
+    if (task) {
+      const jobId = getJobIdForTask(task, elements);
+      if (jobId) conflictJobIds.add(jobId);
+    }
   });
 
   const problems: Job[] = [];

@@ -1,4 +1,5 @@
-import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask } from '@flux/types';
+import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Element } from '@flux/types';
+import { getJobIdForTask } from './taskHelpers';
 
 /** Compact horizon options in hours */
 export const COMPACT_HORIZONS = [
@@ -33,10 +34,15 @@ function isWithinHorizon(assignment: TaskAssignment, now: Date, horizonMs: numbe
 /**
  * Find the predecessor task for a given task (by sequenceOrder within the same job).
  */
-function findPredecessorTask(task: Task, allTasks: Task[]): Task | undefined {
-  if (task.sequenceOrder <= 1) return undefined;
+function findPredecessorTask(task: Task, allTasks: Task[], elements: Element[]): Task | undefined {
+  if (task.sequenceOrder <= 0) return undefined;
+
+  const jobId = getJobIdForTask(task, elements);
+  if (!jobId) return undefined;
+
+  // Find tasks with same elementId (same job) and one lower sequenceOrder
   return allTasks.find(
-    (t) => t.jobId === task.jobId && t.sequenceOrder === task.sequenceOrder - 1
+    (t) => t.elementId === task.elementId && t.sequenceOrder === task.sequenceOrder - 1
   );
 }
 
@@ -46,10 +52,11 @@ function findPredecessorTask(task: Task, allTasks: Task[]): Task | undefined {
 function getPredecessorEndTime(
   task: Task,
   allTasks: Task[],
+  elements: Element[],
   assignments: TaskAssignment[],
   updatedEndTimes: Map<string, Date>
 ): Date | null {
-  const predecessorTask = findPredecessorTask(task, allTasks);
+  const predecessorTask = findPredecessorTask(task, allTasks, elements);
   if (!predecessorTask) return null;
 
   // Check if predecessor was already updated during this compaction
@@ -176,6 +183,7 @@ export function compactTimeline(options: CompactTimelineOptions): CompactTimelin
         const predecessorEnd = getPredecessorEndTime(
           task,
           snapshot.tasks,
+          snapshot.elements,
           snapshot.assignments,
           updatedEndTimes
         );

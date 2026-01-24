@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compactTimeline, COMPACT_HORIZONS } from './compactTimeline';
-import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Job } from '@flux/types';
+import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Job, Element } from '@flux/types';
 
 // Helper to create a basic snapshot
 function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnapshot {
@@ -10,6 +10,7 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
     groups: [],
     providers: [],
     jobs: [],
+    elements: [],
     tasks: [],
     assignments: [],
     lateJobs: [],
@@ -60,6 +61,19 @@ function createJob(id: string): Job {
     paperPurchaseStatus: 'InStock',
     paperOrderedAt: null,
     requiredJobIds: [],
+    elementIds: [`element-${id}`],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  };
+}
+
+// Helper to create an element
+function createElement(jobId: string, taskIds: string[] = []): Element {
+  return {
+    id: `element-${jobId}`,
+    jobId,
+    name: `Element for ${jobId}`,
+    taskIds,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
   };
@@ -68,14 +82,14 @@ function createJob(id: string): Job {
 // Helper to create an internal task
 function createTask(
   id: string,
-  jobId: string,
+  elementId: string,
   stationId: string,
   sequenceOrder: number,
   durationMinutes: number = 60
 ): Task {
   return {
     id,
-    jobId,
+    elementId,
     type: 'Internal',
     stationId,
     sequenceOrder,
@@ -153,8 +167,8 @@ describe('compactTimeline', () => {
       const now = new Date('2024-01-15T10:00:00Z');
       const station = createStation('station-1');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 60);
-      const task2 = createTask('task-2', 'job-1', 'station-1', 2, 60);
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 60);
+      const task2 = createTask('task-2', 'element-job-1', 'station-1', 2, 60);
 
       // Task 1: 10:00-11:00
       // Gap: 11:00-12:00
@@ -162,6 +176,7 @@ describe('compactTimeline', () => {
       const snapshot = createSnapshot({
         stations: [station],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1, task2],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T10:00:00Z', '2024-01-15T11:00:00Z'),
@@ -188,14 +203,15 @@ describe('compactTimeline', () => {
       const now = new Date('2024-01-15T10:30:00Z'); // Now is 10:30
       const station = createStation('station-1');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 60);
-      const task2 = createTask('task-2', 'job-1', 'station-1', 2, 60);
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 60);
+      const task2 = createTask('task-2', 'element-job-1', 'station-1', 2, 60);
 
       // Task 1: 10:00-11:00 (already started at 10:30)
       // Task 2: 12:00-13:00 (within horizon, movable)
       const snapshot = createSnapshot({
         stations: [station],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1, task2],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T10:00:00Z', '2024-01-15T11:00:00Z'),
@@ -224,12 +240,13 @@ describe('compactTimeline', () => {
       const now = new Date('2024-01-15T10:30:00Z'); // Now is 10:30
       const station = createStation('station-1');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 90); // 1.5 hours
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 90); // 1.5 hours
 
       // Task 1: 10:00-11:30 (in progress at 10:30)
       const snapshot = createSnapshot({
         stations: [station],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T10:00:00Z', '2024-01-15T11:30:00Z'),
@@ -255,9 +272,9 @@ describe('compactTimeline', () => {
       const now = new Date('2024-01-15T10:00:00Z');
       const station = createStation('station-1');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 60);
-      const task2 = createTask('task-2', 'job-1', 'station-1', 2, 60);
-      const task3 = createTask('task-3', 'job-1', 'station-1', 3, 60);
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 60);
+      const task2 = createTask('task-2', 'element-job-1', 'station-1', 2, 60);
+      const task3 = createTask('task-3', 'element-job-1', 'station-1', 3, 60);
 
       // Task 1: 10:00-11:00 (now)
       // Task 2: 12:00-13:00 (within 4h horizon)
@@ -265,6 +282,7 @@ describe('compactTimeline', () => {
       const snapshot = createSnapshot({
         stations: [station],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1, task2, task3],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T10:00:00Z', '2024-01-15T11:00:00Z'),
@@ -293,14 +311,15 @@ describe('compactTimeline', () => {
       const now = new Date('2024-01-15T10:00:00Z');
       const station = createStation('station-1');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 60);
-      const task2 = createTask('task-2', 'job-1', 'station-1', 2, 60);
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 60);
+      const task2 = createTask('task-2', 'element-job-1', 'station-1', 2, 60);
 
       // Task 1: 10:00-11:00
       // Task 2: 16:00-17:00 (outside 4h but within 8h)
       const snapshot = createSnapshot({
         stations: [station],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1, task2],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T10:00:00Z', '2024-01-15T11:00:00Z'),
@@ -327,14 +346,15 @@ describe('compactTimeline', () => {
       const station1 = createStation('station-1');
       const station2 = createStation('station-2');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 60); // First task
-      const task2 = createTask('task-2', 'job-1', 'station-2', 2, 60); // Second task
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 60); // First task
+      const task2 = createTask('task-2', 'element-job-1', 'station-2', 2, 60); // Second task
 
       // Task 1: 10:00-11:00 on station-1
       // Task 2: 14:00-15:00 on station-2 (has gap but must wait for task 1)
       const snapshot = createSnapshot({
         stations: [station1, station2],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1, task2],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T10:00:00Z', '2024-01-15T11:00:00Z'),
@@ -359,14 +379,15 @@ describe('compactTimeline', () => {
       const station1 = createStation('station-1');
       const station2 = createStation('station-2');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 120); // 2 hours
-      const task2 = createTask('task-2', 'job-1', 'station-2', 2, 60);
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 120); // 2 hours
+      const task2 = createTask('task-2', 'element-job-1', 'station-2', 2, 60);
 
       // Task 1: 10:00-12:00 on station-1 (2 hours)
       // Task 2: 14:00-15:00 on station-2
       const snapshot = createSnapshot({
         stations: [station1, station2],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1, task2],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T10:00:00Z', '2024-01-15T12:00:00Z'),
@@ -394,13 +415,14 @@ describe('compactTimeline', () => {
       const station2 = createStation('station-2');
       const job1 = createJob('job-1');
       const job2 = createJob('job-2');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 60);
-      const task2 = createTask('task-2', 'job-2', 'station-2', 1, 60);
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 60);
+      const task2 = createTask('task-2', 'element-job-2', 'station-2', 1, 60);
 
       // Both stations have a task with a gap after now
       const snapshot = createSnapshot({
         stations: [station1, station2],
         jobs: [job1, job2],
+        elements: [createElement('job-1'), createElement('job-2')],
         tasks: [task1, task2],
         assignments: [
           createAssignment('a1', 'task-1', 'station-1', '2024-01-15T11:00:00Z', '2024-01-15T12:00:00Z'),
@@ -432,7 +454,7 @@ describe('compactTimeline', () => {
       const now = new Date('2024-01-15T10:00:00Z');
       const station = createStation('station-1');
       const job = createJob('job-1');
-      const task1 = createTask('task-1', 'job-1', 'station-1', 1, 60);
+      const task1 = createTask('task-1', 'element-job-1', 'station-1', 1, 60);
 
       const outsourcedAssignment: TaskAssignment = {
         id: 'a1',
@@ -450,6 +472,7 @@ describe('compactTimeline', () => {
       const snapshot = createSnapshot({
         stations: [station],
         jobs: [job],
+        elements: [createElement('job-1')],
         tasks: [task1],
         assignments: [outsourcedAssignment],
       });

@@ -17,7 +17,7 @@ describe('generateTasksForJob', () => {
     const tasks = generateTasksForJob({ jobId: 'test-job' });
     for (const task of tasks) {
       expect(task).toHaveProperty('id');
-      expect(task).toHaveProperty('jobId');
+      expect(task).toHaveProperty('elementId');
       expect(task).toHaveProperty('sequenceOrder');
       expect(task).toHaveProperty('status');
       expect(task).toHaveProperty('type');
@@ -26,11 +26,12 @@ describe('generateTasksForJob', () => {
     }
   });
 
-  it('tasks reference the correct jobId', () => {
+  it('tasks reference the correct element for the job', () => {
     const jobId = 'my-test-job';
     const tasks = generateTasksForJob({ jobId });
     for (const task of tasks) {
-      expect(task.jobId).toBe(jobId);
+      // Element ID should be derived from jobId using elem- prefix
+      expect(task.elementId).toBe(`elem-${jobId}`);
     }
   });
 
@@ -150,11 +151,17 @@ describe('generateJobs', () => {
     }
   });
 
-  it('each task belongs to a job', () => {
+  it('each task belongs to a job via element', () => {
     const result = generateJobs({ count: 5 });
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    const elementToJob = new Map(result.elements.map((e) => [e.id, e.jobId]));
     const jobIds = new Set(result.jobs.map((j) => j.id));
     for (const task of result.tasks) {
-      expect(jobIds.has(task.jobId)).toBe(true);
+      // Task has elementId
+      expect(elementIds.has(task.elementId)).toBe(true);
+      // Element belongs to a job
+      const jobId = elementToJob.get(task.elementId);
+      expect(jobIds.has(jobId!)).toBe(true);
     }
   });
 });

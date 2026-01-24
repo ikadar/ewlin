@@ -129,7 +129,6 @@ function generateInternalTask(
 
   return {
     id: `task-${jobId}-${sequenceOrder}`,
-    jobId,
     elementId: getElementIdForJob(jobId),
     sequenceOrder,
     status,
@@ -155,7 +154,6 @@ function generateOutsourcedTask(
   const now = new Date();
   return {
     id: `task-${jobId}-${sequenceOrder}`,
-    jobId,
     elementId: getElementIdForJob(jobId),
     sequenceOrder,
     status,

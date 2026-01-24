@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getPredecessorConstraint, getSuccessorConstraint } from './precedenceConstraints';
-import type { ScheduleSnapshot, Task, TaskAssignment, Job } from '@flux/types';
+import type { ScheduleSnapshot, Task, TaskAssignment, Job, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../components/TimelineColumn/HourMarker';
 
 /**
@@ -30,6 +30,7 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
   return {
     timestamp: '2026-01-06T10:00:00Z',
     jobs: [],
+    elements: [],
     tasks: [],
     assignments: [],
     stations: [],
@@ -56,13 +57,26 @@ function createJob(id: string): Job {
     internalDeadline: '2026-01-10T17:00:00Z',
     status: 'active',
     taskIds: [],
+    elementIds: [`element-${id}`],
+  };
+}
+
+// Helper to create element
+function createElement(jobId: string, taskIds: string[] = []): Element {
+  return {
+    id: `element-${jobId}`,
+    jobId,
+    name: `Element for ${jobId}`,
+    taskIds,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
 // Helper to create test task (InternalTask)
 function createTask(
   id: string,
-  jobId: string,
+  elementId: string,
   sequenceOrder: number,
   durationMinutes: number = 60
 ): Task {
@@ -71,7 +85,7 @@ function createTask(
   const runMinutes = durationMinutes - setupMinutes;
   return {
     id,
-    jobId,
+    elementId,
     sequenceOrder,
     type: 'Internal',
     stationId: 'station-1',
@@ -102,11 +116,12 @@ function createAssignment(
 describe('getPredecessorConstraint', () => {
   it('returns null when task has no predecessor (first task)', () => {
     const job = createJob('job-1');
-    const task = createTask('task-1', 'job-1', 1);
+    const task = createTask('task-1', 'element-job-1', 1);
     job.taskIds = ['task-1'];
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [task],
     });
 
@@ -116,12 +131,13 @@ describe('getPredecessorConstraint', () => {
 
   it('returns null when predecessor is not scheduled', () => {
     const job = createJob('job-1');
-    const task1 = createTask('task-1', 'job-1', 1);
-    const task2 = createTask('task-2', 'job-1', 2);
+    const task1 = createTask('task-1', 'element-job-1', 1);
+    const task2 = createTask('task-2', 'element-job-1', 2);
     job.taskIds = ['task-1', 'task-2'];
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [], // No assignments
     });
@@ -132,8 +148,8 @@ describe('getPredecessorConstraint', () => {
 
   it('returns correct Y for predecessor with assignment (non-printing)', () => {
     const job = createJob('job-1');
-    const task1 = createTask('task-1', 'job-1', 1);
-    const task2 = createTask('task-2', 'job-1', 2);
+    const task1 = createTask('task-1', 'element-job-1', 1);
+    const task2 = createTask('task-2', 'element-job-1', 2);
     job.taskIds = ['task-1', 'task-2'];
 
     // Predecessor ends at 10:00 local time (4 hours after startHour of 6)
@@ -146,6 +162,7 @@ describe('getPredecessorConstraint', () => {
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [assignment],
       stations: [
@@ -163,10 +180,10 @@ describe('getPredecessorConstraint', () => {
   it('adds 4h dry time for printing predecessor', () => {
     const job = createJob('job-1');
     // Print task (on offset station which is printing)
-    const printTask = createTask('task-print', 'job-1', 1);
+    const printTask = createTask('task-print', 'element-job-1', 1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test helper override
     (printTask as any).stationId = 'station-offset'; // Override to offset station
-    const cutTask = createTask('task-cut', 'job-1', 2);
+    const cutTask = createTask('task-cut', 'element-job-1', 2);
     job.taskIds = ['task-print', 'task-cut'];
 
     // Print ends at 10:00 local time, earliest for cut should be 14:00 (10:00 + 4h dry time)
@@ -179,6 +196,7 @@ describe('getPredecessorConstraint', () => {
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [printTask, cutTask],
       assignments: [assignment],
       stations: [
@@ -199,10 +217,10 @@ describe('getPredecessorConstraint', () => {
 
   it('does not add dry time for outsourced printing', () => {
     const job = createJob('job-1');
-    const printTask = createTask('task-print', 'job-1', 1);
+    const printTask = createTask('task-print', 'element-job-1', 1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test helper override
     (printTask as any).stationId = 'station-offset'; // Override to offset station
-    const cutTask = createTask('task-cut', 'job-1', 2);
+    const cutTask = createTask('task-cut', 'element-job-1', 2);
     job.taskIds = ['task-print', 'task-cut'];
 
     // Outsourced print - no dry time
@@ -216,6 +234,7 @@ describe('getPredecessorConstraint', () => {
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [printTask, cutTask],
       assignments: [assignment],
       providers: [{ id: 'provider-1', name: 'External Printer' }],
@@ -231,11 +250,12 @@ describe('getPredecessorConstraint', () => {
 describe('getSuccessorConstraint', () => {
   it('returns null when task has no successor (last task)', () => {
     const job = createJob('job-1');
-    const task = createTask('task-1', 'job-1', 1);
+    const task = createTask('task-1', 'element-job-1', 1);
     job.taskIds = ['task-1'];
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [task],
     });
 
@@ -245,12 +265,13 @@ describe('getSuccessorConstraint', () => {
 
   it('returns null when successor is not scheduled', () => {
     const job = createJob('job-1');
-    const task1 = createTask('task-1', 'job-1', 1);
-    const task2 = createTask('task-2', 'job-1', 2);
+    const task1 = createTask('task-1', 'element-job-1', 1);
+    const task2 = createTask('task-2', 'element-job-1', 2);
     job.taskIds = ['task-1', 'task-2'];
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [], // No assignments
     });
@@ -262,8 +283,8 @@ describe('getSuccessorConstraint', () => {
   it('returns correct Y for successor with assignment', () => {
     const job = createJob('job-1');
     // First task has 60 min duration
-    const task1 = createTask('task-1', 'job-1', 1, 60);
-    const task2 = createTask('task-2', 'job-1', 2);
+    const task1 = createTask('task-1', 'element-job-1', 1, 60);
+    const task2 = createTask('task-2', 'element-job-1', 2);
     job.taskIds = ['task-1', 'task-2'];
 
     // Successor starts at 14:00 local time
@@ -275,6 +296,7 @@ describe('getSuccessorConstraint', () => {
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [assignment],
       stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
@@ -291,8 +313,8 @@ describe('getSuccessorConstraint', () => {
   it('calculates correctly with longer task duration', () => {
     const job = createJob('job-1');
     // First task has 120 min (2h) duration
-    const task1 = createTask('task-1', 'job-1', 1, 120);
-    const task2 = createTask('task-2', 'job-1', 2);
+    const task1 = createTask('task-1', 'element-job-1', 1, 120);
+    const task2 = createTask('task-2', 'element-job-1', 2);
     job.taskIds = ['task-1', 'task-2'];
 
     // Successor starts at 14:00 local time
@@ -304,6 +326,7 @@ describe('getSuccessorConstraint', () => {
 
     const snapshot = createSnapshot({
       jobs: [job],
+      elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [assignment],
       stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],

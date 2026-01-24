@@ -1,15 +1,18 @@
 import { useState, useMemo } from 'react';
-import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict } from '@flux/types';
+import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
 import { JobsListHeader } from './JobsListHeader';
 import { ProblemsSection } from './ProblemsSection';
 import { JobsSection } from './JobsSection';
 import { JobCard, type JobProblemType } from './JobCard';
+import { getJobIdForTask, groupTasksByJob, createTaskToJobMap } from '../../utils/taskHelpers';
 
 export interface JobsListProps {
   /** All jobs */
   jobs: Job[];
   /** All tasks */
   tasks: Task[];
+  /** All elements */
+  elements: Element[];
   /** All assignments */
   assignments: TaskAssignment[];
   /** Late jobs */
@@ -28,6 +31,7 @@ export interface JobsListProps {
 export function JobsList({
   jobs,
   tasks,
+  elements,
   assignments,
   lateJobs,
   conflicts,
@@ -47,26 +51,22 @@ export function JobsList({
     conflicts.forEach((c) => {
       // Get job IDs from tasks involved in conflicts
       const task = tasks.find((t) => t.id === c.taskId);
-      if (task) ids.add(task.jobId);
+      if (task) {
+        const jobId = getJobIdForTask(task, elements);
+        if (jobId) ids.add(jobId);
+      }
     });
     return ids;
-  }, [conflicts, tasks]);
+  }, [conflicts, tasks, elements]);
 
-  // Group tasks by job ID
+  // Group tasks by job ID using elements
   const tasksByJob = useMemo(() => {
-    const map = new Map<string, Task[]>();
-    tasks.forEach((task) => {
-      const existing = map.get(task.jobId) || [];
-      existing.push(task);
-      map.set(task.jobId, existing);
-    });
-    return map;
-  }, [tasks]);
+    return groupTasksByJob(tasks, elements);
+  }, [tasks, elements]);
 
-  // Group assignments by job ID (via tasks)
+  // Group assignments by job ID (via tasks and elements)
   const assignmentsByJob = useMemo(() => {
-    const taskJobMap = new Map<string, string>();
-    tasks.forEach((t) => taskJobMap.set(t.id, t.jobId));
+    const taskJobMap = createTaskToJobMap(tasks, elements);
 
     const map = new Map<string, TaskAssignment[]>();
     assignments.forEach((assignment) => {
@@ -78,7 +78,7 @@ export function JobsList({
       }
     });
     return map;
-  }, [tasks, assignments]);
+  }, [tasks, elements, assignments]);
 
   // Filter jobs by search query
   const filteredJobs = useMemo(() => {

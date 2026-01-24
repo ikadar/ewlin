@@ -164,19 +164,31 @@ function baseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'elements' | 'tasks' | 
 }
 
 /**
- * Generate elements for jobs.
- * For v0.4.0, creates one Element per Job (1:1 relationship).
+ * Job without elementIds - used for fixture definitions.
+ * The generateElementsForJobs function will add elementIds automatically.
  */
-function generateElementsForJobs(jobs: Job[], tasks: Task[]): Element[] {
-  return jobs.map((job) => ({
-    id: `elem-${job.id}`,
-    jobId: job.id,
-    suffix: 'ELT',
-    prerequisiteElementIds: [],
-    taskIds: tasks.filter((t) => t.jobId === job.id).map((t) => t.id),
-    createdAt: job.createdAt,
-    updatedAt: job.updatedAt,
-  }));
+type JobWithoutElementIds = Omit<Job, 'elementIds'>;
+
+/**
+ * Generate elements for jobs and add elementIds to jobs.
+ * For v0.4.1+, mutates jobs to add elementIds and returns elements.
+ */
+function generateElementsForJobs(jobs: JobWithoutElementIds[], tasks: Task[]): Element[] {
+  return jobs.map((job) => {
+    const elementId = `elem-${job.id}`;
+    // Mutate job to add elementIds (side effect for convenience in fixtures)
+    (job as Job).elementIds = [elementId];
+    return {
+      id: elementId,
+      jobId: job.id,
+      suffix: 'ELT',
+      prerequisiteElementIds: [],
+      // Tasks have elementId that matches this element's id
+      taskIds: tasks.filter((t) => t.elementId === elementId).map((t) => t.id),
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+  });
 }
 
 // BAT approval dates (proof sent and approved yesterday)
@@ -189,7 +201,7 @@ const batApprovedAt = new Date(today.getTime() - 12 * 60 * 60 * 1000).toISOStrin
 // ============================================================================
 
 export function createBasicFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-test-1',
       reference: 'TEST-001',
@@ -249,7 +261,7 @@ export function createBasicFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-test-1-print',
-      jobId: 'job-test-1',
+      elementId: 'elem-job-test-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -260,7 +272,7 @@ export function createBasicFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-test-1-cut',
-      jobId: 'job-test-1',
+      elementId: 'elem-job-test-1',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -271,7 +283,7 @@ export function createBasicFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-test-2-print',
-      jobId: 'job-test-2',
+      elementId: 'elem-job-test-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -282,7 +294,7 @@ export function createBasicFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-test-2-cut',
-      jobId: 'job-test-2',
+      elementId: 'elem-job-test-2',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -293,7 +305,7 @@ export function createBasicFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-test-3-print',
-      jobId: 'job-test-3',
+      elementId: 'elem-job-test-3',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -343,10 +355,12 @@ export function createBasicFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -376,7 +390,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
     },
   ];
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-pd-1',
       reference: 'PD-001',
@@ -436,7 +450,6 @@ export function createPushDownFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-pd-1',
-      jobId: 'job-pd-1',
       elementId: 'elem-job-pd-1',
       sequenceOrder: 0,
       status: 'Assigned',
@@ -448,7 +461,6 @@ export function createPushDownFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-pd-2',
-      jobId: 'job-pd-2',
       elementId: 'elem-job-pd-2',
       sequenceOrder: 0,
       status: 'Assigned',
@@ -460,7 +472,6 @@ export function createPushDownFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-pd-3',
-      jobId: 'job-pd-3',
       elementId: 'elem-job-pd-3',
       sequenceOrder: 0,
       status: 'Assigned',
@@ -512,11 +523,13 @@ export function createPushDownFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
     stations: pushDownStations,
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -531,7 +544,7 @@ export function createPushDownFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createPrecedenceFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-prec-1',
       reference: 'PREC-001',
@@ -555,7 +568,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-prec-1',
-      jobId: 'job-prec-1',
+      elementId: 'elem-job-prec-1',
       sequenceOrder: 0,  // First task
       status: 'Assigned',
       type: 'Internal',
@@ -566,7 +579,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-prec-2',
-      jobId: 'job-prec-1',
+      elementId: 'elem-job-prec-1',
       sequenceOrder: 1,  // Second task (must wait for first)
       status: 'Ready',
       type: 'Internal',
@@ -594,10 +607,12 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -627,7 +642,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     },
   ];
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     // Job without BAT approval (cannot schedule)
     {
       id: 'job-gate-no-bat',
@@ -690,7 +705,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-gate-no-bat',
-      jobId: 'job-gate-no-bat',
       elementId: 'elem-job-gate-no-bat',
       sequenceOrder: 0,
       status: 'Ready',
@@ -702,7 +716,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-gate-bat-ok',
-      jobId: 'job-gate-bat-ok',
       elementId: 'elem-job-gate-bat-ok',
       sequenceOrder: 0,
       status: 'Ready',
@@ -714,7 +727,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-gate-plates-pending',
-      jobId: 'job-gate-plates-pending',
       elementId: 'elem-job-gate-plates-pending',
       sequenceOrder: 0,
       status: 'Ready',
@@ -726,11 +738,13 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     } as InternalTask,
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
     stations: approvalGatesStations,
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments: [],
     conflicts: [],
@@ -745,7 +759,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createSwapFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-swap-1',
       reference: 'SWAP-001',
@@ -805,7 +819,7 @@ export function createSwapFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-swap-1',
-      jobId: 'job-swap-1',
+      elementId: 'elem-job-swap-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -816,7 +830,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-swap-2',
-      jobId: 'job-swap-2',
+      elementId: 'elem-job-swap-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -827,7 +841,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-swap-3',
-      jobId: 'job-swap-3',
+      elementId: 'elem-job-swap-3',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -878,10 +892,12 @@ export function createSwapFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -921,7 +937,7 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
     },
   ];
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-sidebar-1',
       reference: 'SIDE-001',
@@ -945,7 +961,6 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-sidebar-1',
-      jobId: 'job-sidebar-1',
       elementId: 'elem-job-sidebar-1',
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
@@ -957,11 +972,13 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
     } as InternalTask,
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
     stations: sidebarDragStations,
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments: [], // No assignments - task is unscheduled
     conflicts: [],
@@ -977,7 +994,7 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createAltBypassFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-bypass-1',
       reference: 'BYPASS-001',
@@ -1001,7 +1018,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-bypass-1',
-      jobId: 'job-bypass-1',
+      elementId: 'elem-job-bypass-1',
       sequenceOrder: 0,  // First task
       status: 'Assigned',
       type: 'Internal',
@@ -1012,7 +1029,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-bypass-2',
-      jobId: 'job-bypass-1',
+      elementId: 'elem-job-bypass-1',
       sequenceOrder: 1,  // Second task (must wait for first to complete at 11:00)
       status: 'Ready',
       type: 'Internal',
@@ -1041,10 +1058,12 @@ export function createAltBypassFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -1074,7 +1093,7 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
     },
   ];
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-snap-1',
       reference: 'SNAP-001',
@@ -1098,7 +1117,6 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-snap-1',
-      jobId: 'job-snap-1',
       elementId: 'elem-job-snap-1',
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
@@ -1113,11 +1131,13 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
   // No assignments - task is unscheduled for drag testing
   // Station has lunch break 12:00-13:00 (not in standardDaySchedule slots)
   // Dragging to 12:45 should snap to 13:00 and show GREEN border
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
     stations: dragSnappingStations,
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments: [],
     conflicts: [],
@@ -1132,7 +1152,7 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createUiBugFixesFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     // Job with very long client name and description (for REQ-05 overflow test)
     {
       id: 'job-long-text',
@@ -1214,7 +1234,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-long-text',
-      jobId: 'job-long-text',
+      elementId: 'elem-job-long-text',
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
@@ -1225,7 +1245,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-a',
-      jobId: 'job-a',
+      elementId: 'elem-job-a',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1236,7 +1256,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-b',
-      jobId: 'job-b',
+      elementId: 'elem-job-b',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1247,7 +1267,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-c',
-      jobId: 'job-c',
+      elementId: 'elem-job-c',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1298,10 +1318,12 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -1327,7 +1349,7 @@ export function createLayoutRedesignFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createDatestripRedesignFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     // Job with departure 7 days from now, tasks scheduled today and day 3
     {
       id: 'job-ds-1',
@@ -1371,7 +1393,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-ds-1-a',
-      jobId: 'job-ds-1',
+      elementId: 'elem-job-ds-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1382,7 +1404,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-ds-1-b',
-      jobId: 'job-ds-1',
+      elementId: 'elem-job-ds-1',
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
@@ -1393,7 +1415,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-ds-2',
-      jobId: 'job-ds-2',
+      elementId: 'elem-job-ds-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1447,10 +1469,12 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -1465,7 +1489,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-pv-1',
       reference: 'PV-001',
@@ -1490,7 +1514,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     // Task 1: Printing on Komori - SCHEDULED at 8:00-10:00
     {
       id: 'task-pv-1',
-      jobId: 'job-pv-1',
+      elementId: 'elem-job-pv-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1503,7 +1527,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     // When dragging: should show purple line at 14:00 (Task 1 end 10:00 + 4h dry time)
     {
       id: 'task-pv-2',
-      jobId: 'job-pv-1',
+      elementId: 'elem-job-pv-1',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -1516,7 +1540,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     // When dragging Task 2: should show orange line at 16:30 (Task 3 start 18:00 - Task 2 duration 1.5h)
     {
       id: 'task-pv-3',
-      jobId: 'job-pv-1',
+      elementId: 'elem-job-pv-1',
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
@@ -1556,10 +1580,12 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -1574,7 +1600,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createVirtualScrollFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [];
+  const jobs: JobWithoutElementIds[] = [];
   const tasks: Task[] = [];
   const assignments: TaskAssignment[] = [];
 
@@ -1646,7 +1672,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
   job1Days.forEach((dayOffset, i) => {
     tasks.push({
       id: `task-vs-1${job1TaskSuffixes[i]}`,
-      jobId: 'job-vs-1',
+      elementId: 'elem-job-vs-1',
       sequenceOrder: i,
       status: 'Assigned',
       type: 'Internal',
@@ -1676,7 +1702,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
   job2Days.forEach((dayOffset, i) => {
     tasks.push({
       id: `task-vs-2${job2TaskSuffixes[i]}`,
-      jobId: 'job-vs-2',
+      elementId: 'elem-job-vs-2',
       sequenceOrder: i,
       status: 'Assigned',
       type: 'Internal',
@@ -1703,7 +1729,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
   // Task for job 3: on day 180 (near the 200-day departure)
   tasks.push({
     id: 'task-vs-3',
-    jobId: 'job-vs-3',
+    elementId: 'elem-job-vs-3',
     sequenceOrder: 0,
     status: 'Assigned',
     type: 'Internal',
@@ -1726,10 +1752,12 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     updatedAt: today.toISOString(),
   });
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -1749,7 +1777,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
   yesterdayAt10.setDate(yesterdayAt10.getDate() - 1);
   yesterdayAt10.setHours(10, 0, 0, 0);
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-markers-1',
       reference: 'MARK-001',
@@ -1793,7 +1821,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     // Task 1: Yesterday, NOT completed -> LATE (red marker)
     {
       id: 'task-m1',
-      jobId: 'job-markers-1',
+      elementId: 'elem-job-markers-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1805,7 +1833,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     // Task 2: Today, COMPLETED -> green marker
     {
       id: 'task-m2',
-      jobId: 'job-markers-1',
+      elementId: 'elem-job-markers-1',
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
@@ -1817,7 +1845,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     // Task 3: Tomorrow (day 1), NOT completed, scheduled -> gray marker (future)
     {
       id: 'task-m3',
-      jobId: 'job-markers-1',
+      elementId: 'elem-job-markers-1',
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
@@ -1829,7 +1857,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     // Task 4: Day 2, scheduled but with precedence conflict -> orange marker
     {
       id: 'task-m4',
-      jobId: 'job-markers-1',
+      elementId: 'elem-job-markers-1',
       sequenceOrder: 3,
       status: 'Assigned',
       type: 'Internal',
@@ -1841,7 +1869,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     // Task 5: Day 3, NOT scheduled -> no marker (unscheduled)
     {
       id: 'task-m5',
-      jobId: 'job-markers-1',
+      elementId: 'elem-job-markers-1',
       sequenceOrder: 4,
       status: 'Ready', // Unscheduled
       type: 'Internal',
@@ -1853,7 +1881,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     // Task 6: Other job, today
     {
       id: 'task-m6',
-      jobId: 'job-markers-2',
+      elementId: 'elem-job-markers-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -1947,14 +1975,16 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts,
-    lateJobs: ['job-markers-1'], // Has late task
+    lateJobs: [{ jobId: 'job-markers-1', deadline: isoDate(0, 0, -1), expectedCompletion: isoDate(0, 0, 1), delayDays: 2 }],
   };
 }
 
@@ -1980,7 +2010,7 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
     },
   ];
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-zoom-1',
       reference: 'ZOOM-001',
@@ -2004,7 +2034,6 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-z1',
-      jobId: 'job-zoom-1',
       elementId: 'elem-job-zoom-1',
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled, ready to place
@@ -2016,12 +2045,14 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
     } as InternalTask,
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   // No assignments - task is unscheduled for drag testing at different zoom levels
   return {
     ...baseSnapshot(),
     stations: zoomSnappingStations,
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments: [],
     conflicts: [],
@@ -2036,7 +2067,7 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createDryingTimeFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-dry-1',
       reference: 'DRY-001',
@@ -2062,7 +2093,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
     // This task requires 4h drying time after completion
     {
       id: 'task-dry-1',
-      jobId: 'job-dry-1',
+      elementId: 'elem-job-dry-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -2076,7 +2107,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
     // Arrow goes from 10:00 (task-dry-1 end) to 14:00 (10:00 + 4h dry time)
     {
       id: 'task-dry-2',
-      jobId: 'job-dry-1',
+      elementId: 'elem-job-dry-1',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -2104,10 +2135,12 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -2122,7 +2155,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createValidationMessagesFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     // Job 1: Has 2 sequential tasks - for precedence conflict testing
     {
       id: 'job-val-1',
@@ -2186,7 +2219,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     // Task 1: Predecessor on Komori, scheduled 8:00-10:00
     {
       id: 'task-val-1',
-      jobId: 'job-val-1',
+      elementId: 'elem-job-val-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -2198,7 +2231,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     // Task 2: Successor, unscheduled - will show precedence conflict if placed too early
     {
       id: 'task-val-2',
-      jobId: 'job-val-1',
+      elementId: 'elem-job-val-1',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -2210,7 +2243,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     // Task 3: No BAT approval - will show approval gate conflict
     {
       id: 'task-val-3',
-      jobId: 'job-val-2',
+      elementId: 'elem-job-val-2',
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
@@ -2222,7 +2255,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     // Task 4: Valid task for comparison
     {
       id: 'task-val-4',
-      jobId: 'job-val-3',
+      elementId: 'elem-job-val-3',
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
@@ -2250,10 +2283,12 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -2268,7 +2303,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     // Job 1: Drying ends during lunch - demonstrates snap to 13:00
     {
       id: 'job-pwh-1',
@@ -2317,7 +2352,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     // Purple line should be at 13:00
     {
       id: 'task-pwh-1',
-      jobId: 'job-pwh-1',
+      elementId: 'elem-job-pwh-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -2329,7 +2364,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     // Task 2: Successor - unscheduled
     {
       id: 'task-pwh-2',
-      jobId: 'job-pwh-1',
+      elementId: 'elem-job-pwh-1',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -2346,7 +2381,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     // Purple line should be at 15:00
     {
       id: 'task-pwh-3',
-      jobId: 'job-pwh-2',
+      elementId: 'elem-job-pwh-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -2358,7 +2393,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     // Task 4: Successor - unscheduled
     {
       id: 'task-pwh-4',
-      jobId: 'job-pwh-2',
+      elementId: 'elem-job-pwh-2',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -2398,10 +2433,12 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -2416,7 +2453,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createPickPlaceFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     // Job 1: Has unscheduled tasks for picking
     {
       id: 'job-pick-1',
@@ -2480,7 +2517,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     // Job 1 tasks: Print (scheduled) → Cut (unscheduled) → Finish (unscheduled)
     {
       id: 'task-pick-1a',
-      jobId: 'job-pick-1',
+      elementId: 'elem-job-pick-1',
       sequenceOrder: 0,
       status: 'Assigned', // Scheduled
       type: 'Internal',
@@ -2491,7 +2528,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-pick-1b',
-      jobId: 'job-pick-1',
+      elementId: 'elem-job-pick-1',
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled - waiting for predecessor
       type: 'Internal',
@@ -2502,7 +2539,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-pick-1c',
-      jobId: 'job-pick-1',
+      elementId: 'elem-job-pick-1',
       sequenceOrder: 2,
       status: 'Ready', // Unscheduled
       type: 'Internal',
@@ -2515,7 +2552,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     // Job 2 tasks: All unscheduled (different stations)
     {
       id: 'task-pick-2a',
-      jobId: 'job-pick-2',
+      elementId: 'elem-job-pick-2',
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled
       type: 'Internal',
@@ -2526,7 +2563,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-pick-2b',
-      jobId: 'job-pick-2',
+      elementId: 'elem-job-pick-2',
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled
       type: 'Internal',
@@ -2539,7 +2576,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     // Job 3 tasks: Print (scheduled) → Cut (unscheduled, has predecessor)
     {
       id: 'task-pick-3a',
-      jobId: 'job-pick-3',
+      elementId: 'elem-job-pick-3',
       sequenceOrder: 0,
       status: 'Assigned', // Scheduled
       type: 'Internal',
@@ -2550,7 +2587,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-pick-3b',
-      jobId: 'job-pick-3',
+      elementId: 'elem-job-pick-3',
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled - has precedence constraint (predecessor + dry time)
       type: 'Internal',
@@ -2590,10 +2627,12 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -2607,7 +2646,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
 // ============================================================================
 
 export function createContextMenuFixture(): ScheduleSnapshot {
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     // Job 1: Has 3 consecutive scheduled tasks on same station for swap testing
     {
       id: 'job-menu-1',
@@ -2652,7 +2691,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     // Job 1: 3 consecutive tasks on Komori (for swap testing)
     {
       id: 'task-menu-1a',
-      jobId: 'job-menu-1',
+      elementId: 'elem-job-menu-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -2663,7 +2702,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-menu-1b',
-      jobId: 'job-menu-1',
+      elementId: 'elem-job-menu-1',
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
@@ -2674,7 +2713,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-menu-1c',
-      jobId: 'job-menu-1',
+      elementId: 'elem-job-menu-1',
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
@@ -2687,7 +2726,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     // Job 2: Single task on Heidelberg (isolated)
     {
       id: 'task-menu-2a',
-      jobId: 'job-menu-2',
+      elementId: 'elem-job-menu-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -2751,10 +2790,12 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -2780,17 +2821,20 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     return d.toISOString();
   };
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-height-1',
       reference: 'HEIGHT-001',
       client: 'Test Client',
       description: 'Task with varying durations',
+      status: 'InProgress',
       color: '#8b5cf6', // Purple
       workshopExitDate: isoDate(17, 0),
-      batApproval: { status: 'approved', date: today.toISOString() },
+      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       platesStatus: 'Done',
-      paperStatus: 'InStock',
+      paperPurchaseStatus: 'InStock',
+      requiredJobIds: [],
+      comments: [],
       taskIds: ['task-h-15min', 'task-h-30min', 'task-h-2h', 'task-h-4h'],
       fullyScheduled: false,
       createdAt: today.toISOString(),
@@ -2801,11 +2845,14 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
       reference: 'HEIGHT-002',
       client: 'Another Client',
       description: 'Mix of scheduled and unscheduled',
+      status: 'InProgress',
       color: '#3b82f6', // Blue
       workshopExitDate: isoDate(17, 0),
-      batApproval: { status: 'approved', date: today.toISOString() },
+      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       platesStatus: 'Done',
-      paperStatus: 'InStock',
+      paperPurchaseStatus: 'InStock',
+      requiredJobIds: [],
+      comments: [],
       taskIds: ['task-h-sched', 'task-h-unsched'],
       fullyScheduled: false,
       createdAt: today.toISOString(),
@@ -2817,7 +2864,7 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     // Job 1: 4 tasks with varying durations (all unscheduled)
     {
       id: 'task-h-15min',
-      jobId: 'job-height-1',
+      elementId: 'elem-job-height-1',
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
@@ -2828,7 +2875,7 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-h-30min',
-      jobId: 'job-height-1',
+      elementId: 'elem-job-height-1',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -2839,7 +2886,7 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-h-2h',
-      jobId: 'job-height-1',
+      elementId: 'elem-job-height-1',
       sequenceOrder: 2,
       status: 'Ready',
       type: 'Internal',
@@ -2850,7 +2897,7 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-h-4h',
-      jobId: 'job-height-1',
+      elementId: 'elem-job-height-1',
       sequenceOrder: 3,
       status: 'Ready',
       type: 'Internal',
@@ -2863,7 +2910,7 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     // Job 2: One scheduled, one unscheduled
     {
       id: 'task-h-sched',
-      jobId: 'job-height-2',
+      elementId: 'elem-job-height-2',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -2874,7 +2921,7 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     } as InternalTask,
     {
       id: 'task-h-unsched',
-      jobId: 'job-height-2',
+      elementId: 'elem-job-height-2',
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
@@ -2901,10 +2948,12 @@ function createFixedTileHeightFixture(): ScheduleSnapshot {
     },
   ];
 
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
   return {
     ...baseSnapshot(),
-    jobs,
-    elements: generateElementsForJobs(jobs, tasks),
+    jobs: jobs as Job[],
+    elements,
     tasks,
     assignments,
     conflicts: [],
@@ -3019,7 +3068,7 @@ function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
   const localBatSentAt = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const localBatApprovedAt = new Date(today.getTime() - 12 * 60 * 60 * 1000).toISOString();
 
-  const jobs: Job[] = [
+  const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-overlay-1',
       reference: 'OVERLAY-001',
@@ -3043,7 +3092,7 @@ function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
   const tasks: Task[] = [
     {
       id: 'task-overlay-1',
-      jobId: 'job-overlay-1',
+      elementId: 'elem-job-overlay-1',
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
@@ -3076,7 +3125,7 @@ function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
     categories,
     groups,
     providers: [],
-    jobs,
+    jobs: jobs as Job[],
     elements: generateElementsForJobs(jobs, tasks),
     tasks,
     assignments,

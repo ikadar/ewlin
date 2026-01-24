@@ -10,13 +10,13 @@ import type { ScheduleSnapshot, Task, TaskAssignment, Station } from '@flux/type
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
 import { subtractWorkingTime, snapToNextWorkingTime } from './workingTime';
+import { getTasksForJob, getJobIdForTask } from './taskHelpers';
 
 /**
  * Get all tasks for a job in sequence order.
  */
 function getJobTasks(snapshot: ScheduleSnapshot, jobId: string): Task[] {
-  return snapshot.tasks
-    .filter((t) => t.jobId === jobId)
+  return getTasksForJob(jobId, snapshot.tasks, snapshot.elements)
     .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
 }
 
@@ -24,7 +24,10 @@ function getJobTasks(snapshot: ScheduleSnapshot, jobId: string): Task[] {
  * Get the predecessor task (if any) for a given task.
  */
 function getPredecessorTask(snapshot: ScheduleSnapshot, task: Task): Task | undefined {
-  const jobTasks = getJobTasks(snapshot, task.jobId);
+  const jobId = getJobIdForTask(task, snapshot.elements);
+  if (!jobId) return undefined;
+
+  const jobTasks = getJobTasks(snapshot, jobId);
   const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
   if (taskIndex > 0) {
     return jobTasks[taskIndex - 1];
@@ -36,7 +39,10 @@ function getPredecessorTask(snapshot: ScheduleSnapshot, task: Task): Task | unde
  * Get the successor task (if any) for a given task.
  */
 function getSuccessorTask(snapshot: ScheduleSnapshot, task: Task): Task | undefined {
-  const jobTasks = getJobTasks(snapshot, task.jobId);
+  const jobId = getJobIdForTask(task, snapshot.elements);
+  if (!jobId) return undefined;
+
+  const jobTasks = getJobTasks(snapshot, jobId);
   const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
   if (taskIndex >= 0 && taskIndex < jobTasks.length - 1) {
     return jobTasks[taskIndex + 1];

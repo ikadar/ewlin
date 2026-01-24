@@ -6,7 +6,7 @@ import { ProgressDots } from './ProgressDots';
 import { ProblemsSection } from './ProblemsSection';
 import { JobsSection } from './JobsSection';
 import { JobsListHeader } from './JobsListHeader';
-import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict } from '@flux/types';
+import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
 
 // Mock data
 const mockJobs: Job[] = [
@@ -25,6 +25,7 @@ const mockJobs: Job[] = [
     requiredJobIds: [],
     comments: [],
     taskIds: ['task-1', 'task-2'],
+    elementIds: ['element-1'],
     createdAt: '2025-12-15T10:00:00Z',
     updatedAt: '2025-12-15T10:00:00Z',
   },
@@ -43,6 +44,7 @@ const mockJobs: Job[] = [
     requiredJobIds: [],
     comments: [],
     taskIds: ['task-3'],
+    elementIds: ['element-2'],
     createdAt: '2025-12-15T10:00:00Z',
     updatedAt: '2025-12-15T10:00:00Z',
   },
@@ -61,6 +63,34 @@ const mockJobs: Job[] = [
     requiredJobIds: [],
     comments: [],
     taskIds: [],
+    elementIds: ['element-3'],
+    createdAt: '2025-12-15T10:00:00Z',
+    updatedAt: '2025-12-15T10:00:00Z',
+  },
+];
+
+const mockElements: Element[] = [
+  {
+    id: 'element-1',
+    jobId: 'job-1',
+    name: 'Element 1',
+    taskIds: ['task-1', 'task-2'],
+    createdAt: '2025-12-15T10:00:00Z',
+    updatedAt: '2025-12-15T10:00:00Z',
+  },
+  {
+    id: 'element-2',
+    jobId: 'job-2',
+    name: 'Element 2',
+    taskIds: ['task-3'],
+    createdAt: '2025-12-15T10:00:00Z',
+    updatedAt: '2025-12-15T10:00:00Z',
+  },
+  {
+    id: 'element-3',
+    jobId: 'job-3',
+    name: 'Element 3',
+    taskIds: [],
     createdAt: '2025-12-15T10:00:00Z',
     updatedAt: '2025-12-15T10:00:00Z',
   },
@@ -69,7 +99,7 @@ const mockJobs: Job[] = [
 const mockTasks: Task[] = [
   {
     id: 'task-1',
-    jobId: 'job-1',
+    elementId: 'element-1',
     sequenceOrder: 0,
     status: 'Completed',
     type: 'Internal',
@@ -80,7 +110,7 @@ const mockTasks: Task[] = [
   },
   {
     id: 'task-2',
-    jobId: 'job-1',
+    elementId: 'element-1',
     sequenceOrder: 1,
     status: 'Assigned',
     type: 'Internal',
@@ -91,7 +121,7 @@ const mockTasks: Task[] = [
   },
   {
     id: 'task-3',
-    jobId: 'job-2',
+    elementId: 'element-2',
     sequenceOrder: 0,
     status: 'Ready',
     type: 'Internal',
@@ -146,6 +176,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
@@ -159,6 +190,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
@@ -174,6 +206,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         lateJobs={mockLateJobs}
         conflicts={[]}
@@ -188,6 +221,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
@@ -206,6 +240,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
@@ -224,6 +259,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}
@@ -240,6 +276,7 @@ describe('JobsList', () => {
       <JobsList
         jobs={mockJobs}
         tasks={mockTasks}
+        elements={mockElements}
         assignments={mockAssignments}
         lateJobs={[]}
         conflicts={[]}

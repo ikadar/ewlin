@@ -1,14 +1,17 @@
-import type { Job, Task, TaskAssignment, Station } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, Element } from '@flux/types';
 import { X } from 'lucide-react';
 import { JobInfo } from './JobInfo';
 import { JobStatus } from './JobStatus';
 import { TaskList } from './TaskList';
+import { getTasksForJob } from '../../utils/taskHelpers';
 
 export interface JobDetailsPanelProps {
   /** Selected job to display (null if none selected) */
   job: Job | null;
   /** All tasks */
   tasks: Task[];
+  /** All elements */
+  elements: Element[];
   /** All assignments */
   assignments: TaskAssignment[];
   /** All stations */
@@ -36,6 +39,7 @@ export interface JobDetailsPanelProps {
 export function JobDetailsPanel({
   job,
   tasks,
+  elements,
   assignments,
   stations,
   activeTaskId,
@@ -52,7 +56,7 @@ export function JobDetailsPanel({
   }
 
   // Filter tasks for this job
-  const jobTasks = tasks.filter((t) => t.jobId === job.id);
+  const jobTasks = getTasksForJob(job.id, tasks, elements);
 
   // Filter assignments for this job's tasks
   const jobTaskIds = new Set(jobTasks.map((t) => t.id));
