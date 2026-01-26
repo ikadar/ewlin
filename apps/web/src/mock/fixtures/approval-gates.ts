@@ -1,0 +1,149 @@
+import type {
+  ScheduleSnapshot,
+  Station,
+  Job,
+  Task,
+  InternalTask,
+} from '@flux/types';
+import {
+  today,
+  isoDate,
+  batSentAt,
+  batApprovedAt,
+  baseSnapshot,
+  generateElementsForJobs,
+  sevenDayOperatingSchedule,
+  type JobWithoutElementIds,
+} from './shared';
+
+// ============================================================================
+// Fixture: approval-gates
+// For UC-07 (Approval Gate Validation)
+// Jobs with different approval states
+// Uses 7-day operating schedule so tests pass on weekends
+// ============================================================================
+
+export function createApprovalGatesFixture(): ScheduleSnapshot {
+  // Custom stations with 7-day operating schedule for weekend-proof testing
+  const approvalGatesStations: Station[] = [
+    {
+      id: 'station-komori',
+      name: 'Komori G40',
+      status: 'Available',
+      categoryId: 'cat-offset',
+      groupId: 'grp-offset',
+      capacity: 1,
+      operatingSchedule: sevenDayOperatingSchedule,
+      exceptions: [],
+    },
+  ];
+
+  const jobs: JobWithoutElementIds[] = [
+    // Job without BAT approval (cannot schedule)
+    {
+      id: 'job-gate-no-bat',
+      reference: 'GATE-001',
+      client: 'No BAT Client',
+      description: 'Job without BAT approval',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 7),
+      color: '#ef4444',
+      paperPurchaseStatus: 'InStock',
+      platesStatus: 'Done',
+      proofApproval: { sentAt: batSentAt, approvedAt: null }, // NOT approved
+      requiredJobIds: [],
+      comments: [],
+      taskIds: ['task-gate-no-bat'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    // Job with BAT approved (can schedule)
+    {
+      id: 'job-gate-bat-ok',
+      reference: 'GATE-002',
+      client: 'BAT OK Client',
+      description: 'Job with BAT approved',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 7),
+      color: '#22c55e',
+      paperPurchaseStatus: 'InStock',
+      platesStatus: 'Done',
+      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
+      requiredJobIds: [],
+      comments: [],
+      taskIds: ['task-gate-bat-ok'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    // Job with Plates pending (warning only)
+    {
+      id: 'job-gate-plates-pending',
+      reference: 'GATE-003',
+      client: 'Plates Pending Client',
+      description: 'Job with Plates pending',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 7),
+      color: '#f59e0b',
+      paperPurchaseStatus: 'InStock',
+      platesStatus: 'Todo', // NOT done - warning only
+      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
+      requiredJobIds: [],
+      comments: [],
+      taskIds: ['task-gate-plates-pending'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  const tasks: Task[] = [
+    {
+      id: 'task-gate-no-bat',
+      elementId: 'elem-job-gate-no-bat',
+      sequenceOrder: 0,
+      status: 'Ready',
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 60 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    {
+      id: 'task-gate-bat-ok',
+      elementId: 'elem-job-gate-bat-ok',
+      sequenceOrder: 0,
+      status: 'Ready',
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 60 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    {
+      id: 'task-gate-plates-pending',
+      elementId: 'elem-job-gate-plates-pending',
+      sequenceOrder: 0,
+      status: 'Ready',
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 60 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+  ];
+
+  // generateElementsForJobs mutates jobs to add elementIds
+  const elements = generateElementsForJobs(jobs, tasks);
+  return {
+    ...baseSnapshot(),
+    stations: approvalGatesStations,
+    jobs: jobs as Job[],
+    elements,
+    tasks,
+    assignments: [],
+    conflicts: [],
+    lateJobs: [],
+  };
+}
