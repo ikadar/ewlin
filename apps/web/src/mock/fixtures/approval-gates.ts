@@ -51,7 +51,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: null }, // NOT approved
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-gate-no-bat'],
       fullyScheduled: false,
@@ -70,7 +69,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-gate-bat-ok'],
       fullyScheduled: false,
@@ -89,7 +87,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Todo', // NOT done - warning only
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-gate-plates-pending'],
       fullyScheduled: false,

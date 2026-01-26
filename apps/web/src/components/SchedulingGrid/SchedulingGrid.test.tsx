@@ -79,7 +79,6 @@ const mockJob: Job = {
   platesStatus: 'Done',
   proofSentAt: null,
   proofApprovedAt: null,
-  requiredJobIds: [],
 };
 
 describe('SchedulingGrid', () => {

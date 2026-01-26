@@ -35,7 +35,6 @@ export function createAltBypassFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-bypass-1', 'task-bypass-2'],
       fullyScheduled: false,

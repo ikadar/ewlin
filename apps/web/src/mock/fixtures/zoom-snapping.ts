@@ -50,7 +50,6 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-z1'],
       fullyScheduled: false,

@@ -21,7 +21,6 @@ const mockJob: Job = {
   paperPurchaseStatus: 'Ordered',
   proofApproval: { sentAt: '2025-12-12T14:30:00Z', approvedAt: null },
   platesStatus: 'Done',
-  requiredJobIds: [],
   comments: [],
   taskIds: ['task-1', 'task-2'],
   elementIds: ['element-1'],

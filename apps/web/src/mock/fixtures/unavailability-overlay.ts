@@ -133,7 +133,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
       proofApproval: { sentAt: localBatSentAt, approvedAt: localBatApprovedAt },
       platesStatus: 'Done',
       paperPurchaseStatus: 'InStock',
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-overlay-1'],
       fullyScheduled: false,

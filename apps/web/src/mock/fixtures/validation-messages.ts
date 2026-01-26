@@ -35,7 +35,6 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-val-1', 'task-val-2'],
       fullyScheduled: false,
@@ -54,7 +53,6 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: null }, // NOT approved
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-val-3'],
       fullyScheduled: false,
@@ -73,7 +71,6 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-val-4'],
       fullyScheduled: false,

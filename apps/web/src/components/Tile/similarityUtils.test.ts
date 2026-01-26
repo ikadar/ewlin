@@ -15,7 +15,6 @@ const createMockJob = (overrides: Partial<Job> = {}): Job => ({
   paperPurchaseStatus: 'InStock',
   platesStatus: 'Done',
   proofApproval: { sentAt: null, approvedAt: null },
-  requiredJobIds: [],
   comments: [],
   taskIds: [],
   createdAt: new Date().toISOString(),

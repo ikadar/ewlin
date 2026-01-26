@@ -26,7 +26,6 @@ function createJob(id: string): Job {
       approvedAt: '2025-12-12',
     },
     platesStatus: 'Done',
-    requiredJobIds: [],
     comments: [],
     taskIds: [],
     elementIds: [`element-${id}`],

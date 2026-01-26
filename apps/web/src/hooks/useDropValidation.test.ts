@@ -46,7 +46,6 @@ const mockJob: Job = {
   platesStatus: 'Done',
   proofSentAt: null,
   proofApprovedAt: null,
-  requiredJobIds: [],
 };
 
 const mockInternalTask: Task = {

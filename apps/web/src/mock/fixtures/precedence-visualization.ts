@@ -34,7 +34,6 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-pv-1', 'task-pv-2', 'task-pv-3'],
       fullyScheduled: false,

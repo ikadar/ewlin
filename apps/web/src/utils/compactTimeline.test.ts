@@ -60,7 +60,6 @@ function createJob(id: string): Job {
     platesStatus: 'Done',
     paperPurchaseStatus: 'InStock',
     paperOrderedAt: null,
-    requiredJobIds: [],
     elementIds: [`element-${id}`],
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',

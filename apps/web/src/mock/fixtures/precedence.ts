@@ -34,7 +34,6 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-prec-1', 'task-prec-2'],
       fullyScheduled: false,

@@ -34,7 +34,6 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
       paperPurchaseStatus: 'InStock',
       platesStatus: 'Done',
       proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      requiredJobIds: [],
       comments: [],
       taskIds: ['task-dry-1', 'task-dry-2'],
       fullyScheduled: false,
