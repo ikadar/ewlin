@@ -255,6 +255,148 @@ export async function dragFromSidebarToStation(
 }
 
 /**
+ * Pick a task tile and place it on a station column at a specific Y position.
+ *
+ * targetY is relative to the VISIBLE top of the grid (i.e., offset from
+ * the current scroll position), not from the absolute top of the column.
+ * This is critical because the grid can be 700,000+ px tall (365-day view)
+ * and the visible portion is a tiny window scrolled to "today".
+ *
+ * Uses dispatchEvent with bubbles:true to reach React 18's event delegation,
+ * matching the pattern used by the passing drag-and-drop tests.
+ */
+export async function pickAndPlace(
+  page: Page,
+  taskTileSelector: string,
+  stationId: string,
+  targetY: number
+): Promise<void> {
+  // Step 1: Click task tile to enter pick mode
+  await page.locator(taskTileSelector).click();
+
+  // Wait for pick preview to appear
+  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 3000 });
+
+  // Step 2: Dispatch mousemove + click via evaluate
+  // targetY is offset from the visible top, so we add scrollTop to get
+  // the absolute column position that the handler needs for time calculation.
+  await page.evaluate(
+    async ({ stationId, targetY }) => {
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const stationColumn = document.querySelector(
+        `[data-testid="station-column-${stationId}"]`
+      ) as HTMLElement;
+      if (!stationColumn) throw new Error(`Station column not found: ${stationId}`);
+
+      // Get scroll position of the grid container
+      const grid = document.querySelector('[data-testid="scheduling-grid"]') as HTMLElement;
+      const scrollTop = grid ? grid.scrollTop : 0;
+
+      // absoluteY = position in column coordinates (scrollTop + visible offset)
+      const absoluteY = scrollTop + targetY;
+
+      const rect = stationColumn.getBoundingClientRect();
+      const clientX = rect.x + rect.width / 2;
+      const clientY = rect.y + absoluteY;
+
+      // Dispatch mousemove to trigger validation
+      stationColumn.dispatchEvent(new MouseEvent('mousemove', {
+        bubbles: true, cancelable: true, clientX, clientY,
+      }));
+      await sleep(200);
+
+      // Dispatch click to place
+      stationColumn.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true, clientX, clientY,
+      }));
+    },
+    { stationId, targetY }
+  );
+
+  // Wait for React state update
+  await page.waitForTimeout(300);
+}
+
+/**
+ * Pick a task tile and place it at a specific TIME on a station column.
+ *
+ * Unlike pickAndPlace (which uses a viewport-relative pixel offset),
+ * this function computes the absolute Y position from the desired hour/minute,
+ * making it immune to scroll-position variations caused by different test run times.
+ *
+ * This is important because the grid auto-scrolls to center the current time,
+ * so the same pixel offset can map to different times (and potentially hit
+ * the lunch break 12:00-13:00) depending on when the test runs.
+ *
+ * @param hour - Desired placement hour (0-23) on today's date
+ * @param minute - Desired placement minute (0-59), default 0
+ * @param pixelsPerHour - Pixels per hour at current zoom level, default 80
+ */
+export async function pickAndPlaceAtTime(
+  page: Page,
+  taskTileSelector: string,
+  stationId: string,
+  hour: number,
+  minute: number = 0,
+  pixelsPerHour: number = 80
+): Promise<void> {
+  // Step 1: Click task tile to enter pick mode
+  await page.locator(taskTileSelector).click();
+  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 3000 });
+
+  // Step 2: Compute absolute Y for the desired time and dispatch events
+  await page.evaluate(
+    async ({ stationId, hour, minute, pixelsPerHour }) => {
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const stationColumn = document.querySelector(
+        `[data-testid="station-column-${stationId}"]`
+      ) as HTMLElement;
+      if (!stationColumn) throw new Error(`Station column not found: ${stationId}`);
+
+      // Replicate gridStartDate calculation: today - 6 days, midnight
+      const gridStart = new Date();
+      gridStart.setDate(gridStart.getDate() - 6);
+      gridStart.setHours(0, 0, 0, 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysDiff = Math.round(
+        (today.getTime() - gridStart.getTime()) / (24 * 60 * 60 * 1000)
+      );
+
+      // Absolute Y in column coordinates for the desired time
+      const totalHours = daysDiff * 24 + hour + minute / 60;
+      const absoluteY = totalHours * pixelsPerHour;
+
+      // The handler subtracts PICK_CURSOR_OFFSET_Y (20px) from relativeY,
+      // so we add it to get the correct tileTopY after subtraction
+      const PICK_CURSOR_OFFSET_Y = 20;
+      const relativeY = absoluteY + PICK_CURSOR_OFFSET_Y;
+
+      const rect = stationColumn.getBoundingClientRect();
+      const clientX = rect.x + rect.width / 2;
+      const clientY = rect.y + relativeY;
+
+      // Dispatch mousemove to trigger validation
+      stationColumn.dispatchEvent(new MouseEvent('mousemove', {
+        bubbles: true, cancelable: true, clientX, clientY,
+      }));
+      await sleep(200);
+
+      // Dispatch click to place
+      stationColumn.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true, clientX, clientY,
+      }));
+    },
+    { stationId, hour, minute, pixelsPerHour }
+  );
+
+  await page.waitForTimeout(300);
+}
+
+/**
  * Perform drag outside station column (cancel drag)
  */
 export async function dragTileOutsideColumn(

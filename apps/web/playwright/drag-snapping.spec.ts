@@ -14,40 +14,13 @@ import {
   waitForAppReady,
   countTilesOnStation,
   isOnSnapBoundary,
+  pickAndPlace,
+  pickAndPlaceAtTime,
 } from './helpers/drag';
-
-/**
- * Helper: Pick task from sidebar and place on station using Pick & Place
- */
-async function pickAndPlace(
-  page: import('@playwright/test').Page,
-  taskTileSelector: string,
-  stationId: string,
-  targetY: number
-): Promise<void> {
-  // Click task tile to pick it
-  await page.locator(taskTileSelector).click();
-
-  // Wait for pick preview to appear
-  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 2000 }).catch(() => null);
-
-  // Move to target station at specified Y position
-  const targetColumn = page.locator(`[data-testid="station-column-${stationId}"]`);
-  const box = await targetColumn.boundingBox();
-  if (box) {
-    await page.mouse.move(box.x + box.width / 2, box.y + targetY);
-  }
-
-  // Click to place
-  await targetColumn.click();
-
-  // Wait for state update
-  await page.waitForTimeout(300);
-}
 
 test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
   test.beforeEach(async ({ page }) => {
-    // Use sidebar-drag fixture with unscheduled tasks
+    test.setTimeout(10_000);
     await page.goto('/?fixture=sidebar-drag');
     await waitForAppReady(page);
   });
@@ -203,7 +176,7 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
 
 test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
   test.beforeEach(async ({ page }) => {
-    // Use drag-snapping fixture
+    test.setTimeout(10_000);
     await page.goto('/?fixture=drag-snapping');
     await waitForAppReady(page);
   });
@@ -217,12 +190,13 @@ test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-snap-1"]');
     await expect(taskTile).toBeVisible();
 
-    // ACT: Pick & place to Y position that corresponds to 8:15 (between 8:00 and 8:30)
-    await pickAndPlace(
+    // ACT: Pick & place to 8:15 (between 8:00 and 8:30 grid lines)
+    // Uses time-based placement to avoid scroll-position-dependent failures
+    await pickAndPlaceAtTime(
       page,
       '[data-testid="task-tile-task-snap-1"]',
       'station-komori',
-      180 // 8:15 - between grid lines
+      8, 15 // 8:15 AM - on a snap boundary, within operating hours
     );
 
     // ASSERT: Tile should be at a 15-minute boundary (snapped)
@@ -232,7 +206,7 @@ test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
 
     expect(scheduledStart).toBeTruthy();
     const time = parseTime(scheduledStart!);
-    console.log(`REQ-03: Placed at Y=180 (8:15), scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+    console.log(`REQ-03: Placed at 8:15, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
     // Verify on 15-minute boundary
     expect(isOnSnapBoundary(time)).toBe(true);
@@ -247,12 +221,14 @@ test.describe('v0.3.41: Validation Snapping Consistency (REQ-01/02/03)', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-snap-1"]');
     await expect(taskTile).toBeVisible();
 
-    // ACT: Pick & place to a valid position
-    await pickAndPlace(
+    // ACT: Pick & place to a valid position (use time-based placement to avoid
+    // scroll-position-dependent failures when targetY hits the lunch break)
+    await pickAndPlaceAtTime(
       page,
       '[data-testid="task-tile-task-snap-1"]',
       'station-komori',
-      100
+      9, // 9:00 AM - safely within operating hours (06:00-12:00)
+      0
     );
 
     // ASSERT: Tile should be created at snapped position

@@ -15,36 +15,8 @@ import {
   waitForAppReady,
   countTilesOnStation,
   isOnSnapBoundary,
+  pickAndPlace,
 } from './helpers/drag';
-
-/**
- * Helper: Pick task from sidebar and place on station
- */
-async function pickAndPlace(
-  page: import('@playwright/test').Page,
-  taskTileSelector: string,
-  stationId: string,
-  targetY: number
-): Promise<void> {
-  // Click task tile to pick it
-  await page.locator(taskTileSelector).click();
-
-  // Wait for pick preview to appear
-  await page.waitForSelector('[data-testid="pick-preview"]', { timeout: 3000 });
-
-  // Move to target station at specified Y position
-  const targetColumn = page.locator(`[data-testid="station-column-${stationId}"]`);
-  const box = await targetColumn.boundingBox();
-  if (box) {
-    await page.mouse.move(box.x + box.width / 2, box.y + targetY);
-  }
-
-  // Click to place
-  await targetColumn.click();
-
-  // Wait for state update
-  await page.waitForTimeout(300);
-}
 
 test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
   test.beforeEach(async ({ page }) => {
