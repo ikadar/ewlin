@@ -1300,10 +1300,10 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 #### v0.4.5 - JCF: Reference Data & Mock API
 > **Spec source:** §9 (Reference Data)
 
-- [ ] Reference data types: Paper, Format, Impression, Surfacage, Imposition
-- [ ] Mock reference data (from `reference/jcf/data/*.json`)
-- [ ] Mock API endpoints for reference data (GET /papers, /formats, etc.)
-- [ ] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
+- [x] Reference data types: Paper, Format, Impression, Surfacage, Imposition
+- [x] Mock reference data (from `reference/jcf/data/*.json`)
+- [x] Mock API endpoints for reference data (GET /papers, /formats, etc.)
+- [x] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
 
 #### v0.4.6 - JCF: Page Shell
 - [ ] Job creation page route (or modal — architectural decision)
