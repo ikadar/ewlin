@@ -42,3 +42,6 @@ export type { DryingTimeIndicatorProps } from './DryingTimeIndicator';
 
 export { TopNavBar, ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from './TopNavBar';
 export type { TopNavBarProps } from './TopNavBar';
+
+export { JcfModal } from './JcfModal';
+export type { JcfModalProps } from './JcfModal';

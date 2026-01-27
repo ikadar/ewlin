@@ -23,6 +23,8 @@ export interface JobsListProps {
   selectedJobId?: string | null;
   /** Job selection handler (null to deselect - REQ-03 toggle) */
   onSelectJob?: (jobId: string | null) => void;
+  /** Add job handler (opens JCF modal) */
+  onAddJob?: () => void;
 }
 
 /**
@@ -37,6 +39,7 @@ export function JobsList({
   conflicts,
   selectedJobId,
   onSelectJob,
+  onAddJob,
 }: JobsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -159,6 +162,7 @@ export function JobsList({
       <JobsListHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onAddJob={onAddJob}
       />
 
       <div className="flex-1 overflow-y-auto">
