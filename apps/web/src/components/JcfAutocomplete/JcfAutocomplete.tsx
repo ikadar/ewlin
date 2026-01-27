@@ -18,6 +18,8 @@ export interface JcfAutocompleteProps {
   id?: string;
   onSelect?: (value: string) => void;
   onBlur?: () => void;
+  /** Called when input receives focus */
+  onFocus?: () => void;
   /** Table navigation delegation: called on Tab/Shift+Tab when dropdown is closed */
   onTabOut?: (e: React.KeyboardEvent, direction: 'forward' | 'backward') => void;
   /** Table navigation delegation: called on Alt+Arrow */
@@ -43,6 +45,7 @@ export function JcfAutocomplete({
   id,
   onSelect,
   onBlur,
+  onFocus,
   onTabOut,
   onArrowNav,
 }: JcfAutocompleteProps) {
@@ -121,6 +124,9 @@ export function JcfAutocomplete({
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         setIsOpen(true);
         e.preventDefault();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        (e.target as HTMLElement).blur();
       }
       return;
     }
@@ -171,7 +177,7 @@ export function JcfAutocomplete({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setIsOpen(true)}
+        onFocus={() => { setIsOpen(true); onFocus?.(); }}
         onBlur={onBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}

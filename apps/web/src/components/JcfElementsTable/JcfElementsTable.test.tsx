@@ -96,7 +96,7 @@ describe('JcfElementsTable', () => {
 
     it('renders standard fields as input', () => {
       renderTable();
-      const el = screen.getByTestId('jcf-input-0-format');
+      const el = screen.getByTestId('jcf-input-0-papier');
       expect(el.tagName).toBe('INPUT');
     });
 
@@ -118,10 +118,10 @@ describe('JcfElementsTable', () => {
   describe('input changes', () => {
     it('calls onElementsChange when field value changes', () => {
       const { onElementsChange } = renderTable();
-      const input = screen.getByTestId('jcf-input-0-format');
-      fireEvent.change(input, { target: { value: 'A4' } });
+      const input = screen.getByTestId('jcf-input-0-papier');
+      fireEvent.change(input, { target: { value: 'Couché mat 135g' } });
       expect(onElementsChange).toHaveBeenCalledWith([
-        expect.objectContaining({ format: 'A4' }),
+        expect.objectContaining({ papier: 'Couché mat 135g' }),
       ]);
     });
 
@@ -396,10 +396,10 @@ describe('JcfElementsTable', () => {
 
     it('Enter in text input moves to next cell', () => {
       renderTable();
-      const cell = getCellById(0, 3); // format (text input)
+      const cell = getCellById(0, 4); // papier (plain text input)
       cell.focus();
       fireEvent.keyDown(cell, { key: 'Enter' });
-      expect(document.activeElement).toBe(getCellById(0, 4));
+      expect(document.activeElement).toBe(getCellById(0, 5));
     });
 
     it('Enter in textarea does NOT move to next cell', () => {
@@ -413,7 +413,7 @@ describe('JcfElementsTable', () => {
 
     it('Escape blurs the active cell', () => {
       renderTable();
-      const cell = getCellById(0, 3);
+      const cell = getCellById(0, 4); // papier (plain text input)
       cell.focus();
       expect(document.activeElement).toBe(cell);
       fireEvent.keyDown(cell, { key: 'Escape' });
