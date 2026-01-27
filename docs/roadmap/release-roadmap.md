@@ -1345,13 +1345,13 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Element name field (COUV, INT, FINITION, etc.)
 - [ ] Plain text inputs for all fields (autocomplete added later)
 
-#### v0.4.10 - JCF: Cell Navigation
+#### v0.4.10 - JCF: Cell Navigation ✅
 > **Spec source:** §8 (Keyboard Navigation)
 
-- [ ] Tab / Shift+Tab navigation between cells
-- [ ] Enter to confirm and move to next cell
-- [ ] Escape to cancel edit
-- [ ] Focus management across rows and columns
+- [x] Tab / Shift+Tab navigation between cells
+- [x] Enter to confirm and move to next cell
+- [x] Escape to cancel edit
+- [x] Focus management across rows and columns
 
 ### Phase 4E: Base Autocomplete Infrastructure
 
