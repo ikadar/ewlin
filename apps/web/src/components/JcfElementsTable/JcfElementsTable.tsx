@@ -4,8 +4,9 @@ import { DEFAULT_ELEMENT, generateElementName } from './types';
 import type { JcfElement, JcfFieldKey } from './types';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete';
 import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete';
+import { JcfSurfacageAutocomplete } from '../JcfSurfacageAutocomplete';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
-import { PRODUCT_FORMATS, IMPRESSION_PRESETS } from '../../mock/reference-data';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS } from '../../mock/reference-data';
 
 // ── Row definitions ──
 
@@ -469,6 +470,63 @@ export function JcfElementsTable({
                       presets={IMPRESSION_PRESETS}
                       sessionPresets={sessionLearning.impressions}
                       onLearnPreset={sessionLearning.learnImpression}
+                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      onTabOut={(_e, direction) => {
+                        const lastRow = rows.length - 1;
+                        const lastEl = elements.length - 1;
+                        if (direction === 'forward') {
+                          if (rowIndex < lastRow)
+                            focusCell(elementIndex, rowIndex + 1);
+                          else if (elementIndex < lastEl)
+                            focusCell(elementIndex + 1, 0);
+                        } else {
+                          if (rowIndex > 0)
+                            focusCell(elementIndex, rowIndex - 1);
+                          else if (elementIndex > 0)
+                            focusCell(elementIndex - 1, lastRow);
+                        }
+                      }}
+                      onArrowNav={(_e, direction) => {
+                        const rc = rows.length;
+                        const ec = elements.length;
+                        switch (direction) {
+                          case 'down':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex + 1) % rc,
+                            );
+                            break;
+                          case 'up':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex - 1 + rc) % rc,
+                            );
+                            break;
+                          case 'right':
+                            focusCell(
+                              (elementIndex + 1) % ec,
+                              rowIndex,
+                            );
+                            break;
+                          case 'left':
+                            focusCell(
+                              (elementIndex - 1 + ec) % ec,
+                              rowIndex,
+                            );
+                            break;
+                        }
+                      }}
+                    />
+                  ) : row.key === 'surfacage' ? (
+                    <JcfSurfacageAutocomplete
+                      id={getCellId(elementIndex, rowIndex)}
+                      value={value}
+                      onChange={(v) =>
+                        handleCellChange(elementIndex, 'surfacage', v)
+                      }
+                      presets={SURFACAGE_PRESETS}
+                      sessionPresets={sessionLearning.surfacages}
+                      onLearnPreset={sessionLearning.learnSurfacage}
                       inputClassName={`${inputFilledClass} text-[11px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
