@@ -78,7 +78,8 @@ describe('JcfElementsTable', () => {
 
     it('renders default quantite value as "1"', () => {
       renderTable();
-      const input = screen.getByTestId('jcf-input-0-quantite');
+      const cell = screen.getByTestId('jcf-cell-0-quantite');
+      const input = cell.querySelector('input') as HTMLInputElement;
       expect(input).toHaveValue('1');
     });
 

@@ -5,6 +5,8 @@ import type { JcfElement, JcfFieldKey } from './types';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete';
 import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete';
 import { JcfSurfacageAutocomplete } from '../JcfSurfacageAutocomplete';
+import { JcfQuantiteInput } from '../JcfQuantiteInput';
+import { JcfPaginationInput } from '../JcfPaginationInput';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS } from '../../mock/reference-data';
 
@@ -527,6 +529,114 @@ export function JcfElementsTable({
                       presets={SURFACAGE_PRESETS}
                       sessionPresets={sessionLearning.surfacages}
                       onLearnPreset={sessionLearning.learnSurfacage}
+                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      onTabOut={(_e, direction) => {
+                        const lastRow = rows.length - 1;
+                        const lastEl = elements.length - 1;
+                        if (direction === 'forward') {
+                          if (rowIndex < lastRow)
+                            focusCell(elementIndex, rowIndex + 1);
+                          else if (elementIndex < lastEl)
+                            focusCell(elementIndex + 1, 0);
+                        } else {
+                          if (rowIndex > 0)
+                            focusCell(elementIndex, rowIndex - 1);
+                          else if (elementIndex > 0)
+                            focusCell(elementIndex - 1, lastRow);
+                        }
+                      }}
+                      onArrowNav={(_e, direction) => {
+                        const rc = rows.length;
+                        const ec = elements.length;
+                        switch (direction) {
+                          case 'down':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex + 1) % rc,
+                            );
+                            break;
+                          case 'up':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex - 1 + rc) % rc,
+                            );
+                            break;
+                          case 'right':
+                            focusCell(
+                              (elementIndex + 1) % ec,
+                              rowIndex,
+                            );
+                            break;
+                          case 'left':
+                            focusCell(
+                              (elementIndex - 1 + ec) % ec,
+                              rowIndex,
+                            );
+                            break;
+                        }
+                      }}
+                    />
+                  ) : row.key === 'quantite' ? (
+                    <JcfQuantiteInput
+                      id={getCellId(elementIndex, rowIndex)}
+                      value={value}
+                      onChange={(v) =>
+                        handleCellChange(elementIndex, 'quantite', v)
+                      }
+                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      onTabOut={(_e, direction) => {
+                        const lastRow = rows.length - 1;
+                        const lastEl = elements.length - 1;
+                        if (direction === 'forward') {
+                          if (rowIndex < lastRow)
+                            focusCell(elementIndex, rowIndex + 1);
+                          else if (elementIndex < lastEl)
+                            focusCell(elementIndex + 1, 0);
+                        } else {
+                          if (rowIndex > 0)
+                            focusCell(elementIndex, rowIndex - 1);
+                          else if (elementIndex > 0)
+                            focusCell(elementIndex - 1, lastRow);
+                        }
+                      }}
+                      onArrowNav={(_e, direction) => {
+                        const rc = rows.length;
+                        const ec = elements.length;
+                        switch (direction) {
+                          case 'down':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex + 1) % rc,
+                            );
+                            break;
+                          case 'up':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex - 1 + rc) % rc,
+                            );
+                            break;
+                          case 'right':
+                            focusCell(
+                              (elementIndex + 1) % ec,
+                              rowIndex,
+                            );
+                            break;
+                          case 'left':
+                            focusCell(
+                              (elementIndex - 1 + ec) % ec,
+                              rowIndex,
+                            );
+                            break;
+                        }
+                      }}
+                    />
+                  ) : row.key === 'pagination' ? (
+                    <JcfPaginationInput
+                      id={getCellId(elementIndex, rowIndex)}
+                      value={value}
+                      onChange={(v) =>
+                        handleCellChange(elementIndex, 'pagination', v)
+                      }
                       inputClassName={`${inputFilledClass} text-[11px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
