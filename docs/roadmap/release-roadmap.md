@@ -1324,11 +1324,15 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
   - [x] French display format
 - [x] State management lifted to App.tsx
 
-#### v0.4.8 - JCF: Client Autocomplete
-- [ ] Client field with autocomplete dropdown
-- [ ] API lookup for existing clients
-- [ ] Auto-create new client on save (if not exists)
-- [ ] Keyboard navigation (↑↓ Enter Esc)
+#### v0.4.8 - JCF: Autocomplete Fields (Client & Template) ✅
+- [x] Generic JcfAutocomplete component (reusable for all JCF fields)
+- [x] highlightMatch utility — bold+blue matching text
+- [x] useLazyLoadSuggestions hook — initial 10, scroll to load more, max 25
+- [x] Client field with autocomplete, session learning, focus → Template
+- [x] Template field with client-filtered suggestions, focus → Intitulé
+- [x] Mock client data (8 entries) + mock template data (6 entries)
+- [x] Keyboard navigation (↑↓ Enter Esc Tab)
+- [x] Category badges ("nouveau", client name, "universel")
 
 ### Phase 4D: Elements Table Structure
 
