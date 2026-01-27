@@ -1260,26 +1260,26 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
   - [x] service-boundaries.md — Element in Job Management service
   - [x] ui-backend-compatibility-report.md — Element frontend/backend alignment
 
-#### v0.4.3 - Element Layer: Backend Implementation
-- [ ] Element entity (PHP)
-  - [ ] Entity class with id, job relationship
-  - [ ] ElementRepository
-- [ ] Job-Element relationship
-  - [ ] Job.elements (OneToMany)
-  - [ ] Job.addElement() method
-- [ ] Element-Task relationship
-  - [ ] Task.element (ManyToOne)
-  - [ ] Task.job removed, accessible via element.job
-- [ ] Database migration
-  - [ ] Create elements table
-  - [ ] Migrate existing data (create Element per Job)
-  - [ ] Update tasks.job_id → tasks.element_id
-- [ ] Service updates
-  - [ ] JobService creates Element with Job
-  - [ ] ScheduleSnapshotService includes elements
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] PHPStan level 8
+#### v0.4.3 - Element Layer: Backend Implementation ✅
+- [x] Element entity (PHP)
+  - [x] Entity class with id, job relationship
+  - [x] ElementRepository
+- [x] Job-Element relationship
+  - [x] Job.elements (OneToMany)
+  - [x] Job.addElement() method
+- [x] Element-Task relationship
+  - [x] Task.element (ManyToOne)
+  - [x] Task.job removed, accessible via element.job
+- [x] Database migration
+  - [x] Create elements table
+  - [x] Migrate existing data (create Element per Job)
+  - [x] Update tasks.job_id → tasks.element_id
+- [x] Service updates
+  - [x] JobService creates Element with Job
+  - [x] ScheduleSnapshotService includes elements
+- [x] Unit tests
+- [x] Integration tests
+- [x] PHPStan level 8
 
 ### Phase 4B: JCF Foundation
 
