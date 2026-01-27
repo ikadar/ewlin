@@ -1305,12 +1305,13 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Mock API endpoints for reference data (GET /papers, /formats, etc.)
 - [ ] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
 
-#### v0.4.6 - JCF: Page Shell
-- [ ] Job creation page route (or modal — architectural decision)
-- [ ] Navigation integration (activate "+" button in JobsList)
-- [ ] Layout skeleton: Job Header area + Elements Table area
-- [ ] Empty state rendering
-- [ ] Basic page structure with Tailwind design tokens
+#### v0.4.6 - JCF: Page Shell ✅
+- [x] Full-screen modal overlay (architectural decision: modal, not page route)
+- [x] Navigation integration ("+" button in JobsList opens modal)
+- [x] Modal layout: header (title + close), scrollable content, keyboard hints footer
+- [x] Close behavior: X button, Escape key, backdrop click (mouseDown+mouseUp)
+- [x] Google Fonts integration (Inter + JetBrains Mono)
+- [x] Pixel-perfect rem→px conversion (13px base matching reference/jcf)
 
 ### Phase 4C: Job Header
 
