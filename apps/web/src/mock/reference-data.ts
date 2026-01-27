@@ -194,3 +194,42 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
   { id: 'brochure', name: 'Brochure' },
   { id: 'feuillet', name: 'Feuillet' },
 ];
+
+// ============================================================================
+// Mock Clients (v0.4.8)
+// ============================================================================
+
+export interface MockClient {
+  id: string;
+  name: string;
+}
+
+export const MOCK_CLIENTS: MockClient[] = [
+  { id: 'client-1', name: 'Imprimerie Léon' },
+  { id: 'client-2', name: 'Éditions Gallimard' },
+  { id: 'client-3', name: 'Hachette Livre' },
+  { id: 'client-4', name: 'Publicis France' },
+  { id: 'client-5', name: 'La Poste' },
+  { id: 'client-6', name: 'SNCF Communication' },
+  { id: 'client-7', name: 'Air France Corporate' },
+  { id: 'client-8', name: 'Carrefour Marketing' },
+];
+
+// ============================================================================
+// Mock Templates (v0.4.8)
+// ============================================================================
+
+export interface MockTemplate {
+  id: string;
+  name: string;
+  clientName?: string;
+}
+
+export const MOCK_TEMPLATES: MockTemplate[] = [
+  { id: 'tpl-1', name: 'Brochure A4' },
+  { id: 'tpl-2', name: 'Catalogue 32 pages' },
+  { id: 'tpl-3', name: 'Dépliant 3 volets' },
+  { id: 'tpl-4', name: 'Carte de visite', clientName: 'Publicis France' },
+  { id: 'tpl-5', name: 'Affiche A2', clientName: 'SNCF Communication' },
+  { id: 'tpl-6', name: 'Flyer A5', clientName: 'La Poste' },
+];

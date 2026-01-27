@@ -4,6 +4,10 @@ import { JcfJobHeader } from './JcfJobHeader';
 
 const defaultProps = {
   jobId: 'J-2026-0042',
+  client: '',
+  onClientChange: vi.fn(),
+  template: '',
+  onTemplateChange: vi.fn(),
   intitule: '',
   onIntituleChange: vi.fn(),
   quantity: '',
@@ -35,6 +39,42 @@ describe('JcfJobHeader', () => {
       render(<JcfJobHeader {...defaultProps} />);
       const input = screen.getByTestId('jcf-field-id') as HTMLInputElement;
       expect(input.tabIndex).toBe(-1);
+    });
+  });
+
+  describe('Client field', () => {
+    it('renders Client label', () => {
+      render(<JcfJobHeader {...defaultProps} />);
+      expect(screen.getByText('Client')).toBeInTheDocument();
+    });
+
+    it('renders Client autocomplete input', () => {
+      render(<JcfJobHeader {...defaultProps} />);
+      expect(screen.getByTestId('jcf-field-client')).toBeInTheDocument();
+    });
+
+    it('displays provided client value', () => {
+      render(<JcfJobHeader {...defaultProps} client="La Poste" />);
+      const input = screen.getByTestId('jcf-field-client') as HTMLInputElement;
+      expect(input.value).toBe('La Poste');
+    });
+  });
+
+  describe('Template field', () => {
+    it('renders Template label', () => {
+      render(<JcfJobHeader {...defaultProps} />);
+      expect(screen.getByText('Template')).toBeInTheDocument();
+    });
+
+    it('renders Template autocomplete input', () => {
+      render(<JcfJobHeader {...defaultProps} />);
+      expect(screen.getByTestId('jcf-field-template')).toBeInTheDocument();
+    });
+
+    it('has "Aucun" placeholder', () => {
+      render(<JcfJobHeader {...defaultProps} />);
+      const input = screen.getByTestId('jcf-field-template') as HTMLInputElement;
+      expect(input.placeholder).toBe('Aucun');
     });
   });
 
@@ -119,6 +159,8 @@ describe('JcfJobHeader', () => {
     it('renders all field labels', () => {
       render(<JcfJobHeader {...defaultProps} />);
       expect(screen.getByText('ID')).toBeInTheDocument();
+      expect(screen.getByText('Client')).toBeInTheDocument();
+      expect(screen.getByText('Template')).toBeInTheDocument();
       expect(screen.getByText('Intitulé')).toBeInTheDocument();
       expect(screen.getByText('Quantité')).toBeInTheDocument();
       expect(screen.getByText('Deadline')).toBeInTheDocument();

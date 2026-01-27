@@ -1,9 +1,16 @@
-import { useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
+import { JcfAutocomplete } from '../JcfAutocomplete';
+import type { Suggestion } from '../JcfAutocomplete';
+import { MOCK_CLIENTS, MOCK_TEMPLATES } from '../../mock/reference-data';
 
 export interface JcfJobHeaderProps {
   jobId: string;
+  client: string;
+  onClientChange: (value: string) => void;
+  template: string;
+  onTemplateChange: (value: string) => void;
   intitule: string;
   onIntituleChange: (value: string) => void;
   quantity: string;
@@ -13,16 +20,20 @@ export interface JcfJobHeaderProps {
 }
 
 /**
- * JCF Job Header — horizontal form row with basic job fields.
+ * JCF Job Header — horizontal form row with all job fields.
  *
- * Fields: ID (readonly), Intitulé, Quantité, Deadline.
- * Client and Template autocomplete fields will be added in v0.4.8.
+ * Fields: ID (readonly), Client (autocomplete), Template (autocomplete),
+ * Intitulé, Quantité, Deadline.
  *
  * All rem-based Tailwind classes are converted to px equivalents
  * for the 13px base used by the reference JCF app.
  */
 export function JcfJobHeader({
   jobId,
+  client,
+  onClientChange,
+  template,
+  onTemplateChange,
   intitule,
   onIntituleChange,
   quantity,
@@ -32,9 +43,68 @@ export function JcfJobHeader({
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
 
+  // Session learning: new client names added on blur
+  const [sessionClients, setSessionClients] = useState<string[]>([]);
+
   const labelClass = 'block text-[10px] leading-[13px] text-zinc-500 mb-[3px]';
   const inputBaseClass =
     'w-full bg-zinc-900 border border-zinc-700 rounded-[3px] px-[7px] py-[5px] text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500';
+
+  // --- Client autocomplete ---
+
+  const clientSuggestions: Suggestion[] = useMemo(
+    () => [
+      ...MOCK_CLIENTS.map((c) => ({ label: c.name, value: c.name })),
+      ...sessionClients.map((s) => ({ label: s, value: s, category: 'nouveau' })),
+    ],
+    [sessionClients]
+  );
+
+  const handleClientBlur = () => {
+    const trimmed = client.trim();
+    if (!trimmed) return;
+
+    const existsInMock = MOCK_CLIENTS.some(
+      (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    const existsInSession = sessionClients.some(
+      (s) => s.toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (!existsInMock && !existsInSession) {
+      setSessionClients((prev) => [...prev, trimmed]);
+    }
+  };
+
+  const handleClientSelect = () => {
+    setTimeout(() => {
+      document.getElementById('jcf-template')?.focus();
+    }, 0);
+  };
+
+  // --- Template autocomplete ---
+
+  const templateSuggestions: Suggestion[] = useMemo(() => {
+    const clientTemplates = client
+      ? MOCK_TEMPLATES.filter(
+          (t) => t.clientName?.toLowerCase() === client.toLowerCase()
+        )
+      : [];
+    const universalTemplates = MOCK_TEMPLATES.filter((t) => !t.clientName);
+
+    return [
+      ...clientTemplates.map((t) => ({ label: t.name, value: t.name, category: client })),
+      ...universalTemplates.map((t) => ({ label: t.name, value: t.name, category: 'universel' })),
+    ];
+  }, [client]);
+
+  const handleTemplateSelect = () => {
+    setTimeout(() => {
+      document.getElementById('jcf-intitule')?.focus();
+    }, 0);
+  };
+
+  // --- Deadline ---
 
   const handleDeadlineBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const parsed = parseFrenchDate(e.target.value);
@@ -47,10 +117,7 @@ export function JcfJobHeader({
     onDeadlineChange(e.target.value);
   };
 
-  // Display value: if stored as ISO, convert to French; otherwise show raw input
   const deadlineDisplay = deadline.includes('-') ? formatToFrench(deadline) : deadline;
-
-  // Hidden native date picker value: always ISO format
   const deadlineNativeValue = deadline.includes('-') ? deadline : parseFrenchDate(deadline);
 
   return (
@@ -72,6 +139,38 @@ export function JcfJobHeader({
             className="w-full bg-zinc-800 border border-zinc-700 rounded-[3px] px-[7px] py-[5px] text-zinc-400 font-mono cursor-not-allowed"
             tabIndex={-1}
             data-testid="jcf-field-id"
+          />
+        </div>
+
+        {/* Client — autocomplete */}
+        <div className="w-[234px]">
+          <label htmlFor="jcf-client" className={labelClass}>
+            Client
+          </label>
+          <JcfAutocomplete
+            id="jcf-client"
+            value={client}
+            onChange={onClientChange}
+            suggestions={clientSuggestions}
+            inputClassName={inputBaseClass}
+            onSelect={handleClientSelect}
+            onBlur={handleClientBlur}
+          />
+        </div>
+
+        {/* Template — autocomplete */}
+        <div className="w-[234px]">
+          <label htmlFor="jcf-template" className={labelClass}>
+            Template
+          </label>
+          <JcfAutocomplete
+            id="jcf-template"
+            value={template}
+            onChange={onTemplateChange}
+            suggestions={templateSuggestions}
+            inputClassName={inputBaseClass}
+            placeholder="Aucun"
+            onSelect={handleTemplateSelect}
           />
         </div>
 

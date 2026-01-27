@@ -26,7 +26,10 @@ import {
   POSTE_PRESETS,
   SOUSTRAITANT_PRESETS,
   TEMPLATE_CATEGORIES,
+  MOCK_CLIENTS,
+  MOCK_TEMPLATES,
 } from './reference-data';
+import type { MockClient, MockTemplate } from './reference-data';
 
 // ============================================================================
 // Types
@@ -182,6 +185,14 @@ export interface MockApi {
 
   /** Get template categories */
   getTemplateCategories(): Promise<TemplateCategory[]>;
+
+  // JCF endpoints (v0.4.8)
+
+  /** Get mock clients for JCF autocomplete */
+  getClients(): Promise<MockClient[]>;
+
+  /** Get mock templates for JCF autocomplete */
+  getTemplates(): Promise<MockTemplate[]>;
 }
 
 /**
@@ -403,6 +414,20 @@ export function createMockApi(initialConfig: Partial<MockApiConfig> = {}): MockA
       await simulateLatency(config);
       simulateFailure(config);
       return TEMPLATE_CATEGORIES;
+    },
+
+    // JCF endpoints (v0.4.8)
+
+    async getClients(): Promise<MockClient[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return MOCK_CLIENTS;
+    },
+
+    async getTemplates(): Promise<MockTemplate[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return MOCK_TEMPLATES;
     },
   };
 }

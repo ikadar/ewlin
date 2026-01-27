@@ -48,3 +48,6 @@ export type { JcfModalProps } from './JcfModal';
 
 export { JcfJobHeader, parseFrenchDate, formatToFrench, generateJobId } from './JcfJobHeader';
 export type { JcfJobHeaderProps } from './JcfJobHeader';
+
+export { JcfAutocomplete, highlightMatch } from './JcfAutocomplete';
+export type { JcfAutocompleteProps, Suggestion } from './JcfAutocomplete';

@@ -381,6 +381,9 @@ function AppContent() {
   const [jcfIntitule, setJcfIntitule] = useState('');
   const [jcfQuantity, setJcfQuantity] = useState('');
   const [jcfDeadline, setJcfDeadline] = useState('');
+  // v0.4.8: Client and Template autocomplete state
+  const [jcfClient, setJcfClient] = useState('');
+  const [jcfTemplate, setJcfTemplate] = useState('');
 
   const handleOpenJcf = useCallback(() => {
     setJcfJobId(generateJobId());
@@ -389,6 +392,8 @@ function AppContent() {
 
   const handleCloseJcf = useCallback(() => {
     setIsJcfModalOpen(false);
+    setJcfClient('');
+    setJcfTemplate('');
     setJcfIntitule('');
     setJcfQuantity('');
     setJcfDeadline('');
@@ -1510,6 +1515,10 @@ function AppContent() {
       <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf}>
         <JcfJobHeader
           jobId={jcfJobId}
+          client={jcfClient}
+          onClientChange={setJcfClient}
+          template={jcfTemplate}
+          onTemplateChange={setJcfTemplate}
           intitule={jcfIntitule}
           onIntituleChange={setJcfIntitule}
           quantity={jcfQuantity}

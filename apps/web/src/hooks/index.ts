@@ -3,3 +3,6 @@ export type { DropValidationParams, DropValidationResult } from './useDropValida
 
 export { useVirtualScroll, isAssignmentVisible, getVisibleDates } from './useVirtualScroll';
 export type { VirtualScrollConfig, VirtualScrollResult } from './useVirtualScroll';
+
+export { useLazyLoadSuggestions } from './useLazyLoadSuggestions';
+export type { UseLazyLoadSuggestionsResult } from './useLazyLoadSuggestions';
