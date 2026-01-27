@@ -54,3 +54,16 @@ export {
   type CreateAssignmentRequest,
   type UpdateAssignmentRequest,
 } from './api';
+
+// Reference data (JCF autocomplete presets)
+export {
+  PAPER_TYPES,
+  PRODUCT_FORMATS,
+  FEUILLE_FORMATS,
+  IMPRESSION_PRESETS,
+  SURFACAGE_PRESETS,
+  POSTE_PRESETS,
+  POSTE_CATEGORIES,
+  SOUSTRAITANT_PRESETS,
+  TEMPLATE_CATEGORIES,
+} from './reference-data';

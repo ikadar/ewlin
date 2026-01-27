@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
+import type { JcfElement } from './components';
+import { DEFAULT_ELEMENT } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -373,6 +375,34 @@ function AppContent() {
     assignmentId: string;
     isCompleted: boolean;
   } | null>(null);
+
+  // v0.4.6: JCF modal state
+  const [isJcfModalOpen, setIsJcfModalOpen] = useState(false);
+  // v0.4.7: JCF form state (lifted from JcfJobHeader)
+  const [jcfJobId, setJcfJobId] = useState('');
+  const [jcfIntitule, setJcfIntitule] = useState('');
+  const [jcfQuantity, setJcfQuantity] = useState('');
+  const [jcfDeadline, setJcfDeadline] = useState('');
+  // v0.4.8: Client and Template autocomplete state
+  const [jcfClient, setJcfClient] = useState('');
+  const [jcfTemplate, setJcfTemplate] = useState('');
+  // v0.4.9: Elements table state
+  const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
+
+  const handleOpenJcf = useCallback(() => {
+    setJcfJobId(generateJobId());
+    setIsJcfModalOpen(true);
+  }, []);
+
+  const handleCloseJcf = useCallback(() => {
+    setIsJcfModalOpen(false);
+    setJcfClient('');
+    setJcfTemplate('');
+    setJcfIntitule('');
+    setJcfQuantity('');
+    setJcfDeadline('');
+    setJcfElements([{ ...DEFAULT_ELEMENT }]);
+  }, []);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
   useEffect(() => {
@@ -1382,6 +1412,7 @@ function AppContent() {
           conflicts={snapshot.conflicts}
           selectedJobId={selectedJobId}
           onSelectJob={setSelectedJobId}
+          onAddJob={handleOpenJcf}
         />
         <JobDetailsPanel
           job={selectedJob}
@@ -1484,6 +1515,30 @@ function AppContent() {
           onClose={handleContextMenuClose}
         />
       )}
+
+      {/* v0.4.6: JCF Modal */}
+      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf}>
+        <JcfJobHeader
+          jobId={jcfJobId}
+          client={jcfClient}
+          onClientChange={setJcfClient}
+          template={jcfTemplate}
+          onTemplateChange={setJcfTemplate}
+          intitule={jcfIntitule}
+          onIntituleChange={setJcfIntitule}
+          quantity={jcfQuantity}
+          onQuantityChange={setJcfQuantity}
+          deadline={jcfDeadline}
+          onDeadlineChange={setJcfDeadline}
+        />
+        {/* v0.4.9: Elements Table */}
+        <div className="mt-[13px]">
+          <JcfElementsTable
+            elements={jcfElements}
+            onElementsChange={setJcfElements}
+          />
+        </div>
+      </JcfModal>
     </>
   );
 }

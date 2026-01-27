@@ -1288,22 +1288,22 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 #### v0.4.4 - JCF: Type Mapping & Data Model
 > **Spec source:** §1 (Input Format Conventions), §9 (Reference Data), §11.6 (Domain Model Analysis)
 
-- [ ] Map reference Element (12 string fields) → `@flux/types` model
-  - [ ] Architectural decision: ElementSpec value object vs. flat fields on Element
-  - [ ] Reference Element.name → Element.suffix
-  - [ ] Reference Element.precedences → Element.prerequisiteElementIds
-  - [ ] Reference Element.sequence → Task[] entities within Element
-  - [ ] Production metadata fields (format, papier, pagination, imposition, impression, surfacage, quantite, qteFeuilles, autres, commentaires)
-- [ ] Update `@flux/types` package with new types
-- [ ] Type mapping documentation
+- [x] Map reference Element (12 string fields) → `@flux/types` model
+  - [x] Architectural decision: ElementSpec value object vs. flat fields on Element
+  - [x] Reference Element.name → Element.suffix
+  - [x] Reference Element.precedences → Element.prerequisiteElementIds
+  - [x] Reference Element.sequence → Task[] entities within Element
+  - [x] Production metadata fields (format, papier, pagination, imposition, impression, surfacage, quantite, qteFeuilles, autres, commentaires)
+- [x] Update `@flux/types` package with new types
+- [x] Type mapping documentation
 
 #### v0.4.5 - JCF: Reference Data & Mock API
 > **Spec source:** §9 (Reference Data)
 
-- [ ] Reference data types: Paper, Format, Impression, Surfacage, Imposition
-- [ ] Mock reference data (from `reference/jcf/data/*.json`)
-- [ ] Mock API endpoints for reference data (GET /papers, /formats, etc.)
-- [ ] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
+- [x] Reference data types: Paper, Format, Impression, Surfacage, Imposition
+- [x] Mock reference data (from `reference/jcf/data/*.json`)
+- [x] Mock API endpoints for reference data (GET /papers, /formats, etc.)
+- [x] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
 
 #### v0.4.6 - JCF: Page Shell ✅
 - [x] Full-screen modal overlay (architectural decision: modal, not page route)
@@ -1315,31 +1315,36 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4C: Job Header
 
-#### v0.4.7 - JCF: Job Header Basic Fields
-- [ ] Intitulé text field
-- [ ] Quantity numeric input
-- [ ] Deadline date picker
-  - [ ] French format input (jj/mm or jj/mm/aaaa)
-  - [ ] ISO 8601 storage
-  - [ ] French display format
-- [ ] Basic required field validation
+#### v0.4.7 - JCF: Job Header Basic Fields ✅
+- [x] ID field (readonly, auto-generated J-YYYY-NNNN)
+- [x] Intitulé text field
+- [x] Quantity numeric input
+- [x] Deadline date picker
+  - [x] French format input (jj/mm or jj/mm/aaaa)
+  - [x] ISO 8601 storage (UTC-safe)
+  - [x] French display format
+- [x] State management lifted to App.tsx
 
-#### v0.4.8 - JCF: Client Autocomplete
-- [ ] Client field with autocomplete dropdown
-- [ ] API lookup for existing clients
-- [ ] Auto-create new client on save (if not exists)
-- [ ] Keyboard navigation (↑↓ Enter Esc)
+#### v0.4.8 - JCF: Autocomplete Fields (Client & Template) ✅
+- [x] Generic JcfAutocomplete component (reusable for all JCF fields)
+- [x] highlightMatch utility — bold+blue matching text
+- [x] useLazyLoadSuggestions hook — initial 10, scroll to load more, max 25
+- [x] Client field with autocomplete, session learning, focus → Template
+- [x] Template field with client-filtered suggestions, focus → Intitulé
+- [x] Mock client data (8 entries) + mock template data (6 entries)
+- [x] Keyboard navigation (↑↓ Enter Esc Tab)
+- [x] Category badges ("nouveau", client name, "universel")
 
 ### Phase 4D: Elements Table Structure
 
-#### v0.4.9 - JCF: Elements Table Grid Layout
+#### v0.4.9 - JCF: Elements Table Grid Layout ✅
 > **Spec source:** reference `ElementsTable.tsx`
 
-- [ ] 12-column table layout (name, precedences, quantite, format, pagination, papier, imposition, impression, surfacage, autres, qteFeuilles, commentaires)
-- [ ] Sequence column (multi-line, separate treatment)
-- [ ] Add/remove element rows
-- [ ] Element name field (COUV, INT, FINITION, etc.)
-- [ ] Plain text inputs for all fields (autocomplete added later)
+- [x] 12-column table layout (name, precedences, quantite, format, pagination, papier, imposition, impression, surfacage, autres, qteFeuilles, commentaires)
+- [x] Sequence column (multi-line, separate treatment)
+- [x] Add/remove element rows
+- [x] Element name field (COUV, INT, FINITION, etc.)
+- [x] Plain text inputs for all fields (autocomplete added later)
 
 #### v0.4.10 - JCF: Cell Navigation
 > **Spec source:** §8 (Keyboard Navigation)

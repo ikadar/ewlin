@@ -42,3 +42,15 @@ export type { DryingTimeIndicatorProps } from './DryingTimeIndicator';
 
 export { TopNavBar, ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from './TopNavBar';
 export type { TopNavBarProps } from './TopNavBar';
+
+export { JcfModal } from './JcfModal';
+export type { JcfModalProps } from './JcfModal';
+
+export { JcfJobHeader, parseFrenchDate, formatToFrench, generateJobId } from './JcfJobHeader';
+export type { JcfJobHeaderProps } from './JcfJobHeader';
+
+export { JcfAutocomplete, highlightMatch } from './JcfAutocomplete';
+export type { JcfAutocompleteProps, Suggestion } from './JcfAutocomplete';
+
+export { JcfElementsTable, generateElementName, DEFAULT_ELEMENT } from './JcfElementsTable';
+export type { JcfElementsTableProps, JcfElement, JcfFieldKey } from './JcfElementsTable';
