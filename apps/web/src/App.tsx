@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -373,6 +373,11 @@ function AppContent() {
     assignmentId: string;
     isCompleted: boolean;
   } | null>(null);
+
+  // v0.4.6: JCF modal state
+  const [isJcfModalOpen, setIsJcfModalOpen] = useState(false);
+  const handleOpenJcf = useCallback(() => setIsJcfModalOpen(true), []);
+  const handleCloseJcf = useCallback(() => setIsJcfModalOpen(false), []);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
   useEffect(() => {
@@ -1382,6 +1387,7 @@ function AppContent() {
           conflicts={snapshot.conflicts}
           selectedJobId={selectedJobId}
           onSelectJob={setSelectedJobId}
+          onAddJob={handleOpenJcf}
         />
         <JobDetailsPanel
           job={selectedJob}
@@ -1484,6 +1490,9 @@ function AppContent() {
           onClose={handleContextMenuClose}
         />
       )}
+
+      {/* v0.4.6: JCF Modal */}
+      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf} />
     </>
   );
 }
