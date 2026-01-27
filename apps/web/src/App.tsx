@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
+import type { JcfElement } from './components';
+import { DEFAULT_ELEMENT } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -384,6 +386,8 @@ function AppContent() {
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
   const [jcfTemplate, setJcfTemplate] = useState('');
+  // v0.4.9: Elements table state
+  const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
 
   const handleOpenJcf = useCallback(() => {
     setJcfJobId(generateJobId());
@@ -397,6 +401,7 @@ function AppContent() {
     setJcfIntitule('');
     setJcfQuantity('');
     setJcfDeadline('');
+    setJcfElements([{ ...DEFAULT_ELEMENT }]);
   }, []);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
@@ -1526,6 +1531,13 @@ function AppContent() {
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
         />
+        {/* v0.4.9: Elements Table */}
+        <div className="mt-[13px]">
+          <JcfElementsTable
+            elements={jcfElements}
+            onElementsChange={setJcfElements}
+          />
+        </div>
       </JcfModal>
     </>
   );

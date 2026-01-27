@@ -5,6 +5,8 @@
  * Verifies that tile snapping works correctly at all zoom levels
  *
  * Updated for v0.3.57: Uses Pick & Place instead of drag & drop
+ * Updated for v0.4.9: Uses pickAndPlaceAtTime for deterministic placement
+ *   (avoids scroll-position-dependent failures at low zoom levels)
  */
 
 import { test, expect } from '@playwright/test';
@@ -13,7 +15,7 @@ import {
   waitForAppReady,
   countTilesOnStation,
   isOnSnapBoundary,
-  pickAndPlace,
+  pickAndPlaceAtTime,
 } from './helpers/drag';
 
 /**
@@ -42,6 +44,16 @@ async function setZoomLevel(page: Parameters<typeof test>[0]['page'], targetLeve
   await expect(zoomLevel).toHaveText(targetLevel);
 }
 
+/** Zoom level → pixelsPerHour mapping */
+const ZOOM_PPH: Record<string, number> = {
+  '50%': 40,
+  '75%': 60,
+  '100%': 80,
+  '125%': 100,
+  '150%': 120,
+  '200%': 160,
+};
+
 test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/?fixture=zoom-snapping');
@@ -49,7 +61,6 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
   });
 
   test('snapping works correctly at 100% zoom (baseline)', async ({ page }) => {
-    // This is the baseline test - should always work
     await setZoomLevel(page, '100%');
 
     // Select the job
@@ -60,13 +71,12 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-z1"]');
     await expect(taskTile).toBeVisible();
 
-    // At 100% zoom: 80px/hour, 40px/30min
-    // Y = 120 corresponds to 7:30 (1.5 hours after 6:00 = 1.5 * 80 = 120)
-    await pickAndPlace(
+    // Place at 17:00 (well within operating hours 06:00-22:00)
+    await pickAndPlaceAtTime(
       page,
       '[data-testid="task-tile-task-z1"]',
       'station-komori',
-      120
+      17, 0, ZOOM_PPH['100%']
     );
 
     // Verify tile was created
@@ -96,13 +106,12 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-z1"]');
     await expect(taskTile).toBeVisible();
 
-    // At 50% zoom: 40px/hour, 20px/30min
-    // Y = 60 corresponds to 7:30 (1.5 hours after 6:00 = 1.5 * 40 = 60)
-    await pickAndPlace(
+    // Place at 17:00 using time-based placement (deterministic)
+    await pickAndPlaceAtTime(
       page,
       '[data-testid="task-tile-task-z1"]',
       'station-komori',
-      60
+      17, 0, ZOOM_PPH['50%']
     );
 
     // Verify tile was created
@@ -132,13 +141,12 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-z1"]');
     await expect(taskTile).toBeVisible();
 
-    // At 200% zoom: 160px/hour, 80px/30min
-    // Y = 240 corresponds to 7:30 (1.5 hours after 6:00 = 1.5 * 160 = 240)
-    await pickAndPlace(
+    // Place at 17:00 using time-based placement (deterministic)
+    await pickAndPlaceAtTime(
       page,
       '[data-testid="task-tile-task-z1"]',
       'station-komori',
-      240
+      17, 0, ZOOM_PPH['200%']
     );
 
     // Verify tile was created
@@ -170,14 +178,13 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-z1"]');
     await expect(taskTile).toBeVisible();
 
-    // At 50% zoom: 40px/hour, 20px/30min
-    // Y = 55 is between 7:00 (40px) and 7:30 (60px)
-    // Should snap to either 7:00 or 7:30
-    await pickAndPlace(
+    // Place at 17:23 — between 15-min boundaries (17:15 and 17:30)
+    // Should snap to either 17:15 or 17:30
+    await pickAndPlaceAtTime(
       page,
       '[data-testid="task-tile-task-z1"]',
       'station-komori',
-      55 // Between grid lines
+      17, 23, ZOOM_PPH['50%']
     );
 
     // Verify tile was created
@@ -191,7 +198,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
 
     expect(scheduledStart).toBeTruthy();
     const time = parseTime(scheduledStart!);
-    console.log(`50% zoom at Y=55: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+    console.log(`50% zoom at 17:23: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
     // Must be on a 15-minute boundary
     expect(isOnSnapBoundary(time)).toBe(true);
@@ -208,14 +215,12 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-z1"]');
     await expect(taskTile).toBeVisible();
 
-    // At 150% zoom: 120px/hour, 60px/30min
-    // Y = 150 is between 7:00 (120px) and 7:30 (180px)
-    // Should snap to either 7:00 or 7:30
-    await pickAndPlace(
+    // Place at 17:23 — between 15-min boundaries (17:15 and 17:30)
+    await pickAndPlaceAtTime(
       page,
       '[data-testid="task-tile-task-z1"]',
       'station-komori',
-      150 // Between grid lines
+      17, 23, ZOOM_PPH['150%']
     );
 
     // Verify tile was created
@@ -229,7 +234,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
 
     expect(scheduledStart).toBeTruthy();
     const time = parseTime(scheduledStart!);
-    console.log(`150% zoom at Y=150: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+    console.log(`150% zoom at 17:23: scheduled at ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
     // Must be on a 15-minute boundary
     expect(isOnSnapBoundary(time)).toBe(true);
@@ -237,13 +242,12 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
 
   test('consistent snapping at multiple zoom levels', async ({ page }) => {
     // Test that snapping to 15-minute boundaries works at different zoom levels
-    // Note: Y position to time mapping depends on scroll position, so we just
-    // verify snapping works correctly (time is on 15-minute boundary)
+    // Uses time-based placement for deterministic behavior
 
-    for (const { level, targetY } of [
-      { level: '50%', targetY: 100 },
-      { level: '100%', targetY: 200 },
-      { level: '150%', targetY: 300 },
+    for (const { level, hour, minute } of [
+      { level: '50%', hour: 16, minute: 0 },
+      { level: '100%', hour: 17, minute: 0 },
+      { level: '150%', hour: 18, minute: 0 },
     ]) {
       // Navigate fresh for each test
       await page.goto('/?fixture=zoom-snapping');
@@ -258,11 +262,11 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
       const taskTile = page.locator('[data-testid="task-tile-task-z1"]');
       await expect(taskTile).toBeVisible();
 
-      await pickAndPlace(
+      await pickAndPlaceAtTime(
         page,
         '[data-testid="task-tile-task-z1"]',
         'station-komori',
-        targetY
+        hour, minute, ZOOM_PPH[level]
       );
 
       // Verify tile was created
@@ -276,7 +280,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
 
       expect(scheduledStart).toBeTruthy();
       const time = parseTime(scheduledStart!);
-      console.log(`${level}: Y=${targetY} → ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+      console.log(`${level}: ${hour}:${minute.toString().padStart(2, '0')} → ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
       // Should be on a 15-minute boundary
       expect(isOnSnapBoundary(time)).toBe(true);

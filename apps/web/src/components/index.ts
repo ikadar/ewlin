@@ -51,3 +51,6 @@ export type { JcfJobHeaderProps } from './JcfJobHeader';
 
 export { JcfAutocomplete, highlightMatch } from './JcfAutocomplete';
 export type { JcfAutocompleteProps, Suggestion } from './JcfAutocomplete';
+
+export { JcfElementsTable, generateElementName, DEFAULT_ELEMENT } from './JcfElementsTable';
+export type { JcfElementsTableProps, JcfElement, JcfFieldKey } from './JcfElementsTable';
