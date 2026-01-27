@@ -1355,16 +1355,17 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4E: Base Autocomplete Infrastructure
 
-#### v0.4.11 - JCF: Base Autocomplete Component
-> **Spec source:** reference `Autocomplete.tsx`
+#### v0.4.11 - JCF: Base Autocomplete Component (Table Integration) ✅
+> **Spec source:** reference `Autocomplete.tsx` — Tab/Alt+Arrow delegation pattern
+> **Note:** Base autocomplete features (dropdown, filtering, highlighting, keyboard nav, lazy loading, click-outside) were implemented in v0.4.8. This release adds table navigation delegation.
 
-- [ ] Reusable `Autocomplete` component
-- [ ] Dropdown with filtered suggestions
-- [ ] Text highlight matching
-- [ ] Keyboard navigation (↑↓ Enter Esc)
-- [ ] Dropdown positioning & scrolling
-- [ ] Click outside to close
-- [ ] Lazy-load suggestions
+- [x] `onTabOut` prop for Tab/Shift+Tab delegation to parent table
+- [x] `onArrowNav` prop for Alt+Arrow delegation to parent table
+- [x] handleKeyDown updated for Tab delegation (close dropdown → delegate)
+- [x] handleKeyDown updated for Alt+Arrow delegation (close dropdown → delegate)
+- [x] Unit tests for delegation callbacks (11 tests)
+- [x] E2E tests for backward compatibility (9 tests)
+- [x] Backward compatible: no change when props not provided
 
 #### v0.4.12 - JCF: Session Learning
 > **Spec source:** §7 (Session Learning)
