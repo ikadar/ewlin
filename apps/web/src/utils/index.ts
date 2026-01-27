@@ -40,3 +40,4 @@ export type { DryingTimeInfo } from './precedenceConstraints';
 export { getValidationMessage, getPrimaryValidationMessage } from './validationMessages';
 export { addWorkingTime, subtractWorkingTime, getDayScheduleForDate, isWithinWorkingHours, snapToNextWorkingTime } from './workingTime';
 export { getJobIdForTask, createTaskToJobMap, getTasksForJob, groupTasksByJob } from './taskHelpers';
+export { mergeWithSession } from './mergeWithSession';

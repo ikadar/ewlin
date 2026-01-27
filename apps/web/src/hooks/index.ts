@@ -6,3 +6,6 @@ export type { VirtualScrollConfig, VirtualScrollResult } from './useVirtualScrol
 
 export { useLazyLoadSuggestions } from './useLazyLoadSuggestions';
 export type { UseLazyLoadSuggestionsResult } from './useLazyLoadSuggestions';
+
+export { useSessionLearning } from './useSessionLearning';
+export type { SessionLearningState, SessionLearningActions } from './useSessionLearning';
