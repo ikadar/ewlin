@@ -4,55 +4,28 @@
  * Calculate Y positions for precedence constraint visualization lines.
  * REQ-10: Precedence Constraint Visualization
  * v0.3.53: Precedence Lines + Working Hours (REQ-03)
+ *
+ * Element-scoped: predecessor/successor are within the same element.
+ * Cross-element: prerequisiteElementIds define finish-to-start dependencies.
  */
 
-import type { ScheduleSnapshot, Task, TaskAssignment, Station } from '@flux/types';
+import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element } from '@flux/types';
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
 import { subtractWorkingTime, snapToNextWorkingTime } from './workingTime';
-import { getTasksForJob, getJobIdForTask } from './taskHelpers';
+import { getElementTasks } from './taskHelpers';
 
-/**
- * Get all tasks for a job in sequence order.
- */
-function getJobTasks(snapshot: ScheduleSnapshot, jobId: string): Task[] {
-  return getTasksForJob(jobId, snapshot.tasks, snapshot.elements)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+// Dry time in milliseconds (4 hours) - same as in @flux/schedule-validator
+const DRY_TIME_MS = 4 * 60 * 60 * 1000;
+
+// ============================================================================
+// Element / Lookup helpers
+// ============================================================================
+
+function findElement(snapshot: ScheduleSnapshot, elementId: string): Element | undefined {
+  return snapshot.elements.find((e) => e.id === elementId);
 }
 
-/**
- * Get the predecessor task (if any) for a given task.
- */
-function getPredecessorTask(snapshot: ScheduleSnapshot, task: Task): Task | undefined {
-  const jobId = getJobIdForTask(task, snapshot.elements);
-  if (!jobId) return undefined;
-
-  const jobTasks = getJobTasks(snapshot, jobId);
-  const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
-  if (taskIndex > 0) {
-    return jobTasks[taskIndex - 1];
-  }
-  return undefined;
-}
-
-/**
- * Get the successor task (if any) for a given task.
- */
-function getSuccessorTask(snapshot: ScheduleSnapshot, task: Task): Task | undefined {
-  const jobId = getJobIdForTask(task, snapshot.elements);
-  if (!jobId) return undefined;
-
-  const jobTasks = getJobTasks(snapshot, jobId);
-  const taskIndex = jobTasks.findIndex((t) => t.id === task.id);
-  if (taskIndex >= 0 && taskIndex < jobTasks.length - 1) {
-    return jobTasks[taskIndex + 1];
-  }
-  return undefined;
-}
-
-/**
- * Find an assignment by task ID.
- */
 function findAssignmentByTaskId(
   snapshot: ScheduleSnapshot,
   taskId: string
@@ -60,92 +33,8 @@ function findAssignmentByTaskId(
   return snapshot.assignments.find((a) => a.taskId === taskId);
 }
 
-/**
- * Find a station by ID.
- */
 function findStationById(snapshot: ScheduleSnapshot, stationId: string): Station | undefined {
   return snapshot.stations.find((s) => s.id === stationId);
-}
-
-/**
- * Calculate the Y position for the predecessor constraint line (purple).
- *
- * This represents the earliest possible start time for a task based on
- * its predecessor's end time plus any required dry time for printing tasks.
- *
- * v0.3.53: Drying is a physical process that continues regardless of working hours.
- * However, work can only START during working hours. So:
- * 1. Calculate drying end = predecessor end + dry time (simple addition)
- * 2. If drying ends outside working hours, snap to next working time
- *
- * @returns Y position in pixels, or null if no constraint
- */
-export function getPredecessorConstraint(
-  task: Task,
-  snapshot: ScheduleSnapshot,
-  startHour: number,
-  pixelsPerHour: number,
-  gridStartDate?: Date
-): number | null {
-  // Find predecessor task
-  const predecessor = getPredecessorTask(snapshot, task);
-  if (!predecessor) {
-    return null; // No predecessor = no constraint
-  }
-
-  // Find predecessor's assignment
-  const predecessorAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
-  if (!predecessorAssignment) {
-    return null; // Predecessor not scheduled = no constraint
-  }
-
-  // Get predecessor end time
-  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
-
-  // Check if dry time applies (printing/offset station, not outsourced)
-  let earliestStart: Date;
-  if (!predecessorAssignment.isOutsourced && isPrintingStation(snapshot, predecessorAssignment.targetId)) {
-    // Drying is a physical process - it continues regardless of working hours
-    // So we use simple addition for dry time
-    const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-
-    // But work can only START during working hours
-    // If drying ends outside working hours, snap to next working time
-    const station = findStationById(snapshot, predecessorAssignment.targetId);
-    if (station) {
-      earliestStart = snapToNextWorkingTime(dryingEnd, station);
-    } else {
-      // Fallback if station not found
-      earliestStart = dryingEnd;
-    }
-  } else {
-    // No dry time, earliest start is right after predecessor ends
-    // But still need to snap to working hours
-    const station = predecessorAssignment.isOutsourced
-      ? undefined
-      : findStationById(snapshot, predecessorAssignment.targetId);
-    if (station) {
-      earliestStart = snapToNextWorkingTime(predecessorEnd, station);
-    } else {
-      earliestStart = predecessorEnd;
-    }
-  }
-
-  // Convert to Y position
-  return timeToYPosition(earliestStart, startHour, pixelsPerHour, gridStartDate);
-}
-
-// Dry time in milliseconds (4 hours) - same as in @flux/schedule-validator
-const DRY_TIME_MS = 4 * 60 * 60 * 1000;
-
-/** Information about drying time for visualization */
-export interface DryingTimeInfo {
-  /** Station ID where the predecessor is scheduled (where to show the indicator) */
-  predecessorStationId: string;
-  /** Y position of predecessor task end */
-  predecessorEndY: number;
-  /** Y position where drying time ends */
-  dryingEndY: number;
 }
 
 /**
@@ -158,22 +47,181 @@ function isPrintingStation(snapshot: ScheduleSnapshot, stationId: string): boole
   const category = snapshot.categories.find((c) => c.id === station.categoryId);
   if (!category) return false;
 
-  // Check if category name contains "offset" (case insensitive)
   return category.name.toLowerCase().includes('offset');
 }
 
+// ============================================================================
+// Intra-element predecessor / successor (scoped to same element)
+// ============================================================================
+
 /**
- * Calculate the Y position for the successor constraint line (orange).
+ * Get the predecessor task within the SAME ELEMENT.
+ */
+function getPredecessorTask(snapshot: ScheduleSnapshot, task: Task): Task | undefined {
+  const elementTasks = getElementTasks(task.elementId, snapshot.tasks);
+  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
+  if (taskIndex > 0) {
+    return elementTasks[taskIndex - 1];
+  }
+  return undefined;
+}
+
+/**
+ * Get the successor task within the SAME ELEMENT.
+ */
+function getSuccessorTask(snapshot: ScheduleSnapshot, task: Task): Task | undefined {
+  const elementTasks = getElementTasks(task.elementId, snapshot.tasks);
+  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
+  if (taskIndex >= 0 && taskIndex < elementTasks.length - 1) {
+    return elementTasks[taskIndex + 1];
+  }
+  return undefined;
+}
+
+// ============================================================================
+// Cross-element predecessor / successor
+// ============================================================================
+
+/**
+ * If task is the first in its element and the element has prerequisites,
+ * return the last task of each prerequisite element.
+ */
+function getCrossElementPredecessors(snapshot: ScheduleSnapshot, task: Task): Task[] {
+  const element = findElement(snapshot, task.elementId);
+  if (!element) return [];
+
+  const elementTasks = getElementTasks(element.id, snapshot.tasks);
+  if (elementTasks.length === 0 || elementTasks[0].id !== task.id) {
+    return []; // Not the first task in element
+  }
+
+  if (!element.prerequisiteElementIds || element.prerequisiteElementIds.length === 0) {
+    return [];
+  }
+
+  const predecessors: Task[] = [];
+  for (const prereqElementId of element.prerequisiteElementIds) {
+    const prereqTasks = getElementTasks(prereqElementId, snapshot.tasks);
+    if (prereqTasks.length > 0) {
+      predecessors.push(prereqTasks[prereqTasks.length - 1]);
+    }
+  }
+  return predecessors;
+}
+
+/**
+ * If task is the last in its element, return the first task of each
+ * element that depends on this element.
+ */
+function getCrossElementSuccessors(snapshot: ScheduleSnapshot, task: Task): Task[] {
+  const element = findElement(snapshot, task.elementId);
+  if (!element) return [];
+
+  const elementTasks = getElementTasks(element.id, snapshot.tasks);
+  if (elementTasks.length === 0 || elementTasks[elementTasks.length - 1].id !== task.id) {
+    return []; // Not the last task in element
+  }
+
+  const dependentElements = snapshot.elements.filter((e) =>
+    e.prerequisiteElementIds?.includes(element.id)
+  );
+
+  const successors: Task[] = [];
+  for (const depElement of dependentElements) {
+    const depTasks = getElementTasks(depElement.id, snapshot.tasks);
+    if (depTasks.length > 0) {
+      successors.push(depTasks[0]);
+    }
+  }
+  return successors;
+}
+
+// ============================================================================
+// Shared: earliest start from a single predecessor
+// ============================================================================
+
+/**
+ * Calculate the earliest start Date from a single predecessor assignment.
+ * Handles dry time for printing stations + working hours snapping.
+ */
+function getEarliestStartFromPredecessor(
+  predecessorAssignment: TaskAssignment,
+  snapshot: ScheduleSnapshot
+): Date {
+  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+
+  if (!predecessorAssignment.isOutsourced && isPrintingStation(snapshot, predecessorAssignment.targetId)) {
+    const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+    const station = findStationById(snapshot, predecessorAssignment.targetId);
+    return station ? snapToNextWorkingTime(dryingEnd, station) : dryingEnd;
+  }
+
+  const station = predecessorAssignment.isOutsourced
+    ? undefined
+    : findStationById(snapshot, predecessorAssignment.targetId);
+  return station ? snapToNextWorkingTime(predecessorEnd, station) : predecessorEnd;
+}
+
+// ============================================================================
+// Public API: constraint Y positions
+// ============================================================================
+
+/**
+ * Calculate Y position for the predecessor constraint line (purple).
  *
- * This represents the latest possible start time for a task such that
- * it will finish (including any required dry time) before its successor's scheduled start time.
+ * Checks both intra-element predecessor and cross-element predecessors,
+ * returning the most constraining (latest / highest Y).
+ */
+export function getPredecessorConstraint(
+  task: Task,
+  snapshot: ScheduleSnapshot,
+  startHour: number,
+  pixelsPerHour: number,
+  gridStartDate?: Date
+): number | null {
+  let latestEarliestStart: Date | null = null;
+
+  // 1. Intra-element predecessor
+  const predecessor = getPredecessorTask(snapshot, task);
+  if (predecessor) {
+    const predAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
+    if (predAssignment) {
+      latestEarliestStart = getEarliestStartFromPredecessor(predAssignment, snapshot);
+    }
+  }
+
+  // 2. Cross-element predecessors
+  const crossPreds = getCrossElementPredecessors(snapshot, task);
+  for (const crossPred of crossPreds) {
+    const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
+    if (crossAssignment) {
+      const earliest = getEarliestStartFromPredecessor(crossAssignment, snapshot);
+      if (!latestEarliestStart || earliest > latestEarliestStart) {
+        latestEarliestStart = earliest;
+      }
+    }
+  }
+
+  if (!latestEarliestStart) return null;
+
+  return timeToYPosition(latestEarliestStart, startHour, pixelsPerHour, gridStartDate);
+}
+
+/** Information about drying time for visualization */
+export interface DryingTimeInfo {
+  /** Station ID where the predecessor is scheduled (where to show the indicator) */
+  predecessorStationId: string;
+  /** Y position of predecessor task end */
+  predecessorEndY: number;
+  /** Y position where drying time ends */
+  dryingEndY: number;
+}
+
+/**
+ * Calculate Y position for the successor constraint line (orange).
  *
- * v0.3.53: Drying is a physical process that continues regardless of working hours.
- * But task execution happens during working hours. So:
- * 1. Subtract dry time from successor start (simple subtraction - physical process)
- * 2. Subtract task duration using working time (actual work)
- *
- * @returns Y position in pixels, or null if no constraint
+ * Checks both intra-element successor and cross-element successors,
+ * returning the most constraining (earliest / lowest Y).
  */
 export function getSuccessorConstraint(
   task: Task,
@@ -182,71 +230,63 @@ export function getSuccessorConstraint(
   pixelsPerHour: number,
   gridStartDate?: Date
 ): number | null {
-  // Find successor task
-  const successor = getSuccessorTask(snapshot, task);
-  if (!successor) {
-    return null; // No successor = no constraint
-  }
+  let earliestLatestStart: Date | null = null;
 
-  // Find successor's assignment
-  const successorAssignment = findAssignmentByTaskId(snapshot, successor.id);
-  if (!successorAssignment) {
-    return null; // Successor not scheduled = no constraint
-  }
+  // Helper to calculate latest start from a successor
+  const calcLatestStart = (currentTask: Task, successorAssignment: TaskAssignment): Date => {
+    const successorStart = parseTimestamp(successorAssignment.scheduledStart);
 
-  // Start from successor's scheduled start time
-  const successorStart = parseTimestamp(successorAssignment.scheduledStart);
+    const taskDurationMinutes = currentTask.type === 'Internal'
+      ? currentTask.duration.setupMinutes + currentTask.duration.runMinutes
+      : 0;
+    const taskDurationMs = taskDurationMinutes * 60 * 1000;
 
-  // Get task duration - for internal tasks it's setupMinutes + runMinutes
-  const taskDurationMinutes = task.type === 'Internal'
-    ? task.duration.setupMinutes + task.duration.runMinutes
-    : 0; // Outsourced tasks don't have minute-based duration
-  const taskDurationMs = taskDurationMinutes * 60 * 1000; // minutes to ms
-
-  // Check if current task requires dry time after completion
-  // Dry time applies if this task is on a printing (offset) station
-  let dryTimeMs = 0;
-  if (task.type === 'Internal') {
-    const requiresDryTime = isPrintingStation(snapshot, task.stationId);
-    if (requiresDryTime) {
+    let dryTimeMs = 0;
+    if (currentTask.type === 'Internal' && isPrintingStation(snapshot, currentTask.stationId)) {
       dryTimeMs = DRY_TIME_MS;
+    }
+
+    const latestEnd = dryTimeMs > 0
+      ? new Date(successorStart.getTime() - dryTimeMs)
+      : successorStart;
+
+    const station = currentTask.type === 'Internal' ? findStationById(snapshot, currentTask.stationId) : undefined;
+    return station
+      ? subtractWorkingTime(latestEnd, taskDurationMs, station)
+      : new Date(latestEnd.getTime() - taskDurationMs);
+  };
+
+  // 1. Intra-element successor
+  const successor = getSuccessorTask(snapshot, task);
+  if (successor) {
+    const succAssignment = findAssignmentByTaskId(snapshot, successor.id);
+    if (succAssignment) {
+      earliestLatestStart = calcLatestStart(task, succAssignment);
     }
   }
 
-  // Calculate latest end time for this task:
-  // Drying is physical - simple subtraction from successor start
-  const latestEnd = dryTimeMs > 0
-    ? new Date(successorStart.getTime() - dryTimeMs)
-    : successorStart;
-
-  // Calculate latest start by subtracting task duration (actual work - uses working hours)
-  const station = task.type === 'Internal' ? findStationById(snapshot, task.stationId) : undefined;
-
-  let latestStart: Date;
-  if (station) {
-    latestStart = subtractWorkingTime(latestEnd, taskDurationMs, station);
-  } else {
-    // Fallback: subtract directly (for outsourced tasks or missing station)
-    latestStart = new Date(latestEnd.getTime() - taskDurationMs);
+  // 2. Cross-element successors
+  const crossSuccs = getCrossElementSuccessors(snapshot, task);
+  for (const crossSucc of crossSuccs) {
+    const crossAssignment = findAssignmentByTaskId(snapshot, crossSucc.id);
+    if (crossAssignment) {
+      const ls = calcLatestStart(task, crossAssignment);
+      if (!earliestLatestStart || ls < earliestLatestStart) {
+        earliestLatestStart = ls;
+      }
+    }
   }
 
-  // Convert to Y position
-  return timeToYPosition(latestStart, startHour, pixelsPerHour, gridStartDate);
+  if (!earliestLatestStart) return null;
+
+  return timeToYPosition(earliestLatestStart, startHour, pixelsPerHour, gridStartDate);
 }
 
 /**
  * Get drying time visualization info for a task.
  *
- * Returns information needed to render the drying time indicator:
- * - Station ID where predecessor is scheduled
- * - Y position of predecessor end
- * - Y position where drying ends
- *
- * v0.3.53: Drying is a physical process - the indicator shows the actual
- * physical end of drying (simple addition), not when work can start.
- * The purple precedence line shows when work can actually start.
- *
- * @returns DryingTimeInfo or null if no drying time applies
+ * Checks both intra-element and cross-element predecessors.
+ * Returns info for the most constraining printing predecessor.
  */
 export function getDryingTimeInfo(
   task: Task,
@@ -255,40 +295,45 @@ export function getDryingTimeInfo(
   pixelsPerHour: number,
   gridStartDate?: Date
 ): DryingTimeInfo | null {
-  // Find predecessor task
+  // Collect all predecessor assignments that are printing stations
+  const printingPredecessors: TaskAssignment[] = [];
+
+  // Intra-element predecessor
   const predecessor = getPredecessorTask(snapshot, task);
-  if (!predecessor) {
-    return null; // No predecessor = no drying time to show
+  if (predecessor) {
+    const predAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
+    if (predAssignment && !predAssignment.isOutsourced && isPrintingStation(snapshot, predAssignment.targetId)) {
+      printingPredecessors.push(predAssignment);
+    }
   }
 
-  // Find predecessor's assignment
-  const predecessorAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
-  if (!predecessorAssignment) {
-    return null; // Predecessor not scheduled = no drying time to show
+  // Cross-element predecessors
+  const crossPreds = getCrossElementPredecessors(snapshot, task);
+  for (const crossPred of crossPreds) {
+    const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
+    if (crossAssignment && !crossAssignment.isOutsourced && isPrintingStation(snapshot, crossAssignment.targetId)) {
+      printingPredecessors.push(crossAssignment);
+    }
   }
 
-  // Check if predecessor requires dry time
-  if (predecessorAssignment.isOutsourced) {
-    return null; // Outsourced tasks don't have dry time
+  if (printingPredecessors.length === 0) return null;
+
+  // Pick the most constraining (latest end)
+  let mostConstraining = printingPredecessors[0];
+  for (let i = 1; i < printingPredecessors.length; i++) {
+    const currentEnd = parseTimestamp(printingPredecessors[i].scheduledEnd);
+    const bestEnd = parseTimestamp(mostConstraining.scheduledEnd);
+    if (currentEnd > bestEnd) {
+      mostConstraining = printingPredecessors[i];
+    }
   }
 
-  if (!isPrintingStation(snapshot, predecessorAssignment.targetId)) {
-    return null; // Not a printing station = no dry time
-  }
-
-  // Calculate positions
-  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
-
-  // Drying is a physical process - simple addition
-  // The yellow arrow shows when drying physically ends
+  const predecessorEnd = parseTimestamp(mostConstraining.scheduledEnd);
   const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
 
-  const predecessorEndY = timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate);
-  const dryingEndY = timeToYPosition(dryingEnd, startHour, pixelsPerHour, gridStartDate);
-
   return {
-    predecessorStationId: predecessorAssignment.targetId,
-    predecessorEndY,
-    dryingEndY,
+    predecessorStationId: mostConstraining.targetId,
+    predecessorEndY: timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate),
+    dryingEndY: timeToYPosition(dryingEnd, startHour, pixelsPerHour, gridStartDate),
   };
 }

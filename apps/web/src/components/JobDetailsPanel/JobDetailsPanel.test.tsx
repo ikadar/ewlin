@@ -32,7 +32,8 @@ const mockElements: Element[] = [
   {
     id: 'element-1',
     jobId: 'job-1',
-    name: 'Element 1',
+    suffix: 'ELT',
+    prerequisiteElementIds: [],
     taskIds: ['task-1', 'task-2'],
     createdAt: '2025-12-15T10:00:00Z',
     updatedAt: '2025-12-15T10:00:00Z',
@@ -236,6 +237,7 @@ describe('TaskList', () => {
     render(
       <TaskList
         tasks={mockTasks}
+        elements={mockElements}
         job={mockJob}
         assignments={mockAssignments}
         stations={mockStations}
@@ -247,7 +249,7 @@ describe('TaskList', () => {
 
   it('shows empty state when no tasks', () => {
     render(
-      <TaskList tasks={[]} job={mockJob} assignments={[]} stations={mockStations} />
+      <TaskList tasks={[]} elements={mockElements} job={mockJob} assignments={[]} stations={mockStations} />
     );
     expect(screen.getByText('Aucune tâche')).toBeInTheDocument();
   });

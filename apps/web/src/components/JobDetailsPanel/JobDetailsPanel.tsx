@@ -58,6 +58,9 @@ export function JobDetailsPanel({
   // Filter tasks for this job
   const jobTasks = getTasksForJob(job.id, tasks, elements);
 
+  // Filter elements for this job
+  const jobElements = elements.filter((e) => job.elementIds.includes(e.id));
+
   // Filter assignments for this job's tasks
   const jobTaskIds = new Set(jobTasks.map((t) => t.id));
   const jobAssignments = assignments.filter((a) => jobTaskIds.has(a.taskId));
@@ -87,9 +90,10 @@ export function JobDetailsPanel({
         <JobStatus job={job} onDateClick={onDateClick} />
       </div>
 
-      {/* Task tiles */}
+      {/* Task tiles grouped by element */}
       <TaskList
         tasks={jobTasks}
+        elements={jobElements}
         job={job}
         assignments={jobAssignments}
         stations={stations}

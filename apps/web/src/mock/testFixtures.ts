@@ -30,6 +30,7 @@ import { createPickPlaceFixture } from './fixtures/pick-place';
 import { createContextMenuFixture } from './fixtures/context-menu';
 import { createFixedTileHeightFixture } from './fixtures/fixed-tile-height';
 import { createUnavailabilityOverlayFixture } from './fixtures/unavailability-overlay';
+import { createElementPrecedenceFixture } from './fixtures/element-precedence';
 
 // Re-export createBasicFixture for direct usage
 export { createBasicFixture };
@@ -38,7 +39,7 @@ export { createBasicFixture };
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay' | 'element-precedence';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -63,6 +64,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'context-menu': createContextMenuFixture,
   'fixed-tile-height': createFixedTileHeightFixture,
   'unavailability-overlay': createUnavailabilityOverlayFixture,
+  'element-precedence': createElementPrecedenceFixture,
 };
 
 /**

@@ -70,6 +70,18 @@ export function getTasksForJob(
 }
 
 /**
+ * Get all tasks for a specific element, sorted by sequenceOrder.
+ */
+export function getElementTasks(
+  elementId: string,
+  tasks: Task[]
+): Task[] {
+  return tasks
+    .filter((t) => t.elementId === elementId)
+    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+}
+
+/**
  * Group tasks by their job ID.
  *
  * @param tasks - Array of all tasks
