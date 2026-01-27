@@ -1389,13 +1389,13 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Pretty ↔ DSL bidirectional conversion
 - [x] Dimension lookup from API formats
 
-#### v0.4.14 - JCF: Impression Autocomplete
+#### v0.4.14 - JCF: Impression Autocomplete ✅
 > **Spec source:** §1.3 (Impression DSL)
 
-- [ ] Preset patterns: Q/Q, Q/, Q+V/Q+V, Q+V/Q, Q+V/, N/N, N/, Q/N, N/Q
-- [ ] Recto/verso validation (must contain `/`)
-- [ ] Dropdown with all presets
-- [ ] Free-text input with validation
+- [x] Preset patterns: Q/Q, Q/, Q+V/Q+V, Q+V/Q, Q+V/, N/N, N/, Q/N, N/Q
+- [x] Recto/verso validation (must contain `/`)
+- [x] Dropdown with all presets
+- [x] Free-text input with validation
 
 #### v0.4.15 - JCF: Surfacage Autocomplete
 > **Spec source:** §1.4 (Surfacage DSL)
