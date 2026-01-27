@@ -96,17 +96,19 @@ PROCESS: Job Cancellation
 
 ---
 
-# 3. Task Workflow (within Job)
+# 3. Task Workflow (within Element)
 
 ## State Machine: Task
 #### WF-TASK-SM-001
-> **References:** [DM-ENUM-TASK-001](domain-model.md#dm-enum-task-001), [BR-TASK-001](business-rules.md#br-task-001), [BR-ASSIGN-007](business-rules.md#br-assign-007)
+> **References:** [DM-ENUM-TASK-001](domain-model.md#dm-enum-task-001), [BR-TASK-001](business-rules.md#br-task-001), [BR-TASK-007](business-rules.md#br-task-007), [BR-ELEM-004](business-rules.md#br-elem-004), [BR-ASSIGN-007](business-rules.md#br-assign-007)
 
 ```
 STATE MACHINE: Task
 Initial: Defined
 
-Defined → Ready          (when previous task completed, or first task with approval gates cleared)
+Defined → Ready          (when intra-element predecessor completed;
+                          for first task of element: cross-element prerequisites also satisfied;
+                          approval gates cleared)
 Ready → Assigned         (when scheduled on station with time slot)
 Assigned → Executing     (when scheduled time arrives and work begins)
 Executing → Completed    (normal completion)
@@ -120,7 +122,7 @@ Executing → Cancelled    (job cancellation during execution)
 ```
 
 ### Notes
-- **Ready** means previous task completed and approval gates satisfied.
+- **Ready** means intra-element predecessor task completed and approval gates satisfied. For the first task of an element, cross-element prerequisites (last tasks of prerequisite elements) must also have completed.
 - **Assigned** means scheduled with specific time slot on station.
 - **Failed** tasks can be retried by returning to Ready.
 - Recalling a tile moves from Assigned back to Ready.
@@ -137,15 +139,15 @@ Executing → Cancelled    (job cancellation during execution)
 ```
 PROCESS: BAT Approval
 
-1. Job created with proofSentAt = null
+1. Job created with proofApproval.sentAt = null
 2. User actions:
-   a) Set proofSentAt = "AwaitingFile" → waiting for client file
-   b) Set proofSentAt = "NoProofRequired" → bypass proof, tasks can be scheduled
-   c) Set proofSentAt = <datetime> → proof sent to client
+   a) Set proofApproval.sentAt = "AwaitingFile" → waiting for client file
+   b) Set proofApproval.sentAt = "NoProofRequired" → bypass proof, tasks can be scheduled
+   c) Set proofApproval.sentAt = <datetime> → proof sent to client
 3. If proof sent, wait for client response:
-   a) Client approves → set proofApprovedAt = <datetime>
-   b) Client requests changes → send revised proof (update proofSentAt)
-4. When proofApprovedAt is set (or proofSentAt = "NoProofRequired"):
+   a) Client approves → set proofApproval.approvedAt = <datetime>
+   b) Client requests changes → send revised proof (update proofApproval.sentAt)
+4. When proofApproval.approvedAt is set (or proofApproval.sentAt = "NoProofRequired"):
    → Tasks can be scheduled
 ```
 
@@ -201,22 +203,23 @@ PROCESS: Paper Procurement
 ```
 PROCESS: Task Assignment (Internal)
 
-1. Check task is in Ready state (previous task completed)
+1. Check task is in Ready state:
+   a) Intra-element: previous task in element completed (by sequenceOrder)
+   b) Cross-element: prerequisite elements' last tasks completed (first task of element only)
+   c) Dry time respected if predecessor is printing task (+4h, BR-ELEM-005)
 2. Check approval gates:
-   a) proofApprovedAt is set OR proofSentAt = "NoProofRequired"
+   a) proofApproval.approvedAt is set OR proofApproval.sentAt = "NoProofRequired"
    b) platesStatus = "Done" (if printing task)
 3. Check station:
    a) Station exists and is Available
    b) No conflicting assignments at proposed time
    c) Station group has capacity
-4. Check job dependencies:
-   a) All required jobs are completed
-5. If all valid:
+4. If all valid:
    a) Create TaskAssignment with scheduledStart and scheduledEnd
    b) Update task state → Assigned
    c) Reserve station time slot
    d) Publish TaskAssigned event
-6. If validation fails:
+5. If validation fails:
    a) Report conflicts
    b) Task remains in Ready state
 ```
@@ -306,8 +309,10 @@ PROCESS: Assignment Validation
    - No station double-booking
 
    [Sequence Validation]
-   - Previous task in job completed (or this is first task)
-   - All required jobs completed
+   - Intra-element: previous task in element completed (by sequenceOrder)
+   - Cross-element: prerequisite elements' last tasks completed (first task of element only)
+   - Dry time: if predecessor is printing task, +4h wait respected (BR-ELEM-005)
+   - Most constraining predecessor (latest effectiveEnd) determines earliest valid start
 
    [Gate Validation]
    - Proof approved or not required
@@ -337,8 +342,8 @@ TRIGGER: Station availability change / Task modification / New assignment
 1. Identify affected tasks:
    a) Tasks assigned to changed station
    b) Tasks in same station group
-   c) Tasks in same job (sequence dependencies)
-   d) Tasks in dependent jobs
+   c) Tasks in same element (intra-element sequence dependencies)
+   d) Tasks across elements in same job (cross-element dependencies via prerequisiteElementIds)
 
 2. For each affected task:
    a) Re-validate current assignment
@@ -347,9 +352,10 @@ TRIGGER: Station availability change / Task modification / New assignment
       - Mark task assignment as invalid
 
 3. Conflict types to detect:
+   - StationMismatchConflict: task assigned to wrong station
    - StationConflict: double-booking
    - GroupCapacityConflict: exceeds MaxConcurrent
-   - PrecedenceConflict: wrong sequence order
+   - PrecedenceConflict: intra-element or cross-element predecessor's effectiveEnd exceeds task start (includes dry time)
    - ApprovalGateConflict: gates not satisfied
    - AvailabilityConflict: outside station operating hours
    - DeadlineConflict: exceeds workshopExitDate
@@ -369,7 +375,8 @@ StationCategoryCreated
 → StationCreated
 → ProviderCreated (optional)
 → JobCreated
-→ TasksDefinedFromDSL
+→ ElementsCreated
+→ TasksDefinedFromDSL (within elements)
 → ProofSent (or NoProofRequired)
 → ProofApproved
 → PlatesDone
@@ -411,6 +418,11 @@ JobStarted
 JobCompleted
 JobCancelled
 JobDelayed
+
+// Element Events
+ElementCreated
+ElementDependencyAdded
+ElementDependencyRemoved
 
 // Task Events
 TaskAddedToJob

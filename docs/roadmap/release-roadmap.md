@@ -46,9 +46,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 | **M1** | Core Domain MVP (Station + Job Management) |
 | **M2** | Scheduling Core (Assignment + Validation) |
 | **M3** | Frontend Integration |
-| **M4** | Backend API Integration |
-| **M5** | DSL Editor (Post-MVP) |
-| **M6** | Production Readiness |
+| **M4** | Job Creation Form (Element layer + JCF UI + Templates) |
+| **M5** | Backend API Integration |
+| **M6** | DSL Syntax Highlighting (Post-MVP, optional) |
+| **M7** | Production Readiness |
 | **Post-MVP** | Schedule Branching, Optimization |
 
 ---
@@ -1155,10 +1156,25 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 > **Context:** JCF (Job Creation Form) integration from `reference/jcf/`
 > **Reference:** [Implicit Logic Specification](../../reference/jcf/docs/implicit-logic-specification.md)
 >
-> **Strategy:** Incremental Element layer introduction to minimize risk:
-> 1. Frontend types + tests first (v0.4.0)
-> 2. Documentation update (v0.4.2)
-> 3. Backend implementation (v0.4.3)
+> **Strategy:** Hybrid approach — spec-driven reimplementation with visual reference:
+> - The `reference/jcf/` codebase is a vibe-coding prototype. It is **never merged** into the main app.
+> - The [Implicit Logic Specification](../../reference/jcf/docs/implicit-logic-specification.md) (71KB) is the primary "what" source.
+> - The reference app is the visual/behavioral "how it looks/works" source (run side-by-side for UX verification).
+> - All code is reimplemented cleanly following main app conventions (`@flux/types`, Tailwind design tokens, `memo()`, barrel exports).
+> - Granular releases (1 feature = 1 release) for maximum UX fidelity control and vibe-code firewall.
+>
+> **Phases:**
+> 1. Element layer foundation (v0.4.0–v0.4.3)
+> 2. JCF foundation: type mapping, reference data, page shell (v0.4.4–v0.4.6)
+> 3. Job header form (v0.4.7–v0.4.8)
+> 4. Elements table structure (v0.4.9–v0.4.10)
+> 5. Base autocomplete & session learning (v0.4.11–v0.4.12)
+> 6. Simple autocompletes: format, impression, surfacage, quantité/pagination (v0.4.13–v0.4.16)
+> 7. DSL autocompletes: papier, imposition, precedences (v0.4.17–v0.4.19)
+> 8. Sequence autocomplete: poste, ST, workflow (v0.4.20–v0.4.22)
+> 9. Validation & calculated fields (v0.4.23–v0.4.25)
+> 10. Job save & backend integration (v0.4.26)
+> 11. Template system (v0.4.27–v0.4.28)
 
 ### Phase 4A: Element Entity Foundation
 
@@ -1208,16 +1224,41 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] All tests pass (638 unit + 199 E2E)
 - [x] ESLint passes
 
-#### v0.4.2 - Element Layer: Documentation
-- [ ] Domain vocabulary update (domain-vocabulary.md)
-  - [ ] New Element section
-  - [ ] Job section update (Job → Element relationship)
-  - [ ] Task section update (Element → Task relationship)
-- [ ] Business rules update (business-rules.md)
-  - [ ] BR-ELEM-* rules
-- [ ] Other specification documents review and update
-  - [ ] SimilarityCriterion fieldPath updates
-  - [ ] Any Job/Task references that need Element context
+#### v0.4.2 - Element Layer: Documentation ✅
+- [x] Domain vocabulary update (domain-vocabulary.md)
+  - [x] New Element term definition
+  - [x] New ElementDependency term definition
+  - [x] Job section update (Job → Element → Task hierarchy)
+  - [x] Task section update (element-scoped sequencing, elementId)
+- [x] Business rules update (business-rules.md)
+  - [x] BR-ELEM-001..005 rules (element ownership, dependencies, precedence)
+  - [x] BR-TASK-001/003/007 update (element-scoped sequencing)
+- [x] Domain model update (domain-model.md)
+  - [x] Element entity within Job aggregate
+  - [x] Job aggregate updated (ElementIds, Elements collection)
+  - [x] Task entity updated (ElementId replaces direct Job reference)
+  - [x] ScheduleSnapshot updated (Elements collection)
+  - [x] Relationships and invariants updated
+- [x] Bounded context map update (bounded-context-map.md)
+  - [x] Element added to Job Management Context owned models
+  - [x] Element-related domain events added
+  - [x] Text-based context map updated
+- [x] Workflow definitions update (workflow-definitions.md)
+  - [x] Task sequencing updated to element-scoped
+  - [x] Cross-element precedence validation added
+  - [x] Assignment validation process updated
+  - [x] Element dependency events added
+- [x] Architecture documentation update
+  - [x] aggregate-design.md — Element within Job aggregate
+  - [x] decision-records.md — ADR for Element layer introduction
+  - [x] dependency-graphs.md — Element dependencies in graph
+  - [x] event-message-design.md — Element-related events
+  - [x] interface-contracts.md — Element in API contracts
+  - [x] nonfunctional-design-notes.md — Element impact on validation performance
+  - [x] project-structure.md — Element-related files
+  - [x] sequence-design.md — Element-aware validation sequences
+  - [x] service-boundaries.md — Element in Job Management service
+  - [x] ui-backend-compatibility-report.md — Element frontend/backend alignment
 
 #### v0.4.3 - Element Layer: Backend Implementation
 - [ ] Element entity (PHP)
@@ -1239,6 +1280,258 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Unit tests
 - [ ] Integration tests
 - [ ] PHPStan level 8
+
+### Phase 4B: JCF Foundation
+
+> **Note:** Phase 4B–4K can start with mock data, in parallel with v0.4.3 (backend).
+
+#### v0.4.4 - JCF: Type Mapping & Data Model
+> **Spec source:** §1 (Input Format Conventions), §9 (Reference Data), §11.6 (Domain Model Analysis)
+
+- [ ] Map reference Element (12 string fields) → `@flux/types` model
+  - [ ] Architectural decision: ElementSpec value object vs. flat fields on Element
+  - [ ] Reference Element.name → Element.suffix
+  - [ ] Reference Element.precedences → Element.prerequisiteElementIds
+  - [ ] Reference Element.sequence → Task[] entities within Element
+  - [ ] Production metadata fields (format, papier, pagination, imposition, impression, surfacage, quantite, qteFeuilles, autres, commentaires)
+- [ ] Update `@flux/types` package with new types
+- [ ] Type mapping documentation
+
+#### v0.4.5 - JCF: Reference Data & Mock API
+> **Spec source:** §9 (Reference Data)
+
+- [ ] Reference data types: Paper, Format, Impression, Surfacage, Imposition
+- [ ] Mock reference data (from `reference/jcf/data/*.json`)
+- [ ] Mock API endpoints for reference data (GET /papers, /formats, etc.)
+- [ ] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
+
+#### v0.4.6 - JCF: Page Shell
+- [ ] Job creation page route (or modal — architectural decision)
+- [ ] Navigation integration (activate "+" button in JobsList)
+- [ ] Layout skeleton: Job Header area + Elements Table area
+- [ ] Empty state rendering
+- [ ] Basic page structure with Tailwind design tokens
+
+### Phase 4C: Job Header
+
+#### v0.4.7 - JCF: Job Header Basic Fields
+- [ ] Intitulé text field
+- [ ] Quantity numeric input
+- [ ] Deadline date picker
+  - [ ] French format input (jj/mm or jj/mm/aaaa)
+  - [ ] ISO 8601 storage
+  - [ ] French display format
+- [ ] Basic required field validation
+
+#### v0.4.8 - JCF: Client Autocomplete
+- [ ] Client field with autocomplete dropdown
+- [ ] API lookup for existing clients
+- [ ] Auto-create new client on save (if not exists)
+- [ ] Keyboard navigation (↑↓ Enter Esc)
+
+### Phase 4D: Elements Table Structure
+
+#### v0.4.9 - JCF: Elements Table Grid Layout
+> **Spec source:** reference `ElementsTable.tsx`
+
+- [ ] 12-column table layout (name, precedences, quantite, format, pagination, papier, imposition, impression, surfacage, autres, qteFeuilles, commentaires)
+- [ ] Sequence column (multi-line, separate treatment)
+- [ ] Add/remove element rows
+- [ ] Element name field (COUV, INT, FINITION, etc.)
+- [ ] Plain text inputs for all fields (autocomplete added later)
+
+#### v0.4.10 - JCF: Cell Navigation
+> **Spec source:** §8 (Keyboard Navigation)
+
+- [ ] Tab / Shift+Tab navigation between cells
+- [ ] Enter to confirm and move to next cell
+- [ ] Escape to cancel edit
+- [ ] Focus management across rows and columns
+
+### Phase 4E: Base Autocomplete Infrastructure
+
+#### v0.4.11 - JCF: Base Autocomplete Component
+> **Spec source:** reference `Autocomplete.tsx`
+
+- [ ] Reusable `Autocomplete` component
+- [ ] Dropdown with filtered suggestions
+- [ ] Text highlight matching
+- [ ] Keyboard navigation (↑↓ Enter Esc)
+- [ ] Dropdown positioning & scrolling
+- [ ] Click outside to close
+- [ ] Lazy-load suggestions
+
+#### v0.4.12 - JCF: Session Learning
+> **Spec source:** §7 (Session Learning)
+
+- [ ] Track user inputs per field type during session
+- [ ] Session-learned values appear as top suggestions
+- [ ] Priority: session values > API values
+- [ ] Clear on page reload (session-scoped, not persisted)
+
+### Phase 4F: Simple Autocompletes (1 field = 1 release)
+
+> **Parallelizable:** v0.4.13–v0.4.16 are independent, all depend on v0.4.11–v0.4.12.
+
+#### v0.4.13 - JCF: Format Autocomplete
+> **Spec source:** §1.5 (Format DSL)
+
+- [ ] ISO format lookup (A0–A10)
+- [ ] Custom dimension input (e.g., 210x297)
+- [ ] "Fermé" variants (A4f, A5fi)
+- [ ] Composite formats (A3/A6)
+- [ ] Pretty ↔ DSL bidirectional conversion
+- [ ] Dimension lookup from API formats
+
+#### v0.4.14 - JCF: Impression Autocomplete
+> **Spec source:** §1.3 (Impression DSL)
+
+- [ ] Preset patterns: Q/Q, Q/, Q+V/Q+V, Q+V/Q, Q+V/, N/N, N/, Q/N, N/Q
+- [ ] Recto/verso validation (must contain `/`)
+- [ ] Dropdown with all presets
+- [ ] Free-text input with validation
+
+#### v0.4.15 - JCF: Surfacage Autocomplete
+> **Spec source:** §1.4 (Surfacage DSL)
+
+- [ ] Preset patterns: mat/mat, satin/satin, brillant/brillant, UV/UV, dorure/dorure
+- [ ] Single-side variants: mat/, satin/, brillant/, UV/, dorure/
+- [ ] Recto/verso validation (must contain `/`)
+
+#### v0.4.16 - JCF: Quantité & Pagination Inputs
+> **Spec source:** §1.6 (Pagination)
+
+- [ ] Quantité: numeric multiplier input with validation
+- [ ] Pagination: validation rule — value must be 2 (feuillet) or multiple of 4 (cahier: 4, 8, 12, 16, ...)
+- [ ] Visual error feedback on invalid values
+
+### Phase 4G: DSL Autocompletes (1 field = 1 release)
+
+> **Parallelizable:** v0.4.17–v0.4.19 are independent, all depend on v0.4.11–v0.4.12.
+
+#### v0.4.17 - JCF: Papier Autocomplete
+> **Spec source:** §1.1 (Papier DSL)
+
+- [ ] Type:Grammage DSL format (e.g., `Couché mat:135`)
+- [ ] Two-step autocomplete: type selection → grammage selection
+- [ ] Pretty display conversion: `Couché mat:135` → `Couché mat 135g`
+- [ ] Bidirectional DSL ↔ pretty conversion
+- [ ] Auto-create new paper type on save (if not exists)
+
+#### v0.4.18 - JCF: Imposition Autocomplete
+> **Spec source:** §1.2 (Imposition DSL)
+
+- [ ] LxH(poses) format (e.g., `50x70(8)`)
+- [ ] Format-aware suggestions (based on selected format field)
+- [ ] Poses extraction (supports `50x70(8)` and `50x70(8p)` variants)
+- [ ] Validation regex: `/^[1-9]\d*x[1-9]\d*\([1-9]\d*\)$/i`
+
+#### v0.4.19 - JCF: Precedences Autocomplete
+- [ ] Element name reference selection (autocomplete with other element names)
+- [ ] Multi-value support (element can depend on multiple predecessors)
+- [ ] Visual dependency indicator
+- [ ] Circular dependency prevention
+
+### Phase 4H: Sequence Autocomplete (most complex field — 3 releases)
+
+> **Sequential:** v0.4.20 → v0.4.21 → v0.4.22 (each builds on previous).
+
+#### v0.4.20 - JCF: Sequence — Multi-line Editor & Poste Mode
+> **Spec source:** §5.1–5.2 (Sequence State Machine — Poste mode)
+
+- [ ] Multi-line text editor within table cell
+- [ ] Poste mode: suggest poste names from presets (G37, 754, GTO, Stahl, etc.)
+- [ ] Duration input: `PosteName(duration)` or `PosteName(setup+run)` format
+- [ ] Poste validation regex: `/^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/`
+- [ ] Per-line parsing and validation
+
+#### v0.4.21 - JCF: Sequence — ST (Sous-Traitant) Mode
+> **Spec source:** §5.3 (Sequence State Machine — ST mode)
+
+- [ ] `ST:` prefix detection → switch to ST mode
+- [ ] ST name suggestions (MCA, F37, LGI, AVN, JF)
+- [ ] Duration formats: Nj (days), Nh (hours), N (plain)
+- [ ] Full format: `ST:Name(duration):description`
+- [ ] ST validation regex: `/^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/`
+
+#### v0.4.22 - JCF: Sequence — Workflow-Guided Suggestions
+> **Spec source:** §6 (Workflow-Guided Suggestions)
+
+- [ ] `sequenceWorkflow` array: ordered list of poste categories
+  - Example: `["Presse offset", "Massicot", "Conditionnement"]`
+- [ ] "Next step" suggestion based on current position in workflow
+- [ ] Category-based filtering of poste suggestions
+- [ ] Visual indication of expected workflow progression
+
+### Phase 4I: Validation & Calculated Fields
+
+> **Sequential:** v0.4.23 → v0.4.24 → v0.4.25 (each validation level builds on previous).
+
+#### v0.4.23 - JCF: Live Format Validation (Level 1)
+> **Spec source:** §2.1 (Three-Level Validation — Level 1)
+
+- [ ] Per-field regex validation during typing
+- [ ] Red background + ErrorTooltip on invalid format
+- [ ] Lenient for incomplete input (no error while still typing)
+- [ ] Smart sequence validation: lines without closing `)` are not flagged
+- [ ] Validation rules per field type (papier `:`, impression `/`, surfacage `/`, imposition regex, format regex, pagination rule)
+
+#### v0.4.24 - JCF: Required Indicators & Calculated Fields (Level 2)
+> **Spec source:** §2.2 (Required Field Logic), §3 (Calculated Fields)
+
+- [ ] Amber dot indicator for required-but-empty fields
+- [ ] BLOC SUPPORT trigger: if any of (imposition, impression, surfacage, format) → papier, pagination, format, qteFeuilles, imposition required
+- [ ] BLOC IMPRESSION trigger: if any of (imposition, impression) → impression required
+- [ ] **qteFeuilles auto-calculation**: `ceil((jobQuantity × elementQuantity) / poses)`
+- [ ] Auto/manual toggle for qteFeuilles per element
+- [ ] Recalculation triggers: jobQuantity, elementQuantity, or imposition changes
+
+#### v0.4.25 - JCF: Submit Validation (Level 3)
+> **Spec source:** §2.1 (Three-Level Validation — Level 3)
+
+- [ ] Strict full-form validation on Save button click
+- [ ] All required fields must be filled
+- [ ] All format validations must pass
+- [ ] Error summary display
+- [ ] Form blocking until errors resolved
+- [ ] Scroll to first error
+
+### Phase 4J: Save
+
+#### v0.4.26 - JCF: Job Save & API Integration
+> **Spec source:** §10 (Backend Logic)
+
+- [ ] Form data → API request mapping
+  - [ ] Element production fields → Element/Task backend model
+  - [ ] Sequence lines → Task entities
+- [ ] POST /api/v1/jobs integration
+- [ ] Reference data auto-creation (client, paper)
+- [ ] Success feedback (Toast notification)
+- [ ] Error handling and display
+- [ ] Navigate back to jobs list on success
+
+### Phase 4K: Template System
+
+#### v0.4.27 - JCF: Template CRUD & Apply
+> **Spec source:** reference `TemplateList.tsx`, `TemplateEditorModal.tsx`
+
+- [ ] Create template from existing job
+- [ ] Apply template to new job (populate elements table)
+- [ ] Template list with search
+- [ ] Template categories
+- [ ] Category auto-creation on new category name
+- [ ] Template name and description fields
+
+#### v0.4.28 - JCF: Link Propagation & Dual-Mode Editor
+> **Spec source:** §4 (Link Propagation)
+
+- [ ] Link toggle per field: format, papier, imposition, impression, surfacage
+- [ ] Value inheritance from previous element when linked
+- [ ] Visual link/unlink indicator per field
+- [ ] Dual-mode template editor: Form tab + JSON tab
+- [ ] CodeMirror 6 integration for JSON editing
+- [ ] Contextual autocomplete in JSON editor
+- [ ] Bidirectional sync between form and JSON
 
 ---
 
@@ -1275,20 +1568,15 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ## Milestone 6: DSL Editor (v0.6.x, Post-MVP)
 
-> **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
+> **Note:** The original Job Creation Modal (v0.6.1) and DSL textarea approach have been **superseded by the JCF implementation in M4** (v0.4.4–v0.4.28), which provides a full-featured form-based job creation UI with specialized autocompletes. The Lezer-based DSL parser remains as an optional post-MVP enhancement for syntax highlighting in the sequence field.
 
-### Phase 6A: DSL Parser & Job Creation
+### Phase 6A: DSL Parser (Optional Enhancement)
 
 #### v0.6.0 - DSL Parser Package
 - [ ] `@flux/task-dsl-parser` package setup
-- [ ] Lezer grammar definition
-- [ ] CodeMirror 6 integration
-- [ ] Syntax highlighting
-
-#### v0.6.1 - Job Creation Modal
-- [ ] Modal component
-- [ ] DSL textarea with highlighting
-- [ ] Autocomplete integration
+- [ ] Lezer grammar definition for sequence field syntax
+- [ ] CodeMirror 6 integration (extends v0.4.28 JSON editor)
+- [ ] Syntax highlighting for sequence field
 
 ---
 
@@ -1387,17 +1675,17 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ## Summary Table
 
-| Milestone | Version | Focus                                     |
-|-----------|---------|-------------------------------------------|
-| M0        | v0.0.x  | Infrastructure & Foundation               |
-| M1        | v0.1.x  | Core Domain (Station + Job)               |
-| M2        | v0.2.x  | Scheduling Core (Assignment + Validation) |
-| M3        | v0.3.x  | Frontend Integration                      |
-| M4        | v0.4.x  | Job creation form implementation          |
-| M5        | v0.5.x  | Backend API Integration                   |
-| M6        | v0.6.x  | DSL Editor (Post-MVP)                     |
-| M7        | v1.0.x  | Production Readiness                      |
-| Post-MVP  | v1.1+   | Branching, Optimization, Reporting        |
+| Milestone | Version | Releases | Focus                                     |
+|-----------|---------|----------|-------------------------------------------|
+| M0        | v0.0.x  | 9        | Infrastructure & Foundation               |
+| M1        | v0.1.x  | 20       | Core Domain (Station + Job)               |
+| M2        | v0.2.x  | 19       | Scheduling Core (Assignment + Validation) |
+| M3        | v0.3.x  | 61       | Frontend Integration                      |
+| M4        | v0.4.x  | 29       | Job Creation Form (Element layer + JCF UI + Templates) |
+| M5        | v0.5.x  | 4        | Backend API Integration                   |
+| M6        | v0.6.x  | 1        | DSL Syntax Highlighting (Post-MVP, optional) |
+| M7        | v1.0.x  | 9        | Production Readiness                      |
+| Post-MVP  | v1.1+   | —        | Branching, Optimization, Reporting        |
 
 ---
 
@@ -1418,8 +1706,11 @@ Stream 2: Validation (TypeScript)
 
 Stream 3: Frontend (React)
 ├── Mock mode development
-├── UI components
-├── Drag & drop
+├── Scheduling UI components
+├── Pick & Place interactions
+├── Job Creation Form (v0.4.4–v0.4.28)
+│   ├── Autocompletes (parallelizable: v0.4.13–v0.4.22)
+│   └── Template system (v0.4.27–v0.4.28)
 └── API integration
 
 Stream 4: Infrastructure
@@ -1455,3 +1746,4 @@ Scheduling View ◄──────── All domain events
 - The order can be adjusted based on business priorities
 - Schedule branching and optimization are clearly post-MVP
 - **MVP Validation Behavior:** All validation rules result in visual warnings only — no hard blocks prevent scheduling decisions. Hard blocking behavior may be introduced post-MVP.
+- **JCF Strategy:** The `reference/jcf/` codebase is a vibe-coding prototype used only as visual/behavioral reference. It is never merged. All JCF code is reimplemented cleanly using the [Implicit Logic Specification](../../reference/jcf/docs/implicit-logic-specification.md) as the primary source. Granular releases (1 feature = 1 release) ensure UX fidelity and prevent vibe-code leakage.

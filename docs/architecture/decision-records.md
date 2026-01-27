@@ -18,7 +18,7 @@ Each ADR is a **small, immutable document**. When a decision is changed, a *new*
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
-| [ADR-001](#adr-001--linear-task-sequence-model) | Linear Task Sequence Model | Accepted | 2025-01-15 |
+| [ADR-001](#adr-001--linear-task-sequence-model) | Linear Task Sequence Model | Superseded by ADR-013 | 2025-01-15 |
 | [ADR-002](#adr-002--event-driven-communication-between-services) | Event-Driven Communication | Accepted | 2025-01-16 |
 | [ADR-003](#adr-003--dedicated-assignment--validation-service) | Dedicated Assignment & Validation Service | Accepted | 2025-01-17 |
 | [ADR-004](#adr-004--cqrs-pattern-for-read-models) | CQRS Pattern for Read Models | Accepted | 2025-01-18 |
@@ -30,12 +30,13 @@ Each ADR is a **small, immutable document**. When a decision is changed, a *new*
 | [ADR-010](#adr-010--isomorphic-validation-service-nodejs) | Isomorphic Validation Service (Node.js) | Accepted | 2025-01-24 |
 | [ADR-011](#adr-011--lezer-parser-system-for-task-dsl) | Lezer Parser System for Task DSL | Accepted | 2025-12-11 |
 | [ADR-012](#adr-012--event-sourcing-for-schedule-aggregate-future) | Event Sourcing (Future) | Proposed | 2025-01-25 |
+| [ADR-013](#adr-013--element-layer-with-hybrid-sequencing) | Element Layer with Hybrid Sequencing | Accepted | 2025-12-20 |
 
 ---
 
 ## ADR-001 – Linear Task Sequence Model
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-013](#adr-013--element-layer-with-hybrid-sequencing)
 **Date:** 2025-01-15
 
 ### Context
@@ -66,10 +67,15 @@ Implement tasks as a **linear sequence** where:
 - Cannot model parallel tasks within a job (not needed for print shop)
 - Less flexible than DAG model
 
+### Superseded
+
+This ADR was superseded by [ADR-013 – Element Layer with Hybrid Sequencing](#adr-013--element-layer-with-hybrid-sequencing), which introduced an Element intermediate entity between Job and Task. Tasks remain linearly sequenced within an Element (`sequenceOrder`), but cross-element dependencies form a DAG via `prerequisiteElementIds`. This enables multi-element jobs (e.g., book production: cover + interior + binding) while keeping single-element jobs transparent.
+
 ### Related Documents
 
 - [Domain Model](../domain-model/domain-model.md)
 - [Business Rules](../domain-model/business-rules.md)
+- [ADR-013 – Element Layer with Hybrid Sequencing](#adr-013--element-layer-with-hybrid-sequencing)
 
 ---
 
@@ -456,14 +462,16 @@ Implement schedule validation as a **shared TypeScript package** (`@flux/schedul
 
 export interface ProposedAssignment {
   taskId: string;
-  stationId: string;
-  scheduledStart: string; // ISO-8601
+  targetId: string;            // Station or Provider ID
+  isOutsourced: boolean;
+  scheduledStart: string;      // ISO-8601
+  bypassPrecedence?: boolean;  // Alt-key override (see ADR-013)
 }
 
 export interface ValidationResult {
   valid: boolean;
   conflicts: ScheduleConflict[];
-  warnings: ValidationWarning[];
+  suggestedStart?: string;     // ISO-8601, for precedence conflicts
 }
 
 export function validateAssignment(
@@ -592,7 +600,7 @@ OpenDays {
 }
 ```
 
-**Package Structure:**
+**Planned Package Structure** *(not yet implemented)*:
 ```
 packages/
   task-dsl-parser/
@@ -663,6 +671,83 @@ Implement **event sourcing** for Schedule aggregate (future):
 - Event schema versioning challenges
 
 **Note:** This ADR is marked as "Proposed" for future implementation after initial system stabilization.
+
+---
+
+## ADR-013 – Element Layer with Hybrid Sequencing
+
+**Status:** Accepted
+**Date:** 2025-12-20
+**Supersedes:** [ADR-001 – Linear Task Sequence Model](#adr-001--linear-task-sequence-model)
+
+### Context
+
+The original task sequencing model (ADR-001) assumed a single linear sequence of tasks per job. However, real-world print shop jobs often involve **multiple production elements** that follow partially independent workflows:
+
+- **Book production:** Cover (printing → lamination → cutting) + Interior (printing → folding → binding) + Final assembly
+- **Multi-part packaging:** Box + Insert + Label, each with different production paths
+- **Composite products:** Multiple substrates processed independently before final assembly
+
+ADR-001's flat linear model could not express:
+1. Independent task sequences within the same job
+2. Cross-element dependencies (e.g., binding waits for both cover and interior)
+3. Element-scoped precedence vs cross-element precedence
+
+### Decision
+
+Introduce an **Element Layer** between Job and Task, creating a hierarchy: `Job → Element → Task`.
+
+**Element Entity:**
+- Each Job contains one or more Elements (`Job.elementIds`)
+- Each Element has a suffix (e.g., `"ELT"`, `"COVER"`, `"INT"`) and optional label
+- Each Task belongs to exactly one Element (`Task.elementId`)
+- Tasks within an Element follow a **linear sequence** (`sequenceOrder`, 0-indexed)
+
+**Hybrid Sequencing Model:**
+- **Intra-element:** Linear sequence (Task N depends on Task N-1 within the same element)
+- **Cross-element:** DAG via `prerequisiteElementIds` — finish-to-start dependency where the last task(s) of prerequisite element(s) must complete before the first task of the dependent element can start
+- **Cycle prevention:** Element dependencies within a job must form a Directed Acyclic Graph (DAG)
+
+**Single-element transparency:**
+- Jobs with one element behave identically to the old model
+- The default element suffix `"ELT"` is created automatically
+- `isMultiElementJob(elementIds)` utility distinguishes single vs multi-element jobs
+
+**Dry time integration:**
+- 4-hour dry time after printing tasks (offset press, `cat-offset` category) applies to both intra-element and cross-element predecessors
+- `getEffectivePredecessorEnd()` adds `DRY_TIME_MINUTES = 240` when predecessor is a printing task
+
+**Precedence bypass:**
+- `bypassPrecedence` flag on `ProposedAssignment` allows explicit override of both intra-element and cross-element precedence (Alt-key in UI)
+
+### Consequences
+
+**Positive:**
+- Enables multi-element job workflows (book production, composite products)
+- Backward-compatible — single-element jobs are transparent
+- Intra-element simplicity preserved (linear sequencing)
+- Cross-element flexibility via DAG dependencies
+- Clear separation: element-scoped validation vs cross-element validation
+- Dry time consistently enforced across both predecessor types
+
+**Negative:**
+- Increased model complexity (Element entity, dual precedence logic)
+- UI must handle element grouping and visualization
+- Validation logic split between intra-element and cross-element checks
+- Migration effort for existing single-element jobs (minimal — automatic default element)
+
+### Implementation References
+
+- **Types:** `packages/types/src/element.ts` — Element interface, `isMultiElementJob()`
+- **Validation:** `packages/validator/src/validators/precedence.ts` — `validatePrecedence()`, `getEffectivePredecessorEnd()`, `isPrintingTask()`
+- **Helpers:** `packages/validator/src/utils/helpers.ts` — `getCrossElementPredecessors()`, `getCrossElementSuccessors()`, `getElementTasks()`
+
+### Related Documents
+
+- [ADR-001 – Linear Task Sequence Model](#adr-001--linear-task-sequence-model) (superseded)
+- [Domain Model – Element Entity](../domain-model/domain-model.md#dm-ent-elem-001)
+- [Business Rules – Element Rules](../domain-model/business-rules.md#br-elem-001)
+- [Aggregate Design – Job Aggregate](aggregate-design.md#agg-job-001)
 
 ---
 

@@ -51,17 +51,18 @@ This document defines the major bounded contexts involved in the **print shop sc
 
 **Responsibilities:**
 - Create and manage Jobs with deadlines and metadata.
-- Define Tasks using DSL syntax.
-- Parse DSL into structured task data.
+- Define Elements within jobs with cross-element dependencies.
+- Define Tasks within elements with durations and station requirements.
 - Manage approval gates (BAT, Plates).
 - Track paper procurement status.
-- Manage job-level dependencies.
 - Manage job comments.
 
 **Owned Models:**
 - `Job`
 - `JobId`
 - `JobStatus`
+- `Element`
+- `ElementId`
 - `Task`
 - `TaskId`
 - `TaskStatus`
@@ -74,7 +75,8 @@ This document defines the major bounded contexts involved in the **print shop sc
 - `JobCreated` domain event
 - `TaskAddedToJob` domain event
 - `TasksReordered` domain event
-- `JobDependencyAdded` domain event
+- `ElementCreated` domain event
+- `ElementDependencyAdded` domain event
 - `ApprovalGateUpdated` domain event
 - `PaperStatusChanged` domain event
 - `CommentAdded` domain event
@@ -94,6 +96,7 @@ This document defines the major bounded contexts involved in the **print shop sc
 - Assign tasks to stations with specific time slots.
 - **Schedule tasks with specific start/end times (core functionality).**
 - Validate assignments against all constraints.
+- Validate element-scoped and cross-element precedence constraints (including dry time).
 - Detect and report scheduling conflicts.
 - Enforce station group capacity limits.
 - Calculate task end times considering operating schedules.
@@ -111,6 +114,8 @@ This document defines the major bounded contexts involved in the **print shop sc
 - `StationStatusChanged` event from Station Management Context.
 - `TaskAddedToJob` event from Job Management Context.
 - `TasksReordered` event from Job Management Context.
+- `ElementCreated` event from Job Management Context.
+- `ElementDependencyAdded` event from Job Management Context.
 - `ApprovalGateUpdated` event from Job Management Context.
 
 **Exposes:**
@@ -133,7 +138,7 @@ This document defines the major bounded contexts involved in the **print shop sc
 
 **Owned Models:**
 - Read models and projections only
-- `ScheduleSnapshot`
+- `ScheduleSnapshot` (includes `elements` collection alongside jobs, tasks, assignments)
 - `TileView`
 - `SimilarityIndicator`
 - `LateJobReport`
@@ -146,28 +151,7 @@ This document defines the major bounded contexts involved in the **print shop sc
 
 ---
 
-## 5. DSL Parsing Context
-
-**Responsibilities:**
-- Parse task DSL syntax into structured data.
-- Validate DSL syntax.
-- Provide autocomplete suggestions.
-- Report parsing errors.
-
-**Owned Models:**
-- `ParsedTask`
-- `ParseError`
-- `AutocompleteSuggestion`
-
-**Consumes:**
-- Station/Provider names from Station Management Context.
-
-**Exposes:**
-- Parsed task data (synchronous response, no events).
-
----
-
-## 6. Business Calendar Context
+## 5. Business Calendar Context
 
 **Responsibilities:**
 - Calculate open days (business days).
@@ -187,7 +171,7 @@ This document defines the major bounded contexts involved in the **print shop sc
 
 ---
 
-## 7. Shared Kernel
+## 6. Shared Kernel
 
 **Purpose:**
 A small group of shared concepts used identically across contexts.
@@ -201,7 +185,7 @@ This shared kernel is intentionally minimal to avoid coupling.
 
 ---
 
-## 8. Context Relationships Overview
+## 7. Context Relationships Overview
 
 ### Station Management → Assignment & Validation
 - **Integration Pattern:** Published Language (Domain Events)
@@ -211,7 +195,7 @@ This shared kernel is intentionally minimal to avoid coupling.
 
 ### Job Management → Assignment & Validation
 - **Integration Pattern:** Published Language (Domain Events)
-- **Events:** `TaskAddedToJob`, `TasksReordered`, `ApprovalGateUpdated`
+- **Events:** `TaskAddedToJob`, `TasksReordered`, `ElementCreated`, `ElementDependencyAdded`, `ApprovalGateUpdated`
 - **Relationship Type:** Customer/Supplier
   Job Management is the supplier; Assignment & Validation is the customer.
 
@@ -226,11 +210,6 @@ This shared kernel is intentionally minimal to avoid coupling.
 - **Relationship Type:** Customer/Supplier
   All contexts are suppliers; Scheduling View is the customer.
 
-### Job Management → DSL Parsing
-- **Integration Pattern:** Synchronous Request/Response
-- **Relationship Type:** Customer/Supplier
-  Job Management is the customer; DSL Parsing is the supplier.
-
 ### Assignment & Validation → Business Calendar
 - **Integration Pattern:** Synchronous Request/Response
 - **Relationship Type:** Customer/Supplier
@@ -238,7 +217,7 @@ This shared kernel is intentionally minimal to avoid coupling.
 
 ---
 
-## 9. Anti-Corruption Layers
+## 8. Anti-Corruption Layers
 
 ### External System Integration
 When integrating with external systems (ERP, MES, etc.), each bounded context should implement its own Anti-Corruption Layer (ACL) to:
@@ -248,7 +227,7 @@ When integrating with external systems (ERP, MES, etc.), each bounded context sh
 
 ---
 
-## 10. Text-Based Context Map
+## 9. Text-Based Context Map
 
 ```
 CONTEXT MAP:
@@ -259,24 +238,19 @@ StationManagement
   Consumes: —
 
 JobManagement
-  Owns: Job, Task, Comments, ApprovalGates
-  Publishes: JobCreated, TaskAdded, GateUpdated, JobCompleted
+  Owns: Job, Element, Task, Comments, ApprovalGates
+  Publishes: JobCreated, ElementCreated, TaskAdded, GateUpdated, JobCompleted
   Consumes: Station/Provider references (by ID)
 
 Assignment&Validation
   Owns: Schedule, TaskAssignment, Conflicts
   Publishes: TaskAssigned, ConflictDetected, ScheduleUpdated
-  Consumes: StationEvents, TaskEvents, ApprovalGateEvents
+  Consumes: StationEvents, TaskEvents, ElementEvents, ApprovalGateEvents
 
 SchedulingView
   Owns: Read Models, Snapshots
   Publishes: —
   Consumes: All events
-
-DSLParsing
-  Owns: Parser, Validator, Autocomplete
-  Publishes: —
-  Consumes: Station/Provider names
 
 BusinessCalendar
   Owns: OpenDay calculations
@@ -289,17 +263,17 @@ SharedKernel:
 
 ---
 
-## 11. Context Interaction Flow
+## 10. Context Interaction Flow
 
 1. **Station Setup Phase:**
    - Station Management publishes station/category/group events
    - Assignment & Validation subscribes to maintain availability state
 
 2. **Job Planning Phase:**
-   - Job Management receives DSL input
-   - DSL Parsing validates and structures tasks
-   - Job Management publishes job/task events
-   - Assignment & Validation subscribes to understand requirements
+   - Job Management creates jobs with elements and tasks
+   - Job Management defines elements within jobs and assigns tasks to elements
+   - Job Management publishes job/element/task events
+   - Assignment & Validation subscribes to understand requirements (including element dependencies)
 
 3. **Assignment Phase:**
    - Assignment & Validation validates and assigns tasks

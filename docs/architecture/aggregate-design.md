@@ -190,16 +190,17 @@ Represents an external provider for outsourced tasks, with its own implicit stat
 
 ### 1.5 Job Aggregate
 #### AGG-JOB-001
-> **References:** [DM-AGG-JOB-001](../domain-model/domain-model.md#dm-agg-job-001), [DM-ENT-TASK-001](../domain-model/domain-model.md#dm-ent-task-001), [BR-JOB-001](../domain-model/business-rules.md#br-job-001), [BR-JOB-002](../domain-model/business-rules.md#br-job-002), [BR-TASK-001](../domain-model/business-rules.md#br-task-001)
+> **References:** [DM-AGG-JOB-001](../domain-model/domain-model.md#dm-agg-job-001), [DM-ENT-ELEM-001](../domain-model/domain-model.md#dm-ent-elem-001), [DM-ENT-TASK-001](../domain-model/domain-model.md#dm-ent-task-001), [BR-JOB-001](../domain-model/business-rules.md#br-job-001), [BR-JOB-002](../domain-model/business-rules.md#br-job-002), [BR-TASK-001](../domain-model/business-rules.md#br-task-001), [BR-ELEM-001](../domain-model/business-rules.md#br-elem-001), [BR-ELEM-002](../domain-model/business-rules.md#br-elem-002), [BR-ELEM-003](../domain-model/business-rules.md#br-elem-003)
 
 **Purpose**
-Represents a print job containing multiple tasks, managing deadlines, approval gates, and workflow.
+Represents a print job containing one or more elements, each with sequential tasks. Manages deadlines, approval gates, and workflow. The Element layer enables multi-element jobs (e.g., book production with cover, interior, binding) while single-element jobs remain transparent.
 
 **Invariants**
 - A job must have a reference, client, description, and workshopExitDate
-- Tasks must be ordered by sequenceOrder
-- Task sequence must form valid chain (no gaps)
-- Circular job dependencies are not allowed
+- A job must have at least one element
+- Tasks within an element must be ordered by `sequenceOrder` (no gaps)
+- Element dependencies (`prerequisiteElementIds`) must reference same-job elements only (BR-ELEM-002)
+- Element dependencies must not form cycles (DAG, BR-ELEM-003)
 - Status progression: Draft → Planned → InProgress → Completed | Cancelled
 - Tasks can only be added/reordered in Draft state
 - BAT must be approved (or NoProofRequired) before tasks can be scheduled
@@ -207,52 +208,52 @@ Represents a print job containing multiple tasks, managing deadlines, approval g
 
 **Entities and Value Objects**
 - **Aggregate Root:** Job
-- **Entities:** Task (within aggregate boundary), Comment
-- **Value Objects:** Duration
+- **Entities:** Element (within aggregate boundary), Task (within Element), Comment
+- **Value Objects:** Duration, ProofApproval
 
 **Creation Rules**
 - Job is created in `Draft` status with required fields
-- Tasks are parsed from DSL and added incrementally
-- requiredJobIds validated for cycles on each addition
+- At least one Element is created with the job (default suffix: `"ELT"`)
+- Tasks are parsed from DSL and assigned to elements
 - Color is randomly assigned from predefined palette
-- Dependent jobs (via requiredJobIds) use shades of the same base color
 
 **Color Assignment**
 - `color`: Hex color code randomly assigned at creation
-- Dependent jobs use shades of required job's color for visual grouping
 
 **State Transitions (Behaviour)**
 - `CreateJob`
-- `AddTask` (only in Draft)
+- `CreateElement`
+- `AddElementDependency` (prerequisiteElementIds, same-job only, cycle check)
+- `RemoveElementDependency`
+- `AddTask` (to element, only in Draft)
 - `RemoveTask` (only in Draft)
-- `ReorderTasks`
-- `UpdateProofStatus` (proofSentAt, proofApprovedAt)
+- `ReorderTasks` (within element)
+- `UpdateProofApproval` (proofApproval.sentAt, proofApproval.approvedAt)
 - `UpdatePlatesStatus`
 - `UpdatePaperStatus`
-- `AddJobDependency`
-- `RemoveJobDependency`
 - `AddComment`
 - `PlanJob` (Draft → Planned)
 - `StartJob` (Planned → InProgress, when first task starts)
-- `CompleteJob` (InProgress → Completed, when all tasks complete)
+- `CompleteJob` (InProgress → Completed, when all tasks across all elements complete)
 - `CancelJob` (any → Cancelled)
 
 **Cancellation Behaviour**
-- When cancelled, all tasks status change to Cancelled
+- When cancelled, all tasks across all elements change status to Cancelled
 - Future task assignments (scheduledStart > now) are automatically recalled (removed)
 - Past task assignments (scheduledStart < now) remain for historical reference
 - JobCancelled event includes recalledTaskIds and preservedTaskIds
 
 **Events**
 - `JobCreated`
+- `ElementCreated`
+- `ElementDependencyAdded`
+- `ElementDependencyRemoved`
 - `TaskAddedToJob`
 - `TaskRemovedFromJob`
 - `TasksReordered`
-- `ProofStatusUpdated`
+- `ProofApprovalUpdated`
 - `PlatesStatusUpdated`
 - `PaperStatusUpdated`
-- `JobDependencyAdded`
-- `JobDependencyRemoved`
 - `CommentAdded`
 - `JobPlanned`
 - `JobStarted`
@@ -260,15 +261,15 @@ Represents a print job containing multiple tasks, managing deadlines, approval g
 - `JobCancelled`
 
 **Boundaries and External Interaction**
-- Only JobRepository loads/saves Jobs
+- Only JobRepository loads/saves Jobs (including their Elements and Tasks)
 - Task assignment happens in separate Schedule aggregate
-- DSL parsing provides structured task input
+- DSL parsing provides structured task input assigned to elements
 
 ---
 
 ### 1.6 Schedule Aggregate
 #### AGG-SCHEDULE-001
-> **References:** [DM-AGG-SCHEDULE-001](../domain-model/domain-model.md#dm-agg-schedule-001), [BR-SCHED-001](../domain-model/business-rules.md#br-sched-001), [BR-SCHED-002](../domain-model/business-rules.md#br-sched-002), [BR-ASSIGN-001](../domain-model/business-rules.md#br-assign-001)
+> **References:** [DM-AGG-SCHEDULE-001](../domain-model/domain-model.md#dm-agg-schedule-001), [BR-SCHED-001](../domain-model/business-rules.md#br-sched-001), [BR-SCHED-002](../domain-model/business-rules.md#br-sched-002), [BR-SCHED-003](../domain-model/business-rules.md#br-sched-003), [BR-ASSIGN-001](../domain-model/business-rules.md#br-assign-001), [BR-ELEM-004](../domain-model/business-rules.md#br-elem-004), [BR-ELEM-005](../domain-model/business-rules.md#br-elem-005)
 
 **Purpose**
 Represents the master schedule containing all task assignments with their timings, maintaining consistency and detecting conflicts.
@@ -277,8 +278,10 @@ Represents the master schedule containing all task assignments with their timing
 - No station can be double-booked (except providers with unlimited capacity)
 - Station group capacity limits must be respected
 - Task assignments must respect station operating schedules
-- Dependent tasks cannot start before prerequisites complete (unless explicitly bypassed)
-- All tasks within a job must be scheduled in sequence order
+- Tasks within an element must be scheduled in `sequenceOrder` (intra-element precedence)
+- Cross-element finish-to-start dependencies must be respected: prerequisite element's last task must complete before dependent element's first task starts (BR-ELEM-004)
+- Dry time (4h) after printing tasks must be respected for both intra-element and cross-element predecessors (BR-ELEM-005)
+- Precedence can be explicitly bypassed with `bypassPrecedence` flag (Alt-key in UI)
 - scheduledEnd = scheduledStart + task duration (considering operating schedule)
 
 **Entities and Value Objects**
@@ -339,7 +342,8 @@ Responsible for:
 - Station availability checking
 - Group capacity checking
 - Approval gate checking
-- Precedence checking
+- Element-scoped and cross-element precedence checking (intra-element sequenceOrder + cross-element prerequisiteElementIds)
+- Dry time calculation for printing predecessors (+4h for offset press stations)
 
 ### SimilarityService
 Responsible for:
@@ -449,7 +453,7 @@ Repositories are defined at the **domain/interface level**, not as infrastructur
 
 ### Aggregate Size Considerations
 - Keep aggregates small for less contention
-- Job aggregate includes tasks but not assignments
+- Job aggregate includes elements and tasks but not assignments
 - Schedule aggregate uses versioning for updates
 - Station aggregate is relatively static
 
