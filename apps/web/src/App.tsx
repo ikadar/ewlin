@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal } from './components';
+import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -376,8 +376,23 @@ function AppContent() {
 
   // v0.4.6: JCF modal state
   const [isJcfModalOpen, setIsJcfModalOpen] = useState(false);
-  const handleOpenJcf = useCallback(() => setIsJcfModalOpen(true), []);
-  const handleCloseJcf = useCallback(() => setIsJcfModalOpen(false), []);
+  // v0.4.7: JCF form state (lifted from JcfJobHeader)
+  const [jcfJobId, setJcfJobId] = useState('');
+  const [jcfIntitule, setJcfIntitule] = useState('');
+  const [jcfQuantity, setJcfQuantity] = useState('');
+  const [jcfDeadline, setJcfDeadline] = useState('');
+
+  const handleOpenJcf = useCallback(() => {
+    setJcfJobId(generateJobId());
+    setIsJcfModalOpen(true);
+  }, []);
+
+  const handleCloseJcf = useCallback(() => {
+    setIsJcfModalOpen(false);
+    setJcfIntitule('');
+    setJcfQuantity('');
+    setJcfDeadline('');
+  }, []);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
   useEffect(() => {
@@ -1492,7 +1507,17 @@ function AppContent() {
       )}
 
       {/* v0.4.6: JCF Modal */}
-      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf} />
+      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf}>
+        <JcfJobHeader
+          jobId={jcfJobId}
+          intitule={jcfIntitule}
+          onIntituleChange={setJcfIntitule}
+          quantity={jcfQuantity}
+          onQuantityChange={setJcfQuantity}
+          deadline={jcfDeadline}
+          onDeadlineChange={setJcfDeadline}
+        />
+      </JcfModal>
     </>
   );
 }
