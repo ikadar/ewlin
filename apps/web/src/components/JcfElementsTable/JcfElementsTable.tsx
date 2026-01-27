@@ -141,6 +141,107 @@ export function JcfElementsTable({
     [elements, onElementsChange],
   );
 
+  // ── Cell navigation ──
+
+  const getCellId = useCallback(
+    (elementIndex: number, rowIndex: number) =>
+      `cell-${elementIndex}-${rowIndex}`,
+    [],
+  );
+
+  const focusCell = useCallback(
+    (elementIndex: number, rowIndex: number) => {
+      const id = getCellId(elementIndex, rowIndex);
+      const el = document.getElementById(id) as HTMLElement | null;
+      el?.focus();
+    },
+    [getCellId],
+  );
+
+  const handleCellKeyDown = useCallback(
+    (
+      e: React.KeyboardEvent,
+      elementIndex: number,
+      rowIndex: number,
+    ) => {
+      const rowCount = rows.length;
+      const elementCount = elements.length;
+      const lastRowIndex = rowCount - 1;
+      const lastElementIndex = elementCount - 1;
+      const isTextarea = textareaFields.includes(rows[rowIndex].key);
+
+      // Alt+Arrow — circular wrap navigation
+      if (e.altKey && e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        switch (e.key) {
+          case 'ArrowDown':
+            focusCell(elementIndex, (rowIndex + 1) % rowCount);
+            break;
+          case 'ArrowUp':
+            focusCell(elementIndex, (rowIndex - 1 + rowCount) % rowCount);
+            break;
+          case 'ArrowRight':
+            focusCell((elementIndex + 1) % elementCount, rowIndex);
+            break;
+          case 'ArrowLeft':
+            focusCell(
+              (elementIndex - 1 + elementCount) % elementCount,
+              rowIndex,
+            );
+            break;
+        }
+        return;
+      }
+
+      // Enter — move to next cell (text inputs only; textareas keep newline)
+      if (e.key === 'Enter' && !isTextarea) {
+        e.preventDefault();
+        if (rowIndex < lastRowIndex) {
+          focusCell(elementIndex, rowIndex + 1);
+        } else if (elementIndex < lastElementIndex) {
+          focusCell(elementIndex + 1, 0);
+        }
+        // At last cell: do nothing (Enter doesn't exit table)
+        return;
+      }
+
+      // Escape — blur current cell
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        (e.target as HTMLElement).blur();
+        return;
+      }
+
+      // Tab / Shift+Tab — vertical navigation within column
+      if (e.key !== 'Tab') return;
+
+      if (!e.shiftKey) {
+        // Tab — move down
+        if (rowIndex < lastRowIndex) {
+          e.preventDefault();
+          focusCell(elementIndex, rowIndex + 1);
+        } else if (elementIndex < lastElementIndex) {
+          // Last row → next column, first row
+          e.preventDefault();
+          focusCell(elementIndex + 1, 0);
+        }
+        // Last cell of table → let native Tab exit
+      } else {
+        // Shift+Tab — move up
+        if (rowIndex > 0) {
+          e.preventDefault();
+          focusCell(elementIndex, rowIndex - 1);
+        } else if (elementIndex > 0) {
+          // First row → previous column, last row
+          e.preventDefault();
+          focusCell(elementIndex - 1, lastRowIndex);
+        }
+        // First cell of table → let native Shift+Tab exit
+      }
+    },
+    [rows, elements.length, focusCell],
+  );
+
   // ── Cell change ──
 
   const handleCellChange = useCallback(
@@ -283,9 +384,13 @@ export function JcfElementsTable({
                 >
                   {isTextarea ? (
                     <textarea
+                      id={getCellId(elementIndex, rowIndex)}
                       value={value}
                       onChange={(e) =>
                         handleTextareaAutoExpand(e, elementIndex, row.key)
+                      }
+                      onKeyDown={(e) =>
+                        handleCellKeyDown(e, elementIndex, rowIndex)
                       }
                       className={`${isEmpty ? inputEmptyClass : inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[11px]`}
                       rows={1}
@@ -293,10 +398,14 @@ export function JcfElementsTable({
                     />
                   ) : (
                     <input
+                      id={getCellId(elementIndex, rowIndex)}
                       type="text"
                       value={value}
                       onChange={(e) =>
                         handleCellChange(elementIndex, row.key, e.target.value)
+                      }
+                      onKeyDown={(e) =>
+                        handleCellKeyDown(e, elementIndex, rowIndex)
                       }
                       className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-[11px]`}
                       data-testid={`jcf-input-${elementIndex}-${row.key}`}
