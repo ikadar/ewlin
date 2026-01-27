@@ -1404,12 +1404,12 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Single-side variants: mat/, satin/, brillant/, UV/, dorure/
 - [x] Recto/verso validation (must contain `/`)
 
-#### v0.4.16 - JCF: Quantité & Pagination Inputs
+#### v0.4.16 - JCF: Quantité & Pagination Inputs ✅
 > **Spec source:** §1.6 (Pagination)
 
-- [ ] Quantité: numeric multiplier input with validation
-- [ ] Pagination: validation rule — value must be 2 (feuillet) or multiple of 4 (cahier: 4, 8, 12, 16, ...)
-- [ ] Visual error feedback on invalid values
+- [x] Quantité: numeric multiplier input with validation
+- [x] Pagination: validation rule — value must be 2 (feuillet) or multiple of 4 (cahier: 4, 8, 12, 16, ...)
+- [x] Visual error feedback on invalid values
 
 ### Phase 4G: DSL Autocompletes (1 field = 1 release)
 
