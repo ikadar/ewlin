@@ -1314,14 +1314,15 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4C: Job Header
 
-#### v0.4.7 - JCF: Job Header Basic Fields
-- [ ] Intitulé text field
-- [ ] Quantity numeric input
-- [ ] Deadline date picker
-  - [ ] French format input (jj/mm or jj/mm/aaaa)
-  - [ ] ISO 8601 storage
-  - [ ] French display format
-- [ ] Basic required field validation
+#### v0.4.7 - JCF: Job Header Basic Fields ✅
+- [x] ID field (readonly, auto-generated J-YYYY-NNNN)
+- [x] Intitulé text field
+- [x] Quantity numeric input
+- [x] Deadline date picker
+  - [x] French format input (jj/mm or jj/mm/aaaa)
+  - [x] ISO 8601 storage (UTC-safe)
+  - [x] French display format
+- [x] State management lifted to App.tsx
 
 #### v0.4.8 - JCF: Client Autocomplete
 - [ ] Client field with autocomplete dropdown
