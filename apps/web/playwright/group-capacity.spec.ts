@@ -10,7 +10,7 @@ import { waitForAppReady } from './helpers/drag';
 
 test.describe('v0.3.38: Group Capacity Visualization', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?fixture=test');
     await waitForAppReady(page);
   });
 
@@ -87,9 +87,8 @@ test.describe('v0.3.38: Group Capacity Visualization', () => {
       const jobCard = page.locator('[data-testid^="job-card-"]').first();
       if ((await jobCard.count()) > 0) {
         await jobCard.click();
-        await page.waitForTimeout(100);
 
-        // Job details panel should be visible
+        // Wait for job details panel to render
         const detailsPanel = page.locator('[data-testid="job-details-panel"]');
         await expect(detailsPanel).toBeVisible();
 

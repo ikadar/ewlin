@@ -10,7 +10,7 @@ import { waitForAppReady } from './helpers/drag';
 
 test.describe('v0.3.35: Global Timeline Compaction', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?fixture=test');
     await waitForAppReady(page);
   });
 
@@ -144,11 +144,10 @@ test.describe('v0.3.35: Global Timeline Compaction', () => {
       // Then select a job
       const jobCard = page.locator('[data-testid^="job-card-"]').first();
       await jobCard.click();
-      await page.waitForTimeout(100);
 
-      // Verify job is selected (Quick Placement button becomes enabled)
-      const quickPlaceButton = page.locator('[data-testid="quick-placement-button"]');
-      await expect(quickPlaceButton).toBeEnabled();
+      // Verify job is selected via JobDetailsPanel
+      const jobDetailsPanel = page.locator('[data-testid="job-details-panel"]');
+      await expect(jobDetailsPanel).toBeVisible();
     });
   });
 });

@@ -10,7 +10,7 @@ import { waitForAppReady } from './helpers/drag';
 
 test.describe('v0.3.34: Top Navigation Bar', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?fixture=test');
     await waitForAppReady(page);
   });
 
