@@ -6,7 +6,7 @@ tags:
 
 # Interface Contracts – Flux Print Shop Scheduling System
 
-This document defines **service-to-service interface contracts** for the Station → Job → Task assignment and validation workflow.
+This document defines **service-to-service interface contracts** for the Station → Job → Element → Task assignment and validation workflow.
 
 The goal is to provide **stable, technology-agnostic API contracts** that describe the operations each service exposes to other services.
 
@@ -351,7 +351,8 @@ Interfaces are described in:
   "assignments": [
     {
       "taskId": "string",
-      "stationId": "string",
+      "targetId": "string",
+      "isOutsourced": false,
       "scheduledStart": "ISO-8601-datetime",
       "scheduledEnd": "ISO-8601-datetime"
     }
@@ -485,10 +486,21 @@ Interfaces are described in:
   "status": "Draft",
   "fullyScheduled": false,
   "color": "#RRGGBB",
+  "elementIds": ["string"],
+  "elements": [
+    {
+      "elementId": "string",
+      "suffix": "ELT",
+      "label": "string | null",
+      "prerequisiteElementIds": [],
+      "taskIds": ["string"]
+    }
+  ],
   "tasks": [
     {
       "taskId": "string",
-      "sequenceOrder": 1,
+      "elementId": "string",
+      "sequenceOrder": 0,
       "type": "internal | outsourced",
       "stationId": "string | null",
       "providerId": "string | null",
@@ -504,12 +516,15 @@ Interfaces are described in:
 ```
 
 **Notes:**
-- `color`: Randomly assigned from predefined palette; dependent jobs use shades of required job's color
+- `color`: Randomly assigned from predefined palette
+- At least one element (default suffix `"ELT"`) is created with the job
+- `sequenceOrder`: 0-indexed position within element's task sequence
 
 **Postconditions**
 - Job aggregate created in Draft state
-- Tasks created from DSL parsing
-- Domain event `JobCreated` emitted
+- Default element created
+- Tasks created from DSL parsing and assigned to element
+- Domain events `JobCreated`, `ElementCreated`, `TaskAddedToJob` emitted
 
 **Error responses**
 - `DEADLINE_IN_PAST` – Workshop exit date is not in future
@@ -562,17 +577,19 @@ Interfaces are described in:
 #### IC-JOB-003
 > **References:** [API-TASK-001](../requirements/api-interface-drafts.md#api-task-001), [BR-TASK-003](../domain-model/business-rules.md#br-task-003)
 
-**Purpose:** Change the sequence order of tasks within a job.
+**Purpose:** Change the sequence order of tasks within an element.
 
 **Preconditions**
 - Job exists
-- All task IDs belong to the job
+- Element belongs to the job
+- All task IDs belong to the element
 - Job is not Completed or Cancelled
 
 **Request**
 ```json
 {
   "jobId": "string",
+  "elementId": "string",
   "taskOrder": ["taskId1", "taskId2", "taskId3"]
 }
 ```
@@ -586,13 +603,14 @@ Interfaces are described in:
 ```
 
 **Postconditions**
-- Task sequence updated
-- Domain event `TasksReordered` emitted
-- Existing assignments revalidated for precedence
+- Task sequence updated within element
+- Domain event `TasksReordered` emitted (with elementId)
+- Existing assignments revalidated for element-scoped precedence
 
 **Error responses**
 - `JOB_NOT_FOUND` – Job does not exist
-- `TASK_NOT_IN_JOB` – Task ID not part of this job
+- `ELEMENT_NOT_FOUND` – Element does not exist in this job
+- `TASK_NOT_IN_ELEMENT` – Task ID not part of this element
 - `JOB_INVALID_STATE` – Job is Completed or Cancelled
 
 ### 5.4 SetJobDependency
@@ -642,8 +660,10 @@ Interfaces are described in:
 ```json
 {
   "jobId": "string",
-  "proofSentAt": "ISO-8601-datetime | AwaitingFile | NoProofRequired",
-  "proofApprovedAt": "ISO-8601-datetime | null"
+  "proofApproval": {
+    "sentAt": "ISO-8601-datetime | null",
+    "approvedAt": "ISO-8601-datetime | null"
+  }
 }
 ```
 
@@ -655,9 +675,13 @@ Interfaces are described in:
 }
 ```
 
+**Notes:**
+- `proofApproval.sentAt`: When proof was sent to client, or null
+- `proofApproval.approvedAt`: When proof was approved, or null
+
 **Postconditions**
-- Proof status updated
-- Domain event `ProofStatusChanged` emitted
+- Proof approval status updated
+- Domain event `ProofApprovalUpdated` emitted
 - If proof approved, blocked tasks become schedulable
 
 **Error responses**
@@ -872,17 +896,31 @@ Interfaces are described in:
   "status": "Draft | Planned | InProgress | Delayed | Completed | Cancelled",
   "workshopExitDate": "ISO-8601-datetime",
   "fullyScheduled": "boolean",
+  "color": "#RRGGBB",
   "paperType": "string | null",
   "paperFormat": "string | null",
   "paperPurchaseStatus": "InStock | ToOrder | Ordered | Received",
   "paperOrderedAt": "ISO-8601-timestamp | null",
-  "proofSentAt": "ISO-8601-datetime | AwaitingFile | NoProofRequired | null",
-  "proofApprovedAt": "ISO-8601-datetime | null",
+  "proofApproval": {
+    "sentAt": "ISO-8601-datetime | null",
+    "approvedAt": "ISO-8601-datetime | null"
+  },
   "platesStatus": "Todo | Done",
+  "elementIds": ["string"],
+  "elements": [
+    {
+      "elementId": "string",
+      "suffix": "string",
+      "label": "string | null",
+      "prerequisiteElementIds": ["string"],
+      "taskIds": ["string"]
+    }
+  ],
   "tasks": [
     {
       "taskId": "string",
-      "sequenceOrder": 1,
+      "elementId": "string",
+      "sequenceOrder": 0,
       "type": "internal | outsourced",
       "stationId": "string | null",
       "stationName": "string | null",
@@ -894,10 +932,9 @@ Interfaces are described in:
       "totalMinutes": 60,
       "durationOpenDays": "integer | null",
       "comment": "string | null",
-      "status": "Defined | Ready | Assigned | Completed | Cancelled"
+      "status": "Defined | Ready | Assigned | Executing | Completed | Failed | Cancelled"
     }
   ],
-  "dependencies": ["jobId1", "jobId2"],
   "comments": [
     {
       "author": "string",
@@ -914,6 +951,87 @@ Interfaces are described in:
 **Error responses**
 - `JOB_NOT_FOUND` – Job does not exist
 
+### 5.12 CreateElement
+#### IC-JOB-012
+> **References:** [BR-ELEM-001](../domain-model/business-rules.md#br-elem-001)
+
+**Purpose:** Create a new element within a job for multi-element workflows.
+
+**Preconditions**
+- Job exists
+- Job is in Draft state
+- Element suffix is unique within the job
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "suffix": "string",
+  "label": "string | null"
+}
+```
+
+**Response**
+```json
+{
+  "elementId": "string",
+  "jobId": "string",
+  "suffix": "string",
+  "label": "string | null",
+  "prerequisiteElementIds": [],
+  "taskIds": [],
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Element entity created within Job aggregate
+- Domain event `ElementCreated` emitted
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `JOB_INVALID_STATE` – Job is not in Draft state
+- `ELEMENT_SUFFIX_EXISTS` – Suffix already used in this job
+
+### 5.13 AddElementDependency
+#### IC-JOB-013
+> **References:** [BR-ELEM-002](../domain-model/business-rules.md#br-elem-002), [BR-ELEM-003](../domain-model/business-rules.md#br-elem-003)
+
+**Purpose:** Add a cross-element finish-to-start dependency.
+
+**Preconditions**
+- Job exists
+- Both elements belong to the same job
+- Dependency would not create a cycle (DAG constraint)
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "elementId": "string",
+  "prerequisiteElementId": "string"
+}
+```
+
+**Response**
+```json
+{
+  "status": "created",
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Element dependency added (finish-to-start)
+- Domain event `ElementDependencyAdded` emitted
+- Affected assignments revalidated for cross-element precedence
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `ELEMENT_NOT_FOUND` – One or both elements not found in this job
+- `CIRCULAR_DEPENDENCY` – Would create a cycle in element DAG
+- `SELF_DEPENDENCY` – Element cannot depend on itself
+
 ---
 
 ## 6. Assignment & Validation Service – Public Interface
@@ -928,24 +1046,31 @@ Interfaces are described in:
 - Task exists
 - Station/Provider available at scheduled time
 - Approval gates satisfied (BAT, Plates)
-- Predecessor tasks scheduled (precedence check)
+- Element-scoped and cross-element precedence satisfied (unless bypassPrecedence)
 - No scheduling conflicts
 
 **Request**
 ```json
 {
   "taskId": "string",
-  "stationId": "string",
-  "scheduledStart": "ISO-8601-datetime"
+  "targetId": "string",
+  "isOutsourced": false,
+  "scheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false
 }
 ```
+
+**Notes:**
+- `targetId`: Station ID or Provider ID depending on `isOutsourced`
+- `bypassPrecedence`: When true, skips element-scoped and cross-element precedence checks (Alt-key in UI)
 
 **Response (Valid)**
 ```json
 {
   "taskId": "string",
   "assignment": {
-    "stationId": "string",
+    "targetId": "string",
+    "isOutsourced": false,
     "scheduledStart": "ISO-8601-datetime",
     "scheduledEnd": "ISO-8601-datetime"
   },
@@ -965,12 +1090,14 @@ Interfaces are described in:
     "valid": false,
     "conflicts": [
       {
-        "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
-        "description": "string",
-        "affectedTaskIds": ["taskId1", "taskId2"],
-        "severity": "High | Medium | Low"
+        "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+        "message": "string",
+        "taskId": "string",
+        "relatedTaskId": "string | null",
+        "targetId": "string | null"
       }
-    ]
+    ],
+    "suggestedStart": "ISO-8601-datetime | null"
   }
 }
 ```
@@ -1028,13 +1155,16 @@ Interfaces are described in:
 **Preconditions**
 - Assignment exists
 - New time doesn't create conflicts
-- Precedence still satisfied
+- Element-scoped and cross-element precedence still satisfied (unless bypassPrecedence)
 
 **Request**
 ```json
 {
   "taskId": "string",
-  "newScheduledStart": "ISO-8601-datetime"
+  "newTargetId": "string",
+  "isOutsourced": false,
+  "newScheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false
 }
 ```
 
@@ -1075,8 +1205,10 @@ Interfaces are described in:
 ```json
 {
   "taskId": "string",
-  "stationId": "string",
-  "scheduledStart": "ISO-8601-datetime"
+  "targetId": "string",
+  "isOutsourced": false,
+  "scheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false
 }
 ```
 
@@ -1086,27 +1218,26 @@ Interfaces are described in:
   "valid": "boolean",
   "conflicts": [
     {
-      "type": "string",
-      "description": "string",
-      "affectedTaskIds": ["string"],
-      "severity": "High | Medium | Low"
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+      "message": "string",
+      "taskId": "string",
+      "relatedTaskId": "string | null",
+      "targetId": "string | null"
     }
   ],
-  "warnings": [
-    {
-      "type": "DeadlineRisk",
-      "description": "Only 4 hours buffer before workshop exit date"
-    }
-  ]
+  "suggestedStart": "ISO-8601-datetime | null"
 }
 ```
+
+**Notes:**
+- `suggestedStart`: For PrecedenceConflict, the earliest valid start time respecting all predecessors
 
 **Postconditions**
 - None — this operation is read-only
 
 **Error responses**
 - `TASK_NOT_FOUND` – Task does not exist
-- `STATION_NOT_FOUND` – Station does not exist
+- `TARGET_NOT_FOUND` – Station or Provider does not exist
 
 ### 6.5 ValidateScheduleScope
 #### IC-ASSIGN-005
@@ -1135,18 +1266,19 @@ Interfaces are described in:
   "status": "valid | conflicts_found",
   "conflicts": [
     {
-      "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
-      "severity": "High | Medium | Low",
-      "affectedTaskIds": ["task1", "task2"],
-      "description": "string"
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+      "message": "string",
+      "taskId": "string",
+      "relatedTaskId": "string | null",
+      "targetId": "string | null"
     }
   ],
   "lateJobs": [
     {
       "jobId": "string",
-      "workshopExitDate": "ISO-8601-datetime",
+      "deadline": "ISO-8601-datetime",
       "expectedCompletion": "ISO-8601-datetime",
-      "delayHours": "integer"
+      "delayDays": "integer"
     }
   ],
   "validatedAt": "ISO-8601-timestamp"
@@ -1228,33 +1360,54 @@ Interfaces are described in:
       "color": "#RRGGBB",
       "workshopExitDate": "ISO-8601-datetime",
       "status": "string",
-      "tasks": [...]
+      "elementIds": ["string"]
+    }
+  ],
+  "elements": [
+    {
+      "elementId": "string",
+      "jobId": "string",
+      "suffix": "string",
+      "label": "string | null",
+      "prerequisiteElementIds": ["string"],
+      "taskIds": ["string"]
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "string",
+      "elementId": "string",
+      "sequenceOrder": 0,
+      "type": "internal | outsourced",
+      "status": "string"
     }
   ],
   "assignments": [
     {
       "taskId": "string",
-      "jobId": "string",
-      "stationId": "string",
+      "targetId": "string",
+      "isOutsourced": false,
       "scheduledStart": "ISO-8601-datetime",
-      "scheduledEnd": "ISO-8601-datetime"
+      "scheduledEnd": "ISO-8601-datetime",
+      "isCompleted": false,
+      "completedAt": "ISO-8601-timestamp | null"
     }
   ],
   "conflicts": [
     {
-      "type": "string",
-      "affectedTaskIds": ["string"],
-      "description": "string",
-      "severity": "string"
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+      "message": "string",
+      "taskId": "string",
+      "relatedTaskId": "string | null",
+      "targetId": "string | null"
     }
   ],
   "lateJobs": [
     {
       "jobId": "string",
-      "reference": "string",
-      "workshopExitDate": "ISO-8601-datetime",
+      "deadline": "ISO-8601-datetime",
       "expectedCompletion": "ISO-8601-datetime",
-      "delayHours": "integer"
+      "delayDays": "integer"
     }
   ]
 }
@@ -1488,7 +1641,7 @@ fetches suggestions from these endpoints.
 ### ConflictType
 ```json
 {
-  "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict"
+  "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict"
 }
 ```
 

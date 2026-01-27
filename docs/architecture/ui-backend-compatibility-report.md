@@ -31,13 +31,17 @@ The UX/UI specification and backend documentation are **largely aligned** but ha
 | Conflict jobs display | ✅ Documented | ✅ ScheduleConflict | ✅ Compatible | None |
 | Job search/filter | ✅ Documented | ✅ GET /jobs + params | ✅ Compatible | None |
 | Job creation | ⚠️ Post-MVP | ✅ POST /jobs | ⚠️ UI deferred | Document UI when needed |
-| Job dependencies | ❌ Not in UI | ✅ POST /jobs/{id}/dependencies | ⚠️ Gap | Add to UI spec |
+| **Element Management** |
+| Element display | ✅ ElementSection | ✅ In Job response | ✅ Compatible | None |
+| Element creation | ⚠️ Post-MVP | ✅ POST /jobs/{id}/elements | ⚠️ UI deferred | Document UI when needed |
+| Element dependencies | ⚠️ Post-MVP | ✅ POST /elements/{id}/dependencies | ⚠️ UI deferred | Document UI when needed |
+| Cross-element precedence | ✅ PrecedenceLines | ✅ @flux/schedule-validator | ✅ Compatible | None |
 | **Task Management** |
-| Task list display | ✅ Documented | ✅ In Job response | ✅ Compatible | None |
+| Task list display | ✅ Documented | ✅ In Job response (per element) | ✅ Compatible | None |
 | Task completion toggle | ✅ Documented | ✅ PUT /tasks/{id}/completion | ✅ Compatible | None |
 | Task reorder | ❌ Not in UI | ✅ PUT /jobs/{id}/tasks/reorder | ⚠️ Gap | Add to UI spec |
 | **Approval Gates** |
-| BAT status display | ✅ Documented | ✅ Job.proofSentAt/ApprovedAt | ✅ Compatible | None |
+| BAT status display | ✅ Documented | ✅ Job.proofApproval.sentAt/approvedAt | ✅ Compatible | None |
 | Plates status display | ✅ Documented | ✅ Job.platesStatus | ✅ Compatible | None |
 | Paper status display | ✅ Documented | ✅ Job.paperPurchaseStatus | ✅ Compatible | None |
 | Edit BAT status | ❌ Read-only in MVP | ✅ PUT /jobs/{id}/proof | ⚠️ Deferred | Document when needed |
@@ -102,24 +106,24 @@ The UX/UI specification and backend documentation are **largely aligned** but ha
 | Aspect | Details |
 |--------|---------|
 | **UI Expectation** | Job Details Panel mentions "Reorder tasks" but no interaction documented |
-| **Backend Status** | `PUT /jobs/{jobId}/tasks/reorder` exists |
-| **Missing** | UI interaction pattern for reordering (drag within list?) |
+| **Backend Status** | `PUT /jobs/{jobId}/elements/{elementId}/tasks/reorder` exists |
+| **Missing** | UI interaction pattern for reordering within elements (drag within list?) |
 | **Impact** | Users cannot change task sequence from UI |
-| **Recommendation** | Add task reorder interaction to job-details-panel.md |
+| **Recommendation** | Add element-scoped task reorder interaction to job-details-panel.md |
 
 ---
 
 ### 2. Moderate Gaps (Should Address)
 
-#### Gap 2.1: Job Dependencies UI
+#### Gap 2.1: Element Dependencies UI
 
 | Aspect | Details |
 |--------|---------|
-| **UI Expectation** | Not documented in UI specs |
-| **Backend Status** | `Job.requiredJobIds`, `POST /jobs/{id}/dependencies`, BR-JOB-006/007/008 |
-| **Missing** | UI for viewing/adding job dependencies |
-| **Impact** | Complex multi-job workflows cannot be configured |
-| **Recommendation** | Add job dependencies section to job-details-panel.md |
+| **UI Expectation** | Cross-element precedence visualized via PrecedenceLines component |
+| **Backend Status** | `Element.prerequisiteElementIds`, `POST /elements/{id}/dependencies`, BR-ELEM-002/003 |
+| **Missing** | UI for adding/removing cross-element dependencies (currently display-only) |
+| **Impact** | Cross-element dependency editing requires API access |
+| **Recommendation** | Add element dependency editing to JobDetailsPanel when needed |
 
 #### Gap 2.2: Station/Provider Management UI
 
@@ -188,10 +192,11 @@ The UX/UI specification and backend documentation are **largely aligned** but ha
 | **Job Details Panel** |
 | Job code | `reference` | Job.reference | ✅ |
 | Departure date | `workshopExitDate` | Job.workshopExitDate | ✅ |
-| BAT status | `proofStatus` | Job.proofSentAt/ApprovedAt | ✅ |
+| BAT status | `proofApproval` | Job.proofApproval.sentAt/approvedAt | ✅ |
 | Paper status | `paperStatus` | Job.paperPurchaseStatus | ✅ |
 | Plates status | `platesStatus` | Job.platesStatus | ✅ |
-| Task list | `tasks[]` | Job.tasks | ✅ |
+| Elements | `elements[]` | Job.elements (via ElementSection) | ✅ |
+| Tasks per element | `element.tasks[]` | Element.tasks (per element) | ✅ |
 | **Task Tile (Grid)** |
 | Job color | `color` | Job.color | ✅ |
 | Setup time | `setupMinutes` | Task.setupMinutes | ✅ |
@@ -199,7 +204,7 @@ The UX/UI specification and backend documentation are **largely aligned** but ha
 | Completion status | `isCompleted` | Task.isCompleted | ✅ |
 | Scheduled time | `scheduledStart/End` | TaskAssignment | ✅ |
 | **Task Tile (Job Details)** |
-| Station name | `stationName` | Station.name (via Task.stationId) | ✅ |
+| Target name | `targetName` | Station.name or Provider.name (via TaskAssignment.targetId) | ✅ |
 | Duration | `totalMinutes` | Task.setupMinutes + runMinutes | ✅ |
 | Scheduled time | `scheduledStart` | TaskAssignment.scheduledStart | ✅ |
 | **Station Column** |
@@ -257,7 +262,7 @@ The UX/UI specification and backend documentation are **largely aligned** but ha
 
 | Rule | Backend Reference | UI Impact | Recommendation |
 |------|-------------------|-----------|----------------|
-| Job dependencies | BR-JOB-006/007/008 | Validation errors unexpected | Add UI documentation |
+| Element dependencies | BR-ELEM-002/003/004/005 | Cross-element precedence enforced | Editing UI deferred |
 | Approval gate blocking | BR-GATE-001/002/003 | Tasks may fail unexpectedly | Clarify MVP scope |
 | Paper procurement | BR-PAPER-001/002/003 | Display only, no blocking | OK for MVP |
 | Outsourced timing | BR-TASK-008/008b/009 | Complex calculation | Backend handles |
@@ -275,14 +280,14 @@ The UX/UI specification and backend documentation are **largely aligned** but ha
 
 ### Short-term (During MVP Development)
 
-5. **Add job dependencies UI section** - View and manage dependencies
+5. **Add element dependencies editing UI** - View and manage cross-element dependencies
 6. **Document tile swap API pattern** - Single endpoint or two calls?
 7. **Add business calendar visualization** - Non-working days in date strip
 
 ### Post-MVP (Future Iterations)
 
 8. **Settings UI specification** - Station, category, group, provider management
-9. **Job creation modal** - Full specification with DSL editor
+9. **Job creation modal** - Full specification with element management
 10. **Comments UI** - Display and add comments
 11. **Approval gate editing** - Edit BAT, plates, paper status
 12. **Real-time multi-user** - WebSocket updates, conflict resolution
@@ -294,8 +299,8 @@ The UX/UI specification and backend documentation are **largely aligned** but ha
 The UI/UX and backend documentation are **85% aligned**. The core scheduling workflow (drag-drop, validation, recall, completion) is fully compatible. The main gaps are:
 
 1. **Similarity indicators** need API clarification
-2. **Task reordering** needs UI interaction pattern
-3. **Job dependencies** need UI documentation
+2. **Task reordering** needs UI interaction pattern (element-scoped)
+3. **Element dependency editing** needs UI documentation (display exists via PrecedenceLines)
 4. **Approval gates** need MVP scope clarification
 
 These gaps are addressable and do not block MVP development if handled during implementation.

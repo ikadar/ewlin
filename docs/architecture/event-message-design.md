@@ -6,7 +6,7 @@ tags:
 
 # Event & Message Design Specification – Flux Print Shop Scheduling System
 
-This document defines **domain events**, **integration events**, and **message schemas** used across the Station → Job → Task assignment and scheduling workflow.
+This document defines **domain events**, **integration events**, and **message schemas** used across the Station → Job → Element → Task assignment and scheduling workflow.
 
 The goal is to provide:
 - a consistent event naming strategy,
@@ -159,16 +159,63 @@ The goal is to provide:
 ```
 
 **Notes:**
-- `color`: Randomly assigned from predefined palette; dependent jobs use shades of required job's color
+- `color`: Randomly assigned from predefined palette
+
+### ElementCreated
+**Purpose:** Indicates that an element has been created within a job.
+**Trigger:** Emitted when an element is added to the Job aggregate.
+```json
+{
+  "elementId": "string",
+  "jobId": "string",
+  "suffix": "string",
+  "label": "string|null",
+  "prerequisiteElementIds": [],
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Notes:**
+- At least one element (default suffix `"ELT"`) is created with every job
+- Multi-element jobs have multiple elements with distinct suffixes
+
+### ElementDependencyAdded
+**Purpose:** Signals that a cross-element dependency has been established.
+**Trigger:** Emitted when a prerequisite element is added to an element.
+```json
+{
+  "elementId": "string",
+  "jobId": "string",
+  "prerequisiteElementId": "string",
+  "addedAt": "ISO-8601-timestamp"
+}
+```
+
+**Notes:**
+- Dependencies must reference elements within the same job
+- Dependencies must form a DAG (no cycles)
+
+### ElementDependencyRemoved
+**Purpose:** Signals that a cross-element dependency has been removed.
+**Trigger:** Emitted when a prerequisite element is removed from an element.
+```json
+{
+  "elementId": "string",
+  "jobId": "string",
+  "prerequisiteElementId": "string",
+  "removedAt": "ISO-8601-timestamp"
+}
+```
 
 ### TaskAddedToJob
-**Purpose:** Indicates that a task has been added to a job.
-**Trigger:** Emitted when task is added to job aggregate (from DSL parsing).
+**Purpose:** Indicates that a task has been added to an element within a job.
+**Trigger:** Emitted when task is added to job aggregate.
 ```json
 {
   "jobId": "string",
+  "elementId": "string",
   "taskId": "string",
-  "sequenceOrder": 1,
+  "sequenceOrder": 0,
   "type": "internal|outsourced",
   "stationId": "string",
   "providerId": "string",
@@ -181,28 +228,42 @@ The goal is to provide:
 }
 ```
 
+**Notes:**
+- `elementId`: The element this task belongs to
+- `sequenceOrder`: 0-indexed position within the element's task sequence
+
 ### TasksReordered
-**Purpose:** Signals that tasks within a job have been reordered.
-**Trigger:** Emitted when task sequence is changed.
+**Purpose:** Signals that tasks within an element have been reordered.
+**Trigger:** Emitted when task sequence is changed within an element.
 ```json
 {
   "jobId": "string",
+  "elementId": "string",
   "newOrder": ["task-001", "task-002", "task-003"],
   "reorderedAt": "ISO-8601-timestamp"
 }
 ```
 
-### ProofStatusUpdated
-**Purpose:** Indicates BAT (proof) status has changed.
+**Notes:**
+- Reordering is element-scoped — only affects tasks within the specified element
+
+### ProofApprovalUpdated
+**Purpose:** Indicates BAT (proof) approval status has changed.
 **Trigger:** Emitted when proof is sent, approved, or marked as not required.
 ```json
 {
   "jobId": "string",
-  "proofSentAt": "ISO-8601-timestamp|NoProofRequired|null",
-  "proofApprovedAt": "ISO-8601-timestamp|null",
+  "proofApproval": {
+    "sentAt": "ISO-8601-timestamp|null",
+    "approvedAt": "ISO-8601-timestamp|null"
+  },
   "updatedAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `proofApproval.sentAt`: When the proof was sent to client, or `null` if not yet sent
+- `proofApproval.approvedAt`: When the proof was approved, or `null` if not yet approved
 
 ### PlatesStatusUpdated
 **Purpose:** Indicates plates preparation status has changed.
@@ -284,6 +345,7 @@ The goal is to provide:
 ```json
 {
   "taskId": "string",
+  "elementId": "string",
   "jobId": "string",
   "isCompleted": true,
   "completedAt": "ISO-8601-timestamp|null",
@@ -296,19 +358,23 @@ The goal is to provide:
 - Does NOT affect precedence validation
 
 ### TaskAssigned
-**Purpose:** Indicates that a task has been assigned to a station with timing.
+**Purpose:** Indicates that a task has been assigned to a station or provider with timing.
 **Trigger:** Emitted when task assignment is created in Schedule aggregate.
 ```json
 {
   "taskId": "string",
+  "elementId": "string",
   "jobId": "string",
-  "stationId": "string",
-  "providerId": "string",
+  "targetId": "string",
+  "isOutsourced": false,
   "scheduledStart": "ISO-8601-datetime",
   "scheduledEnd": "ISO-8601-datetime",
   "assignedAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `targetId`: Station ID or Provider ID depending on `isOutsourced`
 
 ### TaskUnassigned
 **Purpose:** Indicates that a task has been recalled (unassigned).
@@ -316,43 +382,53 @@ The goal is to provide:
 ```json
 {
   "taskId": "string",
+  "elementId": "string",
   "jobId": "string",
-  "previousStationId": "string",
+  "oldTargetId": "string",
+  "isOutsourced": false,
   "unassignedAt": "ISO-8601-timestamp"
 }
 ```
 
 ### TaskRescheduled
-**Purpose:** Indicates that a task has been moved to a new time or station.
+**Purpose:** Indicates that a task has been moved to a new time or station/provider.
 **Trigger:** Emitted when existing assignment is modified.
 ```json
 {
   "taskId": "string",
+  "elementId": "string",
   "jobId": "string",
-  "previousStationId": "string",
-  "newStationId": "string",
-  "previousStart": "ISO-8601-datetime",
-  "newStart": "ISO-8601-datetime",
-  "previousEnd": "ISO-8601-datetime",
-  "newEnd": "ISO-8601-datetime",
+  "oldTargetId": "string",
+  "newTargetId": "string",
+  "isOutsourced": false,
+  "oldScheduledStart": "ISO-8601-datetime",
+  "newScheduledStart": "ISO-8601-datetime",
+  "oldScheduledEnd": "ISO-8601-datetime",
+  "newScheduledEnd": "ISO-8601-datetime",
   "rescheduledAt": "ISO-8601-timestamp"
 }
 ```
 
 ### ConflictDetected
-**Purpose:** Alerts that scheduling conflicts have been identified.
-**Trigger:** Emitted during validation when constraints are violated.
+**Purpose:** Alerts that a scheduling conflict has been identified.
+**Trigger:** Emitted during validation when a constraint is violated.
 ```json
 {
   "scheduleId": "string",
-  "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
-  "affectedTaskIds": ["task-001", "task-002"],
-  "stationId": "string",
-  "description": "string",
-  "severity": "High|Medium|Low",
+  "taskId": "string",
+  "targetId": "string",
+  "conflictType": "StationMismatchConflict|StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
+  "message": "string",
+  "relatedTaskId": "string|null",
+  "details": {},
   "detectedAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- Fields match the `ScheduleConflict` interface (flat structure)
+- `relatedTaskId`: Present for PrecedenceConflict (the predecessor task)
+- `targetId`: Station or Provider ID involved in the conflict
 
 ### ScheduleUpdated
 **Purpose:** Signals that the schedule has been modified.
@@ -398,7 +474,7 @@ Published by: **Job Management Service**
 Consumed by: **Assignment Service**, **Scheduling View Service**
 
 **Purpose:** Notifies that job/task structure has changed, affecting scheduling.
-**Trigger:** Task added, removed, or reordered.
+**Trigger:** Task added, removed, or reordered within an element.
 ```json
 {
   "eventId": "uuid",
@@ -407,8 +483,30 @@ Consumed by: **Assignment Service**, **Scheduling View Service**
   "data": {
     "jobId": "string",
     "jobReference": "string",
+    "elementId": "string",
     "changeType": "TaskAdded|TaskRemoved|TasksReordered",
     "affectedTaskIds": ["task-001", "task-002"]
+  }
+}
+```
+
+### JobManagement.ElementStructureChanged
+Published by: **Job Management Service**
+Consumed by: **Assignment Service**, **Scheduling View Service**
+
+**Purpose:** Notifies that element structure has changed, affecting cross-element scheduling.
+**Trigger:** Element created, or element dependency added/removed.
+```json
+{
+  "eventId": "uuid",
+  "eventType": "JobManagement.ElementStructureChanged",
+  "occurredAt": "ISO-8601-timestamp",
+  "data": {
+    "jobId": "string",
+    "jobReference": "string",
+    "elementId": "string",
+    "changeType": "ElementCreated|DependencyAdded|DependencyRemoved",
+    "prerequisiteElementId": "string|null"
   }
 }
 ```
@@ -438,7 +536,7 @@ Consumed by: **Assignment Service**
 Published by: **Assignment Service**
 Consumed by: **Scheduling View Service**, **Job Management Service**
 
-**Purpose:** Broadcasts that a task has been scheduled with station and timing.
+**Purpose:** Broadcasts that a task has been scheduled with station/provider and timing.
 **Trigger:** Successful task assignment.
 ```json
 {
@@ -447,10 +545,12 @@ Consumed by: **Scheduling View Service**, **Job Management Service**
   "occurredAt": "ISO-8601-timestamp",
   "data": {
     "taskId": "string",
+    "elementId": "string",
     "jobId": "string",
     "jobReference": "string",
-    "stationId": "string",
-    "stationName": "string",
+    "targetId": "string",
+    "targetName": "string",
+    "isOutsourced": false,
     "scheduledStart": "ISO-8601-datetime",
     "scheduledEnd": "ISO-8601-datetime"
   }
@@ -469,11 +569,11 @@ Consumed by: **Scheduling View Service**
   "eventType": "Assignment.ConflictDetected",
   "occurredAt": "ISO-8601-timestamp",
   "data": {
-    "conflictType": "StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
-    "affectedTaskIds": ["task-001", "task-002"],
-    "stationId": "string",
-    "description": "string",
-    "severity": "High|Medium|Low"
+    "type": "StationMismatchConflict|StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
+    "message": "string",
+    "taskId": "string",
+    "relatedTaskId": "string|null",
+    "targetId": "string|null"
   }
 }
 ```
@@ -513,13 +613,18 @@ While events describe facts about what already happened, command messages expres
 {
   "commandType": "AssignTask",
   "taskId": "string",
-  "stationId": "string",
+  "targetId": "string",
+  "isOutsourced": false,
   "scheduledStart": "ISO-8601-datetime",
   "bypassPrecedence": false,
   "requestedBy": "string",
   "requestedAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- `targetId`: Station ID or Provider ID depending on `isOutsourced`
+- `bypassPrecedence`: When true, skips element-scoped and cross-element precedence checks (Alt-key in UI)
 
 ### RescheduleTaskCommand
 **Purpose:** Instructs the Assignment Service to move a task to a different time/station.
@@ -530,7 +635,8 @@ While events describe facts about what already happened, command messages expres
 {
   "commandType": "RescheduleTask",
   "taskId": "string",
-  "newStationId": "string",
+  "newTargetId": "string",
+  "isOutsourced": false,
   "newScheduledStart": "ISO-8601-datetime",
   "bypassPrecedence": false,
   "requestedBy": "string",
@@ -569,15 +675,17 @@ While events describe facts about what already happened, command messages expres
 
 ### ValidateAssignmentCommand
 **Purpose:** Validates a proposed assignment without persisting.
-**Expected Outcome:** Validation result with conflicts and warnings.
+**Expected Outcome:** Validation result with conflicts and optional suggested start time.
 **Failure Conditions:** None (always produces result).
 
 ```json
 {
   "commandType": "ValidateAssignment",
   "taskId": "string",
-  "stationId": "string",
+  "targetId": "string",
+  "isOutsourced": false,
   "scheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false,
   "requestedAt": "ISO-8601-timestamp"
 }
 ```
@@ -676,7 +784,7 @@ For WebSocket-based real-time updates:
   "data": {
     "jobId": "job-789",
     "reference": "45120",
-    "delayHours": 42
+    "delayDays": 2
   }
 }
 ```

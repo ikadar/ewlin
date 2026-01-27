@@ -7,7 +7,7 @@ tags:
 # Service Boundaries – Flux Print Shop Scheduling System
 
 This document defines the **service boundaries** for the Flux print shop scheduling system that handles
-Station → Job → Task assignments and scheduling validations.
+Station → Job → Element → Task assignments and scheduling validations.
 
 The goal is to translate the **bounded contexts** from the domain model into concrete services with clear responsibilities and interaction patterns.
 
@@ -68,38 +68,41 @@ Station management is a foundational capability that other services depend on. I
 > **References:** [AGG-JOB-001](aggregate-design.md#agg-job-001), [IC-JOB-001](interface-contracts.md#ic-job-001), [IC-JOB-003](interface-contracts.md#ic-job-003)
 
 **Purpose:**
-Define and manage print jobs with their constituent tasks, approval gates, and dependencies.
+Define and manage print jobs with their elements, constituent tasks, approval gates, and cross-element dependencies.
 
 **Capabilities:**
 - Create and update job definitions with workshop exit dates
-- Parse task DSL into structured task data
-- Add tasks to jobs with duration and station requirements
+- Create and manage elements within jobs (single or multi-element)
+- Add tasks to elements with duration and station requirements
+- Define cross-element dependencies (prerequisiteElementIds, DAG with cycle detection)
 - Manage approval gates (BAT/Proof, Plates)
 - Track paper procurement status
-- Define job-level dependencies
 - Manage job comments
 - Track job and task status transitions
 
 **Inputs:**
-- Commands from external callers (e.g., "createJob", "addTask", "updateProofStatus")
-- Task DSL text for parsing
+- Commands from external callers (e.g., "createJob", "createElement", "addTask", "updateProofApproval")
 - `TaskAssigned` events from Assignment Service (optional)
 
 **Outputs:**
 - `JobCreated` event
+- `ElementCreated` event
+- `ElementDependencyAdded` event
+- `ElementDependencyRemoved` event
 - `TaskAddedToJob` event
 - `TasksReordered` event
-- `JobDependencyAdded` event
-- `ApprovalGateUpdated` event
+- `ProofApprovalUpdated` event
 - `PaperStatusChanged` event
 - `CommentAdded` event
 - `JobStatusChanged` event
-- Job/Task read models or API responses
+- Job/Element/Task read models or API responses
 
 **Ownership:**
 - Job
-- Task (as entity within Job aggregate)
+- Element (as entity within Job aggregate)
+- Task (as entity within Element)
 - Duration
+- ProofApproval
 - Comment
 - PaperPurchaseStatus
 - PlatesStatus
@@ -108,7 +111,7 @@ Define and manage print jobs with their constituent tasks, approval gates, and d
 - Reads station/provider names from Station Management Service (for task validation)
 
 **Reasons for Separation:**
-Job planning and task structuring is independent of station availability and assignment. Jobs define WHAT needs to be done and in what order, while assignments determine WHERE and WHEN. This separation allows jobs to be planned before stations are assigned.
+Job planning and task structuring is independent of station availability and assignment. Jobs define WHAT needs to be done (organized into elements) and in what order, while assignments determine WHERE and WHEN. This separation allows jobs to be planned before stations are assigned.
 
 ---
 
@@ -120,11 +123,16 @@ Job planning and task structuring is independent of station availability and ass
 Orchestrate task assignments, manage schedule state, and coordinate validation.
 
 **Capabilities:**
-- Assign tasks to stations with specific time slots
+- Assign tasks to stations or providers (`targetId` + `isOutsourced`)
 - Calculate scheduled end times considering operating schedules
+- Validate element-scoped precedence (intra-element sequenceOrder)
+- Validate cross-element precedence (prerequisiteElementIds finish-to-start)
+- Validate dry time (4h after printing tasks)
+- Support precedence bypass (`bypassPrecedence` flag)
 - Persist validated assignments
 - Detect and report conflicts
 - Support recall (unassign) and reschedule operations
+- Toggle task completion status
 - Publish assignment and schedule events
 
 **Inputs:**
@@ -132,12 +140,15 @@ Orchestrate task assignments, manage schedule state, and coordinate validation.
 - `StationScheduleUpdated` events from Station Management Service
 - `StationStatusChanged` events from Station Management Service
 - `TaskAddedToJob` events from Job Management Service
+- `ElementCreated` events from Job Management Service
+- `ElementDependencyAdded` events from Job Management Service
 - `ApprovalGateUpdated` events from Job Management Service
 
 **Outputs:**
-- `TaskAssigned` event with timing information
+- `TaskAssigned` event with timing and element information
 - `TaskUnassigned` event
 - `TaskRescheduled` event
+- `TaskCompletionToggled` event
 - `ScheduleUpdated` event
 - `ConflictDetected` event with conflict details
 
@@ -167,10 +178,13 @@ Provide **isomorphic schedule validation** that runs identically on client (brow
 - Validate assignments against all business constraints:
   - StationConflict — no double-booking of stations
   - GroupCapacityConflict — station group limits respected
-  - PrecedenceConflict — task sequence within job respected
+  - PrecedenceConflict — element-scoped (intra-element sequenceOrder) and cross-element (prerequisiteElementIds finish-to-start) precedence respected
+  - DryTimeConflict — 4h dry time after printing tasks respected
   - ApprovalGateConflict — BAT/Plates requirements satisfied
   - AvailabilityConflict — station operating schedule respected
-- Return detailed conflict information
+  - StationMismatchConflict — task assigned to correct station type
+- Support `bypassPrecedence` flag for forced placements (Alt-key in UI)
+- Return detailed conflict information with suggested start time
 - Stateless operation (receives schedule snapshot, returns validation result)
 
 **Shared Package:** `@flux/schedule-validator`
@@ -190,7 +204,7 @@ interface ValidationRequest {
 interface ValidationResult {
   valid: boolean;
   conflicts: ScheduleConflict[];
-  warnings: ValidationWarning[];
+  suggestedStart?: string;  // ISO-8601 — earliest valid start time
 }
 ```
 
@@ -252,41 +266,7 @@ Read models have fundamentally different access patterns and performance require
 
 ---
 
-### 1.6 DSL Parsing Service
-#### SB-DSL-001
-> **References:** [API-DSL-001](../requirements/api-interface-drafts.md#api-dsl-001), [API-DSL-002](../requirements/api-interface-drafts.md#api-dsl-002), [API-DSL-003](../requirements/api-interface-drafts.md#api-dsl-003)
-
-**Purpose:**
-Parse and validate task DSL syntax for job creation.
-
-**Capabilities:**
-- Parse DSL text into structured task data
-- Validate syntax and station/provider references
-- Provide autocomplete suggestions
-- Report errors with line numbers
-
-**Inputs:**
-- DSL text to parse
-- Partial input for autocomplete
-
-**Outputs:**
-- Parsed task structures
-- Parse errors with positions
-- Autocomplete suggestions
-
-**Ownership:**
-- ParsedTask
-- ParseError
-- AutocompleteSuggestion
-
-**External Dependencies:**
-- Station Management Service (for station/provider names)
-
-**Note:** For MVP, embedded within Job Management Service.
-
----
-
-### 1.7 Business Calendar Service
+### 1.6 Business Calendar Service
 #### SB-CAL-001
 > **References:** [IC-CAL-001](interface-contracts.md#ic-cal-001), [IC-CAL-002](interface-contracts.md#ic-cal-002)
 
@@ -327,8 +307,8 @@ Calculate business days (open days) for outsourced task duration.
   - Meaning: Station constraints have changed, requiring revalidation
 
 - **Job Management → Assignment Service**
-  - Events: `TaskAddedToJob`, `TasksReordered`, `ApprovalGateUpdated`
-  - Meaning: Task structure has changed, affecting scheduling possibilities
+  - Events: `TaskAddedToJob`, `TasksReordered`, `ElementCreated`, `ElementDependencyAdded`, `ApprovalGateUpdated`
+  - Meaning: Element/task structure has changed, affecting scheduling possibilities
 
 - **Assignment Service → Validation Service** (synchronous)
   - HTTP call: `POST /validate`
@@ -356,7 +336,7 @@ Interaction should favor **asynchronous domain events** over direct synchronous 
 
 1. **Each service owns its data**
    - Station Management owns stations, categories, groups, and providers
-   - Job Management owns jobs and tasks
+   - Job Management owns jobs, elements, and tasks
    - Assignment Service owns schedules and assignments
    - No other service writes directly to these data stores
 
@@ -370,7 +350,7 @@ Interaction should favor **asynchronous domain events** over direct synchronous 
 
 4. **Published Language alignment**
    - Service APIs and events use the same terms as the domain vocabulary
-   - Consistent use of Station, Job, Task, Assignment, Schedule
+   - Consistent use of Station, Job, Element, Task, Assignment, Schedule
 
 5. **Loose coupling, strong cohesion**
    - Each service is internally cohesive around a specific domain capability
@@ -383,11 +363,10 @@ Interaction should favor **asynchronous domain events** over direct synchronous 
 | Service | Technology | Owns | Listens to | Publishes |
 |---------|------------|------|------------|-----------|
 | Station Management | PHP/Symfony | Station, Category, Group, Provider | External systems | StationCreated, ScheduleUpdated, StatusChanged |
-| Job Management | PHP/Symfony | Job, Task, Comments, Gates | TaskAssigned (optional) | JobCreated, TaskAdded, GateUpdated |
+| Job Management | PHP/Symfony | Job, Element, Task, Comments, Gates | TaskAssigned (optional) | JobCreated, ElementCreated, TaskAdded, GateUpdated |
 | Assignment Service | PHP/Symfony | Schedule, Assignments | Station events, Job events | TaskAssigned, ScheduleUpdated, ConflictDetected |
 | **Validation Service** | **Node.js** | Validation logic (shared with frontend) | — | — |
 | Scheduling View | PHP/Symfony | Read models only | All domain events | None (read-only) |
-| DSL Parsing | PHP/Symfony | Parser, Validator | — | — |
 | Business Calendar | PHP/Symfony | Calendar calculations | — | — |
 
 ---
@@ -398,10 +377,9 @@ The system uses a **hybrid PHP + Node.js architecture**:
 
 ### PHP/Symfony Services
 - **Station Management Service** — stations, categories, groups, providers
-- **Job Management Service** — jobs, tasks, approval gates
+- **Job Management Service** — jobs, elements, tasks, approval gates
 - **Assignment Service** — schedule orchestration, persistence
 - **Scheduling View Service** — read models, snapshots
-- **DSL Parsing Service** — task DSL parsing (embedded in Job Management for MVP)
 - **Business Calendar Service** — open day calculation (embedded in Assignment for MVP)
 
 ### Node.js Service
@@ -424,24 +402,18 @@ The system uses a **hybrid PHP + Node.js architecture**:
 
 ## 6. Deployment Considerations
 
-### Hybrid Deployment Model
+### Deployment Model
 ```yaml
 # docker-compose.yml
 services:
-  # PHP Services (can be monolith or separate)
+  # PHP API (modular monolith)
   php-api:
     image: flux/php-api
     depends_on:
-      - validation-service
       - mariadb
       - redis
 
-  # Node.js Validation Service (always separate)
-  validation-service:
-    image: flux/validation-service
-    # Stateless, can scale independently
-
-  # Frontend
+  # Frontend (bundles @flux/schedule-validator)
   frontend:
     image: flux/frontend
     # Static files, bundles shared validator
@@ -455,13 +427,10 @@ services:
 
 ### Deployment Strategies
 - **Development:** All services in docker-compose
-- **Staging:** PHP as monolith, Node.js validation separate
+- **Staging:** PHP as monolith, frontend separate
 - **Production:** Can extract PHP services as scaling requires
 
-The Validation Service is **always deployed separately** because:
-1. Different runtime (Node.js vs PHP)
-2. Shared code with frontend
-3. Can scale independently based on validation load
+The `@flux/schedule-validator` package is **bundled into the frontend** for client-side validation and is also available for server-side use via Node.js if needed. The PHP API implements its own server-side validation in Symfony.
 
 ---
 
