@@ -56,12 +56,13 @@ test.describe('v0.4.6: JCF Page Shell (Modal)', () => {
       await expect(footer).toContainText('Esc');
     });
 
-    test('placeholder content is visible', async ({ page }) => {
+    test('form content is visible (job header + elements table)', async ({ page }) => {
       const addButton = page.locator('button[aria-label="Ajouter un travail"]');
       await addButton.click();
 
       const content = page.locator('[data-testid="jcf-modal-content"]');
-      await expect(content).toContainText('Contenu du formulaire job...');
+      await expect(content.locator('[data-testid="jcf-job-header"]')).toBeVisible();
+      await expect(content.locator('[data-testid="jcf-elements-table"]')).toBeVisible();
     });
   });
 
