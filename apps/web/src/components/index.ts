@@ -45,3 +45,6 @@ export type { TopNavBarProps } from './TopNavBar';
 
 export { JcfModal } from './JcfModal';
 export type { JcfModalProps } from './JcfModal';
+
+export { JcfJobHeader, parseFrenchDate, formatToFrench, generateJobId } from './JcfJobHeader';
+export type { JcfJobHeaderProps } from './JcfJobHeader';
