@@ -1367,13 +1367,13 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] E2E tests for backward compatibility (9 tests)
 - [x] Backward compatible: no change when props not provided
 
-#### v0.4.12 - JCF: Session Learning
+#### v0.4.12 - JCF: Session Learning ✅
 > **Spec source:** §7 (Session Learning)
 
-- [ ] Track user inputs per field type during session
-- [ ] Session-learned values appear as top suggestions
-- [ ] Priority: session values > API values
-- [ ] Clear on page reload (session-scoped, not persisted)
+- [x] Track user inputs per field type during session (useSessionLearning hook, 6 learn handlers)
+- [x] Session-learned values appear as top suggestions (mergeWithSession utility)
+- [x] Priority: session values > API values (mergeWithSession puts session first)
+- [x] Clear on page reload (session-scoped, React state only)
 
 ### Phase 4F: Simple Autocompletes (1 field = 1 release)
 
