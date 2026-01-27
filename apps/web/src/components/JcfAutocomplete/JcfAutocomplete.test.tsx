@@ -254,4 +254,142 @@ describe('JcfAutocomplete', () => {
       expect(onBlur).toHaveBeenCalled();
     });
   });
+
+  describe('table navigation delegation', () => {
+    it('Tab calls onTabOut with direction forward', () => {
+      const onTabOut = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onTabOut={onTabOut} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.keyDown(input, { key: 'Tab' });
+      expect(onTabOut).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'Tab' }),
+        'forward',
+      );
+    });
+
+    it('Shift+Tab calls onTabOut with direction backward', () => {
+      const onTabOut = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onTabOut={onTabOut} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.keyDown(input, { key: 'Tab', shiftKey: true });
+      expect(onTabOut).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'Tab' }),
+        'backward',
+      );
+    });
+
+    it('Tab without onTabOut behaves as before (native Tab)', () => {
+      render(<JcfAutocomplete {...defaultProps} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.focus(input);
+      expect(screen.getByTestId('test-autocomplete-dropdown')).toBeInTheDocument();
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
+      input.dispatchEvent(event);
+      // Without onTabOut, preventDefault should NOT be called (native Tab)
+      expect(preventDefaultSpy).not.toHaveBeenCalled();
+    });
+
+    it('Tab closes dropdown before calling onTabOut', () => {
+      const onTabOut = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onTabOut={onTabOut} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.focus(input);
+      expect(screen.getByTestId('test-autocomplete-dropdown')).toBeInTheDocument();
+      fireEvent.keyDown(input, { key: 'Tab' });
+      expect(screen.queryByTestId('test-autocomplete-dropdown')).not.toBeInTheDocument();
+      expect(onTabOut).toHaveBeenCalled();
+    });
+
+    it('Alt+ArrowDown calls onArrowNav with direction down', () => {
+      const onArrowNav = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onArrowNav={onArrowNav} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.keyDown(input, { key: 'ArrowDown', altKey: true });
+      expect(onArrowNav).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'ArrowDown' }),
+        'down',
+      );
+    });
+
+    it('Alt+ArrowUp calls onArrowNav with direction up', () => {
+      const onArrowNav = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onArrowNav={onArrowNav} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.keyDown(input, { key: 'ArrowUp', altKey: true });
+      expect(onArrowNav).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'ArrowUp' }),
+        'up',
+      );
+    });
+
+    it('Alt+ArrowRight calls onArrowNav with direction right', () => {
+      const onArrowNav = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onArrowNav={onArrowNav} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.keyDown(input, { key: 'ArrowRight', altKey: true });
+      expect(onArrowNav).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'ArrowRight' }),
+        'right',
+      );
+    });
+
+    it('Alt+ArrowLeft calls onArrowNav with direction left', () => {
+      const onArrowNav = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onArrowNav={onArrowNav} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.keyDown(input, { key: 'ArrowLeft', altKey: true });
+      expect(onArrowNav).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'ArrowLeft' }),
+        'left',
+      );
+    });
+
+    it('Alt+Arrow closes dropdown before calling onArrowNav', () => {
+      const onArrowNav = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onArrowNav={onArrowNav} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.focus(input);
+      expect(screen.getByTestId('test-autocomplete-dropdown')).toBeInTheDocument();
+      fireEvent.keyDown(input, { key: 'ArrowDown', altKey: true });
+      expect(screen.queryByTestId('test-autocomplete-dropdown')).not.toBeInTheDocument();
+      expect(onArrowNav).toHaveBeenCalled();
+    });
+
+    it('plain ArrowDown still navigates dropdown (not delegated)', () => {
+      const onArrowNav = vi.fn();
+      render(<JcfAutocomplete {...defaultProps} onArrowNav={onArrowNav} />);
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.focus(input);
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      // Should navigate dropdown, NOT call onArrowNav
+      expect(onArrowNav).not.toHaveBeenCalled();
+      const items = screen.getByTestId('test-autocomplete-dropdown').children;
+      expect(items[1]).toHaveClass('bg-blue-600');
+    });
+
+    it('existing Enter and Escape behavior unchanged with delegation props', () => {
+      const onTabOut = vi.fn();
+      const onArrowNav = vi.fn();
+      const onChange = vi.fn();
+      render(
+        <JcfAutocomplete
+          {...defaultProps}
+          onChange={onChange}
+          onTabOut={onTabOut}
+          onArrowNav={onArrowNav}
+        />,
+      );
+      const input = screen.getByTestId('jcf-field-test-autocomplete');
+      fireEvent.focus(input);
+      // Enter selects item
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(onChange).toHaveBeenCalledWith('Imprimerie Léon');
+      // Reopen
+      fireEvent.focus(input);
+      // Escape closes dropdown
+      fireEvent.keyDown(input, { key: 'Escape' });
+      expect(screen.queryByTestId('test-autocomplete-dropdown')).not.toBeInTheDocument();
+    });
+  });
 });

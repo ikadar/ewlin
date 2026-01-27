@@ -18,6 +18,10 @@ export interface JcfAutocompleteProps {
   id?: string;
   onSelect?: (value: string) => void;
   onBlur?: () => void;
+  /** Table navigation delegation: called on Tab/Shift+Tab when dropdown is closed */
+  onTabOut?: (e: React.KeyboardEvent, direction: 'forward' | 'backward') => void;
+  /** Table navigation delegation: called on Alt+Arrow */
+  onArrowNav?: (e: React.KeyboardEvent, direction: 'up' | 'down' | 'left' | 'right') => void;
 }
 
 /**
@@ -39,6 +43,8 @@ export function JcfAutocomplete({
   id,
   onSelect,
   onBlur,
+  onTabOut,
+  onArrowNav,
 }: JcfAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -87,6 +93,30 @@ export function JcfAutocomplete({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Alt+Arrow — always delegate to table navigation (open or closed)
+    if (e.altKey && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      if (isOpen) setIsOpen(false);
+      const directionMap: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+        ArrowUp: 'up',
+        ArrowDown: 'down',
+        ArrowLeft: 'left',
+        ArrowRight: 'right',
+      };
+      onArrowNav?.(e, directionMap[e.key]);
+      return;
+    }
+
+    // Tab / Shift+Tab — close dropdown, delegate if onTabOut provided
+    if (e.key === 'Tab') {
+      if (isOpen) setIsOpen(false);
+      if (onTabOut) {
+        e.preventDefault();
+        onTabOut(e, e.shiftKey ? 'backward' : 'forward');
+      }
+      return;
+    }
+
     if (!isOpen) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         setIsOpen(true);
@@ -119,9 +149,6 @@ export function JcfAutocomplete({
       case 'Escape':
         e.preventDefault();
         e.stopPropagation(); // Prevent modal close
-        setIsOpen(false);
-        break;
-      case 'Tab':
         setIsOpen(false);
         break;
     }
