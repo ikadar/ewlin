@@ -1288,14 +1288,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 #### v0.4.4 - JCF: Type Mapping & Data Model
 > **Spec source:** §1 (Input Format Conventions), §9 (Reference Data), §11.6 (Domain Model Analysis)
 
-- [ ] Map reference Element (12 string fields) → `@flux/types` model
-  - [ ] Architectural decision: ElementSpec value object vs. flat fields on Element
-  - [ ] Reference Element.name → Element.suffix
-  - [ ] Reference Element.precedences → Element.prerequisiteElementIds
-  - [ ] Reference Element.sequence → Task[] entities within Element
-  - [ ] Production metadata fields (format, papier, pagination, imposition, impression, surfacage, quantite, qteFeuilles, autres, commentaires)
-- [ ] Update `@flux/types` package with new types
-- [ ] Type mapping documentation
+- [x] Map reference Element (12 string fields) → `@flux/types` model
+  - [x] Architectural decision: ElementSpec value object vs. flat fields on Element
+  - [x] Reference Element.name → Element.suffix
+  - [x] Reference Element.precedences → Element.prerequisiteElementIds
+  - [x] Reference Element.sequence → Task[] entities within Element
+  - [x] Production metadata fields (format, papier, pagination, imposition, impression, surfacage, quantite, qteFeuilles, autres, commentaires)
+- [x] Update `@flux/types` package with new types
+- [x] Type mapping documentation
 
 #### v0.4.5 - JCF: Reference Data & Mock API
 > **Spec source:** §9 (Reference Data)
