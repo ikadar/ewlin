@@ -612,6 +612,110 @@ describe('Mock API', () => {
   });
 
   // ==========================================================================
+  // Reference Data API Tests (v0.4.5)
+  // ==========================================================================
+
+  describe('reference data endpoints', () => {
+    it('getPaperTypes returns 5 paper types', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const papers = await api.getPaperTypes();
+
+      expect(papers).toHaveLength(5);
+      expect(papers[0].id).toBeDefined();
+      expect(papers[0].type).toBeDefined();
+      expect(papers[0].grammages.length).toBeGreaterThan(0);
+    });
+
+    it('getProductFormats returns 36 formats', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const formats = await api.getProductFormats();
+
+      expect(formats).toHaveLength(36);
+      expect(formats[0].id).toBeDefined();
+      expect(formats[0].width).toBeGreaterThan(0);
+      expect(formats[0].height).toBeGreaterThan(0);
+    });
+
+    it('getFeuilleFormats returns 10 sheet formats', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const feuilles = await api.getFeuilleFormats();
+
+      expect(feuilles).toHaveLength(10);
+      expect(feuilles[0].format).toBeDefined();
+      expect(feuilles[0].poses).toHaveLength(8);
+    });
+
+    it('getImpressionPresets returns 9 presets', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const impressions = await api.getImpressionPresets();
+
+      expect(impressions).toHaveLength(9);
+      expect(impressions[0].id).toBeDefined();
+      expect(impressions[0].value).toBeDefined();
+      expect(impressions[0].description).toBeDefined();
+    });
+
+    it('getSurfacagePresets returns 10 presets', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const surfacages = await api.getSurfacagePresets();
+
+      expect(surfacages).toHaveLength(10);
+      expect(surfacages[0].id).toBeDefined();
+      expect(surfacages[0].value).toBeDefined();
+      expect(surfacages[0].description).toBeDefined();
+    });
+
+    it('getPostePresets returns 16 presets', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const postes = await api.getPostePresets();
+
+      expect(postes).toHaveLength(16);
+      expect(postes[0].name).toBeDefined();
+      expect(postes[0].category).toBeDefined();
+    });
+
+    it('getSoustraitantPresets returns 5 presets', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const soustraitants = await api.getSoustraitantPresets();
+
+      expect(soustraitants).toHaveLength(5);
+      expect(soustraitants[0].name).toBeDefined();
+    });
+
+    it('getTemplateCategories returns 2 categories', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
+      const categories = await api.getTemplateCategories();
+
+      expect(categories).toHaveLength(2);
+      expect(categories[0].id).toBeDefined();
+      expect(categories[0].name).toBeDefined();
+    });
+
+    it('reference data methods simulate latency', async () => {
+      const api = createMockApi({ latencyMs: 50, latencyVariance: 0 });
+
+      const start = Date.now();
+      await api.getPaperTypes();
+      const elapsed = Date.now() - start;
+
+      expect(elapsed).toBeGreaterThanOrEqual(45);
+    });
+
+    it('reference data methods respect failure simulation', async () => {
+      const api = createMockApi({ latencyMs: 0, latencyVariance: 0, failureRate: 1 });
+
+      await expect(api.getPaperTypes()).rejects.toThrow(MockApiError);
+      await expect(api.getProductFormats()).rejects.toThrow(MockApiError);
+      await expect(api.getFeuilleFormats()).rejects.toThrow(MockApiError);
+      await expect(api.getImpressionPresets()).rejects.toThrow(MockApiError);
+      await expect(api.getSurfacagePresets()).rejects.toThrow(MockApiError);
+      await expect(api.getPostePresets()).rejects.toThrow(MockApiError);
+      await expect(api.getSoustraitantPresets()).rejects.toThrow(MockApiError);
+      await expect(api.getTemplateCategories()).rejects.toThrow(MockApiError);
+    });
+  });
+
+  // ==========================================================================
   // Default Instance Tests
   // ==========================================================================
 
@@ -626,6 +730,17 @@ describe('Mock API', () => {
       expect(typeof mockApi.reset).toBe('function');
       expect(typeof mockApi.getConfig).toBe('function');
       expect(typeof mockApi.setConfig).toBe('function');
+    });
+
+    it('has reference data methods', () => {
+      expect(typeof mockApi.getPaperTypes).toBe('function');
+      expect(typeof mockApi.getProductFormats).toBe('function');
+      expect(typeof mockApi.getFeuilleFormats).toBe('function');
+      expect(typeof mockApi.getImpressionPresets).toBe('function');
+      expect(typeof mockApi.getSurfacagePresets).toBe('function');
+      expect(typeof mockApi.getPostePresets).toBe('function');
+      expect(typeof mockApi.getSoustraitantPresets).toBe('function');
+      expect(typeof mockApi.getTemplateCategories).toBe('function');
     });
   });
 });

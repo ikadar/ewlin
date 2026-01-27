@@ -7,8 +7,26 @@ import type {
   ScheduleSnapshot,
   TaskAssignment,
   Task,
+  PaperType,
+  ProductFormat,
+  FeuilleFormat,
+  ImpressionPreset,
+  SurfacagePreset,
+  PostePreset,
+  SoustraitantPreset,
+  TemplateCategory,
 } from '@flux/types';
 import { getSnapshot, updateSnapshot, invalidateSnapshot } from './snapshot';
+import {
+  PAPER_TYPES,
+  PRODUCT_FORMATS,
+  FEUILLE_FORMATS,
+  IMPRESSION_PRESETS,
+  SURFACAGE_PRESETS,
+  POSTE_PRESETS,
+  SOUSTRAITANT_PRESETS,
+  TEMPLATE_CATEGORIES,
+} from './reference-data';
 
 // ============================================================================
 // Types
@@ -138,6 +156,32 @@ export interface MockApi {
 
   /** Update configuration */
   setConfig(config: Partial<MockApiConfig>): void;
+
+  // Reference data endpoints (v0.4.5)
+
+  /** Get paper types with grammages */
+  getPaperTypes(): Promise<PaperType[]>;
+
+  /** Get product formats (ISO A/B/SRA series) */
+  getProductFormats(): Promise<ProductFormat[]>;
+
+  /** Get sheet formats with poses for imposition */
+  getFeuilleFormats(): Promise<FeuilleFormat[]>;
+
+  /** Get impression (printing) presets */
+  getImpressionPresets(): Promise<ImpressionPreset[]>;
+
+  /** Get surfacage (finishing/coating) presets */
+  getSurfacagePresets(): Promise<SurfacagePreset[]>;
+
+  /** Get poste (machine/station) presets */
+  getPostePresets(): Promise<PostePreset[]>;
+
+  /** Get soustraitant (subcontractor) presets */
+  getSoustraitantPresets(): Promise<SoustraitantPreset[]>;
+
+  /** Get template categories */
+  getTemplateCategories(): Promise<TemplateCategory[]>;
 }
 
 /**
@@ -309,6 +353,56 @@ export function createMockApi(initialConfig: Partial<MockApiConfig> = {}): MockA
 
     setConfig(newConfig: Partial<MockApiConfig>): void {
       config = { ...config, ...newConfig };
+    },
+
+    // Reference data endpoints (v0.4.5)
+
+    async getPaperTypes(): Promise<PaperType[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return PAPER_TYPES;
+    },
+
+    async getProductFormats(): Promise<ProductFormat[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return PRODUCT_FORMATS;
+    },
+
+    async getFeuilleFormats(): Promise<FeuilleFormat[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return FEUILLE_FORMATS;
+    },
+
+    async getImpressionPresets(): Promise<ImpressionPreset[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return IMPRESSION_PRESETS;
+    },
+
+    async getSurfacagePresets(): Promise<SurfacagePreset[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return SURFACAGE_PRESETS;
+    },
+
+    async getPostePresets(): Promise<PostePreset[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return POSTE_PRESETS;
+    },
+
+    async getSoustraitantPresets(): Promise<SoustraitantPreset[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return SOUSTRAITANT_PRESETS;
+    },
+
+    async getTemplateCategories(): Promise<TemplateCategory[]> {
+      await simulateLatency(config);
+      simulateFailure(config);
+      return TEMPLATE_CATEGORIES;
     },
   };
 }
