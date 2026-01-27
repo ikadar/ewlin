@@ -1380,15 +1380,15 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 > **Parallelizable:** v0.4.13–v0.4.16 are independent, all depend on v0.4.11–v0.4.12.
 
-#### v0.4.13 - JCF: Format Autocomplete
+#### v0.4.13 - JCF: Format Autocomplete ✅
 > **Spec source:** §1.5 (Format DSL)
 
-- [ ] ISO format lookup (A0–A10)
-- [ ] Custom dimension input (e.g., 210x297)
-- [ ] "Fermé" variants (A4f, A5fi)
-- [ ] Composite formats (A3/A6)
-- [ ] Pretty ↔ DSL bidirectional conversion
-- [ ] Dimension lookup from API formats
+- [x] ISO format lookup (A0–A10)
+- [x] Custom dimension input (e.g., 210x297)
+- [x] "Fermé" variants (A4f, A5fi)
+- [x] Composite formats (A3/A6)
+- [x] Pretty ↔ DSL bidirectional conversion
+- [x] Dimension lookup from API formats
 
 #### v0.4.14 - JCF: Impression Autocomplete
 > **Spec source:** §1.3 (Impression DSL)
