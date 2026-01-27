@@ -278,6 +278,148 @@ describe('JcfElementsTable', () => {
       expect(svg).toBeInTheDocument();
     });
   });
+
+  describe('cell navigation', () => {
+    // Row indices: 0=precedences, 1=quantite, 2=pagination, 3=format,
+    // 4=papier, 5=impression, 6=surfacage, 7=autres, 8=imposition,
+    // 9=qteFeuilles, 10=commentaires, 11=sequence
+    const LAST_ROW = 11;
+
+    const twoElements: JcfElement[] = [
+      { ...DEFAULT_ELEMENT, name: 'ELEM1' },
+      { ...DEFAULT_ELEMENT, name: 'ELEM2' },
+    ];
+
+    function getCellById(elementIndex: number, rowIndex: number) {
+      return document.getElementById(
+        `cell-${elementIndex}-${rowIndex}`,
+      ) as HTMLElement;
+    }
+
+    it('cells have IDs in the format cell-{elementIndex}-{rowIndex}', () => {
+      renderTable();
+      expect(getCellById(0, 0)).toBeInTheDocument();
+      expect(getCellById(0, LAST_ROW)).toBeInTheDocument();
+    });
+
+    it('Tab moves focus to next row in same column', () => {
+      renderTable();
+      const cell = getCellById(0, 0);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'Tab' });
+      expect(document.activeElement).toBe(getCellById(0, 1));
+    });
+
+    it('Tab at last row moves to next column first row', () => {
+      renderTable({ elements: twoElements });
+      const cell = getCellById(0, LAST_ROW);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'Tab' });
+      expect(document.activeElement).toBe(getCellById(1, 0));
+    });
+
+    it('Tab at last cell of table does not prevent default (native exit)', () => {
+      renderTable();
+      const cell = getCellById(0, LAST_ROW);
+      cell.focus();
+      const event = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      });
+      const prevented = !cell.dispatchEvent(event);
+      // Last cell of only column → should NOT be prevented (native Tab exits)
+      expect(prevented).toBe(false);
+    });
+
+    it('Shift+Tab moves focus to previous row', () => {
+      renderTable();
+      const cell = getCellById(0, 3);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'Tab', shiftKey: true });
+      expect(document.activeElement).toBe(getCellById(0, 2));
+    });
+
+    it('Shift+Tab at first row moves to previous column last row', () => {
+      renderTable({ elements: twoElements });
+      const cell = getCellById(1, 0);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'Tab', shiftKey: true });
+      expect(document.activeElement).toBe(getCellById(0, LAST_ROW));
+    });
+
+    it('Shift+Tab at first cell of table does not prevent default (native exit)', () => {
+      renderTable();
+      const cell = getCellById(0, 0);
+      cell.focus();
+      const event = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      const prevented = !cell.dispatchEvent(event);
+      expect(prevented).toBe(false);
+    });
+
+    it('Alt+ArrowDown wraps from last row to first row', () => {
+      renderTable();
+      const cell = getCellById(0, LAST_ROW);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'ArrowDown', altKey: true });
+      expect(document.activeElement).toBe(getCellById(0, 0));
+    });
+
+    it('Alt+ArrowUp wraps from first row to last row', () => {
+      renderTable();
+      const cell = getCellById(0, 0);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'ArrowUp', altKey: true });
+      expect(document.activeElement).toBe(getCellById(0, LAST_ROW));
+    });
+
+    it('Alt+ArrowRight wraps from last column to first column', () => {
+      renderTable({ elements: twoElements });
+      const cell = getCellById(1, 3);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'ArrowRight', altKey: true });
+      expect(document.activeElement).toBe(getCellById(0, 3));
+    });
+
+    it('Alt+ArrowLeft wraps from first column to last column', () => {
+      renderTable({ elements: twoElements });
+      const cell = getCellById(0, 3);
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'ArrowLeft', altKey: true });
+      expect(document.activeElement).toBe(getCellById(1, 3));
+    });
+
+    it('Enter in text input moves to next cell', () => {
+      renderTable();
+      const cell = getCellById(0, 3); // format (text input)
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'Enter' });
+      expect(document.activeElement).toBe(getCellById(0, 4));
+    });
+
+    it('Enter in textarea does NOT move to next cell', () => {
+      renderTable();
+      const cell = getCellById(0, 10); // commentaires (textarea, rowIndex=10)
+      cell.focus();
+      fireEvent.keyDown(cell, { key: 'Enter' });
+      // Should stay on same cell (Enter inserts newline in textarea)
+      expect(document.activeElement).toBe(cell);
+    });
+
+    it('Escape blurs the active cell', () => {
+      renderTable();
+      const cell = getCellById(0, 3);
+      cell.focus();
+      expect(document.activeElement).toBe(cell);
+      fireEvent.keyDown(cell, { key: 'Escape' });
+      expect(document.activeElement).not.toBe(cell);
+    });
+  });
 });
 
 describe('generateElementName', () => {
