@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { highlightMatch } from './highlightMatch';
 import { useLazyLoadSuggestions } from '../../hooks/useLazyLoadSuggestions';
 
@@ -68,11 +68,11 @@ export function JcfAutocomplete({
       maxLimit: 25,
     });
 
-  // Reset highlighted index and display count when filter changes
-  useEffect(() => {
+  // Reset highlighted index and display count when input changes
+  const resetHighlight = useCallback(() => {
     setHighlightedIndex(0);
     resetDisplayCount();
-  }, [value, resetDisplayCount]);
+  }, [resetDisplayCount]);
 
   // Auto-scroll highlighted item into view (keyboard nav only)
   useEffect(() => {
@@ -176,8 +176,8 @@ export function JcfAutocomplete({
         id={id}
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => { setIsOpen(true); onFocus?.(); }}
+        onChange={(e) => { onChange(e.target.value); resetHighlight(); }}
+        onFocus={() => { setIsOpen(true); resetHighlight(); onFocus?.(); }}
         onBlur={onBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
