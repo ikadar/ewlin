@@ -5,6 +5,7 @@ import { DEFAULT_ELEMENT } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
+import { shouldUseFixture } from './mock/testFixtures';
 import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo } from './utils';
@@ -20,6 +21,18 @@ import { validateAssignment } from '@flux/schedule-validator';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
+
+/**
+ * Test workflow for E2E testing (v0.4.22).
+ * Used when a test fixture is active to verify workflow-guided suggestions.
+ * @see docs/releases/v0.4.22-jcf-sequence-workflow-suggestions.md
+ */
+const TEST_SEQUENCE_WORKFLOW = [
+  'Presse offset, Presse numérique', // Step 0: Print (offset or digital)
+  'Massicot', // Step 1: Cutting
+  'Plieuse', // Step 2: Folding
+  'Conditionnement', // Step 3: Packaging
+];
 // v0.3.46: Restored to 365 days with virtual scrolling for performance
 const DAY_COUNT = 365;
 
@@ -1536,6 +1549,7 @@ function AppContent() {
           <JcfElementsTable
             elements={jcfElements}
             onElementsChange={setJcfElements}
+            sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : undefined}
           />
         </div>
       </JcfModal>

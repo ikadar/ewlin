@@ -569,4 +569,185 @@ describe('JcfSequenceAutocomplete', () => {
       }
     });
   });
+
+  describe('workflow-guided suggestions', () => {
+    const workflowPostes: PostePreset[] = [
+      { name: 'G37', category: 'Presse offset' },
+      { name: '754', category: 'Presse offset' },
+      { name: 'C9500', category: 'Presse numérique' },
+      { name: 'P137', category: 'Massicot' },
+      { name: 'VM', category: 'Massicot' },
+      { name: 'Stahl', category: 'Plieuse' },
+      { name: 'Carton', category: 'Conditionnement' },
+    ];
+
+    const workflowProps = {
+      ...defaultProps,
+      postePresets: workflowPostes,
+    };
+
+    it('shows star marker for priority postes when workflow is set', () => {
+      const workflow = ['Presse offset'];
+      render(
+        <JcfSequenceAutocomplete
+          {...workflowProps}
+          sequenceWorkflow={workflow}
+        />,
+      );
+      fireEvent.focus(screen.getByRole('textbox'));
+      const dropdown = document.querySelector(
+        '[data-testid="test-seq-dropdown"]',
+      );
+      if (dropdown) {
+        // Should have star marker for Presse offset machines
+        expect(dropdown.textContent).toContain('★ Presse offset');
+        // Massicot should not have star marker
+        expect(dropdown.textContent).toContain('Massicot');
+        expect(dropdown.textContent).not.toContain('★ Massicot');
+      }
+    });
+
+    it('shows priority postes first in dropdown', () => {
+      const workflow = ['Massicot'];
+      render(
+        <JcfSequenceAutocomplete
+          {...workflowProps}
+          sequenceWorkflow={workflow}
+        />,
+      );
+      fireEvent.focus(screen.getByRole('textbox'));
+      const dropdown = document.querySelector(
+        '[data-testid="test-seq-dropdown"]',
+      );
+      if (dropdown) {
+        const items = dropdown.querySelectorAll(
+          'div[class*="cursor-pointer"]',
+        );
+        // Massicot machines (P137, VM) should come before others
+        // First items should be priority ones
+        if (items.length >= 2) {
+          const firstItem = items[0].textContent || '';
+          const secondItem = items[1].textContent || '';
+          // One of the first two should be a Massicot machine
+          const hasMassicotFirst =
+            firstItem.includes('P137') ||
+            firstItem.includes('VM') ||
+            secondItem.includes('P137') ||
+            secondItem.includes('VM');
+          expect(hasMassicotFirst).toBe(true);
+        }
+      }
+    });
+
+    it('advances step after completing first line', () => {
+      const workflow = ['Presse offset', 'Massicot'];
+      render(
+        <JcfSequenceAutocomplete
+          {...workflowProps}
+          value={'G37(20)\n'}
+          sequenceWorkflow={workflow}
+        />,
+      );
+      const textarea = screen.getByRole('textbox');
+      Object.defineProperty(textarea, 'selectionStart', { value: 8 });
+      fireEvent.focus(textarea);
+      fireEvent.select(textarea);
+
+      const dropdown = document.querySelector(
+        '[data-testid="test-seq-dropdown"]',
+      );
+      if (dropdown) {
+        // Now step 1 (Massicot) should be priority
+        expect(dropdown.textContent).toContain('★ Massicot');
+        // Presse offset should not have star
+        expect(dropdown.textContent).not.toContain('★ Presse offset');
+      }
+    });
+
+    it('supports multi-category workflow step', () => {
+      const workflow = ['Presse offset, Presse numérique'];
+      render(
+        <JcfSequenceAutocomplete
+          {...workflowProps}
+          sequenceWorkflow={workflow}
+        />,
+      );
+      fireEvent.focus(screen.getByRole('textbox'));
+      const dropdown = document.querySelector(
+        '[data-testid="test-seq-dropdown"]',
+      );
+      if (dropdown) {
+        // Both Presse offset and Presse numérique should have star
+        expect(dropdown.textContent).toContain('★ Presse offset');
+        expect(dropdown.textContent).toContain('★ Presse numérique');
+        // Massicot should not
+        expect(dropdown.textContent).not.toContain('★ Massicot');
+      }
+    });
+
+    it('shows no star when workflow is empty', () => {
+      render(
+        <JcfSequenceAutocomplete
+          {...workflowProps}
+          sequenceWorkflow={[]}
+        />,
+      );
+      fireEvent.focus(screen.getByRole('textbox'));
+      const dropdown = document.querySelector(
+        '[data-testid="test-seq-dropdown"]',
+      );
+      if (dropdown) {
+        // No star markers when workflow is empty
+        expect(dropdown.textContent).not.toContain('★');
+      }
+    });
+
+    it('shows no star when all workflow steps exhausted', () => {
+      const workflow = ['Presse offset'];
+      // Two complete lines → stepIndex = 2, but workflow only has 1 step
+      render(
+        <JcfSequenceAutocomplete
+          {...workflowProps}
+          value={'G37(20)\nP137(15)\n'}
+          sequenceWorkflow={workflow}
+        />,
+      );
+      const textarea = screen.getByRole('textbox');
+      Object.defineProperty(textarea, 'selectionStart', { value: 18 });
+      fireEvent.focus(textarea);
+      fireEvent.select(textarea);
+
+      const dropdown = document.querySelector(
+        '[data-testid="test-seq-dropdown"]',
+      );
+      if (dropdown) {
+        // No star markers when beyond workflow length
+        expect(dropdown.textContent).not.toContain('★');
+      }
+    });
+
+    it('does not apply workflow sorting to ST step', () => {
+      const workflow = ['Presse offset'];
+      render(
+        <JcfSequenceAutocomplete
+          {...workflowProps}
+          value="ST:"
+          sequenceWorkflow={workflow}
+        />,
+      );
+      const textarea = screen.getByRole('textbox');
+      Object.defineProperty(textarea, 'selectionStart', { value: 3 });
+      fireEvent.focus(textarea);
+      fireEvent.select(textarea);
+
+      const dropdown = document.querySelector(
+        '[data-testid="test-seq-dropdown"]',
+      );
+      if (dropdown) {
+        // ST mode shows sous-traitant names, no star markers
+        expect(dropdown.textContent).not.toContain('★');
+        expect(dropdown.textContent).toContain('Sous-traitant');
+      }
+    });
+  });
 });

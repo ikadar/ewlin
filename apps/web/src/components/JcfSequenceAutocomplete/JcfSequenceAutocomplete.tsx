@@ -11,6 +11,8 @@ import { useLazyLoadSuggestions } from '../../hooks/useLazyLoadSuggestions';
 import {
   parseLine,
   getCurrentLineInfo,
+  getWorkflowStepIndex,
+  getExpectedCategories,
   DEFAULT_DURATIONS,
   DEFAULT_ST_DURATIONS,
 } from './sequenceDsl';
@@ -41,6 +43,13 @@ export interface JcfSequenceAutocompleteProps {
   sessionSoustraitants?: SoustraitantPreset[];
   /** Callback to learn a new sous-traitant */
   onLearnSoustraitant?: (st: SoustraitantPreset) => void;
+  /**
+   * Workflow-guided suggestion ordering.
+   * Array of expected production step categories in order.
+   * Each entry can be comma-separated for multi-category support.
+   * @example ['Presse offset, Presse numérique', 'Massicot', 'Conditionnement']
+   */
+  sequenceWorkflow?: string[];
   /** HTML id for the textarea */
   id?: string;
   /** Additional CSS class */
@@ -70,6 +79,7 @@ export function JcfSequenceAutocomplete({
   soustraitantPresets = [],
   sessionSoustraitants = [],
   onLearnSoustraitant,
+  sequenceWorkflow = [],
   id,
   className,
   inputClassName,
@@ -201,15 +211,34 @@ export function JcfSequenceAutocomplete({
 
     switch (parsed.step) {
       case 'poste': {
+        // Get current workflow step for priority sorting
+        const stepIndex = getWorkflowStepIndex(value, cursorPosition);
+        const expectedCategories = getExpectedCategories(
+          sequenceWorkflow,
+          stepIndex,
+        );
+
         // Filter postes matching search
         const matching = allPostes.filter((p) =>
           p.name.toLowerCase().includes(parsed.search.toLowerCase()),
         );
-        matching.forEach((p) => {
+
+        // Sort: prioritize postes matching expected category (stable sort)
+        const sorted = [...matching].sort((a, b) => {
+          const aMatches = expectedCategories.includes(a.category);
+          const bMatches = expectedCategories.includes(b.category);
+          if (aMatches && !bMatches) return -1;
+          if (!aMatches && bMatches) return 1;
+          return 0;
+        });
+
+        // Add sorted postes to suggestions with star marker for priority
+        sorted.forEach((p) => {
+          const isPriority = expectedCategories.includes(p.category);
           suggestions.push({
             label: p.name,
             value: `${p.name}(`,
-            description: p.category,
+            description: isPriority ? `★ ${p.category}` : p.category,
           });
         });
 
@@ -281,7 +310,7 @@ export function JcfSequenceAutocomplete({
     }
 
     return { filtered: suggestions, searchText: parsed.search };
-  }, [value, cursorPosition, allPostes, allSoustraitants]);
+  }, [value, cursorPosition, allPostes, allSoustraitants, sequenceWorkflow]);
 
   // Lazy load suggestions
   const { displayedItems, handleScroll, hasMore, resetDisplayCount } =

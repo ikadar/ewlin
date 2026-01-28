@@ -3,13 +3,16 @@
  *
  * Tests for v0.4.20: Multi-line sequence editor with poste mode.
  * Tests for v0.4.21: ST (sous-traitant) mode.
+ * Tests for v0.4.22: Workflow-guided suggestion ordering.
  * Verifies poste selection, duration input, multi-line editing,
- * keyboard navigation, and ST name/duration/description flow.
+ * keyboard navigation, ST name/duration/description flow,
+ * and workflow priority sorting.
  *
  * Sequence is row index 11 (last row) in the elements table.
  *
  * @see docs/releases/v0.4.20-jcf-sequence-poste-mode.md
  * @see docs/releases/v0.4.21-jcf-sequence-st-mode.md
+ * @see docs/releases/v0.4.22-jcf-sequence-workflow-suggestions.md
  */
 
 import { test, expect } from '@playwright/test';
@@ -54,6 +57,9 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
     test('shows ST: option in poste suggestions', async ({ page }) => {
       const sequenceTextarea = page.locator('#cell-0-11');
       await sequenceTextarea.click();
+
+      // Type "st" to filter to ST: option (otherwise it's beyond lazy load limit)
+      await sequenceTextarea.fill('st');
 
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
@@ -116,11 +122,11 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       // Type first complete line
       await sequenceTextarea.fill('G37(20)');
 
-      // Press Enter to add new line
+      // Press Enter to add new line, then type filter text
       await page.keyboard.press('Enter');
+      // Type "ahl" which only matches "Stahl" (not "ST:")
+      await page.keyboard.type('ahl');
 
-      // Type on new line — should show poste suggestions
-      await page.keyboard.type('St');
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
       await expect(dropdown).toContainText('Stahl');
@@ -240,6 +246,95 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
 
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).not.toBeVisible();
+    });
+  });
+
+  /**
+   * v0.4.22: Workflow-Guided Suggestions Tests
+   *
+   * When a test fixture is active (?fixture=test), the JCF elements table
+   * receives a test workflow: ['Presse offset, Presse numérique', 'Massicot', 'Plieuse', 'Conditionnement']
+   *
+   * These tests verify:
+   * - Priority postes (matching expected category) appear first
+   * - Priority postes have star marker (★) in description badge
+   * - Step advances after completing each line
+   */
+  test.describe('v0.4.22: Workflow-guided suggestions', () => {
+    test('shows star marker for priority postes at step 0', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+
+      // At step 0, workflow expects "Presse offset, Presse numérique"
+      // Postes in these categories should have star marker
+      await expect(dropdown).toContainText('★ Presse offset');
+    });
+
+    test('priority postes appear first in dropdown', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+
+      // Get all suggestion items
+      const items = dropdown.locator('div[class*="cursor-pointer"]');
+      const firstItemText = await items.first().textContent();
+
+      // First item should be a priority poste (Presse offset or Presse numérique machine)
+      // These are G37, 754, GTO, C9500 in test data
+      expect(firstItemText).toMatch(/G37|754|GTO|C9500/);
+    });
+
+    test('non-priority postes do not have star marker', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+
+      // Massicot, Plieuse, etc. should not have star at step 0
+      // They should have plain category (no star)
+      const text = await dropdown.textContent();
+      expect(text).not.toContain('★ Massicot');
+      expect(text).not.toContain('★ Plieuse');
+    });
+
+    test('step advances after completing first line', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+
+      // Complete first line (step 0 → step 1)
+      await sequenceTextarea.fill('G37(20)');
+      await page.keyboard.press('Enter');
+
+      // Now on step 1, workflow expects "Massicot"
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+
+      // Massicot should now have star marker
+      await expect(dropdown).toContainText('★ Massicot');
+
+      // Presse offset should NOT have star anymore
+      const text = await dropdown.textContent();
+      expect(text).not.toContain('★ Presse offset');
+    });
+
+    test('workflow does not affect ST mode suggestions', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+      await sequenceTextarea.fill('ST:');
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+
+      // ST mode shows sous-traitant names, no star markers
+      const text = await dropdown.textContent();
+      expect(text).not.toContain('★');
+      expect(text).toContain('Sous-traitant');
     });
   });
 });

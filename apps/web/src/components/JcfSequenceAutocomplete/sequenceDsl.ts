@@ -201,3 +201,58 @@ export function getCurrentLineInfo(
     lineEnd,
   };
 }
+
+// ── Workflow utilities ────────────────────────────────────────────────────────
+
+/**
+ * Count completed actions (lines with closing parenthesis) before the cursor
+ * to determine the current workflow step index.
+ *
+ * @param text - Full textarea value
+ * @param cursorPos - Current cursor position
+ * @returns Number of completed steps (0-indexed step to suggest)
+ *
+ * @example
+ * // Empty text → step 0
+ * getWorkflowStepIndex('', 0) // 0
+ *
+ * // One complete line, cursor on second line → step 1
+ * getWorkflowStepIndex('G37(20)\nSta', 11) // 1
+ *
+ * // Two complete lines → step 2
+ * getWorkflowStepIndex('G37(20)\nStahl(30)\n', 18) // 2
+ */
+export function getWorkflowStepIndex(text: string, cursorPos: number): number {
+  const beforeCursor = text.substring(0, cursorPos);
+  const lines = beforeCursor.split('\n');
+  // Count lines that have a closing paren (completed actions)
+  return lines.filter((line) => line.includes(')')).length;
+}
+
+/**
+ * Get expected categories for the current workflow step.
+ * Supports comma-separated multi-category per step.
+ *
+ * @param sequenceWorkflow - Workflow array (e.g., ['Presse offset, Presse numérique', 'Massicot'])
+ * @param stepIndex - Current step index (from getWorkflowStepIndex)
+ * @returns Array of expected category names, or empty array if no workflow or step exhausted
+ *
+ * @example
+ * getExpectedCategories(['Presse offset'], 0) // ['Presse offset']
+ * getExpectedCategories(['Presse offset, Presse numérique'], 0) // ['Presse offset', 'Presse numérique']
+ * getExpectedCategories(['Presse offset'], 1) // [] (beyond workflow length)
+ * getExpectedCategories([], 0) // [] (no workflow)
+ */
+export function getExpectedCategories(
+  sequenceWorkflow: string[],
+  stepIndex: number,
+): string[] {
+  if (
+    sequenceWorkflow.length === 0 ||
+    stepIndex < 0 ||
+    stepIndex >= sequenceWorkflow.length
+  ) {
+    return [];
+  }
+  return sequenceWorkflow[stepIndex].split(',').map((c) => c.trim());
+}

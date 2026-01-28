@@ -57,11 +57,18 @@ export interface JcfElementsTableProps {
   elements: JcfElement[];
   /** Callback when elements change */
   onElementsChange: (elements: JcfElement[]) => void;
+  /**
+   * Workflow-guided suggestion ordering for sequence autocomplete.
+   * Array of expected production step categories in order.
+   * @see JcfSequenceAutocompleteProps.sequenceWorkflow
+   */
+  sequenceWorkflow?: string[];
 }
 
 export function JcfElementsTable({
   elements,
   onElementsChange,
+  sequenceWorkflow,
 }: JcfElementsTableProps) {
   const [editingElementIndex, setEditingElementIndex] = useState<number | null>(
     null,
@@ -437,6 +444,7 @@ export function JcfElementsTable({
                       soustraitantPresets={SOUSTRAITANT_PRESETS}
                       sessionSoustraitants={sessionLearning.soustraitants}
                       onLearnSoustraitant={sessionLearning.learnSoustraitant}
+                      sequenceWorkflow={sequenceWorkflow}
                       inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[11px]`}
                       onTabOut={(e, direction) => {
                         const lastRow = rows.length - 1;
