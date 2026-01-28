@@ -1432,33 +1432,33 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Poses extraction (supports `50x70(8)` and `50x70(8p)` variants)
 - [x] Validation regex: `/^[1-9]\d*x[1-9]\d*\([1-9]\d*\)$/i`
 
-#### v0.4.19 - JCF: Precedences Autocomplete
-- [ ] Element name reference selection (autocomplete with other element names)
-- [ ] Multi-value support (element can depend on multiple predecessors)
-- [ ] Visual dependency indicator
-- [ ] Circular dependency prevention
+#### v0.4.19 - JCF: Precedences Autocomplete ✅
+- [x] Element name reference selection (autocomplete with other element names)
+- [x] Multi-value support (element can depend on multiple predecessors)
+- [x] Visual dependency indicator
+- [x] Circular dependency prevention
 
 ### Phase 4H: Sequence Autocomplete (most complex field — 3 releases)
 
 > **Sequential:** v0.4.20 → v0.4.21 → v0.4.22 (each builds on previous).
 
-#### v0.4.20 - JCF: Sequence — Multi-line Editor & Poste Mode
+#### v0.4.20 - JCF: Sequence — Multi-line Editor & Poste Mode ✅
 > **Spec source:** §5.1–5.2 (Sequence State Machine — Poste mode)
 
-- [ ] Multi-line text editor within table cell
-- [ ] Poste mode: suggest poste names from presets (G37, 754, GTO, Stahl, etc.)
-- [ ] Duration input: `PosteName(duration)` or `PosteName(setup+run)` format
-- [ ] Poste validation regex: `/^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/`
-- [ ] Per-line parsing and validation
+- [x] Multi-line text editor within table cell
+- [x] Poste mode: suggest poste names from presets (G37, 754, GTO, Stahl, etc.)
+- [x] Duration input: `PosteName(duration)` or `PosteName(setup+run)` format
+- [x] Poste validation regex: `/^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/`
+- [x] Per-line parsing and validation
 
-#### v0.4.21 - JCF: Sequence — ST (Sous-Traitant) Mode
+#### v0.4.21 - JCF: Sequence — ST (Sous-Traitant) Mode ✅
 > **Spec source:** §5.3 (Sequence State Machine — ST mode)
 
-- [ ] `ST:` prefix detection → switch to ST mode
-- [ ] ST name suggestions (MCA, F37, LGI, AVN, JF)
-- [ ] Duration formats: Nj (days), Nh (hours), N (plain)
-- [ ] Full format: `ST:Name(duration):description`
-- [ ] ST validation regex: `/^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/`
+- [x] `ST:` prefix detection → switch to ST mode
+- [x] ST name suggestions (MCA, F37, LGI, AVN, JF)
+- [x] Duration formats: Nj (days), Nh (hours), N (plain)
+- [x] Full format: `ST:Name(duration):description`
+- [x] ST validation regex: `/^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/`
 
 #### v0.4.22 - JCF: Sequence — Workflow-Guided Suggestions ✅
 > **Spec source:** §6 (Workflow-Guided Suggestions)
