@@ -271,6 +271,90 @@ describe('JcfElementsTable', () => {
     });
   });
 
+  describe('cascading precedences on rename', () => {
+    it('updates precedences referencing old name when element is renamed', () => {
+      const elements: JcfElement[] = [
+        { ...DEFAULT_ELEMENT, name: 'ELEM1', precedences: '' },
+        { ...DEFAULT_ELEMENT, name: 'ELEM2', precedences: 'ELEM1' },
+        { ...DEFAULT_ELEMENT, name: 'ELEM3', precedences: 'ELEM1,ELEM2' },
+      ];
+      const { onElementsChange } = renderTable({ elements });
+      // Rename ELEM1 → COUV
+      fireEvent.click(screen.getByTestId('jcf-element-name-0'));
+      const input = screen.getByTestId('jcf-element-name-input-0');
+      fireEvent.change(input, { target: { value: 'COUV' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(onElementsChange).toHaveBeenCalledWith([
+        expect.objectContaining({ name: 'COUV', precedences: '' }),
+        expect.objectContaining({ name: 'ELEM2', precedences: 'COUV' }),
+        expect.objectContaining({ name: 'ELEM3', precedences: 'COUV,ELEM2' }),
+      ]);
+    });
+
+    it('does not alter precedences with no matching old name', () => {
+      const elements: JcfElement[] = [
+        { ...DEFAULT_ELEMENT, name: 'ELEM1', precedences: '' },
+        { ...DEFAULT_ELEMENT, name: 'ELEM2', precedences: 'ELEM3' },
+        { ...DEFAULT_ELEMENT, name: 'ELEM3', precedences: '' },
+      ];
+      const { onElementsChange } = renderTable({ elements });
+      // Rename ELEM1 → COUV — ELEM2's precedences reference ELEM3, not ELEM1
+      fireEvent.click(screen.getByTestId('jcf-element-name-0'));
+      const input = screen.getByTestId('jcf-element-name-input-0');
+      fireEvent.change(input, { target: { value: 'COUV' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(onElementsChange).toHaveBeenCalledWith([
+        expect.objectContaining({ name: 'COUV' }),
+        expect.objectContaining({ precedences: 'ELEM3' }),
+        expect.objectContaining({ name: 'ELEM3' }),
+      ]);
+    });
+  });
+
+  describe('cascading precedences on remove', () => {
+    it('removes element name from other elements precedences', () => {
+      const elements: JcfElement[] = [
+        { ...DEFAULT_ELEMENT, name: 'ELEM1', precedences: '' },
+        { ...DEFAULT_ELEMENT, name: 'ELEM2', precedences: 'ELEM1' },
+        { ...DEFAULT_ELEMENT, name: 'ELEM3', precedences: 'ELEM1,ELEM2' },
+      ];
+      const { onElementsChange } = renderTable({ elements });
+      // Remove ELEM1
+      fireEvent.click(screen.getByTestId('jcf-element-remove-0'));
+      expect(onElementsChange).toHaveBeenCalledWith([
+        expect.objectContaining({ name: 'ELEM2', precedences: '' }),
+        expect.objectContaining({ name: 'ELEM3', precedences: 'ELEM2' }),
+      ]);
+    });
+
+    it('handles removing element from middle of precedences list', () => {
+      const elements: JcfElement[] = [
+        { ...DEFAULT_ELEMENT, name: 'A', precedences: '' },
+        { ...DEFAULT_ELEMENT, name: 'B', precedences: '' },
+        { ...DEFAULT_ELEMENT, name: 'C', precedences: 'A,B' },
+      ];
+      const { onElementsChange } = renderTable({ elements });
+      // Remove B (index 1)
+      fireEvent.click(screen.getByTestId('jcf-element-remove-1'));
+      expect(onElementsChange).toHaveBeenCalledWith([
+        expect.objectContaining({ name: 'A', precedences: '' }),
+        expect.objectContaining({ name: 'C', precedences: 'A' }),
+      ]);
+    });
+
+    it('does not alter elements with no precedences', () => {
+      const elements: JcfElement[] = [
+        { ...DEFAULT_ELEMENT, name: 'ELEM1', precedences: '' },
+        { ...DEFAULT_ELEMENT, name: 'ELEM2', precedences: '' },
+      ];
+      const { onElementsChange } = renderTable({ elements });
+      fireEvent.click(screen.getByTestId('jcf-element-remove-0'));
+      expect(onElementsChange).toHaveBeenCalledWith([
+        expect.objectContaining({ name: 'ELEM2', precedences: '' }),
+      ]);
+    });
+  });
+
   describe('git-branch icon', () => {
     it('renders git-branch icon in precedences row', () => {
       renderTable();

@@ -10,6 +10,7 @@ import { JcfPaginationInput } from '../JcfPaginationInput';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfPapierAutocomplete } from '../JcfPapierAutocomplete';
 import { JcfImpositionAutocomplete } from '../JcfImpositionAutocomplete';
+import { JcfPrecedencesAutocomplete } from '../JcfPrecedencesAutocomplete';
 import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS } from '../../mock/reference-data';
 
 // ── Row definitions ──
@@ -68,6 +69,12 @@ export function JcfElementsTable({
 
   const sessionLearning = useSessionLearning();
 
+  // Element names for precedences autocomplete
+  const elementNames = useMemo(
+    () => elements.map((el) => el.name),
+    [elements],
+  );
+
   const rows = useMemo(() => [...baseRows, sequenceRow], []);
 
   // Grid style: 100px label column + 288px per element
@@ -101,9 +108,19 @@ export function JcfElementsTable({
       const oldName = elements[index].name;
 
       if (oldName !== newName) {
-        const updated = elements.map((el, i) =>
-          i === index ? { ...el, name: newName } : el,
-        );
+        // Rename element + cascade: update precedences referencing old name
+        const updated = elements.map((el, i) => {
+          const renamed = i === index ? { ...el, name: newName } : el;
+          // Update precedences that reference the old name
+          if (renamed.precedences) {
+            const precs = renamed.precedences.split(',').map((p) => p.trim());
+            const updatedPrecs = precs.map((p) =>
+              p === oldName ? newName : p,
+            );
+            return { ...renamed, precedences: updatedPrecs.join(',') };
+          }
+          return renamed;
+        });
         onElementsChange(updated);
       }
 
@@ -146,7 +163,20 @@ export function JcfElementsTable({
   const handleRemoveElement = useCallback(
     (index: number) => {
       if (elements.length <= 1) return;
-      const updated = elements.filter((_, i) => i !== index);
+      const removedName = elements[index].name;
+      // Remove element + cascade: remove its name from all precedences
+      const updated = elements
+        .filter((_, i) => i !== index)
+        .map((el) => {
+          if (el.precedences) {
+            const precs = el.precedences
+              .split(',')
+              .map((p) => p.trim())
+              .filter((p) => p !== removedName && p !== '');
+            return { ...el, precedences: precs.join(',') };
+          }
+          return el;
+        });
       onElementsChange(updated);
     },
     [elements, onElementsChange],
@@ -767,6 +797,68 @@ export function JcfElementsTable({
                             focusCell(elementIndex, rowIndex - 1);
                           else if (elementIndex > 0)
                             focusCell(elementIndex - 1, lastRow);
+                        }
+                      }}
+                      onArrowNav={(_e, direction) => {
+                        const rc = rows.length;
+                        const ec = elements.length;
+                        switch (direction) {
+                          case 'down':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex + 1) % rc,
+                            );
+                            break;
+                          case 'up':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex - 1 + rc) % rc,
+                            );
+                            break;
+                          case 'right':
+                            focusCell(
+                              (elementIndex + 1) % ec,
+                              rowIndex,
+                            );
+                            break;
+                          case 'left':
+                            focusCell(
+                              (elementIndex - 1 + ec) % ec,
+                              rowIndex,
+                            );
+                            break;
+                        }
+                      }}
+                    />
+                  ) : row.key === 'precedences' ? (
+                    <JcfPrecedencesAutocomplete
+                      id={getCellId(elementIndex, rowIndex)}
+                      value={value}
+                      onChange={(v) =>
+                        handleCellChange(elementIndex, 'precedences', v)
+                      }
+                      elementNames={elementNames}
+                      currentElementName={element.name}
+                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      onTabOut={(e, direction) => {
+                        const lastRow = rows.length - 1;
+                        const lastEl = elements.length - 1;
+                        if (direction === 'forward') {
+                          if (rowIndex < lastRow) {
+                            e.preventDefault();
+                            focusCell(elementIndex, rowIndex + 1);
+                          } else if (elementIndex < lastEl) {
+                            e.preventDefault();
+                            focusCell(elementIndex + 1, 0);
+                          }
+                        } else {
+                          if (rowIndex > 0) {
+                            e.preventDefault();
+                            focusCell(elementIndex, rowIndex - 1);
+                          } else if (elementIndex > 0) {
+                            e.preventDefault();
+                            focusCell(elementIndex - 1, lastRow);
+                          }
                         }
                       }}
                       onArrowNav={(_e, direction) => {
