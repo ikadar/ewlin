@@ -6,10 +6,11 @@ import type {
   SurfacagePreset,
   ProductFormat,
   PostePreset,
+  SoustraitantPreset,
 } from '@flux/types';
 
 /**
- * Session learning state — 6 learnable data types per §7.1.
+ * Session learning state — 7 learnable data types per §7.1.
  * All arrays start empty and accumulate user-entered values
  * during the current JCF modal session.
  */
@@ -20,6 +21,7 @@ export interface SessionLearningState {
   surfacages: SurfacagePreset[];
   productFormats: ProductFormat[];
   postes: PostePreset[];
+  soustraitants: SoustraitantPreset[];
 }
 
 export interface SessionLearningActions {
@@ -35,12 +37,14 @@ export interface SessionLearningActions {
   learnProductFormat: (format: ProductFormat) => void;
   /** Dedup: skip if name already exists (case-insensitive) */
   learnPoste: (poste: PostePreset) => void;
+  /** Dedup: skip if name already exists (case-insensitive) */
+  learnSoustraitant: (st: SoustraitantPreset) => void;
 }
 
 /**
  * Session learning hook for JCF autocomplete fields.
  *
- * Manages 6 learnable data types with type-specific merge strategies
+ * Manages 7 learnable data types with type-specific merge strategies
  * (§7, Session Learning). State is React-only — cleared on page reload.
  *
  * Called in JcfElementsTable. Individual autocomplete fields receive
@@ -54,6 +58,7 @@ export function useSessionLearning(): SessionLearningState &
   const [surfacages, setSurfacages] = useState<SurfacagePreset[]>([]);
   const [productFormats, setProductFormats] = useState<ProductFormat[]>([]);
   const [postes, setPostes] = useState<PostePreset[]>([]);
+  const [soustraitants, setSoustraitants] = useState<SoustraitantPreset[]>([]);
 
   // ── Compound merge: PaperType ──────────────────────────────────────────
   // Caller provides the full PaperType (with already-merged grammages).
@@ -137,6 +142,16 @@ export function useSessionLearning(): SessionLearningState &
     });
   }, []);
 
+  // ── Simple dedup: SoustraitantPreset ───────────────────────────────────
+  const learnSoustraitant = useCallback((st: SoustraitantPreset) => {
+    setSoustraitants((prev) => {
+      if (prev.some((s) => s.name.toLowerCase() === st.name.toLowerCase())) {
+        return prev;
+      }
+      return [...prev, st];
+    });
+  }, []);
+
   return {
     papiers,
     feuilleFormats,
@@ -144,11 +159,13 @@ export function useSessionLearning(): SessionLearningState &
     surfacages,
     productFormats,
     postes,
+    soustraitants,
     learnPapier,
     learnFeuilleFormat,
     learnImpression,
     learnSurfacage,
     learnProductFormat,
     learnPoste,
+    learnSoustraitant,
   };
 }

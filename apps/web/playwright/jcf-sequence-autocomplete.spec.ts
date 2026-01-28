@@ -2,12 +2,14 @@
  * Playwright JCF Sequence Autocomplete E2E Tests
  *
  * Tests for v0.4.20: Multi-line sequence editor with poste mode.
+ * Tests for v0.4.21: ST (sous-traitant) mode.
  * Verifies poste selection, duration input, multi-line editing,
- * and keyboard navigation.
+ * keyboard navigation, and ST name/duration/description flow.
  *
  * Sequence is row index 11 (last row) in the elements table.
  *
  * @see docs/releases/v0.4.20-jcf-sequence-poste-mode.md
+ * @see docs/releases/v0.4.21-jcf-sequence-st-mode.md
  */
 
 import { test, expect } from '@playwright/test';
@@ -174,6 +176,70 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       // Non-matching should not appear
       const text = await dropdown.textContent();
       expect(text).not.toContain('Stahl');
+    });
+  });
+
+  test.describe('v0.4.21: ST mode', () => {
+    test('shows sous-traitant names after typing ST:', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+      await sequenceTextarea.fill('ST:');
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+      await expect(dropdown).toContainText('MCA');
+      await expect(dropdown).toContainText('F37');
+      await expect(dropdown).toContainText('LGI');
+    });
+
+    test('filters ST names by typed text', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+      await sequenceTextarea.fill('ST:MC');
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+      await expect(dropdown).toContainText('MCA');
+      const text = await dropdown.textContent();
+      expect(text).not.toContain('LGI');
+    });
+
+    test('shows ST duration suggestions after name selection', async ({
+      page,
+    }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+      await sequenceTextarea.fill('ST:MCA(');
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).toBeVisible();
+      await expect(dropdown).toContainText('1j)');
+      await expect(dropdown).toContainText('3j)');
+      await expect(dropdown).toContainText('5j)');
+    });
+
+    test('selecting ST duration completes structured part', async ({
+      page,
+    }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+      await sequenceTextarea.fill('ST:MCA(');
+
+      // Select first duration via Enter
+      await page.keyboard.press('Enter');
+
+      // Should contain ST:MCA(Nj):
+      const value = await sequenceTextarea.inputValue();
+      expect(value).toMatch(/^ST:MCA\(\d+j\):$/);
+    });
+
+    test('no dropdown shown during description typing', async ({ page }) => {
+      const sequenceTextarea = page.locator('#cell-0-11');
+      await sequenceTextarea.click();
+      await sequenceTextarea.fill('ST:MCA(3j):dos carré');
+
+      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+      await expect(dropdown).not.toBeVisible();
     });
   });
 });

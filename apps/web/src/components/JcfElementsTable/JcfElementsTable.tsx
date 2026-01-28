@@ -12,7 +12,7 @@ import { JcfPapierAutocomplete } from '../JcfPapierAutocomplete';
 import { JcfImpositionAutocomplete } from '../JcfImpositionAutocomplete';
 import { JcfPrecedencesAutocomplete } from '../JcfPrecedencesAutocomplete';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete';
-import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS, POSTE_PRESETS } from '../../mock/reference-data';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS, POSTE_PRESETS, SOUSTRAITANT_PRESETS } from '../../mock/reference-data';
 
 // ── Row definitions ──
 
@@ -434,6 +434,9 @@ export function JcfElementsTable({
                       postePresets={POSTE_PRESETS}
                       sessionPostes={sessionLearning.postes}
                       onLearnPoste={sessionLearning.learnPoste}
+                      soustraitantPresets={SOUSTRAITANT_PRESETS}
+                      sessionSoustraitants={sessionLearning.soustraitants}
+                      onLearnSoustraitant={sessionLearning.learnSoustraitant}
                       inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[11px]`}
                       onTabOut={(e, direction) => {
                         const lastRow = rows.length - 1;

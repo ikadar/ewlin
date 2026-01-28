@@ -12,8 +12,9 @@ import {
   parseLine,
   getCurrentLineInfo,
   DEFAULT_DURATIONS,
+  DEFAULT_ST_DURATIONS,
 } from './sequenceDsl';
-import type { PostePreset } from '@flux/types';
+import type { PostePreset, SoustraitantPreset } from '@flux/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,12 @@ export interface JcfSequenceAutocompleteProps {
   sessionPostes?: PostePreset[];
   /** Callback to learn a new poste */
   onLearnPoste?: (poste: PostePreset) => void;
+  /** Sous-traitant presets from reference data */
+  soustraitantPresets?: SoustraitantPreset[];
+  /** Session-learned sous-traitants */
+  sessionSoustraitants?: SoustraitantPreset[];
+  /** Callback to learn a new sous-traitant */
+  onLearnSoustraitant?: (st: SoustraitantPreset) => void;
   /** HTML id for the textarea */
   id?: string;
   /** Additional CSS class */
@@ -60,6 +67,9 @@ export function JcfSequenceAutocomplete({
   postePresets,
   sessionPostes = [],
   onLearnPoste,
+  soustraitantPresets = [],
+  sessionSoustraitants = [],
+  onLearnSoustraitant,
   id,
   className,
   inputClassName,
@@ -87,6 +97,18 @@ export function JcfSequenceAutocomplete({
       return true;
     });
   }, [postePresets, sessionPostes]);
+
+  // Merge presets with session-learned sous-traitants (dedup by name)
+  const allSoustraitants = useMemo(() => {
+    const combined = [...sessionSoustraitants, ...soustraitantPresets];
+    const seen = new Set<string>();
+    return combined.filter((s) => {
+      const key = s.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [soustraitantPresets, sessionSoustraitants]);
 
   // ── Cursor position calculation ────────────────────────────────────────
 
@@ -167,8 +189,8 @@ export function JcfSequenceAutocomplete({
     const parsed = parseLine(partialLine);
     const suggestions: Suggestion[] = [];
 
-    // No suggestions for complete lines or if line already has `(`
-    if (parsed.step === 'complete') {
+    // No suggestions for complete lines, st-description (free text), or already done
+    if (parsed.step === 'complete' || parsed.step === 'st-description') {
       return { filtered: [], searchText: '' };
     }
 
@@ -229,27 +251,37 @@ export function JcfSequenceAutocomplete({
       }
 
       case 'st-name': {
-        // For v0.4.20, just show "ST:" was inserted — full ST mode in v0.4.21
+        // Show filtered sous-traitant names
+        const matchingSt = allSoustraitants.filter((s) =>
+          s.name.toLowerCase().includes(parsed.search.toLowerCase()),
+        );
+        matchingSt.forEach((s) => {
+          suggestions.push({
+            label: s.name,
+            value: `ST:${s.name}(`,
+            description: 'Sous-traitant',
+          });
+        });
         break;
       }
 
       case 'st-duration': {
-        // For v0.4.20, basic duration suggestions for ST
-        DEFAULT_DURATIONS.filter((d) => d.includes(parsed.search)).forEach(
-          (d) => {
-            suggestions.push({
-              label: `${d})`,
-              value: `${parsed.prefix}${d}):`,
-              description: 'Durée',
-            });
-          },
-        );
+        // Show ST duration suggestions (day-based: 1j, 2j, etc.)
+        DEFAULT_ST_DURATIONS.filter((d) =>
+          d.includes(parsed.search),
+        ).forEach((d) => {
+          suggestions.push({
+            label: `${d})`,
+            value: `${parsed.prefix}${d}):`,
+            description: 'Durée ST',
+          });
+        });
         break;
       }
     }
 
     return { filtered: suggestions, searchText: parsed.search };
-  }, [value, cursorPosition, allPostes]);
+  }, [value, cursorPosition, allPostes, allSoustraitants]);
 
   // Lazy load suggestions
   const { displayedItems, handleScroll, hasMore, resetDisplayCount } =
@@ -316,24 +348,32 @@ export function JcfSequenceAutocomplete({
       } else {
         setIsOpen(false);
 
-        // Learn poste if a complete poste line was created
-        if (onLearnPoste && suggestion.value.includes(')')) {
-          const match = suggestion.value.match(
-            /^([A-Za-z0-9_]+)\(/,
+        // Learn poste or ST name when a line is completed via selection
+        if (suggestion.value.includes(')')) {
+          const stMatch = suggestion.value.match(
+            /^ST:([A-Za-z0-9_]+)\(/i,
           );
-          if (match) {
-            const posteName = match[1];
-            const existing = allPostes.find(
-              (p) => p.name.toLowerCase() === posteName.toLowerCase(),
+          if (stMatch && onLearnSoustraitant) {
+            onLearnSoustraitant({ name: stMatch[1] });
+          } else if (onLearnPoste) {
+            const posteMatch = suggestion.value.match(
+              /^([A-Za-z0-9_]+)\(/,
             );
-            if (existing) {
-              onLearnPoste(existing);
+            if (posteMatch) {
+              const posteName = posteMatch[1];
+              const existing = allPostes.find(
+                (p) =>
+                  p.name.toLowerCase() === posteName.toLowerCase(),
+              );
+              if (existing) {
+                onLearnPoste(existing);
+              }
             }
           }
         }
       }
     },
-    [value, cursorPosition, onChange, onLearnPoste, allPostes, resetHighlight],
+    [value, cursorPosition, onChange, onLearnPoste, onLearnSoustraitant, allPostes, resetHighlight],
   );
 
   // ── Event handlers ─────────────────────────────────────────────────────
