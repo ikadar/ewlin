@@ -1474,14 +1474,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 > **Sequential:** v0.4.23 → v0.4.24 → v0.4.25 (each validation level builds on previous).
 
-#### v0.4.23 - JCF: Live Format Validation (Level 1)
+#### v0.4.23 - JCF: Live Format Validation (Level 1) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 1)
 
-- [ ] Per-field regex validation during typing
-- [ ] Red background + ErrorTooltip on invalid format
-- [ ] Lenient for incomplete input (no error while still typing)
-- [ ] Smart sequence validation: lines without closing `)` are not flagged
-- [ ] Validation rules per field type (papier `:`, impression `/`, surfacage `/`, imposition regex, format regex, pagination rule)
+- [x] Per-field regex validation during typing
+- [x] Red background + ErrorTooltip on invalid format
+- [x] Lenient for incomplete input (no error while still typing)
+- [x] Smart sequence validation: lines without closing `)` are not flagged
+- [x] Validation rules per field type (papier `:`, impression `/`, surfacage `/`, imposition regex, format regex, pagination rule)
 
 #### v0.4.24 - JCF: Required Indicators & Calculated Fields (Level 2)
 > **Spec source:** §2.2 (Required Field Logic), §3 (Calculated Fields)
