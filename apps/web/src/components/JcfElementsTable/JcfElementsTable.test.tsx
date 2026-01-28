@@ -89,10 +89,11 @@ describe('JcfElementsTable', () => {
       expect(el.tagName).toBe('TEXTAREA');
     });
 
-    it('renders sequence as textarea', () => {
+    it('renders sequence as autocomplete textarea', () => {
       renderTable();
-      const el = screen.getByTestId('jcf-input-0-sequence');
-      expect(el.tagName).toBe('TEXTAREA');
+      const cell = screen.getByTestId('jcf-cell-0-sequence');
+      const textarea = cell.querySelector('textarea');
+      expect(textarea).toBeInTheDocument();
     });
 
     it('renders standard fields as input', () => {
