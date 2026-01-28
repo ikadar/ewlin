@@ -1433,11 +1433,11 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Poses extraction (supports `50x70(8)` and `50x70(8p)` variants)
 - [x] Validation regex: `/^[1-9]\d*x[1-9]\d*\([1-9]\d*\)$/i`
 
-#### v0.4.19 - JCF: Precedences Autocomplete
-- [ ] Element name reference selection (autocomplete with other element names)
-- [ ] Multi-value support (element can depend on multiple predecessors)
-- [ ] Visual dependency indicator
-- [ ] Circular dependency prevention
+#### v0.4.19 - JCF: Precedences Autocomplete ✅
+- [x] Element name reference selection (autocomplete with other element names)
+- [x] Multi-value support (element can depend on multiple predecessors)
+- [x] Self-reference prevention and already-selected exclusion
+- [x] Cascading update on element rename/remove
 
 ### Phase 4H: Sequence Autocomplete (most complex field — 3 releases)
 
