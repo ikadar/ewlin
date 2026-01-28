@@ -5,6 +5,8 @@ import {
   isValidSequenceLine,
   isSequenceLineInvalid,
   getCurrentLineInfo,
+  getWorkflowStepIndex,
+  getExpectedCategories,
   DEFAULT_DURATIONS,
   DEFAULT_ST_DURATIONS,
 } from './sequenceDsl';
@@ -307,5 +309,109 @@ describe('DEFAULT_ST_DURATIONS', () => {
     DEFAULT_ST_DURATIONS.forEach((d) => {
       expect(d).toMatch(/^\d+j$/);
     });
+  });
+});
+
+describe('getWorkflowStepIndex', () => {
+  it('returns 0 for empty text', () => {
+    expect(getWorkflowStepIndex('', 0)).toBe(0);
+  });
+
+  it('returns 0 for incomplete first line', () => {
+    expect(getWorkflowStepIndex('G37(', 4)).toBe(0);
+  });
+
+  it('returns 1 after one complete line', () => {
+    expect(getWorkflowStepIndex('G37(20)\n', 8)).toBe(1);
+  });
+
+  it('returns 1 when cursor is on second line after one complete', () => {
+    expect(getWorkflowStepIndex('G37(20)\nSta', 11)).toBe(1);
+  });
+
+  it('returns 2 after two complete lines', () => {
+    expect(getWorkflowStepIndex('G37(20)\nStahl(35)\n', 18)).toBe(2);
+  });
+
+  it('returns 2 when cursor is on third line', () => {
+    expect(getWorkflowStepIndex('G37(20)\nStahl(35)\nH', 19)).toBe(2);
+  });
+
+  it('counts only lines with closing paren', () => {
+    // First line complete, second line incomplete, cursor on second
+    expect(getWorkflowStepIndex('G37(20)\nStahl(', 14)).toBe(1);
+  });
+
+  it('counts ST lines as complete', () => {
+    expect(getWorkflowStepIndex('ST:MCA(3j):desc\n', 16)).toBe(1);
+  });
+
+  it('returns 0 for cursor at very start', () => {
+    expect(getWorkflowStepIndex('G37(20)\nStahl(35)', 0)).toBe(0);
+  });
+
+  it('counts lines before cursor only', () => {
+    // Cursor is at position 4 (middle of first line), even though full text has complete line
+    expect(getWorkflowStepIndex('G37(20)\nStahl(35)', 4)).toBe(0);
+  });
+});
+
+describe('getExpectedCategories', () => {
+  it('returns empty array for empty workflow', () => {
+    expect(getExpectedCategories([], 0)).toEqual([]);
+  });
+
+  it('returns single category for step 0', () => {
+    const workflow = ['Presse offset'];
+    expect(getExpectedCategories(workflow, 0)).toEqual(['Presse offset']);
+  });
+
+  it('returns correct category for step 1', () => {
+    const workflow = ['Presse offset', 'Massicot'];
+    expect(getExpectedCategories(workflow, 1)).toEqual(['Massicot']);
+  });
+
+  it('returns empty array when step exceeds workflow length', () => {
+    const workflow = ['Presse offset'];
+    expect(getExpectedCategories(workflow, 1)).toEqual([]);
+  });
+
+  it('returns empty array for negative step', () => {
+    const workflow = ['Presse offset'];
+    expect(getExpectedCategories(workflow, -1)).toEqual([]);
+  });
+
+  it('splits comma-separated categories', () => {
+    const workflow = ['Presse offset, Presse numérique'];
+    expect(getExpectedCategories(workflow, 0)).toEqual([
+      'Presse offset',
+      'Presse numérique',
+    ]);
+  });
+
+  it('trims whitespace from comma-separated categories', () => {
+    const workflow = ['Presse offset  ,  Presse numérique'];
+    expect(getExpectedCategories(workflow, 0)).toEqual([
+      'Presse offset',
+      'Presse numérique',
+    ]);
+  });
+
+  it('handles multi-step workflow with mixed categories', () => {
+    const workflow = [
+      'Presse offset, Presse numérique',
+      'Massicot',
+      'Plieuse, Conditionnement',
+    ];
+    expect(getExpectedCategories(workflow, 0)).toEqual([
+      'Presse offset',
+      'Presse numérique',
+    ]);
+    expect(getExpectedCategories(workflow, 1)).toEqual(['Massicot']);
+    expect(getExpectedCategories(workflow, 2)).toEqual([
+      'Plieuse',
+      'Conditionnement',
+    ]);
+    expect(getExpectedCategories(workflow, 3)).toEqual([]);
   });
 });

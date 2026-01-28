@@ -12,6 +12,8 @@ import { JcfPapierAutocomplete } from '../JcfPapierAutocomplete';
 import { JcfImpositionAutocomplete } from '../JcfImpositionAutocomplete';
 import { JcfPrecedencesAutocomplete } from '../JcfPrecedencesAutocomplete';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete';
+import { JcfErrorTooltip } from '../JcfErrorTooltip';
+import { validateAllElements, getCellError } from './validation';
 import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS, POSTE_PRESETS, SOUSTRAITANT_PRESETS } from '../../mock/reference-data';
 
 // ── Row definitions ──
@@ -57,11 +59,18 @@ export interface JcfElementsTableProps {
   elements: JcfElement[];
   /** Callback when elements change */
   onElementsChange: (elements: JcfElement[]) => void;
+  /**
+   * Workflow-guided suggestion ordering for sequence autocomplete.
+   * Array of expected production step categories in order.
+   * @see JcfSequenceAutocompleteProps.sequenceWorkflow
+   */
+  sequenceWorkflow?: string[];
 }
 
 export function JcfElementsTable({
   elements,
   onElementsChange,
+  sequenceWorkflow,
 }: JcfElementsTableProps) {
   const [editingElementIndex, setEditingElementIndex] = useState<number | null>(
     null,
@@ -77,6 +86,12 @@ export function JcfElementsTable({
   );
 
   const rows = useMemo(() => [...baseRows, sequenceRow], []);
+
+  // Validation errors map
+  const validationErrors = useMemo(
+    () => validateAllElements(elements),
+    [elements],
+  );
 
   // Grid style: 100px label column + 288px per element
   const gridStyle = useMemo(
@@ -417,13 +432,27 @@ export function JcfElementsTable({
               const isLastElement = elementIndex === elements.length - 1;
               const isNumeric = numericFields.includes(row.key);
               const isTextarea = textareaFields.includes(row.key);
+              const cellError = getCellError(
+                validationErrors,
+                elementIndex,
+                row.key,
+              );
+              const hasError = !!cellError;
 
               return (
                 <div
                   key={`${elementIndex}-${row.key}`}
-                  className={`px-[5px] py-[3px] ${!isLastElement ? 'border-r border-zinc-800/50' : ''}`}
+                  className={`px-[5px] py-[3px] relative ${!isLastElement ? 'border-r border-zinc-800/50' : ''} ${hasError ? 'bg-red-900/20 transition-colors duration-500' : ''}`}
                   data-testid={`jcf-cell-${elementIndex}-${row.key}`}
                 >
+                  {/* Error tooltip */}
+                  {cellError && (
+                    <JcfErrorTooltip
+                      message={cellError.message}
+                      visible={hasError}
+                      inputId={getCellId(elementIndex, rowIndex)}
+                    />
+                  )}
                   {row.key === 'sequence' ? (
                     <JcfSequenceAutocomplete
                       id={getCellId(elementIndex, rowIndex)}
@@ -437,6 +466,7 @@ export function JcfElementsTable({
                       soustraitantPresets={SOUSTRAITANT_PRESETS}
                       sessionSoustraitants={sessionLearning.soustraitants}
                       onLearnSoustraitant={sessionLearning.learnSoustraitant}
+                      sequenceWorkflow={sequenceWorkflow}
                       inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[11px]`}
                       onTabOut={(e, direction) => {
                         const lastRow = rows.length - 1;

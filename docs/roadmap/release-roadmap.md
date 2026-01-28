@@ -1461,14 +1461,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Full format: `ST:Name(duration):description`
 - [x] ST validation regex: `/^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/`
 
-#### v0.4.22 - JCF: Sequence — Workflow-Guided Suggestions
+#### v0.4.22 - JCF: Sequence — Workflow-Guided Suggestions ✅
 > **Spec source:** §6 (Workflow-Guided Suggestions)
 
-- [ ] `sequenceWorkflow` array: ordered list of poste categories
+- [x] `sequenceWorkflow` array: ordered list of poste categories
   - Example: `["Presse offset", "Massicot", "Conditionnement"]`
-- [ ] "Next step" suggestion based on current position in workflow
-- [ ] Category-based filtering of poste suggestions
-- [ ] Visual indication of expected workflow progression
+- [x] "Next step" suggestion based on current position in workflow
+- [x] Category-based filtering of poste suggestions
+- [x] Visual indication of expected workflow progression (★ marker)
 
 ### Phase 4I: Validation & Calculated Fields
 
