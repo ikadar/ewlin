@@ -9,7 +9,8 @@ import { JcfQuantiteInput } from '../JcfQuantiteInput';
 import { JcfPaginationInput } from '../JcfPaginationInput';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfPapierAutocomplete } from '../JcfPapierAutocomplete';
-import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES } from '../../mock/reference-data';
+import { JcfImpositionAutocomplete } from '../JcfImpositionAutocomplete';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS } from '../../mock/reference-data';
 
 // ── Row definitions ──
 
@@ -695,6 +696,63 @@ export function JcfElementsTable({
                       paperTypes={PAPER_TYPES}
                       sessionPaperTypes={sessionLearning.papiers}
                       onLearnPaperType={sessionLearning.learnPapier}
+                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      onTabOut={(_e, direction) => {
+                        const lastRow = rows.length - 1;
+                        const lastEl = elements.length - 1;
+                        if (direction === 'forward') {
+                          if (rowIndex < lastRow)
+                            focusCell(elementIndex, rowIndex + 1);
+                          else if (elementIndex < lastEl)
+                            focusCell(elementIndex + 1, 0);
+                        } else {
+                          if (rowIndex > 0)
+                            focusCell(elementIndex, rowIndex - 1);
+                          else if (elementIndex > 0)
+                            focusCell(elementIndex - 1, lastRow);
+                        }
+                      }}
+                      onArrowNav={(_e, direction) => {
+                        const rc = rows.length;
+                        const ec = elements.length;
+                        switch (direction) {
+                          case 'down':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex + 1) % rc,
+                            );
+                            break;
+                          case 'up':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex - 1 + rc) % rc,
+                            );
+                            break;
+                          case 'right':
+                            focusCell(
+                              (elementIndex + 1) % ec,
+                              rowIndex,
+                            );
+                            break;
+                          case 'left':
+                            focusCell(
+                              (elementIndex - 1 + ec) % ec,
+                              rowIndex,
+                            );
+                            break;
+                        }
+                      }}
+                    />
+                  ) : row.key === 'imposition' ? (
+                    <JcfImpositionAutocomplete
+                      id={getCellId(elementIndex, rowIndex)}
+                      value={value}
+                      onChange={(v) =>
+                        handleCellChange(elementIndex, 'imposition', v)
+                      }
+                      feuilleFormats={FEUILLE_FORMATS}
+                      sessionFormats={sessionLearning.feuilleFormats}
+                      onLearnFormat={sessionLearning.learnFeuilleFormat}
                       inputClassName={`${inputFilledClass} text-[11px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
