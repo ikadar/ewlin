@@ -1550,6 +1550,7 @@ function AppContent() {
             elements={jcfElements}
             onElementsChange={setJcfElements}
             sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : undefined}
+            jobQuantity={jcfQuantity}
           />
         </div>
       </JcfModal>

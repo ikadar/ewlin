@@ -157,6 +157,10 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
     // ASSERT: Get the scheduled time
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
     const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
+
+    // Wait for tile to appear after placement
+    await expect(newTile).toBeVisible({ timeout: 5000 });
+
     const scheduledStart = await newTile.getAttribute('data-scheduled-start');
 
     expect(scheduledStart).toBeTruthy();
