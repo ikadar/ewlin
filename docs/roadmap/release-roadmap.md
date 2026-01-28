@@ -1452,14 +1452,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Poste validation regex: `/^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/`
 - [x] Per-line parsing and validation
 
-#### v0.4.21 - JCF: Sequence — ST (Sous-Traitant) Mode
+#### v0.4.21 - JCF: Sequence — ST (Sous-Traitant) Mode ✅
 > **Spec source:** §5.3 (Sequence State Machine — ST mode)
 
-- [ ] `ST:` prefix detection → switch to ST mode
-- [ ] ST name suggestions (MCA, F37, LGI, AVN, JF)
-- [ ] Duration formats: Nj (days), Nh (hours), N (plain)
-- [ ] Full format: `ST:Name(duration):description`
-- [ ] ST validation regex: `/^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/`
+- [x] `ST:` prefix detection → switch to ST mode
+- [x] ST name suggestions (MCA, F37, LGI, AVN, JF)
+- [x] Duration formats: Nj (days), Nh (hours), N (plain)
+- [x] Full format: `ST:Name(duration):description`
+- [x] ST validation regex: `/^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/`
 
 #### v0.4.22 - JCF: Sequence — Workflow-Guided Suggestions
 > **Spec source:** §6 (Workflow-Guided Suggestions)
