@@ -117,7 +117,7 @@ export function JcfErrorTooltip({
       {/* Error badge with "!" */}
       <span
         ref={badgeRef}
-        className="absolute -top-1 right-0.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center z-20 cursor-help transition-all duration-200 hover:scale-110 hover:bg-red-400"
+        className="absolute -top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center z-20 cursor-help transition-all duration-200 hover:scale-110 hover:bg-red-400"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         aria-hidden="true"
@@ -143,7 +143,7 @@ export function JcfErrorTooltip({
             <div className="flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
               <div
-                className="text-sm text-zinc-200 leading-relaxed [&_strong]:text-zinc-100 [&_strong]:font-semibold [&_code]:bg-zinc-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-zinc-300 [&_code]:font-mono [&_code]:text-xs"
+                className="text-xs text-zinc-200 leading-relaxed [&_strong]:text-zinc-100 [&_strong]:font-semibold [&_code]:bg-zinc-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-zinc-300 [&_code]:font-mono [&_code]:text-[10px]"
                 dangerouslySetInnerHTML={{ __html: message }}
               />
             </div>

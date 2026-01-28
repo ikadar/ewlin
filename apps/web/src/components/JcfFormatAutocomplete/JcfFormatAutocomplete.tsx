@@ -138,6 +138,7 @@ export function JcfFormatAutocomplete({
       id={id}
       className={className}
       inputClassName={inputClassName}
+      placeholder="ex: A4, A4f, A3/A6"
       onFocus={handleFocus}
       onBlur={handleBlur}
       onTabOut={onTabOut}

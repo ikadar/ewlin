@@ -13,7 +13,6 @@ import {
   getCurrentLineInfo,
   getWorkflowStepIndex,
   getExpectedCategories,
-  DEFAULT_DURATIONS,
   DEFAULT_ST_DURATIONS,
 } from './sequenceDsl';
 import type { PostePreset, SoustraitantPreset } from '@flux/types';
@@ -66,6 +65,8 @@ export interface JcfSequenceAutocompleteProps {
     e: React.KeyboardEvent,
     direction: 'up' | 'down' | 'left' | 'right',
   ) => void;
+  /** Callback when field loses focus (for touched state tracking) */
+  onBlur?: () => void;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ export function JcfSequenceAutocomplete({
   inputClassName,
   onTabOut,
   onArrowNav,
+  onBlur: onBlurProp,
 }: JcfSequenceAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -256,20 +258,6 @@ export function JcfSequenceAutocomplete({
         break;
       }
 
-      case 'poste-duration': {
-        // Show duration suggestions filtered by search
-        DEFAULT_DURATIONS.filter((d) => d.includes(parsed.search)).forEach(
-          (d) => {
-            suggestions.push({
-              label: `${d})`,
-              value: `${parsed.prefix}${d})`,
-              description: 'Durée',
-            });
-          },
-        );
-        break;
-      }
-
       case 'st-prefix': {
         suggestions.push({
           label: 'ST:',
@@ -438,8 +426,12 @@ export function JcfSequenceAutocomplete({
         return;
       }
       setTimeout(() => setIsOpen(false), 150);
+      // Notify parent for touched state tracking
+      if (onBlurProp) {
+        onBlurProp();
+      }
     },
-    [],
+    [onBlurProp],
   );
 
   const handleKeyDown = useCallback(
@@ -537,7 +529,7 @@ export function JcfSequenceAutocomplete({
         onClick={handleCursorUpdate}
         className={inputClassName ?? defaultInputClass}
         rows={4}
-        placeholder={`G37(20+40)\nStahl(35)\nST:MCA(3j):dos carré collé`}
+        placeholder={`Komori(20+40)\nST:Reliure_Martin(3j):dos carré collé`}
         data-testid={
           id ? `jcf-field-${id.replace('jcf-', '')}` : undefined
         }

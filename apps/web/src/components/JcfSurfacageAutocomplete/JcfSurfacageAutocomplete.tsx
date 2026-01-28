@@ -126,6 +126,7 @@ export function JcfSurfacageAutocomplete({
       id={id}
       className={className}
       inputClassName={inputClassName}
+      placeholder="ex: mat/mat"
       onFocus={handleFocus}
       onBlur={handleBlur}
       onTabOut={onTabOut}

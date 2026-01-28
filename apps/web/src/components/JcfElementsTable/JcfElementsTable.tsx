@@ -100,6 +100,23 @@ export function JcfElementsTable({
     },
   );
 
+  // Track blurred fields for strict validation (sequence field)
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+
+  // Mark a field as touched when user blurs it
+  const markFieldTouched = useCallback(
+    (elementIndex: number, field: string) => {
+      const key = `${elementIndex}-${field}`;
+      setTouchedFields((prev) => {
+        if (prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    },
+    [],
+  );
+
   const sessionLearning = useSessionLearning();
 
   // Element names for precedences autocomplete
@@ -112,8 +129,8 @@ export function JcfElementsTable({
 
   // Validation errors map
   const validationErrors = useMemo(
-    () => validateAllElements(elements),
-    [elements],
+    () => validateAllElements(elements, touchedFields),
+    [elements, touchedFields],
   );
 
   // Required fields map (Level 2 indicators)
@@ -440,7 +457,7 @@ export function JcfElementsTable({
                   onBlur={() => handleSaveName(index)}
                   autoFocus
                   onFocus={(e) => e.target.select()}
-                  className="text-[11px] text-zinc-100 font-medium bg-transparent border border-zinc-600 rounded-[3px] px-[3px] flex-1 min-w-0 focus:border-blue-500 focus:outline-none"
+                  className="text-[13px] text-zinc-100 font-medium bg-transparent border border-zinc-600 rounded-[3px] px-[3px] flex-1 min-w-0 focus:border-blue-500 focus:outline-none"
                   data-testid={`jcf-element-name-input-${index}`}
                 />
               ) : (
@@ -449,7 +466,7 @@ export function JcfElementsTable({
                   onClick={() => handleStartEditing(index)}
                   data-testid={`jcf-element-name-${index}`}
                 >
-                  <span className="text-[11px] text-zinc-400 font-medium hover:text-zinc-300 transition-colors">
+                  <span className="text-[13px] text-zinc-400 font-medium hover:text-zinc-300 transition-colors">
                     {element.name}
                   </span>
                 </div>
@@ -544,7 +561,7 @@ export function JcfElementsTable({
                   )}
                   {/* Required indicator (Level 2) - amber dot */}
                   <span
-                    className={`absolute top-0.5 right-1 w-2 h-2 rounded-full bg-amber-500 z-20 transition-opacity duration-300 ${showRequiredIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                    className={`absolute top-0.5 right-1 w-[6px] h-[6px] rounded-full bg-amber-500 z-20 transition-opacity duration-300 ${showRequiredIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                     title="Champ requis"
                     data-testid={`required-indicator-${elementIndex}-${row.key}`}
                   />
@@ -562,7 +579,7 @@ export function JcfElementsTable({
                       sessionSoustraitants={sessionLearning.soustraitants}
                       onLearnSoustraitant={sessionLearning.learnSoustraitant}
                       sequenceWorkflow={sequenceWorkflow}
-                      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[11px]`}
+                      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[13px]`}
                       onTabOut={(e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -614,6 +631,7 @@ export function JcfElementsTable({
                             break;
                         }
                       }}
+                      onBlur={() => markFieldTouched(elementIndex, 'sequence')}
                     />
                   ) : isTextarea ? (
                     <textarea
@@ -625,7 +643,7 @@ export function JcfElementsTable({
                       onKeyDown={(e) =>
                         handleCellKeyDown(e, elementIndex, rowIndex)
                       }
-                      className={`${isEmpty ? inputEmptyClass : inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[11px]`}
+                      className={`${isEmpty ? inputEmptyClass : inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[13px]`}
                       rows={1}
                       data-testid={`jcf-input-${elementIndex}-${row.key}`}
                     />
@@ -639,7 +657,7 @@ export function JcfElementsTable({
                       formats={PRODUCT_FORMATS}
                       sessionPresets={sessionLearning.productFormats}
                       onLearnPreset={sessionLearning.learnProductFormat}
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -696,7 +714,7 @@ export function JcfElementsTable({
                       presets={IMPRESSION_PRESETS}
                       sessionPresets={sessionLearning.impressions}
                       onLearnPreset={sessionLearning.learnImpression}
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -753,7 +771,7 @@ export function JcfElementsTable({
                       presets={SURFACAGE_PRESETS}
                       sessionPresets={sessionLearning.surfacages}
                       onLearnPreset={sessionLearning.learnSurfacage}
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -807,7 +825,7 @@ export function JcfElementsTable({
                       onChange={(v) =>
                         handleCellChange(elementIndex, 'quantite', v)
                       }
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -861,7 +879,7 @@ export function JcfElementsTable({
                       onChange={(v) =>
                         handleCellChange(elementIndex, 'pagination', v)
                       }
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -918,7 +936,7 @@ export function JcfElementsTable({
                       paperTypes={PAPER_TYPES}
                       sessionPaperTypes={sessionLearning.papiers}
                       onLearnPaperType={sessionLearning.learnPapier}
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -975,7 +993,7 @@ export function JcfElementsTable({
                       feuilleFormats={FEUILLE_FORMATS}
                       sessionFormats={sessionLearning.feuilleFormats}
                       onLearnFormat={sessionLearning.learnFeuilleFormat}
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -1031,7 +1049,7 @@ export function JcfElementsTable({
                       }
                       elementNames={elementNames}
                       currentElementName={element.name}
-                      inputClassName={`${inputFilledClass} text-[11px]`}
+                      inputClassName={`${inputFilledClass} text-[13px]`}
                       onTabOut={(e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -1101,7 +1119,7 @@ export function JcfElementsTable({
                         }
                         data-testid={`auto-toggle-${elementIndex}`}
                       >
-                        <Calculator className="w-3 h-3" />
+                        <Calculator className="w-2.5 h-2.5" />
                       </button>
                       <input
                         id={getCellId(elementIndex, rowIndex)}
@@ -1113,7 +1131,7 @@ export function JcfElementsTable({
                         onKeyDown={(e) =>
                           handleCellKeyDown(e, elementIndex, rowIndex)
                         }
-                        className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-[11px] flex-1`}
+                        className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-[13px] flex-1`}
                         data-testid={`jcf-input-${elementIndex}-${row.key}`}
                       />
                     </div>
@@ -1128,7 +1146,7 @@ export function JcfElementsTable({
                       onKeyDown={(e) =>
                         handleCellKeyDown(e, elementIndex, rowIndex)
                       }
-                      className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-[11px]`}
+                      className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-[13px]`}
                       data-testid={`jcf-input-${elementIndex}-${row.key}`}
                     />
                   )}

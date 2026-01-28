@@ -126,6 +126,7 @@ export function JcfImpressionAutocomplete({
       id={id}
       className={className}
       inputClassName={inputClassName}
+      placeholder="ex: Q/Q"
       onFocus={handleFocus}
       onBlur={handleBlur}
       onTabOut={onTabOut}

@@ -349,6 +349,7 @@ export function JcfPapierAutocomplete({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         className={inputClassName ?? defaultInputClass}
+        placeholder="Papier et grammage"
         data-testid={id ? `jcf-field-${id.replace('jcf-', '')}` : undefined}
       />
 

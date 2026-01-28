@@ -347,7 +347,7 @@ export function JcfImpositionAutocomplete({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         className={inputClassName ?? defaultInputClass}
-        placeholder="ex: 50x70(8)"
+        placeholder="ex: 65x90(16)"
         data-testid={id ? `jcf-field-${id.replace('jcf-', '')}` : undefined}
       />
 

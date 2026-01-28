@@ -216,15 +216,18 @@ export function validateElementLive(
  * Validate all elements and return a map of errors by element-field key
  *
  * @param elements - Array of elements to validate
+ * @param touchedFields - Set of field keys that have been blurred (for strict sequence validation)
  * @returns Map of errors keyed by "elementIndex-field"
  */
 export function validateAllElements(
   elements: JcfElement[],
+  touchedFields: Set<string> = new Set(),
 ): Map<string, ValidationError> {
   const errorMap = new Map<string, ValidationError>();
 
   elements.forEach((element, index) => {
-    const errors = validateElementLive(element, index);
+    const sequenceTouched = touchedFields.has(`${index}-sequence`);
+    const errors = validateElementLive(element, index, sequenceTouched);
     errors.forEach((error) => {
       const key = `${error.elementIndex}-${error.field}`;
       errorMap.set(key, error);

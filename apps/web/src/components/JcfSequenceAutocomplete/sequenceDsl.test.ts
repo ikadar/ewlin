@@ -32,27 +32,20 @@ describe('parseLine', () => {
     });
   });
 
-  describe('poste-duration step', () => {
-    it('returns poste-duration after open paren', () => {
+  describe('poste with open paren (no duration suggestions)', () => {
+    it('returns complete after open paren (user types duration manually)', () => {
       const result = parseLine('G37(');
-      expect(result.step).toBe('poste-duration');
-      expect(result.prefix).toBe('G37(');
-      expect(result.search).toBe('');
-      expect(result.posteName).toBe('G37');
+      expect(result.step).toBe('complete');
     });
 
-    it('returns poste-duration with partial duration', () => {
+    it('returns complete with partial duration', () => {
       const result = parseLine('G37(20');
-      expect(result.step).toBe('poste-duration');
-      expect(result.prefix).toBe('G37(');
-      expect(result.search).toBe('20');
-      expect(result.posteName).toBe('G37');
+      expect(result.step).toBe('complete');
     });
 
-    it('returns poste-duration with setup+run partial', () => {
+    it('returns complete with setup+run partial', () => {
       const result = parseLine('Stahl(20+');
-      expect(result.step).toBe('poste-duration');
-      expect(result.search).toBe('20+');
+      expect(result.step).toBe('complete');
     });
   });
 

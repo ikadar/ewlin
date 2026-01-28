@@ -32,7 +32,6 @@ export const DEFAULT_ST_DURATIONS = ['1j', '2j', '3j', '4j', '5j'];
 
 export type SequenceStep =
   | 'poste'
-  | 'poste-duration'
   | 'st-prefix'
   | 'st-name'
   | 'st-duration'
@@ -46,8 +45,6 @@ export interface ParsedLine {
   prefix: string;
   /** Current search text for filtering suggestions */
   search: string;
-  /** Selected poste name (only in poste-duration step) */
-  posteName?: string;
   /** Selected ST name (only in st-duration step) */
   stName?: string;
 }
@@ -73,12 +70,11 @@ export interface CurrentLineInfo {
  *
  * State machine:
  * - "poste": empty or text without `:` or `(` → suggest poste names + "ST:"
- * - "poste-duration": "PosteName(..." → suggest durations
  * - "st-prefix": starts with "st" (case-insensitive) → suggest "ST:" prefix
  * - "st-name": "ST:..." without `(` → suggest sous-traitant names
  * - "st-duration": "ST:Name(..." → suggest durations
  * - "st-description": "ST:Name(duration):..." → free text, no suggestions
- * - "complete": has `(...)` → no suggestions
+ * - "complete": has `(...)` or poste with `(` → no suggestions
  */
 export function parseLine(line: string): ParsedLine {
   // ST description: ST:Name(duration):... — typing free-text description
@@ -131,13 +127,13 @@ export function parseLine(line: string): ParsedLine {
   }
 
   // Poste with open paren (typing duration) — e.g., "G37(" or "G37(20"
+  // No duration suggestions for postes (user types manually)
   const posteParenMatch = line.match(/^([A-Za-z0-9_]+)\((.*)$/);
   if (posteParenMatch) {
     return {
-      step: 'poste-duration',
-      prefix: posteParenMatch[1] + '(',
-      search: posteParenMatch[2],
-      posteName: posteParenMatch[1],
+      step: 'complete',
+      prefix: line,
+      search: '',
     };
   }
 
