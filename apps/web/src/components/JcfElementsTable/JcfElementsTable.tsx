@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
-import { GitBranch, Minus, Plus } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { GitBranch, Minus, Plus, Calculator } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
 import type { JcfElement, JcfFieldKey } from './types';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete';
@@ -14,6 +14,12 @@ import { JcfPrecedencesAutocomplete } from '../JcfPrecedencesAutocomplete';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
 import { validateAllElements, getCellError } from './validation';
+import {
+  getAllRequiredFields,
+  hasRequiredIndicator,
+  type JcfMode,
+} from './requiredFields';
+import { calculateQteFeuillesFromStrings } from './calculatedFields';
 import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS, POSTE_PRESETS, SOUSTRAITANT_PRESETS } from '../../mock/reference-data';
 
 // ── Row definitions ──
@@ -65,17 +71,34 @@ export interface JcfElementsTableProps {
    * @see JcfSequenceAutocompleteProps.sequenceWorkflow
    */
   sequenceWorkflow?: string[];
+  /** Job quantity for qteFeuilles auto-calculation */
+  jobQuantity?: string;
+  /** Mode: 'job' shows required indicators, 'template' does not */
+  mode?: JcfMode;
 }
 
 export function JcfElementsTable({
   elements,
   onElementsChange,
   sequenceWorkflow,
+  jobQuantity = '',
+  mode = 'job',
 }: JcfElementsTableProps) {
   const [editingElementIndex, setEditingElementIndex] = useState<number | null>(
     null,
   );
   const [editingName, setEditingName] = useState('');
+
+  // Auto-calculation state per element (true = auto, false = manual)
+  const [autoCalculated, setAutoCalculated] = useState<Record<number, boolean>>(
+    () => {
+      const initial: Record<number, boolean> = {};
+      elements.forEach((_, i) => {
+        initial[i] = true;
+      });
+      return initial;
+    },
+  );
 
   const sessionLearning = useSessionLearning();
 
@@ -92,6 +115,48 @@ export function JcfElementsTable({
     () => validateAllElements(elements),
     [elements],
   );
+
+  // Required fields map (Level 2 indicators)
+  const requiredFields = useMemo(
+    () => getAllRequiredFields(elements, mode),
+    [elements, mode],
+  );
+
+  // Fingerprint for qteFeuilles recalculation (quantite + imposition)
+  const qtyImpositionFingerprint = useMemo(
+    () => JSON.stringify(elements.map((e) => [e.quantite, e.imposition])),
+    [elements],
+  );
+
+  // Auto-calculate qteFeuilles when inputs change
+  useEffect(() => {
+    const jobQty = parseInt(jobQuantity, 10) || 0;
+    if (jobQty === 0) return; // No calculation without job quantity
+
+    let changed = false;
+    const updated = elements.map((el, index) => {
+      // Skip if manual mode
+      if (autoCalculated[index] === false) return el;
+
+      const calculated = calculateQteFeuillesFromStrings(
+        jobQuantity,
+        el.quantite,
+        el.imposition,
+      );
+      if (!calculated) return el;
+
+      if (el.qteFeuilles !== calculated) {
+        changed = true;
+        return { ...el, qteFeuilles: calculated };
+      }
+      return el;
+    });
+
+    if (changed) {
+      onElementsChange(updated);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobQuantity, qtyImpositionFingerprint, autoCalculated]);
 
   // Grid style: 100px label column + 288px per element
   const gridStyle = useMemo(
@@ -327,6 +392,22 @@ export function JcfElementsTable({
     [handleCellChange],
   );
 
+  // ── qteFeuilles handlers ──
+
+  // Manual qteFeuilles change - switches to manual mode
+  const handleQteFeuillesChange = useCallback(
+    (elementIndex: number, value: string) => {
+      setAutoCalculated((prev) => ({ ...prev, [elementIndex]: false }));
+      handleCellChange(elementIndex, 'qteFeuilles', value);
+    },
+    [handleCellChange],
+  );
+
+  // Toggle auto-calculation mode
+  const handleToggleAutoCalculated = useCallback((elementIndex: number) => {
+    setAutoCalculated((prev) => ({ ...prev, [elementIndex]: !prev[elementIndex] }));
+  }, []);
+
   // ── Render ──
 
   return (
@@ -438,6 +519,14 @@ export function JcfElementsTable({
                 row.key,
               );
               const hasError = !!cellError;
+              const showRequiredIndicator = hasRequiredIndicator(
+                requiredFields,
+                validationErrors,
+                elementIndex,
+                row.key,
+              );
+              const isQteFeuilles = row.key === 'qteFeuilles';
+              const isAutoMode = autoCalculated[elementIndex] !== false;
 
               return (
                 <div
@@ -453,6 +542,12 @@ export function JcfElementsTable({
                       inputId={getCellId(elementIndex, rowIndex)}
                     />
                   )}
+                  {/* Required indicator (Level 2) - amber dot */}
+                  <span
+                    className={`absolute top-0.5 right-1 w-2 h-2 rounded-full bg-amber-500 z-20 transition-opacity duration-300 ${showRequiredIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                    title="Champ requis"
+                    data-testid={`required-indicator-${elementIndex}-${row.key}`}
+                  />
                   {row.key === 'sequence' ? (
                     <JcfSequenceAutocomplete
                       id={getCellId(elementIndex, rowIndex)}
@@ -989,6 +1084,39 @@ export function JcfElementsTable({
                         }
                       }}
                     />
+                  ) : isQteFeuilles ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAutoCalculated(elementIndex)}
+                        className={`flex-shrink-0 p-0.5 rounded transition-colors ${
+                          isAutoMode
+                            ? 'text-emerald-500 hover:bg-emerald-900/30'
+                            : 'text-zinc-600 hover:bg-zinc-800'
+                        }`}
+                        title={
+                          isAutoMode
+                            ? 'Calcul auto actif - cliquer pour désactiver'
+                            : 'Calcul auto désactivé - cliquer pour réactiver'
+                        }
+                        data-testid={`auto-toggle-${elementIndex}`}
+                      >
+                        <Calculator className="w-3 h-3" />
+                      </button>
+                      <input
+                        id={getCellId(elementIndex, rowIndex)}
+                        type="text"
+                        value={value}
+                        onChange={(e) =>
+                          handleQteFeuillesChange(elementIndex, e.target.value)
+                        }
+                        onKeyDown={(e) =>
+                          handleCellKeyDown(e, elementIndex, rowIndex)
+                        }
+                        className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-[11px] flex-1`}
+                        data-testid={`jcf-input-${elementIndex}-${row.key}`}
+                      />
+                    </div>
                   ) : (
                     <input
                       id={getCellId(elementIndex, rowIndex)}
