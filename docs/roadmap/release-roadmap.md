@@ -1443,14 +1443,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 > **Sequential:** v0.4.20 → v0.4.21 → v0.4.22 (each builds on previous).
 
-#### v0.4.20 - JCF: Sequence — Multi-line Editor & Poste Mode
+#### v0.4.20 - JCF: Sequence — Multi-line Editor & Poste Mode ✅
 > **Spec source:** §5.1–5.2 (Sequence State Machine — Poste mode)
 
-- [ ] Multi-line text editor within table cell
-- [ ] Poste mode: suggest poste names from presets (G37, 754, GTO, Stahl, etc.)
-- [ ] Duration input: `PosteName(duration)` or `PosteName(setup+run)` format
-- [ ] Poste validation regex: `/^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/`
-- [ ] Per-line parsing and validation
+- [x] Multi-line text editor within table cell
+- [x] Poste mode: suggest poste names from presets (G37, 754, GTO, Stahl, etc.)
+- [x] Duration input: `PosteName(duration)` or `PosteName(setup+run)` format
+- [x] Poste validation regex: `/^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/`
+- [x] Per-line parsing and validation
 
 #### v0.4.21 - JCF: Sequence — ST (Sous-Traitant) Mode
 > **Spec source:** §5.3 (Sequence State Machine — ST mode)
