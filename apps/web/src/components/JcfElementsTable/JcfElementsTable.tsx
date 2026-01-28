@@ -11,7 +11,8 @@ import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfPapierAutocomplete } from '../JcfPapierAutocomplete';
 import { JcfImpositionAutocomplete } from '../JcfImpositionAutocomplete';
 import { JcfPrecedencesAutocomplete } from '../JcfPrecedencesAutocomplete';
-import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS } from '../../mock/reference-data';
+import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS, POSTE_PRESETS } from '../../mock/reference-data';
 
 // ── Row definitions ──
 
@@ -423,7 +424,70 @@ export function JcfElementsTable({
                   className={`px-[5px] py-[3px] ${!isLastElement ? 'border-r border-zinc-800/50' : ''}`}
                   data-testid={`jcf-cell-${elementIndex}-${row.key}`}
                 >
-                  {isTextarea ? (
+                  {row.key === 'sequence' ? (
+                    <JcfSequenceAutocomplete
+                      id={getCellId(elementIndex, rowIndex)}
+                      value={value}
+                      onChange={(v) =>
+                        handleCellChange(elementIndex, 'sequence', v)
+                      }
+                      postePresets={POSTE_PRESETS}
+                      sessionPostes={sessionLearning.postes}
+                      onLearnPoste={sessionLearning.learnPoste}
+                      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[11px]`}
+                      onTabOut={(e, direction) => {
+                        const lastRow = rows.length - 1;
+                        const lastEl = elements.length - 1;
+                        if (direction === 'forward') {
+                          if (rowIndex < lastRow) {
+                            e.preventDefault();
+                            focusCell(elementIndex, rowIndex + 1);
+                          } else if (elementIndex < lastEl) {
+                            e.preventDefault();
+                            focusCell(elementIndex + 1, 0);
+                          }
+                        } else {
+                          if (rowIndex > 0) {
+                            e.preventDefault();
+                            focusCell(elementIndex, rowIndex - 1);
+                          } else if (elementIndex > 0) {
+                            e.preventDefault();
+                            focusCell(elementIndex - 1, lastRow);
+                          }
+                        }
+                      }}
+                      onArrowNav={(_e, direction) => {
+                        const rc = rows.length;
+                        const ec = elements.length;
+                        switch (direction) {
+                          case 'down':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex + 1) % rc,
+                            );
+                            break;
+                          case 'up':
+                            focusCell(
+                              elementIndex,
+                              (rowIndex - 1 + rc) % rc,
+                            );
+                            break;
+                          case 'right':
+                            focusCell(
+                              (elementIndex + 1) % ec,
+                              rowIndex,
+                            );
+                            break;
+                          case 'left':
+                            focusCell(
+                              (elementIndex - 1 + ec) % ec,
+                              rowIndex,
+                            );
+                            break;
+                        }
+                      }}
+                    />
+                  ) : isTextarea ? (
                     <textarea
                       id={getCellId(elementIndex, rowIndex)}
                       value={value}
