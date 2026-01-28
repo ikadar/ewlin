@@ -1424,13 +1424,13 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Bidirectional DSL ↔ pretty conversion
 - [x] Auto-create new paper type on save (if not exists)
 
-#### v0.4.18 - JCF: Imposition Autocomplete
+#### v0.4.18 - JCF: Imposition Autocomplete ✅
 > **Spec source:** §1.2 (Imposition DSL)
 
-- [ ] LxH(poses) format (e.g., `50x70(8)`)
-- [ ] Format-aware suggestions (based on selected format field)
-- [ ] Poses extraction (supports `50x70(8)` and `50x70(8p)` variants)
-- [ ] Validation regex: `/^[1-9]\d*x[1-9]\d*\([1-9]\d*\)$/i`
+- [x] LxH(poses) format (e.g., `50x70(8)`)
+- [x] Format-aware suggestions (based on selected format field)
+- [x] Poses extraction (supports `50x70(8)` and `50x70(8p)` variants)
+- [x] Validation regex: `/^[1-9]\d*x[1-9]\d*\([1-9]\d*\)$/i`
 
 #### v0.4.19 - JCF: Precedences Autocomplete
 - [ ] Element name reference selection (autocomplete with other element names)
