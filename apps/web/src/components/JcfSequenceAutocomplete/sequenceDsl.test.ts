@@ -6,6 +6,7 @@ import {
   isSequenceLineInvalid,
   getCurrentLineInfo,
   DEFAULT_DURATIONS,
+  DEFAULT_ST_DURATIONS,
 } from './sequenceDsl';
 
 describe('parseLine', () => {
@@ -98,6 +99,42 @@ describe('parseLine', () => {
     });
   });
 
+  describe('st-description step', () => {
+    it('returns st-description after ST:Name(duration):', () => {
+      const result = parseLine('ST:MCA(3j):');
+      expect(result.step).toBe('st-description');
+      expect(result.prefix).toBe('ST:MCA(3j):');
+      expect(result.search).toBe('');
+    });
+
+    it('returns st-description with partial description', () => {
+      const result = parseLine('ST:MCA(3j):dos carré');
+      expect(result.step).toBe('st-description');
+      expect(result.prefix).toBe('ST:MCA(3j):');
+      expect(result.search).toBe('dos carré');
+    });
+
+    it('returns st-description for full ST line', () => {
+      const result = parseLine('ST:MCA(3j):dos carré collé');
+      expect(result.step).toBe('st-description');
+      expect(result.search).toBe('dos carré collé');
+    });
+
+    it('returns st-description with hour duration', () => {
+      const result = parseLine('ST:F37(5h):pelliculage');
+      expect(result.step).toBe('st-description');
+      expect(result.prefix).toBe('ST:F37(5h):');
+      expect(result.search).toBe('pelliculage');
+    });
+
+    it('returns st-description with plain number duration', () => {
+      const result = parseLine('ST:LGI(3):reliure');
+      expect(result.step).toBe('st-description');
+      expect(result.prefix).toBe('ST:LGI(3):');
+      expect(result.search).toBe('reliure');
+    });
+  });
+
   describe('complete step', () => {
     it('returns complete for finished poste line', () => {
       const result = parseLine('G37(20)');
@@ -109,8 +146,9 @@ describe('parseLine', () => {
       expect(result.step).toBe('complete');
     });
 
-    it('returns complete for ST line', () => {
-      const result = parseLine('ST:MCA(3j):dos carré collé');
+    it('returns complete for ST line without description colon', () => {
+      // ST:MCA(3j) without trailing colon is "complete" (invalid ST but has closing paren)
+      const result = parseLine('ST:MCA(3j)');
       expect(result.step).toBe('complete');
     });
   });
@@ -254,5 +292,20 @@ describe('DEFAULT_DURATIONS', () => {
     expect(DEFAULT_DURATIONS).toContain('30');
     expect(DEFAULT_DURATIONS).toContain('20+30');
     expect(DEFAULT_DURATIONS.length).toBe(7);
+  });
+});
+
+describe('DEFAULT_ST_DURATIONS', () => {
+  it('has expected ST duration values', () => {
+    expect(DEFAULT_ST_DURATIONS).toContain('1j');
+    expect(DEFAULT_ST_DURATIONS).toContain('3j');
+    expect(DEFAULT_ST_DURATIONS).toContain('5j');
+    expect(DEFAULT_ST_DURATIONS.length).toBe(5);
+  });
+
+  it('all values have day suffix', () => {
+    DEFAULT_ST_DURATIONS.forEach((d) => {
+      expect(d).toMatch(/^\d+j$/);
+    });
   });
 });

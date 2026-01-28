@@ -25,6 +25,9 @@ export const DEFAULT_DURATIONS = [
   '30+60',
 ];
 
+/** Default duration suggestions for ST (sous-traitant) mode — day-based */
+export const DEFAULT_ST_DURATIONS = ['1j', '2j', '3j', '4j', '5j'];
+
 // ── Parsed line types ────────────────────────────────────────────────────────
 
 export type SequenceStep =
@@ -33,6 +36,7 @@ export type SequenceStep =
   | 'st-prefix'
   | 'st-name'
   | 'st-duration'
+  | 'st-description'
   | 'complete';
 
 export interface ParsedLine {
@@ -73,9 +77,21 @@ export interface CurrentLineInfo {
  * - "st-prefix": starts with "st" (case-insensitive) → suggest "ST:" prefix
  * - "st-name": "ST:..." without `(` → suggest sous-traitant names
  * - "st-duration": "ST:Name(..." → suggest durations
+ * - "st-description": "ST:Name(duration):..." → free text, no suggestions
  * - "complete": has `(...)` → no suggestions
  */
 export function parseLine(line: string): ParsedLine {
+  // ST description: ST:Name(duration):... — typing free-text description
+  // Must check before generic complete since ST desc also has (...)
+  const stDescMatch = line.match(/^ST:[A-Za-z0-9_]+\([^)]+\):(.*)$/i);
+  if (stDescMatch) {
+    return {
+      step: 'st-description',
+      prefix: line.substring(0, line.length - stDescMatch[1].length),
+      search: stDescMatch[1],
+    };
+  }
+
   // Complete: has parentheses with content and closing paren
   if (/\([^)]+\)/.test(line)) {
     return { step: 'complete', prefix: line, search: '' };
