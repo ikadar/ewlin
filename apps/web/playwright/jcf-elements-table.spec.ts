@@ -117,9 +117,9 @@ test.describe('v0.4.9: JCF Elements Table Grid Layout', () => {
   });
 
   test('Type in field persists the value', async ({ page }) => {
-    const formatInput = page.locator('[data-testid="jcf-input-0-format"]');
-    await formatInput.fill('A4');
-    await expect(formatInput).toHaveValue('A4');
+    const papierInput = page.locator('[data-testid="jcf-input-0-papier"]');
+    await papierInput.fill('Couché mat 135g');
+    await expect(papierInput).toHaveValue('Couché mat 135g');
   });
 
   test('Commentaires auto-expands on multi-line input', async ({ page }) => {

@@ -134,9 +134,9 @@ test.describe('v0.4.10: JCF Cell Navigation', () => {
 
   test.describe('Enter key', () => {
     test('Enter in text input moves to next cell', async ({ page }) => {
-      await focusCell(page, 0, 3); // format (text input)
+      await focusCell(page, 0, 7); // autres (plain text input)
       await page.keyboard.press('Enter');
-      expect(await getFocusedId(page)).toBe('cell-0-4'); // papier
+      expect(await getFocusedId(page)).toBe('cell-0-8'); // imposition
     });
 
     test('Enter in textarea allows newline (does not navigate)', async ({ page }) => {
@@ -149,15 +149,15 @@ test.describe('v0.4.10: JCF Cell Navigation', () => {
 
   test.describe('Escape key', () => {
     test('Escape removes focus from current cell', async ({ page }) => {
-      await focusCell(page, 0, 3); // format
-      expect(await getFocusedId(page)).toBe('cell-0-3');
+      await focusCell(page, 0, 7); // autres (plain text input)
+      expect(await getFocusedId(page)).toBe('cell-0-7');
       await page.keyboard.press('Escape');
       // Focus should no longer be on the cell
-      expect(await getFocusedId(page)).not.toBe('cell-0-3');
+      expect(await getFocusedId(page)).not.toBe('cell-0-7');
     });
 
     test('Escape in cell does not close modal', async ({ page }) => {
-      await focusCell(page, 0, 3);
+      await focusCell(page, 0, 7);
       await page.keyboard.press('Escape');
       // Modal should still be visible (Escape only blurred the cell)
       await expect(page.locator('[data-testid="jcf-modal-backdrop"]')).toBeVisible();
