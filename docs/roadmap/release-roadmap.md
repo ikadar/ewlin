@@ -1483,15 +1483,15 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Smart sequence validation: lines without closing `)` are not flagged
 - [x] Validation rules per field type (papier `:`, impression `/`, surfacage `/`, imposition regex, format regex, pagination rule)
 
-#### v0.4.24 - JCF: Required Indicators & Calculated Fields (Level 2)
+#### v0.4.24 - JCF: Required Indicators & Calculated Fields (Level 2) ✅
 > **Spec source:** §2.2 (Required Field Logic), §3 (Calculated Fields)
 
-- [ ] Amber dot indicator for required-but-empty fields
-- [ ] BLOC SUPPORT trigger: if any of (imposition, impression, surfacage, format) → papier, pagination, format, qteFeuilles, imposition required
-- [ ] BLOC IMPRESSION trigger: if any of (imposition, impression) → impression required
-- [ ] **qteFeuilles auto-calculation**: `ceil((jobQuantity × elementQuantity) / poses)`
-- [ ] Auto/manual toggle for qteFeuilles per element
-- [ ] Recalculation triggers: jobQuantity, elementQuantity, or imposition changes
+- [x] Amber dot indicator for required-but-empty fields
+- [x] BLOC SUPPORT trigger: if any of (imposition, impression, surfacage, format) → papier, pagination, format, qteFeuilles, imposition required
+- [x] BLOC IMPRESSION trigger: if any of (imposition, impression) → impression required
+- [x] **qteFeuilles auto-calculation**: `ceil((jobQuantity × elementQuantity) / poses)`
+- [x] Auto/manual toggle for qteFeuilles per element
+- [x] Recalculation triggers: jobQuantity, elementQuantity, or imposition changes
 
 #### v0.4.25 - JCF: Submit Validation (Level 3)
 > **Spec source:** §2.1 (Three-Level Validation — Level 3)
