@@ -1415,14 +1415,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 > **Parallelizable:** v0.4.17–v0.4.19 are independent, all depend on v0.4.11–v0.4.12.
 
-#### v0.4.17 - JCF: Papier Autocomplete
+#### v0.4.17 - JCF: Papier Autocomplete ✅
 > **Spec source:** §1.1 (Papier DSL)
 
-- [ ] Type:Grammage DSL format (e.g., `Couché mat:135`)
-- [ ] Two-step autocomplete: type selection → grammage selection
-- [ ] Pretty display conversion: `Couché mat:135` → `Couché mat 135g`
-- [ ] Bidirectional DSL ↔ pretty conversion
-- [ ] Auto-create new paper type on save (if not exists)
+- [x] Type:Grammage DSL format (e.g., `Couché mat:135`)
+- [x] Two-step autocomplete: type selection → grammage selection
+- [x] Pretty display conversion: `Couché mat:135` → `Couché mat 135g`
+- [x] Bidirectional DSL ↔ pretty conversion
+- [x] Auto-create new paper type on save (if not exists)
 
 #### v0.4.18 - JCF: Imposition Autocomplete
 > **Spec source:** §1.2 (Imposition DSL)
