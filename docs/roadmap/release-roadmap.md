@@ -1305,12 +1305,13 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Mock API endpoints for reference data (GET /papers, /formats, etc.)
 - [x] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
 
-#### v0.4.6 - JCF: Page Shell
-- [ ] Job creation page route (or modal — architectural decision)
-- [ ] Navigation integration (activate "+" button in JobsList)
-- [ ] Layout skeleton: Job Header area + Elements Table area
-- [ ] Empty state rendering
-- [ ] Basic page structure with Tailwind design tokens
+#### v0.4.6 - JCF: Page Shell ✅
+- [x] Full-screen modal overlay (architectural decision: modal, not page route)
+- [x] Navigation integration ("+" button in JobsList opens modal)
+- [x] Modal layout: header (title + close), scrollable content, keyboard hints footer
+- [x] Close behavior: X button, Escape key, backdrop click (mouseDown+mouseUp)
+- [x] Google Fonts integration (Inter + JetBrains Mono)
+- [x] Pixel-perfect rem→px conversion (13px base matching reference/jcf)
 
 ### Phase 4C: Job Header
 
@@ -1336,14 +1337,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4D: Elements Table Structure
 
-#### v0.4.9 - JCF: Elements Table Grid Layout
+#### v0.4.9 - JCF: Elements Table Grid Layout ✅
 > **Spec source:** reference `ElementsTable.tsx`
 
-- [ ] 12-column table layout (name, precedences, quantite, format, pagination, papier, imposition, impression, surfacage, autres, qteFeuilles, commentaires)
-- [ ] Sequence column (multi-line, separate treatment)
-- [ ] Add/remove element rows
-- [ ] Element name field (COUV, INT, FINITION, etc.)
-- [ ] Plain text inputs for all fields (autocomplete added later)
+- [x] 12-column table layout (name, precedences, quantite, format, pagination, papier, imposition, impression, surfacage, autres, qteFeuilles, commentaires)
+- [x] Sequence column (multi-line, separate treatment)
+- [x] Add/remove element rows
+- [x] Element name field (COUV, INT, FINITION, etc.)
+- [x] Plain text inputs for all fields (autocomplete added later)
 
 #### v0.4.10 - JCF: Cell Navigation ✅
 > **Spec source:** §8 (Keyboard Navigation)
@@ -1435,8 +1436,8 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 #### v0.4.19 - JCF: Precedences Autocomplete ✅
 - [x] Element name reference selection (autocomplete with other element names)
 - [x] Multi-value support (element can depend on multiple predecessors)
-- [x] Visual dependency indicator
-- [x] Circular dependency prevention
+- [x] Self-reference prevention and already-selected exclusion
+- [x] Cascading update on element rename/remove
 
 ### Phase 4H: Sequence Autocomplete (most complex field — 3 releases)
 
