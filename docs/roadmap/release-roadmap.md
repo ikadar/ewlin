@@ -1472,7 +1472,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4I: Validation & Calculated Fields
 
-> **Sequential:** v0.4.23 → v0.4.24 → v0.4.28 → v0.4.29 → v0.4.30 → v0.4.31
+> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32
 
 #### v0.4.23 - JCF: Live Format Validation (Level 1) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 1)
@@ -1493,15 +1493,8 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Auto/manual toggle for qteFeuilles per element
 - [x] Recalculation triggers: jobQuantity, elementQuantity, or imposition changes
 
-#### v0.4.28 - JCF: Submit Validation (Level 3)
-> **Spec source:** §2.1 (Three-Level Validation — Level 3)
-
-- [ ] Strict full-form validation on Save button click
-- [ ] All required fields must be filled
-- [ ] All format validations must pass
-- [ ] Error summary display
-- [ ] Form blocking until errors resolved
-- [ ] Scroll to first error
+#### v0.4.25, v0.4.26, v0.4.27 - SKIPPED
+> **Note:** These version numbers were skipped due to release numbering reorganization.
 
 #### v0.4.29 - UI Scale Harmonization (80% Base App) ✅
 > **Purpose:** Font-size standardization + 80% grid scaling
@@ -1530,7 +1523,17 @@ Two-part release following reference/jcf pattern.
 - JCF components (10 files) - font-size conversion
 - Base app components (5 files) - font-size conversion
 
-#### v0.4.30 - Sequence Autocomplete: Template-Free Mode
+#### v0.4.30 - JCF: Submit Validation (Level 3)
+> **Spec source:** §2.1 (Three-Level Validation — Level 3)
+
+- [ ] Strict full-form validation on Save button click
+- [ ] All required fields must be filled
+- [ ] All format validations must pass
+- [ ] Error summary display
+- [ ] Form blocking until errors resolved
+- [ ] Scroll to first error
+
+#### v0.4.31 - Sequence Autocomplete: Template-Free Mode
 > **Bug:** Sequence input suggests workflow-based categories even when no template is selected
 
 - [ ] Detect when no template is selected (empty `sequenceWorkflow`)
@@ -1542,7 +1545,7 @@ Two-part release following reference/jcf pattern.
 **Affected files:**
 - `apps/web/src/components/JcfSequenceAutocomplete/JcfSequenceAutocomplete.tsx`
 
-#### v0.4.31 - Production Readiness Tracking (Paper, Plates, BAT)
+#### v0.4.32 - Production Readiness Tracking (Paper, Plates, BAT)
 > **Purpose:** Track prerequisites for starting production on each element
 
 - [ ] Paper readiness status per element (InStock/ToOrder/Ordered/Received)
@@ -1559,7 +1562,7 @@ Two-part release following reference/jcf pattern.
 
 ### Phase 4J: Save
 
-#### v0.4.32 - JCF: Job Save & API Integration
+#### v0.4.33 - JCF: Job Save & API Integration
 > **Spec source:** §10 (Backend Logic)
 
 - [ ] Form data → API request mapping
@@ -1573,7 +1576,7 @@ Two-part release following reference/jcf pattern.
 
 ### Phase 4K: Template System
 
-#### v0.4.33 - JCF: Template CRUD & Apply
+#### v0.4.34 - JCF: Template CRUD & Apply
 > **Spec source:** reference `TemplateList.tsx`, `TemplateEditorModal.tsx`
 
 - [ ] Create template from existing job
@@ -1583,7 +1586,7 @@ Two-part release following reference/jcf pattern.
 - [ ] Category auto-creation on new category name
 - [ ] Template name and description fields
 
-#### v0.4.34 - JCF: Link Propagation & Dual-Mode Editor
+#### v0.4.35 - JCF: Link Propagation & Dual-Mode Editor
 > **Spec source:** §4 (Link Propagation)
 
 - [ ] Link toggle per field: format, papier, imposition, impression, surfacage
