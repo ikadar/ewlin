@@ -1533,17 +1533,19 @@ Two-part release following reference/jcf pattern.
 - [x] Form blocking until errors resolved
 - [x] Save button with ⌘S keyboard shortcut
 
-#### v0.4.31 - Sequence Autocomplete: Template-Free Mode
+#### v0.4.31 - Sequence Autocomplete: Template-Free Mode ✅
 > **Bug:** Sequence input suggests workflow-based categories even when no template is selected
 
-- [ ] Detect when no template is selected (empty `sequenceWorkflow`)
-- [ ] Template-free mode: show all postes without category filtering
-- [ ] Template-free mode: no workflow step progression indicators (★)
-- [ ] Template mode: current behavior (workflow-guided suggestions)
-- [ ] Unit tests for both modes
+- [x] Detect when no template is selected (empty `sequenceWorkflow`)
+- [x] Template-free mode: show all postes without category filtering
+- [x] Template-free mode: no workflow step progression indicators (★)
+- [x] Template mode: current behavior (workflow-guided suggestions)
+- [x] E2E tests for both modes
 
 **Affected files:**
-- `apps/web/src/components/JcfSequenceAutocomplete/JcfSequenceAutocomplete.tsx`
+- `apps/web/src/mock/reference-data.ts` (MockTemplate.workflow)
+- `apps/web/src/components/JcfJobHeader/JcfJobHeader.tsx` (onTemplateSelect)
+- `apps/web/src/App.tsx` (sequenceWorkflow state)
 
 #### v0.4.32 - Production Readiness Tracking (Paper, Plates, BAT)
 > **Purpose:** Track prerequisites for starting production on each element
