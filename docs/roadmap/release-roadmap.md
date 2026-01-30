@@ -1526,12 +1526,12 @@ Two-part release following reference/jcf pattern.
 #### v0.4.30 - JCF: Submit Validation (Level 3) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 3)
 
-- [ ] Strict full-form validation on Save button click
-- [ ] All required fields must be filled
-- [ ] All format validations must pass
-- [ ] Error summary display
-- [ ] Form blocking until errors resolved
-- [ ] Scroll to first error
+- [x] Strict full-form validation on Save button click
+- [x] All required fields must be filled (converted from amber indicators to red errors)
+- [x] All format validations must pass (strict mode, no leniency)
+- [x] French error messages with HTML formatting
+- [x] Form blocking until errors resolved
+- [x] Save button with ⌘S keyboard shortcut
 
 #### v0.4.31 - Sequence Autocomplete: Template-Free Mode
 > **Bug:** Sequence input suggests workflow-based categories even when no template is selected
