@@ -84,66 +84,67 @@ describe('TopNavBar', () => {
   });
 
   describe('Zoom control', () => {
+    // v0.4.29: 100% zoom = 64px/hour (scaled to 80%)
     it('displays current zoom level', () => {
-      render(<TopNavBar {...defaultProps} pixelsPerHour={80} />);
+      render(<TopNavBar {...defaultProps} pixelsPerHour={64} />);
       expect(screen.getByTestId('zoom-level')).toHaveTextContent('100%');
     });
 
-    it('displays 50% when pixelsPerHour is 40', () => {
-      render(<TopNavBar {...defaultProps} pixelsPerHour={40} />);
+    it('displays 50% when pixelsPerHour is 32', () => {
+      render(<TopNavBar {...defaultProps} pixelsPerHour={32} />);
       expect(screen.getByTestId('zoom-level')).toHaveTextContent('50%');
     });
 
-    it('displays 200% when pixelsPerHour is 160', () => {
-      render(<TopNavBar {...defaultProps} pixelsPerHour={160} />);
+    it('displays 200% when pixelsPerHour is 128', () => {
+      render(<TopNavBar {...defaultProps} pixelsPerHour={128} />);
       expect(screen.getByTestId('zoom-level')).toHaveTextContent('200%');
     });
 
     it('calls onZoomChange with next level when zoom in is clicked', () => {
       const mockZoomChange = vi.fn();
-      render(<TopNavBar {...defaultProps} pixelsPerHour={80} onZoomChange={mockZoomChange} />);
+      render(<TopNavBar {...defaultProps} pixelsPerHour={64} onZoomChange={mockZoomChange} />);
       fireEvent.click(screen.getByTestId('zoom-in-button'));
-      expect(mockZoomChange).toHaveBeenCalledWith(120); // 150% level
+      expect(mockZoomChange).toHaveBeenCalledWith(96); // 150% level
     });
 
     it('calls onZoomChange with previous level when zoom out is clicked', () => {
       const mockZoomChange = vi.fn();
-      render(<TopNavBar {...defaultProps} pixelsPerHour={80} onZoomChange={mockZoomChange} />);
+      render(<TopNavBar {...defaultProps} pixelsPerHour={64} onZoomChange={mockZoomChange} />);
       fireEvent.click(screen.getByTestId('zoom-out-button'));
-      expect(mockZoomChange).toHaveBeenCalledWith(60); // 75% level
+      expect(mockZoomChange).toHaveBeenCalledWith(48); // 75% level
     });
 
     it('disables zoom in button at maximum zoom', () => {
-      render(<TopNavBar {...defaultProps} pixelsPerHour={160} />);
+      render(<TopNavBar {...defaultProps} pixelsPerHour={128} />);
       expect(screen.getByTestId('zoom-in-button')).toBeDisabled();
     });
 
-    // REQ-08: Minimum zoom is now 25% (20px/hour)
+    // v0.4.29: Minimum zoom 25% = 16px/hour (scaled from 20)
     it('disables zoom out button at minimum zoom', () => {
-      render(<TopNavBar {...defaultProps} pixelsPerHour={20} />);
+      render(<TopNavBar {...defaultProps} pixelsPerHour={16} />);
       expect(screen.getByTestId('zoom-out-button')).toBeDisabled();
     });
 
     it('enables both zoom buttons at middle zoom levels', () => {
-      render(<TopNavBar {...defaultProps} pixelsPerHour={80} />);
+      render(<TopNavBar {...defaultProps} pixelsPerHour={64} />);
       expect(screen.getByTestId('zoom-in-button')).not.toBeDisabled();
       expect(screen.getByTestId('zoom-out-button')).not.toBeDisabled();
     });
   });
 
-  // REQ-08: Added 25% zoom level
+  // v0.4.29: All zoom levels scaled to 80% for UI Scale Harmonization
   describe('ZOOM_LEVELS constant', () => {
-    it('has correct number of levels (6 including 25%)', () => {
+    it('has correct number of levels (6)', () => {
       expect(ZOOM_LEVELS).toHaveLength(6);
     });
 
-    it('has correct pixelsPerHour values', () => {
-      expect(ZOOM_LEVELS[0].pixelsPerHour).toBe(20); // 25%
-      expect(ZOOM_LEVELS[1].pixelsPerHour).toBe(40); // 50%
-      expect(ZOOM_LEVELS[2].pixelsPerHour).toBe(60); // 75%
-      expect(ZOOM_LEVELS[3].pixelsPerHour).toBe(80); // 100%
-      expect(ZOOM_LEVELS[4].pixelsPerHour).toBe(120); // 150%
-      expect(ZOOM_LEVELS[5].pixelsPerHour).toBe(160); // 200%
+    it('has correct pixelsPerHour values (scaled to 80%)', () => {
+      expect(ZOOM_LEVELS[0].pixelsPerHour).toBe(16);  // 25%
+      expect(ZOOM_LEVELS[1].pixelsPerHour).toBe(32);  // 50%
+      expect(ZOOM_LEVELS[2].pixelsPerHour).toBe(48);  // 75%
+      expect(ZOOM_LEVELS[3].pixelsPerHour).toBe(64);  // 100%
+      expect(ZOOM_LEVELS[4].pixelsPerHour).toBe(96);  // 150%
+      expect(ZOOM_LEVELS[5].pixelsPerHour).toBe(128); // 200%
     });
 
     it('has correct labels', () => {
@@ -157,8 +158,9 @@ describe('TopNavBar', () => {
   });
 
   describe('DEFAULT_PIXELS_PER_HOUR constant', () => {
-    it('equals 80 (100% zoom)', () => {
-      expect(DEFAULT_PIXELS_PER_HOUR).toBe(80);
+    // v0.4.29: 100% zoom = 64px/hour (scaled to 80%)
+    it('equals 64 (100% zoom, scaled)', () => {
+      expect(DEFAULT_PIXELS_PER_HOUR).toBe(64);
     });
   });
 

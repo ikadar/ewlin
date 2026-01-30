@@ -20,7 +20,7 @@ export interface TaskTileProps {
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
-  onPick?: (task: Task, job: Job) => void;
+  onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
 }
 
 /**
@@ -159,9 +159,10 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     : undefined;
 
   // v0.3.54: Handle click for pick & place (when onPick is provided)
-  const handleClick = () => {
+  // v0.4.29: Pass click coordinates for ghost positioning
+  const handleClick = (e: React.MouseEvent) => {
     if (onPick) {
-      onPick(task, job);
+      onPick(task, job, e.clientX, e.clientY);
     }
   };
 

@@ -71,7 +71,7 @@ export function JcfModal({
       data-testid="jcf-modal-backdrop"
     >
       <div
-        className="w-[70vw] max-w-[1400px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-[13px] leading-[1.4]"
+        className="w-[70vw] max-w-[1400px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
         data-testid="jcf-modal-dialog"
       >
         {/* Header */}
@@ -106,7 +106,7 @@ export function JcfModal({
         {/* Footer */}
         <footer className="flex-shrink-0 bg-zinc-900 border-t border-zinc-800" data-testid="jcf-modal-footer">
           {/* Keyboard hints row */}
-          <div className="px-[13px] py-[5px] border-b border-zinc-800/50 flex items-center gap-[13px] text-[11px] text-zinc-500">
+          <div className="px-[13px] py-[5px] border-b border-zinc-800/50 flex items-center gap-[13px] text-sm text-zinc-500">
             <span className="flex items-center gap-[3px]">
               <kbd className="bg-zinc-800 px-[5px] py-[2px] rounded-[3px] text-zinc-400">Tab</kbd> Champ suivant
             </span>
@@ -126,7 +126,7 @@ export function JcfModal({
           </div>
           {/* Action buttons row (placeholder for future save buttons) */}
           <div className="px-[13px] py-[8px] flex items-center justify-end">
-            <span className="text-[10px] leading-[13px] text-zinc-600">Actions disponibles dans une version ultérieure</span>
+            <span className="text-xs leading-[13px] text-zinc-600">Actions disponibles dans une version ultérieure</span>
           </div>
         </footer>
       </div>

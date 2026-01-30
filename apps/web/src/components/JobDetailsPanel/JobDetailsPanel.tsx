@@ -25,7 +25,7 @@ export interface JobDetailsPanelProps {
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
-  onPick?: (task: Task, job: Job) => void;
+  onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
   /** Callback when close button is clicked (REQ-02) */
   onClose?: () => void;
   /** REQ-02: Callback when departure date is clicked (scrolls grid to date) */

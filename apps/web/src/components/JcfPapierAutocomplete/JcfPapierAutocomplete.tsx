@@ -374,7 +374,7 @@ export function JcfPapierAutocomplete({
                 handleSelect(suggestion);
               }}
             >
-              <span className="font-mono text-[11px]">
+              <span className="font-mono text-sm">
                 {highlightMatch(
                   suggestion.label,
                   filterText,
@@ -384,7 +384,7 @@ export function JcfPapierAutocomplete({
             </div>
           ))}
           {hasMore && (
-            <div className="px-[10px] py-[5px] text-center text-zinc-500 text-[10px] border-t border-zinc-700">
+            <div className="px-[10px] py-[5px] text-center text-zinc-500 text-xs border-t border-zinc-700">
               ↓ Scroll pour plus de suggestions
             </div>
           )}

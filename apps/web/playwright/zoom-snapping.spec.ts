@@ -44,14 +44,14 @@ async function setZoomLevel(page: Parameters<typeof test>[0]['page'], targetLeve
   await expect(zoomLevel).toHaveText(targetLevel);
 }
 
-/** Zoom level → pixelsPerHour mapping */
+/** Zoom level → pixelsPerHour mapping (v0.4.29: scaled to 80%) */
 const ZOOM_PPH: Record<string, number> = {
-  '50%': 40,
-  '75%': 60,
-  '100%': 80,
-  '125%': 100,
-  '150%': 120,
-  '200%': 160,
+  '25%': 16,
+  '50%': 32,
+  '75%': 48,
+  '100%': 64,
+  '150%': 96,
+  '200%': 128,
 };
 
 test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {

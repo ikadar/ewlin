@@ -109,6 +109,7 @@ test.describe('v0.3.43 - Layout Redesign & Zoom', () => {
   });
 
   test.describe('REQ-08: Zoom levels', () => {
+    // v0.4.29: All zoom levels scaled to 80% for UI Scale Harmonization
     test('all 6 zoom levels are accessible', async ({ page }) => {
       const zoomControl = page.locator('[data-testid="zoom-control"]');
       await expect(zoomControl).toBeVisible();

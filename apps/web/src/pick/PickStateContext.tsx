@@ -71,7 +71,7 @@ const initialState: PickState = {
   targetStationId: null,
   assignmentId: null,
   isPicking: false,
-  pixelsPerHour: 80, // Default, will be set from App
+  pixelsPerHour: 64, // Default (v0.4.29: 100% zoom = 64px/hour)
 };
 
 const PickStateContext = createContext<PickContextValue | null>(null);
@@ -95,28 +95,30 @@ export function PickStateProvider({ children }: PickStateProviderProps) {
     // Get target station ID from task
     const targetStationId = task.type === 'Internal' ? task.stationId : null;
 
-    setState({
+    setState((prev) => ({
+      ...prev,
       pickedTask: task,
       pickedJob: job,
       pickSource: 'sidebar',
       targetStationId,
       assignmentId: null,
       isPicking: true,
-    });
+    }));
   }, []);
 
   const pickFromGrid = useCallback((task: Task, job: Job, assignmentId: string) => {
     // Get target station ID from task
     const targetStationId = task.type === 'Internal' ? task.stationId : null;
 
-    setState({
+    setState((prev) => ({
+      ...prev,
       pickedTask: task,
       pickedJob: job,
       pickSource: 'grid',
       targetStationId,
       assignmentId,
       isPicking: true,
-    });
+    }));
   }, []);
 
   const updateGhostPosition = useCallback((x: number, y: number) => {

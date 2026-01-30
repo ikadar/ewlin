@@ -67,7 +67,7 @@ test.describe('v0.3.45: Precedence Constraint Visualization', () => {
       }
 
       // Pick the task and hover over its station column (Heidelberg)
-      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 300);
+      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 240); // v0.4.29: 300 → 240
 
       // Check that the purple line (earliest) is visible
       const purpleLine = page.locator('[data-testid="precedence-line-earliest"]');
@@ -96,7 +96,7 @@ test.describe('v0.3.45: Precedence Constraint Visualization', () => {
       }
 
       // Pick the task and hover over station column
-      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 300);
+      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 240); // v0.4.29: 300 → 240
 
       // The purple line should be visible and have purple color
       const purpleLine = page.locator('[data-testid="precedence-line-earliest"]');
@@ -127,7 +127,7 @@ test.describe('v0.3.45: Precedence Constraint Visualization', () => {
       }
 
       // Pick the task and hover over station column
-      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 300);
+      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 240); // v0.4.29: 300 → 240
 
       // Check that the orange line (latest) is visible
       const orangeLine = page.locator('[data-testid="precedence-line-latest"]');
@@ -158,7 +158,7 @@ test.describe('v0.3.45: Precedence Constraint Visualization', () => {
       }
 
       // Pick the task and hover over station column
-      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 300);
+      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 240); // v0.4.29: 300 → 240
 
       // Both lines may be visible
       const purpleLine = page.locator('[data-testid="precedence-line-earliest"]');
@@ -193,7 +193,7 @@ test.describe('v0.3.45: Precedence Constraint Visualization', () => {
       }
 
       // Pick the task and hover
-      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 300);
+      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 240); // v0.4.29: 300 → 240
 
       // Purple line may be visible during pick
       const purpleLine = page.locator('[data-testid="precedence-line-earliest"]');
@@ -236,7 +236,7 @@ test.describe('v0.3.45: Precedence Constraint Visualization', () => {
       }
 
       // Pick the task and hover over station column
-      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 300);
+      await pickAndHover(page, '[data-testid="task-tile-task-pv-2"]', 'station-heidelberg', 240); // v0.4.29: 300 → 240
 
       // Check that the purple line has box-shadow (glow effect)
       const purpleLine = page.locator('[data-testid="precedence-line-earliest"]');

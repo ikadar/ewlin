@@ -101,13 +101,18 @@ function PickPreviewInner({ task, job, validationMessage, debugInfo }: PickPrevi
   };
 
   // Calculate height based on duration
+  // Heights scale with pixelsPerHour: at 80px/h min=40, max=200, outsourced=60
   const getHeight = (): number => {
+    const scale = pixelsPerHour / 80;
+    const minHeight = Math.round(40 * scale);
+    const maxHeight = Math.round(200 * scale);
+
     if (task.type === 'Internal') {
       const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-      const height = Math.max(40, Math.round((totalMinutes / 60) * 80));
-      return Math.min(height, 200);
+      const height = Math.max(minHeight, Math.round((totalMinutes / 60) * pixelsPerHour));
+      return Math.min(height, maxHeight);
     }
-    return 60;
+    return Math.round(60 * scale); // Outsourced tasks
   };
 
   const height = getHeight();

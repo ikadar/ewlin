@@ -553,7 +553,7 @@ export function JcfSequenceAutocomplete({
             {displayedItems.map((suggestion, index) => (
               <div
                 key={`${index}-${suggestion.label}`}
-                className={`px-[10px] py-[5px] cursor-pointer flex justify-between items-center font-mono text-[11px] ${
+                className={`px-[10px] py-[5px] cursor-pointer flex justify-between items-center font-mono text-sm ${
                   index === highlightedIndex
                     ? 'bg-blue-600 text-white'
                     : 'hover:bg-zinc-700 text-zinc-100'
@@ -573,7 +573,7 @@ export function JcfSequenceAutocomplete({
                 </span>
                 {suggestion.description && (
                   <span
-                    className={`text-[10px] ml-[8px] px-[6px] py-[1px] rounded-[2px] ${
+                    className={`text-xs ml-[8px] px-[6px] py-[1px] rounded-[2px] ${
                       index === highlightedIndex
                         ? 'bg-blue-500 text-blue-100'
                         : 'bg-zinc-700 text-zinc-400'
@@ -585,7 +585,7 @@ export function JcfSequenceAutocomplete({
               </div>
             ))}
             {hasMore && (
-              <div className="px-[10px] py-[5px] text-center text-zinc-500 text-[10px] border-t border-zinc-700">
+              <div className="px-[10px] py-[5px] text-center text-zinc-500 text-xs border-t border-zinc-700">
                 ↓ Scroll pour plus de suggestions
               </div>
             )}

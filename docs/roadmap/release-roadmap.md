@@ -1503,24 +1503,24 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Form blocking until errors resolved
 - [ ] Scroll to first error
 
-#### v0.4.29 - UI Scale Harmonization (80% Base App)
+#### v0.4.29 - UI Scale Harmonization (80% Base App) ✅
 > **Purpose:** Font-size standardization + 80% grid scaling
 
 Two-part release following reference/jcf pattern.
 
 **Part 1: Font-size Standardization**
-- [ ] Set root font-size to 13px (`html { font-size: 13px }`)
-- [ ] Convert `text-[11px]` → `text-sm` (11.375px with 13px root)
-- [ ] Convert `text-[13px]` → `text-base` (13px with 13px root)
-- [ ] Convert `text-[10px]` → `text-xs` (9.75px with 13px root)
-- [ ] Keep edge cases: `text-[6px]`, `text-[9px]`, `text-[15px]`
+- [x] Set root font-size to 13px (`html { font-size: 13px }`)
+- [x] Convert `text-[11px]` → `text-sm` (11.375px with 13px root)
+- [x] Convert `text-[13px]` → `text-base` (13px with 13px root)
+- [x] Convert `text-[10px]` → `text-xs` (9.75px with 13px root)
+- [x] Keep edge cases: `text-[6px]`, `text-[9px]`, `text-[15px]`
 
 **Part 2: 80% Grid Scaling**
-- [ ] Add 80% zoom level (`pixelsPerHour = 64`)
-- [ ] Fix `DragPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
-- [ ] Fix `PickPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
-- [ ] Scale min/max height bounds proportionally
-- [ ] E2E tests for pick & place at 80% zoom
+- [x] Scale ALL zoom levels to 80%: 25%=16, 50%=32, 75%=48, 100%=64, 150%=96, 200%=128
+- [x] Fix `DragPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
+- [x] Fix `PickPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
+- [x] Add `getLayoutDimensions()` helper for rem-based calculations
+- [x] E2E tests updated for 64px/hour at 100% zoom
 
 **Affected files:**
 - `apps/web/src/index.css`

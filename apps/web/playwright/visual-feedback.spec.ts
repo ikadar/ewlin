@@ -242,11 +242,12 @@ test.describe('v0.3.29: Visual Feedback (REQ-01, REQ-12)', () => {
       await page.waitForTimeout(200);
 
       // ACT: Place Task 2 at valid position (12:00, after Task 1 ends at 11:00)
+      // v0.4.29: 480 → 384 (6 hours at 64px/hour)
       await dragFromSidebarToStation(
         page,
         '[data-testid="task-tile-task-bypass-2"]',
         'station-polar',
-        480 // ~12:00 (valid)
+        384 // ~12:00 (valid)
       );
 
       await page.waitForTimeout(500);

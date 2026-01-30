@@ -268,6 +268,9 @@ function generateJob(options: GenerateJobOptions): { job: Job; element: Element;
   const description = randomElement(JOB_DESCRIPTIONS);
   const quantity = randomElement([100, 250, 500, 1000, 2500, 5000]);
 
+  // Element ID is derived from job ID (deterministic)
+  const elementId = getElementIdForJob(jobId);
+
   const job: Job = {
     id: jobId,
     reference: `${now.getFullYear()}-${String(index).padStart(4, '0')}`,
@@ -293,6 +296,7 @@ function generateJob(options: GenerateJobOptions): { job: Job; element: Element;
         },
     platesStatus: forceApproved ? 'Done' : randomElement(['Todo', 'Done'] as PlatesStatus[]),
     comments: [],
+    elementIds: [elementId],
     taskIds: tasks.map((t) => t.id),
     createdAt: formatTimestamp(addDays(now, -randomInt(5, 30))),
     updatedAt: formatTimestamp(now),

@@ -95,7 +95,8 @@ test.describe('Pick & Place from Grid', () => {
     const box = await targetColumn.boundingBox();
     if (box) {
       // Hover at a different Y position (later in the day)
-      await page.mouse.move(box.x + box.width / 2, box.y + 400);
+      // v0.4.29: 400 → 320 (scaled to 64px/hour)
+      await page.mouse.move(box.x + box.width / 2, box.y + 320);
     }
 
     // Column should have green ring (valid placement)
@@ -115,8 +116,8 @@ test.describe('Pick & Place from Grid', () => {
     const box = await targetColumn.boundingBox();
     if (box) {
       // Move to a position later in the day (around 14:00 - well within working hours)
-      // 80px/hour * 14 hours = 1120px from midnight
-      const targetY = box.y + 1120;
+      // v0.4.29: 64px/hour * 14 hours = 896px from midnight
+      const targetY = box.y + 896;
       await page.mouse.move(box.x + box.width / 2, targetY);
 
       // Wait for validation to complete and verify green ring (valid position)

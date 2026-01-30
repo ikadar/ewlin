@@ -439,7 +439,7 @@ export function JcfElementsTable({
         data-testid="jcf-elements-header"
       >
         {/* Empty label cell */}
-        <div className="px-[10px] py-[7px] text-[11px] text-zinc-500 font-medium border-r border-zinc-800 sticky left-0 bg-zinc-900 z-10" />
+        <div className="px-[10px] py-[7px] text-sm text-zinc-500 font-medium border-r border-zinc-800 sticky left-0 bg-zinc-900 z-10" />
 
         {/* Element headers */}
         {elements.map((element, index) => (
@@ -457,7 +457,7 @@ export function JcfElementsTable({
                   onBlur={() => handleSaveName(index)}
                   autoFocus
                   onFocus={(e) => e.target.select()}
-                  className="text-[13px] text-zinc-100 font-medium bg-transparent border border-zinc-600 rounded-[3px] px-[3px] flex-1 min-w-0 focus:border-blue-500 focus:outline-none"
+                  className="text-base text-zinc-100 font-medium bg-transparent border border-zinc-600 rounded-[3px] px-[3px] flex-1 min-w-0 focus:border-blue-500 focus:outline-none"
                   data-testid={`jcf-element-name-input-${index}`}
                 />
               ) : (
@@ -466,7 +466,7 @@ export function JcfElementsTable({
                   onClick={() => handleStartEditing(index)}
                   data-testid={`jcf-element-name-${index}`}
                 >
-                  <span className="text-[13px] text-zinc-400 font-medium hover:text-zinc-300 transition-colors">
+                  <span className="text-base text-zinc-400 font-medium hover:text-zinc-300 transition-colors">
                     {element.name}
                   </span>
                 </div>
@@ -515,7 +515,7 @@ export function JcfElementsTable({
           >
             {/* Label cell (sticky) */}
             <div
-              className={`px-[10px] py-[5px] text-[11px] ${isPrecedencesRow ? 'text-zinc-600' : 'text-zinc-500'} border-r border-zinc-800 flex items-center gap-[3px] sticky left-0 ${isPrecedencesRow ? 'bg-zinc-900/80' : 'bg-zinc-950/90'} z-10`}
+              className={`px-[10px] py-[5px] text-sm ${isPrecedencesRow ? 'text-zinc-600' : 'text-zinc-500'} border-r border-zinc-800 flex items-center gap-[3px] sticky left-0 ${isPrecedencesRow ? 'bg-zinc-900/80' : 'bg-zinc-950/90'} z-10`}
             >
               {row.icon === 'git-branch' && (
                 <GitBranch className="w-[10px] h-[10px]" />
@@ -579,7 +579,7 @@ export function JcfElementsTable({
                       sessionSoustraitants={sessionLearning.soustraitants}
                       onLearnSoustraitant={sessionLearning.learnSoustraitant}
                       sequenceWorkflow={sequenceWorkflow}
-                      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[13px]`}
+                      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
                       onTabOut={(e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -643,7 +643,7 @@ export function JcfElementsTable({
                       onKeyDown={(e) =>
                         handleCellKeyDown(e, elementIndex, rowIndex)
                       }
-                      className={`${isEmpty ? inputEmptyClass : inputFilledClass} resize-none min-h-[28px] overflow-hidden text-[13px]`}
+                      className={`${isEmpty ? inputEmptyClass : inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
                       rows={1}
                       data-testid={`jcf-input-${elementIndex}-${row.key}`}
                     />
@@ -657,7 +657,7 @@ export function JcfElementsTable({
                       formats={PRODUCT_FORMATS}
                       sessionPresets={sessionLearning.productFormats}
                       onLearnPreset={sessionLearning.learnProductFormat}
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -714,7 +714,7 @@ export function JcfElementsTable({
                       presets={IMPRESSION_PRESETS}
                       sessionPresets={sessionLearning.impressions}
                       onLearnPreset={sessionLearning.learnImpression}
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -771,7 +771,7 @@ export function JcfElementsTable({
                       presets={SURFACAGE_PRESETS}
                       sessionPresets={sessionLearning.surfacages}
                       onLearnPreset={sessionLearning.learnSurfacage}
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -825,7 +825,7 @@ export function JcfElementsTable({
                       onChange={(v) =>
                         handleCellChange(elementIndex, 'quantite', v)
                       }
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -879,7 +879,7 @@ export function JcfElementsTable({
                       onChange={(v) =>
                         handleCellChange(elementIndex, 'pagination', v)
                       }
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -936,7 +936,7 @@ export function JcfElementsTable({
                       paperTypes={PAPER_TYPES}
                       sessionPaperTypes={sessionLearning.papiers}
                       onLearnPaperType={sessionLearning.learnPapier}
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -993,7 +993,7 @@ export function JcfElementsTable({
                       feuilleFormats={FEUILLE_FORMATS}
                       sessionFormats={sessionLearning.feuilleFormats}
                       onLearnFormat={sessionLearning.learnFeuilleFormat}
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(_e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -1049,7 +1049,7 @@ export function JcfElementsTable({
                       }
                       elementNames={elementNames}
                       currentElementName={element.name}
-                      inputClassName={`${inputFilledClass} text-[13px]`}
+                      inputClassName={`${inputFilledClass} text-base`}
                       onTabOut={(e, direction) => {
                         const lastRow = rows.length - 1;
                         const lastEl = elements.length - 1;
@@ -1131,7 +1131,7 @@ export function JcfElementsTable({
                         onKeyDown={(e) =>
                           handleCellKeyDown(e, elementIndex, rowIndex)
                         }
-                        className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-[13px] flex-1`}
+                        className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-base flex-1`}
                         data-testid={`jcf-input-${elementIndex}-${row.key}`}
                       />
                     </div>
@@ -1146,7 +1146,7 @@ export function JcfElementsTable({
                       onKeyDown={(e) =>
                         handleCellKeyDown(e, elementIndex, rowIndex)
                       }
-                      className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-[13px]`}
+                      className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-base`}
                       data-testid={`jcf-input-${elementIndex}-${row.key}`}
                     />
                   )}
