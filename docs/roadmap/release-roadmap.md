@@ -1548,22 +1548,26 @@ Two-part release following reference/jcf pattern.
 - `apps/web/src/components/JcfJobHeader/JcfJobHeader.tsx` (onTemplateSelect)
 - `apps/web/src/App.tsx` (sequenceWorkflow state)
 
-#### v0.4.32a - Element Prerequisites Data Model & Job Details Panel UI
+#### v0.4.32a - Element Prerequisites Data Model & Job Details Panel UI ✅
 > **Purpose:** Move prerequisite tracking from Job level to Element level
 > **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md`
 
-- [ ] New status types: PaperStatus, BatStatus, PlateStatus (snake_case, with 'none' option)
-- [ ] Extend Element interface with prerequisite fields
-- [ ] Remove job-level tracking from Job interface (paperPurchaseStatus, platesStatus, proofApproval)
-- [ ] Prerequisite dropdowns in Job Details Panel (ElementSection)
-- [ ] Plates dropdown only for elements with offset action (cat-offset)
-- [ ] Assembly elements show "(pas de prérequis)"
+- [x] New status types: PaperStatus, BatStatus, PlateStatus (snake_case, with 'none' option)
+- [x] Extend Element interface with prerequisite fields
+- [x] Remove job-level tracking from Job interface (paperPurchaseStatus, platesStatus, proofApproval)
+- [x] Prerequisite dropdowns in Job Details Panel (ElementSection)
+- [x] Plates dropdown only for elements with offset action (cat-offset)
+- [x] Assembly elements show "(pas de prérequis)"
 
 **Affected files:**
 - `packages/types/src/element.ts` - New status types, Element extension
 - `packages/types/src/job.ts` - Remove job-level tracking
 - `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
 - `apps/web/src/components/JobDetailsPanel/PrerequisiteDropdown.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteStatus.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/TaskList.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
+- `apps/web/src/App.tsx`
 
 #### v0.4.32b - Scheduler Tile Blocking Visual & Tooltip
 > **Purpose:** Visual feedback for blocked elements on scheduler tiles
@@ -1595,6 +1599,32 @@ Two-part release following reference/jcf pattern.
 - `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
 - `apps/web/src/components/JobDetailsPanel/PrerequisiteDropdown.tsx`
 - `apps/web/src/utils/prerequisites.ts`
+
+#### v0.4.32d - Element Prerequisites Backend & Documentation
+> **Purpose:** Backend API support and documentation for element-level prerequisites
+> **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md` (Backend section)
+
+- [ ] Add prerequisite fields to Element entity (PHP)
+- [ ] Remove prerequisite fields from Job entity (PHP)
+- [ ] Create database migration (add to element, remove from job)
+- [ ] Update Job API endpoints (remove prerequisite fields from DTOs)
+- [ ] Update Element API endpoints (add prerequisite fields to DTOs)
+- [ ] Update OpenAPI documentation
+- [ ] Run PHPStan level 8
+
+**Documentation updates:**
+- [ ] Update domain model (`docs/domain-model/domain-model.md`)
+- [ ] Update business rules (`docs/domain-model/business-rules.md`)
+- [ ] Update initial data model (`docs/requirements/initial-data-model.md`)
+- [ ] Update service boundaries (`docs/architecture/service-boundaries.md`)
+- [ ] Update interface contracts (`docs/architecture/interface-contracts.md`)
+
+**Affected files:**
+- `services/php-api/src/Entity/Element.php`
+- `services/php-api/src/Entity/Job.php`
+- `services/php-api/migrations/`
+- `services/php-api/src/Controller/JobController.php`
+- `services/php-api/config/openapi/`
 
 ### Phase 4J: Save
 
