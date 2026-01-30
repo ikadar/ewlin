@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 
 export interface JcfModalProps {
   /** Whether the modal is open */
@@ -10,6 +10,10 @@ export interface JcfModalProps {
   title?: string;
   /** Modal content (children) */
   children?: React.ReactNode;
+  /** Save handler - called when Save button is clicked */
+  onSave?: () => void;
+  /** Whether save is in progress (disables button) */
+  isSaving?: boolean;
 }
 
 /**
@@ -22,6 +26,8 @@ export function JcfModal({
   onClose,
   title = 'Nouveau Job',
   children,
+  onSave,
+  isSaving = false,
 }: JcfModalProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
@@ -29,13 +35,18 @@ export function JcfModal({
     onClose();
   }, [onClose]);
 
-  // Escape key closes modal; Cmd+S / Ctrl+S reserved (no-op for now)
+  const stableOnSave = useCallback(() => {
+    onSave?.();
+  }, [onSave]);
+
+  // Escape key closes modal; Cmd+S / Ctrl+S triggers save
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
+        stableOnSave();
         return;
       }
 
@@ -46,7 +57,7 @@ export function JcfModal({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, stableOnClose]);
+  }, [isOpen, stableOnClose, stableOnSave]);
 
   if (!isOpen) return null;
 
@@ -124,9 +135,26 @@ export function JcfModal({
               <kbd className="bg-zinc-800 px-[5px] py-[2px] rounded-[3px] text-zinc-400">Esc</kbd> Fermer
             </span>
           </div>
-          {/* Action buttons row (placeholder for future save buttons) */}
-          <div className="px-[13px] py-[8px] flex items-center justify-end">
-            <span className="text-xs leading-[13px] text-zinc-600">Actions disponibles dans une version ultérieure</span>
+          {/* Action buttons row */}
+          <div className="px-[13px] py-[8px] flex items-center justify-end gap-[10px]">
+            <button
+              onClick={onClose}
+              className="px-[13px] py-[6px] text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-[5px] font-medium transition-colors"
+              data-testid="jcf-modal-cancel"
+            >
+              Annuler
+            </button>
+            {onSave && (
+              <button
+                onClick={stableOnSave}
+                disabled={isSaving}
+                className="px-[13px] py-[6px] text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white rounded-[5px] font-medium transition-colors flex items-center gap-[6px]"
+                data-testid="jcf-modal-save"
+              >
+                <Save size={14} />
+                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+            )}
           </div>
         </footer>
       </div>

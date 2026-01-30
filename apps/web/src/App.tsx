@@ -433,6 +433,32 @@ function AppContent() {
   // v0.4.9: Elements table state
   const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
 
+  // v0.4.30: Save validation ref
+  const jcfSaveAttemptRef = useRef<(() => boolean) | null>(null);
+  const [isJcfSaving, setIsJcfSaving] = useState(false);
+
+  const handleJcfSave = useCallback(() => {
+    if (jcfSaveAttemptRef.current) {
+      const isValid = jcfSaveAttemptRef.current();
+      if (isValid) {
+        // TODO: Actual API save will be implemented in future release
+        setIsJcfSaving(true);
+        // Simulate save for now
+        setTimeout(() => {
+          setIsJcfSaving(false);
+          setIsJcfModalOpen(false);
+          // Reset form
+          setJcfClient('');
+          setJcfTemplate('');
+          setJcfIntitule('');
+          setJcfQuantity('');
+          setJcfDeadline('');
+          setJcfElements([{ ...DEFAULT_ELEMENT }]);
+        }, 500);
+      }
+    }
+  }, []);
+
   const handleOpenJcf = useCallback(() => {
     setJcfJobId(generateJobId());
     setIsJcfModalOpen(true);
@@ -1558,7 +1584,7 @@ function AppContent() {
       )}
 
       {/* v0.4.6: JCF Modal */}
-      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf}>
+      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf} onSave={handleJcfSave} isSaving={isJcfSaving}>
         <JcfJobHeader
           jobId={jcfJobId}
           client={jcfClient}
@@ -1579,6 +1605,7 @@ function AppContent() {
             onElementsChange={setJcfElements}
             sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : undefined}
             jobQuantity={jcfQuantity}
+            onSaveAttemptRef={jcfSaveAttemptRef}
           />
         </div>
       </JcfModal>
