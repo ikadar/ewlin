@@ -1172,9 +1172,9 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 > 6. Simple autocompletes: format, impression, surfacage, quantité/pagination (v0.4.13–v0.4.16)
 > 7. DSL autocompletes: papier, imposition, precedences (v0.4.17–v0.4.19)
 > 8. Sequence autocomplete: poste, ST, workflow (v0.4.20–v0.4.22)
-> 9. Validation & calculated fields (v0.4.23–v0.4.25)
-> 10. Job save & backend integration (v0.4.26)
-> 11. Template system (v0.4.27–v0.4.28)
+> 9. Validation, scaling & production readiness (v0.4.23–v0.4.31)
+> 10. Job save & backend integration (v0.4.32)
+> 11. Template system (v0.4.33–v0.4.34)
 
 ### Phase 4A: Element Entity Foundation
 
@@ -1472,7 +1472,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4I: Validation & Calculated Fields
 
-> **Sequential:** v0.4.23 → v0.4.24 → v0.4.25 (each validation level builds on previous).
+> **Sequential:** v0.4.23 → v0.4.24 → v0.4.28 → v0.4.29 → v0.4.30 → v0.4.31
 
 #### v0.4.23 - JCF: Live Format Validation (Level 1) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 1)
@@ -1493,7 +1493,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [x] Auto/manual toggle for qteFeuilles per element
 - [x] Recalculation triggers: jobQuantity, elementQuantity, or imposition changes
 
-#### v0.4.25 - JCF: Submit Validation (Level 3)
+#### v0.4.28 - JCF: Submit Validation (Level 3)
 > **Spec source:** §2.1 (Three-Level Validation — Level 3)
 
 - [ ] Strict full-form validation on Save button click
@@ -1503,9 +1503,63 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Form blocking until errors resolved
 - [ ] Scroll to first error
 
+#### v0.4.29 - UI Scale Harmonization (80% Base App)
+> **Purpose:** Font-size standardization + 80% grid scaling
+
+Two-part release following reference/jcf pattern.
+
+**Part 1: Font-size Standardization**
+- [ ] Set root font-size to 13px (`html { font-size: 13px }`)
+- [ ] Convert `text-[11px]` → `text-sm` (11.375px with 13px root)
+- [ ] Convert `text-[13px]` → `text-base` (13px with 13px root)
+- [ ] Convert `text-[10px]` → `text-xs` (9.75px with 13px root)
+- [ ] Keep edge cases: `text-[6px]`, `text-[9px]`, `text-[15px]`
+
+**Part 2: 80% Grid Scaling**
+- [ ] Add 80% zoom level (`pixelsPerHour = 64`)
+- [ ] Fix `DragPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
+- [ ] Fix `PickPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
+- [ ] Scale min/max height bounds proportionally
+- [ ] E2E tests for pick & place at 80% zoom
+
+**Affected files:**
+- `apps/web/src/index.css`
+- `apps/web/src/components/TopNavBar/constants.ts`
+- `apps/web/src/components/DragPreview/DragPreview.tsx`
+- `apps/web/src/pick/PickPreview.tsx`
+- JCF components (10 files) - font-size conversion
+- Base app components (5 files) - font-size conversion
+
+#### v0.4.30 - Sequence Autocomplete: Template-Free Mode
+> **Bug:** Sequence input suggests workflow-based categories even when no template is selected
+
+- [ ] Detect when no template is selected (empty `sequenceWorkflow`)
+- [ ] Template-free mode: show all postes without category filtering
+- [ ] Template-free mode: no workflow step progression indicators (★)
+- [ ] Template mode: current behavior (workflow-guided suggestions)
+- [ ] Unit tests for both modes
+
+**Affected files:**
+- `apps/web/src/components/JcfSequenceAutocomplete/JcfSequenceAutocomplete.tsx`
+
+#### v0.4.31 - Production Readiness Tracking (Paper, Plates, BAT)
+> **Purpose:** Track prerequisites for starting production on each element
+
+- [ ] Paper readiness status per element (InStock/ToOrder/Ordered/Received)
+- [ ] Plates readiness status per element (Todo/InProgress/Done)
+- [ ] BAT (Bon à Tirer) approval status per element (Pending/Sent/Approved)
+- [ ] Visual indicators in JCF elements table
+- [ ] Visual indicators in Job Details Panel
+- [ ] Status affects scheduling constraints (future: block scheduling if not ready)
+
+**Affected files:**
+- `apps/web/src/components/JcfElementsTable/JcfElementsTable.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobStatus.tsx`
+- `@flux/types` - Element type extension
+
 ### Phase 4J: Save
 
-#### v0.4.26 - JCF: Job Save & API Integration
+#### v0.4.32 - JCF: Job Save & API Integration
 > **Spec source:** §10 (Backend Logic)
 
 - [ ] Form data → API request mapping
@@ -1519,7 +1573,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4K: Template System
 
-#### v0.4.27 - JCF: Template CRUD & Apply
+#### v0.4.33 - JCF: Template CRUD & Apply
 > **Spec source:** reference `TemplateList.tsx`, `TemplateEditorModal.tsx`
 
 - [ ] Create template from existing job
@@ -1529,7 +1583,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 - [ ] Category auto-creation on new category name
 - [ ] Template name and description fields
 
-#### v0.4.28 - JCF: Link Propagation & Dual-Mode Editor
+#### v0.4.34 - JCF: Link Propagation & Dual-Mode Editor
 > **Spec source:** §4 (Link Propagation)
 
 - [ ] Link toggle per field: format, papier, imposition, impression, surfacage
@@ -1575,14 +1629,14 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ## Milestone 6: DSL Editor (v0.6.x, Post-MVP)
 
-> **Note:** The original Job Creation Modal (v0.6.1) and DSL textarea approach have been **superseded by the JCF implementation in M4** (v0.4.4–v0.4.28), which provides a full-featured form-based job creation UI with specialized autocompletes. The Lezer-based DSL parser remains as an optional post-MVP enhancement for syntax highlighting in the sequence field.
+> **Note:** The original Job Creation Modal (v0.6.1) and DSL textarea approach have been **superseded by the JCF implementation in M4** (v0.4.4–v0.4.34), which provides a full-featured form-based job creation UI with specialized autocompletes. The Lezer-based DSL parser remains as an optional post-MVP enhancement for syntax highlighting in the sequence field.
 
 ### Phase 6A: DSL Parser (Optional Enhancement)
 
 #### v0.6.0 - DSL Parser Package
 - [ ] `@flux/task-dsl-parser` package setup
 - [ ] Lezer grammar definition for sequence field syntax
-- [ ] CodeMirror 6 integration (extends v0.4.28 JSON editor)
+- [ ] CodeMirror 6 integration (extends v0.4.34 JSON editor)
 - [ ] Syntax highlighting for sequence field
 
 ---
@@ -1688,7 +1742,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 | M1        | v0.1.x  | 20       | Core Domain (Station + Job)               |
 | M2        | v0.2.x  | 19       | Scheduling Core (Assignment + Validation) |
 | M3        | v0.3.x  | 61       | Frontend Integration                      |
-| M4        | v0.4.x  | 29       | Job Creation Form (Element layer + JCF UI + Templates) |
+| M4        | v0.4.x  | 32       | Job Creation Form (Element layer + JCF UI + Templates) |
 | M5        | v0.5.x  | 4        | Backend API Integration                   |
 | M6        | v0.6.x  | 1        | DSL Syntax Highlighting (Post-MVP, optional) |
 | M7        | v1.0.x  | 9        | Production Readiness                      |
@@ -1715,9 +1769,9 @@ Stream 3: Frontend (React)
 ├── Mock mode development
 ├── Scheduling UI components
 ├── Pick & Place interactions
-├── Job Creation Form (v0.4.4–v0.4.28)
+├── Job Creation Form (v0.4.4–v0.4.34)
 │   ├── Autocompletes (parallelizable: v0.4.13–v0.4.22)
-│   └── Template system (v0.4.27–v0.4.28)
+│   └── Template system (v0.4.33–v0.4.34)
 └── API integration
 
 Stream 4: Infrastructure

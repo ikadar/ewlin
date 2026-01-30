@@ -8,6 +8,8 @@ Implement the specified release following the workflow below.
 
 **Target branch:** `ux-ui-development` (NOT `main`)
 
+---
+
 ## Workflow Steps
 
 ### Phase 1: Preparation and Specification
@@ -22,10 +24,12 @@ Implement the specified release following the workflow below.
    - If **not exists**:
      - Read: `docs/releases/_TEMPLATE.md`
      - Read: `docs/roadmap/release-roadmap.md` (to understand scope)
-     - Create the release document
+     - Create the release document with:
+       - Feature checklist
+       - **Manual QA Test Plan section** (see template at the bottom of this document)
    - If **exists**, read and understand the scope
 
-3. **STOP - Present the release document and WAIT for approval!**
+3. **STOP — Present the release document and WAIT for approval!**
 
 ---
 
@@ -40,25 +44,43 @@ Continue only after approval!
    git checkout -b feature/v{VERSION}-{short-name}
    ```
 
-2. **Create TodoWrite list** based on the feature checklist
+2. **Create task list** based on the feature checklist
 
 3. **Implement all features:**
-   - React components
-   - Styling (Tailwind CSS)
-   - State management (Redux if needed)
-   - Unit tests
 
-   **IMPORTANT - Follow mockups precisely:**
-   - **Primary mockup file:** `docs/ux-ui/dark-prettier.html`
-   - **Visual reference:** `docs/ux-ui/assets/mockup-reference.png`
-   - Copy class names exactly from mockup code (spacing, colors, typography)
-   - Match visual structure: element order, flex directions, alignments
-   - Compare your implementation's rendered HTML with the mockup HTML
+   **Main app conventions to follow:**
+   - TypeScript strict mode
+   - `@flux/types` for all domain types
+   - Tailwind CSS with project design tokens (`index.css` @theme)
+   - `memo()` for components receiving heavy data props
+   - `useCallback` for event handlers passed to children
+   - Barrel exports (`index.ts`) for component directories
+   - `clsx()` + `tailwind-merge` for conditional classes
+   - Path alias: `@/*` → `./src/*`
 
-4. **Write E2E tests (Cypress):**
-   - Location: `apps/web/cypress/e2e/`
+   **Component structure:**
+   ```
+   src/components/MyComponent/
+   ├── MyComponent.tsx        # Main component
+   ├── MyComponent.test.tsx   # Unit tests
+   └── index.ts               # Barrel export
+   ```
+
+4. **Create deterministic test fixture for Manual QA:**
+   - Location: `apps/web/src/mock/testFixtures.ts`
+   - Add new fixture with name matching the feature (e.g., `zoom-80`, `font-standardization`)
+   - Fixture must provide **predictable, reproducible data** for manual testing
+   - Document the fixture in the release document's Manual QA Test Plan section
+
+5. **Write unit tests (Vitest):**
+   - Location: alongside component (`MyComponent.test.tsx`)
+   - Test: rendering, props, callbacks, edge cases
+   - Use `@testing-library/react`
+
+6. **Write E2E tests (Playwright):**
+   - Location: `apps/web/playwright/`
    - **When to write E2E tests:**
-     - User interactions (click, double-click, drag & drop)
+     - User interactions (click, double-click, keyboard navigation)
      - Navigation and scrolling behavior
      - Keyboard shortcuts
      - Visual state changes (selection, hover, active states)
@@ -67,11 +89,10 @@ Continue only after approval!
      - Pure styling changes (colors, spacing)
      - Internal refactoring without behavior change
      - Performance optimizations
-   - **Test file naming:** `{feature-name}.cy.ts` (e.g., `tile-recall.cy.ts`)
-   - **Use existing custom commands** from `cypress/support/commands.ts`
+   - **Test file naming:** `{feature-name}.spec.ts` (e.g., `zoom-levels.spec.ts`)
    - **Add data-testid** attributes to new components for reliable selection
 
-5. **Quality checks:**
+7. **Quality checks:**
    ```bash
    cd apps/web
    pnpm run lint
@@ -79,28 +100,21 @@ Continue only after approval!
    pnpm test
    ```
 
-6. **Run E2E tests:**
+8. **Run E2E tests:**
    ```bash
-   # Start dev server in background
-   pnpm dev &
-   # Wait for server to be ready
-   sleep 5
-   # Run E2E tests
-   pnpm cypress run --e2e
-   # Kill dev server
-   kill %1
+   cd apps/web
+   pnpm exec playwright test
    ```
 
-   **If E2E tests fail:**
-   - Fix the failing tests or the implementation
-   - Re-run until all tests pass
-   - Never skip failing tests without fixing
+   **If tests fail:** fix and re-run. Never skip failing tests.
 
-7. **STOP - Present the implementation summary:**
+9. **STOP — Present the implementation summary:**
    - Created/modified files
    - Unit test results
    - E2E test results
    - Lint/TypeScript results
+   - **Manual QA Test Plan** with steps and expected results
+   - **Test fixture URL:** `http://localhost:5173/?fixture={feature-name}`
    - **WAIT for approval!**
 
 #### Handling Modification Requests
@@ -128,6 +142,10 @@ Continue only after approval!
    Features:
    - Feature 1
    - Feature 2
+
+   Manual QA:
+   - Test fixture: ?fixture={feature-name}
+   - QA steps documented in release notes
 
    Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
    EOF
@@ -172,6 +190,17 @@ Continue only after approval!
    - Feature 1
    - Feature 2
 
+   ## Manual QA
+   Test URL: `http://localhost:5173/?fixture={feature-name}`
+
+   ### Test Steps
+   1. {Step 1}
+   2. {Step 2}
+
+   ### Expected Results
+   - {Expected result 1}
+   - {Expected result 2}
+
    ## Notes
    - This is a UI development release (ux-ui-development branch)
    - Not yet merged to main
@@ -184,33 +213,72 @@ Continue only after approval!
 ### Phase 5: Documentation Update
 
 1. **Update documents:**
-   - `docs/roadmap/release-roadmap.md` - mark release as completed
+   - `docs/roadmap/release-roadmap.md` — mark release items as `[x]` completed
    - `docs/releases/v{VERSION}-*.md`:
      - Status: ✅ Released (on ux-ui-development)
      - Release Date: current date
      - Feature checklist: all checked
+     - Manual QA: all checked
      - Definition of Done: all checked
 
 2. **Commit documentation:**
    ```bash
    git add docs/
-   git commit -m "docs: Update for v{VERSION} UI release"
+   git commit -m "docs: Update for v{VERSION} release"
    git push origin ux-ui-development
    ```
 
 ---
 
+## Manual QA Test Plan Template
+
+Include this section in every release document:
+
+```markdown
+## Manual QA Test Plan
+
+### Test Fixture
+- **Fixture name:** `{feature-name}`
+- **URL:** `http://localhost:5173/?fixture={feature-name}`
+- **Description:** {What the fixture provides}
+
+### Visual Verification
+- [ ] {Visual check 1 — layout, sizing, colors}
+- [ ] {Visual check 2 — font sizes, spacing}
+- [ ] {Visual check 3 — component alignment}
+
+### Interaction Testing
+- [ ] {Interaction 1 — e.g., click behavior}
+- [ ] {Interaction 2 — e.g., keyboard navigation works}
+- [ ] {Interaction 3 — e.g., zoom level changes}
+
+### Regression Testing
+- [ ] Existing functionality still works
+- [ ] No visual regressions in unrelated components
+```
+
+---
+
 ## Important Rules
 
+### Approval gates
 - **NEVER** proceed without approval after Phase 1 and Phase 2
+- **ALWAYS** present release document before implementation
+- **ALWAYS** present implementation summary before commit
+
+### Manual QA
+- **ALWAYS** include Manual QA Test Plan in release document
+- **ALWAYS** create deterministic test fixtures for Manual QA
+- **ALWAYS** document test fixture URL and steps in implementation summary
+
+### Quality
 - **ALWAYS** read specification documents in Phase 1
 - **ALWAYS** use feature branches, never commit directly to `ux-ui-development`
-- **ALWAYS** use TodoWrite to track progress
 - **ALWAYS** run lint, typecheck, unit tests, and E2E tests
 - **ALWAYS** write E2E tests for user interactions (when applicable)
 - **ALWAYS** create git tag and GitHub release after merge
-- **NEVER** merge into `main` - only merge into `ux-ui-development`
-- **NEVER** skip failing E2E tests - fix them before proceeding
+- **NEVER** merge into `main` — only merge into `ux-ui-development`
+- **NEVER** skip failing tests — fix them before proceeding
 - Commit messages in English, communication in the user's language
 
 ## Affected Repository
@@ -218,3 +286,4 @@ Continue only after approval!
 | Repo | When affected |
 |------|---------------|
 | `apps/web` | Always (UI releases) |
+| `packages/types` | When domain types change |
