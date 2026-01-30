@@ -1,9 +1,10 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
 import { MOCK_CLIENTS, MOCK_TEMPLATES } from '../../mock/reference-data';
+import type { MockTemplate } from '../../mock/reference-data';
 
 export interface JcfJobHeaderProps {
   jobId: string;
@@ -17,6 +18,8 @@ export interface JcfJobHeaderProps {
   onQuantityChange: (value: string) => void;
   deadline: string;
   onDeadlineChange: (value: string) => void;
+  /** Called when a template is selected, with full template data including workflow (v0.4.31) */
+  onTemplateSelect?: (template: MockTemplate | null) => void;
 }
 
 /**
@@ -40,6 +43,7 @@ export function JcfJobHeader({
   onQuantityChange,
   deadline,
   onDeadlineChange,
+  onTemplateSelect,
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,11 +102,34 @@ export function JcfJobHeader({
     ];
   }, [client]);
 
-  const handleTemplateSelect = () => {
-    setTimeout(() => {
-      document.getElementById('jcf-intitule')?.focus();
-    }, 0);
-  };
+  // v0.4.31: Handle template selection with workflow extraction
+  const handleTemplateSelectInternal = useCallback(
+    (selectedValue: string) => {
+      // Look up the full template object by name
+      const selectedTemplate = MOCK_TEMPLATES.find(
+        (t) => t.name.toLowerCase() === selectedValue.toLowerCase()
+      );
+      // Call external callback with full template (including workflow) or null if not found
+      onTemplateSelect?.(selectedTemplate ?? null);
+      // Focus next field
+      setTimeout(() => {
+        document.getElementById('jcf-intitule')?.focus();
+      }, 0);
+    },
+    [onTemplateSelect]
+  );
+
+  // v0.4.31: Handle template clear (empty value)
+  const handleTemplateChange = useCallback(
+    (value: string) => {
+      onTemplateChange(value);
+      // If cleared, notify parent to reset workflow
+      if (!value.trim()) {
+        onTemplateSelect?.(null);
+      }
+    },
+    [onTemplateChange, onTemplateSelect]
+  );
 
   // --- Deadline ---
 
@@ -166,11 +193,11 @@ export function JcfJobHeader({
           <JcfAutocomplete
             id="jcf-template"
             value={template}
-            onChange={onTemplateChange}
+            onChange={handleTemplateChange}
             suggestions={templateSuggestions}
             inputClassName={inputBaseClass}
             placeholder="Aucun"
-            onSelect={handleTemplateSelect}
+            onSelect={handleTemplateSelectInternal}
           />
         </div>
 

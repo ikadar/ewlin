@@ -6,6 +6,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
+import type { MockTemplate } from './mock/reference-data';
 import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo } from './utils';
@@ -433,6 +434,9 @@ function AppContent() {
   // v0.4.9: Elements table state
   const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
 
+  // v0.4.31: Sequence workflow from selected template (template-free mode when empty)
+  const [sequenceWorkflow, setSequenceWorkflow] = useState<string[]>([]);
+
   // v0.4.30: Save validation ref
   const jcfSaveAttemptRef = useRef<(() => boolean) | null>(null);
   const [isJcfSaving, setIsJcfSaving] = useState(false);
@@ -454,6 +458,7 @@ function AppContent() {
           setJcfQuantity('');
           setJcfDeadline('');
           setJcfElements([{ ...DEFAULT_ELEMENT }]);
+          setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
         }, 500);
       }
     }
@@ -472,6 +477,12 @@ function AppContent() {
     setJcfQuantity('');
     setJcfDeadline('');
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
+    setSequenceWorkflow([]); // v0.4.31: Reset workflow on close
+  }, []);
+
+  // v0.4.31: Handle template selection - extract workflow for sequence suggestions
+  const handleJcfTemplateSelect = useCallback((template: MockTemplate | null) => {
+    setSequenceWorkflow(template?.workflow ?? []);
   }, []);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
@@ -1597,13 +1608,14 @@ function AppContent() {
           onQuantityChange={setJcfQuantity}
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
+          onTemplateSelect={handleJcfTemplateSelect}
         />
         {/* v0.4.9: Elements Table */}
         <div className="mt-[13px]">
           <JcfElementsTable
             elements={jcfElements}
             onElementsChange={setJcfElements}
-            sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : undefined}
+            sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : sequenceWorkflow}
             jobQuantity={jcfQuantity}
             onSaveAttemptRef={jcfSaveAttemptRef}
           />
