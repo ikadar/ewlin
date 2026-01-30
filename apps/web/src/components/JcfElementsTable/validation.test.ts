@@ -386,6 +386,7 @@ describe('getCellError', () => {
       elementIndex: 0,
       field: 'pagination' as const,
       message: 'Invalid',
+      type: 'live' as const,
     };
     const errorMap = new Map([['0-pagination', error]]);
     expect(getCellError(errorMap, 0, 'pagination')).toBe(error);

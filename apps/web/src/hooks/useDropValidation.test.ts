@@ -42,8 +42,6 @@ const mockJob: Job = {
   status: 'Planned',
   workshopExitDate: '2025-12-20T18:00:00Z',
   color: '#8b5cf6',
-  paperPurchaseStatus: 'InStock',
-  platesStatus: 'Done',
   proofSentAt: null,
   proofApprovedAt: null,
 };

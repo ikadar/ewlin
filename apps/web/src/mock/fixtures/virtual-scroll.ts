@@ -8,8 +8,6 @@ import type {
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -39,9 +37,6 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     status: 'InProgress',
     workshopExitDate: isoDate(0, 0, 35), // 35 days from now
     color: '#8b5cf6', // Purple
-    paperPurchaseStatus: 'InStock',
-    platesStatus: 'Done',
-    proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
     comments: [],
     taskIds: ['task-vs-1a', 'task-vs-1b', 'task-vs-1c', 'task-vs-1d'],
     fullyScheduled: false,
@@ -57,9 +52,6 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     status: 'InProgress',
     workshopExitDate: isoDate(0, 0, 160), // 160 days from now
     color: '#3b82f6', // Blue
-    paperPurchaseStatus: 'InStock',
-    platesStatus: 'Done',
-    proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
     comments: [],
     taskIds: ['task-vs-2a', 'task-vs-2b', 'task-vs-2c'],
     fullyScheduled: false,
@@ -75,9 +67,6 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     status: 'InProgress',
     workshopExitDate: isoDate(0, 0, 200), // 200 days from now
     color: '#22c55e', // Green
-    paperPurchaseStatus: 'InStock',
-    platesStatus: 'Done',
-    proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
     comments: [],
     taskIds: ['task-vs-3'],
     fullyScheduled: false,

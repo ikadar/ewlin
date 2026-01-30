@@ -28,7 +28,8 @@ const DEFAULT_OPERATING_SCHEDULE = {
 // Helper to create minimal snapshot
 function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnapshot {
   return {
-    timestamp: '2026-01-06T10:00:00Z',
+    version: 1,
+    generatedAt: '2026-01-06T10:00:00Z',
     jobs: [],
     elements: [],
     tasks: [],
@@ -36,8 +37,8 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
     stations: [],
     groups: [],
     categories: [
-      { id: 'cat-offset', name: 'Offset', colorCode: '#FF0000' },
-      { id: 'cat-cutting', name: 'Cutting', colorCode: '#00FF00' },
+      { id: 'cat-offset', name: 'Offset', similarityCriteria: [] },
+      { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [] },
     ],
     providers: [],
     conflicts: [],
@@ -50,14 +51,18 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
 function createJob(id: string): Job {
   return {
     id,
-    jobNumber: '1234',
-    customerName: 'Test Customer',
-    customerPriority: 'normal',
-    requestedDelivery: '2026-01-10T17:00:00Z',
-    internalDeadline: '2026-01-10T17:00:00Z',
-    status: 'active',
+    reference: '1234',
+    client: 'Test Customer',
+    description: 'Test Job',
+    workshopExitDate: '2026-01-10',
+    status: 'InProgress',
+    color: '#8B5CF6',
+    fullyScheduled: false,
+    comments: [],
     taskIds: [],
     elementIds: [`element-${id}`],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -66,8 +71,12 @@ function createElement(jobId: string, taskIds: string[] = []): Element {
   return {
     id: `element-${jobId}`,
     jobId,
-    name: `Element for ${jobId}`,
+    suffix: 'ELT',
+    prerequisiteElementIds: [],
     taskIds,
+    paperStatus: 'in_stock',
+    batStatus: 'bat_approved',
+    plateStatus: 'ready',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -105,11 +114,16 @@ function createAssignment(
   isOutsourced: boolean = false
 ): TaskAssignment {
   return {
+    id: `assign-${taskId}`,
     taskId,
     targetId,
     isOutsourced,
     scheduledStart: start,
     scheduledEnd: end,
+    isCompleted: false,
+    completedAt: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -237,7 +251,15 @@ describe('getPredecessorConstraint', () => {
       elements: [createElement('job-1')],
       tasks: [printTask, cutTask],
       assignments: [assignment],
-      providers: [{ id: 'provider-1', name: 'External Printer' }],
+      providers: [{
+        id: 'provider-1',
+        name: 'External Printer',
+        status: 'Active',
+        supportedActionTypes: ['offset'],
+        latestDepartureTime: '14:00',
+        receptionTime: '09:00',
+        groupId: 'grp-external',
+      }],
     });
 
     const result = getPredecessorConstraint(cutTask, snapshot, 6, PIXELS_PER_HOUR);

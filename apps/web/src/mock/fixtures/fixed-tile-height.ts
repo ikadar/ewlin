@@ -6,8 +6,6 @@ import type {
   TaskAssignment,
 } from '@flux/types';
 import {
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -40,9 +38,6 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       status: 'InProgress',
       color: '#8b5cf6', // Purple
       workshopExitDate: isoDate(17, 0),
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      platesStatus: 'Done',
-      paperPurchaseStatus: 'InStock',
       comments: [],
       taskIds: ['task-h-15min', 'task-h-30min', 'task-h-2h', 'task-h-4h'],
       fullyScheduled: false,
@@ -57,9 +52,6 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       status: 'InProgress',
       color: '#3b82f6', // Blue
       workshopExitDate: isoDate(17, 0),
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
-      platesStatus: 'Done',
-      paperPurchaseStatus: 'InStock',
       comments: [],
       taskIds: ['task-h-sched', 'task-h-unsched'],
       fullyScheduled: false,

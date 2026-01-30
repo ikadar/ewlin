@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
-import type { JcfElement } from './components';
+import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
@@ -947,6 +947,33 @@ function AppContent() {
     setSnapshotVersion((v) => v + 1);
   }, []);
 
+  // v0.4.32a: Handle element prerequisite status change
+  const handleElementStatusChange = useCallback((update: ElementStatusUpdate) => {
+    updateSnapshot((currentSnapshot) => {
+      const elementIndex = currentSnapshot.elements.findIndex((e) => e.id === update.elementId);
+      if (elementIndex === -1) {
+        console.warn('Element not found for status update:', update.elementId);
+        return currentSnapshot;
+      }
+
+      console.log('Updating element status:', update);
+
+      // Create new elements array with updated element
+      const newElements = [...currentSnapshot.elements];
+      newElements[elementIndex] = {
+        ...newElements[elementIndex],
+        [update.field]: update.value,
+        updatedAt: new Date().toISOString(),
+      };
+
+      return {
+        ...currentSnapshot,
+        elements: newElements,
+      };
+    });
+    setSnapshotVersion((v) => v + 1);
+  }, []);
+
   // REQ-14: Handle date click - scroll grid to the clicked date
   const handleDateClick = useCallback((date: Date) => {
     if (!gridRef.current) return;
@@ -1505,6 +1532,7 @@ function AppContent() {
           onPick={handlePickTask}
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
+          onElementStatusChange={handleElementStatusChange}
         />
         <DateStrip
           startDate={gridStartDate}

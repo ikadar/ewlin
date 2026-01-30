@@ -4,14 +4,12 @@ import type {
   Job,
   Task,
   InternalTask,
+  Element,
 } from '@flux/types';
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
-  generateElementsForJobs,
   sevenDayOperatingSchedule,
   type JobWithoutElementIds,
 } from './shared';
@@ -48,9 +46,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7),
       color: '#ef4444',
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: null }, // NOT approved
       comments: [],
       taskIds: ['task-gate-no-bat'],
       fullyScheduled: false,
@@ -66,9 +61,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7),
       color: '#22c55e',
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-gate-bat-ok'],
       fullyScheduled: false,
@@ -84,9 +76,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7),
       color: '#f59e0b',
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Todo', // NOT done - warning only
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-gate-plates-pending'],
       fullyScheduled: false,
@@ -131,8 +120,54 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     } as InternalTask,
   ];
 
-  // generateElementsForJobs mutates jobs to add elementIds
-  const elements = generateElementsForJobs(jobs, tasks);
+  // Create elements with specific prerequisite statuses for each test case
+  const elements: Element[] = [
+    // Element without BAT approval (batStatus: waiting_files) - BLOCKING
+    {
+      id: 'elem-job-gate-no-bat',
+      jobId: 'job-gate-no-bat',
+      suffix: 'ELT',
+      prerequisiteElementIds: [],
+      taskIds: ['task-gate-no-bat'],
+      paperStatus: 'in_stock',
+      batStatus: 'waiting_files', // BAT not approved - blocking
+      plateStatus: 'ready',
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    // Element with BAT approved - CAN SCHEDULE
+    {
+      id: 'elem-job-gate-bat-ok',
+      jobId: 'job-gate-bat-ok',
+      suffix: 'ELT',
+      prerequisiteElementIds: [],
+      taskIds: ['task-gate-bat-ok'],
+      paperStatus: 'in_stock',
+      batStatus: 'bat_approved', // BAT approved - can schedule
+      plateStatus: 'ready',
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    // Element with Plates pending - WARNING ONLY (not blocking)
+    {
+      id: 'elem-job-gate-plates-pending',
+      jobId: 'job-gate-plates-pending',
+      suffix: 'ELT',
+      prerequisiteElementIds: [],
+      taskIds: ['task-gate-plates-pending'],
+      paperStatus: 'in_stock',
+      batStatus: 'bat_approved', // BAT is approved
+      plateStatus: 'to_make', // Plates not ready - warning only
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  // Add elementIds to jobs
+  (jobs[0] as Job).elementIds = ['elem-job-gate-no-bat'];
+  (jobs[1] as Job).elementIds = ['elem-job-gate-bat-ok'];
+  (jobs[2] as Job).elementIds = ['elem-job-gate-plates-pending'];
+
   return {
     ...baseSnapshot(),
     stations: approvalGatesStations,

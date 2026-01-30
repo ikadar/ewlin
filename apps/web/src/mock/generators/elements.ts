@@ -6,7 +6,7 @@
  * This mirrors what the backend migration will do.
  */
 
-import type { Element } from '@flux/types';
+import type { Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
 
 // ============================================================================
 // Helper Functions
@@ -25,6 +25,12 @@ interface CreateElementOptions {
   taskIds: string[];
   suffix?: string;
   label?: string;
+  /** Paper availability status (defaults to 'in_stock') */
+  paperStatus?: PaperStatus;
+  /** BAT approval status (defaults to 'bat_approved') */
+  batStatus?: BatStatus;
+  /** Plates preparation status (defaults to 'ready') */
+  plateStatus?: PlateStatus;
 }
 
 /**
@@ -32,7 +38,15 @@ interface CreateElementOptions {
  * For v0.4.0, each Job has exactly one Element containing all its Tasks.
  */
 export function createElement(options: CreateElementOptions): Element {
-  const { jobId, taskIds, suffix = 'ELT', label } = options;
+  const {
+    jobId,
+    taskIds,
+    suffix = 'ELT',
+    label,
+    paperStatus = 'in_stock',
+    batStatus = 'bat_approved',
+    plateStatus = 'ready',
+  } = options;
   const now = new Date();
 
   // Element ID is derived from job ID for deterministic testing
@@ -45,6 +59,10 @@ export function createElement(options: CreateElementOptions): Element {
     label,
     prerequisiteElementIds: [],
     taskIds,
+    spec: undefined,
+    paperStatus,
+    batStatus,
+    plateStatus,
     createdAt: formatTimestamp(now),
     updatedAt: formatTimestamp(now),
   };
