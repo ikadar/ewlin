@@ -74,7 +74,7 @@ test.describe('v0.3.33: Task Completion Toggle', () => {
     await expect(incompleteIcon).toBeVisible();
 
     // Get the tile that contains this icon (to check if it becomes selected)
-    const parentTile = incompleteIcon.locator('xpath=ancestor::div[starts-with(@data-testid, "tile-")]').first();
+    const _parentTile = incompleteIcon.locator('xpath=ancestor::div[starts-with(@data-testid, "tile-")]').first();
 
     // ACT: Click the completion icon (not the tile itself)
     await incompleteIcon.click();

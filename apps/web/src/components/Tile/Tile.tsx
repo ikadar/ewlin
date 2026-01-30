@@ -1,12 +1,14 @@
-import { memo } from 'react';
+import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import { Circle, CircleCheck } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
+import { PrerequisiteTooltip } from './PrerequisiteTooltip';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { SubcolumnLayout } from '../../utils/subcolumnLayout';
+import type { PrerequisiteBlockingInfo } from '../../utils';
 
 export interface TileProps {
   /** Task assignment data */
@@ -53,6 +55,10 @@ export interface TileProps {
   isPickingActive?: boolean;
   /** v0.3.58: Callback when tile is right-clicked (context menu) */
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
+  /** v0.4.32b: Whether this element is blocked due to missing prerequisites */
+  isBlocked?: boolean;
+  /** v0.4.32b: Prerequisite blocking info for tooltip display */
+  blockingInfo?: PrerequisiteBlockingInfo;
 }
 
 /**
@@ -91,7 +97,39 @@ export const Tile = memo(function Tile({
   onPickFromGrid,
   isPickingActive = false,
   onContextMenu,
+  isBlocked = false,
+  blockingInfo,
 }: TileProps) {
+  // v0.4.32b: Tooltip visibility state with 2-second hover delay
+  const [showTooltip, setShowTooltip] = useState(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // v0.4.32b: Handle mouse enter - start 2s timer for tooltip
+  const handleMouseEnter = useCallback(() => {
+    if (isBlocked && blockingInfo) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        setShowTooltip(true);
+      }, 2000);
+    }
+  }, [isBlocked, blockingInfo]);
+
+  // v0.4.32b: Handle mouse leave - cancel timer and hide tooltip
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowTooltip(false);
+  }, []);
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
 
@@ -210,7 +248,15 @@ export const Tile = memo(function Tile({
   const subcolumnStyle = getSubcolumnStyle();
 
   // REQ-19: Outsourced tile styling
-  const outsourcedBorderClass = isOutsourced ? 'border-2 border-dashed' : 'border-l-4';
+  // v0.4.32b: Blocked tiles show dashed border
+  const getBorderClass = () => {
+    if (isOutsourced) {
+      return 'border-2 border-dashed';
+    }
+    // Internal tiles: dashed when blocked, solid when ready
+    return isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
+  };
+  const borderStyleClass = getBorderClass();
   // v0.3.57: Cursor is pointer for pickable tiles (not completed, not outsourced)
   const cursorClass = !isCompleted && !isOutsourced && onPickFromGrid ? 'cursor-pointer' : 'cursor-default';
 
@@ -228,7 +274,7 @@ export const Tile = memo(function Tile({
 
   return (
     <div
-      className={`absolute text-sm ${outsourcedBorderClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
@@ -240,6 +286,8 @@ export const Tile = memo(function Tile({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       data-testid={`tile-${assignment.id}`}
       data-scheduled-start={assignment.scheduledStart}
       data-scheduled-end={assignment.scheduledEnd}
@@ -247,6 +295,7 @@ export const Tile = memo(function Tile({
       data-station-id={task.stationId}
       data-has-conflict={hasConflict ? 'true' : undefined}
       data-is-outsourced={isOutsourced ? 'true' : undefined}
+      data-is-blocked={isBlocked ? 'true' : undefined}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -337,6 +386,14 @@ export const Tile = memo(function Tile({
         showUp={showSwapUp}
         showDown={showSwapDown}
       />
+
+      {/* v0.4.32b: Prerequisite tooltip (shown after 2s hover on blocked tiles) */}
+      {isBlocked && blockingInfo && (
+        <PrerequisiteTooltip
+          blockingInfo={blockingInfo}
+          isVisible={showTooltip}
+        />
+      )}
     </div>
   );
 }, (prevProps, nextProps) => {
@@ -366,6 +423,10 @@ export const Tile = memo(function Tile({
   if (prevProps.isOutsourced !== nextProps.isOutsourced) return false;
   if (prevProps.similarityResults !== nextProps.similarityResults) return false;
   if (prevProps.subcolumnLayout !== nextProps.subcolumnLayout) return false;
+
+  // v0.4.32b: Blocking state
+  if (prevProps.isBlocked !== nextProps.isBlocked) return false;
+  if (prevProps.blockingInfo !== nextProps.blockingInfo) return false;
 
   // Callbacks - compare by reference
   if (prevProps.onSelect !== nextProps.onSelect) return false;

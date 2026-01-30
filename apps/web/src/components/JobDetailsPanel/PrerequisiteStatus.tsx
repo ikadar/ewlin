@@ -1,5 +1,6 @@
 import type { PaperStatus, BatStatus, PlateStatus } from '@flux/types';
-import { PrerequisiteDropdown, paperOptions, batOptions, plateOptions } from './PrerequisiteDropdown';
+import { PrerequisiteDropdown } from './PrerequisiteDropdown';
+import { paperOptions, batOptions, plateOptions } from './prerequisiteOptions';
 
 export interface PrerequisiteStatusProps {
   paperStatus: PaperStatus;

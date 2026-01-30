@@ -21,5 +21,8 @@ export type { ElementSectionProps } from './ElementSection';
 export { PrerequisiteStatus } from './PrerequisiteStatus';
 export type { PrerequisiteStatusProps } from './PrerequisiteStatus';
 
-export { PrerequisiteDropdown, paperOptions, batOptions, plateOptions } from './PrerequisiteDropdown';
+export { PrerequisiteDropdown } from './PrerequisiteDropdown';
 export type { PrerequisiteDropdownProps } from './PrerequisiteDropdown';
+
+export { paperOptions, batOptions, plateOptions } from './prerequisiteOptions';
+export type { PrerequisiteOption } from './prerequisiteOptions';

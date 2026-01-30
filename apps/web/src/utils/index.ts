@@ -41,3 +41,14 @@ export { getValidationMessage, getPrimaryValidationMessage } from './validationM
 export { addWorkingTime, subtractWorkingTime, getDayScheduleForDate, isWithinWorkingHours, snapToNextWorkingTime } from './workingTime';
 export { getJobIdForTask, createTaskToJobMap, getTasksForJob, groupTasksByJob } from './taskHelpers';
 export { mergeWithSession } from './mergeWithSession';
+export {
+  isElementBlocked,
+  isPaperReady,
+  isBatReady,
+  isPlatesReady,
+  getPrerequisiteBlockingInfo,
+  PAPER_READY_STATES,
+  BAT_READY_STATES,
+  PLATES_READY_STATES,
+} from './prerequisites';
+export type { PrerequisiteBlockingInfo } from './prerequisites';

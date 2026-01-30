@@ -13,6 +13,7 @@ import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { calculateSubcolumnLayout, getSubcolumnLayout } from '../../utils/subcolumnLayout';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { getJobIdForTask } from '../../utils/taskHelpers';
+import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -573,6 +574,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     // Skip if we don't have the task/job data or if task is not internal
                     if (!task || !job || !isInternalTask(task)) return null;
 
+                    // v0.4.32b: Get element for blocking status
+                    const element = elements.find((e) => e.id === task.elementId);
+                    const blocked = element ? isElementBlocked(element) : false;
+                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element) : undefined;
+
                     // Calculate top position from assignment.scheduledStart
                     // Use multi-day calculation when startDate is provided (REQ-14)
                     const startTime = new Date(assignment.scheduledStart);
@@ -617,6 +623,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onPickFromGrid={onPickFromGrid}
                         isPickingActive={isPicking}
                         onContextMenu={onContextMenu}
+                        isBlocked={blocked}
+                        blockingInfo={blockingInfo}
                       />
                     );
                   })}
@@ -645,6 +653,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     // Skip if we don't have the task/job data or if task is not internal
                     if (!task || !job || !isInternalTask(task)) return null;
 
+                    // v0.4.32b: Get element for blocking status
+                    const element = elements.find((e) => e.id === task.elementId);
+                    const blocked = element ? isElementBlocked(element) : false;
+                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element) : undefined;
+
                     // Calculate top position from assignment.scheduledStart
                     const startTime = new Date(assignment.scheduledStart);
                     const top = timeToYPosition(startTime, startHour, pixelsPerHour, startDate);
@@ -672,6 +685,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         isPickingActive={isPicking}
                         onContextMenu={onContextMenu}
                         onToggleComplete={onToggleComplete}
+                        isBlocked={blocked}
+                        blockingInfo={blockingInfo}
                       />
                     );
                   })}

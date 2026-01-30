@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import type { PaperStatus, BatStatus, PlateStatus } from '@flux/types';
 import { ChevronDown } from 'lucide-react';
 
 // Generic dropdown option type
@@ -7,31 +6,6 @@ interface DropdownOption<T extends string> {
   value: T;
   label: string;
 }
-
-// Paper status options
-const paperOptions: DropdownOption<PaperStatus>[] = [
-  { value: 'none', label: 'N/A' },
-  { value: 'in_stock', label: 'En stock' },
-  { value: 'to_order', label: 'À commander' },
-  { value: 'ordered', label: 'Commandé' },
-  { value: 'delivered', label: 'Livré' },
-];
-
-// BAT status options
-const batOptions: DropdownOption<BatStatus>[] = [
-  { value: 'none', label: 'N/A' },
-  { value: 'waiting_files', label: 'Attente fichiers' },
-  { value: 'files_received', label: 'Fichiers reçus' },
-  { value: 'bat_sent', label: 'BAT envoyé' },
-  { value: 'bat_approved', label: 'BAT OK' },
-];
-
-// Plate status options
-const plateOptions: DropdownOption<PlateStatus>[] = [
-  { value: 'none', label: 'N/A' },
-  { value: 'to_make', label: 'À faire' },
-  { value: 'ready', label: 'Prêtes' },
-];
 
 // Status colors
 function getStatusColor(type: 'paper' | 'bat' | 'plate', value: string): string {
@@ -136,6 +110,3 @@ export function PrerequisiteDropdown<T extends string>({
     </div>
   );
 }
-
-// Export option arrays for use in components
-export { paperOptions, batOptions, plateOptions };
