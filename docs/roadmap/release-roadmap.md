@@ -1569,19 +1569,20 @@ Two-part release following reference/jcf pattern.
 - `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
 - `apps/web/src/App.tsx`
 
-#### v0.4.32b - Scheduler Tile Blocking Visual & Tooltip
+#### v0.4.32b - Scheduler Tile Blocking Visual & Tooltip ✅
 > **Purpose:** Visual feedback for blocked elements on scheduler tiles
 > **Spec:** See `docs/releases/v0.4.32b-scheduler-tile-blocking-visual.md`
 
-- [ ] Blocking logic: isElementBlocked utility
-- [ ] Dashed left border for blocked tiles (vs solid for ready)
-- [ ] Custom tooltip on 2-second hover (blocked tiles only)
-- [ ] Tooltip shows ⚠/✓ indicators with French labels
+- [x] Blocking logic: isElementBlocked utility
+- [x] Dashed left border for blocked tiles (vs solid for ready)
+- [x] Custom tooltip on 2-second hover (blocked tiles only)
+- [x] Tooltip shows ⚠/✓ indicators with French labels
 
 **Affected files:**
 - `apps/web/src/utils/prerequisites.ts` (new)
 - `apps/web/src/components/Tile/Tile.tsx`
 - `apps/web/src/components/Tile/PrerequisiteTooltip.tsx` (new)
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
 
 #### v0.4.32c - Forme Status & Date Tracking
 > **Purpose:** Die-cutting tool tracking and automatic date recording
