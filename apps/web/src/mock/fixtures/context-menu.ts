@@ -8,8 +8,6 @@ import type {
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -31,9 +29,6 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7),
       color: '#3b82f6', // Blue
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-menu-1a', 'task-menu-1b', 'task-menu-1c'],
       fullyScheduled: true,
@@ -49,9 +44,6 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 5),
       color: '#8b5cf6', // Purple
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-menu-2a'],
       fullyScheduled: true,

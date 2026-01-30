@@ -118,9 +118,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
     },
   ];
 
-  const localBatSentAt = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const localBatApprovedAt = new Date(today.getTime() - 12 * 60 * 60 * 1000).toISOString();
-
   const jobs: JobWithoutElementIds[] = [
     {
       id: 'job-overlay-1',
@@ -130,9 +127,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
       status: 'InProgress',
       color: '#8b5cf6', // Purple
       workshopExitDate: isoDate(17, 0),
-      proofApproval: { sentAt: localBatSentAt, approvedAt: localBatApprovedAt },
-      platesStatus: 'Done',
-      paperPurchaseStatus: 'InStock',
       comments: [],
       taskIds: ['task-overlay-1'],
       fullyScheduled: false,

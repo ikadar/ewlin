@@ -1,8 +1,9 @@
-import type { Task, TaskAssignment, Station, Job, Element } from '@flux/types';
+import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
 import { isMultiElementJob } from '@flux/types';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
+import type { ElementStatusUpdate } from './JobDetailsPanel';
 
 /** Category ID for printing stations (offset press) */
 const PRINTING_CATEGORY_ID = 'cat-offset';
@@ -28,12 +29,14 @@ export interface TaskListProps {
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
   onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
+  /** Callback when element prerequisite status changes (v0.4.32a) */
+  onElementStatusChange?: (update: ElementStatusUpdate) => void;
 }
 
 /**
  * Scrollable list of task tiles for the selected job, grouped by element.
  */
-export function TaskList({ tasks, elements, job, assignments, stations, activeTaskId, pickedTaskId, onJumpToTask, onRecallTask, onPick }: TaskListProps) {
+export function TaskList({ tasks, elements, job, assignments, stations, activeTaskId, pickedTaskId, onJumpToTask, onRecallTask, onPick, onElementStatusChange }: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
     assignments.map((a) => [a.taskId, a])
@@ -62,6 +65,26 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
     if (task.type !== 'Internal') return false;
     const station = stationById.get(task.stationId);
     return station?.categoryId === PRINTING_CATEGORY_ID;
+  };
+
+  /**
+   * Check if an element has any offset printing tasks.
+   */
+  const elementHasOffset = (element: Element): boolean => {
+    return element.taskIds.some((taskId) => {
+      const task = taskById.get(taskId);
+      return task ? isPrintingTask(task) : false;
+    });
+  };
+
+  /**
+   * Check if an element is an assembly element (has prerequisite elements but no printing).
+   * Assembly elements typically only combine other elements without their own printing.
+   */
+  const isAssemblyElement = (element: Element): boolean => {
+    // An element is considered "assembly" if it has prerequisites but no tasks
+    // or if all its statuses are 'none' (explicitly marked as assembly)
+    return element.paperStatus === 'none' && element.batStatus === 'none' && element.plateStatus === 'none';
   };
 
   /**
@@ -113,12 +136,28 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
           .map((id) => taskById.get(id))
           .filter((t): t is Task => t !== undefined);
 
+        // Create status change handlers for this element
+        const handlePaperStatusChange = onElementStatusChange
+          ? (value: PaperStatus) => onElementStatusChange({ elementId: element.id, field: 'paperStatus', value })
+          : undefined;
+        const handleBatStatusChange = onElementStatusChange
+          ? (value: BatStatus) => onElementStatusChange({ elementId: element.id, field: 'batStatus', value })
+          : undefined;
+        const handlePlateStatusChange = onElementStatusChange
+          ? (value: PlateStatus) => onElementStatusChange({ elementId: element.id, field: 'plateStatus', value })
+          : undefined;
+
         return (
           <ElementSection
             key={element.id}
             element={element}
             allElements={jobElements}
             isSingleElement={isSingleElement}
+            hasOffset={elementHasOffset(element)}
+            isAssembly={isAssemblyElement(element)}
+            onPaperStatusChange={handlePaperStatusChange}
+            onBatStatusChange={handleBatStatusChange}
+            onPlateStatusChange={handlePlateStatusChange}
           >
             {renderTaskTiles(elementTasks)}
           </ElementSection>

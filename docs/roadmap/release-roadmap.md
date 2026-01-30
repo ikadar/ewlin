@@ -1172,9 +1172,10 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 > 6. Simple autocompletes: format, impression, surfacage, quantité/pagination (v0.4.13–v0.4.16)
 > 7. DSL autocompletes: papier, imposition, precedences (v0.4.17–v0.4.19)
 > 8. Sequence autocomplete: poste, ST, workflow (v0.4.20–v0.4.22)
-> 9. Validation, scaling & production readiness (v0.4.23–v0.4.31)
-> 10. Job save & backend integration (v0.4.32)
-> 11. Template system (v0.4.33–v0.4.34)
+> 9. Validation & scaling (v0.4.23–v0.4.31)
+> 10. Production readiness tracking (v0.4.32a–v0.4.32c)
+> 11. Job save & backend integration (v0.4.33)
+> 12. Template system (v0.4.34–v0.4.35)
 
 ### Phase 4A: Element Entity Foundation
 
@@ -1472,7 +1473,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4I: Validation & Calculated Fields
 
-> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32
+> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32a → v0.4.32b → v0.4.32c
 
 #### v0.4.23 - JCF: Live Format Validation (Level 1) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 1)
@@ -1547,20 +1548,53 @@ Two-part release following reference/jcf pattern.
 - `apps/web/src/components/JcfJobHeader/JcfJobHeader.tsx` (onTemplateSelect)
 - `apps/web/src/App.tsx` (sequenceWorkflow state)
 
-#### v0.4.32 - Production Readiness Tracking (Paper, Plates, BAT)
-> **Purpose:** Track prerequisites for starting production on each element
+#### v0.4.32a - Element Prerequisites Data Model & Job Details Panel UI
+> **Purpose:** Move prerequisite tracking from Job level to Element level
+> **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md`
 
-- [ ] Paper readiness status per element (InStock/ToOrder/Ordered/Received)
-- [ ] Plates readiness status per element (Todo/InProgress/Done)
-- [ ] BAT (Bon à Tirer) approval status per element (Pending/Sent/Approved)
-- [ ] Visual indicators in JCF elements table
-- [ ] Visual indicators in Job Details Panel
-- [ ] Status affects scheduling constraints (future: block scheduling if not ready)
+- [ ] New status types: PaperStatus, BatStatus, PlateStatus (snake_case, with 'none' option)
+- [ ] Extend Element interface with prerequisite fields
+- [ ] Remove job-level tracking from Job interface (paperPurchaseStatus, platesStatus, proofApproval)
+- [ ] Prerequisite dropdowns in Job Details Panel (ElementSection)
+- [ ] Plates dropdown only for elements with offset action (cat-offset)
+- [ ] Assembly elements show "(pas de prérequis)"
 
 **Affected files:**
-- `apps/web/src/components/JcfElementsTable/JcfElementsTable.tsx`
-- `apps/web/src/components/JobDetailsPanel/JobStatus.tsx`
-- `@flux/types` - Element type extension
+- `packages/types/src/element.ts` - New status types, Element extension
+- `packages/types/src/job.ts` - Remove job-level tracking
+- `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteDropdown.tsx` (new)
+
+#### v0.4.32b - Scheduler Tile Blocking Visual & Tooltip
+> **Purpose:** Visual feedback for blocked elements on scheduler tiles
+> **Spec:** See `docs/releases/v0.4.32b-scheduler-tile-blocking-visual.md`
+
+- [ ] Blocking logic: isElementBlocked utility
+- [ ] Dashed left border for blocked tiles (vs solid for ready)
+- [ ] Custom tooltip on 2-second hover (blocked tiles only)
+- [ ] Tooltip shows ⚠/✓ indicators with French labels
+
+**Affected files:**
+- `apps/web/src/utils/prerequisites.ts` (new)
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/Tile/PrerequisiteTooltip.tsx` (new)
+
+#### v0.4.32c - Forme Status & Date Tracking
+> **Purpose:** Die-cutting tool tracking and automatic date recording
+> **Spec:** See `docs/releases/v0.4.32c-forme-status-date-tracking.md`
+
+- [ ] FormeStatus type and formeStatus field on Element
+- [ ] Die-cutting action detection (cat-die-cutting or outsourced "découpe")
+- [ ] Forme dropdown in Job Details Panel
+- [ ] Date fields: paperOrderedAt, paperDeliveredAt, filesReceivedAt, batSentAt, batApprovedAt, formeOrderedAt, formeDeliveredAt
+- [ ] Automatic date recording on status transitions
+- [ ] Date display inline next to dropdowns (DD/MM/YYYY)
+
+**Affected files:**
+- `packages/types/src/element.ts` - FormeStatus, date fields
+- `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteDropdown.tsx`
+- `apps/web/src/utils/prerequisites.ts`
 
 ### Phase 4J: Save
 

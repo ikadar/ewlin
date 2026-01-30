@@ -8,8 +8,6 @@ import type {
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -32,9 +30,6 @@ export function createAltBypassFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7),
       color: '#3b82f6', // Blue
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-bypass-1', 'task-bypass-2'],
       fullyScheduled: false,

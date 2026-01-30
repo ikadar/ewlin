@@ -7,14 +7,15 @@ import { faker } from '@faker-js/faker/locale/fr';
 import type {
   Job,
   JobStatus,
-  PaperPurchaseStatus,
-  PlatesStatus,
   Task,
   InternalTask,
   OutsourcedTask,
   TaskStatus,
   LateJob,
   Element,
+  PaperStatus,
+  BatStatus,
+  PlateStatus,
 } from '@flux/types';
 import { createElement, getElementIdForJob } from './elements';
 
@@ -220,12 +221,16 @@ interface GenerateJobOptions {
   forceFirstStation?: string;
   /** Keep the first task unscheduled */
   keepFirstUnscheduled?: boolean;
-  /** Ensure all approval gates are satisfied (BAT approved, Plates done) */
-  forceApproved?: boolean;
+  /** Element prerequisites (for deterministic testing) */
+  elementPrerequisites?: {
+    paperStatus?: PaperStatus;
+    batStatus?: BatStatus;
+    plateStatus?: PlateStatus;
+  };
 }
 
 function generateJob(options: GenerateJobOptions): { job: Job; element: Element; tasks: Task[] } {
-  const { index, isLate = false, forceFirstStation, keepFirstUnscheduled = false, forceApproved = false } = options;
+  const { index, isLate = false, forceFirstStation, keepFirstUnscheduled = false, elementPrerequisites } = options;
   const now = new Date();
   const jobId = `job-${String(index).padStart(5, '0')}`;
 
@@ -284,17 +289,6 @@ function generateJob(options: GenerateJobOptions): { job: Job; element: Element;
     paperFormat: randomElement(PAPER_FORMATS),
     paperWeight: randomElement(PAPER_WEIGHTS),
     inking: randomElement(INKINGS),
-    paperPurchaseStatus: randomElement(['InStock', 'Ordered', 'Received'] as PaperPurchaseStatus[]),
-    proofApproval: forceApproved
-      ? {
-          sentAt: formatDate(addDays(now, -randomInt(5, 10))),
-          approvedAt: formatDate(addDays(now, -randomInt(1, 4))),
-        }
-      : {
-          sentAt: Math.random() > 0.3 ? formatDate(addDays(now, -randomInt(3, 10))) : 'AwaitingFile',
-          approvedAt: Math.random() > 0.1 ? formatDate(addDays(now, -randomInt(1, 5))) : null,
-        },
-    platesStatus: forceApproved ? 'Done' : randomElement(['Todo', 'Done'] as PlatesStatus[]),
     comments: [],
     elementIds: [elementId],
     taskIds: tasks.map((t) => t.id),
@@ -303,9 +297,13 @@ function generateJob(options: GenerateJobOptions): { job: Job; element: Element;
   };
 
   // Create element for this job (1:1 relationship for v0.4.0)
+  // Use provided prerequisites or random defaults
   const element = createElement({
     jobId,
     taskIds: tasks.map((t) => t.id),
+    paperStatus: elementPrerequisites?.paperStatus ?? randomElement(['in_stock', 'ordered', 'delivered'] as PaperStatus[]),
+    batStatus: elementPrerequisites?.batStatus ?? randomElement(['bat_sent', 'bat_approved'] as BatStatus[]),
+    plateStatus: elementPrerequisites?.plateStatus ?? randomElement(['to_make', 'ready'] as PlateStatus[]),
   });
 
   return { job, element, tasks };
@@ -324,13 +322,17 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   const elements: Element[] = [];
   const tasks: Task[] = [];
 
-  // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved)
+  // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved prerequisites)
   const { job: qaJob, element: qaElement, tasks: qaTasks } = generateJob({
     index: 1,
     isLate: false, // NOT late so deadline is in the future
     forceFirstStation: 'sta-komori-g40',
     keepFirstUnscheduled: true,
-    forceApproved: true,
+    elementPrerequisites: {
+      paperStatus: 'in_stock',
+      batStatus: 'bat_approved',
+      plateStatus: 'ready',
+    },
   });
   jobs.push(qaJob);
   elements.push(qaElement);

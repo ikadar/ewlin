@@ -1,5 +1,6 @@
-import type { Element } from '@flux/types';
+import type { Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
 import { Workflow } from 'lucide-react';
+import { PrerequisiteStatus } from './PrerequisiteStatus';
 
 export interface ElementSectionProps {
   /** The element to display */
@@ -8,23 +9,55 @@ export interface ElementSectionProps {
   allElements: Element[];
   /** Whether this is a single-element job (hides the section header) */
   isSingleElement?: boolean;
+  /** Whether this element has offset printing tasks (show plates dropdown) */
+  hasOffset?: boolean;
+  /** Whether this is an assembly element (show "pas de prérequis") */
+  isAssembly?: boolean;
+  /** Callback when paper status changes */
+  onPaperStatusChange?: (status: PaperStatus) => void;
+  /** Callback when BAT status changes */
+  onBatStatusChange?: (status: BatStatus) => void;
+  /** Callback when plate status changes */
+  onPlateStatusChange?: (status: PlateStatus) => void;
   /** Children (task tiles) */
   children: React.ReactNode;
 }
 
 /**
  * Section header for an element in the JobDetailsPanel.
- * Shows the element suffix and prerequisite elements.
+ * Shows the element suffix, prerequisite elements, and production statuses.
  */
 export function ElementSection({
   element,
   allElements,
   isSingleElement = false,
+  hasOffset = true,
+  isAssembly = false,
+  onPaperStatusChange,
+  onBatStatusChange,
+  onPlateStatusChange,
   children,
 }: ElementSectionProps) {
-  // For single-element jobs, don't show the header but still add spacing
+  // For single-element jobs, show prerequisite status but not the element header
   if (isSingleElement) {
-    return <div className="space-y-1.5">{children}</div>;
+    return (
+      <div className="space-y-1.5">
+        {/* Show prerequisite status even for single elements */}
+        <div className="px-1 mb-2">
+          <PrerequisiteStatus
+            paperStatus={element.paperStatus}
+            batStatus={element.batStatus}
+            plateStatus={element.plateStatus}
+            hasOffset={hasOffset}
+            isAssembly={isAssembly}
+            onPaperStatusChange={onPaperStatusChange}
+            onBatStatusChange={onBatStatusChange}
+            onPlateStatusChange={onPlateStatusChange}
+          />
+        </div>
+        {children}
+      </div>
+    );
   }
 
   // Build prerequisite suffix list
@@ -38,7 +71,7 @@ export function ElementSection({
   return (
     <div className="mb-3">
       {/* Element header */}
-      <div className="flex items-center justify-between mb-2 px-1">
+      <div className="flex items-center justify-between mb-1 px-1">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-zinc-400 tracking-wide">
             {element.suffix.toUpperCase()}
@@ -56,6 +89,20 @@ export function ElementSection({
             <span>{prerequisiteSuffixes.join(' ')}</span>
           </div>
         )}
+      </div>
+
+      {/* Prerequisite status row */}
+      <div className="px-1 mb-2">
+        <PrerequisiteStatus
+          paperStatus={element.paperStatus}
+          batStatus={element.batStatus}
+          plateStatus={element.plateStatus}
+          hasOffset={hasOffset}
+          isAssembly={isAssembly}
+          onPaperStatusChange={onPaperStatusChange}
+          onBatStatusChange={onBatStatusChange}
+          onPlateStatusChange={onPlateStatusChange}
+        />
       </div>
 
       {/* Tasks */}

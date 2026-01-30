@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { JobDetailsPanel } from './JobDetailsPanel';
 import { JobInfo } from './JobInfo';
-import { JobStatus } from './JobStatus';
 import { InfoField } from './InfoField';
 import { TaskList } from './TaskList';
 import { TaskTile } from './TaskTile';
@@ -18,9 +17,6 @@ const mockJob: Job = {
   workshopExitDate: '2025-12-18',
   fullyScheduled: false,
   color: '#8B5CF6',
-  paperPurchaseStatus: 'Ordered',
-  proofApproval: { sentAt: '2025-12-12T14:30:00Z', approvedAt: null },
-  platesStatus: 'Done',
   comments: [],
   taskIds: ['task-1', 'task-2'],
   elementIds: ['element-1'],
@@ -35,6 +31,9 @@ const mockElements: Element[] = [
     suffix: 'ELT',
     prerequisiteElementIds: [],
     taskIds: ['task-1', 'task-2'],
+    paperStatus: 'in_stock',
+    batStatus: 'bat_approved',
+    plateStatus: 'ready',
     createdAt: '2025-12-15T10:00:00Z',
     updatedAt: '2025-12-15T10:00:00Z',
   },
@@ -65,40 +64,43 @@ const mockTasks: Task[] = [
   },
 ];
 
+const weekdaySchedule = { isOperating: true, slots: [{ start: '07:00', end: '19:00' }] };
+const weekendSchedule = { isOperating: false, slots: [] };
+
 const mockStations: Station[] = [
   {
     id: 'station-1',
     name: 'Komori G40',
-    status: 'Operational',
+    status: 'Available',
     categoryId: 'cat-1',
     groupId: 'group-1',
     capacity: 1,
     operatingSchedule: {
-      monday: { start: '07:00', end: '19:00' },
-      tuesday: { start: '07:00', end: '19:00' },
-      wednesday: { start: '07:00', end: '19:00' },
-      thursday: { start: '07:00', end: '19:00' },
-      friday: { start: '07:00', end: '19:00' },
-      saturday: null,
-      sunday: null,
+      monday: weekdaySchedule,
+      tuesday: weekdaySchedule,
+      wednesday: weekdaySchedule,
+      thursday: weekdaySchedule,
+      friday: weekdaySchedule,
+      saturday: weekendSchedule,
+      sunday: weekendSchedule,
     },
     exceptions: [],
   },
   {
     id: 'station-2',
     name: 'Polar 137',
-    status: 'Operational',
+    status: 'Available',
     categoryId: 'cat-2',
     groupId: 'group-2',
     capacity: 1,
     operatingSchedule: {
-      monday: { start: '07:00', end: '19:00' },
-      tuesday: { start: '07:00', end: '19:00' },
-      wednesday: { start: '07:00', end: '19:00' },
-      thursday: { start: '07:00', end: '19:00' },
-      friday: { start: '07:00', end: '19:00' },
-      saturday: null,
-      sunday: null,
+      monday: weekdaySchedule,
+      tuesday: weekdaySchedule,
+      wednesday: weekdaySchedule,
+      thursday: weekdaySchedule,
+      friday: weekdaySchedule,
+      saturday: weekendSchedule,
+      sunday: weekendSchedule,
     },
     exceptions: [],
   },
@@ -163,21 +165,6 @@ describe('JobDetailsPanel', () => {
     expect(screen.getByText('Départ')).toBeInTheDocument();
   });
 
-  it('displays job status fields', () => {
-    render(
-      <JobDetailsPanel
-        job={mockJob}
-        tasks={mockTasks}
-        elements={mockElements}
-        assignments={mockAssignments}
-        stations={mockStations}
-      />
-    );
-    expect(screen.getByText('BAT')).toBeInTheDocument();
-    expect(screen.getByText('Papier')).toBeInTheDocument();
-    expect(screen.getByText('Plaques')).toBeInTheDocument();
-  });
-
   it('displays task tiles', () => {
     render(
       <JobDetailsPanel
@@ -214,21 +201,6 @@ describe('JobInfo', () => {
     expect(screen.getByText('Autosphere')).toBeInTheDocument();
     expect(screen.getByText('Brochures Autosphère accueil')).toBeInTheDocument();
     expect(screen.getByText('18/12/2025')).toBeInTheDocument();
-  });
-});
-
-describe('JobStatus', () => {
-  it('displays formatted status values', () => {
-    render(<JobStatus job={mockJob} />);
-    expect(screen.getByText('Commandé')).toBeInTheDocument();
-    expect(screen.getByText('Prêtes')).toBeInTheDocument();
-  });
-
-  it('displays BAT status with date when sent', () => {
-    render(<JobStatus job={mockJob} />);
-    // The BAT was sent, so it should show "Reçu DD/MM HH:MM"
-    // Time varies by timezone, so just check for the pattern
-    expect(screen.getByText(/Reçu 12\/12 \d{2}:\d{2}/)).toBeInTheDocument();
   });
 });
 

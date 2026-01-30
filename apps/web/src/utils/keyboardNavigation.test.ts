@@ -16,14 +16,12 @@ function createJob(id: string): Job {
     client: 'Test Client',
     description: 'Test Job',
     color: '#8b5cf6',
-    workshopEntryDate: '2025-12-16T08:00:00Z',
-    workshopExitDate: '2025-12-20T17:00:00Z',
+    status: 'InProgress',
+    workshopExitDate: '2025-12-20',
+    fullyScheduled: false,
+    comments: [],
     elementIds: [`element-${id}`],
-    approvalGates: {
-      bat: 'approved',
-      paper: 'approved',
-      plates: 'approved',
-    },
+    taskIds: [],
     createdAt: '2025-12-15T00:00:00Z',
     updatedAt: '2025-12-15T00:00:00Z',
   };
@@ -33,8 +31,12 @@ function createElement(jobId: string, taskIds: string[] = []): Element {
   return {
     id: `element-${jobId}`,
     jobId,
-    name: `Element for ${jobId}`,
+    suffix: 'ELT',
+    prerequisiteElementIds: [],
     taskIds,
+    paperStatus: 'in_stock',
+    batStatus: 'bat_approved',
+    plateStatus: 'ready',
     createdAt: '2025-12-15T00:00:00Z',
     updatedAt: '2025-12-15T00:00:00Z',
   };
@@ -46,7 +48,7 @@ function createTask(id: string, elementId: string): InternalTask {
     elementId,
     type: 'Internal',
     stationId: 'station-1',
-    sequence: 1,
+    status: 'Ready',
     sequenceOrder: 1,
     duration: {
       setupMinutes: 30,
@@ -60,8 +62,9 @@ function createTask(id: string, elementId: string): InternalTask {
 function createLateJob(jobId: string): LateJob {
   return {
     jobId,
-    daysOverdue: 1,
-    workshopExitDate: '2025-12-15T00:00:00Z',
+    delayDays: 1,
+    deadline: '2025-12-15',
+    expectedCompletion: '2025-12-16',
   };
 }
 

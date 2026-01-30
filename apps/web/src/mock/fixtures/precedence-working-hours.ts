@@ -8,8 +8,6 @@ import type {
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -32,9 +30,6 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 14),
       color: '#8b5cf6', // Purple
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-pwh-1', 'task-pwh-2'],
       fullyScheduled: false,
@@ -50,9 +45,6 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 14),
       color: '#3b82f6', // Blue
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-pwh-3', 'task-pwh-4'],
       fullyScheduled: false,
