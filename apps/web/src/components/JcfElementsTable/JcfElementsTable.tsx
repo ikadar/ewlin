@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, type MutableRefObject } from 'react';
 import { GitBranch, Minus, Plus, Calculator } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
 import type { JcfElement, JcfFieldKey } from './types';
@@ -13,7 +13,7 @@ import { JcfImpositionAutocomplete } from '../JcfImpositionAutocomplete';
 import { JcfPrecedencesAutocomplete } from '../JcfPrecedencesAutocomplete';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
-import { validateAllElements, getCellError } from './validation';
+import { validateAllElements, validateAllForSubmit, getCellError } from './validation';
 import {
   getAllRequiredFields,
   hasRequiredIndicator,
@@ -75,6 +75,17 @@ export interface JcfElementsTableProps {
   jobQuantity?: string;
   /** Mode: 'job' shows required indicators, 'template' does not */
   mode?: JcfMode;
+  /**
+   * Ref to expose the save validation handler to parent.
+   * Parent sets this ref, and we populate it with a function that returns true if valid.
+   * @see v0.4.30 Submit Validation
+   */
+  onSaveAttemptRef?: MutableRefObject<(() => boolean) | null>;
+  /**
+   * Callback when save validation passes.
+   * Called with the current elements array for the parent to proceed with API call.
+   */
+  onSave?: (elements: JcfElement[]) => void;
 }
 
 export function JcfElementsTable({
@@ -83,11 +94,16 @@ export function JcfElementsTable({
   sequenceWorkflow,
   jobQuantity = '',
   mode = 'job',
+  onSaveAttemptRef,
+  onSave,
 }: JcfElementsTableProps) {
   const [editingElementIndex, setEditingElementIndex] = useState<number | null>(
     null,
   );
   const [editingName, setEditingName] = useState('');
+
+  // Level 3: Track if user has attempted to submit (triggers submit errors)
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   // Auto-calculation state per element (true = auto, false = manual)
   const [autoCalculated, setAutoCalculated] = useState<Record<number, boolean>>(
@@ -128,9 +144,14 @@ export function JcfElementsTable({
   const rows = useMemo(() => [...baseRows, sequenceRow], []);
 
   // Validation errors map
+  // Level 1: Live errors (always shown)
+  // Level 3: Submit errors (shown after hasAttemptedSubmit)
   const validationErrors = useMemo(
-    () => validateAllElements(elements, touchedFields),
-    [elements, touchedFields],
+    () =>
+      hasAttemptedSubmit
+        ? validateAllForSubmit(elements, mode)
+        : validateAllElements(elements, touchedFields),
+    [elements, touchedFields, hasAttemptedSubmit, mode],
   );
 
   // Required fields map (Level 2 indicators)
@@ -424,6 +445,35 @@ export function JcfElementsTable({
   const handleToggleAutoCalculated = useCallback((elementIndex: number) => {
     setAutoCalculated((prev) => ({ ...prev, [elementIndex]: !prev[elementIndex] }));
   }, []);
+
+  // ── Level 3: Submit Validation ──
+
+  /**
+   * Handle save attempt - validates and returns success status.
+   * Sets hasAttemptedSubmit to trigger Level 3 error display.
+   */
+  const handleSaveAttempt = useCallback((): boolean => {
+    setHasAttemptedSubmit(true);
+    const submitErrors = validateAllForSubmit(elements, mode);
+
+    if (submitErrors.size > 0) {
+      // Validation failed - errors will be displayed
+      return false;
+    }
+
+    // Validation passed - call onSave if provided
+    if (onSave) {
+      onSave(elements);
+    }
+    return true;
+  }, [elements, mode, onSave]);
+
+  // Expose handleSaveAttempt to parent via ref
+  useEffect(() => {
+    if (onSaveAttemptRef) {
+      onSaveAttemptRef.current = handleSaveAttempt;
+    }
+  }, [onSaveAttemptRef, handleSaveAttempt]);
 
   // ── Render ──
 
