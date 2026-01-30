@@ -121,8 +121,8 @@ test.describe('UC-06: Precedence Validation', () => {
     const tilesBefore = await countTilesOnStation(page, 'station-polar');
 
     // ACT: Drag task 2 to Polar station at 9:00 (after 8:30)
-    // 9:00 is 3 hours after 6:00 start = 300px (at 100px/hour)
-    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-polar', 300);
+    // v0.4.29: 9:00 is 3 hours after 6:00 start = 192px (at 64px/hour)
+    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-polar', 192);
 
     // ASSERT: Check what happened - task should be placed
     const tilesAfter = await countTilesOnStation(page, 'station-polar');

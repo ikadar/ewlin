@@ -280,7 +280,7 @@ export function JcfPrecedencesAutocomplete({
               {displayedItems.map((name, index) => (
                 <div
                   key={`${index}-${name}`}
-                  className={`px-[10px] py-[5px] cursor-pointer font-mono text-[11px] ${
+                  className={`px-[10px] py-[5px] cursor-pointer font-mono text-sm ${
                     index === highlightedIndex
                       ? 'bg-blue-600 text-white'
                       : 'hover:bg-zinc-700 text-zinc-100'
@@ -299,13 +299,13 @@ export function JcfPrecedencesAutocomplete({
                 </div>
               ))}
               {hasMore && (
-                <div className="px-[10px] py-[5px] text-center text-zinc-500 text-[10px] border-t border-zinc-700">
+                <div className="px-[10px] py-[5px] text-center text-zinc-500 text-xs border-t border-zinc-700">
                   ↓ Scroll pour plus de suggestions
                 </div>
               )}
             </>
           ) : (
-            <div className="px-[10px] py-[5px] text-zinc-500 text-[11px] italic">
+            <div className="px-[10px] py-[5px] text-zinc-500 text-sm italic">
               Aucun élément disponible
             </div>
           )}

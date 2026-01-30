@@ -206,12 +206,12 @@ export function JcfAutocomplete({
                 handleSelect(suggestion);
               }}
             >
-              <span className="font-mono text-[11px]">
+              <span className="font-mono text-sm">
                 {highlightMatch(suggestion.label, value, index === highlightedIndex)}
               </span>
               {suggestion.category && (
                 <span
-                  className={`text-[10px] px-[5px] rounded-[3px] ${
+                  className={`text-xs px-[5px] rounded-[3px] ${
                     index === highlightedIndex
                       ? 'bg-blue-500 text-blue-100'
                       : 'bg-zinc-700 text-zinc-400'
@@ -223,7 +223,7 @@ export function JcfAutocomplete({
             </div>
           ))}
           {hasMore && (
-            <div className="px-[10px] py-[5px] text-center text-zinc-500 text-[10px] border-t border-zinc-700">
+            <div className="px-[10px] py-[5px] text-center text-zinc-500 text-xs border-t border-zinc-700">
               ↓ Scroll pour plus de suggestions
             </div>
           )}

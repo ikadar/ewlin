@@ -8,8 +8,8 @@
 import { test, expect } from '@playwright/test';
 import { parseTime, isOnSnapBoundary, waitForAppReady } from './helpers/drag';
 
-/** Must match TopNavBar/constants.ts DEFAULT_PIXELS_PER_HOUR */
-const PIXELS_PER_HOUR = 80;
+/** Must match TopNavBar/constants.ts DEFAULT_PIXELS_PER_HOUR (v0.4.29: 64) */
+const PIXELS_PER_HOUR = 64;
 /** Must match PickPreview.tsx PICK_CURSOR_OFFSET_Y */
 const PICK_CURSOR_OFFSET_Y = 20;
 

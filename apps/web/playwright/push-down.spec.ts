@@ -71,8 +71,8 @@ test.describe('UC-04: Push-Down on Collision', () => {
     console.log(`Before: second tile at ${secondOriginalTime} (${secondOriginalMinutes} min)`);
 
     // ACT: Pick first tile and place it at a later position (onto second tile's position)
-    // Calculate Y position for ~1.5 hours later (100px at 80px/hour)
-    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 200);
+    // v0.4.29: Calculate Y position for ~2.5 hours (160px at 64px/hour)
+    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 160);
 
     // Wait for push-down to complete
     await page.waitForTimeout(200);
@@ -108,8 +108,9 @@ test.describe('UC-04: Push-Down on Collision', () => {
     console.log(`Before: second=${secondOriginalTime}, third=${thirdOriginalTime}`);
 
     // ACT: Pick first tile and place it significantly later to cause chain push
+    // v0.4.29: 300 → 240 (scaled to 64px/hour)
     const firstTileTestId = await tiles.nth(0).getAttribute('data-testid');
-    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 300);
+    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 240);
 
     // Wait for push-down chain to complete
     await page.waitForTimeout(300);
@@ -147,7 +148,8 @@ test.describe('UC-04: Push-Down on Collision', () => {
     console.log('Original order:', originalOrder);
 
     // ACT: Pick first tile and place it later
-    await pickAndPlaceOnStation(page, `[data-testid="${originalOrder[0]}"]`, 'station-komori', 250);
+    // v0.4.29: 250 → 200 (scaled to 64px/hour)
+    await pickAndPlaceOnStation(page, `[data-testid="${originalOrder[0]}"]`, 'station-komori', 200);
     await page.waitForTimeout(300);
 
     // ASSERT: Check the order is maintained (first tile moved, others pushed but kept order)
@@ -184,7 +186,8 @@ test.describe('UC-04: Push-Down on Collision', () => {
     const firstTileTestId = await stationColumn.locator('[data-testid^="tile-assign-"]').first().getAttribute('data-testid');
 
     // ACT: Pick and place to cause push-down
-    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 250);
+    // v0.4.29: 250 → 200 (scaled to 64px/hour)
+    await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 200);
     await page.waitForTimeout(300);
 
     // ASSERT: Tile count should be the same

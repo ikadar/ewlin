@@ -13,7 +13,7 @@ export function JobsSection({ children }: JobsSectionProps) {
   return (
     <section>
       <div className="px-3 py-2 mt-2 flex items-center gap-2">
-        <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+        <span className="text-sm font-semibold text-zinc-500 uppercase tracking-wider">
           Travaux
         </span>
       </div>

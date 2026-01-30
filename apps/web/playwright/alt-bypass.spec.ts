@@ -43,12 +43,12 @@ test.describe('v0.3.28: Alt+Drag Bypass Bug Fix (REQ-13)', () => {
 
     // ACT: Drag Task 2 to Polar station at 09:00 (BEFORE Task 1 ends at 11:00)
     // With Alt pressed to bypass precedence
-    // 09:00 is 3 hours after 06:00 start = 3 * 80px = 240px from column top
+    // v0.4.29: 09:00 is 3 hours after 06:00 start = 3 * 64px = 192px from column top
     await dragFromSidebarToStationWithAlt(
       page,
       '[data-testid="task-tile-task-bypass-2"]',
       'station-polar',
-      240 // ~09:00
+      192 // ~09:00
     );
 
     // Wait for state update
@@ -138,12 +138,12 @@ test.describe('v0.3.28: Alt+Drag Bypass Bug Fix (REQ-13)', () => {
     await expect(taskTile).toBeVisible();
 
     // ACT: Drag Task 2 to 12:00 (AFTER Task 1 ends at 11:00) with Alt
-    // 12:00 is 6 hours after 06:00 start = 6 * 80px = 480px from column top
+    // v0.4.29: 12:00 is 6 hours after 06:00 start = 6 * 64px = 384px from column top
     await dragFromSidebarToStationWithAlt(
       page,
       '[data-testid="task-tile-task-bypass-2"]',
       'station-polar',
-      480 // ~12:00
+      384 // ~12:00
     );
 
     await page.waitForTimeout(500);

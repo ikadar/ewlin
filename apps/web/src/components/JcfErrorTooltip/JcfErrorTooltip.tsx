@@ -143,7 +143,7 @@ export function JcfErrorTooltip({
             <div className="flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
               <div
-                className="text-xs text-zinc-200 leading-relaxed [&_strong]:text-zinc-100 [&_strong]:font-semibold [&_code]:bg-zinc-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-zinc-300 [&_code]:font-mono [&_code]:text-[10px]"
+                className="text-xs text-zinc-200 leading-relaxed [&_strong]:text-zinc-100 [&_strong]:font-semibold [&_code]:bg-zinc-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-zinc-300 [&_code]:font-mono [&_code]:text-xs"
                 dangerouslySetInnerHTML={{ __html: message }}
               />
             </div>

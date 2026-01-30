@@ -46,7 +46,7 @@ export function JcfJobHeader({
   // Session learning: new client names added on blur
   const [sessionClients, setSessionClients] = useState<string[]>([]);
 
-  const labelClass = 'block text-[10px] leading-[13px] text-zinc-500 mb-[3px]';
+  const labelClass = 'block text-xs leading-[13px] text-zinc-500 mb-[3px]';
   const inputBaseClass =
     'w-full bg-zinc-900 border border-zinc-700 rounded-[3px] px-[7px] py-[5px] text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500';
 

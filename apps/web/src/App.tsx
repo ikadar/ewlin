@@ -37,6 +37,37 @@ const TEST_SEQUENCE_WORKFLOW = [
 const DAY_COUNT = 365;
 
 // ============================================================================
+// v0.4.29: Layout dimensions helper
+// Calculates actual pixel values based on root font-size (rem → px conversion)
+// ============================================================================
+
+/**
+ * Get layout dimensions in pixels based on current root font-size.
+ * Tailwind uses rem units, so dimensions scale with root font-size.
+ * Default root font-size is 13px (v0.4.29: UI Scale Harmonization).
+ *
+ * @returns Object with computed pixel values for layout dimensions
+ */
+function getLayoutDimensions(): {
+  stationWidth: number;  // w-60 = 15rem
+  gap: number;           // gap-3 = 0.75rem
+  paddingLeft: number;   // px-3 = 0.75rem
+  timelineWidth: number; // w-12 = 3rem
+} {
+  // Get root font-size (defaults to 16px in browsers, 13px in our app)
+  const rootFontSize = typeof window !== 'undefined'
+    ? parseFloat(getComputedStyle(document.documentElement).fontSize)
+    : 13; // SSR fallback
+
+  return {
+    stationWidth: 15 * rootFontSize,    // w-60 = 15rem
+    gap: 0.75 * rootFontSize,           // gap-3 = 0.75rem
+    paddingLeft: 0.75 * rootFontSize,   // px-3 = 0.75rem
+    timelineWidth: 3 * rootFontSize,    // w-12 = 3rem
+  };
+}
+
+// ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
 // ============================================================================
 
@@ -832,17 +863,15 @@ function AppContent() {
     let scrollTargetX = gridRef.current.getScrollX(); // Default: keep current X
 
     if (stationIndex >= 0) {
-      const STATION_WIDTH = 240; // w-60
-      const GAP = 12; // gap-3
-      const PADDING_LEFT = 12; // px-3
+      // v0.4.29: Use computed dimensions based on root font-size (rem → px)
+      const { stationWidth, gap, paddingLeft, timelineWidth } = getLayoutDimensions();
 
       // Calculate station's X position
-      const stationX = PADDING_LEFT + stationIndex * (STATION_WIDTH + GAP);
+      const stationX = paddingLeft + stationIndex * (stationWidth + gap);
 
       // Center the station in the viewport (accounting for timeline column width)
-      const TIMELINE_WIDTH = 48; // w-12
       const viewportWidth = gridRef.current.getViewportWidth();
-      scrollTargetX = Math.max(0, stationX - (viewportWidth - TIMELINE_WIDTH - STATION_WIDTH) / 2);
+      scrollTargetX = Math.max(0, stationX - (viewportWidth - timelineWidth - stationWidth) / 2);
     }
 
     // Scroll both X and Y at once
@@ -1181,10 +1210,11 @@ function AppContent() {
 
   // v0.3.54: Handle pick from sidebar (unscheduled task)
   // v0.3.55: Added scroll to target column and save scroll position
-  const handlePickTask = useCallback((task: Task, job: Job) => {
+  // v0.4.29: Accept click coordinates for initial ghost position
+  const handlePickTask = useCallback((task: Task, job: Job, clientX: number, clientY: number) => {
     pickActions.pickFromSidebar(task, job);
-    // Initialize ghost position at cursor (will be updated on mouse move)
-    pickActions.updateGhostPosition(0, 0);
+    // Initialize ghost position at click location
+    pickActions.updateGhostPosition(clientX, clientY);
 
     // v0.3.55: Save current scroll position for cancel restoration
     if (gridRef.current) {
@@ -1198,11 +1228,9 @@ function AppContent() {
         const targetStationId = task.stationId;
         const stationIndex = snapshot.stations.findIndex((s) => s.id === targetStationId);
         if (stationIndex >= 0) {
-          // Calculate X position: padding (12px) + index * (column width 240px + gap 12px)
-          const PADDING = 12;
-          const COLUMN_WIDTH = 240;
-          const GAP = 12;
-          const targetX = PADDING + stationIndex * (COLUMN_WIDTH + GAP);
+          // v0.4.29: Use computed dimensions based on root font-size (rem → px)
+          const { stationWidth, gap, paddingLeft } = getLayoutDimensions();
+          const targetX = paddingLeft + stationIndex * (stationWidth + gap);
           gridRef.current.scrollToX(targetX, 'smooth');
         }
       }

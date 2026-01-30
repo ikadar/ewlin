@@ -73,7 +73,8 @@ test.describe('Element Precedence (prerequisiteElementIds)', () => {
     const targetColumn = page.locator('[data-testid="station-column-station-polar"]');
     const box = await targetColumn.boundingBox();
     if (box) {
-      await page.mouse.move(box.x + box.width / 2, box.y + 200);
+      // v0.4.29: 200 → 160 (scaled to 64px/hour)
+      await page.mouse.move(box.x + box.width / 2, box.y + 160);
     }
     await page.waitForTimeout(300);
 
@@ -213,7 +214,8 @@ test.describe('Element Precedence (prerequisiteElementIds)', () => {
     const targetColumn = page.locator('[data-testid="station-column-station-polar"]');
     const box = await targetColumn.boundingBox();
     if (box) {
-      await page.mouse.move(box.x + box.width / 2, box.y + 200);
+      // v0.4.29: 200 → 160 (scaled to 64px/hour)
+      await page.mouse.move(box.x + box.width / 2, box.y + 160);
     }
     await page.waitForTimeout(200);
 

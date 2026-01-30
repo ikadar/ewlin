@@ -80,37 +80,8 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
     });
   });
 
-  test.describe('duration input', () => {
-    test('shows duration suggestions after poste selection', async ({
-      page,
-    }) => {
-      const sequenceTextarea = page.locator('#cell-0-11');
-      await sequenceTextarea.click();
-
-      // Type a poste name with open paren
-      await sequenceTextarea.fill('G37(');
-
-      // Dropdown should show duration suggestions
-      const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
-      await expect(dropdown).toBeVisible();
-      await expect(dropdown).toContainText('20)');
-      await expect(dropdown).toContainText('30)');
-      await expect(dropdown).toContainText('20+30)');
-    });
-
-    test('selecting duration completes the line', async ({ page }) => {
-      const sequenceTextarea = page.locator('#cell-0-11');
-      await sequenceTextarea.click();
-      await sequenceTextarea.fill('G37(');
-
-      // Select first duration via Enter
-      await page.keyboard.press('Enter');
-
-      // Textarea should contain complete line: G37(20)
-      const value = await sequenceTextarea.inputValue();
-      expect(value).toMatch(/^G37\(\d+(\+\d+)?\)$/);
-    });
-  });
+  // Note: Duration suggestions for postes were removed - users type duration manually.
+  // Only ST mode has duration suggestions.
 
   test.describe('multi-line editing', () => {
     test('supports multiple lines with independent autocomplete', async ({

@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Base font size: 13px (reference/jcf compatible)
+ * This makes Tailwind rem-based classes map to:
+ * - text-xs (0.75rem) = 9.75px
+ * - text-sm (0.875rem) = 11.375px ≈ 11px
+ * - text-base (1rem) = 13px
+ * - text-lg (1.125rem) = 14.625px
+ */
+html {
+  font-size: 13px;
+}
+
 @theme {
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
@@ -29,7 +40,7 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 1rem; /* Inherits 13px from html */
   font-weight: 500;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;

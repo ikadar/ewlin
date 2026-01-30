@@ -109,7 +109,7 @@ test.describe('v0.3.42 - UI Bug Fixes', () => {
         // Extract top value from style
         const topMatch = style?.match(/top:\s*(\d+)/);
         if (topMatch) {
-          positions.add(Math.floor(parseInt(topMatch[1]) / 1920)); // Day index (24h * 80px/h = 1920px)
+          positions.add(Math.floor(parseInt(topMatch[1]) / 1536)); // Day index (24h * 64px/h = 1536px) - v0.4.29
         }
       }
 

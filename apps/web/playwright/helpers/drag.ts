@@ -331,7 +331,7 @@ export async function pickAndPlace(
  *
  * @param hour - Desired placement hour (0-23) on today's date
  * @param minute - Desired placement minute (0-59), default 0
- * @param pixelsPerHour - Pixels per hour at current zoom level, default 80
+ * @param pixelsPerHour - Pixels per hour at current zoom level, default 64 (v0.4.29)
  */
 export async function pickAndPlaceAtTime(
   page: Page,
@@ -339,7 +339,7 @@ export async function pickAndPlaceAtTime(
   stationId: string,
   hour: number,
   minute: number = 0,
-  pixelsPerHour: number = 80
+  pixelsPerHour: number = 64
 ): Promise<void> {
   // Step 1: Click task tile to enter pick mode
   await page.locator(taskTileSelector).click();

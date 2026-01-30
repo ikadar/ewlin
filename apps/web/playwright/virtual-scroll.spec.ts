@@ -9,8 +9,8 @@ test.describe('Virtual Scrolling (v0.3.46)', () => {
 
   test('renders grid with 365-day virtual height', async ({ page }) => {
     // The grid should have the full virtual height for 365 days
-    // Each day = 24 hours * 80px = 1920px
-    // Total = 365 * 1920 = 700800px
+    // v0.4.29: Each day = 24 hours * 64px = 1536px (was 80px = 1920px)
+    // Total = 365 * 1536 = 560640px
 
     const grid = page.locator('[data-testid="scheduling-grid"]');
     await expect(grid).toBeVisible();
@@ -21,8 +21,8 @@ test.describe('Virtual Scrolling (v0.3.46)', () => {
       return grid?.scrollHeight ?? 0;
     });
 
-    // The height should be at least 700000px (365 days * 1920px)
-    expect(scrollHeight).toBeGreaterThan(700000);
+    // The height should be at least 560000px (365 days * 1536px)
+    expect(scrollHeight).toBeGreaterThan(560000);
   });
 
   test('shows tiles for today initially (day 6 in grid)', async ({ page }) => {
@@ -45,15 +45,16 @@ test.describe('Virtual Scrolling (v0.3.46)', () => {
     // Scroll down to approximately day 16 (6 days offset + 10 days from today)
     const grid = page.locator('[data-testid="scheduling-grid"]');
     await grid.evaluate((el) => {
-      el.scrollTop = 16 * 1920; // Day 16 in grid (10 days from today)
+      el.scrollTop = 16 * 1536; // Day 16 in grid (10 days from today) - v0.4.29: 1536px/day (24h * 64px/h)
     });
 
     // Wait for the virtual scroll to update
     await page.waitForTimeout(300);
 
     // The grid should have scrolled
+    // v0.4.29: 16 days * 1536px/day = 24576px (was 16 * 1920 = 30720)
     const scrollTop = await grid.evaluate((el) => el.scrollTop);
-    expect(scrollTop).toBeGreaterThan(25000);
+    expect(scrollTop).toBeGreaterThan(20000);
   });
 
   test('DateStrip container has correct virtual height', async ({ page }) => {
@@ -118,7 +119,7 @@ test.describe('Virtual Scrolling (v0.3.46)', () => {
     // Scroll through 100 days
     for (let i = 0; i < 10; i++) {
       await grid.evaluate((el, day) => {
-        el.scrollTop = day * 1920;
+        el.scrollTop = day * 1536; // v0.4.29: 1536px/day
       }, i * 10);
       await page.waitForTimeout(50);
     }
@@ -135,7 +136,7 @@ test.describe('Virtual Scrolling (v0.3.46)', () => {
 
     // Scroll to the last day
     await grid.evaluate((el) => {
-      el.scrollTop = 364 * 1920;
+      el.scrollTop = 364 * 1536; // v0.4.29: 1536px/day
     });
 
     // Wait for render
@@ -157,7 +158,7 @@ test.describe('Virtual Scrolling (v0.3.46)', () => {
 
     // First scroll away, then back to 0
     await grid.evaluate((el) => {
-      el.scrollTop = 50 * 1920;
+      el.scrollTop = 50 * 1536; // v0.4.29: 1536px/day
     });
     await page.waitForTimeout(100);
 

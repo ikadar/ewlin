@@ -92,7 +92,7 @@ export const JobCard = memo(function JobCard({
     >
       {/* Header row: reference · client + date/icon - REQ-05: overflow fix */}
       <div className="flex items-center gap-2 mb-1 overflow-hidden min-w-0">
-        <span className={`font-mono text-[13px] shrink-0 ${referenceColor}`}>{reference}</span>
+        <span className={`font-mono text-base shrink-0 ${referenceColor}`}>{reference}</span>
         <span className="text-zinc-600 shrink-0">·</span>
         <span className="text-zinc-400 truncate min-w-0">{client}</span>
         {renderProblemIcon()}

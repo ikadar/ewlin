@@ -59,8 +59,9 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
     expect(tilesBefore).toBe(0); // No tiles initially
 
-    // ACT: Pick task and place on Komori station at Y=200
-    await pickAndPlace(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 200);
+    // ACT: Pick task and place on Komori station
+    // v0.4.29: 200 → 160 (scaled to 64px/hour)
+    await pickAndPlace(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 160);
 
     // ASSERT: New tile should be created
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
@@ -102,7 +103,8 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
     const wrongColumn = page.locator('[data-testid="station-column-station-polar"]');
     const box = await wrongColumn.boundingBox();
     if (box) {
-      await page.mouse.move(box.x + box.width / 2, box.y + 200);
+      // v0.4.29: 200 → 160 (scaled to 64px/hour)
+      await page.mouse.move(box.x + box.width / 2, box.y + 160);
     }
     await wrongColumn.click({ force: true });
     await page.waitForTimeout(300);

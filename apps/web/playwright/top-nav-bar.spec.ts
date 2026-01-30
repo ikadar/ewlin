@@ -82,6 +82,7 @@ test.describe('v0.3.34: Top Navigation Bar', () => {
   });
 
   test.describe('Zoom control', () => {
+    // v0.4.29: 100% zoom is now 64px/hour (scaled to 80% of original)
     test('displays 100% as default zoom level', async ({ page }) => {
       const zoomLevel = page.locator('[data-testid="zoom-level"]');
       await expect(zoomLevel).toHaveText('100%');
@@ -131,7 +132,7 @@ test.describe('v0.3.34: Top Navigation Bar', () => {
     test('zoom in button is disabled at maximum zoom', async ({ page }) => {
       const zoomInButton = page.locator('[data-testid="zoom-in-button"]');
 
-      // Zoom in to maximum (200%)
+      // Zoom in to maximum (200%) - 2 clicks from 100%: 100% -> 150% -> 200%
       await zoomInButton.click();
       await zoomInButton.click();
 

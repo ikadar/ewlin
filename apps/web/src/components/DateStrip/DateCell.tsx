@@ -177,7 +177,7 @@ export function DateCell({
         />
       )}
 
-      <span className="text-[10px] relative z-10">{dayAbbrev}</span>
+      <span className="text-xs relative z-10">{dayAbbrev}</span>
       <span className={`font-medium ${dayNumberColor} relative z-10`}>{dayNumber}</span>
 
       {/* v0.3.47: Task markers (colored lines for each task on this day) */}

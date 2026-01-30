@@ -148,8 +148,9 @@ test.describe('Edge Cases', () => {
       const firstTile = tiles.first();
       const firstTileTestId = await firstTile.getAttribute('data-testid');
 
-      // ACT: Pick first tile and place it at a later position (Y=200 is ~1.5 hours later)
-      await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 200);
+      // ACT: Pick first tile and place it at a later position
+      // v0.4.29: 200 → 160 (scaled to 64px/hour, ~2.5 hours)
+      await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 160);
 
       // Wait for push-down to complete
       await page.waitForTimeout(300);
@@ -182,7 +183,8 @@ test.describe('Edge Cases', () => {
       const firstTileTestId = await tiles.first().getAttribute('data-testid');
 
       // ACT: Pick first tile and place it at a later position
-      await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 200);
+      // v0.4.29: 200 → 160 (scaled to 64px/hour, ~2.5 hours)
+      await pickAndPlaceOnStation(page, `[data-testid="${firstTileTestId}"]`, 'station-komori', 160);
 
       // ASSERT: Tiles should maintain order (each subsequent tile is at a later time)
       const newTimes: number[] = [];
