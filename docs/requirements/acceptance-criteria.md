@@ -250,34 +250,52 @@ ST [Clément] Pelliculage 2JO
 
 ---
 
-## Approval Gates
+## Element Prerequisites (v0.4.32)
 
-### AC-GATE-001: BAT Blocking
-> **References:** [US-GATE-001](user-stories.md#us-gate-001), [BR-GATE-001](../domain-model/business-rules.md#br-gate-001)
+### AC-PREREQ-001: BAT Blocking
+> **References:** [US-PREREQ-001](user-stories.md#us-prereq-001), [BR-PREREQ-001](../domain-model/business-rules.md#br-prereq-001)
 
-**Given** a job with proofSentAt = null
-**When** the user tries to schedule tasks
-**Then** scheduling is blocked with message "Proof not sent"
+**Given** an element with batStatus in ('waiting_files', 'files_received', 'bat_sent')
+**When** the user tries to schedule tasks for this element
+**Then** scheduling is blocked with PrerequisiteConflict "BAT not approved"
+**And** the element tile shows dashed left border
 
-### AC-GATE-002: BAT Bypass
-> **References:** [US-GATE-001](user-stories.md#us-gate-001), [BR-GATE-001](../domain-model/business-rules.md#br-gate-001)
+### AC-PREREQ-002: BAT Bypass
+> **References:** [US-PREREQ-001](user-stories.md#us-prereq-001), [BR-PREREQ-001](../domain-model/business-rules.md#br-prereq-001)
 
-**Given** a job with proofSentAt = "NoProofRequired"
-**Then** tasks can be scheduled without proof approval
+**Given** an element with batStatus = 'none'
+**Then** tasks can be scheduled without BAT approval
+**And** the element tile shows no blocking indicator
 
-### AC-GATE-003: Plates Blocking
-> **References:** [US-GATE-002](user-stories.md#us-gate-002), [BR-GATE-002](../domain-model/business-rules.md#br-gate-002)
+### AC-PREREQ-003: Plates Blocking
+> **References:** [US-PREREQ-002](user-stories.md#us-prereq-002), [BR-PREREQ-003](../domain-model/business-rules.md#br-prereq-003)
 
-**Given** a job with platesStatus = "Todo"
+**Given** an element with plateStatus = 'to_make'
 **When** the user tries to schedule a printing task on an offset station
-**Then** scheduling shows warning "Plates not ready"
+**Then** scheduling shows PrerequisiteConflict "Plates not ready"
+**And** the element tile shows dashed left border
 
-### AC-GATE-004: Paper Status Timestamp
-> **References:** [US-GATE-003](user-stories.md#us-gate-003), [BR-PAPER-002](../domain-model/business-rules.md#br-paper-002)
+### AC-PREREQ-004: Paper Status Timestamp
+> **References:** [US-PREREQ-003](user-stories.md#us-prereq-003), [BR-PREREQ-002](../domain-model/business-rules.md#br-prereq-002)
 
-**Given** a job with paperPurchaseStatus = "ToOrder"
-**When** the user changes status to "Ordered"
+**Given** an element with paperStatus = 'to_order'
+**When** the user changes status to 'ordered'
 **Then** paperOrderedAt is automatically set to current timestamp
+**And** ElementPaperStatusUpdated event is published
+
+### AC-PREREQ-005: Forme Visibility
+> **References:** [US-PREREQ-004](user-stories.md#us-prereq-004), [BR-PREREQ-005](../domain-model/business-rules.md#br-prereq-005)
+
+**Given** an element with a task targeting a station in 'cat-die-cutting' category
+**Then** the forme prerequisite field is visible for this element
+**And** formeStatus can be set to 'none', 'in_stock', 'to_order', 'ordered', or 'delivered'
+
+### AC-PREREQ-006: Element Blocking Indicator
+> **References:** [US-PREREQ-001](user-stories.md#us-prereq-001), [BR-PREREQ-007](../domain-model/business-rules.md#br-prereq-007)
+
+**Given** an element where ANY prerequisite is not in ready state
+**Then** the element tile displays a dashed left border
+**And** hovering shows tooltip listing blocking prerequisites
 
 ---
 

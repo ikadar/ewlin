@@ -1,9 +1,15 @@
-import type { Job, Task, TaskAssignment, Station, Element } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 import { X } from 'lucide-react';
 import { JobInfo } from './JobInfo';
-import { JobStatus } from './JobStatus';
 import { TaskList } from './TaskList';
 import { getTasksForJob } from '../../utils/taskHelpers';
+
+/** Payload for element prerequisite status updates */
+export interface ElementStatusUpdate {
+  elementId: string;
+  field: 'paperStatus' | 'batStatus' | 'plateStatus' | 'formeStatus';
+  value: PaperStatus | BatStatus | PlateStatus | FormeStatus;
+}
 
 export interface JobDetailsPanelProps {
   /** Selected job to display (null if none selected) */
@@ -30,6 +36,8 @@ export interface JobDetailsPanelProps {
   onClose?: () => void;
   /** REQ-02: Callback when departure date is clicked (scrolls grid to date) */
   onDateClick?: (date: Date) => void;
+  /** Callback when element prerequisite status changes (v0.4.32a) */
+  onElementStatusChange?: (update: ElementStatusUpdate) => void;
 }
 
 /**
@@ -49,6 +57,7 @@ export function JobDetailsPanel({
   onPick,
   onClose,
   onDateClick,
+  onElementStatusChange,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -83,11 +92,6 @@ export function JobDetailsPanel({
       {/* Job details - simple key-value list */}
       <div className="px-3 pb-3 border-b border-white/5 space-y-2.5 text-sm">
         <JobInfo job={job} onDateClick={onDateClick} />
-
-        {/* Separator between info and status */}
-        <div className="border-t border-white/5 pt-2.5" />
-
-        <JobStatus job={job} onDateClick={onDateClick} />
       </div>
 
       {/* Task tiles grouped by element */}
@@ -102,6 +106,7 @@ export function JobDetailsPanel({
         onJumpToTask={onJumpToTask}
         onRecallTask={onRecallTask}
         onPick={onPick}
+        onElementStatusChange={onElementStatusChange}
       />
     </div>
   );

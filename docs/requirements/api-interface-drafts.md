@@ -215,7 +215,6 @@ Create a new job.
   "workshopExitDate": "2025-12-15T17:00:00Z",
   "paperType": "CB300",
   "paperFormat": "63x88",
-  "paperPurchaseStatus": "InStock",
   "notes": "",
   "tasksDSL": "[Komori] 20+40 \"vernis\"\n[Massicot] 15\nST [Clément] Pelliculage 2JO"
 }
@@ -232,39 +231,56 @@ Create a new job.
   "status": "Draft",
   "fullyScheduled": false,
   "color": "#3B82F6",
-  "tasks": [
+  "elements": [
     {
-      "taskId": "task-001",
-      "sequenceOrder": 1,
-      "type": "internal",
-      "stationId": "station-komori",
-      "setupMinutes": 20,
-      "runMinutes": 40,
-      "comment": "vernis",
-      "status": "Defined"
-    },
-    {
-      "taskId": "task-002",
-      "sequenceOrder": 2,
-      "type": "internal",
-      "stationId": "station-massicot",
-      "setupMinutes": 0,
-      "runMinutes": 15,
-      "status": "Defined"
-    },
-    {
-      "taskId": "task-003",
-      "sequenceOrder": 3,
-      "type": "outsourced",
-      "providerId": "prov-clement",
-      "actionType": "Pelliculage",
-      "durationOpenDays": 2,
-      "status": "Defined"
+      "elementId": "element-001",
+      "suffix": "ELT",
+      "paperStatus": "none",
+      "batStatus": "none",
+      "plateStatus": "none",
+      "formeStatus": "none",
+      "isBlocked": false,
+      "tasks": [
+        {
+          "taskId": "task-001",
+          "sequenceOrder": 1,
+          "type": "internal",
+          "stationId": "station-komori",
+          "setupMinutes": 20,
+          "runMinutes": 40,
+          "comment": "vernis",
+          "status": "Defined"
+        },
+        {
+          "taskId": "task-002",
+          "sequenceOrder": 2,
+          "type": "internal",
+          "stationId": "station-massicot",
+          "setupMinutes": 0,
+          "runMinutes": 15,
+          "status": "Defined"
+        },
+        {
+          "taskId": "task-003",
+          "sequenceOrder": 3,
+          "type": "outsourced",
+          "providerId": "prov-clement",
+          "actionType": "Pelliculage",
+          "durationOpenDays": 2,
+          "status": "Defined"
+        }
+      ]
     }
   ],
   "createdAt": "2025-12-11T10:00:00Z"
 }
 ```
+
+**Notes (v0.4.32):**
+- Jobs now contain `elements` array instead of flat `tasks` array
+- Single-element jobs use default suffix "ELT"
+- Element prerequisite statuses default to 'none'
+- `isBlocked`: Computed - true if ANY prerequisite not in ready state
 
 ### GET /api/v1/jobs
 #### API-JOB-002
@@ -293,64 +309,64 @@ List jobs with filtering.
 
 Update job details.
 
-### PUT /api/v1/jobs/{jobId}/proof
-#### API-JOB-004
-> **References:** [US-GATE-001](user-stories.md#us-gate-001), [AC-GATE-001](acceptance-criteria.md#ac-gate-001-bat-blocking), [AC-GATE-002](acceptance-criteria.md#ac-gate-002-bat-bypass)
+### PUT /api/v1/elements/{elementId}/prerequisites (v0.4.32)
+#### API-ELEMENT-001
+> **References:** [US-PREREQ-001](user-stories.md#us-prereq-001), [US-PREREQ-002](user-stories.md#us-prereq-002), [US-PREREQ-003](user-stories.md#us-prereq-003), [AC-PREREQ-001](acceptance-criteria.md#ac-prereq-001-bat-blocking), [AC-PREREQ-003](acceptance-criteria.md#ac-prereq-003-plates-blocking), [AC-PREREQ-004](acceptance-criteria.md#ac-prereq-004-paper-status-timestamp)
 
-Update BAT status.
+Update element prerequisite status.
 
-**Request:**
+**Request (Paper):**
 ```json
 {
-  "proofSentAt": "2025-12-11T14:00:00Z"
-}
-```
-Or:
-```json
-{
-  "proofSentAt": "NoProofRequired"
-}
-```
-Or:
-```json
-{
-  "proofApprovedAt": "2025-12-12T09:00:00Z"
+  "paperStatus": "ordered"
 }
 ```
 
-### PUT /api/v1/jobs/{jobId}/plates
-#### API-JOB-005
-> **References:** [US-GATE-002](user-stories.md#us-gate-002), [AC-GATE-003](acceptance-criteria.md#ac-gate-003-plates-blocking)
-
-Update plates status.
-
-**Request:**
+**Request (BAT):**
 ```json
 {
-  "platesStatus": "Done"
+  "batStatus": "bat_approved"
 }
 ```
 
-### PUT /api/v1/jobs/{jobId}/paper
-#### API-JOB-006
-> **References:** [US-GATE-003](user-stories.md#us-gate-003), [AC-GATE-004](acceptance-criteria.md#ac-gate-004-paper-status-timestamp)
-
-Update paper procurement status.
-
-**Request:**
+**Request (Plates):**
 ```json
 {
-  "paperPurchaseStatus": "Ordered"
+  "plateStatus": "ready"
+}
+```
+
+**Request (Forme):**
+```json
+{
+  "formeStatus": "delivered"
 }
 ```
 
 **Response (200):**
 ```json
 {
-  "paperPurchaseStatus": "Ordered",
-  "paperOrderedAt": "2025-12-11T10:30:00Z"
+  "elementId": "element-123",
+  "paperStatus": "ordered",
+  "paperOrderedAt": "2025-12-11T10:30:00Z",
+  "batStatus": "bat_approved",
+  "batApprovedAt": "2025-12-11T14:00:00Z",
+  "plateStatus": "ready",
+  "formeStatus": "none",
+  "isBlocked": false
 }
 ```
+
+**Notes:**
+- Date fields are automatically set when status transitions to certain values
+- `paperOrderedAt`: Set when paperStatus → 'ordered'
+- `paperDeliveredAt`: Set when paperStatus → 'delivered'
+- `filesReceivedAt`: Set when batStatus → 'files_received'
+- `batSentAt`: Set when batStatus → 'bat_sent'
+- `batApprovedAt`: Set when batStatus → 'bat_approved'
+- `formeOrderedAt`: Set when formeStatus → 'ordered'
+- `formeDeliveredAt`: Set when formeStatus → 'delivered'
+- `isBlocked`: Computed - true if ANY prerequisite not in ready state
 
 ### POST /api/v1/jobs/{jobId}/dependencies
 #### API-JOB-007
@@ -594,13 +610,25 @@ Get complete schedule snapshot for UI rendering.
       "client": "Fibois Grand Est",
       "color": "#3B82F6",
       "workshopExitDate": "2025-12-15T17:00:00Z",
-      "tasks": [...]
+      "elements": [
+        {
+          "elementId": "element-001",
+          "suffix": "ELT",
+          "paperStatus": "delivered",
+          "batStatus": "bat_approved",
+          "plateStatus": "ready",
+          "formeStatus": "none",
+          "isBlocked": false,
+          "tasks": [...]
+        }
+      ]
     }
   ],
   "assignments": [
     {
       "taskId": "task-001",
       "jobId": "job-456",
+      "elementId": "element-001",
       "stationId": "station-komori",
       "scheduledStart": "2025-12-12T09:00:00Z",
       "scheduledEnd": "2025-12-12T10:00:00Z",
@@ -612,7 +640,14 @@ Get complete schedule snapshot for UI rendering.
     {
       "type": "StationConflict",
       "affectedTaskIds": ["task-x", "task-y"],
-      "description": "...",
+      "description": "Station Komori double-booked",
+      "severity": "High"
+    },
+    {
+      "type": "PrerequisiteConflict",
+      "affectedTaskIds": ["task-z"],
+      "affectedElementIds": ["element-002"],
+      "description": "Element prerequisite not ready: BAT not approved",
       "severity": "High"
     }
   ],
@@ -791,7 +826,7 @@ Calculate open days between dates.
 | `NOT_FOUND` | 404 | Resource not found |
 | `CONFLICT` | 409 | Operation would create conflict |
 | `CIRCULAR_DEPENDENCY` | 400 | Dependency would create cycle |
-| `APPROVAL_GATE_BLOCKED` | 400 | Approval gate not satisfied |
+| `PREREQUISITE_BLOCKED` | 400 | Element prerequisite not satisfied (v0.4.32) |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
 ---

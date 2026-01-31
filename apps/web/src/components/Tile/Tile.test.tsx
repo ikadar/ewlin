@@ -15,8 +15,6 @@ const mockJob: Job = {
   status: 'Planned',
   workshopExitDate: new Date().toISOString(),
   color: '#8B5CF6', // Purple
-  paperPurchaseStatus: 'InStock',
-  platesStatus: 'Done',
   proofSentAt: null,
   proofApprovedAt: null,
 };

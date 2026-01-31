@@ -8,8 +8,6 @@ import type {
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -31,9 +29,6 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7),
       color: '#8b5cf6',
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-prec-1', 'task-prec-2'],
       fullyScheduled: false,

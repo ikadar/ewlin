@@ -1,10 +1,13 @@
 /**
- * JCF Elements Table - Level 1 Live Format Validation
+ * JCF Elements Table - Validation System
  *
- * Validates DSL format for each field type during typing.
- * Lenient for incomplete input — only flags complete but invalid values.
+ * Three-level validation:
+ * - Level 1: Live format validation during typing (lenient)
+ * - Level 2: Required field indicators (amber dots) - see requiredFields.ts
+ * - Level 3: Submit validation (strict, converts required to errors)
  *
  * @see docs/releases/v0.4.23-jcf-live-format-validation.md
+ * @see docs/releases/v0.4.30-jcf-submit-validation.md
  * @see reference/jcf/docs/implicit-logic-specification.md §2.1
  */
 
@@ -13,8 +16,11 @@ import {
   isSequenceLineInvalid,
   isValidSequenceLine,
 } from '../JcfSequenceAutocomplete/sequenceDsl';
+import { getRequiredFields, type JcfMode } from './requiredFields';
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+export type ValidationErrorType = 'live' | 'submit';
 
 export interface ValidationError {
   /** Element index in the array */
@@ -23,10 +29,13 @@ export interface ValidationError {
   field: JcfFieldKey;
   /** HTML message for tooltip (supports <strong>, <code>, <br>) */
   message: string;
+  /** Error type: 'live' for format errors, 'submit' for required field errors */
+  type: ValidationErrorType;
 }
 
 // ── Validation Messages ──────────────────────────────────────────────────────
 
+// Level 1: Live format validation messages
 const MESSAGES = {
   pagination: `<strong>Pagination invalide</strong><br>Doit être <code>2</code> (feuillet) ou un multiple de 4 (cahier).<br>Exemples : <code>2</code>, <code>4</code>, <code>8</code>, <code>16</code>`,
   papier: `<strong>Format Papier invalide</strong><br>Syntaxe attendue : <code>Type:Grammage</code><br>Exemples : <code>Couché:135</code>, <code>Offset:80</code>`,
@@ -35,6 +44,23 @@ const MESSAGES = {
   surfacage: `<strong>Format Surfacage invalide</strong><br>Syntaxe attendue : <code>recto/verso</code><br>Exemples : <code>mat/mat</code>, <code>brillant/</code>, <code>vernis/</code>`,
   format: `<strong>Format produit invalide</strong><br>Formats acceptés :<br>• ISO : <code>A4</code>, <code>A3</code><br>• Dimensions : <code>210x297</code><br>• Fini : <code>A4f</code>, <code>A4fi</code><br>• Composite : <code>A3/A6</code>`,
   sequence: `<strong>Format Séquence invalide</strong><br>Une ligne par opération :<br>• Poste : <code>Komori(20+40)</code><br>• Sous-traitant : <code>ST:Reliure(3j):desc</code>`,
+};
+
+// Level 3: Submit validation messages for required fields
+const SUBMIT_MESSAGES: Record<JcfFieldKey, string> = {
+  sequence: `<strong>Séquence requise</strong><br>Définissez au moins une opération pour cet élément.`,
+  papier: `<strong>Papier requis</strong><br>Indiquez le type et grammage du papier.`,
+  pagination: `<strong>Pagination requise</strong><br>Nombre de pages de l'élément.`,
+  format: `<strong>Format requis</strong><br>Format du produit fini.`,
+  qteFeuilles: `<strong>Quantité feuilles requise</strong><br>Nombre de feuilles à imprimer.`,
+  imposition: `<strong>Imposition requise</strong><br>Format feuille et nombre de poses.`,
+  impression: `<strong>Impression requise</strong><br>Couleurs recto/verso.`,
+  // Fields that are never required but need entries for type safety
+  precedences: `<strong>Champ requis</strong>`,
+  quantite: `<strong>Quantité requise</strong>`,
+  surfacage: `<strong>Surfacage requis</strong>`,
+  autres: `<strong>Champ requis</strong>`,
+  commentaires: `<strong>Champ requis</strong>`,
 };
 
 // ── Individual Field Validators ──────────────────────────────────────────────
@@ -148,6 +174,7 @@ export function validateElementLive(
       elementIndex: index,
       field: 'pagination',
       message: MESSAGES.pagination,
+      type: 'live',
     });
   }
 
@@ -157,6 +184,7 @@ export function validateElementLive(
       elementIndex: index,
       field: 'papier',
       message: MESSAGES.papier,
+      type: 'live',
     });
   }
 
@@ -166,6 +194,7 @@ export function validateElementLive(
       elementIndex: index,
       field: 'imposition',
       message: MESSAGES.imposition,
+      type: 'live',
     });
   }
 
@@ -175,6 +204,7 @@ export function validateElementLive(
       elementIndex: index,
       field: 'impression',
       message: MESSAGES.impression,
+      type: 'live',
     });
   }
 
@@ -184,6 +214,7 @@ export function validateElementLive(
       elementIndex: index,
       field: 'surfacage',
       message: MESSAGES.surfacage,
+      type: 'live',
     });
   }
 
@@ -193,6 +224,7 @@ export function validateElementLive(
       elementIndex: index,
       field: 'format',
       message: MESSAGES.format,
+      type: 'live',
     });
   }
 
@@ -206,6 +238,7 @@ export function validateElementLive(
       elementIndex: index,
       field: 'sequence',
       message: MESSAGES.sequence,
+      type: 'live',
     });
   }
 
@@ -246,4 +279,65 @@ export function getCellError(
   field: JcfFieldKey,
 ): ValidationError | undefined {
   return errorMap.get(`${elementIndex}-${field}`);
+}
+
+// ── Level 3: Submit Validation ────────────────────────────────────────────────
+
+/**
+ * Validate all elements for submit (Level 3 - Strict)
+ *
+ * Combines:
+ * - Strict DSL format validation (no leniency for incomplete input)
+ * - Required field validation (converts amber indicators to red errors)
+ *
+ * @param elements - Array of elements to validate
+ * @param mode - 'job' or 'template' mode (template skips required validation)
+ * @returns Array of all validation errors
+ */
+export function validateForSubmit(
+  elements: JcfElement[],
+  mode: JcfMode = 'job',
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  elements.forEach((element, index) => {
+    // Level 1 STRICT: DSL format validation (always strict on submit)
+    const dslErrors = validateElementLive(element, index, true);
+    errors.push(...dslErrors);
+
+    // Level 3: Convert required fields to submit errors
+    const requiredFields = getRequiredFields(element, index, mode);
+    requiredFields.forEach((rf) => {
+      errors.push({
+        elementIndex: rf.elementIndex,
+        field: rf.field,
+        message: SUBMIT_MESSAGES[rf.field],
+        type: 'submit',
+      });
+    });
+  });
+
+  return errors;
+}
+
+/**
+ * Validate all elements for submit and return as a map
+ *
+ * @param elements - Array of elements to validate
+ * @param mode - 'job' or 'template' mode
+ * @returns Map of errors keyed by "elementIndex-field"
+ */
+export function validateAllForSubmit(
+  elements: JcfElement[],
+  mode: JcfMode = 'job',
+): Map<string, ValidationError> {
+  const errorMap = new Map<string, ValidationError>();
+  const errors = validateForSubmit(elements, mode);
+
+  errors.forEach((error) => {
+    const key = `${error.elementIndex}-${error.field}`;
+    errorMap.set(key, error);
+  });
+
+  return errorMap;
 }

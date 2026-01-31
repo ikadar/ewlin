@@ -69,6 +69,14 @@ export function generateStationCategories(): StationCategory[] {
       similarityCriteria: FINISHING_CRITERIA,
     },
     {
+      id: 'cat-die-cutting',
+      name: 'Découpe',
+      description: 'Machines de découpe à forme (die-cutting)',
+      similarityCriteria: [
+        { id: 'crit-forme-size', name: 'Même taille de forme', fieldPath: 'formeSize' },
+      ],
+    },
+    {
       id: 'cat-outsourced',
       name: 'Sous-traitance',
       description: 'Travaux externalisés',
@@ -105,6 +113,12 @@ export function generateStationGroups(): StationGroup[] {
       id: 'grp-finishing',
       name: 'Finition',
       maxConcurrent: 3,
+      isOutsourcedProviderGroup: false,
+    },
+    {
+      id: 'grp-die-cutting',
+      name: 'Découpe',
+      maxConcurrent: 1,
       isOutsourcedProviderGroup: false,
     },
     // Provider groups (unlimited capacity)
@@ -239,6 +253,9 @@ const STATION_DEFINITIONS: StationDefinition[] = [
   { id: 'sta-stahl', name: 'Stahl TH82', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
   { id: 'sta-muller', name: 'Muller Martini', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
   { id: 'sta-horizon', name: 'Horizon BQ-270', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
+
+  // Die-cutting
+  { id: 'sta-bobst', name: 'Bobst SP 102', categoryId: 'cat-die-cutting', groupId: 'grp-die-cutting', scheduleType: 'standard' },
 ];
 
 export function generateStations(): Station[] {

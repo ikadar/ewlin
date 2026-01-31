@@ -5,6 +5,8 @@ import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Job
 // Helper to create a basic snapshot
 function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnapshot {
   return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
     stations: [],
     categories: [],
     groups: [],
@@ -15,7 +17,6 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
     assignments: [],
     lateJobs: [],
     conflicts: [],
-    snapshotVersion: 1,
     ...overrides,
   };
 }
@@ -25,10 +26,10 @@ function createStation(id: string, name: string = id): Station {
   return {
     id,
     name,
-    code: id.toUpperCase(),
     categoryId: 'cat-1',
-    groupId: null,
-    status: 'Active',
+    groupId: 'grp-1',
+    capacity: 1,
+    status: 'Available',
     operatingSchedule: {
       monday: { isOperating: true, slots: [{ start: '06:00', end: '22:00' }] },
       tuesday: { isOperating: true, slots: [{ start: '06:00', end: '22:00' }] },
@@ -39,8 +40,6 @@ function createStation(id: string, name: string = id): Station {
       sunday: { isOperating: false, slots: [] },
     },
     exceptions: [],
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
   };
 }
 
@@ -51,16 +50,13 @@ function createJob(id: string): Job {
     reference: id,
     client: 'Test Client',
     description: 'Test Job',
-    workshopEntryDate: '2024-01-01T00:00:00Z',
-    workshopExitDate: null,
+    workshopExitDate: '2024-01-15',
     status: 'InProgress',
     color: '#FF0000',
-    proofSentAt: null,
-    proofApprovedAt: '2024-01-01T00:00:00Z',
-    platesStatus: 'Done',
-    paperPurchaseStatus: 'InStock',
-    paperOrderedAt: null,
+    fullyScheduled: false,
+    comments: [],
     elementIds: [`element-${id}`],
+    taskIds: [],
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
   };
@@ -71,8 +67,13 @@ function createElement(jobId: string, taskIds: string[] = []): Element {
   return {
     id: `element-${jobId}`,
     jobId,
-    name: `Element for ${jobId}`,
+    name: 'ELT',
+    prerequisiteElementIds: [],
     taskIds,
+    paperStatus: 'in_stock',
+    batStatus: 'bat_approved',
+    plateStatus: 'ready',
+    formeStatus: 'none',
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
   };

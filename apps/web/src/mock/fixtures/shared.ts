@@ -159,10 +159,31 @@ export function baseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'elements' | 'ta
 export type JobWithoutElementIds = Omit<Job, 'elementIds'>;
 
 /**
+ * Options for generating elements with custom prerequisites.
+ */
+export interface ElementGeneratorOptions {
+  paperStatus?: 'none' | 'in_stock' | 'to_order' | 'ordered' | 'delivered';
+  batStatus?: 'none' | 'waiting_files' | 'files_received' | 'bat_sent' | 'bat_approved';
+  plateStatus?: 'none' | 'to_make' | 'ready';
+  formeStatus?: 'none' | 'in_stock' | 'to_order' | 'ordered' | 'delivered';
+}
+
+/**
  * Generate elements for jobs and add elementIds to jobs.
  * For v0.4.1+, mutates jobs to add elementIds and returns elements.
  */
-export function generateElementsForJobs(jobs: JobWithoutElementIds[], tasks: Task[]): Element[] {
+export function generateElementsForJobs(
+  jobs: JobWithoutElementIds[],
+  tasks: Task[],
+  options: ElementGeneratorOptions = {}
+): Element[] {
+  const {
+    paperStatus = 'in_stock',
+    batStatus = 'bat_approved',
+    plateStatus = 'ready',
+    formeStatus = 'none',
+  } = options;
+
   return jobs.map((job) => {
     const elementId = `elem-${job.id}`;
     // Mutate job to add elementIds (side effect for convenience in fixtures)
@@ -170,16 +191,16 @@ export function generateElementsForJobs(jobs: JobWithoutElementIds[], tasks: Tas
     return {
       id: elementId,
       jobId: job.id,
-      suffix: 'ELT',
+      name: 'ELT',
       prerequisiteElementIds: [],
       // Tasks have elementId that matches this element's id
       taskIds: tasks.filter((t) => t.elementId === elementId).map((t) => t.id),
+      paperStatus,
+      batStatus,
+      plateStatus,
+      formeStatus,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     };
   });
 }
-
-// BAT approval dates (proof sent and approved yesterday)
-export const batSentAt = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
-export const batApprovedAt = new Date(today.getTime() - 12 * 60 * 60 * 1000).toISOString();

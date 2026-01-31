@@ -90,19 +90,38 @@ This document defines the core domain terms used in the **print shop scheduling*
 ## Element
 
 - **Definition:** A segment of a job's production process, containing one or more sequential tasks. Every job has at least one element. Multi-element jobs enable complex production workflows (e.g., book production with separate cover, interior, and binding elements).
-- **Notes:** The Element is an intermediate layer between Job and Task. Tasks belong to an Element (via `elementId`), and Elements belong to a Job (via `jobId`). Single-element jobs behave identically to the pre-Element flat task list — the element layer is transparent.
+- **Notes:** The Element is an intermediate layer between Job and Task. Tasks belong to an Element (via `elementId`), and Elements belong to a Job (via `jobId`). Single-element jobs behave identically to the pre-Element flat task list — the element layer is transparent. **As of v0.4.32, prerequisite tracking (paper, BAT, plates, forme) is at element level.**
 - **Fields:**
   - `id` – unique identifier
   - `jobId` – parent job ID
   - `suffix` – short identifier (e.g., `"couv"`, `"int"`, `"fin"`, `"ELT"`)
   - `label` – optional display label (e.g., `"Couverture"`, `"Intérieur"`)
+  - `spec` – optional ElementSpec with additional specifications
   - `prerequisiteElementIds` – element IDs (same job) that must complete before this element can start
   - `taskIds` – task IDs in execution order within this element
+  - **Prerequisite Status Fields (v0.4.32):**
+    - `paperStatus` – paper availability: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+    - `batStatus` – BAT approval: `none` | `waiting_files` | `files_received` | `bat_sent` | `bat_approved`
+    - `plateStatus` – plates preparation: `none` | `to_make` | `ready`
+    - `formeStatus` – forme (die-cutting tool): `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+  - **Date Tracking Fields (v0.4.32):**
+    - `paperOrderedAt` – timestamp when paper was ordered
+    - `paperDeliveredAt` – timestamp when paper was delivered
+    - `filesReceivedAt` – timestamp when client files were received
+    - `batSentAt` – timestamp when BAT was sent to client
+    - `batApprovedAt` – timestamp when BAT was approved
+    - `formeOrderedAt` – timestamp when forme was ordered
+    - `formeDeliveredAt` – timestamp when forme was delivered
+- **Blocking Logic (v0.4.32):** An element is blocked if ANY prerequisite is not ready:
+  - Paper ready: `none`, `in_stock`, `delivered`
+  - BAT ready: `none`, `bat_approved`
+  - Plates ready: `none`, `ready`
+  - Forme ready: `none`, `in_stock`, `delivered`
 - **Examples:**
   - Single-element job: one element with suffix `"ELT"`, all tasks in sequence
   - Book production: Element A "Couverture" (cover), Element B "Intérieur" (interior), Element C "Reliure" (binding, depends on A and B)
 - **Helper:** `isMultiElementJob(elementIds)` returns `true` when `elementIds.length > 1`
-- **Related terms:** Job, Task, ElementDependency.
+- **Related terms:** Job, Task, ElementDependency, ElementPrerequisite.
 
 ---
 
@@ -135,7 +154,7 @@ This document defines the core domain terms used in the **print shop scheduling*
 ## Job
 
 - **Definition:** A complete print order consisting of one or more elements, each containing sequential tasks, that must be completed by a deadline.
-- **Notes:** Jobs have rich metadata specific to print production including client info, paper specifications, and approval gates.
+- **Notes:** Jobs have rich metadata specific to print production including client info and paper specifications. **As of v0.4.32, prerequisite tracking (paper, BAT, plates, forme) moved to Element level.**
 - **Typical fields:**
   - `reference` – order reference (user-manipulated for order lines/parts)
   - `client` – customer name
@@ -144,14 +163,8 @@ This document defines the core domain terms used in the **print shop scheduling*
   - `notes` – free-form comments
   - `description` – product description (e.g., "Cartes de voeux - 9,9 x 21 cm - off 350g - 350 ex")
   - `workshopExitDate` – date job MUST leave the factory
-  - `paperPurchaseStatus` – enum: InStock / ToOrder / Ordered / Received
-  - `paperOrderedAt` – timestamp when paper was ordered
   - `paperType` – paper type and weight (e.g., "CB300")
   - `paperFormat` – paper dimensions (e.g., "63x88")
-  - `proofApproval` – proof (BAT) approval gate object:
-    - `sentAt` – date proof sent to client (ISO string), or `"AwaitingFile"` / `"NoProofRequired"`
-    - `approvedAt` – date proof approval received (ISO string), or null
-  - `platesStatus` – approval gate: Todo / Done
   - `comments` – thread of dated/authored messages
 - **Status values:**
   - `Draft` – job is being defined
@@ -160,7 +173,7 @@ This document defines the core domain terms used in the **print shop scheduling*
   - `Delayed` – job at risk of missing deadline
   - `Completed` – all tasks finished
   - `Cancelled` – job was cancelled
-- **Related terms:** Element, Task, ApprovalGate, Comment.
+- **Related terms:** Element, Task, ElementPrerequisite, Comment.
 
 ---
 
@@ -232,17 +245,26 @@ This document defines the core domain terms used in the **print shop scheduling*
 
 ---
 
-## ApprovalGate
+## ElementPrerequisite (v0.4.32)
 
-- **Definition:** A checkpoint that must be cleared before production can proceed.
-- **Instances:**
+- **Definition:** A production readiness checkpoint tracked at the element level. Prerequisites must be ready before production can proceed efficiently.
+- **Prerequisite Types:**
+  - **Paper** – paper availability for production
+    - `paperStatus`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+    - Ready states: `none`, `in_stock`, `delivered`
   - **BAT (Bon à Tirer)** – proof approval from client
-    - `proofApproval.sentAt`: Date sent (ISO string), or `"AwaitingFile"` / `"NoProofRequired"`
-    - `proofApproval.approvedAt`: Date approved (ISO string), or null
+    - `batStatus`: `none` | `waiting_files` | `files_received` | `bat_sent` | `bat_approved`
+    - Ready states: `none`, `bat_approved`
   - **Plates** – printing plates preparation
-    - `platesStatus`: Todo / Done
-- **Notes:** Tasks cannot proceed until their required approval gates are satisfied.
-- **Related terms:** Job, Task.
+    - `plateStatus`: `none` | `to_make` | `ready`
+    - Ready states: `none`, `ready`
+  - **Forme** – die-cutting tool availability (only for elements with die-cutting tasks)
+    - `formeStatus`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+    - Ready states: `none`, `in_stock`, `delivered`
+- **Blocking Logic:** An element is blocked if ANY prerequisite is not in a ready state.
+- **Visual Indicator:** Blocked elements display a dashed left border on their scheduler tiles.
+- **Notes:** Prerequisites are warnings only (MVP) — users can still schedule blocked elements. Hard blocking may be introduced post-MVP.
+- **Related terms:** Element, Task, PrerequisiteConflict.
 
 ---
 
@@ -329,10 +351,10 @@ This document defines the core domain terms used in the **print shop scheduling*
   - `StationConflict` – station double-booked
   - `GroupCapacityConflict` – station group max concurrent exceeded
   - `PrecedenceConflict` – task scheduled before predecessor completes (covers both intra-element sequencing and cross-element finish-to-start dependencies)
-  - `ApprovalGateConflict` – approval gate not satisfied
+  - `PrerequisiteConflict` – element prerequisite not ready (paper, BAT, plates, forme) — v0.4.32
   - `AvailabilityConflict` – task scheduled outside station operating hours
   - `DeadlineConflict` – task completion exceeds job workshop exit date
-- **Related terms:** Schedule, Assignment, Validation.
+- **Related terms:** Schedule, Assignment, Validation, ElementPrerequisite.
 
 ---
 

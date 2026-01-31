@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
-import type { JcfElement } from './components';
+import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
@@ -22,6 +22,7 @@ import {
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
+import { createJob, transformJcfToRequest, JobApiError } from './api';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -437,9 +438,66 @@ function AppContent() {
   // v0.4.9: Elements table state
   const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
 
+  // v0.4.31: Sequence workflow from selected template (template-free mode when empty)
+  const [sequenceWorkflow, setSequenceWorkflow] = useState<string[]>([]);
+
   // v0.4.34: Template editor modal state
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [isTemplateSaving, setIsTemplateSaving] = useState(false);
+
+  // v0.4.30: Save validation ref
+  const jcfSaveAttemptRef = useRef<(() => boolean) | null>(null);
+  const [isJcfSaving, setIsJcfSaving] = useState(false);
+  // v0.4.33: API error state
+  const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
+
+  // v0.4.33: Save job via API
+  const handleJcfSave = useCallback(async () => {
+    if (!jcfSaveAttemptRef.current) return;
+
+    const isValid = jcfSaveAttemptRef.current();
+    if (!isValid) return;
+
+    setIsJcfSaving(true);
+    setJcfSaveError(null);
+
+    try {
+      const request = transformJcfToRequest(
+        jcfJobId,
+        jcfClient,
+        jcfIntitule,
+        jcfDeadline,
+        jcfElements
+      );
+      await createJob(request);
+
+      // Success: close modal and reset form
+      setIsJcfSaving(false);
+      setIsJcfModalOpen(false);
+      setJcfClient('');
+      setJcfTemplate('');
+      setJcfIntitule('');
+      setJcfQuantity('');
+      setJcfDeadline('');
+      setJcfElements([{ ...DEFAULT_ELEMENT }]);
+      setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
+    } catch (error) {
+      setIsJcfSaving(false);
+      if (error instanceof JobApiError) {
+        // Format validation errors if present
+        if (error.violations && error.violations.length > 0) {
+          const messages = error.violations.map((v) => `${v.propertyPath}: ${v.message}`);
+          setJcfSaveError(messages.join('\n'));
+        } else {
+          setJcfSaveError(error.message);
+        }
+      } else if (error instanceof Error) {
+        setJcfSaveError(error.message);
+      } else {
+        setJcfSaveError('An unexpected error occurred');
+      }
+    }
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements]);
 
   const handleOpenJcf = useCallback(() => {
     setJcfJobId(generateJobId());
@@ -454,6 +512,8 @@ function AppContent() {
     setJcfQuantity('');
     setJcfDeadline('');
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
+    setSequenceWorkflow([]); // v0.4.31: Reset workflow on close
+    setJcfSaveError(null); // v0.4.33: Reset API error on close
   }, []);
 
   // v0.4.34: Handler for "Save as Template" button in JcfModal
@@ -496,8 +556,15 @@ function AppContent() {
   }, []);
 
   // v0.4.34: Handler for template selection in JcfJobHeader
-  // Applies the selected template's elements to the form
-  const handleTemplateSelect = useCallback((template: JcfTemplate) => {
+  // Applies the selected template's elements to the form and extracts workflow
+  const handleTemplateSelect = useCallback((template: JcfTemplate | null) => {
+    if (!template) {
+      // Clear template - reset to default state
+      setJcfElements([{ ...DEFAULT_ELEMENT }]);
+      setSequenceWorkflow([]);
+      return;
+    }
+
     // Convert JcfTemplateElement to JcfElement
     const newElements: JcfElement[] = template.elements.map(el => ({
       name: el.name,
@@ -517,6 +584,11 @@ function AppContent() {
     }));
     setJcfElements(newElements.length > 0 ? newElements : [{ ...DEFAULT_ELEMENT }]);
     setJcfTemplate(template.name);
+
+    // v0.4.31: Extract workflow from first element's sequenceWorkflow (if available)
+    const firstElementWorkflow = template.elements[0]?.sequenceWorkflow;
+    setSequenceWorkflow(firstElementWorkflow ?? []);
+
     // Also set client if the template has one
     if (template.clientName && !jcfClient) {
       setJcfClient(template.clientName);
@@ -980,6 +1052,33 @@ function AppContent() {
       return {
         ...currentSnapshot,
         assignments: currentSnapshot.assignments.filter((a) => a.id !== assignmentId),
+      };
+    });
+    setSnapshotVersion((v) => v + 1);
+  }, []);
+
+  // v0.4.32a: Handle element prerequisite status change
+  const handleElementStatusChange = useCallback((update: ElementStatusUpdate) => {
+    updateSnapshot((currentSnapshot) => {
+      const elementIndex = currentSnapshot.elements.findIndex((e) => e.id === update.elementId);
+      if (elementIndex === -1) {
+        console.warn('Element not found for status update:', update.elementId);
+        return currentSnapshot;
+      }
+
+      console.log('Updating element status:', update);
+
+      // Create new elements array with updated element
+      const newElements = [...currentSnapshot.elements];
+      newElements[elementIndex] = {
+        ...newElements[elementIndex],
+        [update.field]: update.value,
+        updatedAt: new Date().toISOString(),
+      };
+
+      return {
+        ...currentSnapshot,
+        elements: newElements,
       };
     });
     setSnapshotVersion((v) => v + 1);
@@ -1543,6 +1642,7 @@ function AppContent() {
           onPick={handlePickTask}
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
+          onElementStatusChange={handleElementStatusChange}
         />
         <DateStrip
           startDate={gridStartDate}
@@ -1636,6 +1736,9 @@ function AppContent() {
       <JcfModal
         isOpen={isJcfModalOpen}
         onClose={handleCloseJcf}
+        onSave={handleJcfSave}
+        isSaving={isJcfSaving}
+        error={jcfSaveError}
         onSaveAsTemplate={handleSaveAsTemplate}
         canSaveAsTemplate={jcfElements.length > 0 && jcfElements.some(el => el.name.trim() !== '')}
       >
@@ -1658,8 +1761,9 @@ function AppContent() {
           <JcfElementsTable
             elements={jcfElements}
             onElementsChange={setJcfElements}
-            sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : undefined}
+            sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : sequenceWorkflow}
             jobQuantity={jcfQuantity}
+            onSaveAttemptRef={jcfSaveAttemptRef}
           />
         </div>
       </JcfModal>

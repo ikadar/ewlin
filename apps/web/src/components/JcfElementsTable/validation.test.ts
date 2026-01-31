@@ -17,6 +17,8 @@ import {
   validateElementLive,
   validateAllElements,
   getCellError,
+  validateForSubmit,
+  validateAllForSubmit,
 } from './validation';
 import type { JcfElement } from './types';
 
@@ -384,8 +386,192 @@ describe('getCellError', () => {
       elementIndex: 0,
       field: 'pagination' as const,
       message: 'Invalid',
+      type: 'live' as const,
     };
     const errorMap = new Map([['0-pagination', error]]);
     expect(getCellError(errorMap, 0, 'pagination')).toBe(error);
+  });
+});
+
+// ── validateForSubmit ────────────────────────────────────────────────────────
+
+describe('validateForSubmit', () => {
+  const baseElement: JcfElement = {
+    name: 'E1',
+    precedences: '',
+    quantite: '1', // Default value - empty element needs '1' as default
+    pagination: '',
+    format: '',
+    papier: '',
+    impression: '',
+    surfacage: '',
+    autres: '',
+    imposition: '',
+    qteFeuilles: '',
+    commentaires: '',
+    sequence: '',
+  };
+
+  it('returns empty array for completely empty element', () => {
+    const elements: JcfElement[] = [baseElement];
+    const errors = validateForSubmit(elements, 'job');
+    expect(errors).toHaveLength(0);
+  });
+
+  it('returns strict DSL errors (incomplete lines flagged)', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      sequence: 'G37(', // Incomplete - only strict mode catches this
+    };
+    const errors = validateForSubmit([element], 'job');
+    const sequenceErrors = errors.filter((e) => e.field === 'sequence');
+    expect(sequenceErrors.length).toBeGreaterThan(0);
+    expect(sequenceErrors[0].type).toBe('live');
+  });
+
+  it('returns required field errors for element with content', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      papier: 'Couché:135', // Has content, so sequence is required
+    };
+    const errors = validateForSubmit([element], 'job');
+    const sequenceErrors = errors.filter(
+      (e) => e.field === 'sequence' && e.type === 'submit',
+    );
+    expect(sequenceErrors).toHaveLength(1);
+    expect(sequenceErrors[0].message).toContain('Séquence requise');
+  });
+
+  it('returns required BLOC SUPPORT fields when triggered', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      imposition: '50x70(8)', // Triggers BLOC SUPPORT
+      sequence: 'G37(20)', // Provide sequence to avoid that error
+    };
+    const errors = validateForSubmit([element], 'job');
+    const requiredFields = errors
+      .filter((e) => e.type === 'submit')
+      .map((e) => e.field);
+    expect(requiredFields).toContain('papier');
+    expect(requiredFields).toContain('pagination');
+    expect(requiredFields).toContain('format');
+    expect(requiredFields).toContain('qteFeuilles');
+  });
+
+  it('returns required BLOC IMPRESSION fields when triggered', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      imposition: '50x70(8)', // Triggers BLOC IMPRESSION
+      sequence: 'G37(20)',
+    };
+    const errors = validateForSubmit([element], 'job');
+    const requiredFields = errors
+      .filter((e) => e.type === 'submit')
+      .map((e) => e.field);
+    expect(requiredFields).toContain('impression');
+  });
+
+  it('returns no required field errors in template mode', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      papier: 'Couché:135', // Has content, but template mode skips required check
+    };
+    const errors = validateForSubmit([element], 'template');
+    const submitErrors = errors.filter((e) => e.type === 'submit');
+    expect(submitErrors).toHaveLength(0);
+  });
+
+  it('still returns DSL format errors in template mode', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      pagination: '3', // Invalid pagination
+    };
+    const errors = validateForSubmit([element], 'template');
+    const paginationErrors = errors.filter((e) => e.field === 'pagination');
+    expect(paginationErrors).toHaveLength(1);
+    expect(paginationErrors[0].type).toBe('live');
+  });
+
+  it('returns empty array for valid complete element', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      sequence: 'G37(20)',
+      papier: 'Couché:135',
+      pagination: '8',
+      format: 'A4',
+      qteFeuilles: '1000',
+      imposition: '50x70(8)',
+      impression: 'Q/Q',
+    };
+    const errors = validateForSubmit([element], 'job');
+    expect(errors).toHaveLength(0);
+  });
+
+  it('validates multiple elements independently', () => {
+    const elements: JcfElement[] = [
+      { ...baseElement, pagination: '3' }, // Invalid DSL
+      { ...baseElement, name: 'E2', papier: 'Couché:135' }, // Missing sequence
+    ];
+    const errors = validateForSubmit(elements, 'job');
+    expect(errors.some((e) => e.elementIndex === 0 && e.field === 'pagination')).toBe(true);
+    expect(errors.some((e) => e.elementIndex === 1 && e.field === 'sequence')).toBe(true);
+  });
+});
+
+// ── validateAllForSubmit ─────────────────────────────────────────────────────
+
+describe('validateAllForSubmit', () => {
+  const baseElement: JcfElement = {
+    name: 'E1',
+    precedences: '',
+    quantite: '1', // Default value - empty element needs '1' as default
+    pagination: '',
+    format: '',
+    papier: '',
+    impression: '',
+    surfacage: '',
+    autres: '',
+    imposition: '',
+    qteFeuilles: '',
+    commentaires: '',
+    sequence: '',
+  };
+
+  it('returns empty map for valid elements', () => {
+    const elements: JcfElement[] = [baseElement];
+    const errorMap = validateAllForSubmit(elements, 'job');
+    expect(errorMap.size).toBe(0);
+  });
+
+  it('returns errors keyed by element-field', () => {
+    const elements: JcfElement[] = [
+      { ...baseElement, pagination: '3' }, // Invalid DSL
+      { ...baseElement, name: 'E2', papier: 'Couché:135' }, // Missing sequence
+    ];
+    const errorMap = validateAllForSubmit(elements, 'job');
+    expect(errorMap.has('0-pagination')).toBe(true);
+    expect(errorMap.has('1-sequence')).toBe(true);
+  });
+
+  it('returns submit type errors for required fields', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      papier: 'Couché:135',
+    };
+    const errorMap = validateAllForSubmit([element], 'job');
+    const sequenceError = errorMap.get('0-sequence');
+    expect(sequenceError).toBeDefined();
+    expect(sequenceError?.type).toBe('submit');
+  });
+
+  it('returns live type errors for DSL format errors', () => {
+    const element: JcfElement = {
+      ...baseElement,
+      pagination: '3',
+    };
+    const errorMap = validateAllForSubmit([element], 'job');
+    const paginationError = errorMap.get('0-pagination');
+    expect(paginationError).toBeDefined();
+    expect(paginationError?.type).toBe('live');
   });
 });

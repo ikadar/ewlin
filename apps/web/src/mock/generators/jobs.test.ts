@@ -83,10 +83,20 @@ describe('generateJobs', () => {
       expect(job).toHaveProperty('workshopExitDate');
       expect(job).toHaveProperty('fullyScheduled');
       expect(job).toHaveProperty('color');
-      expect(job).toHaveProperty('paperPurchaseStatus');
-      expect(job).toHaveProperty('proofApproval');
-      expect(job).toHaveProperty('platesStatus');
       expect(job).toHaveProperty('taskIds');
+    }
+  });
+
+  it('each element has prerequisite status fields', () => {
+    const result = generateJobs({ count: 5 });
+    for (const element of result.elements) {
+      expect(element).toHaveProperty('paperStatus');
+      expect(element).toHaveProperty('batStatus');
+      expect(element).toHaveProperty('plateStatus');
+      // Verify valid status values
+      expect(['none', 'in_stock', 'to_order', 'ordered', 'delivered']).toContain(element.paperStatus);
+      expect(['none', 'waiting_files', 'files_received', 'bat_sent', 'bat_approved']).toContain(element.batStatus);
+      expect(['none', 'to_make', 'ready']).toContain(element.plateStatus);
     }
   });
 

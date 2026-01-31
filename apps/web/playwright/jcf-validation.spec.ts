@@ -1,9 +1,11 @@
 /**
- * E2E tests for JCF Live Format Validation (Level 1)
+ * E2E tests for JCF Validation
  *
- * Tests error display for invalid input and lenient typing behavior.
+ * - Level 1: Live Format Validation during typing
+ * - Level 3: Submit Validation (strict errors + required fields)
  *
  * @see docs/releases/v0.4.23-jcf-live-format-validation.md
+ * @see docs/releases/v0.4.30-jcf-submit-validation.md
  */
 
 import { test, expect } from '@playwright/test';
@@ -320,6 +322,194 @@ test.describe('JCF Live Format Validation', () => {
 
       // Should have transition class
       await expect(cell).toHaveClass(/transition-colors/);
+    });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Level 3: Submit Validation Tests
+// ────────────────────────────────────────────────────────────────────────────
+
+test.describe('JCF Submit Validation (Level 3)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/?fixture=test');
+    await waitForAppReady(page);
+
+    // Open JCF modal
+    const addButton = page.locator('button[aria-label="Ajouter un travail"]');
+    await addButton.click();
+    await expect(
+      page.locator('[data-testid="jcf-modal-backdrop"]'),
+    ).toBeVisible();
+  });
+
+  test.describe('save button', () => {
+    test('save button is visible in modal footer', async ({ page }) => {
+      const saveButton = page.getByTestId('jcf-modal-save');
+      await expect(saveButton).toBeVisible();
+      await expect(saveButton).toContainText('Enregistrer');
+    });
+
+    test('clicking save with empty required fields shows errors', async ({
+      page,
+    }) => {
+      // Add content to trigger required field checks
+      const papierCell = page.getByTestId('jcf-cell-0-papier');
+      const papierInput = papierCell.locator('input');
+      await papierInput.click();
+      await papierInput.fill('Couché:135');
+      await papierInput.blur();
+
+      // Verify sequence field doesn't have error yet (amber indicator only)
+      const sequenceCell = page.getByTestId('jcf-cell-0-sequence');
+      await expect(sequenceCell).not.toHaveClass(/bg-red-900/);
+
+      // Click save
+      const saveButton = page.getByTestId('jcf-modal-save');
+      await saveButton.click();
+
+      // Now sequence field should show error (required field converted to error)
+      await expect(sequenceCell).toHaveClass(/bg-red-900/);
+    });
+
+    test('clicking save with invalid DSL shows strict errors', async ({
+      page,
+    }) => {
+      const sequenceCell = page.getByTestId('jcf-cell-0-sequence');
+      const textarea = sequenceCell.locator('textarea');
+
+      // Type incomplete sequence (lenient mode would not show error)
+      await textarea.fill('G37(');
+
+      // Verify no error before save (lenient mode)
+      await expect(sequenceCell).not.toHaveClass(/bg-red-900/);
+
+      // Click save
+      const saveButton = page.getByTestId('jcf-modal-save');
+      await saveButton.click();
+
+      // Now strict mode shows error for incomplete sequence
+      await expect(sequenceCell).toHaveClass(/bg-red-900/);
+    });
+  });
+
+  test.describe('required field errors', () => {
+    test('BLOC SUPPORT triggers required fields on save', async ({ page }) => {
+      // Fill imposition to trigger BLOC SUPPORT
+      const impositionCell = page.getByTestId('jcf-cell-0-imposition');
+      const impositionInput = impositionCell.locator('input');
+      await impositionInput.click();
+      await impositionInput.fill('50x70(8)');
+      await impositionInput.blur();
+
+      // Click save
+      const saveButton = page.getByTestId('jcf-modal-save');
+      await saveButton.click();
+
+      // Required BLOC SUPPORT fields should show errors
+      const papierCell = page.getByTestId('jcf-cell-0-papier');
+      const paginationCell = page.getByTestId('jcf-cell-0-pagination');
+      const formatCell = page.getByTestId('jcf-cell-0-format');
+      const qteFeuilles = page.getByTestId('jcf-cell-0-qteFeuilles');
+      const sequenceCell = page.getByTestId('jcf-cell-0-sequence');
+
+      await expect(papierCell).toHaveClass(/bg-red-900/);
+      await expect(paginationCell).toHaveClass(/bg-red-900/);
+      await expect(formatCell).toHaveClass(/bg-red-900/);
+      await expect(qteFeuilles).toHaveClass(/bg-red-900/);
+      await expect(sequenceCell).toHaveClass(/bg-red-900/);
+    });
+
+    test('error tooltip shows French message for required field', async ({
+      page,
+    }) => {
+      // Add content to trigger required checks
+      const papierCell = page.getByTestId('jcf-cell-0-papier');
+      const papierInput = papierCell.locator('input');
+      await papierInput.click();
+      await papierInput.fill('Couché:135');
+      await papierInput.blur();
+
+      // Click save
+      const saveButton = page.getByTestId('jcf-modal-save');
+      await saveButton.click();
+
+      // Hover over sequence error badge
+      const sequenceCell = page.getByTestId('jcf-cell-0-sequence');
+      const badge = sequenceCell.getByTestId('error-badge');
+      await badge.hover();
+
+      // Tooltip should show French required message
+      const tooltip = page.getByTestId('error-tooltip');
+      await expect(tooltip).toContainText('Séquence requise');
+    });
+  });
+
+  test.describe('fix errors and save', () => {
+    test('fixing all errors allows save to succeed', async ({ page }) => {
+      // Add content to trigger BLOC SUPPORT
+      const impositionCell = page.getByTestId('jcf-cell-0-imposition');
+      await impositionCell.locator('input').click();
+      await impositionCell.locator('input').fill('50x70(8)');
+      await impositionCell.locator('input').blur();
+
+      // Click save to trigger errors
+      const saveButton = page.getByTestId('jcf-modal-save');
+      await saveButton.click();
+
+      // Fill all required fields
+      const sequenceCell = page.getByTestId('jcf-cell-0-sequence');
+      await sequenceCell.locator('textarea').fill('G37(20)');
+
+      const papierCell = page.getByTestId('jcf-cell-0-papier');
+      await papierCell.locator('input').click();
+      await papierCell.locator('input').fill('Couché:135');
+      await papierCell.locator('input').blur();
+
+      const paginationCell = page.getByTestId('jcf-cell-0-pagination');
+      await paginationCell.locator('input').fill('8');
+
+      const formatCell = page.getByTestId('jcf-cell-0-format');
+      await formatCell.locator('input').click();
+      await formatCell.locator('input').fill('A4');
+      await formatCell.locator('input').blur();
+
+      const qteFeuilles = page.getByTestId('jcf-cell-0-qteFeuilles');
+      await qteFeuilles.locator('input').fill('1000');
+
+      const impressionCell = page.getByTestId('jcf-cell-0-impression');
+      await impressionCell.locator('input').click();
+      await impressionCell.locator('input').fill('Q/Q');
+      await impressionCell.locator('input').blur();
+
+      // Click save again
+      await saveButton.click();
+
+      // Modal should close (save succeeded)
+      await expect(
+        page.locator('[data-testid="jcf-modal-backdrop"]'),
+      ).not.toBeVisible({ timeout: 2000 });
+    });
+  });
+
+  test.describe('keyboard shortcut', () => {
+    test('Cmd+S triggers save', async ({ page }) => {
+      // Add content to trigger required checks
+      const papierCell = page.getByTestId('jcf-cell-0-papier');
+      const papierInput = papierCell.locator('input');
+      await papierInput.click();
+      await papierInput.fill('Couché:135');
+      await papierInput.blur();
+
+      // Verify no error before save
+      const sequenceCell = page.getByTestId('jcf-cell-0-sequence');
+      await expect(sequenceCell).not.toHaveClass(/bg-red-900/);
+
+      // Press Cmd+S (or Ctrl+S on Linux/Windows)
+      await page.keyboard.press('Meta+s');
+
+      // Now sequence field should show error
+      await expect(sequenceCell).toHaveClass(/bg-red-900/);
     });
   });
 });

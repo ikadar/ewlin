@@ -8,8 +8,6 @@ import type {
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -32,9 +30,6 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7), // 7 days from now
       color: '#8b5cf6',
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-ds-1-a', 'task-ds-1-b'],
       fullyScheduled: false,
@@ -50,9 +45,6 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 14), // 14 days from now
       color: '#3b82f6',
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-ds-2'],
       fullyScheduled: false,

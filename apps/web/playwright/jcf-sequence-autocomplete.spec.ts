@@ -4,6 +4,7 @@
  * Tests for v0.4.20: Multi-line sequence editor with poste mode.
  * Tests for v0.4.21: ST (sous-traitant) mode.
  * Tests for v0.4.22: Workflow-guided suggestion ordering.
+ * Tests for v0.4.31: Template-free mode (no workflow, no star markers).
  * Verifies poste selection, duration input, multi-line editing,
  * keyboard navigation, ST name/duration/description flow,
  * and workflow priority sorting.
@@ -13,6 +14,7 @@
  * @see docs/releases/v0.4.20-jcf-sequence-poste-mode.md
  * @see docs/releases/v0.4.21-jcf-sequence-st-mode.md
  * @see docs/releases/v0.4.22-jcf-sequence-workflow-suggestions.md
+ * @see docs/releases/v0.4.31-sequence-template-free-mode.md
  */
 
 import { test, expect } from '@playwright/test';
@@ -307,5 +309,109 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       expect(text).not.toContain('★');
       expect(text).toContain('Sous-traitant');
     });
+  });
+});
+
+/**
+ * v0.4.31: Template-Free Mode Tests
+ *
+ * When no template is selected (or no test fixture is active), the sequence
+ * autocomplete should show all postes without workflow-based priority sorting
+ * and without star markers.
+ *
+ * These tests verify:
+ * - No star markers when no template is selected
+ * - All postes shown equally (no priority sorting)
+ * - Template selection activates workflow
+ */
+test.describe('v0.4.31: Template-Free Mode', () => {
+  test.beforeEach(async ({ page }) => {
+    // NO fixture - this is template-free mode
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Open JCF modal
+    const addButton = page.locator('button[aria-label="Ajouter un travail"]');
+    await addButton.click();
+    await expect(
+      page.locator('[data-testid="jcf-modal-backdrop"]'),
+    ).toBeVisible();
+  });
+
+  test('no star markers when no template selected', async ({ page }) => {
+    // Template field should be empty
+    const templateInput = page.locator('#jcf-template');
+    await expect(templateInput).toHaveValue('');
+
+    // Focus sequence cell
+    const sequenceTextarea = page.locator('#cell-0-11');
+    await sequenceTextarea.click();
+
+    const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+    await expect(dropdown).toBeVisible();
+
+    // No star markers should appear in template-free mode
+    const text = await dropdown.textContent();
+    expect(text).not.toContain('★');
+  });
+
+  test('all postes shown in template-free mode', async ({ page }) => {
+    const sequenceTextarea = page.locator('#cell-0-11');
+    await sequenceTextarea.click();
+
+    const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+    await expect(dropdown).toBeVisible();
+
+    // Should show postes from different categories (no filtering)
+    await expect(dropdown).toContainText('G37'); // Presse offset
+    await expect(dropdown).toContainText('P137'); // Massicot
+    await expect(dropdown).toContainText('Stahl'); // Plieuse
+  });
+
+  test('selecting template activates workflow with star markers', async ({
+    page,
+  }) => {
+    // Select a template with workflow
+    const templateInput = page.locator('#jcf-template');
+    await templateInput.click();
+    await templateInput.fill('Brochure A4');
+
+    // Select from dropdown
+    const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
+    await expect(templateDropdown).toBeVisible();
+    await page.keyboard.press('Enter');
+
+    // Now check sequence suggestions
+    const sequenceTextarea = page.locator('#cell-0-11');
+    await sequenceTextarea.click();
+
+    const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+    await expect(dropdown).toBeVisible();
+
+    // With Brochure A4 template (workflow: ['Presse offset', 'Massicot', 'Plieuse', 'Conditionnement'])
+    // Presse offset should have star marker at step 0
+    await expect(dropdown).toContainText('★ Presse offset');
+  });
+
+  test('clearing template removes star markers', async ({ page }) => {
+    // First select a template
+    const templateInput = page.locator('#jcf-template');
+    await templateInput.click();
+    await templateInput.fill('Brochure A4');
+    await page.keyboard.press('Enter');
+
+    // Clear template
+    await templateInput.fill('');
+
+    // Check sequence suggestions
+    const sequenceTextarea = page.locator('#cell-0-11');
+    await sequenceTextarea.click();
+
+    const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
+    await expect(dropdown).toBeVisible();
+
+    // No star markers after clearing template
+    const text = await dropdown.textContent();
+    expect(text).not.toContain('★');
   });
 });

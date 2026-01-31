@@ -8,8 +8,6 @@ import type {
 import {
   today,
   isoDate,
-  batSentAt,
-  batApprovedAt,
   baseSnapshot,
   generateElementsForJobs,
   type JobWithoutElementIds,
@@ -32,9 +30,6 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 14),
       color: '#3b82f6', // Blue
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-val-1', 'task-val-2'],
       fullyScheduled: false,
@@ -50,9 +45,6 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 14),
       color: '#ef4444', // Red
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: null }, // NOT approved
       comments: [],
       taskIds: ['task-val-3'],
       fullyScheduled: false,
@@ -68,9 +60,6 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 14),
       color: '#22c55e', // Green
-      paperPurchaseStatus: 'InStock',
-      platesStatus: 'Done',
-      proofApproval: { sentAt: batSentAt, approvedAt: batApprovedAt },
       comments: [],
       taskIds: ['task-val-4'],
       fullyScheduled: false,

@@ -6,7 +6,7 @@ import type { InternalTask } from '@flux/types';
 function createMockTask(setupMinutes: number, runMinutes: number): InternalTask {
   return {
     id: 'task-1',
-    jobId: 'job-1',
+    elementId: 'element-1',
     type: 'Internal',
     stationId: 'station-1',
     sequenceOrder: 0,

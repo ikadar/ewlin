@@ -8,27 +8,30 @@ const mockJob: Job = {
   reference: '12345',
   client: 'Test Client',
   description: 'Test Job',
-  status: 'Planned',
-  workshopExitDate: new Date().toISOString(),
+  status: 'InProgress',
+  workshopExitDate: '2025-12-20',
   color: '#8B5CF6', // Purple
-  paperPurchaseStatus: 'InStock',
-  platesStatus: 'Done',
-  proofSentAt: null,
-  proofApprovedAt: null,
+  fullyScheduled: false,
+  comments: [],
+  taskIds: ['task-1'],
+  elementIds: ['element-1'],
+  createdAt: '2025-12-15T00:00:00Z',
+  updatedAt: '2025-12-15T00:00:00Z',
 };
 
 const mockTask: InternalTask = {
   id: 'task-1',
-  jobId: 'job-1',
-  categoryId: 'cat-1',
+  elementId: 'element-1',
   stationId: 'station-1',
   type: 'Internal',
   sequenceOrder: 1,
-  status: 'Pending',
+  status: 'Ready',
   duration: {
     setupMinutes: 30,
     runMinutes: 60,
   },
+  createdAt: '2025-12-15T00:00:00Z',
+  updatedAt: '2025-12-15T00:00:00Z',
 };
 
 describe('DragPreview', () => {

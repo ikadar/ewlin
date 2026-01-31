@@ -78,7 +78,7 @@ This domain model describes the core entities, value objects, and aggregates for
 - **Responsibilities:**
   - Represents a complete print order with deadline.
   - Contains and manages its elements, each containing sequential tasks.
-  - Tracks approval gates (BAT, Plates).
+  - Prerequisite tracking (paper, BAT, plates, forme) is delegated to Element level (v0.4.32).
 - **Key attributes:**
   - `JobId` (value object)
   - `Reference` (user-manipulated order reference)
@@ -87,20 +87,17 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Notes` (free-form comments)
   - `WorkshopExitDate` (deadline for leaving factory)
   - `FullyScheduled` (boolean, computed)
-  - `PaperPurchaseStatus` (enum: InStock, ToOrder, Ordered, Received)
-  - `PaperOrderedAt` (DateTime, nullable)
   - `PaperType` (string, e.g., "CB300")
   - `PaperFormat` (string, e.g., "63x88")
   - `PaperWeight` (integer, nullable, g/m², e.g., 300)
   - `Inking` (string, nullable, e.g., "CMYK", "4C+0", "Pantone 123")
-  - `ProofApproval` (value object: `sentAt` DateTime or AwaitingFile/NoProofRequired, `approvedAt` DateTime nullable)
-  - `PlatesStatus` (enum: Todo, Done)
   - `ElementIds` (ordered collection of ElementId references)
   - `TaskIds` (ordered collection of TaskId references — deprecated, use Element.taskIds)
   - `Comments` (collection of Comment value objects)
   - `Status` (Draft, Planned, InProgress, Delayed, Completed, Cancelled)
   - `Color` (hex string, e.g., "#3B82F6", randomly assigned at creation)
   - `CreatedAt` (DateTime)
+- **Note:** Prerequisite tracking (paper, BAT, plates, forme) moved to Element level in v0.4.32.
 
 ### Element (Entity within Job Aggregate)
 #### DM-ENT-ELEM-001
@@ -110,16 +107,36 @@ This domain model describes the core entities, value objects, and aggregates for
   - Represents a segment of a job's production process (e.g., cover, interior, binding).
   - Contains and orders its sequential tasks (via `taskIds`).
   - Defines finish-to-start dependencies on other elements in the same job (via `prerequisiteElementIds`).
+  - Tracks prerequisite status for production readiness (paper, BAT, plates, forme).
 - **Key attributes:**
   - `ElementId` (value object)
   - `JobId` (reference to parent Job)
   - `Suffix` (string, short identifier, e.g., "couv", "int", "fin", "ELT")
   - `Label` (string, optional display label, e.g., "Couverture", "Intérieur")
+  - `Spec` (ElementSpec, optional specification details)
   - `PrerequisiteElementIds` (collection of ElementId references — same job only)
   - `TaskIds` (ordered collection of TaskId references — execution order within element)
+  - **Prerequisite Status Fields (v0.4.32):**
+    - `PaperStatus` (enum: none, in_stock, to_order, ordered, delivered)
+    - `BatStatus` (enum: none, waiting_files, files_received, bat_sent, bat_approved)
+    - `PlateStatus` (enum: none, to_make, ready)
+    - `FormeStatus` (enum: none, in_stock, to_order, ordered, delivered)
+  - **Date Tracking Fields (v0.4.32):**
+    - `PaperOrderedAt` (DateTime, nullable)
+    - `PaperDeliveredAt` (DateTime, nullable)
+    - `FilesReceivedAt` (DateTime, nullable)
+    - `BatSentAt` (DateTime, nullable)
+    - `BatApprovedAt` (DateTime, nullable)
+    - `FormeOrderedAt` (DateTime, nullable)
+    - `FormeDeliveredAt` (DateTime, nullable)
   - `CreatedAt` (DateTime)
   - `UpdatedAt` (DateTime)
 - **Helper:** `isMultiElementJob(elementIds)` returns `true` when `elementIds.length > 1`
+- **Blocking Logic:** An element is blocked if ANY prerequisite is not ready:
+  - Paper ready: `none`, `in_stock`, `delivered`
+  - BAT ready: `none`, `bat_approved`
+  - Plates ready: `none`, `ready`
+  - Forme ready: `none`, `in_stock`, `delivered`
 
 ### Task (Entity within Job Aggregate, scoped to Element)
 #### DM-ENT-TASK-001
@@ -300,7 +317,7 @@ This domain model describes the core entities, value objects, and aggregates for
 #### DM-VO-CONFLICT-001
 
 - **Fields:**
-  - `Type` (enum: StationMismatchConflict, StationConflict, GroupCapacityConflict, PrecedenceConflict, ApprovalGateConflict, AvailabilityConflict, DeadlineConflict)
+  - `Type` (enum: StationMismatchConflict, StationConflict, GroupCapacityConflict, PrecedenceConflict, PrerequisiteConflict, AvailabilityConflict, DeadlineConflict)
   - `TaskId` (reference to Task — the task that has the conflict)
   - `Message` (string, human-readable description)
   - `RelatedTaskId` (reference to Task, optional — e.g., predecessor for PrecedenceConflict)
@@ -382,26 +399,38 @@ This domain model describes the core entities, value objects, and aggregates for
 - **Allowed values:** Defined, Ready, Assigned, Executing, Completed, Failed, Cancelled
 - Represents the lifecycle state of a Task within a Job.
 
-### PaperPurchaseStatus
+### PaperStatus (Element-level, v0.4.32)
 #### DM-ENUM-PAPER-001
 
-- **Allowed values:** InStock, ToOrder, Ordered, Received
-- Represents the paper procurement state for a Job.
+- **Allowed values:** `none`, `in_stock`, `to_order`, `ordered`, `delivered`
+- Represents the paper procurement state for an Element.
+- Ready states (not blocking): `none`, `in_stock`, `delivered`
+- Blocking states: `to_order`, `ordered`
 
-### PlatesStatus
-#### DM-ENUM-GATE-001
+### BatStatus (Element-level, v0.4.32)
+#### DM-ENUM-BAT-001
 
-- **Allowed values:** Todo, Done
-- Represents the plates preparation approval gate.
+- **Allowed values:** `none`, `waiting_files`, `files_received`, `bat_sent`, `bat_approved`
+- Represents the BAT (Bon à Tirer / proof approval) state for an Element.
+- Ready states (not blocking): `none`, `bat_approved`
+- Blocking states: `waiting_files`, `files_received`, `bat_sent`
 
-### ProofSentStatus (Special Values)
-#### DM-ENUM-GATE-002
+### PlateStatus (Element-level, v0.4.32)
+#### DM-ENUM-PLATE-001
 
-- `proofApproval.sentAt` can be:
-  - A DateTime string (actual date sent, ISO format)
-  - `"AwaitingFile"` (waiting for client to provide file)
-  - `"NoProofRequired"` (no proof needed for this job)
-  - `null` (not yet set)
+- **Allowed values:** `none`, `to_make`, `ready`
+- Represents the plates preparation state for an Element.
+- Ready states (not blocking): `none`, `ready`
+- Blocking states: `to_make`
+
+### FormeStatus (Element-level, v0.4.32)
+#### DM-ENUM-FORME-001
+
+- **Allowed values:** `none`, `in_stock`, `to_order`, `ordered`, `delivered`
+- Represents the forme (die-cutting tool) state for an Element.
+- Ready states (not blocking): `none`, `in_stock`, `delivered`
+- Blocking states: `to_order`, `ordered`
+- Only relevant for elements with die-cutting tasks (internal or outsourced).
 
 ---
 
@@ -442,9 +471,11 @@ This domain model describes the core entities, value objects, and aggregates for
    - All tasks of a prerequisite element must complete before the dependent element's first task can start.
    - If the predecessor is a printing task, a 4-hour dry time is added (BR-ELEM-005).
 
-5. **Approval Gates:**
-   - Tasks requiring BAT cannot start until proof is approved (or marked NoProofRequired).
-   - Tasks requiring plates cannot start until plates are Done.
+5. **Element Prerequisites (v0.4.32):**
+   - An element is blocked if any prerequisite is not in a ready state.
+   - Blocked elements display a dashed left border in the scheduler UI.
+   - Prerequisites are tracked at element level: paper, BAT, plates, forme.
+   - Forme prerequisite only applies to elements with die-cutting tasks.
 
 6. **Deadline Constraints:**
    - All tasks must complete before the job's workshop exit date.
@@ -476,8 +507,6 @@ This domain model describes the core entities, value objects, and aggregates for
 - `TaskAddedToJob`
 - `TaskRemovedFromJob`
 - `TasksReordered`
-- `ApprovalGateUpdated`
-- `PaperStatusChanged`
 - `CommentAdded`
 - `JobPlanned`
 - `JobStarted`
@@ -485,10 +514,16 @@ This domain model describes the core entities, value objects, and aggregates for
 - `JobDelayed`
 - `JobCancelled`
 
+**Note (v0.4.32):** `ApprovalGateUpdated` and `PaperStatusChanged` moved to Element Events.
+
 ### Element Events
 - `ElementCreated`
 - `ElementDependencyAdded`
 - `ElementDependencyRemoved`
+- `ElementPaperStatusUpdated` (v0.4.32)
+- `ElementBatStatusUpdated` (v0.4.32)
+- `ElementPlateStatusUpdated` (v0.4.32)
+- `ElementFormeStatusUpdated` (v0.4.32)
 
 ### Schedule Events
 - `ScheduleCreated`
@@ -545,8 +580,11 @@ As of v0.4.1, the `@flux/types` package is fully aligned with this domain model.
 | StationGroup | `isOutsourcedProviderGroup` | ✅ Implemented |
 | OutsourcedProvider | `status` (ProviderStatus) | ✅ Implemented |
 | Element | Full structure (`id`, `jobId`, `suffix`, `label`, `prerequisiteElementIds`, `taskIds`) | ✅ Implemented (v0.4.0) |
+| Element | Prerequisite status (`paperStatus`, `batStatus`, `plateStatus`, `formeStatus`) | ✅ Implemented (v0.4.32) |
+| Element | Date tracking (`paperOrderedAt`, `paperDeliveredAt`, `filesReceivedAt`, `batSentAt`, `batApprovedAt`, `formeOrderedAt`, `formeDeliveredAt`) | ✅ Implemented (v0.4.32) |
 | Task | `elementId` (replaces former `jobId`) | ✅ Implemented (v0.4.0) |
 | Job | `elementIds` | ✅ Implemented (v0.4.0) |
+| Job | Prerequisite fields removed (moved to Element) | ✅ Implemented (v0.4.32) |
 | ScheduleSnapshot | `elements` collection | ✅ Implemented (v0.4.0) |
 | LateJob | Full structure | ✅ Implemented |
 | ProposedAssignment | Full structure | ✅ Implemented |
@@ -563,3 +601,9 @@ The implementation includes type guard functions and helpers for runtime use:
 - `isOutsourcedTask(task)` - Check if task is outsourced
 - `isMultiElementJob(elementIds)` - Check if a job has multiple elements
 - `getTotalMinutes(duration)` - Calculate total duration for internal task
+- `isElementBlocked(element)` - Check if element is blocked by prerequisites (v0.4.32)
+- `isPaperReady(status)` - Check if paper status is ready (v0.4.32)
+- `isBatReady(status)` - Check if BAT status is ready (v0.4.32)
+- `isPlatesReady(status)` - Check if plates status is ready (v0.4.32)
+- `isFormeReady(status)` - Check if forme status is ready (v0.4.32)
+- `hasDieCuttingAction(element, tasks, stations)` - Check if element has die-cutting (v0.4.32)

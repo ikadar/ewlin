@@ -14,6 +14,12 @@ export interface JcfModalProps {
   onSaveAsTemplate?: () => void;
   /** Disable Save as Template button (e.g., when no elements) */
   canSaveAsTemplate?: boolean;
+  /** Save handler - called when Save button is clicked */
+  onSave?: () => void;
+  /** Whether save is in progress (disables button) */
+  isSaving?: boolean;
+  /** v0.4.33: Error message to display (from API failure) */
+  error?: string | null;
 }
 
 /**
@@ -28,6 +34,9 @@ export function JcfModal({
   children,
   onSaveAsTemplate,
   canSaveAsTemplate = true,
+  onSave,
+  isSaving = false,
+  error = null,
 }: JcfModalProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
@@ -35,13 +44,18 @@ export function JcfModal({
     onClose();
   }, [onClose]);
 
-  // Escape key closes modal; Cmd+S / Ctrl+S reserved (no-op for now)
+  const stableOnSave = useCallback(() => {
+    onSave?.();
+  }, [onSave]);
+
+  // Escape key closes modal; Cmd+S / Ctrl+S triggers save
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
+        stableOnSave();
         return;
       }
 
@@ -52,7 +66,7 @@ export function JcfModal({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, stableOnClose]);
+  }, [isOpen, stableOnClose, stableOnSave]);
 
   if (!isOpen) return null;
 
@@ -111,6 +125,15 @@ export function JcfModal({
 
         {/* Footer */}
         <footer className="flex-shrink-0 bg-zinc-900 border-t border-zinc-800" data-testid="jcf-modal-footer">
+          {/* v0.4.33: Error message display */}
+          {error && (
+            <div
+              className="px-[13px] py-[8px] bg-red-950/50 border-b border-red-900/50 text-red-400 text-sm whitespace-pre-wrap"
+              data-testid="jcf-modal-error"
+            >
+              {error}
+            </div>
+          )}
           {/* Keyboard hints row */}
           <div className="px-[13px] py-[5px] border-b border-zinc-800/50 flex items-center gap-[13px] text-sm text-zinc-500">
             <span className="flex items-center gap-[3px]">
@@ -141,6 +164,24 @@ export function JcfModal({
               >
                 <Save size={14} />
                 <span className="text-sm">Sauvegarder comme template</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-[13px] py-[6px] text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-[5px] font-medium transition-colors"
+              data-testid="jcf-modal-cancel"
+            >
+              Annuler
+            </button>
+            {onSave && (
+              <button
+                onClick={stableOnSave}
+                disabled={isSaving}
+                className="px-[13px] py-[6px] text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white rounded-[5px] font-medium transition-colors flex items-center gap-[6px]"
+                data-testid="jcf-modal-save"
+              >
+                <Save size={14} />
+                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
               </button>
             )}
           </div>

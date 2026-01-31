@@ -7,7 +7,7 @@ describe('DateCell', () => {
   it('renders day abbreviation and number', () => {
     // Monday, December 9, 2024
     const date = new Date(2024, 11, 9);
-    render(<DateCell date={date} />);
+    render(<DateCell date={date} dayIndex={0} />);
 
     expect(screen.getByText('Lu')).toBeInTheDocument();
     expect(screen.getByText('09')).toBeInTheDocument();
@@ -25,8 +25,8 @@ describe('DateCell', () => {
       { date: new Date(2024, 11, 15), abbrev: 'Di' }, // Sunday
     ];
 
-    testCases.forEach(({ date, abbrev }) => {
-      const { unmount } = render(<DateCell date={date} />);
+    testCases.forEach(({ date, abbrev }, index) => {
+      const { unmount } = render(<DateCell date={date} dayIndex={index} />);
       expect(screen.getByText(abbrev)).toBeInTheDocument();
       unmount();
     });
@@ -34,13 +34,13 @@ describe('DateCell', () => {
 
   it('displays day number with leading zero', () => {
     const date = new Date(2024, 11, 5);
-    render(<DateCell date={date} />);
+    render(<DateCell date={date} dayIndex={0} />);
     expect(screen.getByText('05')).toBeInTheDocument();
   });
 
   it('applies today styling when isToday is true (REQ-09.3: thin red line)', () => {
     const date = new Date();
-    const { container } = render(<DateCell date={date} isToday />);
+    const { container } = render(<DateCell date={date} dayIndex={0} isToday />);
 
     // REQ-09.3: Today now shows a thin red line, not amber background
     const todayLine = container.querySelector('[data-testid="today-indicator-line"]');
@@ -50,7 +50,7 @@ describe('DateCell', () => {
 
   it('applies normal styling when isToday is false', () => {
     const date = new Date(2024, 11, 9);
-    const { container } = render(<DateCell date={date} isToday={false} />);
+    const { container } = render(<DateCell date={date} dayIndex={0} isToday={false} />);
 
     const cell = container.firstChild as HTMLElement;
     expect(cell).toHaveClass('text-zinc-500');
@@ -61,7 +61,7 @@ describe('DateCell', () => {
   it('calls onClick when clicked', () => {
     const handleClick = vi.fn();
     const date = new Date(2024, 11, 9);
-    render(<DateCell date={date} onClick={handleClick} />);
+    render(<DateCell date={date} dayIndex={0} onClick={handleClick} />);
 
     fireEvent.click(screen.getByRole('button'));
     expect(handleClick).toHaveBeenCalledTimes(1);
@@ -69,7 +69,7 @@ describe('DateCell', () => {
 
   it('is a focusable button element', () => {
     const date = new Date(2024, 11, 9);
-    render(<DateCell date={date} />);
+    render(<DateCell date={date} dayIndex={0} />);
 
     // Button elements are implicitly focusable and handle Enter key natively
     const button = screen.getByRole('button');

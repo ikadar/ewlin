@@ -4,8 +4,8 @@ export type { SidebarProps, SidebarButtonProps } from './Sidebar';
 export { JobsList, JobsListHeader, ProblemsSection, JobsSection, JobCard, ProgressSegments, getSegmentState, getSegmentWidth, getOutsourcedLabel } from './JobsList';
 export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSectionProps, JobCardProps, JobProblemType, ProgressSegmentsProps, SegmentState } from './JobsList';
 
-export { JobDetailsPanel, JobInfo, JobStatus, InfoField, TaskList, TaskTile } from './JobDetailsPanel';
-export type { JobDetailsPanelProps, JobInfoProps, JobStatusProps, InfoFieldProps, TaskListProps, TaskTileProps } from './JobDetailsPanel';
+export { JobDetailsPanel, JobInfo, InfoField, TaskList, TaskTile, ElementSection, PrerequisiteStatus } from './JobDetailsPanel';
+export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, PrerequisiteStatusProps, ElementStatusUpdate } from './JobDetailsPanel';
 
 export { DateStrip, DateCell, TaskMarkers, ViewportIndicator, ExitTriangle } from './DateStrip';
 export type { DateStripProps, DateCellProps, TaskMarker, TaskMarkerStatus, TaskMarkersProps, ViewportIndicatorProps, ExitTriangleProps } from './DateStrip';
@@ -17,7 +17,7 @@ export { StationHeaders, StationHeader, OffScreenIndicator } from './StationHead
 export type { StationHeadersProps, StationHeaderProps, OffScreenInfo, OffScreenIndicatorProps } from './StationHeaders';
 
 export { StationColumns, StationColumn, UnavailabilityOverlay } from './StationColumns';
-export type { StationColumnsProps, StationColumnProps, StationDropData, UnavailabilityOverlayProps } from './StationColumns';
+export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProps } from './StationColumns';
 
 export { ProviderColumn, ProviderHeader } from './ProviderColumn';
 export type { ProviderColumnProps, ProviderHeaderProps } from './ProviderColumn';

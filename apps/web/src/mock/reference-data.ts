@@ -216,20 +216,49 @@ export const MOCK_CLIENTS: MockClient[] = [
 ];
 
 // ============================================================================
-// Mock Templates (v0.4.8)
+// Mock Templates (v0.4.8, v0.4.31: workflow added)
 // ============================================================================
 
 export interface MockTemplate {
   id: string;
   name: string;
   clientName?: string;
+  /** Workflow-guided sequence suggestion ordering (v0.4.31) */
+  workflow?: string[];
 }
 
 export const MOCK_TEMPLATES: MockTemplate[] = [
-  { id: 'tpl-1', name: 'Brochure A4' },
-  { id: 'tpl-2', name: 'Catalogue 32 pages' },
-  { id: 'tpl-3', name: 'Dépliant 3 volets' },
-  { id: 'tpl-4', name: 'Carte de visite', clientName: 'Publicis France' },
-  { id: 'tpl-5', name: 'Affiche A2', clientName: 'SNCF Communication' },
-  { id: 'tpl-6', name: 'Flyer A5', clientName: 'La Poste' },
+  {
+    id: 'tpl-1',
+    name: 'Brochure A4',
+    workflow: ['Presse offset', 'Massicot', 'Plieuse', 'Conditionnement'],
+  },
+  {
+    id: 'tpl-2',
+    name: 'Catalogue 32 pages',
+    workflow: ['Presse offset', 'Massicot', 'Plieuse', 'Assembleuse', 'Conditionnement'],
+  },
+  {
+    id: 'tpl-3',
+    name: 'Dépliant 3 volets',
+    workflow: ['Presse offset, Presse numérique', 'Massicot', 'Plieuse'],
+  },
+  {
+    id: 'tpl-4',
+    name: 'Carte de visite',
+    clientName: 'Publicis France',
+    workflow: ['Presse numérique', 'Massicot'],
+  },
+  {
+    id: 'tpl-5',
+    name: 'Affiche A2',
+    clientName: 'SNCF Communication',
+    workflow: ['Presse numérique', 'Massicot'],
+  },
+  {
+    id: 'tpl-6',
+    name: 'Flyer A5',
+    clientName: 'La Poste',
+    workflow: ['Presse numérique', 'Massicot', 'Conditionnement'],
+  },
 ];

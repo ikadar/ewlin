@@ -1172,9 +1172,10 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 > 6. Simple autocompletes: format, impression, surfacage, quantité/pagination (v0.4.13–v0.4.16)
 > 7. DSL autocompletes: papier, imposition, precedences (v0.4.17–v0.4.19)
 > 8. Sequence autocomplete: poste, ST, workflow (v0.4.20–v0.4.22)
-> 9. Validation, scaling & production readiness (v0.4.23–v0.4.31)
-> 10. Job save & backend integration (v0.4.32)
-> 11. Template system (v0.4.33–v0.4.34)
+> 9. Validation & scaling (v0.4.23–v0.4.31)
+> 10. Production readiness tracking (v0.4.32a–v0.4.32e)
+> 11. Job save & backend integration (v0.4.33)
+> 12. Template system (v0.4.34–v0.4.35)
 
 ### Phase 4A: Element Entity Foundation
 
@@ -1472,7 +1473,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4I: Validation & Calculated Fields
 
-> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32
+> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32a → v0.4.32b → v0.4.32c → v0.4.32d → v0.4.32e
 
 #### v0.4.23 - JCF: Live Format Validation (Level 1) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 1)
@@ -1523,56 +1524,166 @@ Two-part release following reference/jcf pattern.
 - JCF components (10 files) - font-size conversion
 - Base app components (5 files) - font-size conversion
 
-#### v0.4.30 - JCF: Submit Validation (Level 3)
+#### v0.4.30 - JCF: Submit Validation (Level 3) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 3)
 
-- [ ] Strict full-form validation on Save button click
-- [ ] All required fields must be filled
-- [ ] All format validations must pass
-- [ ] Error summary display
-- [ ] Form blocking until errors resolved
-- [ ] Scroll to first error
+- [x] Strict full-form validation on Save button click
+- [x] All required fields must be filled (converted from amber indicators to red errors)
+- [x] All format validations must pass (strict mode, no leniency)
+- [x] French error messages with HTML formatting
+- [x] Form blocking until errors resolved
+- [x] Save button with ⌘S keyboard shortcut
 
-#### v0.4.31 - Sequence Autocomplete: Template-Free Mode
+#### v0.4.31 - Sequence Autocomplete: Template-Free Mode ✅
 > **Bug:** Sequence input suggests workflow-based categories even when no template is selected
 
-- [ ] Detect when no template is selected (empty `sequenceWorkflow`)
-- [ ] Template-free mode: show all postes without category filtering
-- [ ] Template-free mode: no workflow step progression indicators (★)
-- [ ] Template mode: current behavior (workflow-guided suggestions)
-- [ ] Unit tests for both modes
+- [x] Detect when no template is selected (empty `sequenceWorkflow`)
+- [x] Template-free mode: show all postes without category filtering
+- [x] Template-free mode: no workflow step progression indicators (★)
+- [x] Template mode: current behavior (workflow-guided suggestions)
+- [x] E2E tests for both modes
 
 **Affected files:**
-- `apps/web/src/components/JcfSequenceAutocomplete/JcfSequenceAutocomplete.tsx`
+- `apps/web/src/mock/reference-data.ts` (MockTemplate.workflow)
+- `apps/web/src/components/JcfJobHeader/JcfJobHeader.tsx` (onTemplateSelect)
+- `apps/web/src/App.tsx` (sequenceWorkflow state)
 
-#### v0.4.32 - Production Readiness Tracking (Paper, Plates, BAT)
-> **Purpose:** Track prerequisites for starting production on each element
+#### v0.4.32a - Element Prerequisites Data Model & Job Details Panel UI ✅
+> **Purpose:** Move prerequisite tracking from Job level to Element level
+> **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md`
 
-- [ ] Paper readiness status per element (InStock/ToOrder/Ordered/Received)
-- [ ] Plates readiness status per element (Todo/InProgress/Done)
-- [ ] BAT (Bon à Tirer) approval status per element (Pending/Sent/Approved)
-- [ ] Visual indicators in JCF elements table
-- [ ] Visual indicators in Job Details Panel
-- [ ] Status affects scheduling constraints (future: block scheduling if not ready)
+- [x] New status types: PaperStatus, BatStatus, PlateStatus (snake_case, with 'none' option)
+- [x] Extend Element interface with prerequisite fields
+- [x] Remove job-level tracking from Job interface (paperPurchaseStatus, platesStatus, proofApproval)
+- [x] Prerequisite dropdowns in Job Details Panel (ElementSection)
+- [x] Plates dropdown only for elements with offset action (cat-offset)
+- [x] Assembly elements show "(pas de prérequis)"
 
 **Affected files:**
-- `apps/web/src/components/JcfElementsTable/JcfElementsTable.tsx`
-- `apps/web/src/components/JobDetailsPanel/JobStatus.tsx`
-- `@flux/types` - Element type extension
+- `packages/types/src/element.ts` - New status types, Element extension
+- `packages/types/src/job.ts` - Remove job-level tracking
+- `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteDropdown.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteStatus.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/TaskList.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
+- `apps/web/src/App.tsx`
+
+#### v0.4.32b - Scheduler Tile Blocking Visual & Tooltip ✅
+> **Purpose:** Visual feedback for blocked elements on scheduler tiles
+> **Spec:** See `docs/releases/v0.4.32b-scheduler-tile-blocking-visual.md`
+
+- [x] Blocking logic: isElementBlocked utility
+- [x] Dashed left border for blocked tiles (vs solid for ready)
+- [x] Custom tooltip on 2-second hover (blocked tiles only)
+- [x] Tooltip shows ⚠/✓ indicators with French labels
+
+**Affected files:**
+- `apps/web/src/utils/prerequisites.ts` (new)
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/Tile/PrerequisiteTooltip.tsx` (new)
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
+
+#### v0.4.32c - Forme Status & Date Tracking ✅
+> **Purpose:** Die-cutting tool tracking and automatic date recording
+> **Spec:** See `docs/releases/v0.4.32c-forme-status-date-tracking.md`
+
+- [x] FormeStatus type and formeStatus field on Element
+- [x] Die-cutting action detection (cat-die-cutting or outsourced "découpe")
+- [x] Forme dropdown in Job Details Panel
+- [x] Date fields: paperOrderedAt, paperDeliveredAt, filesReceivedAt, batSentAt, batApprovedAt, formeOrderedAt, formeDeliveredAt
+- [x] Automatic date recording on status transitions
+- [x] Date display inline next to dropdowns (DD/MM/YYYY)
+
+**Affected files:**
+- `packages/types/src/element.ts` - FormeStatus, date fields
+- `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteStatus.tsx`
+- `apps/web/src/utils/prerequisites.ts`
+- `apps/web/src/utils/dateFormat.ts` (new)
+
+#### v0.4.32d - Element Prerequisites Documentation ✅
+> **Purpose:** Documentation updates for element-level prerequisites
+> **Spec:** See `docs/releases/v0.4.32d-element-prerequisites-documentation.md`
+> **Released:** 2026-01-31
+
+**Domain Model Updates (5 files):**
+- [x] Update domain model (`docs/domain-model/domain-model.md`)
+- [x] Update business rules (`docs/domain-model/business-rules.md`)
+- [x] Update domain vocabulary (`docs/domain-model/domain-vocabulary.md`)
+- [x] Update workflow definitions (`docs/domain-model/workflow-definitions.md`)
+- [x] Update bounded context map (`docs/domain-model/bounded-context-map.md`)
+
+**Architecture Updates (4 files):**
+- [x] Update service boundaries (`docs/architecture/service-boundaries.md`)
+- [x] Update interface contracts (`docs/architecture/interface-contracts.md`)
+- [x] Update aggregate design (`docs/architecture/aggregate-design.md`)
+- [x] Update event message design (`docs/architecture/event-message-design.md`)
+
+**Requirements Updates (4 files):**
+- [x] Update initial data model (`docs/requirements/initial-data-model.md`)
+- [x] Update acceptance criteria (`docs/requirements/acceptance-criteria.md`)
+- [x] Update API interface drafts (`docs/requirements/api-interface-drafts.md`)
+- [x] Update user stories (`docs/requirements/user-stories.md`)
+
+**Affected files (13 total):**
+- `docs/domain-model/domain-model.md`
+- `docs/domain-model/business-rules.md`
+- `docs/domain-model/domain-vocabulary.md`
+- `docs/domain-model/workflow-definitions.md`
+- `docs/domain-model/bounded-context-map.md`
+- `docs/architecture/service-boundaries.md`
+- `docs/architecture/interface-contracts.md`
+- `docs/architecture/aggregate-design.md`
+- `docs/architecture/event-message-design.md`
+- `docs/requirements/initial-data-model.md`
+- `docs/requirements/acceptance-criteria.md`
+- `docs/requirements/api-interface-drafts.md`
+- `docs/requirements/user-stories.md`
+
+#### v0.4.32e - Element Prerequisites Backend API ✅
+> **Purpose:** Backend API support for element-level prerequisites
+> **Spec:** See `docs/releases/v0.4.32e-element-prerequisites-backend.md`
+> **Released:** 2026-01-31
+
+- [x] Add prerequisite fields to Element entity (PHP)
+- [x] Remove prerequisite fields from Job entity (PHP)
+- [x] Create database migration (add to element, remove from job)
+- [x] Update Job API endpoints (remove prerequisite endpoints)
+- [x] Create Element prerequisites endpoint
+- [x] Run PHPStan level 8
+
+**Implemented:**
+- `services/php-api/src/Entity/Element.php` - 4 status + 7 date fields
+- `services/php-api/src/Entity/Job.php` - removed prerequisite fields
+- `services/php-api/migrations/Version20260131000000.php`
+- `services/php-api/src/Controller/ElementController.php`
+- `services/php-api/src/Entity/PaperStatus.php`, `BatStatus.php`, `PlateStatus.php`, `FormeStatus.php`
 
 ### Phase 4J: Save
 
-#### v0.4.33 - JCF: Job Save & API Integration
+#### v0.4.33 - JCF: Job Save & API Integration ✅
 > **Spec source:** §10 (Backend Logic)
+> **Spec:** See `docs/releases/v0.4.33-jcf-job-save-api-integration.md`
+> **Released:** 2026-01-31
 
-- [ ] Form data → API request mapping
-  - [ ] Element production fields → Element/Task backend model
-  - [ ] Sequence lines → Task entities
-- [ ] POST /api/v1/jobs integration
-- [ ] Reference data auto-creation (client, paper)
-- [ ] Success feedback (Toast notification)
-- [ ] Error handling and display
-- [ ] Navigate back to jobs list on success
+**Part 1: Naming Alignment (suffix → name):**
+- [x] Element `suffix` → `name` across all layers (packages/types, php-api, apps/web)
+- [x] Database migration for column rename
+- [x] All tests updated (1116 PHP + 1521 JS tests passing)
+
+**Part 2: Multi-Element Job Creation:**
+- [x] JcfElementInput DTO for element input
+- [x] POST /api/v1/jobs accepts `elements[]` array
+- [x] Parse each element's `sequence` into Tasks via DSL
+- [x] Resolve element prerequisites by name lookup
+
+**Part 3: Frontend API Integration:**
+- [x] Job API client (`src/api/jobApi.ts`)
+- [x] Form data → API request mapping (transformJcfToRequest)
+- [x] POST /api/v1/jobs integration (mock + real API support)
+- [x] Error handling and display in JcfModal
+- [x] Modal closes on success
 
 ### Phase 4K: Template System
 
