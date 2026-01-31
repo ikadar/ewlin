@@ -1604,7 +1604,7 @@ Two-part release following reference/jcf pattern.
 
 #### v0.4.32d - Element Prerequisites Documentation
 > **Purpose:** Documentation updates for element-level prerequisites
-> **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md`
+> **Spec:** See `docs/releases/v0.4.32d-element-prerequisites-documentation.md`
 
 - [ ] Update domain model (`docs/domain-model/domain-model.md`)
 - [ ] Update business rules (`docs/domain-model/business-rules.md`)
@@ -1621,7 +1621,7 @@ Two-part release following reference/jcf pattern.
 
 #### v0.4.32e - Element Prerequisites Backend API
 > **Purpose:** Backend API support for element-level prerequisites
-> **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md` (Backend section)
+> **Spec:** See `docs/releases/v0.4.32e-element-prerequisites-backend.md`
 
 - [ ] Add prerequisite fields to Element entity (PHP)
 - [ ] Remove prerequisite fields from Job entity (PHP)
