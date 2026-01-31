@@ -1687,15 +1687,15 @@ Two-part release following reference/jcf pattern.
 
 ### Phase 4K: Template System
 
-#### v0.4.34 - JCF: Template CRUD & Apply
+#### v0.4.34 - JCF: Template CRUD & Apply ✅
 > **Spec source:** reference `TemplateList.tsx`, `TemplateEditorModal.tsx`
 
-- [ ] Create template from existing job
-- [ ] Apply template to new job (populate elements table)
-- [ ] Template list with search
-- [ ] Template categories
-- [ ] Category auto-creation on new category name
-- [ ] Template name and description fields
+- [x] Create template from existing job
+- [x] Apply template to new job (populate elements table)
+- [x] Template list with search (JcfTemplateList component)
+- [x] Template categories
+- [x] Category auto-creation on new category name
+- [x] Template name and description fields
 
 #### v0.4.35 - JCF: Link Propagation & Dual-Mode Editor
 > **Spec source:** §4 (Link Propagation)

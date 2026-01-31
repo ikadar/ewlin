@@ -2,11 +2,14 @@ import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } f
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
+import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
+import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
+import { getTemplates, createTemplate, updateTemplate } from './mock/templateApi';
+import type { JcfTemplate, JcfTemplateElement } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import type { MockTemplate } from './mock/reference-data';
 import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo } from './utils';
@@ -438,6 +441,10 @@ function AppContent() {
   // v0.4.31: Sequence workflow from selected template (template-free mode when empty)
   const [sequenceWorkflow, setSequenceWorkflow] = useState<string[]>([]);
 
+  // v0.4.34: Template editor modal state
+  const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
+  const [isTemplateSaving, setIsTemplateSaving] = useState(false);
+
   // v0.4.30: Save validation ref
   const jcfSaveAttemptRef = useRef<(() => boolean) | null>(null);
   const [isJcfSaving, setIsJcfSaving] = useState(false);
@@ -509,10 +516,84 @@ function AppContent() {
     setJcfSaveError(null); // v0.4.33: Reset API error on close
   }, []);
 
-  // v0.4.31: Handle template selection - extract workflow for sequence suggestions
-  const handleJcfTemplateSelect = useCallback((template: MockTemplate | null) => {
-    setSequenceWorkflow(template?.workflow ?? []);
+  // v0.4.34: Handler for "Save as Template" button in JcfModal
+  const handleSaveAsTemplate = useCallback(() => {
+    setIsTemplateEditorOpen(true);
   }, []);
+
+  // v0.4.34: Handler for saving template from editor
+  const handleTemplateSave = useCallback(async (data: TemplateEditorData & { id?: string }) => {
+    setIsTemplateSaving(true);
+    try {
+      if (data.id) {
+        await updateTemplate(data.id, {
+          name: data.name,
+          description: data.description,
+          category: data.category,
+          clientName: data.clientName,
+          elements: data.elements,
+        });
+      } else {
+        await createTemplate({
+          name: data.name,
+          description: data.description,
+          category: data.category,
+          clientName: data.clientName,
+          elements: data.elements,
+        });
+      }
+      setIsTemplateEditorOpen(false);
+    } catch (error) {
+      console.error('Failed to save template:', error);
+    } finally {
+      setIsTemplateSaving(false);
+    }
+  }, []);
+
+  // v0.4.34: Handler for canceling template editor
+  const handleTemplateEditorCancel = useCallback(() => {
+    setIsTemplateEditorOpen(false);
+  }, []);
+
+  // v0.4.34: Handler for template selection in JcfJobHeader
+  // Applies the selected template's elements to the form and extracts workflow
+  const handleTemplateSelect = useCallback((template: JcfTemplate | null) => {
+    if (!template) {
+      // Clear template - reset to default state
+      setJcfElements([{ ...DEFAULT_ELEMENT }]);
+      setSequenceWorkflow([]);
+      return;
+    }
+
+    // Convert JcfTemplateElement to JcfElement
+    const newElements: JcfElement[] = template.elements.map(el => ({
+      name: el.name,
+      precedences: el.precedences,
+      quantite: el.quantite,
+      format: el.format,
+      pagination: el.pagination,
+      papier: el.papier,
+      imposition: el.imposition,
+      impression: el.impression,
+      surfacage: el.surfacage,
+      autres: el.autres,
+      qteFeuilles: el.qteFeuilles,
+      commentaires: el.commentaires,
+      sequence: el.sequence,
+      sequenceWorkflow: el.sequenceWorkflow,
+    }));
+    setJcfElements(newElements.length > 0 ? newElements : [{ ...DEFAULT_ELEMENT }]);
+    setJcfTemplate(template.name);
+
+    // v0.4.31: Extract workflow from first element's sequenceWorkflow (if available)
+    const firstElementWorkflow = template.elements[0]?.sequenceWorkflow;
+    setSequenceWorkflow(firstElementWorkflow ?? []);
+
+    // Also set client if the template has one
+    if (template.clientName && !jcfClient) {
+      setJcfClient(template.clientName);
+    }
+  }, [jcfClient]);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
   useEffect(() => {
@@ -1652,20 +1733,28 @@ function AppContent() {
       )}
 
       {/* v0.4.6: JCF Modal */}
-      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf} onSave={handleJcfSave} isSaving={isJcfSaving} error={jcfSaveError}>
+      <JcfModal
+        isOpen={isJcfModalOpen}
+        onClose={handleCloseJcf}
+        onSave={handleJcfSave}
+        isSaving={isJcfSaving}
+        error={jcfSaveError}
+        onSaveAsTemplate={handleSaveAsTemplate}
+        canSaveAsTemplate={jcfElements.length > 0 && jcfElements.some(el => el.name.trim() !== '')}
+      >
         <JcfJobHeader
           jobId={jcfJobId}
           client={jcfClient}
           onClientChange={setJcfClient}
           template={jcfTemplate}
           onTemplateChange={setJcfTemplate}
+          onTemplateSelect={handleTemplateSelect}
           intitule={jcfIntitule}
           onIntituleChange={setJcfIntitule}
           quantity={jcfQuantity}
           onQuantityChange={setJcfQuantity}
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
-          onTemplateSelect={handleJcfTemplateSelect}
         />
         {/* v0.4.9: Elements Table */}
         <div className="mt-[13px]">
@@ -1678,6 +1767,30 @@ function AppContent() {
           />
         </div>
       </JcfModal>
+
+      {/* v0.4.34: Template editor modal (for "Save as Template") */}
+      <JcfTemplateEditorModal
+        isOpen={isTemplateEditorOpen}
+        onSave={handleTemplateSave}
+        onCancel={handleTemplateEditorCancel}
+        isSaving={isTemplateSaving}
+        initialElements={jcfElements.filter(el => el.name.trim() !== '').map(el => ({
+          name: el.name,
+          precedences: el.precedences,
+          quantite: el.quantite,
+          format: el.format,
+          pagination: el.pagination,
+          papier: el.papier,
+          imposition: el.imposition,
+          impression: el.impression,
+          surfacage: el.surfacage,
+          autres: el.autres,
+          qteFeuilles: el.qteFeuilles,
+          commentaires: el.commentaires,
+          sequence: el.sequence,
+        }))}
+        initialClientName={jcfClient}
+      />
     </>
   );
 }

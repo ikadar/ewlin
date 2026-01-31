@@ -10,6 +10,10 @@ export interface JcfModalProps {
   title?: string;
   /** Modal content (children) */
   children?: React.ReactNode;
+  /** Handler for "Save as Template" button (v0.4.34) */
+  onSaveAsTemplate?: () => void;
+  /** Disable Save as Template button (e.g., when no elements) */
+  canSaveAsTemplate?: boolean;
   /** Save handler - called when Save button is clicked */
   onSave?: () => void;
   /** Whether save is in progress (disables button) */
@@ -28,6 +32,8 @@ export function JcfModal({
   onClose,
   title = 'Nouveau Job',
   children,
+  onSaveAsTemplate,
+  canSaveAsTemplate = true,
   onSave,
   isSaving = false,
   error = null,
@@ -149,6 +155,17 @@ export function JcfModal({
           </div>
           {/* Action buttons row */}
           <div className="px-[13px] py-[8px] flex items-center justify-end gap-[10px]">
+            {onSaveAsTemplate && (
+              <button
+                onClick={onSaveAsTemplate}
+                disabled={!canSaveAsTemplate}
+                className="flex items-center gap-[5px] px-[10px] py-[5px] text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-[3px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="jcf-save-as-template"
+              >
+                <Save size={14} />
+                <span className="text-sm">Sauvegarder comme template</span>
+              </button>
+            )}
             <button
               onClick={onClose}
               className="px-[13px] py-[6px] text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-[5px] font-medium transition-colors"

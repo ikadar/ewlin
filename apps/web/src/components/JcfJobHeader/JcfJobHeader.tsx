@@ -3,8 +3,9 @@ import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
-import { MOCK_CLIENTS, MOCK_TEMPLATES } from '../../mock/reference-data';
-import type { MockTemplate } from '../../mock/reference-data';
+import { MOCK_CLIENTS } from '../../mock/reference-data';
+import { getTemplates } from '../../mock/templateApi';
+import type { JcfTemplate } from '@flux/types';
 
 export interface JcfJobHeaderProps {
   jobId: string;
@@ -12,14 +13,14 @@ export interface JcfJobHeaderProps {
   onClientChange: (value: string) => void;
   template: string;
   onTemplateChange: (value: string) => void;
+  /** Called when user selects a template to apply (v0.4.34) - receives full template data for both element application and workflow extraction */
+  onTemplateSelect?: (template: JcfTemplate | null) => void;
   intitule: string;
   onIntituleChange: (value: string) => void;
   quantity: string;
   onQuantityChange: (value: string) => void;
   deadline: string;
   onDeadlineChange: (value: string) => void;
-  /** Called when a template is selected, with full template data including workflow (v0.4.31) */
-  onTemplateSelect?: (template: MockTemplate | null) => void;
 }
 
 /**
@@ -37,18 +38,21 @@ export function JcfJobHeader({
   onClientChange,
   template,
   onTemplateChange,
+  onTemplateSelect,
   intitule,
   onIntituleChange,
   quantity,
   onQuantityChange,
   deadline,
   onDeadlineChange,
-  onTemplateSelect,
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
 
   // Session learning: new client names added on blur
   const [sessionClients, setSessionClients] = useState<string[]>([]);
+
+  // v0.4.34: Load templates from API (synchronous localStorage API)
+  const [templates, setTemplates] = useState<JcfTemplate[]>(() => getTemplates());
 
   const labelClass = 'block text-xs leading-[13px] text-zinc-500 mb-[3px]';
   const inputBaseClass =
@@ -90,33 +94,31 @@ export function JcfJobHeader({
 
   const templateSuggestions: Suggestion[] = useMemo(() => {
     const clientTemplates = client
-      ? MOCK_TEMPLATES.filter(
+      ? templates.filter(
           (t) => t.clientName?.toLowerCase() === client.toLowerCase()
         )
       : [];
-    const universalTemplates = MOCK_TEMPLATES.filter((t) => !t.clientName);
+    const universalTemplates = templates.filter((t) => !t.clientName);
 
     return [
-      ...clientTemplates.map((t) => ({ label: t.name, value: t.name, category: client })),
-      ...universalTemplates.map((t) => ({ label: t.name, value: t.name, category: 'universel' })),
+      ...clientTemplates.map((t) => ({ label: t.name, value: t.id, category: client })),
+      ...universalTemplates.map((t) => ({ label: t.name, value: t.id, category: 'universel' })),
     ];
-  }, [client]);
+  }, [client, templates]);
 
-  // v0.4.31: Handle template selection with workflow extraction
+  // v0.4.34: Handle template selection - find template and call callback
   const handleTemplateSelectInternal = useCallback(
     (selectedValue: string) => {
-      // Look up the full template object by name
-      const selectedTemplate = MOCK_TEMPLATES.find(
-        (t) => t.name.toLowerCase() === selectedValue.toLowerCase()
-      );
-      // Call external callback with full template (including workflow) or null if not found
-      onTemplateSelect?.(selectedTemplate ?? null);
-      // Focus next field
+      const selectedTemplate = templates.find((t) => t.id === selectedValue);
+      if (selectedTemplate) {
+        onTemplateChange(selectedTemplate.name);
+        onTemplateSelect?.(selectedTemplate);
+      }
       setTimeout(() => {
         document.getElementById('jcf-intitule')?.focus();
       }, 0);
     },
-    [onTemplateSelect]
+    [templates, onTemplateChange, onTemplateSelect]
   );
 
   // v0.4.31: Handle template clear (empty value)
