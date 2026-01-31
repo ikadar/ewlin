@@ -1584,22 +1584,23 @@ Two-part release following reference/jcf pattern.
 - `apps/web/src/components/Tile/PrerequisiteTooltip.tsx` (new)
 - `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
 
-#### v0.4.32c - Forme Status & Date Tracking
+#### v0.4.32c - Forme Status & Date Tracking ✅
 > **Purpose:** Die-cutting tool tracking and automatic date recording
 > **Spec:** See `docs/releases/v0.4.32c-forme-status-date-tracking.md`
 
-- [ ] FormeStatus type and formeStatus field on Element
-- [ ] Die-cutting action detection (cat-die-cutting or outsourced "découpe")
-- [ ] Forme dropdown in Job Details Panel
-- [ ] Date fields: paperOrderedAt, paperDeliveredAt, filesReceivedAt, batSentAt, batApprovedAt, formeOrderedAt, formeDeliveredAt
-- [ ] Automatic date recording on status transitions
-- [ ] Date display inline next to dropdowns (DD/MM/YYYY)
+- [x] FormeStatus type and formeStatus field on Element
+- [x] Die-cutting action detection (cat-die-cutting or outsourced "découpe")
+- [x] Forme dropdown in Job Details Panel
+- [x] Date fields: paperOrderedAt, paperDeliveredAt, filesReceivedAt, batSentAt, batApprovedAt, formeOrderedAt, formeDeliveredAt
+- [x] Automatic date recording on status transitions
+- [x] Date display inline next to dropdowns (DD/MM/YYYY)
 
 **Affected files:**
 - `packages/types/src/element.ts` - FormeStatus, date fields
 - `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
-- `apps/web/src/components/JobDetailsPanel/PrerequisiteDropdown.tsx`
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteStatus.tsx`
 - `apps/web/src/utils/prerequisites.ts`
+- `apps/web/src/utils/dateFormat.ts` (new)
 
 #### v0.4.32d - Element Prerequisites Backend & Documentation
 > **Purpose:** Backend API support and documentation for element-level prerequisites
