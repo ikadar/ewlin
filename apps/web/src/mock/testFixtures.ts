@@ -34,6 +34,7 @@ import { createElementPrecedenceFixture } from './fixtures/element-precedence';
 import { createScaleHarmonizationFixture } from './fixtures/scale-harmonization';
 import { createBlockingVisualFixture } from './fixtures/blocking-visual';
 import { createFormeDateTrackingFixture } from './fixtures/forme-date-tracking';
+import { createPickRescheduleFixture } from './fixtures/pick-reschedule';
 
 // Re-export createBasicFixture for direct usage
 export { createBasicFixture };
@@ -42,7 +43,7 @@ export { createBasicFixture };
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay' | 'element-precedence' | 'scale-harmonization' | 'blocking-visual' | 'forme-date-tracking';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay' | 'element-precedence' | 'scale-harmonization' | 'blocking-visual' | 'forme-date-tracking' | 'pick-reschedule';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -71,6 +72,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'scale-harmonization': createScaleHarmonizationFixture,
   'blocking-visual': createBlockingVisualFixture,
   'forme-date-tracking': createFormeDateTrackingFixture,
+  'pick-reschedule': createPickRescheduleFixture,
 };
 
 /**

@@ -69,24 +69,25 @@ test.describe('v0.3.33: Task Completion Toggle', () => {
     // Wait for any selection state to clear - no job should be selected
     await expect(grid).toBeVisible();
 
-    // Get a tile with incomplete icon and find its parent tile
+    // Get a tile with incomplete icon
     const incompleteIcon = page.locator('[data-testid="tile-incomplete-icon"]').first();
     await expect(incompleteIcon).toBeVisible();
 
-    // Get the tile that contains this icon (to check if it becomes selected)
-    const _parentTile = incompleteIcon.locator('xpath=ancestor::div[starts-with(@data-testid, "tile-")]').first();
+    // Get the parent tile to track which specific tile we're clicking
+    const parentTile = incompleteIcon.locator('xpath=ancestor::div[starts-with(@data-testid, "tile-")]').first();
+    const tileTestId = await parentTile.getAttribute('data-testid');
 
-    // ACT: Click the completion icon (not the tile itself)
-    await incompleteIcon.click();
+    // ACT: Click the completion icon using dispatchEvent
+    // This bypasses Playwright actionability checks and works with SVG elements
+    await incompleteIcon.evaluate((el) => {
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
 
-    // ASSERT: The click should not have selected the job
-    // If the job were selected, the JobDetailsPanel would show - but we only verify
-    // that the click on icon works (state changes) without triggering tile click behavior
-    // Wait for state change (icon should toggle)
-    const completedLocator = page.locator('[data-testid="tile-completed-icon"]');
-    await expect(completedLocator.first()).toBeVisible();
+    // ASSERT: The same tile should now have a completed icon
+    const tileLocator = page.locator(`[data-testid="${tileTestId}"]`);
+    await expect(tileLocator.locator('[data-testid="tile-completed-icon"]')).toBeVisible({ timeout: 3000 });
 
-    // The test passes if clicking the icon works and doesn't throw
+    // The test passes if clicking the icon works and toggles state
     // The stopPropagation prevents the tile's onClick from firing
   });
 
