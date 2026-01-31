@@ -247,46 +247,81 @@ The goal is to provide:
 **Notes:**
 - Reordering is element-scoped — only affects tasks within the specified element
 
-### ProofApprovalUpdated
-**Purpose:** Indicates BAT (proof) approval status has changed.
-**Trigger:** Emitted when proof is sent, approved, or marked as not required.
+### ElementPaperStatusUpdated (v0.4.32)
+**Purpose:** Indicates element paper availability status has changed.
+**Trigger:** Emitted when element paperStatus is updated.
 ```json
 {
+  "elementId": "string",
   "jobId": "string",
-  "proofApproval": {
-    "sentAt": "ISO-8601-timestamp|null",
-    "approvedAt": "ISO-8601-timestamp|null"
-  },
+  "paperStatus": "none|in_stock|to_order|ordered|delivered",
+  "paperOrderedAt": "ISO-8601-timestamp|null",
+  "paperDeliveredAt": "ISO-8601-timestamp|null",
+  "isBlocked": true,
   "updatedAt": "ISO-8601-timestamp"
 }
 ```
 
 **Notes:**
-- `proofApproval.sentAt`: When the proof was sent to client, or `null` if not yet sent
-- `proofApproval.approvedAt`: When the proof was approved, or `null` if not yet approved
+- Ready states: `none`, `in_stock`, `delivered`
+- Blocking states: `to_order`, `ordered`
 
-### PlatesStatusUpdated
-**Purpose:** Indicates plates preparation status has changed.
-**Trigger:** Emitted when plates status is updated.
+### ElementBatStatusUpdated (v0.4.32)
+**Purpose:** Indicates element BAT (proof) approval status has changed.
+**Trigger:** Emitted when element batStatus is updated.
 ```json
 {
+  "elementId": "string",
   "jobId": "string",
-  "platesStatus": "Todo|Done",
+  "batStatus": "none|waiting_files|files_received|bat_sent|bat_approved",
+  "filesReceivedAt": "ISO-8601-timestamp|null",
+  "batSentAt": "ISO-8601-timestamp|null",
+  "batApprovedAt": "ISO-8601-timestamp|null",
+  "isBlocked": true,
   "updatedAt": "ISO-8601-timestamp"
 }
 ```
 
-### PaperStatusUpdated
-**Purpose:** Indicates paper procurement status has changed.
-**Trigger:** Emitted when paper status is updated.
+**Notes:**
+- Ready states: `none`, `bat_approved`
+- Blocking states: `waiting_files`, `files_received`, `bat_sent`
+
+### ElementPlateStatusUpdated (v0.4.32)
+**Purpose:** Indicates element plates preparation status has changed.
+**Trigger:** Emitted when element plateStatus is updated.
 ```json
 {
+  "elementId": "string",
   "jobId": "string",
-  "paperPurchaseStatus": "InStock|ToOrder|Ordered|Received",
-  "paperOrderedAt": "ISO-8601-timestamp|null",
+  "plateStatus": "none|to_make|ready",
+  "isBlocked": true,
   "updatedAt": "ISO-8601-timestamp"
 }
 ```
+
+**Notes:**
+- Ready states: `none`, `ready`
+- Blocking states: `to_make`
+
+### ElementFormeStatusUpdated (v0.4.32)
+**Purpose:** Indicates element forme (die-cutting tool) status has changed.
+**Trigger:** Emitted when element formeStatus is updated.
+```json
+{
+  "elementId": "string",
+  "jobId": "string",
+  "formeStatus": "none|in_stock|to_order|ordered|delivered",
+  "formeOrderedAt": "ISO-8601-timestamp|null",
+  "formeDeliveredAt": "ISO-8601-timestamp|null",
+  "isBlocked": true,
+  "updatedAt": "ISO-8601-timestamp"
+}
+```
+
+**Notes:**
+- Ready states: `none`, `in_stock`, `delivered`
+- Blocking states: `to_order`, `ordered`
+- Only relevant for elements with die-cutting tasks
 
 ### JobDependencyAdded
 **Purpose:** Signals that a job dependency has been established.
@@ -417,7 +452,7 @@ The goal is to provide:
   "scheduleId": "string",
   "taskId": "string",
   "targetId": "string",
-  "conflictType": "StationMismatchConflict|StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
+  "conflictType": "StationMismatchConflict|StationConflict|GroupCapacityConflict|PrecedenceConflict|PrerequisiteConflict|AvailabilityConflict|DeadlineConflict",
   "message": "string",
   "relatedTaskId": "string|null",
   "details": {},
@@ -511,26 +546,31 @@ Consumed by: **Assignment Service**, **Scheduling View Service**
 }
 ```
 
-### JobManagement.ApprovalGateChanged
+### JobManagement.ElementPrerequisiteChanged (v0.4.32)
 Published by: **Job Management Service**
-Consumed by: **Assignment Service**
+Consumed by: **Assignment Service**, **Scheduling View Service**
 
-**Purpose:** Notifies that an approval gate status has changed.
-**Trigger:** Proof or plates status updated.
+**Purpose:** Notifies that an element prerequisite status has changed.
+**Trigger:** Element paper, BAT, plates, or forme status updated.
 ```json
 {
   "eventId": "uuid",
-  "eventType": "JobManagement.ApprovalGateChanged",
+  "eventType": "JobManagement.ElementPrerequisiteChanged",
   "occurredAt": "ISO-8601-timestamp",
   "data": {
+    "elementId": "string",
     "jobId": "string",
-    "gateType": "Proof|Plates",
-    "previousState": "string",
-    "newState": "string",
-    "isBlocking": false
+    "prerequisiteType": "paper|bat|plates|forme",
+    "previousStatus": "string",
+    "newStatus": "string",
+    "isBlocked": true
   }
 }
 ```
+
+**Notes:**
+- `isBlocked`: True if ANY element prerequisite is not in ready state
+- Triggers tile blocking visual update in UI
 
 ### Assignment.TaskScheduled
 Published by: **Assignment Service**
@@ -569,7 +609,7 @@ Consumed by: **Scheduling View Service**
   "eventType": "Assignment.ConflictDetected",
   "occurredAt": "ISO-8601-timestamp",
   "data": {
-    "type": "StationMismatchConflict|StationConflict|GroupCapacityConflict|PrecedenceConflict|ApprovalGateConflict|AvailabilityConflict|DeadlineConflict",
+    "type": "StationMismatchConflict|StationConflict|GroupCapacityConflict|PrecedenceConflict|PrerequisiteConflict|AvailabilityConflict|DeadlineConflict",
     "message": "string",
     "taskId": "string",
     "relatedTaskId": "string|null",

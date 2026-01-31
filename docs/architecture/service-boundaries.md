@@ -68,20 +68,19 @@ Station management is a foundational capability that other services depend on. I
 > **References:** [AGG-JOB-001](aggregate-design.md#agg-job-001), [IC-JOB-001](interface-contracts.md#ic-job-001), [IC-JOB-003](interface-contracts.md#ic-job-003)
 
 **Purpose:**
-Define and manage print jobs with their elements, constituent tasks, approval gates, and cross-element dependencies.
+Define and manage print jobs with their elements, constituent tasks, element-level prerequisites, and cross-element dependencies.
 
 **Capabilities:**
 - Create and update job definitions with workshop exit dates
 - Create and manage elements within jobs (single or multi-element)
 - Add tasks to elements with duration and station requirements
 - Define cross-element dependencies (prerequisiteElementIds, DAG with cycle detection)
-- Manage approval gates (BAT/Proof, Plates)
-- Track paper procurement status
+- Track element-level prerequisites (paper, BAT, plates, forme) — v0.4.32
 - Manage job comments
 - Track job and task status transitions
 
 **Inputs:**
-- Commands from external callers (e.g., "createJob", "createElement", "addTask", "updateProofApproval")
+- Commands from external callers (e.g., "createJob", "createElement", "addTask", "updateElementPrerequisite")
 - `TaskAssigned` events from Assignment Service (optional)
 
 **Outputs:**
@@ -91,21 +90,24 @@ Define and manage print jobs with their elements, constituent tasks, approval ga
 - `ElementDependencyRemoved` event
 - `TaskAddedToJob` event
 - `TasksReordered` event
-- `ProofApprovalUpdated` event
-- `PaperStatusChanged` event
+- `ElementPaperStatusUpdated` event (v0.4.32)
+- `ElementBatStatusUpdated` event (v0.4.32)
+- `ElementPlateStatusUpdated` event (v0.4.32)
+- `ElementFormeStatusUpdated` event (v0.4.32)
 - `CommentAdded` event
 - `JobStatusChanged` event
 - Job/Element/Task read models or API responses
 
 **Ownership:**
 - Job
-- Element (as entity within Job aggregate)
+- Element (as entity within Job aggregate, including prerequisite status fields)
 - Task (as entity within Element)
 - Duration
-- ProofApproval
 - Comment
-- PaperPurchaseStatus
-- PlatesStatus
+- PaperStatus (element-level, v0.4.32)
+- BatStatus (element-level, v0.4.32)
+- PlateStatus (element-level, v0.4.32)
+- FormeStatus (element-level, v0.4.32)
 
 **External Dependencies:**
 - Reads station/provider names from Station Management Service (for task validation)
@@ -142,7 +144,10 @@ Orchestrate task assignments, manage schedule state, and coordinate validation.
 - `TaskAddedToJob` events from Job Management Service
 - `ElementCreated` events from Job Management Service
 - `ElementDependencyAdded` events from Job Management Service
-- `ApprovalGateUpdated` events from Job Management Service
+- `ElementPaperStatusUpdated` events from Job Management Service (v0.4.32)
+- `ElementBatStatusUpdated` events from Job Management Service (v0.4.32)
+- `ElementPlateStatusUpdated` events from Job Management Service (v0.4.32)
+- `ElementFormeStatusUpdated` events from Job Management Service (v0.4.32)
 
 **Outputs:**
 - `TaskAssigned` event with timing and element information
@@ -180,7 +185,7 @@ Provide **isomorphic schedule validation** that runs identically on client (brow
   - GroupCapacityConflict — station group limits respected
   - PrecedenceConflict — element-scoped (intra-element sequenceOrder) and cross-element (prerequisiteElementIds finish-to-start) precedence respected
   - DryTimeConflict — 4h dry time after printing tasks respected
-  - ApprovalGateConflict — BAT/Plates requirements satisfied
+  - PrerequisiteConflict — element prerequisites ready (paper, BAT, plates, forme) — v0.4.32
   - AvailabilityConflict — station operating schedule respected
   - StationMismatchConflict — task assigned to correct station type
 - Support `bypassPrecedence` flag for forced placements (Alt-key in UI)
@@ -307,8 +312,8 @@ Calculate business days (open days) for outsourced task duration.
   - Meaning: Station constraints have changed, requiring revalidation
 
 - **Job Management → Assignment Service**
-  - Events: `TaskAddedToJob`, `TasksReordered`, `ElementCreated`, `ElementDependencyAdded`, `ApprovalGateUpdated`
-  - Meaning: Element/task structure has changed, affecting scheduling possibilities
+  - Events: `TaskAddedToJob`, `TasksReordered`, `ElementCreated`, `ElementDependencyAdded`, `ElementPaperStatusUpdated`, `ElementBatStatusUpdated`, `ElementPlateStatusUpdated`, `ElementFormeStatusUpdated` (v0.4.32)
+  - Meaning: Element/task structure or prerequisites have changed, affecting scheduling possibilities
 
 - **Assignment Service → Validation Service** (synchronous)
   - HTTP call: `POST /validate`
@@ -363,8 +368,8 @@ Interaction should favor **asynchronous domain events** over direct synchronous 
 | Service | Technology | Owns | Listens to | Publishes |
 |---------|------------|------|------------|-----------|
 | Station Management | PHP/Symfony | Station, Category, Group, Provider | External systems | StationCreated, ScheduleUpdated, StatusChanged |
-| Job Management | PHP/Symfony | Job, Element, Task, Comments, Gates | TaskAssigned (optional) | JobCreated, ElementCreated, TaskAdded, GateUpdated |
-| Assignment Service | PHP/Symfony | Schedule, Assignments | Station events, Job events | TaskAssigned, ScheduleUpdated, ConflictDetected |
+| Job Management | PHP/Symfony | Job, Element, Task, Comments, ElementPrerequisites | TaskAssigned (optional) | JobCreated, ElementCreated, TaskAdded, ElementPrerequisiteUpdated |
+| Assignment Service | PHP/Symfony | Schedule, Assignments | Station events, Job events, ElementPrerequisite events | TaskAssigned, ScheduleUpdated, ConflictDetected |
 | **Validation Service** | **Node.js** | Validation logic (shared with frontend) | — | — |
 | Scheduling View | PHP/Symfony | Read models only | All domain events | None (read-only) |
 | Business Calendar | PHP/Symfony | Calendar calculations | — | — |

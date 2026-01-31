@@ -308,45 +308,71 @@ The end time of an outsourced task is calculated as: the ReceptionTime on the bu
 
 ---
 
-## Approval Gates
+## Element Prerequisites (v0.4.32)
 
-#### BR-GATE-001
-**BAT approval before scheduling**
+#### BR-PREREQ-001
+**Element blocking logic**
 
-Tasks CANNOT be scheduled until the job's proof is approved (`proofApprovedAt` is set) OR `proofSentAt` is "NoProofRequired".
+An element is **blocked** if ANY of its prerequisites is not in a ready state:
+- Paper ready states: `none`, `in_stock`, `delivered`
+- BAT ready states: `none`, `bat_approved`
+- Plates ready states: `none`, `ready`
+- Forme ready states: `none`, `in_stock`, `delivered`
 
-#### BR-GATE-002
-**Plates approval before printing**
+#### BR-PREREQ-002
+**BAT approval before production**
 
-Printing tasks on offset stations CANNOT start until the job's `platesStatus` is "Done".
+Tasks of an element CANNOT start until the element's BAT status is `bat_approved` OR `none` (no BAT required).
 
-#### BR-GATE-003
-**AwaitingFile blocks BAT**
+#### BR-PREREQ-003
+**Plates readiness before printing**
 
-When `proofSentAt` is "AwaitingFile", the job is waiting for client file and scheduling is blocked.
+Printing tasks on offset stations CANNOT start until the element's `plateStatus` is `ready` OR `none` (no plates required).
+
+#### BR-PREREQ-004
+**Paper availability before production**
+
+Production tasks SHOULD NOT start until the element's paper status is `in_stock` or `delivered`. Blocking states are `to_order` and `ordered`.
+
+#### BR-PREREQ-005
+**Forme readiness for die-cutting**
+
+Die-cutting tasks (internal on category `cat-die-cutting` OR outsourced with die-cutting action type) CANNOT start until the element's `formeStatus` is `in_stock` or `delivered`. This prerequisite only applies to elements with die-cutting tasks.
+
+#### BR-PREREQ-006
+**Forme prerequisite visibility**
+
+The Forme prerequisite field SHOULD only be visible in UI when the element has at least one die-cutting task (detected by station category or outsourced action type keywords: "découpe", "die-cut", "stancolás").
+
+#### BR-PREREQ-007
+**Blocked element visual indicator**
+
+Blocked elements (any prerequisite not ready) MUST display a dashed left border on their scheduler tiles instead of a solid border.
 
 ---
 
-## Paper Procurement
+## Paper Procurement (Element-level, v0.4.32)
 
 #### BR-PAPER-001
 **Paper status progression**
 
-PaperPurchaseStatus MUST follow the progression: InStock | ToOrder → Ordered → Received.
-- InStock: Paper available, no progression needed
-- ToOrder → Ordered: When order is placed
-- Ordered → Received: When paper arrives
-Backward transitions (e.g., Ordered → ToOrder) are NOT permitted. If an order is cancelled, a new job or manual correction is needed.
+Element `paperStatus` MUST follow the progression: `in_stock` | `to_order` → `ordered` → `delivered`.
+- `none`: No paper tracking needed for this element
+- `in_stock`: Paper available, no progression needed
+- `to_order` → `ordered`: When order is placed
+- `ordered` → `delivered`: When paper arrives
+Backward transitions (e.g., `ordered` → `to_order`) are NOT permitted.
 
 #### BR-PAPER-002
 **Order timestamp on status change**
 
-When PaperPurchaseStatus changes to "Ordered", `paperOrderedAt` MUST be set to current timestamp.
+When element `paperStatus` changes to `ordered`, `paperOrderedAt` MUST be set to current timestamp.
+When element `paperStatus` changes to `delivered`, `paperDeliveredAt` MUST be set to current timestamp.
 
 #### BR-PAPER-003
 **Paper required before production**
 
-Production tasks SHOULD NOT start until paper status is "InStock" or "Received".
+Production tasks SHOULD NOT start until element paper status is `none`, `in_stock`, or `delivered`. See BR-PREREQ-004.
 
 ---
 
@@ -454,9 +480,9 @@ The system MUST prevent starting a job's tasks before all required jobs are comp
 The system MUST warn when scheduled task completion exceeds the job's workshopExitDate.
 
 #### BR-SCHED-006
-**Approval gate enforcement**
+**Element prerequisite enforcement (v0.4.32)**
 
-The system MUST prevent scheduling tasks when required approval gates are not satisfied.
+The system MUST warn (not block) when scheduling tasks of elements with prerequisites not ready. See BR-PREREQ-001 for blocking logic.
 
 #### BR-SCHED-007
 **Schedule version increment**
@@ -515,7 +541,7 @@ Before accepting an assignment, the system MUST verify:
 - Group capacity is not exceeded
 - Task sequence is respected
 - Job dependencies are satisfied
-- Approval gates are cleared
+- Element prerequisites are ready (paper, BAT, plates, forme) — warning only (v0.4.32)
 - Workshop exit date can be met
 
 #### VAL-002
@@ -525,7 +551,7 @@ The system MUST detect and report all types of conflicts:
 - Station conflicts (double-booking)
 - Group capacity conflicts (exceeds MaxConcurrent)
 - Precedence conflicts (wrong task sequence order)
-- Approval gate conflicts (gates not satisfied)
+- Prerequisite conflicts (element prerequisites not ready — v0.4.32)
 - Availability conflicts (outside station operating hours)
 - Deadline conflicts (cannot meet workshopExitDate)
 
@@ -617,9 +643,8 @@ The following table provides a quick reference for validation rules, their corre
 | VAL-001.3 | Group capacity not exceeded | GroupCapacityConflict | High | Yes |
 | VAL-001.4 | Intra-element + cross-element sequence respected (only when predecessor is scheduled) | PrecedenceConflict | Medium | Soft* |
 | VAL-001.5 | Job dependencies satisfied | PrecedenceConflict | High | Yes |
-| VAL-001.6 | Approval gates cleared (BAT) | ApprovalGateConflict | High | Yes |
-| VAL-001.7 | Approval gates cleared (Plates) | ApprovalGateConflict | Medium | Warning |
-| VAL-001.8 | Workshop exit date achievable | DeadlineConflict | Medium | Warning |
+| VAL-001.6 | Element prerequisites ready (paper, BAT, plates, forme) | PrerequisiteConflict | Medium | Warning |
+| VAL-001.7 | Workshop exit date achievable | DeadlineConflict | Medium | Warning |
 | BR-ASSIGN-002 | Within operating hours | AvailabilityConflict | High | Yes |
 | BR-ASSIGN-004 | Not in the past | — | High | Yes |
 
@@ -632,8 +657,7 @@ The following table provides a quick reference for validation rules, their corre
 | StationConflict | Station double-booked (overlapping assignments) | Red highlight on both tiles |
 | GroupCapacityConflict | Station group MaxConcurrent exceeded | Yellow/orange time slot |
 | PrecedenceConflict | Intra-element or cross-element predecessor's effectiveEnd exceeds proposed task start (includes dry time for printing predecessors) | Red halo on violating tile |
-| ApprovalGateConflict (BAT) | BAT approval not satisfied | Red drop highlight (blocking) |
-| ApprovalGateConflict (Plates) | Plates approval not satisfied | Orange drop highlight (warning, non-blocking) |
+| PrerequisiteConflict | Element prerequisite not ready (paper, BAT, plates, forme) | Dashed left border on tile (v0.4.32) |
 | AvailabilityConflict | Outside station operating hours | Gray hatched overlay |
 | DeadlineConflict | Task completion exceeds workshopExitDate | Job in "Late Jobs" panel |
 

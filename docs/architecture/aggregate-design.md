@@ -193,7 +193,7 @@ Represents an external provider for outsourced tasks, with its own implicit stat
 > **References:** [DM-AGG-JOB-001](../domain-model/domain-model.md#dm-agg-job-001), [DM-ENT-ELEM-001](../domain-model/domain-model.md#dm-ent-elem-001), [DM-ENT-TASK-001](../domain-model/domain-model.md#dm-ent-task-001), [BR-JOB-001](../domain-model/business-rules.md#br-job-001), [BR-JOB-002](../domain-model/business-rules.md#br-job-002), [BR-TASK-001](../domain-model/business-rules.md#br-task-001), [BR-ELEM-001](../domain-model/business-rules.md#br-elem-001), [BR-ELEM-002](../domain-model/business-rules.md#br-elem-002), [BR-ELEM-003](../domain-model/business-rules.md#br-elem-003)
 
 **Purpose**
-Represents a print job containing one or more elements, each with sequential tasks. Manages deadlines, approval gates, and workflow. The Element layer enables multi-element jobs (e.g., book production with cover, interior, binding) while single-element jobs remain transparent.
+Represents a print job containing one or more elements, each with sequential tasks. Manages deadlines and workflow. The Element layer enables multi-element jobs (e.g., book production with cover, interior, binding) while single-element jobs remain transparent. **As of v0.4.32, prerequisite tracking (paper, BAT, plates, forme) is at element level.**
 
 **Invariants**
 - A job must have a reference, client, description, and workshopExitDate
@@ -203,13 +203,12 @@ Represents a print job containing one or more elements, each with sequential tas
 - Element dependencies must not form cycles (DAG, BR-ELEM-003)
 - Status progression: Draft → Planned → InProgress → Completed | Cancelled
 - Tasks can only be added/reordered in Draft state
-- BAT must be approved (or NoProofRequired) before tasks can be scheduled
-- Plates must be Done before printing tasks can be scheduled
+- Element prerequisites (paper, BAT, plates, forme) affect blocking state but do not hard-block scheduling in MVP (v0.4.32)
 
 **Entities and Value Objects**
 - **Aggregate Root:** Job
-- **Entities:** Element (within aggregate boundary), Task (within Element), Comment
-- **Value Objects:** Duration, ProofApproval
+- **Entities:** Element (within aggregate boundary, includes prerequisite status fields), Task (within Element), Comment
+- **Value Objects:** Duration, ElementSpec
 
 **Creation Rules**
 - Job is created in `Draft` status with required fields
@@ -228,9 +227,7 @@ Represents a print job containing one or more elements, each with sequential tas
 - `AddTask` (to element, only in Draft)
 - `RemoveTask` (only in Draft)
 - `ReorderTasks` (within element)
-- `UpdateProofApproval` (proofApproval.sentAt, proofApproval.approvedAt)
-- `UpdatePlatesStatus`
-- `UpdatePaperStatus`
+- `UpdateElementPrerequisite` (paper, BAT, plates, forme status — v0.4.32)
 - `AddComment`
 - `PlanJob` (Draft → Planned)
 - `StartJob` (Planned → InProgress, when first task starts)
@@ -251,9 +248,10 @@ Represents a print job containing one or more elements, each with sequential tas
 - `TaskAddedToJob`
 - `TaskRemovedFromJob`
 - `TasksReordered`
-- `ProofApprovalUpdated`
-- `PlatesStatusUpdated`
-- `PaperStatusUpdated`
+- `ElementPaperStatusUpdated` (v0.4.32)
+- `ElementBatStatusUpdated` (v0.4.32)
+- `ElementPlateStatusUpdated` (v0.4.32)
+- `ElementFormeStatusUpdated` (v0.4.32)
 - `CommentAdded`
 - `JobPlanned`
 - `JobStarted`
@@ -341,7 +339,7 @@ Responsible for:
 - Cross-aggregate validation rules
 - Station availability checking
 - Group capacity checking
-- Approval gate checking
+- Element prerequisite checking (paper, BAT, plates, forme — v0.4.32)
 - Element-scoped and cross-element precedence checking (intra-element sequenceOrder + cross-element prerequisiteElementIds)
 - Dry time calculation for printing predecessors (+4h for offset press stations)
 
@@ -433,7 +431,7 @@ Repositories are defined at the **domain/interface level**, not as infrastructur
 ### Examples
 - When a task is assigned: Job aggregate task status update via event
 - When station schedule changes: Existing assignments revalidated asynchronously
-- When approval gate updates: Affected assignments flagged for review
+- When element prerequisite updates: Affected tile blocking state recalculated (v0.4.32)
 
 ### Read Model Consistency
 - CQRS pattern for complex queries

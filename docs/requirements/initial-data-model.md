@@ -107,15 +107,10 @@ This is not a final database schema — it is an early conceptual reference.
 - **workshopExitDate** (datetime, deadline for leaving factory)
 - **fullyScheduled** (boolean, computed: all tasks have assignments)
 - **color** (string, hex color code, e.g., "#3B82F6") — randomly assigned at creation; dependent jobs use shades of required job's color
-- **paperPurchaseStatus**: InStock | ToOrder | Ordered | Received
-- **paperOrderedAt** (datetime | null)
 - **paperType** (string, e.g., "CB300")
 - **paperFormat** (string, e.g., "63x88")
-- **proofSentAt** (datetime | "AwaitingFile" | "NoProofRequired")
-- **proofApprovedAt** (datetime | null)
-- **platesStatus**: Todo | Done
+- **elementIds** (list of string, references to Element entities)
 - **requiredJobIds** (list of string, job references that must complete first)
-- **tasks** (list of Task, ordered by sequence)
 - **comments** (list of Comment)
 - **status**: Draft | Planned | InProgress | Delayed | Completed | Cancelled
   - `Draft` – job is being defined
@@ -127,6 +122,41 @@ This is not a final database schema — it is an early conceptual reference.
 - **createdAt** (datetime)
 - **updatedAt** (datetime)
 
+**Note (v0.4.32):** Prerequisite tracking (paper, BAT, plates, forme) moved to Element level.
+
+---
+
+## 6b. Element (v0.4.32)
+
+- **elementId** (string)
+- **jobId** (string, reference to parent Job)
+- **suffix** (string, short identifier, e.g., "couv", "int", "fin", "ELT")
+- **label** (string | null, optional display label)
+- **spec** (ElementSpec | null, optional specifications)
+- **prerequisiteElementIds** (list of string, same-job element references)
+- **taskIds** (list of string, ordered task references)
+- **Prerequisite Status Fields:**
+  - **paperStatus**: none | in_stock | to_order | ordered | delivered
+  - **batStatus**: none | waiting_files | files_received | bat_sent | bat_approved
+  - **plateStatus**: none | to_make | ready
+  - **formeStatus**: none | in_stock | to_order | ordered | delivered
+- **Date Tracking Fields:**
+  - **paperOrderedAt** (datetime | null)
+  - **paperDeliveredAt** (datetime | null)
+  - **filesReceivedAt** (datetime | null)
+  - **batSentAt** (datetime | null)
+  - **batApprovedAt** (datetime | null)
+  - **formeOrderedAt** (datetime | null)
+  - **formeDeliveredAt** (datetime | null)
+- **createdAt** (datetime)
+- **updatedAt** (datetime)
+
+**Blocking Logic:** An element is blocked if ANY prerequisite is not in a ready state:
+- Paper ready: `none`, `in_stock`, `delivered`
+- BAT ready: `none`, `bat_approved`
+- Plates ready: `none`, `ready`
+- Forme ready: `none`, `in_stock`, `delivered`
+
 ---
 
 ## 7. Task
@@ -135,8 +165,8 @@ Tasks are polymorphic (internal or outsourced).
 
 ### Common Fields
 - **taskId** (string)
-- **jobId** (string, reference)
-- **sequenceOrder** (integer, position in job's task list)
+- **elementId** (string, reference to parent Element)
+- **sequenceOrder** (integer, position in element's task list)
 - **type**: internal | outsourced
 - **comment** (string | null, from DSL)
 - **rawDSLInput** (string, original DSL line)
@@ -207,10 +237,12 @@ Tasks are polymorphic (internal or outsourced).
 - **validationStatus**: Valid | Invalid
 
 ### ScheduleConflict (Value Object)
-- **type**: StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict
+- **type**: StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict
 - **affectedTaskIds** (list of string)
 - **description** (string)
 - **severity**: High | Medium | Low
+
+**Note (v0.4.32):** `PrerequisiteConflict` replaces `ApprovalGateConflict` for element-level prerequisite tracking.
 
 ---
 
@@ -227,25 +259,33 @@ Tasks are polymorphic (internal or outsourced).
 3. **OutsourcedProvider → StationGroup** (1:1)
    - Each provider has its own dedicated group with unlimited capacity
 
-4. **Job → Task** (1:N, ordered)
-   - A job contains multiple tasks in sequence
-   - Tasks cannot exist without a job
+4. **Job → Element** (1:N, ordered) — v0.4.32
+   - A job contains one or more elements
+   - Elements cannot exist without a job
+   - Single-element jobs use default suffix "ELT"
 
-5. **Task → Station** (N:1, for internal tasks)
+5. **Element → Task** (1:N, ordered) — v0.4.32
+   - An element contains multiple tasks in sequence
+   - Tasks cannot exist without an element
+
+6. **Element → Element** (N:M via prerequisiteElementIds) — v0.4.32
+   - Elements within same job can have finish-to-start dependencies
+
+7. **Task → Station** (N:1, for internal tasks)
    - Internal tasks reference a station
 
-6. **Task → OutsourcedProvider** (N:1, for outsourced tasks)
+8. **Task → OutsourcedProvider** (N:1, for outsourced tasks)
    - Outsourced tasks reference a provider
 
-7. **Task → TaskAssignment** (1:0..1)
+9. **Task → TaskAssignment** (1:0..1)
    - A task may have zero or one assignment
    - Assignment includes station/provider and timing
 
-8. **Job → Job** (N:M via requiredJobIds)
-   - Jobs can depend on other jobs completing first
+10. **Job → Job** (N:M via requiredJobIds)
+    - Jobs can depend on other jobs completing first
 
-9. **Job → Comment** (1:N)
-   - A job has zero or more comments
+11. **Job → Comment** (1:N)
+    - A job has zero or more comments
 
 ---
 
@@ -280,26 +320,39 @@ Tasks are polymorphic (internal or outsourced).
 | Failed | Error during execution |
 | Cancelled | Cancelled (typically via job) |
 
-### PaperPurchaseStatus
-| Value | Description |
-|-------|-------------|
-| InStock | Paper already available |
-| ToOrder | Paper needs to be ordered |
-| Ordered | Paper order placed |
-| Received | Paper received |
+### PaperStatus (Element-level, v0.4.32)
+| Value | Description | Ready? |
+|-------|-------------|--------|
+| none | No paper tracking needed | Yes |
+| in_stock | Paper already available | Yes |
+| to_order | Paper needs to be ordered | No |
+| ordered | Paper order placed | No |
+| delivered | Paper received | Yes |
 
-### PlatesStatus
-| Value | Description |
-|-------|-------------|
-| Todo | Plates not yet prepared |
-| Done | Plates ready for printing |
+### BatStatus (Element-level, v0.4.32)
+| Value | Description | Ready? |
+|-------|-------------|--------|
+| none | No BAT required | Yes |
+| waiting_files | Waiting for client file | No |
+| files_received | Client files received | No |
+| bat_sent | BAT sent to client | No |
+| bat_approved | BAT approved by client | Yes |
 
-### ProofSentAt (Special Values)
-| Value | Description |
-|-------|-------------|
-| *datetime* | Actual date proof was sent |
-| AwaitingFile | Waiting for client file |
-| NoProofRequired | No proof needed for this job |
+### PlateStatus (Element-level, v0.4.32)
+| Value | Description | Ready? |
+|-------|-------------|--------|
+| none | No plates required | Yes |
+| to_make | Plates need to be prepared | No |
+| ready | Plates ready for printing | Yes |
+
+### FormeStatus (Element-level, v0.4.32)
+| Value | Description | Ready? |
+|-------|-------------|--------|
+| none | No forme required | Yes |
+| in_stock | Forme already available | Yes |
+| to_order | Forme needs to be ordered | No |
+| ordered | Forme order placed | No |
+| delivered | Forme received | Yes |
 
 ---
 

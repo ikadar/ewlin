@@ -647,113 +647,66 @@ Interfaces are described in:
 - `JOB_NOT_FOUND` – One or both jobs don't exist
 - `CIRCULAR_DEPENDENCY` – Would create a cycle
 
-### 5.5 UpdateProofStatus
+### 5.5 UpdateElementPrerequisite (v0.4.32)
 #### IC-JOB-005
-> **References:** [API-JOB-004](../requirements/api-interface-drafts.md#api-job-004), [AC-GATE-001](../requirements/acceptance-criteria.md#ac-gate-001-bat-blocking), [AC-GATE-002](../requirements/acceptance-criteria.md#ac-gate-002-bat-bypass), [BR-GATE-001](../domain-model/business-rules.md#br-gate-001), [BR-GATE-003](../domain-model/business-rules.md#br-gate-003)
+> **References:** [BR-PREREQ-001](../domain-model/business-rules.md#br-prereq-001), [BR-PREREQ-002](../domain-model/business-rules.md#br-prereq-002), [BR-PREREQ-003](../domain-model/business-rules.md#br-prereq-003), [BR-PREREQ-004](../domain-model/business-rules.md#br-prereq-004), [BR-PREREQ-005](../domain-model/business-rules.md#br-prereq-005)
 
-**Purpose:** Update BAT (Bon à Tirer) approval status.
+**Purpose:** Update element-level prerequisite status (paper, BAT, plates, forme).
 
 **Preconditions**
-- Job exists
+- Element exists
+- Job is not Completed or Cancelled
 
 **Request**
 ```json
 {
-  "jobId": "string",
-  "proofApproval": {
-    "sentAt": "ISO-8601-datetime | null",
-    "approvedAt": "ISO-8601-datetime | null"
-  }
+  "elementId": "string",
+  "prerequisiteType": "paper | bat | plates | forme",
+  "status": "string"
 }
 ```
+
+**Status values by type:**
+- `paper`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+- `bat`: `none` | `waiting_files` | `files_received` | `bat_sent` | `bat_approved`
+- `plates`: `none` | `to_make` | `ready`
+- `forme`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
 
 **Response**
 ```json
 {
-  "status": "updated",
+  "elementId": "string",
+  "prerequisiteType": "string",
+  "status": "string",
+  "isBlocked": "boolean",
+  "dateTracking": {
+    "paperOrderedAt": "ISO-8601-timestamp | null",
+    "paperDeliveredAt": "ISO-8601-timestamp | null",
+    "filesReceivedAt": "ISO-8601-timestamp | null",
+    "batSentAt": "ISO-8601-timestamp | null",
+    "batApprovedAt": "ISO-8601-timestamp | null",
+    "formeOrderedAt": "ISO-8601-timestamp | null",
+    "formeDeliveredAt": "ISO-8601-timestamp | null"
+  },
   "updatedAt": "ISO-8601-timestamp"
 }
 ```
 
 **Notes:**
-- `proofApproval.sentAt`: When proof was sent to client, or null
-- `proofApproval.approvedAt`: When proof was approved, or null
+- Date tracking fields are automatically set when status changes to relevant state
+- `isBlocked` returns true if ANY prerequisite is not in ready state
+- Ready states: paper (`none`, `in_stock`, `delivered`), bat (`none`, `bat_approved`), plates (`none`, `ready`), forme (`none`, `in_stock`, `delivered`)
 
 **Postconditions**
-- Proof approval status updated
-- Domain event `ProofApprovalUpdated` emitted
-- If proof approved, blocked tasks become schedulable
+- Element prerequisite status updated
+- Date tracking field set if applicable
+- Domain event `ElementPaperStatusUpdated` / `ElementBatStatusUpdated` / `ElementPlateStatusUpdated` / `ElementFormeStatusUpdated` emitted
+- Element blocking state recalculated
 
 **Error responses**
-- `JOB_NOT_FOUND` – Job does not exist
-- `INVALID_PROOF_STATE` – Cannot approve without sending first
-
-### 5.6 UpdatePlatesStatus
-#### IC-JOB-006
-> **References:** [API-JOB-005](../requirements/api-interface-drafts.md#api-job-005), [AC-GATE-003](../requirements/acceptance-criteria.md#ac-gate-003-plates-blocking), [BR-GATE-002](../domain-model/business-rules.md#br-gate-002)
-
-**Purpose:** Update plates preparation status.
-
-**Preconditions**
-- Job exists
-
-**Request**
-```json
-{
-  "jobId": "string",
-  "platesStatus": "Todo | Done"
-}
-```
-
-**Response**
-```json
-{
-  "status": "updated",
-  "updatedAt": "ISO-8601-timestamp"
-}
-```
-
-**Postconditions**
-- Plates status updated
-- Domain event `PlatesStatusChanged` emitted
-- If plates done, printing tasks become schedulable
-
-**Error responses**
-- `JOB_NOT_FOUND` – Job does not exist
-
-### 5.7 UpdatePaperStatus
-#### IC-JOB-007
-> **References:** [API-JOB-006](../requirements/api-interface-drafts.md#api-job-006), [AC-GATE-004](../requirements/acceptance-criteria.md#ac-gate-004-paper-status-timestamp), [BR-PAPER-001](../domain-model/business-rules.md#br-paper-001), [BR-PAPER-002](../domain-model/business-rules.md#br-paper-002)
-
-**Purpose:** Update paper procurement status.
-
-**Preconditions**
-- Job exists
-
-**Request**
-```json
-{
-  "jobId": "string",
-  "paperPurchaseStatus": "InStock | ToOrder | Ordered | Received"
-}
-```
-
-**Response**
-```json
-{
-  "paperPurchaseStatus": "string",
-  "paperOrderedAt": "ISO-8601-timestamp | null",
-  "updatedAt": "ISO-8601-timestamp"
-}
-```
-
-**Postconditions**
-- Paper status updated
-- If changed to Ordered, paperOrderedAt set
-- Domain event `PaperStatusChanged` emitted
-
-**Error responses**
-- `JOB_NOT_FOUND` – Job does not exist
+- `ELEMENT_NOT_FOUND` – Element does not exist
+- `JOB_INVALID_STATE` – Job is Completed or Cancelled
+- `INVALID_STATUS` – Status value not valid for prerequisite type
 
 ### 5.8 AddComment
 #### IC-JOB-008
@@ -1045,7 +998,7 @@ Interfaces are described in:
 **Preconditions**
 - Task exists
 - Station/Provider available at scheduled time
-- Approval gates satisfied (BAT, Plates)
+- Element prerequisites ready (paper, BAT, plates, forme) — warning only in MVP (v0.4.32)
 - Element-scoped and cross-element precedence satisfied (unless bypassPrecedence)
 - No scheduling conflicts
 
@@ -1090,7 +1043,7 @@ Interfaces are described in:
     "valid": false,
     "conflicts": [
       {
-        "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+        "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
         "message": "string",
         "taskId": "string",
         "relatedTaskId": "string | null",
@@ -1218,7 +1171,7 @@ Interfaces are described in:
   "valid": "boolean",
   "conflicts": [
     {
-      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
       "message": "string",
       "taskId": "string",
       "relatedTaskId": "string | null",
@@ -1266,7 +1219,7 @@ Interfaces are described in:
   "status": "valid | conflicts_found",
   "conflicts": [
     {
-      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
       "message": "string",
       "taskId": "string",
       "relatedTaskId": "string | null",
@@ -1370,7 +1323,12 @@ Interfaces are described in:
       "suffix": "string",
       "label": "string | null",
       "prerequisiteElementIds": ["string"],
-      "taskIds": ["string"]
+      "taskIds": ["string"],
+      "paperStatus": "none | in_stock | to_order | ordered | delivered",
+      "batStatus": "none | waiting_files | files_received | bat_sent | bat_approved",
+      "plateStatus": "none | to_make | ready",
+      "formeStatus": "none | in_stock | to_order | ordered | delivered",
+      "isBlocked": "boolean"
     }
   ],
   "tasks": [
@@ -1395,7 +1353,7 @@ Interfaces are described in:
   ],
   "conflicts": [
     {
-      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
       "message": "string",
       "taskId": "string",
       "relatedTaskId": "string | null",
@@ -1641,9 +1599,11 @@ fetches suggestions from these endpoints.
 ### ConflictType
 ```json
 {
-  "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict"
+  "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict"
 }
 ```
+
+**Note (v0.4.32):** `PrerequisiteConflict` replaces `ApprovalGateConflict` for element-level prerequisite tracking.
 
 ### SimilarityCriterion
 ```json
@@ -1679,7 +1639,7 @@ All services return errors using a uniform schema:
 | `NOT_FOUND` | Resource not found |
 | `CONFLICT` | Operation would create conflict |
 | `CIRCULAR_DEPENDENCY` | Dependency would create cycle |
-| `APPROVAL_GATE_BLOCKED` | Approval gate not satisfied |
+| `PREREQUISITE_NOT_READY` | Element prerequisite not in ready state (v0.4.32) |
 | `INTERNAL_ERROR` | Unexpected server error |
 
 ---

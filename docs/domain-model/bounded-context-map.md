@@ -53,8 +53,7 @@ This document defines the major bounded contexts involved in the **print shop sc
 - Create and manage Jobs with deadlines and metadata.
 - Define Elements within jobs with cross-element dependencies.
 - Define Tasks within elements with durations and station requirements.
-- Manage approval gates (BAT, Plates).
-- Track paper procurement status.
+- Track element-level prerequisites (paper, BAT, plates, forme) — v0.4.32.
 - Manage job comments.
 
 **Owned Models:**
@@ -67,8 +66,10 @@ This document defines the major bounded contexts involved in the **print shop sc
 - `TaskId`
 - `TaskStatus`
 - `Comment`
-- `PaperPurchaseStatus`
-- `PlatesStatus`
+- `PaperStatus` (element-level, v0.4.32)
+- `BatStatus` (element-level, v0.4.32)
+- `PlateStatus` (element-level, v0.4.32)
+- `FormeStatus` (element-level, v0.4.32)
 - `Duration` (shared kernel)
 
 **Exposes:**
@@ -77,8 +78,10 @@ This document defines the major bounded contexts involved in the **print shop sc
 - `TasksReordered` domain event
 - `ElementCreated` domain event
 - `ElementDependencyAdded` domain event
-- `ApprovalGateUpdated` domain event
-- `PaperStatusChanged` domain event
+- `ElementPaperStatusUpdated` domain event (v0.4.32)
+- `ElementBatStatusUpdated` domain event (v0.4.32)
+- `ElementPlateStatusUpdated` domain event (v0.4.32)
+- `ElementFormeStatusUpdated` domain event (v0.4.32)
 - `CommentAdded` domain event
 - `JobPlanned` domain event
 - `JobStarted` domain event
@@ -116,7 +119,10 @@ This document defines the major bounded contexts involved in the **print shop sc
 - `TasksReordered` event from Job Management Context.
 - `ElementCreated` event from Job Management Context.
 - `ElementDependencyAdded` event from Job Management Context.
-- `ApprovalGateUpdated` event from Job Management Context.
+- `ElementPaperStatusUpdated` event from Job Management Context (v0.4.32).
+- `ElementBatStatusUpdated` event from Job Management Context (v0.4.32).
+- `ElementPlateStatusUpdated` event from Job Management Context (v0.4.32).
+- `ElementFormeStatusUpdated` event from Job Management Context (v0.4.32).
 
 **Exposes:**
 - `TaskAssigned` domain event
@@ -195,7 +201,7 @@ This shared kernel is intentionally minimal to avoid coupling.
 
 ### Job Management → Assignment & Validation
 - **Integration Pattern:** Published Language (Domain Events)
-- **Events:** `TaskAddedToJob`, `TasksReordered`, `ElementCreated`, `ElementDependencyAdded`, `ApprovalGateUpdated`
+- **Events:** `TaskAddedToJob`, `TasksReordered`, `ElementCreated`, `ElementDependencyAdded`, `ElementPaperStatusUpdated`, `ElementBatStatusUpdated`, `ElementPlateStatusUpdated`, `ElementFormeStatusUpdated` (v0.4.32)
 - **Relationship Type:** Customer/Supplier
   Job Management is the supplier; Assignment & Validation is the customer.
 
@@ -238,14 +244,14 @@ StationManagement
   Consumes: —
 
 JobManagement
-  Owns: Job, Element, Task, Comments, ApprovalGates
-  Publishes: JobCreated, ElementCreated, TaskAdded, GateUpdated, JobCompleted
+  Owns: Job, Element, Task, Comments, ElementPrerequisites (v0.4.32)
+  Publishes: JobCreated, ElementCreated, TaskAdded, ElementPrerequisiteUpdated, JobCompleted
   Consumes: Station/Provider references (by ID)
 
 Assignment&Validation
   Owns: Schedule, TaskAssignment, Conflicts
   Publishes: TaskAssigned, ConflictDetected, ScheduleUpdated
-  Consumes: StationEvents, TaskEvents, ElementEvents, ApprovalGateEvents
+  Consumes: StationEvents, TaskEvents, ElementEvents, ElementPrerequisiteEvents
 
 SchedulingView
   Owns: Read Models, Snapshots
