@@ -9,6 +9,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="none"
         batStatus="none"
         plateStatus="none"
+        formeStatus="none"
       />
     );
     expect(container.firstChild).toBeNull();
@@ -20,6 +21,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
       />
     );
     expect(screen.getByTestId('prerequisite-status')).toBeInTheDocument();
@@ -34,6 +36,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
         isAssembly
       />
     );
@@ -47,6 +50,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
         hasOffset={false}
       />
     );
@@ -55,12 +59,40 @@ describe('PrerequisiteStatus', () => {
     expect(screen.queryByTestId('prerequisite-plate-dropdown')).not.toBeInTheDocument();
   });
 
+  it('shows forme dropdown when hasDieCutting is true', () => {
+    render(
+      <PrerequisiteStatus
+        paperStatus="in_stock"
+        batStatus="bat_approved"
+        plateStatus="ready"
+        formeStatus="in_stock"
+        hasDieCutting={true}
+      />
+    );
+    expect(screen.getByTestId('prerequisite-forme-dropdown')).toBeInTheDocument();
+    expect(screen.getByText('Sur stock')).toBeInTheDocument();
+  });
+
+  it('hides forme dropdown when hasDieCutting is false', () => {
+    render(
+      <PrerequisiteStatus
+        paperStatus="in_stock"
+        batStatus="bat_approved"
+        plateStatus="ready"
+        formeStatus="in_stock"
+        hasDieCutting={false}
+      />
+    );
+    expect(screen.queryByTestId('prerequisite-forme-dropdown')).not.toBeInTheDocument();
+  });
+
   it('displays current status labels', () => {
     render(
       <PrerequisiteStatus
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
       />
     );
     expect(screen.getByText('En stock')).toBeInTheDocument();
@@ -74,6 +106,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
       />
     );
 
@@ -94,6 +127,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
         onPaperStatusChange={onPaperChange}
       />
     );
@@ -111,6 +145,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
         onPaperStatusChange={() => {}}
       />
     );
@@ -132,6 +167,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="to_order"
         batStatus="waiting_files"
         plateStatus="to_make"
+        formeStatus="none"
       />
     );
 
@@ -145,6 +181,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="in_stock"
         batStatus="bat_approved"
         plateStatus="ready"
+        formeStatus="none"
       />
     );
 
@@ -159,6 +196,7 @@ describe('PrerequisiteStatus', () => {
         paperStatus="ordered"
         batStatus="bat_sent"
         plateStatus="to_make"
+        formeStatus="none"
       />
     );
 

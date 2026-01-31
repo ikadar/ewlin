@@ -1,6 +1,7 @@
 /**
  * PrerequisiteTooltip Component Tests
  * v0.4.32b: Scheduler Tile Blocking Visual & Tooltip
+ * v0.4.32c: Forme Status & Date Tracking
  */
 
 import { describe, it, expect } from 'vitest';
@@ -15,10 +16,12 @@ function createBlockingInfo(
   batStatus: string,
   batReady: boolean,
   platesStatus: string,
-  platesReady: boolean
+  platesReady: boolean,
+  formeStatus: string = 'none',
+  formeReady: boolean = true
 ): PrerequisiteBlockingInfo {
   return {
-    isBlocked: !paperReady || !batReady || !platesReady,
+    isBlocked: !paperReady || !batReady || !platesReady || !formeReady,
     paper: {
       status: paperStatus as PrerequisiteBlockingInfo['paper']['status'],
       isReady: paperReady,
@@ -30,6 +33,10 @@ function createBlockingInfo(
     plates: {
       status: platesStatus as PrerequisiteBlockingInfo['plates']['status'],
       isReady: platesReady,
+    },
+    forme: {
+      status: formeStatus as PrerequisiteBlockingInfo['forme']['status'],
+      isReady: formeReady,
     },
   };
 }

@@ -165,6 +165,7 @@ export interface ElementGeneratorOptions {
   paperStatus?: 'none' | 'in_stock' | 'to_order' | 'ordered' | 'delivered';
   batStatus?: 'none' | 'waiting_files' | 'files_received' | 'bat_sent' | 'bat_approved';
   plateStatus?: 'none' | 'to_make' | 'ready';
+  formeStatus?: 'none' | 'in_stock' | 'to_order' | 'ordered' | 'delivered';
 }
 
 /**
@@ -180,6 +181,7 @@ export function generateElementsForJobs(
     paperStatus = 'in_stock',
     batStatus = 'bat_approved',
     plateStatus = 'ready',
+    formeStatus = 'none',
   } = options;
 
   return jobs.map((job) => {
@@ -196,6 +198,7 @@ export function generateElementsForJobs(
       paperStatus,
       batStatus,
       plateStatus,
+      formeStatus,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     };

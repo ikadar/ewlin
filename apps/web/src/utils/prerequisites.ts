@@ -3,9 +3,18 @@
  *
  * Helper functions for checking element prerequisite status (blocking state).
  * v0.4.32b: Scheduler Tile Blocking Visual
+ * v0.4.32c: Forme Status & Date Tracking
  */
 
-import type { Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
+import type {
+  Element,
+  PaperStatus,
+  BatStatus,
+  PlateStatus,
+  FormeStatus,
+  Task,
+  Station,
+} from '@flux/types';
 
 /**
  * Ready states for each prerequisite type.
@@ -14,6 +23,7 @@ import type { Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
 export const PAPER_READY_STATES: PaperStatus[] = ['none', 'in_stock', 'delivered'];
 export const BAT_READY_STATES: BatStatus[] = ['none', 'bat_approved'];
 export const PLATES_READY_STATES: PlateStatus[] = ['none', 'ready'];
+export const FORME_READY_STATES: FormeStatus[] = ['none', 'in_stock', 'delivered'];
 
 /**
  * Check if an element's paper status is ready (not blocking).
@@ -37,6 +47,55 @@ export function isPlatesReady(status: PlateStatus): boolean {
 }
 
 /**
+ * Check if an element's forme status is ready (not blocking).
+ */
+export function isFormeReady(status: FormeStatus): boolean {
+  return FORME_READY_STATES.includes(status);
+}
+
+/**
+ * Die-cutting category ID for station detection.
+ */
+export const DIE_CUTTING_CATEGORY_ID = 'cat-die-cutting';
+
+/**
+ * Keywords for detecting die-cutting in outsourced action types.
+ */
+const DIE_CUTTING_KEYWORDS = ['découpe', 'die-cut', 'die cut', 'stancolás'];
+
+/**
+ * Check if an element has any die-cutting action (internal or outsourced).
+ * Used to determine if Forme prerequisite should be shown.
+ *
+ * @param element - The element to check
+ * @param tasks - All tasks
+ * @param stations - All stations
+ * @returns true if element has die-cutting action
+ */
+export function hasDieCuttingAction(
+  element: Element,
+  tasks: Task[],
+  stations: Station[]
+): boolean {
+  return element.taskIds.some((taskId) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return false;
+
+    if (task.type === 'Internal') {
+      const station = stations.find((s) => s.id === task.stationId);
+      return station?.categoryId === DIE_CUTTING_CATEGORY_ID;
+    }
+
+    if (task.type === 'Outsourced') {
+      const actionLower = task.actionType?.toLowerCase() || '';
+      return DIE_CUTTING_KEYWORDS.some((keyword) => actionLower.includes(keyword));
+    }
+
+    return false;
+  });
+}
+
+/**
  * Check if an element is blocked due to missing prerequisites.
  * An element is blocked if ANY prerequisite is not in a ready state.
  *
@@ -47,8 +106,9 @@ export function isElementBlocked(element: Element): boolean {
   const paperReady = isPaperReady(element.paperStatus);
   const batReady = isBatReady(element.batStatus);
   const platesReady = isPlatesReady(element.plateStatus);
+  const formeReady = isFormeReady(element.formeStatus);
 
-  return !paperReady || !batReady || !platesReady;
+  return !paperReady || !batReady || !platesReady || !formeReady;
 }
 
 /**
@@ -63,14 +123,25 @@ export interface PrerequisiteBlockingInfo {
   paper: {
     status: PaperStatus;
     isReady: boolean;
+    orderedAt?: string;
+    deliveredAt?: string;
   };
   bat: {
     status: BatStatus;
     isReady: boolean;
+    filesReceivedAt?: string;
+    sentAt?: string;
+    approvedAt?: string;
   };
   plates: {
     status: PlateStatus;
     isReady: boolean;
+  };
+  forme: {
+    status: FormeStatus;
+    isReady: boolean;
+    orderedAt?: string;
+    deliveredAt?: string;
   };
 }
 
@@ -78,20 +149,32 @@ export function getPrerequisiteBlockingInfo(element: Element): PrerequisiteBlock
   const paperReady = isPaperReady(element.paperStatus);
   const batReady = isBatReady(element.batStatus);
   const platesReady = isPlatesReady(element.plateStatus);
+  const formeReady = isFormeReady(element.formeStatus);
 
   return {
-    isBlocked: !paperReady || !batReady || !platesReady,
+    isBlocked: !paperReady || !batReady || !platesReady || !formeReady,
     paper: {
       status: element.paperStatus,
       isReady: paperReady,
+      orderedAt: element.paperOrderedAt,
+      deliveredAt: element.paperDeliveredAt,
     },
     bat: {
       status: element.batStatus,
       isReady: batReady,
+      filesReceivedAt: element.filesReceivedAt,
+      sentAt: element.batSentAt,
+      approvedAt: element.batApprovedAt,
     },
     plates: {
       status: element.plateStatus,
       isReady: platesReady,
+    },
+    forme: {
+      status: element.formeStatus,
+      isReady: formeReady,
+      orderedAt: element.formeOrderedAt,
+      deliveredAt: element.formeDeliveredAt,
     },
   };
 }

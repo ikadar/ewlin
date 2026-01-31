@@ -1,4 +1,4 @@
-import type { Job, Task, TaskAssignment, Station, Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 import { X } from 'lucide-react';
 import { JobInfo } from './JobInfo';
 import { TaskList } from './TaskList';
@@ -7,8 +7,8 @@ import { getTasksForJob } from '../../utils/taskHelpers';
 /** Payload for element prerequisite status updates */
 export interface ElementStatusUpdate {
   elementId: string;
-  field: 'paperStatus' | 'batStatus' | 'plateStatus';
-  value: PaperStatus | BatStatus | PlateStatus;
+  field: 'paperStatus' | 'batStatus' | 'plateStatus' | 'formeStatus';
+  value: PaperStatus | BatStatus | PlateStatus | FormeStatus;
 }
 
 export interface JobDetailsPanelProps {

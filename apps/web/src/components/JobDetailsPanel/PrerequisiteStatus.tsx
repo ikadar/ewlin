@@ -1,13 +1,16 @@
-import type { PaperStatus, BatStatus, PlateStatus } from '@flux/types';
+import type { PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 import { PrerequisiteDropdown } from './PrerequisiteDropdown';
-import { paperOptions, batOptions, plateOptions } from './prerequisiteOptions';
+import { paperOptions, batOptions, plateOptions, formeOptions } from './prerequisiteOptions';
 
 export interface PrerequisiteStatusProps {
   paperStatus: PaperStatus;
   batStatus: BatStatus;
   plateStatus: PlateStatus;
+  formeStatus: FormeStatus;
   /** Whether this element has offset printing (show plates dropdown) */
   hasOffset?: boolean;
+  /** Whether this element has die-cutting (show forme dropdown) */
+  hasDieCutting?: boolean;
   /** Whether this is an assembly element (show "pas de prérequis") */
   isAssembly?: boolean;
   /** Callback when paper status changes */
@@ -16,21 +19,68 @@ export interface PrerequisiteStatusProps {
   onBatStatusChange?: (status: BatStatus) => void;
   /** Callback when plate status changes */
   onPlateStatusChange?: (status: PlateStatus) => void;
+  /** Callback when forme status changes */
+  onFormeStatusChange?: (status: FormeStatus) => void;
+  /** Date fields for display */
+  paperOrderedAt?: string;
+  paperDeliveredAt?: string;
+  filesReceivedAt?: string;
+  batSentAt?: string;
+  batApprovedAt?: string;
+  formeOrderedAt?: string;
+  formeDeliveredAt?: string;
+}
+
+/**
+ * Get the relevant date for a status field based on current status.
+ */
+function getPaperDate(status: PaperStatus, orderedAt?: string, deliveredAt?: string): string | undefined {
+  if (status === 'delivered') return deliveredAt;
+  if (status === 'ordered') return orderedAt;
+  return undefined;
+}
+
+function getBatDate(
+  status: BatStatus,
+  filesReceivedAt?: string,
+  sentAt?: string,
+  approvedAt?: string
+): string | undefined {
+  if (status === 'bat_approved') return approvedAt;
+  if (status === 'bat_sent') return sentAt;
+  if (status === 'files_received') return filesReceivedAt;
+  return undefined;
+}
+
+function getFormeDate(status: FormeStatus, orderedAt?: string, deliveredAt?: string): string | undefined {
+  if (status === 'delivered') return deliveredAt;
+  if (status === 'ordered') return orderedAt;
+  return undefined;
 }
 
 /**
  * Prerequisite status dropdowns for an element.
- * Shows Paper, BAT, and optionally Plates status with editable dropdowns.
+ * Shows Paper, BAT, and optionally Plates/Forme status with editable dropdowns.
  */
 export function PrerequisiteStatus({
   paperStatus,
   batStatus,
   plateStatus,
+  formeStatus,
   hasOffset = true,
+  hasDieCutting = false,
   isAssembly = false,
   onPaperStatusChange,
   onBatStatusChange,
   onPlateStatusChange,
+  onFormeStatusChange,
+  paperOrderedAt,
+  paperDeliveredAt,
+  filesReceivedAt,
+  batSentAt,
+  batApprovedAt,
+  formeOrderedAt,
+  formeDeliveredAt,
 }: PrerequisiteStatusProps) {
   // Assembly elements show a simple message
   if (isAssembly) {
@@ -42,8 +92,10 @@ export function PrerequisiteStatus({
   }
 
   // Don't show anything if all statuses are 'none' and no handlers provided
-  const allNone = paperStatus === 'none' && batStatus === 'none' && plateStatus === 'none';
-  const hasHandlers = onPaperStatusChange || onBatStatusChange || onPlateStatusChange;
+  const allNone =
+    paperStatus === 'none' && batStatus === 'none' && plateStatus === 'none' && formeStatus === 'none';
+  const hasHandlers =
+    onPaperStatusChange || onBatStatusChange || onPlateStatusChange || onFormeStatusChange;
 
   if (allNone && !hasHandlers) {
     return null;
@@ -58,6 +110,7 @@ export function PrerequisiteStatus({
         options={paperOptions}
         type="paper"
         onChange={onPaperStatusChange ?? (() => {})}
+        dateValue={getPaperDate(paperStatus, paperOrderedAt, paperDeliveredAt)}
       />
 
       {/* BAT status dropdown */}
@@ -67,6 +120,7 @@ export function PrerequisiteStatus({
         options={batOptions}
         type="bat"
         onChange={onBatStatusChange ?? (() => {})}
+        dateValue={getBatDate(batStatus, filesReceivedAt, batSentAt, batApprovedAt)}
       />
 
       {/* Plates status dropdown - only for offset elements */}
@@ -77,6 +131,18 @@ export function PrerequisiteStatus({
           options={plateOptions}
           type="plate"
           onChange={onPlateStatusChange ?? (() => {})}
+        />
+      )}
+
+      {/* Forme status dropdown - only for die-cutting elements */}
+      {hasDieCutting && (
+        <PrerequisiteDropdown
+          label="Forme"
+          value={formeStatus}
+          options={formeOptions}
+          type="forme"
+          onChange={onFormeStatusChange ?? (() => {})}
+          dateValue={getFormeDate(formeStatus, formeOrderedAt, formeDeliveredAt)}
         />
       )}
     </div>

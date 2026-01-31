@@ -1,6 +1,7 @@
 /**
  * Prerequisites Utility Tests
  * v0.4.32b: Scheduler Tile Blocking Visual
+ * v0.4.32c: Forme Status & Date Tracking
  */
 
 import { describe, it, expect } from 'vitest';
@@ -10,6 +11,7 @@ import {
   isPaperReady,
   isBatReady,
   isPlatesReady,
+  isFormeReady,
   getPrerequisiteBlockingInfo,
 } from './prerequisites';
 
@@ -17,7 +19,8 @@ import {
 function createElement(
   paperStatus: Element['paperStatus'],
   batStatus: Element['batStatus'],
-  plateStatus: Element['plateStatus']
+  plateStatus: Element['plateStatus'],
+  formeStatus: Element['formeStatus'] = 'none'
 ): Element {
   return {
     id: 'elem-test',
@@ -29,6 +32,7 @@ function createElement(
     paperStatus,
     batStatus,
     plateStatus,
+    formeStatus,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -92,6 +96,28 @@ describe('isPlatesReady', () => {
   });
 });
 
+describe('isFormeReady', () => {
+  it('returns true for "none" status', () => {
+    expect(isFormeReady('none')).toBe(true);
+  });
+
+  it('returns true for "in_stock" status', () => {
+    expect(isFormeReady('in_stock')).toBe(true);
+  });
+
+  it('returns true for "delivered" status', () => {
+    expect(isFormeReady('delivered')).toBe(true);
+  });
+
+  it('returns false for "to_order" status', () => {
+    expect(isFormeReady('to_order')).toBe(false);
+  });
+
+  it('returns false for "ordered" status', () => {
+    expect(isFormeReady('ordered')).toBe(false);
+  });
+});
+
 describe('isElementBlocked', () => {
   it('returns false when all prerequisites are ready', () => {
     const element = createElement('in_stock', 'bat_approved', 'ready');
@@ -142,6 +168,26 @@ describe('isElementBlocked', () => {
     const element = createElement('delivered', 'bat_approved', 'none');
     expect(isElementBlocked(element)).toBe(false);
   });
+
+  it('returns true when forme is not ready', () => {
+    const element = createElement('in_stock', 'bat_approved', 'ready', 'to_order');
+    expect(isElementBlocked(element)).toBe(true);
+  });
+
+  it('returns true when forme is "ordered" (not yet delivered)', () => {
+    const element = createElement('in_stock', 'bat_approved', 'ready', 'ordered');
+    expect(isElementBlocked(element)).toBe(true);
+  });
+
+  it('returns false when forme is "delivered"', () => {
+    const element = createElement('in_stock', 'bat_approved', 'ready', 'delivered');
+    expect(isElementBlocked(element)).toBe(false);
+  });
+
+  it('returns false when forme is "in_stock"', () => {
+    const element = createElement('in_stock', 'bat_approved', 'ready', 'in_stock');
+    expect(isElementBlocked(element)).toBe(false);
+  });
 });
 
 describe('getPrerequisiteBlockingInfo', () => {
@@ -156,6 +202,8 @@ describe('getPrerequisiteBlockingInfo', () => {
     expect(info.bat.isReady).toBe(true);
     expect(info.plates.status).toBe('ready');
     expect(info.plates.isReady).toBe(true);
+    expect(info.forme.status).toBe('none');
+    expect(info.forme.isReady).toBe(true);
   });
 
   it('returns correct info for blocked element (paper)', () => {
@@ -190,5 +238,17 @@ describe('getPrerequisiteBlockingInfo', () => {
     expect(info.bat.isReady).toBe(true);
     expect(info.plates.status).toBe('to_make');
     expect(info.plates.isReady).toBe(false);
+  });
+
+  it('returns correct info for blocked element (forme)', () => {
+    const element = createElement('in_stock', 'bat_approved', 'ready', 'to_order');
+    const info = getPrerequisiteBlockingInfo(element);
+
+    expect(info.isBlocked).toBe(true);
+    expect(info.paper.isReady).toBe(true);
+    expect(info.bat.isReady).toBe(true);
+    expect(info.plates.isReady).toBe(true);
+    expect(info.forme.status).toBe('to_order');
+    expect(info.forme.isReady).toBe(false);
   });
 });

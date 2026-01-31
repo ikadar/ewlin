@@ -15,6 +15,7 @@ function createElement(overrides: Partial<Element> = {}): Element {
     paperStatus: 'in_stock',
     batStatus: 'bat_approved',
     plateStatus: 'ready',
+    formeStatus: 'none',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,

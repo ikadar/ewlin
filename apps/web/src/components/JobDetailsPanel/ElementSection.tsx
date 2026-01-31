@@ -1,4 +1,4 @@
-import type { Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
+import type { Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 import { Workflow } from 'lucide-react';
 import { PrerequisiteStatus } from './PrerequisiteStatus';
 
@@ -11,6 +11,8 @@ export interface ElementSectionProps {
   isSingleElement?: boolean;
   /** Whether this element has offset printing tasks (show plates dropdown) */
   hasOffset?: boolean;
+  /** Whether this element has die-cutting tasks (show forme dropdown) */
+  hasDieCutting?: boolean;
   /** Whether this is an assembly element (show "pas de prérequis") */
   isAssembly?: boolean;
   /** Callback when paper status changes */
@@ -19,6 +21,8 @@ export interface ElementSectionProps {
   onBatStatusChange?: (status: BatStatus) => void;
   /** Callback when plate status changes */
   onPlateStatusChange?: (status: PlateStatus) => void;
+  /** Callback when forme status changes */
+  onFormeStatusChange?: (status: FormeStatus) => void;
   /** Children (task tiles) */
   children: React.ReactNode;
 }
@@ -32,10 +36,12 @@ export function ElementSection({
   allElements,
   isSingleElement = false,
   hasOffset = true,
+  hasDieCutting = false,
   isAssembly = false,
   onPaperStatusChange,
   onBatStatusChange,
   onPlateStatusChange,
+  onFormeStatusChange,
   children,
 }: ElementSectionProps) {
   // For single-element jobs, show prerequisite status but not the element header
@@ -48,11 +54,21 @@ export function ElementSection({
             paperStatus={element.paperStatus}
             batStatus={element.batStatus}
             plateStatus={element.plateStatus}
+            formeStatus={element.formeStatus}
             hasOffset={hasOffset}
+            hasDieCutting={hasDieCutting}
             isAssembly={isAssembly}
             onPaperStatusChange={onPaperStatusChange}
             onBatStatusChange={onBatStatusChange}
             onPlateStatusChange={onPlateStatusChange}
+            onFormeStatusChange={onFormeStatusChange}
+            paperOrderedAt={element.paperOrderedAt}
+            paperDeliveredAt={element.paperDeliveredAt}
+            filesReceivedAt={element.filesReceivedAt}
+            batSentAt={element.batSentAt}
+            batApprovedAt={element.batApprovedAt}
+            formeOrderedAt={element.formeOrderedAt}
+            formeDeliveredAt={element.formeDeliveredAt}
           />
         </div>
         {children}
@@ -97,11 +113,21 @@ export function ElementSection({
           paperStatus={element.paperStatus}
           batStatus={element.batStatus}
           plateStatus={element.plateStatus}
+          formeStatus={element.formeStatus}
           hasOffset={hasOffset}
+          hasDieCutting={hasDieCutting}
           isAssembly={isAssembly}
           onPaperStatusChange={onPaperStatusChange}
           onBatStatusChange={onBatStatusChange}
           onPlateStatusChange={onPlateStatusChange}
+          onFormeStatusChange={onFormeStatusChange}
+          paperOrderedAt={element.paperOrderedAt}
+          paperDeliveredAt={element.paperDeliveredAt}
+          filesReceivedAt={element.filesReceivedAt}
+          batSentAt={element.batSentAt}
+          batApprovedAt={element.batApprovedAt}
+          formeOrderedAt={element.formeOrderedAt}
+          formeDeliveredAt={element.formeDeliveredAt}
         />
       </div>
 

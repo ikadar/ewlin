@@ -4,7 +4,7 @@
  * Option arrays with French labels for prerequisite status dropdowns.
  */
 
-import type { PaperStatus, BatStatus, PlateStatus } from '@flux/types';
+import type { PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 
 export interface PrerequisiteOption<T> {
   value: T;
@@ -32,4 +32,12 @@ export const plateOptions: PrerequisiteOption<PlateStatus>[] = [
   { value: 'none', label: 'Pas de plaques', colorClass: 'text-zinc-400' },
   { value: 'to_make', label: 'À faire', colorClass: 'text-red-400' },
   { value: 'ready', label: 'Prêtes', colorClass: 'text-emerald-400' },
+];
+
+export const formeOptions: PrerequisiteOption<FormeStatus>[] = [
+  { value: 'none', label: 'Pas de forme', colorClass: 'text-zinc-400' },
+  { value: 'in_stock', label: 'Sur stock', colorClass: 'text-emerald-400' },
+  { value: 'to_order', label: 'À commander', colorClass: 'text-red-400' },
+  { value: 'ordered', label: 'Commandée', colorClass: 'text-amber-400' },
+  { value: 'delivered', label: 'Livrée', colorClass: 'text-emerald-400' },
 ];

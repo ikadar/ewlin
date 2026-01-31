@@ -155,6 +155,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       paperStatus: 'in_stock',
       batStatus: 'bat_approved',
       plateStatus: 'ready',
+      formeStatus: 'none',
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },
@@ -169,6 +170,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       paperStatus: 'to_order', // BLOCKING
       batStatus: 'bat_approved',
       plateStatus: 'ready',
+      formeStatus: 'none',
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },
@@ -183,6 +185,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       paperStatus: 'delivered',
       batStatus: 'waiting_files', // BLOCKING
       plateStatus: 'none', // No plates needed
+      formeStatus: 'none',
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },
@@ -197,6 +200,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       paperStatus: 'in_stock',
       batStatus: 'bat_approved',
       plateStatus: 'to_make', // BLOCKING
+      formeStatus: 'none',
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },

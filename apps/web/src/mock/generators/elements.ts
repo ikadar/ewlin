@@ -6,7 +6,7 @@
  * This mirrors what the backend migration will do.
  */
 
-import type { Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
+import type { Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 
 // ============================================================================
 // Helper Functions
@@ -31,6 +31,8 @@ interface CreateElementOptions {
   batStatus?: BatStatus;
   /** Plates preparation status (defaults to 'ready') */
   plateStatus?: PlateStatus;
+  /** Forme (die-cutting tool) status (defaults to 'none') */
+  formeStatus?: FormeStatus;
 }
 
 /**
@@ -46,6 +48,7 @@ export function createElement(options: CreateElementOptions): Element {
     paperStatus = 'in_stock',
     batStatus = 'bat_approved',
     plateStatus = 'ready',
+    formeStatus = 'none',
   } = options;
   const now = new Date();
 
@@ -63,6 +66,7 @@ export function createElement(options: CreateElementOptions): Element {
     paperStatus,
     batStatus,
     plateStatus,
+    formeStatus,
     createdAt: formatTimestamp(now),
     updatedAt: formatTimestamp(now),
   };

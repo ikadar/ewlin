@@ -1,12 +1,16 @@
-import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus } from '@flux/types';
+import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 import { isMultiElementJob } from '@flux/types';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
 import type { ElementStatusUpdate } from './JobDetailsPanel';
+import { DIE_CUTTING_CATEGORY_ID } from '../../utils';
 
 /** Category ID for printing stations (offset press) */
 const PRINTING_CATEGORY_ID = 'cat-offset';
+
+/** Keywords for detecting die-cutting in outsourced action types */
+const DIE_CUTTING_KEYWORDS = ['découpe', 'die-cut', 'die cut', 'stancolás'];
 
 export interface TaskListProps {
   /** Tasks to display */
@@ -74,6 +78,31 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
     return element.taskIds.some((taskId) => {
       const task = taskById.get(taskId);
       return task ? isPrintingTask(task) : false;
+    });
+  };
+
+  /**
+   * Check if a task is a die-cutting task (internal or outsourced).
+   */
+  const isDieCuttingTask = (task: Task): boolean => {
+    if (task.type === 'Internal') {
+      const station = stationById.get(task.stationId);
+      return station?.categoryId === DIE_CUTTING_CATEGORY_ID;
+    }
+    if (task.type === 'Outsourced') {
+      const actionLower = task.actionType?.toLowerCase() || '';
+      return DIE_CUTTING_KEYWORDS.some((keyword) => actionLower.includes(keyword));
+    }
+    return false;
+  };
+
+  /**
+   * Check if an element has any die-cutting tasks.
+   */
+  const elementHasDieCutting = (element: Element): boolean => {
+    return element.taskIds.some((taskId) => {
+      const task = taskById.get(taskId);
+      return task ? isDieCuttingTask(task) : false;
     });
   };
 
@@ -146,6 +175,9 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
         const handlePlateStatusChange = onElementStatusChange
           ? (value: PlateStatus) => onElementStatusChange({ elementId: element.id, field: 'plateStatus', value })
           : undefined;
+        const handleFormeStatusChange = onElementStatusChange
+          ? (value: FormeStatus) => onElementStatusChange({ elementId: element.id, field: 'formeStatus', value })
+          : undefined;
 
         return (
           <ElementSection
@@ -154,10 +186,12 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
             allElements={jobElements}
             isSingleElement={isSingleElement}
             hasOffset={elementHasOffset(element)}
+            hasDieCutting={elementHasDieCutting(element)}
             isAssembly={isAssemblyElement(element)}
             onPaperStatusChange={handlePaperStatusChange}
             onBatStatusChange={handleBatStatusChange}
             onPlateStatusChange={handlePlateStatusChange}
+            onFormeStatusChange={handleFormeStatusChange}
           >
             {renderTaskTiles(elementTasks)}
           </ElementSection>

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { formatDateDDMMYYYY } from '../../utils';
 
 // Generic dropdown option type
 interface DropdownOption<T extends string> {
@@ -8,7 +9,7 @@ interface DropdownOption<T extends string> {
 }
 
 // Status colors
-function getStatusColor(type: 'paper' | 'bat' | 'plate', value: string): string {
+function getStatusColor(type: 'paper' | 'bat' | 'plate' | 'forme', value: string): string {
   // Red for blocking states
   if (value === 'to_order' || value === 'waiting_files') {
     return 'text-red-500';
@@ -33,11 +34,13 @@ export interface PrerequisiteDropdownProps<T extends string> {
   /** Available options */
   options: DropdownOption<T>[];
   /** Type for color styling */
-  type: 'paper' | 'bat' | 'plate';
+  type: 'paper' | 'bat' | 'plate' | 'forme';
   /** Change handler */
   onChange: (value: T) => void;
   /** Test ID prefix */
   testIdPrefix?: string;
+  /** Optional date to display (ISO timestamp) */
+  dateValue?: string;
 }
 
 /**
@@ -50,6 +53,7 @@ export function PrerequisiteDropdown<T extends string>({
   type,
   onChange,
   testIdPrefix = 'prerequisite',
+  dateValue,
 }: PrerequisiteDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -70,6 +74,7 @@ export function PrerequisiteDropdown<T extends string>({
 
   const currentOption = options.find((o) => o.value === value);
   const colorClass = getStatusColor(type, value);
+  const formattedDate = formatDateDDMMYYYY(dateValue);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -81,6 +86,11 @@ export function PrerequisiteDropdown<T extends string>({
       >
         <span className="text-zinc-500 font-medium">{label}:</span>
         <span className={colorClass}>{currentOption?.label ?? value}</span>
+        {formattedDate && (
+          <span className="text-zinc-500 ml-0.5" data-testid={`${testIdPrefix}-${type}-date`}>
+            {formattedDate}
+          </span>
+        )}
         <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 

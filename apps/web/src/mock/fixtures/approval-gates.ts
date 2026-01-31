@@ -132,6 +132,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       paperStatus: 'in_stock',
       batStatus: 'waiting_files', // BAT not approved - blocking
       plateStatus: 'ready',
+      formeStatus: 'none',
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },
@@ -145,6 +146,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       paperStatus: 'in_stock',
       batStatus: 'bat_approved', // BAT approved - can schedule
       plateStatus: 'ready',
+      formeStatus: 'none',
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },
@@ -158,6 +160,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       paperStatus: 'in_stock',
       batStatus: 'bat_approved', // BAT is approved
       plateStatus: 'to_make', // Plates not ready - warning only
+      formeStatus: 'none',
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },

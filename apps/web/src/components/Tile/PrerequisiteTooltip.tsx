@@ -4,16 +4,19 @@
  * Shows prerequisite status for a blocked element.
  * Displays after 2 seconds of hover, only on blocked tiles.
  * v0.4.32b: Scheduler Tile Blocking Visual & Tooltip
+ * v0.4.32c: Forme Status & Date Tracking
  */
 
 import { memo } from 'react';
 import type { PrerequisiteBlockingInfo } from '../../utils';
+import { formatDateDDMMYYYY } from '../../utils';
 
 /** French labels for prerequisite types */
 const LABELS = {
   paper: 'Papier',
   bat: 'BAT',
   plates: 'Plaques',
+  forme: 'Forme',
 } as const;
 
 /** French labels for paper status */
@@ -41,6 +44,15 @@ const PLATES_STATUS_LABELS: Record<string, string> = {
   ready: 'Prêtes',
 };
 
+/** French labels for forme status */
+const FORME_STATUS_LABELS: Record<string, string> = {
+  none: 'Pas de forme',
+  in_stock: 'Sur stock',
+  to_order: 'À commander',
+  ordered: 'Commandée',
+  delivered: 'Livrée',
+};
+
 export interface PrerequisiteTooltipProps {
   /** Blocking info with status for each prerequisite */
   blockingInfo: PrerequisiteBlockingInfo;
@@ -58,7 +70,7 @@ export const PrerequisiteTooltip = memo(function PrerequisiteTooltip({
 }: PrerequisiteTooltipProps) {
   if (!isVisible) return null;
 
-  const { paper, bat, plates } = blockingInfo;
+  const { paper, bat, plates, forme } = blockingInfo;
 
   // Build items to show (hide items with 'none' status unless blocking)
   const items: Array<{
@@ -66,25 +78,46 @@ export const PrerequisiteTooltip = memo(function PrerequisiteTooltip({
     label: string;
     statusLabel: string;
     isReady: boolean;
+    date?: string;
   }> = [];
 
   // Paper: always show if not 'none', or if blocking
   if (paper.status !== 'none' || !paper.isReady) {
+    // Show relevant date based on status
+    const paperDate =
+      paper.status === 'delivered'
+        ? formatDateDDMMYYYY(paper.deliveredAt)
+        : paper.status === 'ordered'
+          ? formatDateDDMMYYYY(paper.orderedAt)
+          : undefined;
+
     items.push({
       key: 'paper',
       label: LABELS.paper,
       statusLabel: PAPER_STATUS_LABELS[paper.status] || paper.status,
       isReady: paper.isReady,
+      date: paperDate,
     });
   }
 
   // BAT: always show if not 'none', or if blocking
   if (bat.status !== 'none' || !bat.isReady) {
+    // Show relevant date based on status
+    const batDate =
+      bat.status === 'bat_approved'
+        ? formatDateDDMMYYYY(bat.approvedAt)
+        : bat.status === 'bat_sent'
+          ? formatDateDDMMYYYY(bat.sentAt)
+          : bat.status === 'files_received'
+            ? formatDateDDMMYYYY(bat.filesReceivedAt)
+            : undefined;
+
     items.push({
       key: 'bat',
       label: LABELS.bat,
       statusLabel: BAT_STATUS_LABELS[bat.status] || bat.status,
       isReady: bat.isReady,
+      date: batDate,
     });
   }
 
@@ -95,6 +128,25 @@ export const PrerequisiteTooltip = memo(function PrerequisiteTooltip({
       label: LABELS.plates,
       statusLabel: PLATES_STATUS_LABELS[plates.status] || plates.status,
       isReady: plates.isReady,
+    });
+  }
+
+  // Forme: always show if not 'none', or if blocking
+  if (forme.status !== 'none' || !forme.isReady) {
+    // Show relevant date based on status
+    const formeDate =
+      forme.status === 'delivered'
+        ? formatDateDDMMYYYY(forme.deliveredAt)
+        : forme.status === 'ordered'
+          ? formatDateDDMMYYYY(forme.orderedAt)
+          : undefined;
+
+    items.push({
+      key: 'forme',
+      label: LABELS.forme,
+      statusLabel: FORME_STATUS_LABELS[forme.status] || forme.status,
+      isReady: forme.isReady,
+      date: formeDate,
     });
   }
 
@@ -114,9 +166,10 @@ export const PrerequisiteTooltip = memo(function PrerequisiteTooltip({
             <span className={item.isReady ? 'text-green-400' : 'text-amber-400'}>
               {item.isReady ? '✓' : '⚠'}
             </span>
-            {/* Label and status */}
+            {/* Label, status, and optional date */}
             <span>
               {item.label}: {item.statusLabel}
+              {item.date && <span className="ml-1 text-slate-400">{item.date}</span>}
             </span>
           </div>
         ))}
