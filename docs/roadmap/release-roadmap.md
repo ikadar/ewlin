@@ -1641,24 +1641,24 @@ Two-part release following reference/jcf pattern.
 - `docs/requirements/api-interface-drafts.md`
 - `docs/requirements/user-stories.md`
 
-#### v0.4.32e - Element Prerequisites Backend API
+#### v0.4.32e - Element Prerequisites Backend API ✅
 > **Purpose:** Backend API support for element-level prerequisites
 > **Spec:** See `docs/releases/v0.4.32e-element-prerequisites-backend.md`
+> **Released:** 2026-01-31
 
-- [ ] Add prerequisite fields to Element entity (PHP)
-- [ ] Remove prerequisite fields from Job entity (PHP)
-- [ ] Create database migration (add to element, remove from job)
-- [ ] Update Job API endpoints (remove prerequisite fields from DTOs)
-- [ ] Update Element API endpoints (add prerequisite fields to DTOs)
-- [ ] Update OpenAPI documentation
-- [ ] Run PHPStan level 8
+- [x] Add prerequisite fields to Element entity (PHP)
+- [x] Remove prerequisite fields from Job entity (PHP)
+- [x] Create database migration (add to element, remove from job)
+- [x] Update Job API endpoints (remove prerequisite endpoints)
+- [x] Create Element prerequisites endpoint
+- [x] Run PHPStan level 8
 
-**Affected files:**
-- `services/php-api/src/Entity/Element.php`
-- `services/php-api/src/Entity/Job.php`
-- `services/php-api/migrations/`
-- `services/php-api/src/Controller/JobController.php`
-- `services/php-api/config/openapi/`
+**Implemented:**
+- `services/php-api/src/Entity/Element.php` - 4 status + 7 date fields
+- `services/php-api/src/Entity/Job.php` - removed prerequisite fields
+- `services/php-api/migrations/Version20260131000000.php`
+- `services/php-api/src/Controller/ElementController.php`
+- `services/php-api/src/Entity/PaperStatus.php`, `BatStatus.php`, `PlateStatus.php`, `FormeStatus.php`
 
 ### Phase 4J: Save
 
