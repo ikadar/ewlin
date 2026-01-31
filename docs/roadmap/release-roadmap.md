@@ -1662,17 +1662,28 @@ Two-part release following reference/jcf pattern.
 
 ### Phase 4J: Save
 
-#### v0.4.33 - JCF: Job Save & API Integration
+#### v0.4.33 - JCF: Job Save & API Integration ✅
 > **Spec source:** §10 (Backend Logic)
+> **Spec:** See `docs/releases/v0.4.33-jcf-job-save-api-integration.md`
+> **Released:** 2026-01-31
 
-- [ ] Form data → API request mapping
-  - [ ] Element production fields → Element/Task backend model
-  - [ ] Sequence lines → Task entities
-- [ ] POST /api/v1/jobs integration
-- [ ] Reference data auto-creation (client, paper)
-- [ ] Success feedback (Toast notification)
-- [ ] Error handling and display
-- [ ] Navigate back to jobs list on success
+**Part 1: Naming Alignment (suffix → name):**
+- [x] Element `suffix` → `name` across all layers (packages/types, php-api, apps/web)
+- [x] Database migration for column rename
+- [x] All tests updated (1116 PHP + 1521 JS tests passing)
+
+**Part 2: Multi-Element Job Creation:**
+- [x] JcfElementInput DTO for element input
+- [x] POST /api/v1/jobs accepts `elements[]` array
+- [x] Parse each element's `sequence` into Tasks via DSL
+- [x] Resolve element prerequisites by name lookup
+
+**Part 3: Frontend API Integration:**
+- [x] Job API client (`src/api/jobApi.ts`)
+- [x] Form data → API request mapping (transformJcfToRequest)
+- [x] POST /api/v1/jobs integration (mock + real API support)
+- [x] Error handling and display in JcfModal
+- [x] Modal closes on success
 
 ### Phase 4K: Template System
 
