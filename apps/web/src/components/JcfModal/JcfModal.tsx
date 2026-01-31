@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 
 export interface JcfModalProps {
   /** Whether the modal is open */
@@ -10,6 +10,10 @@ export interface JcfModalProps {
   title?: string;
   /** Modal content (children) */
   children?: React.ReactNode;
+  /** Handler for "Save as Template" button (v0.4.34) */
+  onSaveAsTemplate?: () => void;
+  /** Disable Save as Template button (e.g., when no elements) */
+  canSaveAsTemplate?: boolean;
 }
 
 /**
@@ -22,6 +26,8 @@ export function JcfModal({
   onClose,
   title = 'Nouveau Job',
   children,
+  onSaveAsTemplate,
+  canSaveAsTemplate = true,
 }: JcfModalProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
@@ -124,9 +130,19 @@ export function JcfModal({
               <kbd className="bg-zinc-800 px-[5px] py-[2px] rounded-[3px] text-zinc-400">Esc</kbd> Fermer
             </span>
           </div>
-          {/* Action buttons row (placeholder for future save buttons) */}
-          <div className="px-[13px] py-[8px] flex items-center justify-end">
-            <span className="text-xs leading-[13px] text-zinc-600">Actions disponibles dans une version ultérieure</span>
+          {/* Action buttons row */}
+          <div className="px-[13px] py-[8px] flex items-center justify-end gap-[10px]">
+            {onSaveAsTemplate && (
+              <button
+                onClick={onSaveAsTemplate}
+                disabled={!canSaveAsTemplate}
+                className="flex items-center gap-[5px] px-[10px] py-[5px] text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-[3px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="jcf-save-as-template"
+              >
+                <Save size={14} />
+                <span className="text-sm">Sauvegarder comme template</span>
+              </button>
+            )}
           </div>
         </footer>
       </div>

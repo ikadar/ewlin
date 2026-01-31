@@ -3,7 +3,9 @@ import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
-import { MOCK_CLIENTS, MOCK_TEMPLATES } from '../../mock/reference-data';
+import { MOCK_CLIENTS } from '../../mock/reference-data';
+import { getTemplates } from '../../mock/templateApi';
+import type { JcfTemplate } from '@flux/types';
 
 export interface JcfJobHeaderProps {
   jobId: string;
@@ -11,6 +13,8 @@ export interface JcfJobHeaderProps {
   onClientChange: (value: string) => void;
   template: string;
   onTemplateChange: (value: string) => void;
+  /** Called when user selects a template to apply (v0.4.34) */
+  onTemplateSelect?: (template: JcfTemplate) => void;
   intitule: string;
   onIntituleChange: (value: string) => void;
   quantity: string;
@@ -34,6 +38,7 @@ export function JcfJobHeader({
   onClientChange,
   template,
   onTemplateChange,
+  onTemplateSelect,
   intitule,
   onIntituleChange,
   quantity,
@@ -45,6 +50,9 @@ export function JcfJobHeader({
 
   // Session learning: new client names added on blur
   const [sessionClients, setSessionClients] = useState<string[]>([]);
+
+  // v0.4.34: Load templates from API (synchronous localStorage API)
+  const [templates, setTemplates] = useState<JcfTemplate[]>(() => getTemplates());
 
   const labelClass = 'block text-xs leading-[13px] text-zinc-500 mb-[3px]';
   const inputBaseClass =
@@ -86,19 +94,27 @@ export function JcfJobHeader({
 
   const templateSuggestions: Suggestion[] = useMemo(() => {
     const clientTemplates = client
-      ? MOCK_TEMPLATES.filter(
+      ? templates.filter(
           (t) => t.clientName?.toLowerCase() === client.toLowerCase()
         )
       : [];
-    const universalTemplates = MOCK_TEMPLATES.filter((t) => !t.clientName);
+    const universalTemplates = templates.filter((t) => !t.clientName);
 
     return [
-      ...clientTemplates.map((t) => ({ label: t.name, value: t.name, category: client })),
-      ...universalTemplates.map((t) => ({ label: t.name, value: t.name, category: 'universel' })),
+      ...clientTemplates.map((t) => ({ label: t.name, value: t.id, category: client })),
+      ...universalTemplates.map((t) => ({ label: t.name, value: t.id, category: 'universel' })),
     ];
-  }, [client]);
+  }, [client, templates]);
 
-  const handleTemplateSelect = () => {
+  // v0.4.34: Handle template selection - find template and call callback
+  const handleTemplateSelectInternal = (selectedValue: string) => {
+    const selectedTemplate = templates.find((t) => t.id === selectedValue);
+    if (selectedTemplate) {
+      onTemplateChange(selectedTemplate.name);
+      if (onTemplateSelect) {
+        onTemplateSelect(selectedTemplate);
+      }
+    }
     setTimeout(() => {
       document.getElementById('jcf-intitule')?.focus();
     }, 0);
@@ -170,7 +186,7 @@ export function JcfJobHeader({
             suggestions={templateSuggestions}
             inputClassName={inputBaseClass}
             placeholder="Aucun"
-            onSelect={handleTemplateSelect}
+            onSelect={handleTemplateSelectInternal}
           />
         </div>
 

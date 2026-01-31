@@ -2,6 +2,10 @@ import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } f
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
 import type { JcfElement } from './components';
 import { DEFAULT_ELEMENT } from './components';
+import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
+import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
+import { getTemplates, createTemplate, updateTemplate } from './mock/templateApi';
+import type { JcfTemplate, JcfTemplateElement } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { getSnapshot, updateSnapshot } from './mock';
@@ -433,6 +437,10 @@ function AppContent() {
   // v0.4.9: Elements table state
   const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
 
+  // v0.4.34: Template editor modal state
+  const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
+  const [isTemplateSaving, setIsTemplateSaving] = useState(false);
+
   const handleOpenJcf = useCallback(() => {
     setJcfJobId(generateJobId());
     setIsJcfModalOpen(true);
@@ -447,6 +455,73 @@ function AppContent() {
     setJcfDeadline('');
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
   }, []);
+
+  // v0.4.34: Handler for "Save as Template" button in JcfModal
+  const handleSaveAsTemplate = useCallback(() => {
+    setIsTemplateEditorOpen(true);
+  }, []);
+
+  // v0.4.34: Handler for saving template from editor
+  const handleTemplateSave = useCallback(async (data: TemplateEditorData & { id?: string }) => {
+    setIsTemplateSaving(true);
+    try {
+      if (data.id) {
+        await updateTemplate(data.id, {
+          name: data.name,
+          description: data.description,
+          category: data.category,
+          clientName: data.clientName,
+          elements: data.elements,
+        });
+      } else {
+        await createTemplate({
+          name: data.name,
+          description: data.description,
+          category: data.category,
+          clientName: data.clientName,
+          elements: data.elements,
+        });
+      }
+      setIsTemplateEditorOpen(false);
+    } catch (error) {
+      console.error('Failed to save template:', error);
+    } finally {
+      setIsTemplateSaving(false);
+    }
+  }, []);
+
+  // v0.4.34: Handler for canceling template editor
+  const handleTemplateEditorCancel = useCallback(() => {
+    setIsTemplateEditorOpen(false);
+  }, []);
+
+  // v0.4.34: Handler for template selection in JcfJobHeader
+  // Applies the selected template's elements to the form
+  const handleTemplateSelect = useCallback((template: JcfTemplate) => {
+    // Convert JcfTemplateElement to JcfElement
+    const newElements: JcfElement[] = template.elements.map(el => ({
+      name: el.name,
+      precedences: el.precedences,
+      quantite: el.quantite,
+      format: el.format,
+      pagination: el.pagination,
+      papier: el.papier,
+      imposition: el.imposition,
+      impression: el.impression,
+      surfacage: el.surfacage,
+      autres: el.autres,
+      qteFeuilles: el.qteFeuilles,
+      commentaires: el.commentaires,
+      sequence: el.sequence,
+      sequenceWorkflow: el.sequenceWorkflow,
+    }));
+    setJcfElements(newElements.length > 0 ? newElements : [{ ...DEFAULT_ELEMENT }]);
+    setJcfTemplate(template.name);
+    // Also set client if the template has one
+    if (template.clientName && !jcfClient) {
+      setJcfClient(template.clientName);
+    }
+  }, [jcfClient]);
 
   // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
   useEffect(() => {
@@ -1558,13 +1633,19 @@ function AppContent() {
       )}
 
       {/* v0.4.6: JCF Modal */}
-      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf}>
+      <JcfModal
+        isOpen={isJcfModalOpen}
+        onClose={handleCloseJcf}
+        onSaveAsTemplate={handleSaveAsTemplate}
+        canSaveAsTemplate={jcfElements.length > 0 && jcfElements.some(el => el.name.trim() !== '')}
+      >
         <JcfJobHeader
           jobId={jcfJobId}
           client={jcfClient}
           onClientChange={setJcfClient}
           template={jcfTemplate}
           onTemplateChange={setJcfTemplate}
+          onTemplateSelect={handleTemplateSelect}
           intitule={jcfIntitule}
           onIntituleChange={setJcfIntitule}
           quantity={jcfQuantity}
@@ -1582,6 +1663,30 @@ function AppContent() {
           />
         </div>
       </JcfModal>
+
+      {/* v0.4.34: Template editor modal (for "Save as Template") */}
+      <JcfTemplateEditorModal
+        isOpen={isTemplateEditorOpen}
+        onSave={handleTemplateSave}
+        onCancel={handleTemplateEditorCancel}
+        isSaving={isTemplateSaving}
+        initialElements={jcfElements.filter(el => el.name.trim() !== '').map(el => ({
+          name: el.name,
+          precedences: el.precedences,
+          quantite: el.quantite,
+          format: el.format,
+          pagination: el.pagination,
+          papier: el.papier,
+          imposition: el.imposition,
+          impression: el.impression,
+          surfacage: el.surfacage,
+          autres: el.autres,
+          qteFeuilles: el.qteFeuilles,
+          commentaires: el.commentaires,
+          sequence: el.sequence,
+        }))}
+        initialClientName={jcfClient}
+      />
     </>
   );
 }
