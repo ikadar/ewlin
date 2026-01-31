@@ -1173,7 +1173,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 > 7. DSL autocompletes: papier, imposition, precedences (v0.4.17–v0.4.19)
 > 8. Sequence autocomplete: poste, ST, workflow (v0.4.20–v0.4.22)
 > 9. Validation & scaling (v0.4.23–v0.4.31)
-> 10. Production readiness tracking (v0.4.32a–v0.4.32c)
+> 10. Production readiness tracking (v0.4.32a–v0.4.32e)
 > 11. Job save & backend integration (v0.4.33)
 > 12. Template system (v0.4.34–v0.4.35)
 
@@ -1473,7 +1473,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 
 ### Phase 4I: Validation & Calculated Fields
 
-> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32a → v0.4.32b → v0.4.32c
+> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32a → v0.4.32b → v0.4.32c → v0.4.32d → v0.4.32e
 
 #### v0.4.23 - JCF: Live Format Validation (Level 1) ✅
 > **Spec source:** §2.1 (Three-Level Validation — Level 1)
@@ -1602,8 +1602,25 @@ Two-part release following reference/jcf pattern.
 - `apps/web/src/utils/prerequisites.ts`
 - `apps/web/src/utils/dateFormat.ts` (new)
 
-#### v0.4.32d - Element Prerequisites Backend & Documentation
-> **Purpose:** Backend API support and documentation for element-level prerequisites
+#### v0.4.32d - Element Prerequisites Documentation
+> **Purpose:** Documentation updates for element-level prerequisites
+> **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md`
+
+- [ ] Update domain model (`docs/domain-model/domain-model.md`)
+- [ ] Update business rules (`docs/domain-model/business-rules.md`)
+- [ ] Update initial data model (`docs/requirements/initial-data-model.md`)
+- [ ] Update service boundaries (`docs/architecture/service-boundaries.md`)
+- [ ] Update interface contracts (`docs/architecture/interface-contracts.md`)
+
+**Affected files:**
+- `docs/domain-model/domain-model.md`
+- `docs/domain-model/business-rules.md`
+- `docs/requirements/initial-data-model.md`
+- `docs/architecture/service-boundaries.md`
+- `docs/architecture/interface-contracts.md`
+
+#### v0.4.32e - Element Prerequisites Backend API
+> **Purpose:** Backend API support for element-level prerequisites
 > **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md` (Backend section)
 
 - [ ] Add prerequisite fields to Element entity (PHP)
@@ -1613,13 +1630,6 @@ Two-part release following reference/jcf pattern.
 - [ ] Update Element API endpoints (add prerequisite fields to DTOs)
 - [ ] Update OpenAPI documentation
 - [ ] Run PHPStan level 8
-
-**Documentation updates:**
-- [ ] Update domain model (`docs/domain-model/domain-model.md`)
-- [ ] Update business rules (`docs/domain-model/business-rules.md`)
-- [ ] Update initial data model (`docs/requirements/initial-data-model.md`)
-- [ ] Update service boundaries (`docs/architecture/service-boundaries.md`)
-- [ ] Update interface contracts (`docs/architecture/interface-contracts.md`)
 
 **Affected files:**
 - `services/php-api/src/Entity/Element.php`
