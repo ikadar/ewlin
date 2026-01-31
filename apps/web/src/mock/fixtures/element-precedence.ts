@@ -94,7 +94,7 @@ export function createElementPrecedenceFixture(): ScheduleSnapshot {
     {
       id: elemCoverId,
       jobId: 'job-book',
-      suffix: 'couv',
+      name: 'couv',
       label: 'Couverture',
       prerequisiteElementIds: [],
       taskIds: ['task-a1', 'task-a2'],
@@ -108,7 +108,7 @@ export function createElementPrecedenceFixture(): ScheduleSnapshot {
     {
       id: elemInteriorId,
       jobId: 'job-book',
-      suffix: 'int',
+      name: 'int',
       label: 'Intérieur',
       prerequisiteElementIds: [],
       taskIds: ['task-b1', 'task-b2'],
@@ -122,7 +122,7 @@ export function createElementPrecedenceFixture(): ScheduleSnapshot {
     {
       id: elemBindingId,
       jobId: 'job-book',
-      suffix: 'rel',
+      name: 'rel',
       label: 'Reliure',
       prerequisiteElementIds: [elemCoverId, elemInteriorId],
       taskIds: ['task-c1'],

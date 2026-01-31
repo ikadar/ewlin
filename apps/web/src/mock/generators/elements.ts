@@ -23,7 +23,7 @@ function formatTimestamp(date: Date): string {
 interface CreateElementOptions {
   jobId: string;
   taskIds: string[];
-  suffix?: string;
+  name?: string;
   label?: string;
   /** Paper availability status (defaults to 'in_stock') */
   paperStatus?: PaperStatus;
@@ -43,7 +43,7 @@ export function createElement(options: CreateElementOptions): Element {
   const {
     jobId,
     taskIds,
-    suffix = 'ELT',
+    name = 'ELT',
     label,
     paperStatus = 'in_stock',
     batStatus = 'bat_approved',
@@ -58,7 +58,7 @@ export function createElement(options: CreateElementOptions): Element {
   return {
     id: elementId,
     jobId,
-    suffix,
+    name,
     label,
     prerequisiteElementIds: [],
     taskIds,

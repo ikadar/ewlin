@@ -126,7 +126,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     {
       id: 'elem-job-gate-no-bat',
       jobId: 'job-gate-no-bat',
-      suffix: 'ELT',
+      name: 'ELT',
       prerequisiteElementIds: [],
       taskIds: ['task-gate-no-bat'],
       paperStatus: 'in_stock',
@@ -140,7 +140,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     {
       id: 'elem-job-gate-bat-ok',
       jobId: 'job-gate-bat-ok',
-      suffix: 'ELT',
+      name: 'ELT',
       prerequisiteElementIds: [],
       taskIds: ['task-gate-bat-ok'],
       paperStatus: 'in_stock',
@@ -154,7 +154,7 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     {
       id: 'elem-job-gate-plates-pending',
       jobId: 'job-gate-plates-pending',
-      suffix: 'ELT',
+      name: 'ELT',
       prerequisiteElementIds: [],
       taskIds: ['task-gate-plates-pending'],
       paperStatus: 'in_stock',

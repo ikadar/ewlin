@@ -146,7 +146,7 @@ export function createFormeDateTrackingFixture(): ScheduleSnapshot {
     {
       id: 'elem-forme',
       jobId: 'job-forme',
-      suffix: 'couv',
+      name: 'couv',
       label: 'Couverture avec découpe',
       prerequisiteElementIds: [],
       taskIds: ['task-forme-print', 'task-forme-cut'],
@@ -164,7 +164,7 @@ export function createFormeDateTrackingFixture(): ScheduleSnapshot {
     {
       id: 'elem-no-forme',
       jobId: 'job-no-forme',
-      suffix: 'couv',
+      name: 'couv',
       label: 'Couverture sans découpe',
       prerequisiteElementIds: [],
       taskIds: ['task-no-forme'],

@@ -71,12 +71,13 @@ function createElement(jobId: string, taskIds: string[] = []): Element {
   return {
     id: `element-${jobId}`,
     jobId,
-    suffix: 'ELT',
+    name: 'ELT',
     prerequisiteElementIds: [],
     taskIds,
     paperStatus: 'in_stock',
     batStatus: 'bat_approved',
     plateStatus: 'ready',
+    formeStatus: 'none',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

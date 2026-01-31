@@ -28,7 +28,7 @@ const mockElements: Element[] = [
   {
     id: 'element-1',
     jobId: 'job-1',
-    suffix: 'ELT',
+    name: 'ELT',
     prerequisiteElementIds: [],
     taskIds: ['task-1', 'task-2'],
     paperStatus: 'in_stock',

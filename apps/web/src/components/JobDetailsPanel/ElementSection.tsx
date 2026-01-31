@@ -78,7 +78,7 @@ export function ElementSection({
 
   // Build prerequisite suffix list
   const prerequisiteSuffixes = element.prerequisiteElementIds
-    .map((id) => allElements.find((e) => e.id === id)?.suffix)
+    .map((id) => allElements.find((e) => e.id === id)?.name)
     .filter(Boolean)
     .map((s) => s!.toLowerCase());
 
@@ -90,7 +90,7 @@ export function ElementSection({
       <div className="flex items-center justify-between mb-1 px-1">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-zinc-400 tracking-wide">
-            {element.suffix.toUpperCase()}
+            {element.name.toUpperCase()}
           </span>
           {element.label && (
             <span className="text-xs text-zinc-500">

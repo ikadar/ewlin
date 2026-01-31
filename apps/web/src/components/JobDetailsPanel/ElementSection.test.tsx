@@ -8,7 +8,7 @@ function createElement(overrides: Partial<Element> = {}): Element {
   return {
     id: 'elem-job-00001-couv',
     jobId: 'job-00001',
-    suffix: 'COUV',
+    name: 'COUV',
     label: 'Couverture',
     prerequisiteElementIds: [],
     taskIds: ['task-1', 'task-2'],
@@ -23,8 +23,8 @@ function createElement(overrides: Partial<Element> = {}): Element {
 }
 
 describe('ElementSection', () => {
-  it('renders element suffix in uppercase', () => {
-    const element = createElement({ suffix: 'couv' });
+  it('renders element name in uppercase', () => {
+    const element = createElement({ name: 'couv' });
 
     render(
       <ElementSection element={element} allElements={[element]}>
@@ -59,20 +59,20 @@ describe('ElementSection', () => {
     expect(screen.queryByText('Couverture')).not.toBeInTheDocument();
   });
 
-  it('renders prerequisite suffixes with Workflow icon', () => {
+  it('renders prerequisite namees with Workflow icon', () => {
     const couvElement = createElement({
       id: 'elem-couv',
-      suffix: 'COUV',
+      name: 'COUV',
       prerequisiteElementIds: [],
     });
     const intElement = createElement({
       id: 'elem-int',
-      suffix: 'INT',
+      name: 'INT',
       prerequisiteElementIds: [],
     });
     const finElement = createElement({
       id: 'elem-fin',
-      suffix: 'FIN',
+      name: 'FIN',
       prerequisiteElementIds: ['elem-couv', 'elem-int'],
     });
 
@@ -84,7 +84,7 @@ describe('ElementSection', () => {
       </ElementSection>
     );
 
-    // Should show lowercase prerequisite suffixes
+    // Should show lowercase prerequisite namees
     expect(screen.getByText('couv int')).toBeInTheDocument();
   });
 
@@ -102,7 +102,7 @@ describe('ElementSection', () => {
   });
 
   it('hides header for single-element jobs', () => {
-    const element = createElement({ suffix: 'ELT' });
+    const element = createElement({ name: 'ELT' });
 
     render(
       <ElementSection element={element} allElements={[element]} isSingleElement>

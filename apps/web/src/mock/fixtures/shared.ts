@@ -191,7 +191,7 @@ export function generateElementsForJobs(
     return {
       id: elementId,
       jobId: job.id,
-      suffix: 'ELT',
+      name: 'ELT',
       prerequisiteElementIds: [],
       // Tasks have elementId that matches this element's id
       taskIds: tasks.filter((t) => t.elementId === elementId).map((t) => t.id),

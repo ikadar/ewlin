@@ -19,6 +19,7 @@ import {
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
+import { createJob, transformJcfToRequest, JobApiError } from './api';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -440,29 +441,56 @@ function AppContent() {
   // v0.4.30: Save validation ref
   const jcfSaveAttemptRef = useRef<(() => boolean) | null>(null);
   const [isJcfSaving, setIsJcfSaving] = useState(false);
+  // v0.4.33: API error state
+  const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
 
-  const handleJcfSave = useCallback(() => {
-    if (jcfSaveAttemptRef.current) {
-      const isValid = jcfSaveAttemptRef.current();
-      if (isValid) {
-        // TODO: Actual API save will be implemented in future release
-        setIsJcfSaving(true);
-        // Simulate save for now
-        setTimeout(() => {
-          setIsJcfSaving(false);
-          setIsJcfModalOpen(false);
-          // Reset form
-          setJcfClient('');
-          setJcfTemplate('');
-          setJcfIntitule('');
-          setJcfQuantity('');
-          setJcfDeadline('');
-          setJcfElements([{ ...DEFAULT_ELEMENT }]);
-          setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
-        }, 500);
+  // v0.4.33: Save job via API
+  const handleJcfSave = useCallback(async () => {
+    if (!jcfSaveAttemptRef.current) return;
+
+    const isValid = jcfSaveAttemptRef.current();
+    if (!isValid) return;
+
+    setIsJcfSaving(true);
+    setJcfSaveError(null);
+
+    try {
+      const request = transformJcfToRequest(
+        jcfJobId,
+        jcfClient,
+        jcfIntitule,
+        jcfDeadline,
+        jcfElements
+      );
+      await createJob(request);
+
+      // Success: close modal and reset form
+      setIsJcfSaving(false);
+      setIsJcfModalOpen(false);
+      setJcfClient('');
+      setJcfTemplate('');
+      setJcfIntitule('');
+      setJcfQuantity('');
+      setJcfDeadline('');
+      setJcfElements([{ ...DEFAULT_ELEMENT }]);
+      setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
+    } catch (error) {
+      setIsJcfSaving(false);
+      if (error instanceof JobApiError) {
+        // Format validation errors if present
+        if (error.violations && error.violations.length > 0) {
+          const messages = error.violations.map((v) => `${v.propertyPath}: ${v.message}`);
+          setJcfSaveError(messages.join('\n'));
+        } else {
+          setJcfSaveError(error.message);
+        }
+      } else if (error instanceof Error) {
+        setJcfSaveError(error.message);
+      } else {
+        setJcfSaveError('An unexpected error occurred');
       }
     }
-  }, []);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements]);
 
   const handleOpenJcf = useCallback(() => {
     setJcfJobId(generateJobId());
@@ -478,6 +506,7 @@ function AppContent() {
     setJcfDeadline('');
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
     setSequenceWorkflow([]); // v0.4.31: Reset workflow on close
+    setJcfSaveError(null); // v0.4.33: Reset API error on close
   }, []);
 
   // v0.4.31: Handle template selection - extract workflow for sequence suggestions
@@ -1623,7 +1652,7 @@ function AppContent() {
       )}
 
       {/* v0.4.6: JCF Modal */}
-      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf} onSave={handleJcfSave} isSaving={isJcfSaving}>
+      <JcfModal isOpen={isJcfModalOpen} onClose={handleCloseJcf} onSave={handleJcfSave} isSaving={isJcfSaving} error={jcfSaveError}>
         <JcfJobHeader
           jobId={jcfJobId}
           client={jcfClient}

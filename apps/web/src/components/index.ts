@@ -5,7 +5,7 @@ export { JobsList, JobsListHeader, ProblemsSection, JobsSection, JobCard, Progre
 export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSectionProps, JobCardProps, JobProblemType, ProgressSegmentsProps, SegmentState } from './JobsList';
 
 export { JobDetailsPanel, JobInfo, InfoField, TaskList, TaskTile, ElementSection, PrerequisiteStatus } from './JobDetailsPanel';
-export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, PrerequisiteStatusProps } from './JobDetailsPanel';
+export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, PrerequisiteStatusProps, ElementStatusUpdate } from './JobDetailsPanel';
 
 export { DateStrip, DateCell, TaskMarkers, ViewportIndicator, ExitTriangle } from './DateStrip';
 export type { DateStripProps, DateCellProps, TaskMarker, TaskMarkerStatus, TaskMarkersProps, ViewportIndicatorProps, ExitTriangleProps } from './DateStrip';

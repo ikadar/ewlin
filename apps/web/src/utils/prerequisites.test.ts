@@ -25,7 +25,7 @@ function createElement(
   return {
     id: 'elem-test',
     jobId: 'job-test',
-    suffix: 'test',
+    name: 'test',
     label: 'Test Element',
     prerequisiteElementIds: [],
     taskIds: ['task-test'],

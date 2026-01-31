@@ -14,6 +14,8 @@ export interface JcfModalProps {
   onSave?: () => void;
   /** Whether save is in progress (disables button) */
   isSaving?: boolean;
+  /** v0.4.33: Error message to display (from API failure) */
+  error?: string | null;
 }
 
 /**
@@ -28,6 +30,7 @@ export function JcfModal({
   children,
   onSave,
   isSaving = false,
+  error = null,
 }: JcfModalProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
@@ -116,6 +119,15 @@ export function JcfModal({
 
         {/* Footer */}
         <footer className="flex-shrink-0 bg-zinc-900 border-t border-zinc-800" data-testid="jcf-modal-footer">
+          {/* v0.4.33: Error message display */}
+          {error && (
+            <div
+              className="px-[13px] py-[8px] bg-red-950/50 border-b border-red-900/50 text-red-400 text-sm whitespace-pre-wrap"
+              data-testid="jcf-modal-error"
+            >
+              {error}
+            </div>
+          )}
           {/* Keyboard hints row */}
           <div className="px-[13px] py-[5px] border-b border-zinc-800/50 flex items-center gap-[13px] text-sm text-zinc-500">
             <span className="flex items-center gap-[3px]">

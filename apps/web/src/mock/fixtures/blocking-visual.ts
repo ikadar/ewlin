@@ -148,7 +148,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
     {
       id: 'elem-ready',
       jobId: 'job-ready',
-      suffix: 'couv',
+      name: 'couv',
       label: 'Couverture',
       prerequisiteElementIds: [],
       taskIds: ['task-ready'],
@@ -163,7 +163,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
     {
       id: 'elem-blocked-paper',
       jobId: 'job-blocked-paper',
-      suffix: 'couv',
+      name: 'couv',
       label: 'Couverture',
       prerequisiteElementIds: [],
       taskIds: ['task-blocked-paper'],
@@ -178,7 +178,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
     {
       id: 'elem-blocked-bat',
       jobId: 'job-blocked-bat',
-      suffix: 'int',
+      name: 'int',
       label: 'Intérieur',
       prerequisiteElementIds: [],
       taskIds: ['task-blocked-bat'],
@@ -193,7 +193,7 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
     {
       id: 'elem-blocked-plates',
       jobId: 'job-blocked-plates',
-      suffix: 'couv',
+      name: 'couv',
       label: 'Couverture',
       prerequisiteElementIds: [],
       taskIds: ['task-blocked-plates'],
