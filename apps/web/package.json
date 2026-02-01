@@ -19,12 +19,16 @@
     "sonar:coverage": "pnpm test:coverage && sonar-scanner"
   },
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/state": "^6.5.4",
+    "@codemirror/theme-one-dark": "^6.1.3",
     "@faker-js/faker": "^10.1.0",
     "@flux/schedule-validator": "link:../../packages/validator",
     "@flux/types": "link:../../packages/types",
     "@reduxjs/toolkit": "^2.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "codemirror": "^6.0.2",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.560.0",
     "react": "^19.2.0",

@@ -7,19 +7,26 @@
  *
  * Features:
  * - Form tab with TemplateHeaderForm + ElementsTable
+ * - JSON tab with CodeMirror editor (v0.4.35)
  * - Validation (name required, at least one element)
  * - Keyboard shortcuts (Cmd+S, Esc)
+ * - Bidirectional sync between Form and JSON
  *
  * @see v0.4.34 - JCF: Template CRUD & Apply
+ * @see v0.4.35 - JCF: Link Propagation & Dual-Mode Editor
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, FileText, Code } from 'lucide-react';
 import type { JcfTemplate, JcfTemplateElement } from '@flux/types';
 import { JcfTemplateHeaderForm } from '../JcfTemplateHeaderForm';
 import type { TemplateHeaderData } from '../JcfTemplateHeaderForm';
 import { JcfElementsTable } from '../JcfElementsTable';
 import type { JcfElement } from '../JcfElementsTable/types';
+import { JcfJsonEditor } from './JcfJsonEditor';
+
+/** Tab types for dual-mode editor (v0.4.35) */
+type EditorTab = 'form' | 'json';
 
 export interface TemplateEditorData {
   name: string;
@@ -151,14 +158,74 @@ export function JcfTemplateEditorModal({
   const [elements, setElements] = useState<JcfElement[]>(initialData.elements);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // v0.4.35: Dual-mode editor tab state
+  const [activeTab, setActiveTab] = useState<EditorTab>('form');
+  const [jsonValue, setJsonValue] = useState<string>(() =>
+    JSON.stringify(initialData.elements, null, 2)
+  );
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
   // Reset state when modal opens with new data
   useEffect(() => {
     if (isOpen) {
       setHeader(initialData.header);
       setElements(initialData.elements);
       setValidationError(null);
+      setActiveTab('form');
+      setJsonValue(JSON.stringify(initialData.elements, null, 2));
+      setJsonError(null);
     }
   }, [isOpen, initialData]);
+
+  // v0.4.35: Handle tab switching with bidirectional sync
+  const handleTabChange = useCallback(
+    (tab: EditorTab) => {
+      if (tab === activeTab) return;
+
+      if (tab === 'json') {
+        // Switching to JSON: serialize current form elements
+        setJsonValue(JSON.stringify(elements, null, 2));
+        setJsonError(null);
+      } else if (tab === 'form') {
+        // Switching to Form: parse JSON and update elements
+        try {
+          const parsed = JSON.parse(jsonValue);
+          if (!Array.isArray(parsed)) {
+            setJsonError('Le JSON doit être un tableau d\'éléments');
+            return; // Don't switch tab if error
+          }
+          // Convert to JcfElement format
+          const newElements: JcfElement[] = parsed.map((el: JcfTemplateElement) =>
+            templateElementToFormElement(el)
+          );
+          setElements(newElements);
+          setJsonError(null);
+        } catch (e) {
+          setJsonError(e instanceof Error ? e.message : 'JSON invalide');
+          return; // Don't switch tab if error
+        }
+      }
+
+      setActiveTab(tab);
+    },
+    [activeTab, elements, jsonValue]
+  );
+
+  // v0.4.35: Handle JSON editor changes
+  const handleJsonChange = useCallback((value: string) => {
+    setJsonValue(value);
+    // Validate JSON structure
+    try {
+      const parsed = JSON.parse(value);
+      if (!Array.isArray(parsed)) {
+        setJsonError('Le JSON doit être un tableau d\'éléments');
+      } else {
+        setJsonError(null);
+      }
+    } catch {
+      // Error will be shown by the JSON editor itself
+    }
+  }, []);
 
   // Stable close handler
   const stableOnCancel = useCallback(() => {
@@ -186,10 +253,38 @@ export function JcfTemplateEditorModal({
 
   // Handle save
   const handleSave = useCallback(() => {
-    const error = validateTemplate();
-    if (error) {
-      setValidationError(error);
+    // v0.4.35: Parse JSON if in JSON mode
+    let finalElements = elements;
+    if (activeTab === 'json') {
+      try {
+        const parsed = JSON.parse(jsonValue);
+        if (!Array.isArray(parsed)) {
+          setValidationError('Le JSON doit être un tableau d\'éléments');
+          return;
+        }
+        finalElements = parsed.map((el: JcfTemplateElement) =>
+          templateElementToFormElement(el)
+        );
+      } catch (e) {
+        setValidationError(e instanceof Error ? e.message : 'JSON invalide');
+        return;
+      }
+    }
+
+    // Validate with final elements
+    if (!header.name.trim()) {
+      setValidationError('Le nom du template est obligatoire');
       return;
+    }
+    if (finalElements.length === 0) {
+      setValidationError('Le template doit contenir au moins un élément');
+      return;
+    }
+    for (let i = 0; i < finalElements.length; i++) {
+      if (!finalElements[i].name.trim()) {
+        setValidationError(`L'élément ${i + 1} doit avoir un nom`);
+        return;
+      }
     }
 
     setValidationError(null);
@@ -199,12 +294,12 @@ export function JcfTemplateEditorModal({
       description: header.description?.trim() || undefined,
       category: header.category?.trim() || undefined,
       clientName: header.clientName?.trim() || undefined,
-      elements: elements.map(formElementToTemplateElement),
+      elements: finalElements.map(formElementToTemplateElement),
       id: template?.id,
     };
 
     onSave(data);
-  }, [validateTemplate, header, elements, template?.id, onSave]);
+  }, [activeTab, jsonValue, header, elements, template?.id, onSave]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -259,22 +354,55 @@ export function JcfTemplateEditorModal({
         data-testid="template-editor-dialog"
       >
         {/* Header */}
-        <header className="flex-shrink-0 flex items-center justify-between px-[13px] py-[10px] bg-zinc-900 border-b border-zinc-800">
-          <h2
-            className="text-[15px] leading-[23px] font-medium text-zinc-100"
-            data-testid="template-editor-title"
-          >
-            {title}
-          </h2>
-          <button
-            onClick={stableOnCancel}
-            disabled={isSaving}
-            className="p-[3px] rounded-[3px] hover:bg-zinc-800 transition-colors disabled:opacity-50"
-            aria-label="Fermer"
-            data-testid="template-editor-close"
-          >
-            <X size={20} className="text-zinc-400 hover:text-zinc-100" />
-          </button>
+        <header className="flex-shrink-0 bg-zinc-900 border-b border-zinc-800">
+          <div className="flex items-center justify-between px-[13px] py-[10px]">
+            <h2
+              className="text-[15px] leading-[23px] font-medium text-zinc-100"
+              data-testid="template-editor-title"
+            >
+              {title}
+            </h2>
+            <button
+              onClick={stableOnCancel}
+              disabled={isSaving}
+              className="p-[3px] rounded-[3px] hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              aria-label="Fermer"
+              data-testid="template-editor-close"
+            >
+              <X size={20} className="text-zinc-400 hover:text-zinc-100" />
+            </button>
+          </div>
+
+          {/* v0.4.35: Tab switcher */}
+          <div className="flex px-[13px] gap-[3px]" data-testid="template-editor-tabs">
+            <button
+              onClick={() => handleTabChange('form')}
+              disabled={isSaving}
+              className={`flex items-center gap-[5px] px-[10px] py-[6px] text-sm rounded-t-[3px] transition-colors ${
+                activeTab === 'form'
+                  ? 'bg-zinc-950 text-zinc-100 border-t border-l border-r border-zinc-700'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+              data-testid="template-editor-tab-form"
+            >
+              <FileText size={14} />
+              Form
+            </button>
+            <button
+              onClick={() => handleTabChange('json')}
+              disabled={isSaving}
+              className={`flex items-center gap-[5px] px-[10px] py-[6px] text-sm rounded-t-[3px] transition-colors ${
+                activeTab === 'json'
+                  ? 'bg-zinc-950 text-zinc-100 border-t border-l border-r border-zinc-700'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              } ${jsonError ? 'text-red-400' : ''}`}
+              data-testid="template-editor-tab-json"
+            >
+              <Code size={14} />
+              JSON
+              {jsonError && <span className="text-red-400">!</span>}
+            </button>
+          </div>
         </header>
 
         {/* Content */}
@@ -282,20 +410,34 @@ export function JcfTemplateEditorModal({
           className="flex-1 overflow-y-auto px-[20px] py-[13px] space-y-[13px]"
           data-testid="template-editor-content"
         >
-          {/* Template header form */}
+          {/* Template header form - always visible */}
           <JcfTemplateHeaderForm
             value={header}
             onChange={setHeader}
             disabled={isSaving}
           />
 
-          {/* Elements table */}
-          <JcfElementsTable
-            elements={elements}
-            onElementsChange={setElements}
-            mode="template"
-            jobQuantity="1"
-          />
+          {/* v0.4.35: Conditional content based on active tab */}
+          {activeTab === 'form' ? (
+            /* Elements table (Form mode) */
+            <JcfElementsTable
+              elements={elements}
+              onElementsChange={setElements}
+              mode="template"
+              jobQuantity="1"
+            />
+          ) : (
+            /* JSON editor (JSON mode) */
+            <div className="flex-1 min-h-[300px]">
+              <JcfJsonEditor
+                value={jsonValue}
+                onChange={handleJsonChange}
+                readOnly={isSaving}
+                className="h-full"
+                data-testid="template-editor-json"
+              />
+            </div>
+          )}
         </main>
 
         {/* Footer */}

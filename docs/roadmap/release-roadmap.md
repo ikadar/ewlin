@@ -1697,16 +1697,16 @@ Two-part release following reference/jcf pattern.
 - [x] Category auto-creation on new category name
 - [x] Template name and description fields
 
-#### v0.4.35 - JCF: Link Propagation & Dual-Mode Editor
+#### v0.4.35 - JCF: Link Propagation & Dual-Mode Editor ✅
 > **Spec source:** §4 (Link Propagation)
 
-- [ ] Link toggle per field: format, papier, imposition, impression, surfacage
-- [ ] Value inheritance from previous element when linked
-- [ ] Visual link/unlink indicator per field
-- [ ] Dual-mode template editor: Form tab + JSON tab
-- [ ] CodeMirror 6 integration for JSON editing
-- [ ] Contextual autocomplete in JSON editor
-- [ ] Bidirectional sync between form and JSON
+- [x] Link toggle per field: format, papier, imposition, impression, surfacage
+- [x] Value inheritance from previous element when linked
+- [x] Visual link/unlink indicator per field
+- [x] Dual-mode template editor: Form tab + JSON tab
+- [x] CodeMirror 6 integration for JSON editing
+- [ ] Contextual autocomplete in JSON editor (deferred to v0.4.36)
+- [x] Bidirectional sync between form and JSON
 
 ---
 

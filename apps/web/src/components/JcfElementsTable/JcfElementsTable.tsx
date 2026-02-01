@@ -1,7 +1,9 @@
 import { useState, useCallback, useMemo, useEffect, type MutableRefObject } from 'react';
 import { GitBranch, Minus, Plus, Calculator } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
-import type { JcfElement, JcfFieldKey } from './types';
+import type { JcfElement, JcfFieldKey, JcfLinkableField } from './types';
+import { useLinkPropagation, isLinkableField, LINKABLE_FIELDS } from '../../hooks/useLinkPropagation';
+import { JcfLinkToggle } from '../JcfLinkToggle';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete';
 import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete';
 import { JcfSurfacageAutocomplete } from '../JcfSurfacageAutocomplete';
@@ -57,6 +59,8 @@ const inputBaseClass =
   'w-full bg-transparent border border-transparent hover:border-zinc-700 focus:border-zinc-600 focus:outline-none rounded-[3px] px-[5px] py-[2px] font-mono placeholder:text-zinc-700';
 const inputFilledClass = `${inputBaseClass} text-zinc-100`;
 const inputEmptyClass = `${inputBaseClass} text-zinc-500`;
+// v0.4.35: Linked field styling
+const inputLinkedClass = `${inputBaseClass} text-blue-400 cursor-pointer`;
 
 // ── Component ──
 
@@ -134,6 +138,12 @@ export function JcfElementsTable({
   );
 
   const sessionLearning = useSessionLearning();
+
+  // v0.4.35: Link propagation between elements
+  const linkPropagation = useLinkPropagation({
+    elements,
+    onElementsChange,
+  });
 
   // Element names for precedences autocomplete
   const elementNames = useMemo(
@@ -406,12 +416,18 @@ export function JcfElementsTable({
 
   const handleCellChange = useCallback(
     (elementIndex: number, field: JcfFieldKey, value: string) => {
+      // v0.4.35: Use link propagation for linkable fields
+      if (isLinkableField(field)) {
+        linkPropagation.updateFieldWithPropagation(elementIndex, field, value);
+        return;
+      }
+
       const updated = elements.map((el, i) =>
         i === elementIndex ? { ...el, [field]: value } : el,
       );
       onElementsChange(updated);
     },
-    [elements, onElementsChange],
+    [elements, onElementsChange, linkPropagation],
   );
 
   // ── Textarea auto-expand ──
@@ -595,10 +611,15 @@ export function JcfElementsTable({
               const isQteFeuilles = row.key === 'qteFeuilles';
               const isAutoMode = autoCalculated[elementIndex] !== false;
 
+              // v0.4.35: Link propagation state
+              const isLinkable = isLinkableField(row.key);
+              const canLinkThisCell = isLinkable && linkPropagation.canLink(elementIndex);
+              const isLinked = isLinkable && linkPropagation.isLinked(elementIndex, row.key as JcfLinkableField);
+
               return (
                 <div
                   key={`${elementIndex}-${row.key}`}
-                  className={`px-[5px] py-[3px] relative ${!isLastElement ? 'border-r border-zinc-800/50' : ''} ${hasError ? 'bg-red-900/20 transition-colors duration-500' : ''}`}
+                  className={`px-[5px] py-[3px] relative ${!isLastElement ? 'border-r border-zinc-800/50' : ''} ${hasError ? 'bg-red-900/20 transition-colors duration-500' : ''} ${isLinked ? 'bg-blue-900/30' : ''}`}
                   data-testid={`jcf-cell-${elementIndex}-${row.key}`}
                 >
                   {/* Error tooltip */}
@@ -698,176 +719,248 @@ export function JcfElementsTable({
                       data-testid={`jcf-input-${elementIndex}-${row.key}`}
                     />
                   ) : row.key === 'format' ? (
-                    <JcfFormatAutocomplete
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'format', v)
-                      }
-                      formats={PRODUCT_FORMATS}
-                      sessionPresets={sessionLearning.productFormats}
-                      onLearnPreset={sessionLearning.learnProductFormat}
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(_e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow)
-                            focusCell(elementIndex, rowIndex + 1);
-                          else if (elementIndex < lastEl)
-                            focusCell(elementIndex + 1, 0);
-                        } else {
-                          if (rowIndex > 0)
-                            focusCell(elementIndex, rowIndex - 1);
-                          else if (elementIndex > 0)
-                            focusCell(elementIndex - 1, lastRow);
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
-                    />
+                    <div className="flex items-center gap-1">
+                      {canLinkThisCell && (
+                        <JcfLinkToggle
+                          isLinked={isLinked}
+                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'format')}
+                          data-testid={`link-toggle-${elementIndex}-format`}
+                        />
+                      )}
+                      {isLinked ? (
+                        <input
+                          id={getCellId(elementIndex, rowIndex)}
+                          type="text"
+                          value={value}
+                          readOnly
+                          onClick={() => linkPropagation.toggleLink(elementIndex, 'format')}
+                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
+                          title="Cliquer pour délier"
+                          data-testid={`jcf-input-${elementIndex}-format`}
+                        />
+                      ) : (
+                        <div className="flex-1">
+                          <JcfFormatAutocomplete
+                            id={getCellId(elementIndex, rowIndex)}
+                            value={value}
+                            onChange={(v) =>
+                              handleCellChange(elementIndex, 'format', v)
+                            }
+                            formats={PRODUCT_FORMATS}
+                            sessionPresets={sessionLearning.productFormats}
+                            onLearnPreset={sessionLearning.learnProductFormat}
+                            inputClassName={`${inputFilledClass} text-base`}
+                            onTabOut={(_e, direction) => {
+                              const lastRow = rows.length - 1;
+                              const lastEl = elements.length - 1;
+                              if (direction === 'forward') {
+                                if (rowIndex < lastRow)
+                                  focusCell(elementIndex, rowIndex + 1);
+                                else if (elementIndex < lastEl)
+                                  focusCell(elementIndex + 1, 0);
+                              } else {
+                                if (rowIndex > 0)
+                                  focusCell(elementIndex, rowIndex - 1);
+                                else if (elementIndex > 0)
+                                  focusCell(elementIndex - 1, lastRow);
+                              }
+                            }}
+                            onArrowNav={(_e, direction) => {
+                              const rc = rows.length;
+                              const ec = elements.length;
+                              switch (direction) {
+                                case 'down':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex + 1) % rc,
+                                  );
+                                  break;
+                                case 'up':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex - 1 + rc) % rc,
+                                  );
+                                  break;
+                                case 'right':
+                                  focusCell(
+                                    (elementIndex + 1) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                                case 'left':
+                                  focusCell(
+                                    (elementIndex - 1 + ec) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : row.key === 'impression' ? (
-                    <JcfImpressionAutocomplete
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'impression', v)
-                      }
-                      presets={IMPRESSION_PRESETS}
-                      sessionPresets={sessionLearning.impressions}
-                      onLearnPreset={sessionLearning.learnImpression}
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(_e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow)
-                            focusCell(elementIndex, rowIndex + 1);
-                          else if (elementIndex < lastEl)
-                            focusCell(elementIndex + 1, 0);
-                        } else {
-                          if (rowIndex > 0)
-                            focusCell(elementIndex, rowIndex - 1);
-                          else if (elementIndex > 0)
-                            focusCell(elementIndex - 1, lastRow);
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
-                    />
+                    <div className="flex items-center gap-1">
+                      {canLinkThisCell && (
+                        <JcfLinkToggle
+                          isLinked={isLinked}
+                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'impression')}
+                          data-testid={`link-toggle-${elementIndex}-impression`}
+                        />
+                      )}
+                      {isLinked ? (
+                        <input
+                          id={getCellId(elementIndex, rowIndex)}
+                          type="text"
+                          value={value}
+                          readOnly
+                          onClick={() => linkPropagation.toggleLink(elementIndex, 'impression')}
+                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
+                          title="Cliquer pour délier"
+                          data-testid={`jcf-input-${elementIndex}-impression`}
+                        />
+                      ) : (
+                        <div className="flex-1">
+                          <JcfImpressionAutocomplete
+                            id={getCellId(elementIndex, rowIndex)}
+                            value={value}
+                            onChange={(v) =>
+                              handleCellChange(elementIndex, 'impression', v)
+                            }
+                            presets={IMPRESSION_PRESETS}
+                            sessionPresets={sessionLearning.impressions}
+                            onLearnPreset={sessionLearning.learnImpression}
+                            inputClassName={`${inputFilledClass} text-base`}
+                            onTabOut={(_e, direction) => {
+                              const lastRow = rows.length - 1;
+                              const lastEl = elements.length - 1;
+                              if (direction === 'forward') {
+                                if (rowIndex < lastRow)
+                                  focusCell(elementIndex, rowIndex + 1);
+                                else if (elementIndex < lastEl)
+                                  focusCell(elementIndex + 1, 0);
+                              } else {
+                                if (rowIndex > 0)
+                                  focusCell(elementIndex, rowIndex - 1);
+                                else if (elementIndex > 0)
+                                  focusCell(elementIndex - 1, lastRow);
+                              }
+                            }}
+                            onArrowNav={(_e, direction) => {
+                              const rc = rows.length;
+                              const ec = elements.length;
+                              switch (direction) {
+                                case 'down':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex + 1) % rc,
+                                  );
+                                  break;
+                                case 'up':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex - 1 + rc) % rc,
+                                  );
+                                  break;
+                                case 'right':
+                                  focusCell(
+                                    (elementIndex + 1) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                                case 'left':
+                                  focusCell(
+                                    (elementIndex - 1 + ec) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : row.key === 'surfacage' ? (
-                    <JcfSurfacageAutocomplete
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'surfacage', v)
-                      }
-                      presets={SURFACAGE_PRESETS}
-                      sessionPresets={sessionLearning.surfacages}
-                      onLearnPreset={sessionLearning.learnSurfacage}
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(_e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow)
-                            focusCell(elementIndex, rowIndex + 1);
-                          else if (elementIndex < lastEl)
-                            focusCell(elementIndex + 1, 0);
-                        } else {
-                          if (rowIndex > 0)
-                            focusCell(elementIndex, rowIndex - 1);
-                          else if (elementIndex > 0)
-                            focusCell(elementIndex - 1, lastRow);
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
-                    />
+                    <div className="flex items-center gap-1">
+                      {canLinkThisCell && (
+                        <JcfLinkToggle
+                          isLinked={isLinked}
+                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'surfacage')}
+                          data-testid={`link-toggle-${elementIndex}-surfacage`}
+                        />
+                      )}
+                      {isLinked ? (
+                        <input
+                          id={getCellId(elementIndex, rowIndex)}
+                          type="text"
+                          value={value}
+                          readOnly
+                          onClick={() => linkPropagation.toggleLink(elementIndex, 'surfacage')}
+                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
+                          title="Cliquer pour délier"
+                          data-testid={`jcf-input-${elementIndex}-surfacage`}
+                        />
+                      ) : (
+                        <div className="flex-1">
+                          <JcfSurfacageAutocomplete
+                            id={getCellId(elementIndex, rowIndex)}
+                            value={value}
+                            onChange={(v) =>
+                              handleCellChange(elementIndex, 'surfacage', v)
+                            }
+                            presets={SURFACAGE_PRESETS}
+                            sessionPresets={sessionLearning.surfacages}
+                            onLearnPreset={sessionLearning.learnSurfacage}
+                            inputClassName={`${inputFilledClass} text-base`}
+                            onTabOut={(_e, direction) => {
+                              const lastRow = rows.length - 1;
+                              const lastEl = elements.length - 1;
+                              if (direction === 'forward') {
+                                if (rowIndex < lastRow)
+                                  focusCell(elementIndex, rowIndex + 1);
+                                else if (elementIndex < lastEl)
+                                  focusCell(elementIndex + 1, 0);
+                              } else {
+                                if (rowIndex > 0)
+                                  focusCell(elementIndex, rowIndex - 1);
+                                else if (elementIndex > 0)
+                                  focusCell(elementIndex - 1, lastRow);
+                              }
+                            }}
+                            onArrowNav={(_e, direction) => {
+                              const rc = rows.length;
+                              const ec = elements.length;
+                              switch (direction) {
+                                case 'down':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex + 1) % rc,
+                                  );
+                                  break;
+                                case 'up':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex - 1 + rc) % rc,
+                                  );
+                                  break;
+                                case 'right':
+                                  focusCell(
+                                    (elementIndex + 1) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                                case 'left':
+                                  focusCell(
+                                    (elementIndex - 1 + ec) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : row.key === 'quantite' ? (
                     <JcfQuantiteInput
                       id={getCellId(elementIndex, rowIndex)}
@@ -977,119 +1070,167 @@ export function JcfElementsTable({
                       }}
                     />
                   ) : row.key === 'papier' ? (
-                    <JcfPapierAutocomplete
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'papier', v)
-                      }
-                      paperTypes={PAPER_TYPES}
-                      sessionPaperTypes={sessionLearning.papiers}
-                      onLearnPaperType={sessionLearning.learnPapier}
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(_e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow)
-                            focusCell(elementIndex, rowIndex + 1);
-                          else if (elementIndex < lastEl)
-                            focusCell(elementIndex + 1, 0);
-                        } else {
-                          if (rowIndex > 0)
-                            focusCell(elementIndex, rowIndex - 1);
-                          else if (elementIndex > 0)
-                            focusCell(elementIndex - 1, lastRow);
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
-                    />
+                    <div className="flex items-center gap-1">
+                      {canLinkThisCell && (
+                        <JcfLinkToggle
+                          isLinked={isLinked}
+                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'papier')}
+                          data-testid={`link-toggle-${elementIndex}-papier`}
+                        />
+                      )}
+                      {isLinked ? (
+                        <input
+                          id={getCellId(elementIndex, rowIndex)}
+                          type="text"
+                          value={value}
+                          readOnly
+                          onClick={() => linkPropagation.toggleLink(elementIndex, 'papier')}
+                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
+                          title="Cliquer pour délier"
+                          data-testid={`jcf-input-${elementIndex}-papier`}
+                        />
+                      ) : (
+                        <div className="flex-1">
+                          <JcfPapierAutocomplete
+                            id={getCellId(elementIndex, rowIndex)}
+                            value={value}
+                            onChange={(v) =>
+                              handleCellChange(elementIndex, 'papier', v)
+                            }
+                            paperTypes={PAPER_TYPES}
+                            sessionPaperTypes={sessionLearning.papiers}
+                            onLearnPaperType={sessionLearning.learnPapier}
+                            inputClassName={`${inputFilledClass} text-base`}
+                            onTabOut={(_e, direction) => {
+                              const lastRow = rows.length - 1;
+                              const lastEl = elements.length - 1;
+                              if (direction === 'forward') {
+                                if (rowIndex < lastRow)
+                                  focusCell(elementIndex, rowIndex + 1);
+                                else if (elementIndex < lastEl)
+                                  focusCell(elementIndex + 1, 0);
+                              } else {
+                                if (rowIndex > 0)
+                                  focusCell(elementIndex, rowIndex - 1);
+                                else if (elementIndex > 0)
+                                  focusCell(elementIndex - 1, lastRow);
+                              }
+                            }}
+                            onArrowNav={(_e, direction) => {
+                              const rc = rows.length;
+                              const ec = elements.length;
+                              switch (direction) {
+                                case 'down':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex + 1) % rc,
+                                  );
+                                  break;
+                                case 'up':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex - 1 + rc) % rc,
+                                  );
+                                  break;
+                                case 'right':
+                                  focusCell(
+                                    (elementIndex + 1) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                                case 'left':
+                                  focusCell(
+                                    (elementIndex - 1 + ec) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : row.key === 'imposition' ? (
-                    <JcfImpositionAutocomplete
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'imposition', v)
-                      }
-                      feuilleFormats={FEUILLE_FORMATS}
-                      sessionFormats={sessionLearning.feuilleFormats}
-                      onLearnFormat={sessionLearning.learnFeuilleFormat}
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(_e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow)
-                            focusCell(elementIndex, rowIndex + 1);
-                          else if (elementIndex < lastEl)
-                            focusCell(elementIndex + 1, 0);
-                        } else {
-                          if (rowIndex > 0)
-                            focusCell(elementIndex, rowIndex - 1);
-                          else if (elementIndex > 0)
-                            focusCell(elementIndex - 1, lastRow);
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
-                    />
+                    <div className="flex items-center gap-1">
+                      {canLinkThisCell && (
+                        <JcfLinkToggle
+                          isLinked={isLinked}
+                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'imposition')}
+                          data-testid={`link-toggle-${elementIndex}-imposition`}
+                        />
+                      )}
+                      {isLinked ? (
+                        <input
+                          id={getCellId(elementIndex, rowIndex)}
+                          type="text"
+                          value={value}
+                          readOnly
+                          onClick={() => linkPropagation.toggleLink(elementIndex, 'imposition')}
+                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
+                          title="Cliquer pour délier"
+                          data-testid={`jcf-input-${elementIndex}-imposition`}
+                        />
+                      ) : (
+                        <div className="flex-1">
+                          <JcfImpositionAutocomplete
+                            id={getCellId(elementIndex, rowIndex)}
+                            value={value}
+                            onChange={(v) =>
+                              handleCellChange(elementIndex, 'imposition', v)
+                            }
+                            feuilleFormats={FEUILLE_FORMATS}
+                            sessionFormats={sessionLearning.feuilleFormats}
+                            onLearnFormat={sessionLearning.learnFeuilleFormat}
+                            inputClassName={`${inputFilledClass} text-base`}
+                            onTabOut={(_e, direction) => {
+                              const lastRow = rows.length - 1;
+                              const lastEl = elements.length - 1;
+                              if (direction === 'forward') {
+                                if (rowIndex < lastRow)
+                                  focusCell(elementIndex, rowIndex + 1);
+                                else if (elementIndex < lastEl)
+                                  focusCell(elementIndex + 1, 0);
+                              } else {
+                                if (rowIndex > 0)
+                                  focusCell(elementIndex, rowIndex - 1);
+                                else if (elementIndex > 0)
+                                  focusCell(elementIndex - 1, lastRow);
+                              }
+                            }}
+                            onArrowNav={(_e, direction) => {
+                              const rc = rows.length;
+                              const ec = elements.length;
+                              switch (direction) {
+                                case 'down':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex + 1) % rc,
+                                  );
+                                  break;
+                                case 'up':
+                                  focusCell(
+                                    elementIndex,
+                                    (rowIndex - 1 + rc) % rc,
+                                  );
+                                  break;
+                                case 'right':
+                                  focusCell(
+                                    (elementIndex + 1) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                                case 'left':
+                                  focusCell(
+                                    (elementIndex - 1 + ec) % ec,
+                                    rowIndex,
+                                  );
+                                  break;
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : row.key === 'precedences' ? (
                     <JcfPrecedencesAutocomplete
                       id={getCellId(elementIndex, rowIndex)}

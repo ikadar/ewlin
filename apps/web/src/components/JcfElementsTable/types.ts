@@ -1,3 +1,5 @@
+import type { JcfLinkableField, JcfElementLinks } from '@flux/types';
+
 // ── JCF Element type (local form state, all string fields) ──
 
 export interface JcfElement {
@@ -14,7 +16,18 @@ export interface JcfElement {
   qteFeuilles: string;
   commentaires: string;
   sequence: string;
+  /**
+   * Link state for propagation from previous element (v0.4.35).
+   * When a field is linked, it inherits and auto-updates from the previous element.
+   */
+  links?: JcfElementLinks;
 }
+
+/**
+ * Fields that can be linked between elements.
+ * Re-exported from @flux/types for convenience.
+ */
+export type { JcfLinkableField, JcfElementLinks };
 
 export type JcfFieldKey = keyof Omit<JcfElement, 'name'>;
 
