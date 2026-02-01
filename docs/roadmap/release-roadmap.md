@@ -1176,6 +1176,7 @@ Pick & Place is a two-click interaction replacing drag-and-drop for performance:
 > 10. Production readiness tracking (v0.4.32a–v0.4.32e)
 > 11. Job save & backend integration (v0.4.33)
 > 12. Template system (v0.4.34–v0.4.35)
+> 13. Frontend infrastructure: Redux, Router, Code Quality (v0.4.36–v0.4.38)
 
 ### Phase 4A: Element Entity Foundation
 
@@ -1707,6 +1708,50 @@ Two-part release following reference/jcf pattern.
 - [x] CodeMirror 6 integration for JSON editing
 - [ ] Contextual autocomplete in JSON editor (deferred to v0.4.36)
 - [x] Bidirectional sync between form and JSON
+
+### Phase 4L: Frontend Infrastructure
+
+> Prepare frontend architecture for backend integration and production readiness.
+
+#### v0.4.36 - Redux Store & RTK Query Setup
+> **Goal:** Replace useState-based state management with Redux, prepare for API integration
+
+- [ ] Redux store configuration with Redux Toolkit
+- [ ] RTK Query API slice setup (mock endpoints first)
+- [ ] Migrate core state from App.tsx useState to Redux slices
+  - [ ] Snapshot state (jobs, tasks, assignments, stations)
+  - [ ] UI state (selectedJob, modals, zoom, etc.)
+  - [ ] JCF form state
+- [ ] Provider setup in main.tsx
+- [ ] DevTools integration
+
+#### v0.4.37 - React Router Integration
+> **Goal:** Enable URL-based navigation and deep linking
+
+- [ ] React Router DOM installation and setup
+- [ ] Route structure definition
+  - [ ] `/` - Main scheduler view
+  - [ ] `/job/:jobId` - Job details (deep link)
+  - [ ] `/job/new` - JCF modal route
+- [ ] Navigation hooks integration
+- [ ] URL state sync (selected job, date, zoom)
+
+#### v0.4.38 - Code Quality & CI/CD
+> **Goal:** Establish code quality gates and automated checks
+
+- [ ] SonarQube/SonarCloud integration
+- [ ] Quality gate configuration (coverage, duplications, bugs)
+- [ ] ESLint strict mode review
+- [ ] Pre-commit hooks (husky + lint-staged)
+- [ ] GitHub Actions workflow for quality checks
+- [ ] Code coverage reporting to SonarCloud
+
+#### v0.4.39 - JSON Editor Contextual Autocomplete
+> **Deferred from v0.4.35**
+
+- [ ] Contextual autocomplete in JSON editor
+- [ ] Field-aware suggestions based on cursor position
+- [ ] Integration with reference data
 
 ---
 
