@@ -1715,15 +1715,20 @@ Two-part release following reference/jcf pattern.
 
 #### v0.4.36 - Redux Store & RTK Query Setup
 > **Goal:** Replace useState-based state management with Redux, prepare for API integration
+> **Pattern:** RTK Query + Mock Adapter (queryFn wraps existing mock/snapshot.ts)
 
 - [ ] Redux store configuration with Redux Toolkit
-- [ ] RTK Query API slice setup (mock endpoints first)
+- [ ] RTK Query API slice with mock adapter pattern
+  - [ ] `scheduleApi` with `useGetSnapshotQuery` hook
+  - [ ] Mutation endpoints (createAssignment, updateAssignment, etc.)
+  - [ ] Cache invalidation via tags
 - [ ] Migrate core state from App.tsx useState to Redux slices
-  - [ ] Snapshot state (jobs, tasks, assignments, stations)
-  - [ ] UI state (selectedJob, modals, zoom, etc.)
-  - [ ] JCF form state
+  - [ ] UI state (selectedJob, modals, zoom, etc.) → `uiSlice`
+  - [ ] JCF form state → `jcfSlice`
+  - [ ] Snapshot data via RTK Query (not separate slice)
 - [ ] Provider setup in main.tsx
 - [ ] DevTools integration
+- [ ] Existing fixture mechanism preserved (`?fixture=xxx` works)
 
 #### v0.4.37 - React Router Integration
 > **Goal:** Enable URL-based navigation and deep linking
