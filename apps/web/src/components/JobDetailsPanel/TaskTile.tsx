@@ -174,27 +174,49 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   };
 
   // Unscheduled task - job color styling, clickable for Pick & Place
+  const baseClassName = `h-8 pt-0.5 px-2 text-sm border-l-4 select-none transition-all duration-150 ${getCursorClass()}`;
+  const tileStyle = {
+    borderLeftColor: jobColor,
+    backgroundColor: colorStyles.backgroundColor,
+    ...activePlacementStyle,
+    ...pickedStyle,
+  };
+
+  const content = (
+    <div className="flex items-center justify-between gap-2">
+      <span
+        className={`font-medium truncate min-w-0 ${colorStyles.textColor}`}
+        style={colorStyles.textColor ? undefined : { color: jobColor }}
+      >
+        {displayName}
+      </span>
+      <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
+    </div>
+  );
+
+  // Use button when interactive (onPick provided)
+  if (onPick) {
+    return (
+      <button
+        type="button"
+        className={`${baseClassName} w-full text-left`}
+        style={tileStyle}
+        data-testid={`task-tile-${task.id}`}
+        onClick={handleClick}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  // Non-interactive display
   return (
     <div
-      className={`h-8 pt-0.5 px-2 text-sm border-l-4 select-none transition-all duration-150 ${getCursorClass()}`}
-      style={{
-        borderLeftColor: jobColor,
-        backgroundColor: colorStyles.backgroundColor,
-        ...activePlacementStyle,
-        ...pickedStyle,
-      }}
+      className={baseClassName}
+      style={tileStyle}
       data-testid={`task-tile-${task.id}`}
-      onClick={handleClick}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={`font-medium truncate min-w-0 ${colorStyles.textColor}`}
-          style={colorStyles.textColor ? undefined : { color: jobColor }}
-        >
-          {displayName}
-        </span>
-        <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
-      </div>
+      {content}
     </div>
   );
 }

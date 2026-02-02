@@ -340,9 +340,10 @@ export function JcfPapierAutocomplete({
           data-testid={id ? `${id}-dropdown` : 'papier-dropdown'}
         >
           {displayedItems.map((suggestion, index) => (
-            <div
+            <button
+              type="button"
               key={`${index}-${suggestion.value}`}
-              className={`px-[10px] py-[5px] cursor-pointer flex justify-between items-center ${
+              className={`w-full px-[10px] py-[5px] cursor-pointer flex justify-between items-center text-left ${
                 index === highlightedIndex
                   ? 'bg-blue-600 text-white'
                   : 'hover:bg-zinc-700 text-zinc-100'
@@ -360,7 +361,7 @@ export function JcfPapierAutocomplete({
                   index === highlightedIndex,
                 )}
               </span>
-            </div>
+            </button>
           ))}
           {hasMore && (
             <div className="px-[10px] py-[5px] text-center text-zinc-500 text-xs border-t border-zinc-700">

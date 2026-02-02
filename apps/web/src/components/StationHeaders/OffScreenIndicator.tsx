@@ -25,16 +25,14 @@ export function OffScreenIndicator({
   const Icon = direction === 'up' ? ChevronUp : ChevronDown;
 
   return (
-    <div
+    <button
+      type="button"
       className="flex items-center gap-1 text-xs text-zinc-500 cursor-pointer hover:text-zinc-400"
       onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
       title={`${count} tile${count > 1 ? 's' : ''} ${direction === 'up' ? 'above' : 'below'}`}
     >
       <Icon className="w-3 h-3" />
       <span>{count}</span>
-    </div>
+    </button>
   );
 }

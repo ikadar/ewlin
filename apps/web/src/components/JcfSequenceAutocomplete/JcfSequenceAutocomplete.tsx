@@ -550,9 +550,10 @@ export function JcfSequenceAutocomplete({
             }
           >
             {displayedItems.map((suggestion, index) => (
-              <div
+              <button
+                type="button"
                 key={`${index}-${suggestion.label}`}
-                className={`px-[10px] py-[5px] cursor-pointer flex justify-between items-center font-mono text-sm ${
+                className={`w-full px-[10px] py-[5px] cursor-pointer flex justify-between items-center font-mono text-sm text-left ${
                   index === highlightedIndex
                     ? 'bg-blue-600 text-white'
                     : 'hover:bg-zinc-700 text-zinc-100'
@@ -581,7 +582,7 @@ export function JcfSequenceAutocomplete({
                     {suggestion.description}
                   </span>
                 )}
-              </div>
+              </button>
             ))}
             {hasMore && (
               <div className="px-[10px] py-[5px] text-center text-zinc-500 text-xs border-t border-zinc-700">

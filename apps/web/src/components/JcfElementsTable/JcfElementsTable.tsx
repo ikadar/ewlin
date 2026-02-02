@@ -489,15 +489,16 @@ export function JcfElementsTable({
                   data-testid={`jcf-element-name-input-${index}`}
                 />
               ) : (
-                <div
-                  className="flex-1 cursor-pointer hover:bg-zinc-800/50 rounded-[3px] px-[3px] mx-[-3px] py-[2px] my-[-2px] transition-colors"
+                <button
+                  type="button"
+                  className="flex-1 cursor-pointer hover:bg-zinc-800/50 rounded-[3px] px-[3px] mx-[-3px] py-[2px] my-[-2px] transition-colors text-left"
                   onClick={() => handleStartEditing(index)}
                   data-testid={`jcf-element-name-${index}`}
                 >
                   <span className="text-base text-zinc-400 font-medium hover:text-zinc-300 transition-colors">
                     {element.name}
                   </span>
-                </div>
+                </button>
               )}
               <div className="flex items-center gap-[3px]">
                 <button

@@ -258,6 +258,8 @@ export const StationColumn = memo(function StationColumn({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
+      role="gridcell"
+      aria-label={`Station ${station.name}`}
     >
       {/* Unavailability overlay - REQ-04: Multi-day support, v0.3.46: virtual scroll optimization */}
       {isMultiDayGrid ? (

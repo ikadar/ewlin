@@ -88,6 +88,7 @@ export function JcfModal({
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      role="presentation"
       data-testid="jcf-modal-backdrop"
     >
       <div

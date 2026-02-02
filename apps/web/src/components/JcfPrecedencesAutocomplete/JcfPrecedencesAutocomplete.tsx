@@ -255,9 +255,10 @@ export function JcfPrecedencesAutocomplete({
           {displayedItems.length > 0 ? (
             <>
               {displayedItems.map((name, index) => (
-                <div
+                <button
+                  type="button"
                   key={`${index}-${name}`}
-                  className={`px-[10px] py-[5px] cursor-pointer font-mono text-sm ${
+                  className={`w-full px-[10px] py-[5px] cursor-pointer font-mono text-sm text-left ${
                     index === highlightedIndex
                       ? 'bg-blue-600 text-white'
                       : 'hover:bg-zinc-700 text-zinc-100'
@@ -273,7 +274,7 @@ export function JcfPrecedencesAutocomplete({
                     filterText,
                     index === highlightedIndex,
                   )}
-                </div>
+                </button>
               ))}
               {hasMore && (
                 <div className="px-[10px] py-[5px] text-center text-zinc-500 text-xs border-t border-zinc-700">
