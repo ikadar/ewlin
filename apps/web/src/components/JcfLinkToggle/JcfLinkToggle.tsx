@@ -14,6 +14,25 @@ export interface JcfLinkToggleProps {
 }
 
 /**
+ * Get the default tooltip title based on state.
+ */
+function getDefaultTitle(disabled: boolean, isLinked: boolean): string {
+  if (disabled) return 'Pas de lien possible (premier élément)';
+  if (isLinked) return 'Délier de l\'élément précédent';
+  return 'Lier à l\'élément précédent';
+}
+
+/**
+ * Get the button className based on state.
+ */
+function getButtonClassName(disabled: boolean, isLinked: boolean): string {
+  const base = 'p-[2px] rounded-[2px] transition-colors';
+  if (disabled) return `${base} opacity-30 cursor-not-allowed`;
+  if (isLinked) return `${base} text-blue-400 bg-blue-900/50 hover:bg-blue-900/70`;
+  return `${base} text-zinc-500 hover:text-zinc-400 hover:bg-zinc-800`;
+}
+
+/**
  * Toggle button for linking/unlinking a field to the previous element.
  *
  * Visual states:
@@ -32,27 +51,13 @@ export function JcfLinkToggle({
 }: JcfLinkToggleProps) {
   const Icon = isLinked ? Link2 : Unlink;
 
-  const defaultTitle = disabled
-    ? 'Pas de lien possible (premier élément)'
-    : isLinked
-      ? 'Délier de l\'élément précédent'
-      : 'Lier à l\'élément précédent';
-
   return (
     <button
       type="button"
       onClick={onToggle}
       disabled={disabled}
-      title={title ?? defaultTitle}
-      className={`
-        p-[2px] rounded-[2px] transition-colors
-        ${disabled
-          ? 'opacity-30 cursor-not-allowed'
-          : isLinked
-            ? 'text-blue-400 bg-blue-900/50 hover:bg-blue-900/70'
-            : 'text-zinc-500 hover:text-zinc-400 hover:bg-zinc-800'
-        }
-      `}
+      title={title ?? getDefaultTitle(disabled, isLinked)}
+      className={getButtonClassName(disabled, isLinked)}
       data-testid={testId}
     >
       <Icon size={12} />

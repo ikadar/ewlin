@@ -2,6 +2,16 @@ import { Crosshair, Minus, Plus, Loader2 } from 'lucide-react';
 import { ZOOM_LEVELS } from './constants';
 import { COMPACT_HORIZONS, type CompactHorizon } from '../../utils/compactTimeline';
 
+/**
+ * Get Quick Placement button className based on state.
+ */
+function getQuickPlacementClassName(canEnable: boolean, isActive: boolean): string {
+  const base = 'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors';
+  if (!canEnable) return `${base} text-zinc-600 cursor-not-allowed`;
+  if (isActive) return `${base} bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30`;
+  return `${base} text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800`;
+}
+
 export interface TopNavBarProps {
   /** Whether Quick Placement mode is active */
   isQuickPlacementMode: boolean;
@@ -66,16 +76,7 @@ export function TopNavBar({
         <button
           onClick={onToggleQuickPlacement}
           disabled={!canEnableQuickPlacement}
-          className={`
-            flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-            ${
-              !canEnableQuickPlacement
-                ? 'text-zinc-600 cursor-not-allowed'
-                : isQuickPlacementMode
-                  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-            }
-          `}
+          className={getQuickPlacementClassName(canEnableQuickPlacement, isQuickPlacementMode)}
           data-testid="quick-placement-button"
           title={canEnableQuickPlacement ? 'Toggle Quick Placement (Alt+Q)' : 'Select a job first'}
         >

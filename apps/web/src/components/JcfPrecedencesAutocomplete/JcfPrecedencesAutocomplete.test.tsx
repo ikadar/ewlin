@@ -115,7 +115,7 @@ describe('JcfPrecedencesAutocomplete', () => {
       fireEvent.focus(input);
       // Click first suggestion (COUV — first non-self name)
       const dropdown = screen.getByTestId('test-prec-dropdown');
-      const firstItem = dropdown.querySelector('div[class*="cursor-pointer"]');
+      const firstItem = dropdown.querySelector('button');
       fireEvent.mouseDown(firstItem!);
       expect(onChange).toHaveBeenCalledWith('COUV');
     });
@@ -133,7 +133,7 @@ describe('JcfPrecedencesAutocomplete', () => {
       fireEvent.focus(input);
       // INT should be available (COUV already selected)
       const dropdown = screen.getByTestId('test-prec-dropdown');
-      const firstItem = dropdown.querySelector('div[class*="cursor-pointer"]');
+      const firstItem = dropdown.querySelector('button');
       fireEvent.mouseDown(firstItem!);
       expect(onChange).toHaveBeenCalledWith('COUV,INT');
     });
@@ -151,7 +151,7 @@ describe('JcfPrecedencesAutocomplete', () => {
       fireEvent.focus(input);
       // ENCART should match "EN"
       const dropdown = screen.getByTestId('test-prec-dropdown');
-      const firstItem = dropdown.querySelector('div[class*="cursor-pointer"]');
+      const firstItem = dropdown.querySelector('button');
       fireEvent.mouseDown(firstItem!);
       expect(onChange).toHaveBeenCalledWith('COUV,ENCART');
     });

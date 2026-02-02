@@ -99,9 +99,8 @@ export function DateCell({
 
   if (isDepartureDate) {
     // REQ-15: Departure date - v0.3.47: now indicated by exit triangle only, no background
+    // Only override textColor; borderColor and dayNumberColor stay at defaults
     textColor = 'text-zinc-400';
-    borderColor = 'border-white/5';
-    dayNumberColor = 'text-zinc-400';
   } else if (isFocused) {
     // REQ-09.3: Focused day styling (white/light highlight)
     textColor = 'text-zinc-200';

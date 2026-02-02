@@ -63,24 +63,37 @@ interface TooltipItem {
 }
 
 /**
+ * Get the most relevant date for paper status.
+ */
+function getPaperDate(paper: PrerequisiteBlockingInfo['paper']): string | undefined {
+  if (paper.status === 'delivered') return formatDateDDMMYYYY(paper.deliveredAt);
+  if (paper.status === 'ordered') return formatDateDDMMYYYY(paper.orderedAt);
+  return undefined;
+}
+
+/**
  * Build paper item for tooltip.
  * Extracted to reduce cognitive complexity.
  */
 function buildPaperItem(paper: PrerequisiteBlockingInfo['paper']): TooltipItem | null {
   if (paper.status === 'none' && paper.isReady) return null;
-  const date =
-    paper.status === 'delivered'
-      ? formatDateDDMMYYYY(paper.deliveredAt)
-      : paper.status === 'ordered'
-        ? formatDateDDMMYYYY(paper.orderedAt)
-        : undefined;
   return {
     key: 'paper',
     label: LABELS.paper,
     statusLabel: PAPER_STATUS_LABELS[paper.status] || paper.status,
     isReady: paper.isReady,
-    date,
+    date: getPaperDate(paper),
   };
+}
+
+/**
+ * Get the most relevant date for BAT status.
+ */
+function getBatDate(bat: PrerequisiteBlockingInfo['bat']): string | undefined {
+  if (bat.status === 'bat_approved') return formatDateDDMMYYYY(bat.approvedAt);
+  if (bat.status === 'bat_sent') return formatDateDDMMYYYY(bat.sentAt);
+  if (bat.status === 'files_received') return formatDateDDMMYYYY(bat.filesReceivedAt);
+  return undefined;
 }
 
 /**
@@ -89,20 +102,12 @@ function buildPaperItem(paper: PrerequisiteBlockingInfo['paper']): TooltipItem |
  */
 function buildBatItem(bat: PrerequisiteBlockingInfo['bat']): TooltipItem | null {
   if (bat.status === 'none' && bat.isReady) return null;
-  const date =
-    bat.status === 'bat_approved'
-      ? formatDateDDMMYYYY(bat.approvedAt)
-      : bat.status === 'bat_sent'
-        ? formatDateDDMMYYYY(bat.sentAt)
-        : bat.status === 'files_received'
-          ? formatDateDDMMYYYY(bat.filesReceivedAt)
-          : undefined;
   return {
     key: 'bat',
     label: LABELS.bat,
     statusLabel: BAT_STATUS_LABELS[bat.status] || bat.status,
     isReady: bat.isReady,
-    date,
+    date: getBatDate(bat),
   };
 }
 
@@ -120,23 +125,26 @@ function buildPlatesItem(plates: PrerequisiteBlockingInfo['plates']): TooltipIte
 }
 
 /**
+ * Get the most relevant date for forme status.
+ */
+function getFormeDate(forme: PrerequisiteBlockingInfo['forme']): string | undefined {
+  if (forme.status === 'delivered') return formatDateDDMMYYYY(forme.deliveredAt);
+  if (forme.status === 'ordered') return formatDateDDMMYYYY(forme.orderedAt);
+  return undefined;
+}
+
+/**
  * Build forme item for tooltip.
  * Extracted to reduce cognitive complexity.
  */
 function buildFormeItem(forme: PrerequisiteBlockingInfo['forme']): TooltipItem | null {
   if (forme.status === 'none' && forme.isReady) return null;
-  const date =
-    forme.status === 'delivered'
-      ? formatDateDDMMYYYY(forme.deliveredAt)
-      : forme.status === 'ordered'
-        ? formatDateDDMMYYYY(forme.orderedAt)
-        : undefined;
   return {
     key: 'forme',
     label: LABELS.forme,
     statusLabel: FORME_STATUS_LABELS[forme.status] || forme.status,
     isReady: forme.isReady,
-    date,
+    date: getFormeDate(forme),
   };
 }
 

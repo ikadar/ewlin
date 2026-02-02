@@ -50,7 +50,7 @@ describe('templateApi', () => {
   });
 
   describe('createTemplate', () => {
-    it('creates a new template with generated ID', () => {
+    it('creates a new template with generated ID', async () => {
       const input: JcfTemplateCreateInput = {
         name: 'Test Template',
         description: 'A test template',
@@ -74,7 +74,7 @@ describe('templateApi', () => {
         ],
       };
 
-      const created = createTemplate(input);
+      const created = await createTemplate(input);
 
       expect(created.id).toBeTruthy();
       expect(created.id).toMatch(/^tpl-/);
@@ -86,25 +86,25 @@ describe('templateApi', () => {
       expect(created.updatedAt).toBeTruthy();
     });
 
-    it('persists the new template', () => {
+    it('persists the new template', async () => {
       const input: JcfTemplateCreateInput = {
         name: 'Persisted Template',
         elements: [],
       };
 
-      const created = createTemplate(input);
+      const created = await createTemplate(input);
       const retrieved = getTemplate(created.id);
 
       expect(retrieved).toEqual(created);
     });
 
-    it('allows templates without optional fields', () => {
+    it('allows templates without optional fields', async () => {
       const input: JcfTemplateCreateInput = {
         name: 'Minimal Template',
         elements: [],
       };
 
-      const created = createTemplate(input);
+      const created = await createTemplate(input);
 
       expect(created.name).toBe('Minimal Template');
       expect(created.description).toBeUndefined();
@@ -114,18 +114,18 @@ describe('templateApi', () => {
   });
 
   describe('updateTemplate', () => {
-    it('updates template name', () => {
+    it('updates template name', async () => {
       const templates = getTemplates();
       const first = templates[0];
 
-      const updated = updateTemplate(first.id, { name: 'Updated Name' });
+      const updated = await updateTemplate(first.id, { name: 'Updated Name' });
 
       expect(updated.name).toBe('Updated Name');
       expect(updated.id).toBe(first.id);
       expect(updated.createdAt).toBe(first.createdAt);
     });
 
-    it('updates template elements', () => {
+    it('updates template elements', async () => {
       const templates = getTemplates();
       const first = templates[0];
       const newElements = [
@@ -146,34 +146,34 @@ describe('templateApi', () => {
         },
       ];
 
-      const updated = updateTemplate(first.id, { elements: newElements });
+      const updated = await updateTemplate(first.id, { elements: newElements });
 
       expect(updated.elements).toHaveLength(1);
       expect(updated.elements[0].name).toBe('NEW');
     });
 
-    it('updates updatedAt timestamp', () => {
+    it('updates updatedAt timestamp', async () => {
       const templates = getTemplates();
       const first = templates[0];
       const originalUpdatedAt = first.updatedAt;
 
       // Small delay to ensure different timestamp
-      const updated = updateTemplate(first.id, { name: 'New Name' });
+      const updated = await updateTemplate(first.id, { name: 'New Name' });
 
       expect(updated.updatedAt).not.toBe(originalUpdatedAt);
     });
 
-    it('throws for non-existent ID', () => {
-      expect(() => updateTemplate('non-existent', { name: 'Test' })).toThrow(
+    it('throws for non-existent ID', async () => {
+      await expect(updateTemplate('non-existent', { name: 'Test' })).rejects.toThrow(
         'Template not found'
       );
     });
 
-    it('preserves ID and createdAt on update', () => {
+    it('preserves ID and createdAt on update', async () => {
       const templates = getTemplates();
       const first = templates[0];
 
-      const updated = updateTemplate(first.id, {
+      const updated = await updateTemplate(first.id, {
         name: 'New Name',
         // @ts-expect-error - Testing that these are ignored
         id: 'hacked-id',

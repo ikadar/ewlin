@@ -22,6 +22,15 @@ import { snapToGrid, ValidationMessage } from '../components/DragPreview';
 import { usePickState } from './PickStateContext';
 
 /**
+ * Get color class for ring state display.
+ */
+function getRingStateColorClass(ringState: string): string {
+  if (ringState === 'valid') return 'text-green-400';
+  if (ringState === 'invalid') return 'text-red-400';
+  return 'text-yellow-400';
+}
+
+/**
  * Offset from cursor to tile top during pick operations.
  * The cursor should appear 20px inside the tile, not at the top edge.
  * This value is also used in App.tsx for validation calculations.
@@ -209,7 +218,7 @@ function PickPreviewInner({ task, job, validationMessage, debugInfo }: PickPrevi
       {/* Debug overlay */}
       {debugInfo && (
         <div className="mt-2 px-2 py-1 bg-black/90 text-xs text-white font-mono rounded max-w-72">
-          <div>ring: <span className={debugInfo.ringState === 'valid' ? 'text-green-400' : debugInfo.ringState === 'invalid' ? 'text-red-400' : 'text-yellow-400'}>{debugInfo.ringState}</span></div>
+          <div>ring: <span className={getRingStateColorClass(debugInfo.ringState)}>{debugInfo.ringState}</span></div>
           <div>start: {debugInfo.scheduledStart ? new Date(debugInfo.scheduledStart).toLocaleTimeString() : 'null'}</div>
           <div>conflicts: {debugInfo.conflicts.length === 0 ? 'none' : debugInfo.conflicts.map(c => c.type).join(', ')}</div>
           {debugInfo.conflicts.map((c, i) => (

@@ -16,8 +16,6 @@ import { calculateQteFeuillesFromStrings } from './calculatedFields';
 import {
   getTabNavigationTarget,
   getArrowNavigationTarget,
-  createTabOutHandler,
-  createArrowNavHandler,
 } from './navigationUtils';
 
 // ── Row definitions ──
