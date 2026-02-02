@@ -12,6 +12,10 @@
  * - Keyboard shortcuts (Cmd+S, Esc)
  * - Bidirectional sync between Form and JSON
  *
+ * Architecture:
+ * - JcfTemplateEditorModal: Handles visibility, renders content only when open
+ * - TemplateEditorContent: Contains all state, gets remounted when modal opens
+ *
  * @see v0.4.34 - JCF: Template CRUD & Apply
  * @see v0.4.35 - JCF: Link Propagation & Dual-Mode Editor
  */
@@ -130,15 +134,31 @@ function templateToEditorData(
   };
 }
 
-export function JcfTemplateEditorModal({
-  isOpen,
+// ============================================================================
+// Internal Content Component
+// ============================================================================
+
+interface TemplateEditorContentProps {
+  template?: JcfTemplate;
+  initialElements?: JcfTemplateElement[];
+  initialClientName?: string;
+  onSave: (data: TemplateEditorData & { id?: string }) => void;
+  onCancel: () => void;
+  isSaving?: boolean;
+}
+
+/**
+ * Internal component containing all editor state.
+ * Gets remounted when modal opens, ensuring fresh state.
+ */
+function TemplateEditorContent({
   template,
   initialElements,
   initialClientName,
   onSave,
   onCancel,
   isSaving,
-}: JcfTemplateEditorModalProps) {
+}: TemplateEditorContentProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
   // Determine mode
@@ -153,7 +173,7 @@ export function JcfTemplateEditorModal({
     return createEmptyTemplate(initialClientName, initialElements);
   }, [isEditMode, template, initialClientName, initialElements]);
 
-  // Form state
+  // Form state - initialized from initialData on mount
   const [header, setHeader] = useState<TemplateHeaderData>(initialData.header);
   const [elements, setElements] = useState<JcfElement[]>(initialData.elements);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -164,18 +184,6 @@ export function JcfTemplateEditorModal({
     JSON.stringify(initialData.elements, null, 2)
   );
   const [jsonError, setJsonError] = useState<string | null>(null);
-
-  // Reset state when modal opens with new data
-  useEffect(() => {
-    if (isOpen) {
-      setHeader(initialData.header);
-      setElements(initialData.elements);
-      setValidationError(null);
-      setActiveTab('form');
-      setJsonValue(JSON.stringify(initialData.elements, null, 2));
-      setJsonError(null);
-    }
-  }, [isOpen, initialData]);
 
   // v0.4.35: Handle tab switching with bidirectional sync
   const handleTabChange = useCallback(
@@ -234,23 +242,6 @@ export function JcfTemplateEditorModal({
     }
   }, [onCancel, isSaving]);
 
-  // Validate template data
-  const validateTemplate = useCallback((): string | null => {
-    if (!header.name.trim()) {
-      return 'Le nom du template est obligatoire';
-    }
-    if (elements.length === 0) {
-      return 'Le template doit contenir au moins un élément';
-    }
-    // Check that all elements have names
-    for (let i = 0; i < elements.length; i++) {
-      if (!elements[i].name.trim()) {
-        return `L'élément ${i + 1} doit avoir un nom`;
-      }
-    }
-    return null;
-  }, [header.name, elements]);
-
   // Handle save
   const handleSave = useCallback(() => {
     // v0.4.35: Parse JSON if in JSON mode
@@ -303,8 +294,6 @@ export function JcfTemplateEditorModal({
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (!isOpen) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
@@ -321,9 +310,7 @@ export function JcfTemplateEditorModal({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isSaving, handleSave, stableOnCancel]);
-
-  if (!isOpen) return null;
+  }, [isSaving, handleSave, stableOnCancel]);
 
   // Track where mousedown started for backdrop click
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -499,5 +486,39 @@ export function JcfTemplateEditorModal({
         </footer>
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// Main Modal Component
+// ============================================================================
+
+/**
+ * Template editor modal wrapper.
+ * Handles visibility and renders content component only when open.
+ * Content component gets remounted on each open, ensuring fresh state.
+ */
+export function JcfTemplateEditorModal({
+  isOpen,
+  template,
+  initialElements,
+  initialClientName,
+  onSave,
+  onCancel,
+  isSaving,
+}: JcfTemplateEditorModalProps) {
+  // Only render content when modal is open
+  // This ensures state is fresh on each open (component remounts)
+  if (!isOpen) return null;
+
+  return (
+    <TemplateEditorContent
+      template={template}
+      initialElements={initialElements}
+      initialClientName={initialClientName}
+      onSave={onSave}
+      onCancel={onCancel}
+      isSaving={isSaving}
+    />
   );
 }

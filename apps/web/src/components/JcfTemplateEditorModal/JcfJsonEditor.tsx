@@ -29,7 +29,7 @@ export function JcfJsonEditor({
   value,
   onChange,
   readOnly = false,
-  placeholder = '[]',
+  placeholder: _placeholder = '[]',
   className = '',
   'data-testid': testId,
 }: JcfJsonEditorProps) {

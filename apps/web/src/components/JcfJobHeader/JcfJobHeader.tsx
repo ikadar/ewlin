@@ -52,7 +52,8 @@ export function JcfJobHeader({
   const [sessionClients, setSessionClients] = useState<string[]>([]);
 
   // v0.4.34: Load templates from API (synchronous localStorage API)
-  const [templates, setTemplates] = useState<JcfTemplate[]>(() => getTemplates());
+  // Note: setTemplates unused - templates are refreshed on component mount
+  const [templates, _setTemplates] = useState<JcfTemplate[]>(() => getTemplates());
 
   const labelClass = 'block text-xs leading-[13px] text-zinc-500 mb-[3px]';
   const inputBaseClass =
