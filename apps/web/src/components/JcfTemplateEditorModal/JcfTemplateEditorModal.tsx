@@ -27,7 +27,14 @@ import { JcfTemplateHeaderForm } from '../JcfTemplateHeaderForm';
 import type { TemplateHeaderData } from '../JcfTemplateHeaderForm';
 import { JcfElementsTable } from '../JcfElementsTable';
 import type { JcfElement } from '../JcfElementsTable/types';
-import { JcfJsonEditor } from './JcfJsonEditor';
+import { JcfJsonEditor, type JsonEditorSuggestions } from './JcfJsonEditor';
+import {
+  PAPER_TYPES,
+  PRODUCT_FORMATS,
+  IMPRESSION_PRESETS,
+  SURFACAGE_PRESETS,
+  POSTE_CATEGORIES,
+} from '@/mock/reference-data';
 
 /** Tab types for dual-mode editor (v0.4.35) */
 type EditorTab = 'form' | 'json';
@@ -117,6 +124,26 @@ function templateToEditorData(
     elements: template.elements.map(templateElementToFormElement),
   };
 }
+
+// ============================================================================
+// JSON Editor Suggestions (v0.4.40)
+// ============================================================================
+
+/** Static element name suggestions */
+const ELEMENT_NAME_SUGGESTIONS = ['COUV', 'INT', 'FEUILLET', 'FINITION', 'ENCART'];
+
+/**
+ * Build suggestions object from reference data.
+ * Computed once at module load time.
+ */
+const JSON_EDITOR_SUGGESTIONS: JsonEditorSuggestions = {
+  name: ELEMENT_NAME_SUGGESTIONS,
+  format: PRODUCT_FORMATS.map((f) => f.name),
+  impression: IMPRESSION_PRESETS.map((i) => i.value),
+  surfacage: SURFACAGE_PRESETS.map((s) => s.value),
+  papier: PAPER_TYPES.map((p) => p.type),
+  sequence: [...POSTE_CATEGORIES],
+};
 
 // ============================================================================
 // Internal Content Component
@@ -322,7 +349,7 @@ function TemplateEditorContent({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
+        if (e.key === 'Escape') stableOnCancel();
       }}
       aria-label="Close modal"
     >
@@ -412,6 +439,7 @@ function TemplateEditorContent({
                 readOnly={isSaving}
                 className="h-full"
                 data-testid="template-editor-json"
+                suggestions={JSON_EDITOR_SUGGESTIONS}
               />
             </div>
           )}

@@ -1,8 +1,47 @@
+/**
+ * JcfJsonEditor - CodeMirror 6 JSON editor with contextual autocomplete
+ *
+ * Features:
+ * - JSON syntax highlighting with dark theme
+ * - JSON validation with error display
+ * - Contextual autocomplete for element fields (v0.4.40)
+ *
+ * @see v0.4.35 - JCF: Link Propagation & Dual-Mode Editor
+ * @see v0.4.40 - JSON Editor Contextual Autocomplete
+ */
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorState, Compartment } from '@codemirror/state';
+import {
+  autocompletion,
+  startCompletion,
+  type CompletionContext,
+  type CompletionResult,
+} from '@codemirror/autocomplete';
+import { detectFieldContext } from './fieldDetection';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** Suggestions for autocomplete fields */
+export interface JsonEditorSuggestions {
+  /** Element names (COUV, INT, etc.) */
+  name?: string[];
+  /** Product formats (A4, A5, etc.) */
+  format?: string[];
+  /** Impression presets (Q/Q, Q/, etc.) */
+  impression?: string[];
+  /** Surfacage presets (mat/mat, etc.) */
+  surfacage?: string[];
+  /** Paper types (Couché mat, etc.) */
+  papier?: string[];
+  /** Workflow categories for sequence (Presse offset, etc.) */
+  sequence?: string[];
+}
 
 export interface JcfJsonEditorProps {
   /** Current JSON value (as string) */
@@ -17,13 +56,69 @@ export interface JcfJsonEditorProps {
   className?: string;
   /** Test ID */
   'data-testid'?: string;
+  /** Autocomplete suggestions (v0.4.40) */
+  suggestions?: JsonEditorSuggestions;
 }
 
+// ============================================================================
+// Completion Source (v0.4.40)
+// ============================================================================
+
 /**
- * CodeMirror 6 JSON editor with dark theme.
+ * Create CodeMirror completion source for JSON element fields.
+ * Uses a ref to access dynamically loaded suggestions.
+ */
+function createCompletionSource(
+  suggestionsRef: React.RefObject<JsonEditorSuggestions>
+) {
+  return function jsonFieldCompletionSource(
+    context: CompletionContext
+  ): CompletionResult | null {
+    const doc = context.state.doc.toString();
+    const pos = context.pos;
+    const field = detectFieldContext(doc, pos);
+
+    if (!field) return null;
+
+    const suggestions = suggestionsRef.current?.[field] || [];
+    if (suggestions.length === 0) return null;
+
+    // Find the start of the current string value
+    const before = doc.slice(0, pos);
+    const lastQuote = before.lastIndexOf('"');
+    const from = lastQuote + 1;
+    const typed = doc.slice(from, pos).toLowerCase();
+
+    // Filter suggestions based on what's typed
+    const filtered = suggestions.filter((s) =>
+      s.toLowerCase().includes(typed)
+    );
+
+    if (filtered.length === 0) return null;
+
+    return {
+      from,
+      // Allow triggering even with no typed text (explicit activation)
+      validFor: /^.*$/,
+      options: filtered.map((label) => ({
+        label,
+        type: 'text',
+        apply: label,
+      })),
+    };
+  };
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+/**
+ * CodeMirror 6 JSON editor with dark theme and contextual autocomplete.
  * Validates JSON and only calls onChange when valid.
  *
  * @see v0.4.35 - JCF: Link Propagation & Dual-Mode Editor
+ * @see v0.4.40 - JSON Editor Contextual Autocomplete
  */
 export function JcfJsonEditor({
   value,
@@ -32,14 +127,21 @@ export function JcfJsonEditor({
   placeholder: _placeholder = '[]',
   className = '',
   'data-testid': testId,
+  suggestions = {},
 }: JcfJsonEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const readOnlyCompartment = useRef(new Compartment());
+  const suggestionsRef = useRef<JsonEditorSuggestions>(suggestions);
   const [error, setError] = useState<string | null>(null);
 
   // Track if the last update was external (from parent) vs internal (from typing)
   const isExternalUpdate = useRef(false);
+
+  // Keep suggestions ref in sync
+  useEffect(() => {
+    suggestionsRef.current = suggestions;
+  }, [suggestions]);
 
   /**
    * Validate JSON and update error state.
@@ -90,6 +192,23 @@ export function JcfJsonEditor({
         json(),
         oneDark,
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
+        // v0.4.40: Contextual autocomplete
+        autocompletion({
+          override: [createCompletionSource(suggestionsRef)],
+          activateOnTyping: true,
+        }),
+        // v0.4.40: Trigger autocomplete when cursor moves into autocompletable field
+        EditorView.updateListener.of((update) => {
+          if (update.selectionSet && !update.docChanged) {
+            const pos = update.state.selection.main.head;
+            const doc = update.state.doc.toString();
+            const field = detectFieldContext(doc, pos);
+            if (field) {
+              // Delay to avoid interfering with other updates
+              setTimeout(() => startCompletion(update.view), 50);
+            }
+          }
+        }),
         EditorView.updateListener.of(handleUpdate),
         EditorView.theme({
           '&': {
@@ -108,6 +227,23 @@ export function JcfJsonEditor({
           },
           '&.cm-focused': {
             outline: 'none',
+          },
+          // v0.4.40: Autocomplete dropdown styling
+          '.cm-tooltip.cm-tooltip-autocomplete': {
+            backgroundColor: 'rgb(39, 39, 42)', // zinc-800
+            border: '1px solid rgb(63, 63, 70)', // zinc-700
+            borderRadius: '4px',
+          },
+          '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+            fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
+            fontSize: '12px',
+          },
+          '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+            padding: '4px 8px',
+          },
+          '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+            backgroundColor: 'rgb(59, 130, 246)', // blue-500
+            color: 'white',
           },
         }),
       ],
