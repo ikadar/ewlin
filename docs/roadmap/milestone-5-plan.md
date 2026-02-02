@@ -50,9 +50,24 @@ const baseQueryWithFixtureSupport = async (args, api, extraOptions) => {
 **Acceptance Criteria:**
 - [ ] `?fixture=xxx` loads mock data instead of calling real API
 - [ ] All existing fixtures continue to work
-- [ ] E2E tests can run in fixture mode
+- [ ] **Playwright tests can use fixtures via URL param** (see Phase 5D)
 - [ ] `VITE_USE_MOCK=true` enables mock mode without URL param
 - [ ] No fixture code in production bundle (tree-shaking)
+
+**Playwright Integration:**
+```typescript
+// Fixture-based test (fast, deterministic, no backend)
+test('example with fixture', async ({ page }) => {
+  await page.goto('/?fixture=my-test-scenario');
+  // Test against known, deterministic data
+});
+
+// Real API test (integration, requires backend)
+test('example with real API', async ({ page }) => {
+  await page.goto('/');  // No fixture = real API
+  // Test against live backend
+});
+```
 
 ---
 
@@ -373,18 +388,75 @@ createAssignment: builder.mutation({
 
 ## Phase 5D: Testing & Verification
 
+### E2E Testing Strategy
+
+**Two complementary approaches:**
+
+| Approach | Location | When to Use | CI Pipeline |
+|----------|----------|-------------|-------------|
+| **Fixture-based** | `playwright/tests/` | UI behavior, interactions, visual | Every PR |
+| **Real API** | `playwright/e2e-api/` | Integration, data flow, edge cases | Nightly/Staging |
+
+#### Fixture-based E2E (existing + enhanced)
+
+```typescript
+// playwright/tests/scheduling.spec.ts
+test('drag task creates assignment', async ({ page }) => {
+  // Fixture mode - no backend needed, deterministic data
+  await page.goto('/?fixture=scheduling-basic');
+
+  const task = page.getByTestId('task-JOB001-COUV-Offset');
+  await task.dragTo(page.getByTestId('station-G37'));
+
+  await expect(page.getByTestId('tile-JOB001-COUV-Offset')).toBeVisible();
+});
+```
+
+**Benefits:**
+- Fast execution (no API latency)
+- Deterministic (same data every run)
+- No infrastructure (frontend only)
+- Minimal flaky tests
+
+#### Real API E2E (new in M5)
+
+```typescript
+// playwright/e2e-api/job-creation.spec.ts
+test('JCF creates job via API', async ({ page }) => {
+  // Real API mode - requires backend
+  await page.goto('/');  // No fixture param = real API
+
+  await page.getByTestId('new-job-button').click();
+  await page.getByTestId('jcf-client').fill('Acme Corp');
+  // ... fill form
+  await page.getByTestId('jcf-save').click();
+
+  // Verify job appears in grid (from real database)
+  await expect(page.getByText('Acme Corp')).toBeVisible();
+});
+```
+
+**Benefits:**
+- True integration testing
+- Catches API contract mismatches
+- Tests real error scenarios
+
+---
+
 ### v0.5.9 - E2E Tests with Real Backend
 
-**Goal:** E2E tests run against actual PHP API.
+**Goal:** Add real API E2E tests alongside existing fixture-based tests.
 
 **Tasks:**
 - [ ] Docker Compose setup for E2E (PHP + PostgreSQL + Frontend)
-- [ ] Test database seeding
-- [ ] Playwright configuration for API mode
-- [ ] Convert key E2E tests to use real backend
-- [ ] CI pipeline integration
+- [ ] Test database seeding/reset between tests
+- [ ] Playwright configuration for API mode (`playwright.api.config.ts`)
+- [ ] Create `playwright/e2e-api/` directory structure
+- [ ] Write key integration tests (see scenarios below)
+- [ ] CI pipeline: nightly run against staging
+- [ ] **Preserve existing fixture-based tests** (NFR-1)
 
-**Test Scenarios:**
+**Test Scenarios (Real API):**
 - [ ] Full job creation flow (JCF → API → Grid display)
 - [ ] Assignment CRUD cycle
 - [ ] Validation error handling
