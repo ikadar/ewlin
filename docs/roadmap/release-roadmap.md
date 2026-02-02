@@ -1755,15 +1755,23 @@ Two-part release following reference/jcf pattern.
 - [x] Navigation hooks integration
 - [x] URL state sync (selected job)
 
-#### v0.4.39 - Code Quality & CI/CD
-> **Goal:** Establish code quality gates and automated checks
+#### v0.4.39 - SonarQube Integration ✅
+> **Goal:** Establish code quality analysis and fix issues
+> **Released:** 2026-02-02
 
-- [ ] SonarQube/SonarCloud integration
-- [ ] Quality gate configuration (coverage, duplications, bugs)
-- [ ] ESLint strict mode review
-- [ ] Pre-commit hooks (husky + lint-staged)
-- [ ] GitHub Actions workflow for quality checks
-- [ ] Code coverage reporting to SonarCloud
+- [x] SonarQube integration with `/sonar` command
+- [x] CRITICAL issues fixed (17 → 0)
+- [x] MAJOR issues fixed (24 → 4)
+- [x] Cognitive complexity reduction
+- [x] Accessibility improvements (native buttons)
+- [x] Code cleanup (duplicate functions, redundant assignments)
+
+*Deferred to future release:*
+- Quality gate configuration (coverage thresholds)
+- ESLint strict mode review
+- Pre-commit hooks (husky + lint-staged)
+- GitHub Actions workflow for quality checks
+- Code coverage reporting to SonarCloud
 
 #### v0.4.40 - JSON Editor Contextual Autocomplete
 > **Deferred from v0.4.35**
