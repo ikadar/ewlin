@@ -1,20 +1,11 @@
 import { useState, useCallback, useMemo, useEffect, type MutableRefObject } from 'react';
-import { GitBranch, Minus, Plus, Calculator } from 'lucide-react';
+import { GitBranch, Minus, Plus } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
-import type { JcfElement, JcfFieldKey, JcfLinkableField } from './types';
+import type { JcfElement, JcfFieldKey } from './types';
 import { useLinkPropagation, isLinkableField } from '../../hooks/useLinkPropagation';
-import { JcfLinkToggle } from '../JcfLinkToggle';
-import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete';
-import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete';
-import { JcfSurfacageAutocomplete } from '../JcfSurfacageAutocomplete';
-import { JcfQuantiteInput } from '../JcfQuantiteInput';
-import { JcfPaginationInput } from '../JcfPaginationInput';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
-import { JcfPapierAutocomplete } from '../JcfPapierAutocomplete';
-import { JcfImpositionAutocomplete } from '../JcfImpositionAutocomplete';
-import { JcfPrecedencesAutocomplete } from '../JcfPrecedencesAutocomplete';
-import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
+import { CellContent } from './CellContent';
 import { validateAllElements, validateAllForSubmit, getCellError } from './validation';
 import {
   getAllRequiredFields,
@@ -28,7 +19,6 @@ import {
   createTabOutHandler,
   createArrowNavHandler,
 } from './navigationUtils';
-import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS, POSTE_PRESETS, SOUSTRAITANT_PRESETS } from '../../mock/reference-data';
 
 // ── Row definitions ──
 
@@ -608,312 +598,37 @@ export function JcfElementsTable({
                     title="Champ requis"
                     data-testid={`required-indicator-${elementIndex}-${row.key}`}
                   />
-                  {row.key === 'sequence' ? (
-                    <JcfSequenceAutocomplete
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'sequence', v)
-                      }
-                      postePresets={POSTE_PRESETS}
-                      sessionPostes={sessionLearning.postes}
-                      onLearnPoste={sessionLearning.learnPoste}
-                      soustraitantPresets={SOUSTRAITANT_PRESETS}
-                      sessionSoustraitants={sessionLearning.soustraitants}
-                      onLearnSoustraitant={sessionLearning.learnSoustraitant}
-                      sequenceWorkflow={sequenceWorkflow}
-                      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
-                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                      onBlur={() => markFieldTouched(elementIndex, 'sequence')}
-                    />
-                  ) : isTextarea ? (
-                    <textarea
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(e) =>
-                        handleTextareaAutoExpand(e, elementIndex, row.key)
-                      }
-                      onKeyDown={(e) =>
-                        handleCellKeyDown(e, elementIndex, rowIndex)
-                      }
-                      className={`${isEmpty ? inputEmptyClass : inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
-                      rows={1}
-                      data-testid={`jcf-input-${elementIndex}-${row.key}`}
-                    />
-                  ) : row.key === 'format' ? (
-                    <div className="flex items-center gap-1">
-                      {canLinkThisCell && (
-                        <JcfLinkToggle
-                          isLinked={isLinked}
-                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'format')}
-                          data-testid={`link-toggle-${elementIndex}-format`}
-                        />
-                      )}
-                      {isLinked ? (
-                        <input
-                          id={getCellId(elementIndex, rowIndex)}
-                          type="text"
-                          value={value}
-                          readOnly
-                          onClick={() => linkPropagation.toggleLink(elementIndex, 'format')}
-                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
-                          title="Cliquer pour délier"
-                          data-testid={`jcf-input-${elementIndex}-format`}
-                        />
-                      ) : (
-                        <div className="flex-1">
-                          <JcfFormatAutocomplete
-                            id={getCellId(elementIndex, rowIndex)}
-                            value={value}
-                            onChange={(v) =>
-                              handleCellChange(elementIndex, 'format', v)
-                            }
-                            formats={PRODUCT_FORMATS}
-                            sessionPresets={sessionLearning.productFormats}
-                            onLearnPreset={sessionLearning.learnProductFormat}
-                            inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : row.key === 'impression' ? (
-                    <div className="flex items-center gap-1">
-                      {canLinkThisCell && (
-                        <JcfLinkToggle
-                          isLinked={isLinked}
-                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'impression')}
-                          data-testid={`link-toggle-${elementIndex}-impression`}
-                        />
-                      )}
-                      {isLinked ? (
-                        <input
-                          id={getCellId(elementIndex, rowIndex)}
-                          type="text"
-                          value={value}
-                          readOnly
-                          onClick={() => linkPropagation.toggleLink(elementIndex, 'impression')}
-                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
-                          title="Cliquer pour délier"
-                          data-testid={`jcf-input-${elementIndex}-impression`}
-                        />
-                      ) : (
-                        <div className="flex-1">
-                          <JcfImpressionAutocomplete
-                            id={getCellId(elementIndex, rowIndex)}
-                            value={value}
-                            onChange={(v) =>
-                              handleCellChange(elementIndex, 'impression', v)
-                            }
-                            presets={IMPRESSION_PRESETS}
-                            sessionPresets={sessionLearning.impressions}
-                            onLearnPreset={sessionLearning.learnImpression}
-                            inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : row.key === 'surfacage' ? (
-                    <div className="flex items-center gap-1">
-                      {canLinkThisCell && (
-                        <JcfLinkToggle
-                          isLinked={isLinked}
-                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'surfacage')}
-                          data-testid={`link-toggle-${elementIndex}-surfacage`}
-                        />
-                      )}
-                      {isLinked ? (
-                        <input
-                          id={getCellId(elementIndex, rowIndex)}
-                          type="text"
-                          value={value}
-                          readOnly
-                          onClick={() => linkPropagation.toggleLink(elementIndex, 'surfacage')}
-                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
-                          title="Cliquer pour délier"
-                          data-testid={`jcf-input-${elementIndex}-surfacage`}
-                        />
-                      ) : (
-                        <div className="flex-1">
-                          <JcfSurfacageAutocomplete
-                            id={getCellId(elementIndex, rowIndex)}
-                            value={value}
-                            onChange={(v) =>
-                              handleCellChange(elementIndex, 'surfacage', v)
-                            }
-                            presets={SURFACAGE_PRESETS}
-                            sessionPresets={sessionLearning.surfacages}
-                            onLearnPreset={sessionLearning.learnSurfacage}
-                            inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : row.key === 'quantite' ? (
-                    <JcfQuantiteInput
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'quantite', v)
-                      }
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                    />
-                  ) : row.key === 'pagination' ? (
-                    <JcfPaginationInput
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'pagination', v)
-                      }
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                    />
-                  ) : row.key === 'papier' ? (
-                    <div className="flex items-center gap-1">
-                      {canLinkThisCell && (
-                        <JcfLinkToggle
-                          isLinked={isLinked}
-                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'papier')}
-                          data-testid={`link-toggle-${elementIndex}-papier`}
-                        />
-                      )}
-                      {isLinked ? (
-                        <input
-                          id={getCellId(elementIndex, rowIndex)}
-                          type="text"
-                          value={value}
-                          readOnly
-                          onClick={() => linkPropagation.toggleLink(elementIndex, 'papier')}
-                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
-                          title="Cliquer pour délier"
-                          data-testid={`jcf-input-${elementIndex}-papier`}
-                        />
-                      ) : (
-                        <div className="flex-1">
-                          <JcfPapierAutocomplete
-                            id={getCellId(elementIndex, rowIndex)}
-                            value={value}
-                            onChange={(v) =>
-                              handleCellChange(elementIndex, 'papier', v)
-                            }
-                            paperTypes={PAPER_TYPES}
-                            sessionPaperTypes={sessionLearning.papiers}
-                            onLearnPaperType={sessionLearning.learnPapier}
-                            inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : row.key === 'imposition' ? (
-                    <div className="flex items-center gap-1">
-                      {canLinkThisCell && (
-                        <JcfLinkToggle
-                          isLinked={isLinked}
-                          onToggle={() => linkPropagation.toggleLink(elementIndex, 'imposition')}
-                          data-testid={`link-toggle-${elementIndex}-imposition`}
-                        />
-                      )}
-                      {isLinked ? (
-                        <input
-                          id={getCellId(elementIndex, rowIndex)}
-                          type="text"
-                          value={value}
-                          readOnly
-                          onClick={() => linkPropagation.toggleLink(elementIndex, 'imposition')}
-                          className={`${inputLinkedClass} text-base flex-1 cursor-pointer`}
-                          title="Cliquer pour délier"
-                          data-testid={`jcf-input-${elementIndex}-imposition`}
-                        />
-                      ) : (
-                        <div className="flex-1">
-                          <JcfImpositionAutocomplete
-                            id={getCellId(elementIndex, rowIndex)}
-                            value={value}
-                            onChange={(v) =>
-                              handleCellChange(elementIndex, 'imposition', v)
-                            }
-                            feuilleFormats={FEUILLE_FORMATS}
-                            sessionFormats={sessionLearning.feuilleFormats}
-                            onLearnFormat={sessionLearning.learnFeuilleFormat}
-                            inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : row.key === 'precedences' ? (
-                    <JcfPrecedencesAutocomplete
-                      id={getCellId(elementIndex, rowIndex)}
-                      value={value}
-                      onChange={(v) =>
-                        handleCellChange(elementIndex, 'precedences', v)
-                      }
-                      elementNames={elementNames}
-                      currentElementName={element.name}
-                      inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
-                    />
-                  ) : isQteFeuilles ? (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAutoCalculated(elementIndex)}
-                        className={`flex-shrink-0 p-0.5 rounded transition-colors ${
-                          isAutoMode
-                            ? 'text-emerald-500 hover:bg-emerald-900/30'
-                            : 'text-zinc-600 hover:bg-zinc-800'
-                        }`}
-                        title={
-                          isAutoMode
-                            ? 'Calcul auto actif - cliquer pour désactiver'
-                            : 'Calcul auto désactivé - cliquer pour réactiver'
-                        }
-                        data-testid={`auto-toggle-${elementIndex}`}
-                      >
-                        <Calculator className="w-2.5 h-2.5" />
-                      </button>
-                      <input
-                        id={getCellId(elementIndex, rowIndex)}
-                        type="text"
-                        value={value}
-                        onChange={(e) =>
-                          handleQteFeuillesChange(elementIndex, e.target.value)
-                        }
-                        onKeyDown={(e) =>
-                          handleCellKeyDown(e, elementIndex, rowIndex)
-                        }
-                        className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-base flex-1`}
-                        data-testid={`jcf-input-${elementIndex}-${row.key}`}
-                      />
-                    </div>
-                  ) : (
-                    <input
-                      id={getCellId(elementIndex, rowIndex)}
-                      type="text"
-                      value={value}
-                      onChange={(e) =>
-                        handleCellChange(elementIndex, row.key, e.target.value)
-                      }
-                      onKeyDown={(e) =>
-                        handleCellKeyDown(e, elementIndex, rowIndex)
-                      }
-                      className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-base`}
-                      data-testid={`jcf-input-${elementIndex}-${row.key}`}
-                    />
-                  )}
+                  <CellContent
+                    rowKey={row.key}
+                    value={value}
+                    isEmpty={isEmpty}
+                    isTextarea={isTextarea}
+                    isNumeric={isNumeric}
+                    isQteFeuilles={isQteFeuilles}
+                    isAutoMode={isAutoMode}
+                    isLinked={isLinked}
+                    canLinkThisCell={canLinkThisCell}
+                    elementIndex={elementIndex}
+                    rowIndex={rowIndex}
+                    rowCount={rows.length}
+                    elementCount={elements.length}
+                    cellId={getCellId(elementIndex, rowIndex)}
+                    inputEmptyClass={inputEmptyClass}
+                    inputFilledClass={inputFilledClass}
+                    inputLinkedClass={inputLinkedClass}
+                    elementNames={elementNames}
+                    currentElementName={element.name}
+                    sequenceWorkflow={sequenceWorkflow}
+                    sessionLearning={sessionLearning}
+                    linkPropagation={linkPropagation}
+                    focusCell={focusCell}
+                    handleCellChange={handleCellChange}
+                    handleCellKeyDown={handleCellKeyDown}
+                    handleTextareaAutoExpand={handleTextareaAutoExpand}
+                    handleQteFeuillesChange={handleQteFeuillesChange}
+                    handleToggleAutoCalculated={handleToggleAutoCalculated}
+                    markFieldTouched={markFieldTouched}
+                  />
                 </div>
               );
             })}
