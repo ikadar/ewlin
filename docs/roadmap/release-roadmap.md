@@ -1744,16 +1744,16 @@ Two-part release following reference/jcf pattern.
 - [x] Redux DevTools integration
 - [x] Existing fixture mechanism preserved (`?fixture=xxx` works)
 
-#### v0.4.38 - React Router Integration
+#### v0.4.38 - React Router Integration ✅
 > **Goal:** Enable URL-based navigation and deep linking
 
-- [ ] React Router DOM installation and setup
-- [ ] Route structure definition
-  - [ ] `/` - Main scheduler view
-  - [ ] `/job/:jobId` - Job details (deep link)
-  - [ ] `/job/new` - JCF modal route
-- [ ] Navigation hooks integration
-- [ ] URL state sync (selected job, date, zoom)
+- [x] React Router DOM installation and setup
+- [x] Route structure definition
+  - [x] `/` - Main scheduler view
+  - [x] `/job/:jobId` - Job details (deep link)
+  - [x] `/job/new` - JCF modal route
+- [x] Navigation hooks integration
+- [x] URL state sync (selected job)
 
 #### v0.4.39 - Code Quality & CI/CD
 > **Goal:** Establish code quality gates and automated checks
