@@ -8,8 +8,10 @@ import { createTemplate, updateTemplate } from './mock/templateApi';
 import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
-import { getSnapshot, updateSnapshot } from './mock';
+import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
+import { useGetSnapshotQuery, scheduleApi } from './store';
+import { useAppDispatch } from './store';
 import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo } from './utils';
@@ -375,10 +377,38 @@ function handlePageScroll(e: KeyboardEvent, ctx: KeyboardContext): boolean {
 
 // Inner App component that uses drag state context
 function AppContent() {
-  // Snapshot version state to force re-render on updates
-  const [snapshotVersion, setSnapshotVersion] = useState(0);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshotVersion triggers refetch
-  const snapshot = useMemo(() => getSnapshot(), [snapshotVersion]);
+  // v0.4.37: RTK Query for snapshot data
+  const dispatch = useAppDispatch();
+  const { data: snapshotData } = useGetSnapshotQuery();
+
+  // Helper to trigger refetch after local updateSnapshot calls
+  // This bridges the gap between the mock layer and RTK Query cache
+  const invalidateSnapshot = useCallback(() => {
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [dispatch]);
+
+  // Memoized snapshot with loading guard (mock layer always returns data synchronously)
+  // The empty snapshot is a fallback that should never actually be used
+  const snapshot = useMemo(() => {
+    if (!snapshotData) {
+      // Return minimal valid snapshot during initial load (should be instant with mock)
+      return {
+        version: 0,
+        generatedAt: new Date().toISOString(),
+        stations: [],
+        categories: [],
+        groups: [],
+        providers: [],
+        jobs: [],
+        elements: [],
+        tasks: [],
+        assignments: [],
+        conflicts: [],
+        lateJobs: [],
+      };
+    }
+    return snapshotData;
+  }, [snapshotData]);
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   // v0.3.46: Use deferred value for grid to keep sidebar responsive during selection
@@ -948,8 +978,8 @@ function AppContent() {
       }
       return currentSnapshot;
     });
-    setSnapshotVersion((v) => v + 1);
-  }, []);
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
 
   // Handle swap down - exchange position with tile below
   const handleSwapDown = useCallback((assignmentId: string) => {
@@ -964,8 +994,8 @@ function AppContent() {
       }
       return currentSnapshot;
     });
-    setSnapshotVersion((v) => v + 1);
-  }, []);
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
 
   // v0.3.58: Handle context menu open
   const handleContextMenuOpen = useCallback((x: number, y: number, assignmentId: string, isCompleted: boolean) => {
@@ -1054,8 +1084,8 @@ function AppContent() {
         assignments: currentSnapshot.assignments.filter((a) => a.id !== assignmentId),
       };
     });
-    setSnapshotVersion((v) => v + 1);
-  }, []);
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
 
   // v0.4.32a: Handle element prerequisite status change
   const handleElementStatusChange = useCallback((update: ElementStatusUpdate) => {
@@ -1081,8 +1111,8 @@ function AppContent() {
         elements: newElements,
       };
     });
-    setSnapshotVersion((v) => v + 1);
-  }, []);
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
 
   // REQ-14: Handle date click - scroll grid to the clicked date
   const handleDateClick = useCallback((date: Date) => {
@@ -1135,8 +1165,8 @@ function AppContent() {
         assignments: newAssignments,
       };
     });
-    setSnapshotVersion((v) => v + 1);
-  }, []);
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
 
   // v0.3.58: Handle context menu "Toggle completion" action
   const handleContextMenuToggleComplete = useCallback(() => {
@@ -1324,7 +1354,7 @@ function AppContent() {
     });
 
     // Trigger re-render
-    setSnapshotVersion((v) => v + 1);
+    invalidateSnapshot();
 
     console.log('Quick placement assignment created:', {
       assignmentId: newAssignment.id,
@@ -1334,7 +1364,7 @@ function AppContent() {
       scheduledEnd,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, gridStartDate, pixelsPerHour]);
+  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, gridStartDate, pixelsPerHour, invalidateSnapshot]);
 
   // Calculate which stations have available tasks (for quick placement cursor)
   const stationsWithAvailableTasks = useMemo(() => {
@@ -1369,10 +1399,10 @@ function AppContent() {
         compactStationAssignments(currentSnapshot, stationId, calculateEndTime)
       );
 
-      setSnapshotVersion((v) => v + 1);
+      invalidateSnapshot();
       setCompactingStationId(null);
     }, 300); // Small delay for visual feedback
-  }, []);
+  }, [invalidateSnapshot]);
 
   // Toggle Quick Placement (for TopNavBar button)
   const handleToggleQuickPlacement = useCallback(() => {
@@ -1569,12 +1599,12 @@ function AppContent() {
       bypassedPrecedence,
     }));
 
-    setSnapshotVersion((v) => v + 1);
+    invalidateSnapshot();
     pickActions.completePlacement();
     lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking on successful placement
     setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
     console.log(isRescheduleOp ? 'Pick reschedule completed:' : 'Pick placement created:', { taskId: task.id, scheduledStart });
-  }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId]);
+  }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, invalidateSnapshot]);
 
   // Handle global timeline compaction (v0.3.35)
   const handleCompactTimeline = useCallback((horizonHours: CompactHorizon) => {
@@ -1591,10 +1621,10 @@ function AppContent() {
         return result.snapshot;
       });
 
-      setSnapshotVersion((v) => v + 1);
+      invalidateSnapshot();
       setIsCompactingTimeline(false);
     }, 300); // Small delay for visual feedback
-  }, []);
+  }, [invalidateSnapshot]);
 
   return (
     <>

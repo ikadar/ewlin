@@ -16,6 +16,7 @@ import {
   countTilesOnStation,
   isOnSnapBoundary,
   pickAndPlace,
+  pickAndPlaceAtTime,
 } from './helpers/drag';
 
 test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
@@ -147,14 +148,16 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
 
   test('Place at different Y positions creates different scheduled times', async ({ page }) => {
     // This test verifies that placement creates a valid scheduled time
+    // Uses pickAndPlaceAtTime to avoid flakiness from Y-position timing issues
+    // (e.g., placing during lunch break 12:00-13:00 when test runs at noon)
 
     // ARRANGE: Select the job
     const jobCard = page.locator('[data-testid="job-card-job-sidebar-1"]');
     await jobCard.click();
     await page.waitForTimeout(200);
 
-    // ACT: Pick task and place at Y=100
-    await pickAndPlace(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 100);
+    // ACT: Pick task and place at 8:00 AM (guaranteed to be within operating hours 06:00-12:00)
+    await pickAndPlaceAtTime(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 8, 0);
 
     // ASSERT: Get the scheduled time
     const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
@@ -169,13 +172,13 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
     const time = parseTime(scheduledStart!);
     const minutes = toTotalMinutes(time);
 
-    console.log(`Placed at Y=100, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')} (${minutes} min)`);
+    console.log(`Placed at 8:00, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')} (${minutes} min)`);
 
     // Time should be snapped to 15-minute boundary
     expect(isOnSnapBoundary(time)).toBe(true);
 
-    // Time should be within working day (6:00 - 22:00 = 360-1320 minutes)
-    expect(minutes).toBeGreaterThanOrEqual(360); // 6:00
-    expect(minutes).toBeLessThanOrEqual(1320); // 22:00
+    // Time should be at 8:00 (480 minutes from midnight)
+    expect(time.hours).toBe(8);
+    expect(time.minutes).toBe(0);
   });
 });
