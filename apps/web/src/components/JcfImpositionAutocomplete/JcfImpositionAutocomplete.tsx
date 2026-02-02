@@ -256,6 +256,21 @@ export function JcfImpositionAutocomplete({
     [resetHighlight],
   );
 
+  /** Handle keyboard when dropdown is closed. */
+  const handleClosedDropdownKey = useCallback((e: React.KeyboardEvent): boolean => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setIsOpen(true);
+      return true;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      (e.target as HTMLElement).blur();
+      return true;
+    }
+    return false;
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       // Alt+Arrow — always delegate to table navigation
@@ -276,15 +291,9 @@ export function JcfImpositionAutocomplete({
         return;
       }
 
-      // Dropdown closed: open on arrow keys, blur on escape
+      // Dropdown closed: delegate to helper
       if (!isOpen) {
-        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-          setIsOpen(true);
-          e.preventDefault();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          (e.target as HTMLElement).blur();
-        }
+        handleClosedDropdownKey(e);
         return;
       }
 
@@ -298,7 +307,7 @@ export function JcfImpositionAutocomplete({
         onClose: () => setIsOpen(false),
       });
     },
-    [isOpen, displayedItems, highlightedIndex, handleSelect, onTabOut, onArrowNav],
+    [isOpen, displayedItems, highlightedIndex, handleSelect, onTabOut, onArrowNav, handleClosedDropdownKey],
   );
 
   // Default input styling at 13px base

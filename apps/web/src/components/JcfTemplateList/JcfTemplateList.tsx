@@ -44,6 +44,19 @@ function compareTemplates(a: JcfTemplate, b: JcfTemplate, column: SortColumn): n
 }
 
 /**
+ * Get aria-sort value for a column header.
+ * Extracted to reduce cognitive complexity.
+ */
+function getAriaSort(
+  column: SortColumn,
+  sortColumn: SortColumn,
+  sortDirection: SortDirection,
+): 'ascending' | 'descending' | 'none' {
+  if (sortColumn !== column) return 'none';
+  return sortDirection === 'asc' ? 'ascending' : 'descending';
+}
+
+/**
  * Sort indicator icon component.
  */
 function SortIcon({
@@ -143,13 +156,7 @@ export function JcfTemplateList({
           <th
             className={`${thClass} pl-[13px]`}
             onClick={() => handleSort('name')}
-            aria-sort={
-              sortColumn === 'name'
-                ? sortDirection === 'asc'
-                  ? 'ascending'
-                  : 'descending'
-                : 'none'
-            }
+            aria-sort={getAriaSort('name', sortColumn, sortDirection)}
           >
             Nom
             <SortIcon column="name" sortColumn={sortColumn} sortDirection={sortDirection} />
@@ -157,74 +164,34 @@ export function JcfTemplateList({
           <th
             className={`${thClass} px-[13px]`}
             onClick={() => handleSort('clientName')}
-            aria-sort={
-              sortColumn === 'clientName'
-                ? sortDirection === 'asc'
-                  ? 'ascending'
-                  : 'descending'
-                : 'none'
-            }
+            aria-sort={getAriaSort('clientName', sortColumn, sortDirection)}
           >
             Client
-            <SortIcon
-              column="clientName"
-              sortColumn={sortColumn}
-              sortDirection={sortDirection}
-            />
+            <SortIcon column="clientName" sortColumn={sortColumn} sortDirection={sortDirection} />
           </th>
           <th
             className={`${thClass} px-[13px]`}
             onClick={() => handleSort('category')}
-            aria-sort={
-              sortColumn === 'category'
-                ? sortDirection === 'asc'
-                  ? 'ascending'
-                  : 'descending'
-                : 'none'
-            }
+            aria-sort={getAriaSort('category', sortColumn, sortDirection)}
           >
             Catégorie
-            <SortIcon
-              column="category"
-              sortColumn={sortColumn}
-              sortDirection={sortDirection}
-            />
+            <SortIcon column="category" sortColumn={sortColumn} sortDirection={sortDirection} />
           </th>
           <th
             className={`${thClass} px-[13px] text-right`}
             onClick={() => handleSort('elementsCount')}
-            aria-sort={
-              sortColumn === 'elementsCount'
-                ? sortDirection === 'asc'
-                  ? 'ascending'
-                  : 'descending'
-                : 'none'
-            }
+            aria-sort={getAriaSort('elementsCount', sortColumn, sortDirection)}
           >
             Éléments
-            <SortIcon
-              column="elementsCount"
-              sortColumn={sortColumn}
-              sortDirection={sortDirection}
-            />
+            <SortIcon column="elementsCount" sortColumn={sortColumn} sortDirection={sortDirection} />
           </th>
           <th
             className={`${thClass} px-[13px]`}
             onClick={() => handleSort('updatedAt')}
-            aria-sort={
-              sortColumn === 'updatedAt'
-                ? sortDirection === 'asc'
-                  ? 'ascending'
-                  : 'descending'
-                : 'none'
-            }
+            aria-sort={getAriaSort('updatedAt', sortColumn, sortDirection)}
           >
             Modifié
-            <SortIcon
-              column="updatedAt"
-              sortColumn={sortColumn}
-              sortDirection={sortDirection}
-            />
+            <SortIcon column="updatedAt" sortColumn={sortColumn} sortDirection={sortDirection} />
           </th>
           <th className="pb-[10px] pr-[13px]">
             <span className="sr-only">Actions</span>

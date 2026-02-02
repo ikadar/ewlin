@@ -333,13 +333,40 @@ export function JcfSequenceAutocomplete({
 
   // ── Selection handling ─────────────────────────────────────────────────
 
+  /**
+   * Learn poste or soustraitant when a suggestion is selected.
+   * Extracted to reduce cognitive complexity.
+   */
+  const learnFromSelection = useCallback(
+    (suggestionValue: string) => {
+      if (!suggestionValue.includes(')')) return;
+
+      // Check for ST: pattern first
+      const stMatch = suggestionValue.match(/^ST:([A-Za-z0-9_]+)\(/i);
+      if (stMatch && onLearnSoustraitant) {
+        onLearnSoustraitant({ name: stMatch[1] });
+        return;
+      }
+
+      // Check for poste pattern
+      if (!onLearnPoste) return;
+      const posteMatch = suggestionValue.match(/^([A-Za-z0-9_]+)\(/);
+      if (!posteMatch) return;
+
+      const posteName = posteMatch[1];
+      const existing = allPostes.find(
+        (p) => p.name.toLowerCase() === posteName.toLowerCase(),
+      );
+      if (existing) {
+        onLearnPoste(existing);
+      }
+    },
+    [onLearnPoste, onLearnSoustraitant, allPostes],
+  );
+
   const handleSelectSuggestion = useCallback(
     (suggestion: Suggestion) => {
-      const { lineStart, lineEnd } = getCurrentLineInfo(
-        value,
-        cursorPosition,
-      );
-
+      const { lineStart, lineEnd } = getCurrentLineInfo(value, cursorPosition);
       const beforeLine = value.substring(0, lineStart);
       const afterLine = value.substring(lineEnd);
 
@@ -356,42 +383,17 @@ export function JcfSequenceAutocomplete({
         }
       }, 0);
 
-      // Keep dropdown open if more input expected (ends with "(" or ":")
-      if (
-        suggestion.value.endsWith('(') ||
-        suggestion.value === 'ST:'
-      ) {
+      // Keep dropdown open if more input expected
+      const needsMoreInput = suggestion.value.endsWith('(') || suggestion.value === 'ST:';
+      if (needsMoreInput) {
         setIsOpen(true);
         resetHighlight();
       } else {
         setIsOpen(false);
-
-        // Learn poste or ST name when a line is completed via selection
-        if (suggestion.value.includes(')')) {
-          const stMatch = suggestion.value.match(
-            /^ST:([A-Za-z0-9_]+)\(/i,
-          );
-          if (stMatch && onLearnSoustraitant) {
-            onLearnSoustraitant({ name: stMatch[1] });
-          } else if (onLearnPoste) {
-            const posteMatch = suggestion.value.match(
-              /^([A-Za-z0-9_]+)\(/,
-            );
-            if (posteMatch) {
-              const posteName = posteMatch[1];
-              const existing = allPostes.find(
-                (p) =>
-                  p.name.toLowerCase() === posteName.toLowerCase(),
-              );
-              if (existing) {
-                onLearnPoste(existing);
-              }
-            }
-          }
-        }
+        learnFromSelection(suggestion.value);
       }
     },
-    [value, cursorPosition, onChange, onLearnPoste, onLearnSoustraitant, allPostes, resetHighlight],
+    [value, cursorPosition, onChange, learnFromSelection, resetHighlight],
   );
 
   // ── Event handlers ─────────────────────────────────────────────────────

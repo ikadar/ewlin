@@ -102,8 +102,26 @@ export function JcfAutocomplete({
     onSelect?.(suggestion.value);
   }, [onChange, onSelect]);
 
+  /**
+   * Handle keyboard when dropdown is closed.
+   * Extracted to reduce cognitive complexity.
+   */
+  const handleClosedDropdownKey = useCallback((e: React.KeyboardEvent): boolean => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setIsOpen(true);
+      return true;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      (e.target as HTMLElement).blur();
+      return true;
+    }
+    return false;
+  }, []);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Alt+Arrow — always delegate to table navigation (open or closed)
+    // Alt+Arrow — always delegate to table navigation
     if (e.altKey && e.key.startsWith('Arrow')) {
       e.preventDefault();
       if (isOpen) setIsOpen(false);
@@ -111,7 +129,7 @@ export function JcfAutocomplete({
       return;
     }
 
-    // Tab / Shift+Tab — close dropdown, delegate if onTabOut provided
+    // Tab / Shift+Tab — close dropdown, delegate
     if (e.key === 'Tab') {
       if (isOpen) setIsOpen(false);
       if (onTabOut) {
@@ -121,15 +139,9 @@ export function JcfAutocomplete({
       return;
     }
 
-    // Dropdown closed: open on arrow keys, blur on escape
+    // Dropdown closed: delegate to helper
     if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        setIsOpen(true);
-        e.preventDefault();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        (e.target as HTMLElement).blur();
-      }
+      handleClosedDropdownKey(e);
       return;
     }
 
@@ -142,7 +154,7 @@ export function JcfAutocomplete({
       onSelect: handleSelect,
       onClose: () => setIsOpen(false),
     });
-  }, [isOpen, displayedItems, highlightedIndex, handleSelect, onTabOut, onArrowNav]);
+  }, [isOpen, displayedItems, highlightedIndex, handleSelect, onTabOut, onArrowNav, handleClosedDropdownKey]);
 
   // Default input styling at 13px base
   const defaultInputClass =
