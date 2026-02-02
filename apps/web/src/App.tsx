@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
@@ -410,7 +411,35 @@ function AppContent() {
     return snapshotData;
   }, [snapshotData]);
 
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  // v0.4.38: URL-based job selection with React Router
+  // Use local state for fast UI updates, sync URL silently
+  const { jobId: urlJobId } = useParams<{ jobId?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Local state for immediate UI response
+  const [selectedJobId, setSelectedJobIdLocal] = useState<string | null>(() => {
+    // Initialize from URL on mount
+    if (location.pathname === '/job/new') return null;
+    return urlJobId ?? null;
+  });
+
+  // Sync URL → state when URL changes (browser back/forward, direct navigation)
+  useEffect(() => {
+    const urlSelectedJobId = location.pathname === '/job/new' ? null : (urlJobId ?? null);
+    if (urlSelectedJobId !== selectedJobId) {
+      setSelectedJobIdLocal(urlSelectedJobId);
+    }
+  }, [urlJobId, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Wrapper that updates local state (fast) and URL silently (no React Router re-render)
+  const setSelectedJobId = useCallback((jobId: string | null) => {
+    setSelectedJobIdLocal(jobId); // Immediate UI update
+    // Update URL silently using History API - no React Router re-render
+    const newUrl = jobId ? `/job/${jobId}` : '/';
+    window.history.replaceState(null, '', newUrl);
+  }, []);
+
   // v0.3.46: Use deferred value for grid to keep sidebar responsive during selection
   const deferredSelectedJobId = useDeferredValue(selectedJobId);
 
@@ -455,8 +484,9 @@ function AppContent() {
     isCompleted: boolean;
   } | null>(null);
 
-  // v0.4.6: JCF modal state
-  const [isJcfModalOpen, setIsJcfModalOpen] = useState(false);
+  // v0.4.38: JCF modal state derived from URL
+  // Modal opens when URL is /job/new
+  const isJcfModalOpen = location.pathname === '/job/new';
   // v0.4.7: JCF form state (lifted from JcfJobHeader)
   const [jcfJobId, setJcfJobId] = useState('');
   const [jcfIntitule, setJcfIntitule] = useState('');
@@ -503,7 +533,7 @@ function AppContent() {
 
       // Success: close modal and reset form
       setIsJcfSaving(false);
-      setIsJcfModalOpen(false);
+      navigate('/'); // v0.4.38: Navigate away to close modal
       setJcfClient('');
       setJcfTemplate('');
       setJcfIntitule('');
@@ -527,15 +557,17 @@ function AppContent() {
         setJcfSaveError('An unexpected error occurred');
       }
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, navigate]);
 
+  // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
     setJcfJobId(generateJobId());
-    setIsJcfModalOpen(true);
-  }, []);
+    navigate('/job/new');
+  }, [navigate]);
 
+  // v0.4.38: Navigate away from /job/new to close modal
   const handleCloseJcf = useCallback(() => {
-    setIsJcfModalOpen(false);
+    navigate('/');
     setJcfClient('');
     setJcfTemplate('');
     setJcfIntitule('');
@@ -544,7 +576,7 @@ function AppContent() {
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
     setSequenceWorkflow([]); // v0.4.31: Reset workflow on close
     setJcfSaveError(null); // v0.4.33: Reset API error on close
-  }, []);
+  }, [navigate]);
 
   // v0.4.34: Handler for "Save as Template" button in JcfModal
   const handleSaveAsTemplate = useCallback(() => {
@@ -963,7 +995,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {
@@ -1018,7 +1050,7 @@ function AppContent() {
         if (jobId) setSelectedJobId(jobId);
       }
     }
-  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.elements]);
+  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.elements, setSelectedJobId]);
 
   // Handle jump to task - scroll grid to assignment position (single-click in Job Details Panel)
   const handleJumpToTask = useCallback((assignment: TaskAssignment) => {
