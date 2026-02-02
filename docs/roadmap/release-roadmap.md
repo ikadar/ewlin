@@ -1728,21 +1728,21 @@ Two-part release following reference/jcf pattern.
 - [x] Request/response examples for each endpoint
 - [x] Update `@flux/types` package if needed
 
-#### v0.4.37 - Redux Store & RTK Query Setup
+#### v0.4.37 - Redux Store & RTK Query Setup ✅
 > **Goal:** Replace useState-based state management with Redux, prepare for API integration
 > **Pattern:** RTK Query + Mock Adapter (queryFn wraps existing mock/snapshot.ts)
 
-- [ ] Redux store configuration with Redux Toolkit
-- [ ] RTK Query API slice with mock adapter pattern
-  - [ ] `scheduleApi` with endpoints designed in v0.4.36
-  - [ ] Snapshot data in RTK Query cache (no separate snapshotSlice)
-  - [ ] Mutation endpoints with cache invalidation
-- [ ] Redux slices for local UI state
-  - [ ] `uiSlice` - selectedJob, modals, zoom, contextMenu, etc.
-  - [ ] `jcfSlice` - JCF form state
-- [ ] Provider setup in main.tsx
-- [ ] Redux DevTools integration
-- [ ] Existing fixture mechanism preserved (`?fixture=xxx` works)
+- [x] Redux store configuration with Redux Toolkit
+- [x] RTK Query API slice with mock adapter pattern
+  - [x] `scheduleApi` with endpoints designed in v0.4.36
+  - [x] Snapshot data in RTK Query cache (no separate snapshotSlice)
+  - [x] Mutation endpoints with cache invalidation
+- [x] Redux slices for local UI state
+  - [x] `uiSlice` - selectedJob, modals, zoom, contextMenu, etc.
+  - [x] `jcfSlice` - JCF form state
+- [x] Provider setup in main.tsx
+- [x] Redux DevTools integration
+- [x] Existing fixture mechanism preserved (`?fixture=xxx` works)
 
 #### v0.4.38 - React Router Integration
 > **Goal:** Enable URL-based navigation and deep linking
