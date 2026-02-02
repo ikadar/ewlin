@@ -379,10 +379,17 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     // Select from dropdown
     const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
     await expect(templateDropdown).toBeVisible();
-    await page.keyboard.press('Enter');
+
+    // Click the exact "Brochure A4" option (not "Brochure A4 piquée")
+    // Each dropdown item is a div, find the one where first span contains exactly "Brochure A4"
+    await templateDropdown.locator('div').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+
+    // Wait for template to be applied (elements table updates)
+    await page.waitForTimeout(300);
 
     // Now check sequence suggestions
     const sequenceTextarea = page.locator('#cell-0-11');
+    await expect(sequenceTextarea).toBeVisible();
     await sequenceTextarea.click();
 
     const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
@@ -398,13 +405,20 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     const templateInput = page.locator('#jcf-template');
     await templateInput.click();
     await templateInput.fill('Brochure A4');
-    await page.keyboard.press('Enter');
+
+    // Select from dropdown - exact match to avoid "Brochure A4 piquée"
+    const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
+    await expect(templateDropdown).toBeVisible();
+    await templateDropdown.locator('div').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+    await page.waitForTimeout(300);
 
     // Clear template
     await templateInput.fill('');
+    await page.waitForTimeout(200);
 
     // Check sequence suggestions
     const sequenceTextarea = page.locator('#cell-0-11');
+    await expect(sequenceTextarea).toBeVisible();
     await sequenceTextarea.click();
 
     const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
