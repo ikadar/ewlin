@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, type MutableRefObject } from
 import { GitBranch, Minus, Plus, Calculator } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
 import type { JcfElement, JcfFieldKey, JcfLinkableField } from './types';
-import { useLinkPropagation, isLinkableField, LINKABLE_FIELDS } from '../../hooks/useLinkPropagation';
+import { useLinkPropagation, isLinkableField } from '../../hooks/useLinkPropagation';
 import { JcfLinkToggle } from '../JcfLinkToggle';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete';
 import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete';

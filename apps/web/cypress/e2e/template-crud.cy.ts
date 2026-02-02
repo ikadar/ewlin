@@ -161,7 +161,7 @@ describe('JCF Template CRUD', () => {
       cy.window().then((win) => {
         const templates = JSON.parse(win.localStorage.getItem('flux-jcf-templates') || '[]');
         const createdTemplate = templates.find((t: { name: string }) => t.name === 'Test Template E2E');
-        expect(createdTemplate).to.exist;
+        expect(createdTemplate).to.not.equal(undefined);
         expect(createdTemplate.description).to.equal('Template created by E2E test');
         expect(createdTemplate.elements).to.have.length(1);
         expect(createdTemplate.elements[0].name).to.equal('COUV');
@@ -360,7 +360,7 @@ describe('JCF Template CRUD', () => {
       cy.window().then((win) => {
         const templates = JSON.parse(win.localStorage.getItem('flux-jcf-templates') || '[]');
         const savedTemplate = templates.find((t: { name: string }) => t.name === 'Keyboard Save Test');
-        expect(savedTemplate).to.exist;
+        expect(savedTemplate).to.not.equal(undefined);
       });
     });
   });
