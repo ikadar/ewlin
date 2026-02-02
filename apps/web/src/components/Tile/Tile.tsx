@@ -396,46 +396,74 @@ export const Tile = memo(function Tile({
       )}
     </div>
   );
-}, (prevProps, nextProps) => {
-  // v0.3.46: Custom comparison to prevent unnecessary re-renders
-  // v0.3.57: Updated for pick instead of drag
+}, arePropsEqual);
+
+/**
+ * Check if data props changed.
+ * Extracted to reduce cognitive complexity.
+ */
+function haveDataPropsChanged(prev: TileProps, next: TileProps): boolean {
+  return (
+    prev.assignment !== next.assignment ||
+    prev.task !== next.task ||
+    prev.job !== next.job ||
+    prev.top !== next.top ||
+    prev.pixelsPerHour !== next.pixelsPerHour ||
+    prev.isOutsourced !== next.isOutsourced ||
+    prev.similarityResults !== next.similarityResults ||
+    prev.subcolumnLayout !== next.subcolumnLayout
+  );
+}
+
+/**
+ * Check if state props changed.
+ * Extracted to reduce cognitive complexity.
+ */
+function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
+  return (
+    prev.isSelected !== next.isSelected ||
+    prev.showSwapUp !== next.showSwapUp ||
+    prev.showSwapDown !== next.showSwapDown ||
+    prev.hasConflict !== next.hasConflict ||
+    prev.isPicked !== next.isPicked ||
+    prev.isPickingActive !== next.isPickingActive ||
+    prev.isBlocked !== next.isBlocked ||
+    prev.blockingInfo !== next.blockingInfo
+  );
+}
+
+/**
+ * Check if callback props changed.
+ * Extracted to reduce cognitive complexity.
+ */
+function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
+  return (
+    prev.onSelect !== next.onSelect ||
+    prev.onRecall !== next.onRecall ||
+    prev.onSwapUp !== next.onSwapUp ||
+    prev.onSwapDown !== next.onSwapDown ||
+    prev.onToggleComplete !== next.onToggleComplete ||
+    prev.onPickFromGrid !== next.onPickFromGrid ||
+    prev.onContextMenu !== next.onContextMenu
+  );
+}
+
+/**
+ * Custom comparison function for memo to prevent unnecessary re-renders.
+ * v0.3.46: Initial implementation
+ * v0.3.57: Updated for pick instead of drag
+ * v0.4.32b: Added blocking state
+ * v0.4.39: Refactored to reduce cognitive complexity
+ */
+function arePropsEqual(prevProps: TileProps, nextProps: TileProps): boolean {
   // For selectedJobId, compare the computed mute state, not raw values
   const prevMutedBySelection = prevProps.selectedJobId !== undefined && prevProps.selectedJobId !== prevProps.job.id;
   const nextMutedBySelection = nextProps.selectedJobId !== undefined && nextProps.selectedJobId !== nextProps.job.id;
 
-  // Check if mute state changed
   if (prevMutedBySelection !== nextMutedBySelection) return false;
-
-  // v0.3.57: Pick-related props
-  if (prevProps.isPicked !== nextProps.isPicked) return false;
-  if (prevProps.isPickingActive !== nextProps.isPickingActive) return false;
-
-  // Compare other props normally (shallow comparison)
-  if (prevProps.assignment !== nextProps.assignment) return false;
-  if (prevProps.task !== nextProps.task) return false;
-  if (prevProps.job !== nextProps.job) return false;
-  if (prevProps.top !== nextProps.top) return false;
-  if (prevProps.isSelected !== nextProps.isSelected) return false;
-  if (prevProps.showSwapUp !== nextProps.showSwapUp) return false;
-  if (prevProps.showSwapDown !== nextProps.showSwapDown) return false;
-  if (prevProps.hasConflict !== nextProps.hasConflict) return false;
-  if (prevProps.pixelsPerHour !== nextProps.pixelsPerHour) return false;
-  if (prevProps.isOutsourced !== nextProps.isOutsourced) return false;
-  if (prevProps.similarityResults !== nextProps.similarityResults) return false;
-  if (prevProps.subcolumnLayout !== nextProps.subcolumnLayout) return false;
-
-  // v0.4.32b: Blocking state
-  if (prevProps.isBlocked !== nextProps.isBlocked) return false;
-  if (prevProps.blockingInfo !== nextProps.blockingInfo) return false;
-
-  // Callbacks - compare by reference
-  if (prevProps.onSelect !== nextProps.onSelect) return false;
-  if (prevProps.onRecall !== nextProps.onRecall) return false;
-  if (prevProps.onSwapUp !== nextProps.onSwapUp) return false;
-  if (prevProps.onSwapDown !== nextProps.onSwapDown) return false;
-  if (prevProps.onToggleComplete !== nextProps.onToggleComplete) return false;
-  if (prevProps.onPickFromGrid !== nextProps.onPickFromGrid) return false;
-  if (prevProps.onContextMenu !== nextProps.onContextMenu) return false;
+  if (haveDataPropsChanged(prevProps, nextProps)) return false;
+  if (haveStatePropsChanged(prevProps, nextProps)) return false;
+  if (haveCallbackPropsChanged(prevProps, nextProps)) return false;
 
   return true; // Props are equal, skip re-render
-});
+}

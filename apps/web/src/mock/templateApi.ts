@@ -344,8 +344,9 @@ export function getTemplate(id: string): JcfTemplate | null {
 
 /**
  * Create a new template.
+ * Returns a Promise for API compatibility.
  */
-export function createTemplate(data: JcfTemplateCreateInput): JcfTemplate {
+export async function createTemplate(data: JcfTemplateCreateInput): Promise<JcfTemplate> {
   const templates = loadTemplates();
   const timestamp = now();
 
@@ -368,8 +369,9 @@ export function createTemplate(data: JcfTemplateCreateInput): JcfTemplate {
 
 /**
  * Update an existing template.
+ * Returns a Promise for API compatibility.
  */
-export function updateTemplate(id: string, data: JcfTemplateUpdateInput): JcfTemplate {
+export async function updateTemplate(id: string, data: JcfTemplateUpdateInput): Promise<JcfTemplate> {
   const templates = loadTemplates();
   const index = templates.findIndex((t) => t.id === id);
 

@@ -53,6 +53,93 @@ const FORME_STATUS_LABELS: Record<string, string> = {
   delivered: 'Livrée',
 };
 
+/** Tooltip item structure */
+interface TooltipItem {
+  key: string;
+  label: string;
+  statusLabel: string;
+  isReady: boolean;
+  date?: string;
+}
+
+/**
+ * Build paper item for tooltip.
+ * Extracted to reduce cognitive complexity.
+ */
+function buildPaperItem(paper: PrerequisiteBlockingInfo['paper']): TooltipItem | null {
+  if (paper.status === 'none' && paper.isReady) return null;
+  const date =
+    paper.status === 'delivered'
+      ? formatDateDDMMYYYY(paper.deliveredAt)
+      : paper.status === 'ordered'
+        ? formatDateDDMMYYYY(paper.orderedAt)
+        : undefined;
+  return {
+    key: 'paper',
+    label: LABELS.paper,
+    statusLabel: PAPER_STATUS_LABELS[paper.status] || paper.status,
+    isReady: paper.isReady,
+    date,
+  };
+}
+
+/**
+ * Build BAT item for tooltip.
+ * Extracted to reduce cognitive complexity.
+ */
+function buildBatItem(bat: PrerequisiteBlockingInfo['bat']): TooltipItem | null {
+  if (bat.status === 'none' && bat.isReady) return null;
+  const date =
+    bat.status === 'bat_approved'
+      ? formatDateDDMMYYYY(bat.approvedAt)
+      : bat.status === 'bat_sent'
+        ? formatDateDDMMYYYY(bat.sentAt)
+        : bat.status === 'files_received'
+          ? formatDateDDMMYYYY(bat.filesReceivedAt)
+          : undefined;
+  return {
+    key: 'bat',
+    label: LABELS.bat,
+    statusLabel: BAT_STATUS_LABELS[bat.status] || bat.status,
+    isReady: bat.isReady,
+    date,
+  };
+}
+
+/**
+ * Build plates item for tooltip.
+ */
+function buildPlatesItem(plates: PrerequisiteBlockingInfo['plates']): TooltipItem | null {
+  if (plates.status === 'none' && plates.isReady) return null;
+  return {
+    key: 'plates',
+    label: LABELS.plates,
+    statusLabel: PLATES_STATUS_LABELS[plates.status] || plates.status,
+    isReady: plates.isReady,
+  };
+}
+
+/**
+ * Build forme item for tooltip.
+ * Extracted to reduce cognitive complexity.
+ */
+function buildFormeItem(forme: PrerequisiteBlockingInfo['forme']): TooltipItem | null {
+  if (forme.status === 'none' && forme.isReady) return null;
+  const date =
+    forme.status === 'delivered'
+      ? formatDateDDMMYYYY(forme.deliveredAt)
+      : forme.status === 'ordered'
+        ? formatDateDDMMYYYY(forme.orderedAt)
+        : undefined;
+  return {
+    key: 'forme',
+    label: LABELS.forme,
+    statusLabel: FORME_STATUS_LABELS[forme.status] || forme.status,
+    isReady: forme.isReady,
+    date,
+  };
+}
+
 export interface PrerequisiteTooltipProps {
   /** Blocking info with status for each prerequisite */
   blockingInfo: PrerequisiteBlockingInfo;
@@ -72,83 +159,13 @@ export const PrerequisiteTooltip = memo(function PrerequisiteTooltip({
 
   const { paper, bat, plates, forme } = blockingInfo;
 
-  // Build items to show (hide items with 'none' status unless blocking)
-  const items: Array<{
-    key: string;
-    label: string;
-    statusLabel: string;
-    isReady: boolean;
-    date?: string;
-  }> = [];
-
-  // Paper: always show if not 'none', or if blocking
-  if (paper.status !== 'none' || !paper.isReady) {
-    // Show relevant date based on status
-    const paperDate =
-      paper.status === 'delivered'
-        ? formatDateDDMMYYYY(paper.deliveredAt)
-        : paper.status === 'ordered'
-          ? formatDateDDMMYYYY(paper.orderedAt)
-          : undefined;
-
-    items.push({
-      key: 'paper',
-      label: LABELS.paper,
-      statusLabel: PAPER_STATUS_LABELS[paper.status] || paper.status,
-      isReady: paper.isReady,
-      date: paperDate,
-    });
-  }
-
-  // BAT: always show if not 'none', or if blocking
-  if (bat.status !== 'none' || !bat.isReady) {
-    // Show relevant date based on status
-    const batDate =
-      bat.status === 'bat_approved'
-        ? formatDateDDMMYYYY(bat.approvedAt)
-        : bat.status === 'bat_sent'
-          ? formatDateDDMMYYYY(bat.sentAt)
-          : bat.status === 'files_received'
-            ? formatDateDDMMYYYY(bat.filesReceivedAt)
-            : undefined;
-
-    items.push({
-      key: 'bat',
-      label: LABELS.bat,
-      statusLabel: BAT_STATUS_LABELS[bat.status] || bat.status,
-      isReady: bat.isReady,
-      date: batDate,
-    });
-  }
-
-  // Plates: always show if not 'none', or if blocking
-  if (plates.status !== 'none' || !plates.isReady) {
-    items.push({
-      key: 'plates',
-      label: LABELS.plates,
-      statusLabel: PLATES_STATUS_LABELS[plates.status] || plates.status,
-      isReady: plates.isReady,
-    });
-  }
-
-  // Forme: always show if not 'none', or if blocking
-  if (forme.status !== 'none' || !forme.isReady) {
-    // Show relevant date based on status
-    const formeDate =
-      forme.status === 'delivered'
-        ? formatDateDDMMYYYY(forme.deliveredAt)
-        : forme.status === 'ordered'
-          ? formatDateDDMMYYYY(forme.orderedAt)
-          : undefined;
-
-    items.push({
-      key: 'forme',
-      label: LABELS.forme,
-      statusLabel: FORME_STATUS_LABELS[forme.status] || forme.status,
-      isReady: forme.isReady,
-      date: formeDate,
-    });
-  }
+  // Build items to show using helper functions
+  const items: TooltipItem[] = [
+    buildPaperItem(paper),
+    buildBatItem(bat),
+    buildPlatesItem(plates),
+    buildFormeItem(forme),
+  ].filter((item): item is TooltipItem => item !== null);
 
   // If no items to show, don't render tooltip
   if (items.length === 0) return null;

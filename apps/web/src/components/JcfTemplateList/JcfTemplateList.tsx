@@ -25,6 +25,25 @@ type SortColumn = 'name' | 'clientName' | 'category' | 'elementsCount' | 'update
 type SortDirection = 'asc' | 'desc';
 
 /**
+ * Compare two templates by the specified column.
+ * Extracted to reduce cognitive complexity of the main component.
+ */
+function compareTemplates(a: JcfTemplate, b: JcfTemplate, column: SortColumn): number {
+  switch (column) {
+    case 'name':
+      return a.name.localeCompare(b.name, 'fr');
+    case 'clientName':
+      return (a.clientName || 'zzz').localeCompare(b.clientName || 'zzz', 'fr');
+    case 'category':
+      return (a.category || 'zzz').localeCompare(b.category || 'zzz', 'fr');
+    case 'elementsCount':
+      return a.elements.length - b.elements.length;
+    case 'updatedAt':
+      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+  }
+}
+
+/**
  * Sort indicator icon component.
  */
 function SortIcon({
@@ -81,24 +100,7 @@ export function JcfTemplateList({
 
   const sortedTemplates = useMemo(() => {
     return [...templates].sort((a, b) => {
-      let comparison = 0;
-      switch (sortColumn) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name, 'fr');
-          break;
-        case 'clientName':
-          comparison = (a.clientName || 'zzz').localeCompare(b.clientName || 'zzz', 'fr');
-          break;
-        case 'category':
-          comparison = (a.category || 'zzz').localeCompare(b.category || 'zzz', 'fr');
-          break;
-        case 'elementsCount':
-          comparison = a.elements.length - b.elements.length;
-          break;
-        case 'updatedAt':
-          comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-          break;
-      }
+      const comparison = compareTemplates(a, b, sortColumn);
       return sortDirection === 'asc' ? comparison : -comparison;
     });
   }, [templates, sortColumn, sortDirection]);

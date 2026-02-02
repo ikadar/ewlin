@@ -101,56 +101,61 @@ function getAvailabilityMessage(conflict: ScheduleConflict): string {
   return 'Station indisponible';
 }
 
-function getPrecedenceMessage(conflict: ScheduleConflict): string {
-  const details = conflict.details as Record<string, unknown> | undefined;
+/**
+ * Get predecessor constraint message.
+ * Extracted to reduce cognitive complexity.
+ */
+function getPredecessorMessage(details: Record<string, unknown>): string {
+  const hasDryTime = details.hasDryTime as boolean;
+  const predecessorEnd = details.predecessorEnd as string | undefined;
+  const suggestedStart = details.suggestedStart as string | undefined;
+  const proposedStart = details.proposedStart as string | undefined;
 
-  if (details?.constraintType === 'predecessor') {
-    const hasDryTime = details.hasDryTime as boolean;
-    const predecessorEnd = details.predecessorEnd as string | undefined;
-    const suggestedStart = details.suggestedStart as string | undefined;
-    const proposedStart = details.proposedStart as string | undefined;
+  // Check timing relative to predecessor end
+  if (predecessorEnd && proposedStart) {
+    const predecessorEndTime = new Date(predecessorEnd).getTime();
+    const proposedStartTime = new Date(proposedStart).getTime();
 
-    // Determine if we're before predecessor end or in drying time
-    if (predecessorEnd && proposedStart) {
-      const predecessorEndTime = new Date(predecessorEnd).getTime();
-      const proposedStartTime = new Date(proposedStart).getTime();
-
-      // If proposed start is before predecessor ends
-      if (proposedStartTime < predecessorEndTime) {
-        const time = formatTime(predecessorEnd);
-        return `Prédécesseur finit à ${time}`;
-      }
-
-      // If we're in drying time (after predecessor end but before suggested start)
-      if (hasDryTime && suggestedStart) {
-        const effectiveTime = formatTime(suggestedStart);
-        return `Séchage jusqu'à ${effectiveTime}`;
-      }
+    if (proposedStartTime < predecessorEndTime) {
+      return `Prédécesseur finit à ${formatTime(predecessorEnd)}`;
     }
 
-    // Fallback
-    if (predecessorEnd) {
-      const time = formatTime(predecessorEnd);
-      if (hasDryTime) {
-        return `Prédécesseur finit à ${time} + 4h séchage`;
-      }
-      return `Prédécesseur finit à ${time}`;
+    if (hasDryTime && suggestedStart) {
+      return `Séchage jusqu'à ${formatTime(suggestedStart)}`;
     }
-
-    return hasDryTime
-      ? 'Trop tôt (séchage requis)'
-      : 'Trop tôt';
   }
 
-  if (details?.constraintType === 'successor') {
-    const successorStart = details.successorStart as string | undefined;
+  // Fallback with predecessor end time
+  if (predecessorEnd) {
+    const time = formatTime(predecessorEnd);
+    return hasDryTime ? `Prédécesseur finit à ${time} + 4h séchage` : `Prédécesseur finit à ${time}`;
+  }
 
-    if (successorStart) {
-      const time = formatTime(successorStart);
-      return `Successeur commence à ${time}`;
-    }
+  return hasDryTime ? 'Trop tôt (séchage requis)' : 'Trop tôt';
+}
 
-    return 'Trop tard';
+/**
+ * Get successor constraint message.
+ * Extracted to reduce cognitive complexity.
+ */
+function getSuccessorMessage(details: Record<string, unknown>): string {
+  const successorStart = details.successorStart as string | undefined;
+  if (successorStart) {
+    return `Successeur commence à ${formatTime(successorStart)}`;
+  }
+  return 'Trop tard';
+}
+
+function getPrecedenceMessage(conflict: ScheduleConflict): string {
+  const details = conflict.details as Record<string, unknown> | undefined;
+  if (!details) return 'Conflit de séquence';
+
+  if (details.constraintType === 'predecessor') {
+    return getPredecessorMessage(details);
+  }
+
+  if (details.constraintType === 'successor') {
+    return getSuccessorMessage(details);
   }
 
   return 'Conflit de séquence';

@@ -108,6 +108,74 @@ export interface CompactTimelineResult {
   skippedCount: number;
 }
 
+interface ProcessAssignmentContext {
+  assignment: TaskAssignment;
+  task: Task | undefined;
+  now: Date;
+  horizonMs: number;
+  nextAvailableTime: Date;
+  snapshot: ScheduleSnapshot;
+  updatedEndTimes: Map<string, Date>;
+  station: Station;
+  stationMap: Map<string, Station>;
+  calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string;
+}
+
+interface ProcessAssignmentResult {
+  nextAvailableTime: Date;
+  update?: { scheduledStart: string; scheduledEnd: string };
+  moved: boolean;
+  skipped: boolean;
+}
+
+/**
+ * Process a single assignment during compaction.
+ * Extracted to reduce cognitive complexity.
+ */
+function processAssignment(ctx: ProcessAssignmentContext): ProcessAssignmentResult {
+  const { assignment, task, now, horizonMs, snapshot, updatedEndTimes, station, stationMap, calculateEndTimeFn } = ctx;
+  let nextAvailableTime = ctx.nextAvailableTime;
+
+  // Skip immobile tasks (already started)
+  if (isTaskImmobile(assignment, now)) {
+    const endTime = new Date(assignment.scheduledEnd);
+    if (endTime > nextAvailableTime) {
+      nextAvailableTime = endTime;
+    }
+    updatedEndTimes.set(assignment.taskId, endTime);
+    return { nextAvailableTime, skipped: true, moved: false };
+  }
+
+  // Skip tasks outside the horizon
+  if (!isWithinHorizon(assignment, now, horizonMs)) {
+    return { nextAvailableTime, skipped: false, moved: false };
+  }
+
+  // Calculate earliest possible start time
+  let earliestStart = nextAvailableTime;
+
+  // Check precedence constraint
+  if (task) {
+    const predecessorEnd = getPredecessorEndTime(task, snapshot.tasks, snapshot.elements, snapshot.assignments, updatedEndTimes);
+    if (predecessorEnd && predecessorEnd > earliestStart) {
+      earliestStart = predecessorEnd;
+    }
+  }
+
+  // Calculate new end time
+  const newEnd = calculateCompactedEndTime(task, assignment, earliestStart, stationMap.get(station.id), calculateEndTimeFn);
+
+  // Check if the assignment actually moved
+  const originalStart = new Date(assignment.scheduledStart);
+  const moved = earliestStart.getTime() !== originalStart.getTime();
+
+  // Store the update
+  const update = { scheduledStart: earliestStart.toISOString(), scheduledEnd: newEnd };
+  updatedEndTimes.set(assignment.taskId, new Date(newEnd));
+
+  return { nextAvailableTime: new Date(newEnd), update, moved, skipped: false };
+}
+
 /**
  * Compact all assignments across all stations within the specified time horizon.
  *
@@ -130,120 +198,52 @@ export function compactTimeline(options: CompactTimelineOptions): CompactTimelin
   const now = options.now ?? new Date();
   const horizonMs = horizonHours * 60 * 60 * 1000;
 
-  // Build lookup maps
   const taskMap = new Map(snapshot.tasks.map((t) => [t.id, t]));
   const stationMap = new Map(snapshot.stations.map((s) => [s.id, s]));
-
-  // Track updated end times for precedence checks
   const updatedEndTimes = new Map<string, Date>();
-  // Track all assignment updates
   const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
 
   let movedCount = 0;
   let skippedCount = 0;
 
-  // Process each station
   for (const station of snapshot.stations) {
-    // Get all assignments for this station, sorted by start time
     const stationAssignments = snapshot.assignments
       .filter((a) => a.targetId === station.id && !a.isOutsourced)
       .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
 
     if (stationAssignments.length === 0) continue;
 
-    // Track the next available start time for this station
     let nextAvailableTime = now;
 
     for (const assignment of stationAssignments) {
-      const task = taskMap.get(assignment.taskId);
-
-      // Skip immobile tasks (already started)
-      if (isTaskImmobile(assignment, now)) {
-        skippedCount++;
-        // Update next available time to after this task ends
-        const endTime = new Date(assignment.scheduledEnd);
-        if (endTime > nextAvailableTime) {
-          nextAvailableTime = endTime;
-        }
-        // Track the end time for precedence
-        updatedEndTimes.set(assignment.taskId, endTime);
-        continue;
-      }
-
-      // Skip tasks outside the horizon
-      if (!isWithinHorizon(assignment, now, horizonMs)) {
-        continue;
-      }
-
-      // Calculate earliest possible start time
-      let earliestStart = nextAvailableTime;
-
-      // Check precedence constraint
-      if (task) {
-        const predecessorEnd = getPredecessorEndTime(
-          task,
-          snapshot.tasks,
-          snapshot.elements,
-          snapshot.assignments,
-          updatedEndTimes
-        );
-        if (predecessorEnd && predecessorEnd > earliestStart) {
-          earliestStart = predecessorEnd;
-        }
-      }
-
-      // Calculate new end time
-      const newEnd = calculateCompactedEndTime(
-        task,
+      const result = processAssignment({
         assignment,
-        earliestStart,
-        stationMap.get(station.id),
-        calculateEndTimeFn
-      );
-
-      // Check if the assignment actually moved
-      const originalStart = new Date(assignment.scheduledStart);
-      if (earliestStart.getTime() !== originalStart.getTime()) {
-        movedCount++;
-      }
-
-      // Store the update
-      updatedAssignmentsMap.set(assignment.id, {
-        scheduledStart: earliestStart.toISOString(),
-        scheduledEnd: newEnd,
+        task: taskMap.get(assignment.taskId),
+        now,
+        horizonMs,
+        nextAvailableTime,
+        snapshot,
+        updatedEndTimes,
+        station,
+        stationMap,
+        calculateEndTimeFn,
       });
 
-      // Track updated end time for precedence
-      updatedEndTimes.set(assignment.taskId, new Date(newEnd));
-
-      // Update next available time
-      nextAvailableTime = new Date(newEnd);
+      nextAvailableTime = result.nextAvailableTime;
+      if (result.skipped) skippedCount++;
+      if (result.moved) movedCount++;
+      if (result.update) updatedAssignmentsMap.set(assignment.id, result.update);
     }
   }
 
-  // Apply all updates to create new assignments array
   const newAssignments = snapshot.assignments.map((assignment) => {
     const updated = updatedAssignmentsMap.get(assignment.id);
     return updated
-      ? {
-          ...assignment,
-          scheduledStart: updated.scheduledStart,
-          scheduledEnd: updated.scheduledEnd,
-          updatedAt: new Date().toISOString(),
-        }
+      ? { ...assignment, scheduledStart: updated.scheduledStart, scheduledEnd: updated.scheduledEnd, updatedAt: new Date().toISOString() }
       : assignment;
   });
 
-  console.log('Timeline compacted:', {
-    horizonHours,
-    movedCount,
-    skippedCount,
-    totalProcessed: updatedAssignmentsMap.size,
-  });
+  console.log('Timeline compacted:', { horizonHours, movedCount, skippedCount, totalProcessed: updatedAssignmentsMap.size });
 
-  return {
-    snapshot: { ...snapshot, assignments: newAssignments },
-    movedCount,
-    skippedCount,
-  };
+  return { snapshot: { ...snapshot, assignments: newAssignments }, movedCount, skippedCount };
 }

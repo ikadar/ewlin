@@ -65,11 +65,114 @@ interface AssignmentResult {
   stationNextAvailable: Map<string, Date>;
 }
 
-export function generateAssignments(options: AssignmentGeneratorOptions): AssignmentResult {
-  const { tasks, jobs: _jobs, elements, stations, baseDate = new Date() } = options;
-  const assignments: TaskAssignment[] = [];
+interface InternalTaskContext {
+  task: Task & { stationId: string };
+  stations: Station[];
+  stationNextAvailable: Map<string, Date>;
+  previousTaskEnd: Date | null;
+  startTime: Date;
+  baseDate: Date;
+}
 
-  // Track next available time per station
+interface OutsourcedTaskContext {
+  task: Task & { providerId: string; duration: { latestDepartureTime: string; openDays: number; receptionTime: string } };
+  previousTaskEnd: Date | null;
+  startTime: Date;
+  baseDate: Date;
+}
+
+/**
+ * Create assignment for an internal task.
+ * Extracted to reduce cognitive complexity.
+ */
+function createInternalAssignment(ctx: InternalTaskContext): { assignment: TaskAssignment; scheduledEnd: Date } {
+  const { task, stations, stationNextAvailable, previousTaskEnd, startTime, baseDate } = ctx;
+  const stationId = task.stationId;
+  const station = stations.find((s) => s.id === stationId);
+  const stationAvailable = stationNextAvailable.get(stationId) || startTime;
+
+  // Start time is the later of: station availability or previous task end
+  let scheduledStart = new Date(stationAvailable);
+  if (previousTaskEnd && previousTaskEnd > scheduledStart) {
+    scheduledStart = new Date(previousTaskEnd);
+  }
+
+  // Snap to grid interval (SNAP_INTERVAL_MINUTES)
+  const minutes = scheduledStart.getMinutes();
+  if (minutes % SNAP_INTERVAL_MINUTES !== 0) {
+    scheduledStart.setMinutes(Math.ceil(minutes / SNAP_INTERVAL_MINUTES) * SNAP_INTERVAL_MINUTES);
+  }
+
+  // Calculate end time with operating hours stretching (BR-ASSIGN-003b)
+  const scheduledEndStr = calculateEndTime(task, scheduledStart.toISOString(), station);
+  const scheduledEnd = new Date(scheduledEndStr);
+
+  // Only mark tasks as completed if they're in the past
+  const now = new Date();
+  const isInPast = scheduledEnd < now;
+  const isCompleted = isInPast && Math.random() > 0.2;
+
+  const assignment: TaskAssignment = {
+    id: `assign-${task.id}`,
+    taskId: task.id,
+    targetId: stationId,
+    isOutsourced: false,
+    scheduledStart: formatTimestamp(scheduledStart),
+    scheduledEnd: formatTimestamp(scheduledEnd),
+    isCompleted,
+    completedAt: isCompleted ? formatTimestamp(scheduledEnd) : null,
+    createdAt: formatTimestamp(baseDate),
+    updatedAt: formatTimestamp(baseDate),
+  };
+
+  return { assignment, scheduledEnd };
+}
+
+/**
+ * Create assignment for an outsourced task.
+ * Extracted to reduce cognitive complexity.
+ */
+function createOutsourcedAssignment(ctx: OutsourcedTaskContext): { assignment: TaskAssignment; scheduledEnd: Date } {
+  const { task, previousTaskEnd, startTime, baseDate } = ctx;
+  const providerId = task.providerId;
+
+  // Start time is after previous task
+  let scheduledStart: Date = previousTaskEnd ? new Date(previousTaskEnd) : new Date(startTime);
+
+  // Move to next workday if needed and set to departure time
+  const departureHour = parseInt(task.duration.latestDepartureTime.split(':')[0]);
+  if (scheduledStart.getHours() >= departureHour) {
+    scheduledStart = getNextWorkday(scheduledStart);
+  }
+  scheduledStart = setTime(scheduledStart, departureHour - 1, 0);
+
+  // Calculate end time based on open days
+  let scheduledEnd: Date = new Date(scheduledStart);
+  for (let i = 0; i < task.duration.openDays; i++) {
+    scheduledEnd = getNextWorkday(scheduledEnd);
+  }
+  const receptionHour = parseInt(task.duration.receptionTime.split(':')[0]);
+  scheduledEnd = setTime(scheduledEnd, receptionHour, 0);
+
+  const assignment: TaskAssignment = {
+    id: `assign-${task.id}`,
+    taskId: task.id,
+    targetId: providerId,
+    isOutsourced: true,
+    scheduledStart: formatTimestamp(scheduledStart),
+    scheduledEnd: formatTimestamp(scheduledEnd),
+    isCompleted: false,
+    completedAt: null,
+    createdAt: formatTimestamp(baseDate),
+    updatedAt: formatTimestamp(baseDate),
+  };
+
+  return { assignment, scheduledEnd };
+}
+
+export function generateAssignments(options: AssignmentGeneratorOptions): AssignmentResult {
+  const { tasks, elements, stations, baseDate = new Date() } = options;
+  const assignments: TaskAssignment[] = [];
   const stationNextAvailable = new Map<string, Date>();
 
   // Initialize station availability (start at 6:00 today)
@@ -78,100 +181,30 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
     stationNextAvailable.set(station.id, new Date(startTime));
   }
 
-  // Group tasks by job using element lookup
+  // Group and sort tasks by job
   const tasksByJobMap = groupTasksByJob(tasks, elements);
-
-  // Sort tasks within each job by sequence order
   for (const jobTasks of tasksByJobMap.values()) {
     jobTasks.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
   }
 
   // Process each job's tasks
-  for (const [_jobId, jobTasks] of tasksByJobMap.entries()) {
+  for (const [, jobTasks] of tasksByJobMap.entries()) {
     let previousTaskEnd: Date | null = null;
 
     for (const task of jobTasks) {
-      // Only create assignment for tasks with status 'Assigned'
       if (task.status !== 'Assigned') continue;
 
       if (isInternalTask(task)) {
-        const stationId = task.stationId;
-        const station = stations.find((s) => s.id === stationId);
-        const stationAvailable = stationNextAvailable.get(stationId) || startTime;
-
-        // Start time is the later of: station availability or previous task end
-        let scheduledStart = new Date(stationAvailable);
-        if (previousTaskEnd && previousTaskEnd > scheduledStart) {
-          scheduledStart = new Date(previousTaskEnd);
-        }
-
-        // Snap to grid interval (SNAP_INTERVAL_MINUTES)
-        const minutes = scheduledStart.getMinutes();
-        if (minutes % SNAP_INTERVAL_MINUTES !== 0) {
-          scheduledStart.setMinutes(Math.ceil(minutes / SNAP_INTERVAL_MINUTES) * SNAP_INTERVAL_MINUTES);
-        }
-
-        // Calculate end time with operating hours stretching (BR-ASSIGN-003b)
-        const scheduledEndStr = calculateEndTime(task, scheduledStart.toISOString(), station);
-        const scheduledEnd = new Date(scheduledEndStr);
-
-        // Only mark tasks as completed if they're in the past
-        const now = new Date();
-        const isInPast = scheduledEnd < now;
-        // 80% of past tasks are completed, future tasks are never completed
-        const isCompleted = isInPast && Math.random() > 0.2;
-
-        const assignment: TaskAssignment = {
-          id: `assign-${task.id}`,
-          taskId: task.id,
-          targetId: stationId,
-          isOutsourced: false,
-          scheduledStart: formatTimestamp(scheduledStart),
-          scheduledEnd: formatTimestamp(scheduledEnd),
-          isCompleted,
-          completedAt: isCompleted ? formatTimestamp(scheduledEnd) : null,
-          createdAt: formatTimestamp(baseDate),
-          updatedAt: formatTimestamp(baseDate),
-        };
-
+        const { assignment, scheduledEnd } = createInternalAssignment({
+          task, stations, stationNextAvailable, previousTaskEnd, startTime, baseDate,
+        });
         assignments.push(assignment);
-        stationNextAvailable.set(stationId, scheduledEnd);
+        stationNextAvailable.set(task.stationId, scheduledEnd);
         previousTaskEnd = scheduledEnd;
-
       } else if (isOutsourcedTask(task)) {
-        const providerId = task.providerId;
-
-        // Start time is after previous task
-        let scheduledStart: Date = previousTaskEnd ? new Date(previousTaskEnd) : new Date(startTime);
-
-        // Move to next workday if needed and set to departure time
-        const departureHour = parseInt(task.duration.latestDepartureTime.split(':')[0]);
-        if (scheduledStart.getHours() >= departureHour) {
-          scheduledStart = getNextWorkday(scheduledStart);
-        }
-        scheduledStart = setTime(scheduledStart, departureHour - 1, 0); // Send 1 hour before cutoff
-
-        // Calculate end time based on open days
-        let scheduledEnd: Date = new Date(scheduledStart);
-        for (let i = 0; i < task.duration.openDays; i++) {
-          scheduledEnd = getNextWorkday(scheduledEnd);
-        }
-        const receptionHour = parseInt(task.duration.receptionTime.split(':')[0]);
-        scheduledEnd = setTime(scheduledEnd, receptionHour, 0);
-
-        const assignment: TaskAssignment = {
-          id: `assign-${task.id}`,
-          taskId: task.id,
-          targetId: providerId,
-          isOutsourced: true,
-          scheduledStart: formatTimestamp(scheduledStart),
-          scheduledEnd: formatTimestamp(scheduledEnd),
-          isCompleted: false,
-          completedAt: null,
-          createdAt: formatTimestamp(baseDate),
-          updatedAt: formatTimestamp(baseDate),
-        };
-
+        const { assignment, scheduledEnd } = createOutsourcedAssignment({
+          task, previousTaskEnd, startTime, baseDate,
+        });
         assignments.push(assignment);
         previousTaskEnd = scheduledEnd;
       }

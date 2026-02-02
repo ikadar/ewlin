@@ -73,6 +73,26 @@ export type JcfMode = 'job' | 'template';
  * @param mode - 'job' or 'template' mode
  * @returns Array of required field descriptors
  */
+/**
+ * Add required field if the element is missing the specified value.
+ * Helper to reduce cognitive complexity.
+ */
+function addIfMissing(
+  required: RequiredField[],
+  element: JcfElement,
+  index: number,
+  field: JcfFieldKey,
+): void {
+  if (!element[field]) {
+    required.push({ elementIndex: index, field });
+  }
+}
+
+/**
+ * Fields required for BLOC SUPPORT.
+ */
+const BLOC_SUPPORT_FIELDS: JcfFieldKey[] = ['papier', 'pagination', 'format', 'qteFeuilles', 'imposition'];
+
 export function getRequiredFields(
   element: JcfElement,
   index: number,
@@ -87,34 +107,16 @@ export function getRequiredFields(
   if (!hasElementContent(element)) return required;
 
   // Séquence is ALWAYS required if element has any content
-  if (!element.sequence) {
-    required.push({ elementIndex: index, field: 'sequence' });
-  }
+  addIfMissing(required, element, index, 'sequence');
 
   // BLOC SUPPORT: triggered by Imposition OR Impression OR Surfacage OR Format
   if (hasBlocSupportTrigger(element)) {
-    if (!element.papier) {
-      required.push({ elementIndex: index, field: 'papier' });
-    }
-    if (!element.pagination) {
-      required.push({ elementIndex: index, field: 'pagination' });
-    }
-    if (!element.format) {
-      required.push({ elementIndex: index, field: 'format' });
-    }
-    if (!element.qteFeuilles) {
-      required.push({ elementIndex: index, field: 'qteFeuilles' });
-    }
-    if (!element.imposition) {
-      required.push({ elementIndex: index, field: 'imposition' });
-    }
+    BLOC_SUPPORT_FIELDS.forEach((field) => addIfMissing(required, element, index, field));
   }
 
   // BLOC IMPRESSION: triggered by Imposition OR Impression only
   if (hasBlocImpressionTrigger(element)) {
-    if (!element.impression) {
-      required.push({ elementIndex: index, field: 'impression' });
-    }
+    addIfMissing(required, element, index, 'impression');
   }
 
   return required;

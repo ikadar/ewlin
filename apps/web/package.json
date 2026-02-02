@@ -16,7 +16,8 @@
     "test:e2e": "cypress run --e2e",
     "test:e2e:dev": "cypress open --e2e",
     "sonar": "sonar-scanner",
-    "sonar:coverage": "pnpm test:coverage && sonar-scanner"
+    "sonar:coverage": "pnpm test:coverage && sonar-scanner",
+    "sonar:report": "./scripts/sonar-report.sh"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",

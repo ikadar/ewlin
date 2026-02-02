@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { highlightMatch } from '../JcfAutocomplete/highlightMatch';
+import { ARROW_DIRECTION_MAP } from '../JcfAutocomplete/keyboardUtils';
 import { useLazyLoadSuggestions } from '../../hooks/useLazyLoadSuggestions';
 import {
   parseLine,
@@ -434,22 +435,55 @@ export function JcfSequenceAutocomplete({
     [onBlurProp],
   );
 
+  /**
+   * Handle dropdown navigation keys when open.
+   * Extracted to reduce cognitive complexity.
+   */
+  const handleDropdownKey = useCallback(
+    (e: React.KeyboardEvent): boolean => {
+      if (!isOpen || displayedItems.length === 0) return false;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          e.stopPropagation();
+          isKeyboardNavRef.current = true;
+          setHighlightedIndex((prev) =>
+            prev < displayedItems.length - 1 ? prev + 1 : prev,
+          );
+          return true;
+        case 'ArrowUp':
+          e.preventDefault();
+          e.stopPropagation();
+          isKeyboardNavRef.current = true;
+          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+          return true;
+        case 'Enter':
+          if (!e.shiftKey && displayedItems[highlightedIndex]) {
+            e.preventDefault();
+            handleSelectSuggestion(displayedItems[highlightedIndex]);
+            return true;
+          }
+          return false;
+        case 'Escape':
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(false);
+          return true;
+        default:
+          return false;
+      }
+    },
+    [isOpen, displayedItems, highlightedIndex, handleSelectSuggestion],
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       // Alt+Arrow — always delegate to table navigation
       if (e.altKey && e.key.startsWith('Arrow')) {
         e.preventDefault();
         if (isOpen) setIsOpen(false);
-        const directionMap: Record<
-          string,
-          'up' | 'down' | 'left' | 'right'
-        > = {
-          ArrowUp: 'up',
-          ArrowDown: 'down',
-          ArrowLeft: 'left',
-          ArrowRight: 'right',
-        };
-        onArrowNav?.(e, directionMap[e.key]);
+        onArrowNav?.(e, ARROW_DIRECTION_MAP[e.key]);
         return;
       }
 
@@ -463,46 +497,9 @@ export function JcfSequenceAutocomplete({
       }
 
       // Dropdown navigation
-      if (isOpen && displayedItems.length > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          e.stopPropagation();
-          isKeyboardNavRef.current = true;
-          setHighlightedIndex((prev) =>
-            prev < displayedItems.length - 1 ? prev + 1 : prev,
-          );
-          return;
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          e.stopPropagation();
-          isKeyboardNavRef.current = true;
-          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
-          return;
-        }
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          if (displayedItems[highlightedIndex]) {
-            handleSelectSuggestion(displayedItems[highlightedIndex]);
-          }
-          return;
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsOpen(false);
-          return;
-        }
-      }
+      handleDropdownKey(e);
     },
-    [
-      isOpen,
-      displayedItems,
-      highlightedIndex,
-      handleSelectSuggestion,
-      onTabOut,
-      onArrowNav,
-    ],
+    [isOpen, handleDropdownKey, onTabOut, onArrowNav],
   );
 
   // ── Default styling ────────────────────────────────────────────────────

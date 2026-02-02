@@ -22,6 +22,12 @@ import {
   type JcfMode,
 } from './requiredFields';
 import { calculateQteFeuillesFromStrings } from './calculatedFields';
+import {
+  getTabNavigationTarget,
+  getArrowNavigationTarget,
+  createTabOutHandler,
+  createArrowNavHandler,
+} from './navigationUtils';
 import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, PAPER_TYPES, FEUILLE_FORMATS, POSTE_PRESETS, SOUSTRAITANT_PRESETS } from '../../mock/reference-data';
 
 // ── Row definitions ──
@@ -336,42 +342,24 @@ export function JcfElementsTable({
     ) => {
       const rowCount = rows.length;
       const elementCount = elements.length;
-      const lastRowIndex = rowCount - 1;
-      const lastElementIndex = elementCount - 1;
       const isTextarea = textareaFields.includes(rows[rowIndex].key);
 
       // Alt+Arrow — circular wrap navigation
       if (e.altKey && e.key.startsWith('Arrow')) {
         e.preventDefault();
-        switch (e.key) {
-          case 'ArrowDown':
-            focusCell(elementIndex, (rowIndex + 1) % rowCount);
-            break;
-          case 'ArrowUp':
-            focusCell(elementIndex, (rowIndex - 1 + rowCount) % rowCount);
-            break;
-          case 'ArrowRight':
-            focusCell((elementIndex + 1) % elementCount, rowIndex);
-            break;
-          case 'ArrowLeft':
-            focusCell(
-              (elementIndex - 1 + elementCount) % elementCount,
-              rowIndex,
-            );
-            break;
-        }
+        const direction = e.key.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
+        const target = getArrowNavigationTarget(direction, elementIndex, rowIndex, rowCount, elementCount);
+        focusCell(target.elementIndex, target.rowIndex);
         return;
       }
 
       // Enter — move to next cell (text inputs only; textareas keep newline)
       if (e.key === 'Enter' && !isTextarea) {
         e.preventDefault();
-        if (rowIndex < lastRowIndex) {
-          focusCell(elementIndex, rowIndex + 1);
-        } else if (elementIndex < lastElementIndex) {
-          focusCell(elementIndex + 1, 0);
+        const target = getTabNavigationTarget('forward', elementIndex, rowIndex, rowCount, elementCount);
+        if (target) {
+          focusCell(target.elementIndex, target.rowIndex);
         }
-        // At last cell: do nothing (Enter doesn't exit table)
         return;
       }
 
@@ -385,29 +373,13 @@ export function JcfElementsTable({
       // Tab / Shift+Tab — vertical navigation within column
       if (e.key !== 'Tab') return;
 
-      if (!e.shiftKey) {
-        // Tab — move down
-        if (rowIndex < lastRowIndex) {
-          e.preventDefault();
-          focusCell(elementIndex, rowIndex + 1);
-        } else if (elementIndex < lastElementIndex) {
-          // Last row → next column, first row
-          e.preventDefault();
-          focusCell(elementIndex + 1, 0);
-        }
-        // Last cell of table → let native Tab exit
-      } else {
-        // Shift+Tab — move up
-        if (rowIndex > 0) {
-          e.preventDefault();
-          focusCell(elementIndex, rowIndex - 1);
-        } else if (elementIndex > 0) {
-          // First row → previous column, last row
-          e.preventDefault();
-          focusCell(elementIndex - 1, lastRowIndex);
-        }
-        // First cell of table → let native Shift+Tab exit
+      const direction = e.shiftKey ? 'backward' : 'forward';
+      const target = getTabNavigationTarget(direction, elementIndex, rowIndex, rowCount, elementCount);
+      if (target) {
+        e.preventDefault();
+        focusCell(target.elementIndex, target.rowIndex);
       }
+      // null = boundary, let native Tab/Shift+Tab exit
     },
     [rows, elements.length, focusCell],
   );
@@ -651,57 +623,8 @@ export function JcfElementsTable({
                       onLearnSoustraitant={sessionLearning.learnSoustraitant}
                       sequenceWorkflow={sequenceWorkflow}
                       inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
-                      onTabOut={(e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow) {
-                            e.preventDefault();
-                            focusCell(elementIndex, rowIndex + 1);
-                          } else if (elementIndex < lastEl) {
-                            e.preventDefault();
-                            focusCell(elementIndex + 1, 0);
-                          }
-                        } else {
-                          if (rowIndex > 0) {
-                            e.preventDefault();
-                            focusCell(elementIndex, rowIndex - 1);
-                          } else if (elementIndex > 0) {
-                            e.preventDefault();
-                            focusCell(elementIndex - 1, lastRow);
-                          }
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
+                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                       onBlur={() => markFieldTouched(elementIndex, 'sequence')}
                     />
                   ) : isTextarea ? (
@@ -750,51 +673,8 @@ export function JcfElementsTable({
                             sessionPresets={sessionLearning.productFormats}
                             onLearnPreset={sessionLearning.learnProductFormat}
                             inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={(_e, direction) => {
-                              const lastRow = rows.length - 1;
-                              const lastEl = elements.length - 1;
-                              if (direction === 'forward') {
-                                if (rowIndex < lastRow)
-                                  focusCell(elementIndex, rowIndex + 1);
-                                else if (elementIndex < lastEl)
-                                  focusCell(elementIndex + 1, 0);
-                              } else {
-                                if (rowIndex > 0)
-                                  focusCell(elementIndex, rowIndex - 1);
-                                else if (elementIndex > 0)
-                                  focusCell(elementIndex - 1, lastRow);
-                              }
-                            }}
-                            onArrowNav={(_e, direction) => {
-                              const rc = rows.length;
-                              const ec = elements.length;
-                              switch (direction) {
-                                case 'down':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex + 1) % rc,
-                                  );
-                                  break;
-                                case 'up':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex - 1 + rc) % rc,
-                                  );
-                                  break;
-                                case 'right':
-                                  focusCell(
-                                    (elementIndex + 1) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                                case 'left':
-                                  focusCell(
-                                    (elementIndex - 1 + ec) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                              }
-                            }}
+                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                           />
                         </div>
                       )}
@@ -831,51 +711,8 @@ export function JcfElementsTable({
                             sessionPresets={sessionLearning.impressions}
                             onLearnPreset={sessionLearning.learnImpression}
                             inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={(_e, direction) => {
-                              const lastRow = rows.length - 1;
-                              const lastEl = elements.length - 1;
-                              if (direction === 'forward') {
-                                if (rowIndex < lastRow)
-                                  focusCell(elementIndex, rowIndex + 1);
-                                else if (elementIndex < lastEl)
-                                  focusCell(elementIndex + 1, 0);
-                              } else {
-                                if (rowIndex > 0)
-                                  focusCell(elementIndex, rowIndex - 1);
-                                else if (elementIndex > 0)
-                                  focusCell(elementIndex - 1, lastRow);
-                              }
-                            }}
-                            onArrowNav={(_e, direction) => {
-                              const rc = rows.length;
-                              const ec = elements.length;
-                              switch (direction) {
-                                case 'down':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex + 1) % rc,
-                                  );
-                                  break;
-                                case 'up':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex - 1 + rc) % rc,
-                                  );
-                                  break;
-                                case 'right':
-                                  focusCell(
-                                    (elementIndex + 1) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                                case 'left':
-                                  focusCell(
-                                    (elementIndex - 1 + ec) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                              }
-                            }}
+                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                           />
                         </div>
                       )}
@@ -912,51 +749,8 @@ export function JcfElementsTable({
                             sessionPresets={sessionLearning.surfacages}
                             onLearnPreset={sessionLearning.learnSurfacage}
                             inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={(_e, direction) => {
-                              const lastRow = rows.length - 1;
-                              const lastEl = elements.length - 1;
-                              if (direction === 'forward') {
-                                if (rowIndex < lastRow)
-                                  focusCell(elementIndex, rowIndex + 1);
-                                else if (elementIndex < lastEl)
-                                  focusCell(elementIndex + 1, 0);
-                              } else {
-                                if (rowIndex > 0)
-                                  focusCell(elementIndex, rowIndex - 1);
-                                else if (elementIndex > 0)
-                                  focusCell(elementIndex - 1, lastRow);
-                              }
-                            }}
-                            onArrowNav={(_e, direction) => {
-                              const rc = rows.length;
-                              const ec = elements.length;
-                              switch (direction) {
-                                case 'down':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex + 1) % rc,
-                                  );
-                                  break;
-                                case 'up':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex - 1 + rc) % rc,
-                                  );
-                                  break;
-                                case 'right':
-                                  focusCell(
-                                    (elementIndex + 1) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                                case 'left':
-                                  focusCell(
-                                    (elementIndex - 1 + ec) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                              }
-                            }}
+                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                           />
                         </div>
                       )}
@@ -969,51 +763,8 @@ export function JcfElementsTable({
                         handleCellChange(elementIndex, 'quantite', v)
                       }
                       inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(_e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow)
-                            focusCell(elementIndex, rowIndex + 1);
-                          else if (elementIndex < lastEl)
-                            focusCell(elementIndex + 1, 0);
-                        } else {
-                          if (rowIndex > 0)
-                            focusCell(elementIndex, rowIndex - 1);
-                          else if (elementIndex > 0)
-                            focusCell(elementIndex - 1, lastRow);
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
+                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                     />
                   ) : row.key === 'pagination' ? (
                     <JcfPaginationInput
@@ -1023,51 +774,8 @@ export function JcfElementsTable({
                         handleCellChange(elementIndex, 'pagination', v)
                       }
                       inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(_e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow)
-                            focusCell(elementIndex, rowIndex + 1);
-                          else if (elementIndex < lastEl)
-                            focusCell(elementIndex + 1, 0);
-                        } else {
-                          if (rowIndex > 0)
-                            focusCell(elementIndex, rowIndex - 1);
-                          else if (elementIndex > 0)
-                            focusCell(elementIndex - 1, lastRow);
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
+                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                     />
                   ) : row.key === 'papier' ? (
                     <div className="flex items-center gap-1">
@@ -1101,51 +809,8 @@ export function JcfElementsTable({
                             sessionPaperTypes={sessionLearning.papiers}
                             onLearnPaperType={sessionLearning.learnPapier}
                             inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={(_e, direction) => {
-                              const lastRow = rows.length - 1;
-                              const lastEl = elements.length - 1;
-                              if (direction === 'forward') {
-                                if (rowIndex < lastRow)
-                                  focusCell(elementIndex, rowIndex + 1);
-                                else if (elementIndex < lastEl)
-                                  focusCell(elementIndex + 1, 0);
-                              } else {
-                                if (rowIndex > 0)
-                                  focusCell(elementIndex, rowIndex - 1);
-                                else if (elementIndex > 0)
-                                  focusCell(elementIndex - 1, lastRow);
-                              }
-                            }}
-                            onArrowNav={(_e, direction) => {
-                              const rc = rows.length;
-                              const ec = elements.length;
-                              switch (direction) {
-                                case 'down':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex + 1) % rc,
-                                  );
-                                  break;
-                                case 'up':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex - 1 + rc) % rc,
-                                  );
-                                  break;
-                                case 'right':
-                                  focusCell(
-                                    (elementIndex + 1) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                                case 'left':
-                                  focusCell(
-                                    (elementIndex - 1 + ec) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                              }
-                            }}
+                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                           />
                         </div>
                       )}
@@ -1182,51 +847,8 @@ export function JcfElementsTable({
                             sessionFormats={sessionLearning.feuilleFormats}
                             onLearnFormat={sessionLearning.learnFeuilleFormat}
                             inputClassName={`${inputFilledClass} text-base`}
-                            onTabOut={(_e, direction) => {
-                              const lastRow = rows.length - 1;
-                              const lastEl = elements.length - 1;
-                              if (direction === 'forward') {
-                                if (rowIndex < lastRow)
-                                  focusCell(elementIndex, rowIndex + 1);
-                                else if (elementIndex < lastEl)
-                                  focusCell(elementIndex + 1, 0);
-                              } else {
-                                if (rowIndex > 0)
-                                  focusCell(elementIndex, rowIndex - 1);
-                                else if (elementIndex > 0)
-                                  focusCell(elementIndex - 1, lastRow);
-                              }
-                            }}
-                            onArrowNav={(_e, direction) => {
-                              const rc = rows.length;
-                              const ec = elements.length;
-                              switch (direction) {
-                                case 'down':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex + 1) % rc,
-                                  );
-                                  break;
-                                case 'up':
-                                  focusCell(
-                                    elementIndex,
-                                    (rowIndex - 1 + rc) % rc,
-                                  );
-                                  break;
-                                case 'right':
-                                  focusCell(
-                                    (elementIndex + 1) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                                case 'left':
-                                  focusCell(
-                                    (elementIndex - 1 + ec) % ec,
-                                    rowIndex,
-                                  );
-                                  break;
-                              }
-                            }}
+                            onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                            onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                           />
                         </div>
                       )}
@@ -1241,57 +863,8 @@ export function JcfElementsTable({
                       elementNames={elementNames}
                       currentElementName={element.name}
                       inputClassName={`${inputFilledClass} text-base`}
-                      onTabOut={(e, direction) => {
-                        const lastRow = rows.length - 1;
-                        const lastEl = elements.length - 1;
-                        if (direction === 'forward') {
-                          if (rowIndex < lastRow) {
-                            e.preventDefault();
-                            focusCell(elementIndex, rowIndex + 1);
-                          } else if (elementIndex < lastEl) {
-                            e.preventDefault();
-                            focusCell(elementIndex + 1, 0);
-                          }
-                        } else {
-                          if (rowIndex > 0) {
-                            e.preventDefault();
-                            focusCell(elementIndex, rowIndex - 1);
-                          } else if (elementIndex > 0) {
-                            e.preventDefault();
-                            focusCell(elementIndex - 1, lastRow);
-                          }
-                        }
-                      }}
-                      onArrowNav={(_e, direction) => {
-                        const rc = rows.length;
-                        const ec = elements.length;
-                        switch (direction) {
-                          case 'down':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex + 1) % rc,
-                            );
-                            break;
-                          case 'up':
-                            focusCell(
-                              elementIndex,
-                              (rowIndex - 1 + rc) % rc,
-                            );
-                            break;
-                          case 'right':
-                            focusCell(
-                              (elementIndex + 1) % ec,
-                              rowIndex,
-                            );
-                            break;
-                          case 'left':
-                            focusCell(
-                              (elementIndex - 1 + ec) % ec,
-                              rowIndex,
-                            );
-                            break;
-                        }
-                      }}
+                      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
+                      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rows.length, elements.length)}
                     />
                   ) : isQteFeuilles ? (
                     <div className="flex items-center gap-1">

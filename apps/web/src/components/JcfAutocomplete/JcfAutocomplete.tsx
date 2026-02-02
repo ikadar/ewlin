@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { highlightMatch } from './highlightMatch';
+import { ARROW_DIRECTION_MAP, handleOpenDropdownKey } from './keyboardUtils';
 import { useLazyLoadSuggestions } from '../../hooks/useLazyLoadSuggestions';
 
 export interface Suggestion {
@@ -95,18 +96,18 @@ export function JcfAutocomplete({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleSelect = useCallback((suggestion: Suggestion) => {
+    onChange(suggestion.value);
+    setIsOpen(false);
+    onSelect?.(suggestion.value);
+  }, [onChange, onSelect]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Alt+Arrow — always delegate to table navigation (open or closed)
     if (e.altKey && e.key.startsWith('Arrow')) {
       e.preventDefault();
       if (isOpen) setIsOpen(false);
-      const directionMap: Record<string, 'up' | 'down' | 'left' | 'right'> = {
-        ArrowUp: 'up',
-        ArrowDown: 'down',
-        ArrowLeft: 'left',
-        ArrowRight: 'right',
-      };
-      onArrowNav?.(e, directionMap[e.key]);
+      onArrowNav?.(e, ARROW_DIRECTION_MAP[e.key]);
       return;
     }
 
@@ -120,6 +121,7 @@ export function JcfAutocomplete({
       return;
     }
 
+    // Dropdown closed: open on arrow keys, blur on escape
     if (!isOpen) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         setIsOpen(true);
@@ -131,40 +133,16 @@ export function JcfAutocomplete({
       return;
     }
 
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        isKeyboardNavRef.current = true;
-        setHighlightedIndex((prev) =>
-          prev < displayedItems.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        isKeyboardNavRef.current = true;
-        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (displayedItems[highlightedIndex]) {
-          onChange(displayedItems[highlightedIndex].value);
-          setIsOpen(false);
-          onSelect?.(displayedItems[highlightedIndex].value);
-        }
-        break;
-      case 'Escape':
-        e.preventDefault();
-        e.stopPropagation(); // Prevent modal close
-        setIsOpen(false);
-        break;
-    }
-  };
-
-  const handleSelect = (suggestion: Suggestion) => {
-    onChange(suggestion.value);
-    setIsOpen(false);
-    onSelect?.(suggestion.value);
-  };
+    // Dropdown open: delegate to shared handler
+    handleOpenDropdownKey(e, {
+      displayedItems,
+      highlightedIndex,
+      setHighlightedIndex,
+      isKeyboardNavRef,
+      onSelect: handleSelect,
+      onClose: () => setIsOpen(false),
+    });
+  }, [isOpen, displayedItems, highlightedIndex, handleSelect, onTabOut, onArrowNav]);
 
   // Default input styling at 13px base
   const defaultInputClass =

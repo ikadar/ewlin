@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { highlightMatch } from '../JcfAutocomplete/highlightMatch';
+import { ARROW_DIRECTION_MAP, handleOpenDropdownKey } from '../JcfAutocomplete/keyboardUtils';
 import { useLazyLoadSuggestions } from '../../hooks/useLazyLoadSuggestions';
 
 export interface JcfPrecedencesAutocompleteProps {
@@ -177,16 +178,7 @@ export function JcfPrecedencesAutocomplete({
       if (e.altKey && e.key.startsWith('Arrow')) {
         e.preventDefault();
         if (isOpen) setIsOpen(false);
-        const directionMap: Record<
-          string,
-          'up' | 'down' | 'left' | 'right'
-        > = {
-          ArrowUp: 'up',
-          ArrowDown: 'down',
-          ArrowLeft: 'left',
-          ArrowRight: 'right',
-        };
-        onArrowNav?.(e, directionMap[e.key]);
+        onArrowNav?.(e, ARROW_DIRECTION_MAP[e.key]);
         return;
       }
 
@@ -201,6 +193,7 @@ export function JcfPrecedencesAutocomplete({
         return;
       }
 
+      // Dropdown closed: open on arrow keys, blur on escape
       if (!isOpen) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           setIsOpen(true);
@@ -212,40 +205,17 @@ export function JcfPrecedencesAutocomplete({
         return;
       }
 
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          isKeyboardNavRef.current = true;
-          setHighlightedIndex((prev) =>
-            prev < displayedItems.length - 1 ? prev + 1 : prev,
-          );
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          isKeyboardNavRef.current = true;
-          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (displayedItems[highlightedIndex]) {
-            handleSelect(displayedItems[highlightedIndex]);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          e.stopPropagation(); // Prevent modal close
-          setIsOpen(false);
-          break;
-      }
+      // Dropdown open: delegate to shared handler
+      handleOpenDropdownKey(e, {
+        displayedItems,
+        highlightedIndex,
+        setHighlightedIndex,
+        isKeyboardNavRef,
+        onSelect: handleSelect,
+        onClose: () => setIsOpen(false),
+      });
     },
-    [
-      isOpen,
-      displayedItems,
-      highlightedIndex,
-      handleSelect,
-      onTabOut,
-      onArrowNav,
-    ],
+    [isOpen, displayedItems, highlightedIndex, handleSelect, onTabOut, onArrowNav],
   );
 
   // Default input styling at 13px base
