@@ -1520,10 +1520,12 @@ function AppContent() {
       (c) => !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
     );
 
-    // Determine ring state
-    let ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass' = 'none';
+    // Check if only warning (non-blocking) conflicts exist
     const hasWarningOnly = blockingConflicts.length === 0 &&
       validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates');
+
+    // Determine ring state
+    let ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
 
     if (validationResult.valid) {
       ringState = 'valid';

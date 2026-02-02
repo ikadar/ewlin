@@ -531,9 +531,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
               // Precedence constraints: show for quick placement or pick
               const isPickTarget = isPicking && pickTargetStationId === station.id;
-              const effectivePrecedenceConstraints = isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement
-                ? quickPlacementPrecedenceConstraints
-                : (isPickTarget ? pickPrecedenceConstraints : undefined);
+              const showQuickPlacementConstraints = isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement;
+              let effectivePrecedenceConstraints;
+              if (showQuickPlacementConstraints) {
+                effectivePrecedenceConstraints = quickPlacementPrecedenceConstraints;
+              } else if (isPickTarget) {
+                effectivePrecedenceConstraints = pickPrecedenceConstraints;
+              }
 
               // v0.3.51: Drying time info - show only on the predecessor's station
               const effectiveDryingTimeInfo = pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined;

@@ -53,12 +53,6 @@ export function calculateMaxGroupUsage(
   stations: Station[]
 ): Map<string, number> {
   const maxUsageMap = new Map<string, number>();
-  const stationGroupMap = new Map<string, string>();
-
-  // Build station -> group lookup
-  stations.forEach((station) => {
-    stationGroupMap.set(station.id, station.groupId);
-  });
 
   // Collect all time boundaries
   const timeBoundaries = new Set<number>();

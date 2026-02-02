@@ -32,9 +32,14 @@ export interface PrerequisiteStatusProps {
 }
 
 /**
- * Get the relevant date for a status field based on current status.
+ * Get the relevant date for an ordered/delivered status.
+ * Works for both Paper and Forme statuses which share the same date logic.
  */
-function getPaperDate(status: PaperStatus, orderedAt?: string, deliveredAt?: string): string | undefined {
+function getOrderedDeliveredDate(
+  status: string,
+  orderedAt?: string,
+  deliveredAt?: string
+): string | undefined {
   if (status === 'delivered') return deliveredAt;
   if (status === 'ordered') return orderedAt;
   return undefined;
@@ -52,11 +57,11 @@ function getBatDate(
   return undefined;
 }
 
-function getFormeDate(status: FormeStatus, orderedAt?: string, deliveredAt?: string): string | undefined {
-  if (status === 'delivered') return deliveredAt;
-  if (status === 'ordered') return orderedAt;
-  return undefined;
-}
+// Type-safe wrappers using the shared implementation
+const getPaperDate = (status: PaperStatus, orderedAt?: string, deliveredAt?: string) =>
+  getOrderedDeliveredDate(status, orderedAt, deliveredAt);
+const getFormeDate = (status: FormeStatus, orderedAt?: string, deliveredAt?: string) =>
+  getOrderedDeliveredDate(status, orderedAt, deliveredAt);
 
 /**
  * Prerequisite status dropdowns for an element.

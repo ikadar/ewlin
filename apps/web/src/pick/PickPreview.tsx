@@ -221,8 +221,8 @@ function PickPreviewInner({ task, job, validationMessage, debugInfo }: PickPrevi
           <div>ring: <span className={getRingStateColorClass(debugInfo.ringState)}>{debugInfo.ringState}</span></div>
           <div>start: {debugInfo.scheduledStart ? new Date(debugInfo.scheduledStart).toLocaleTimeString() : 'null'}</div>
           <div>conflicts: {debugInfo.conflicts.length === 0 ? 'none' : debugInfo.conflicts.map(c => c.type).join(', ')}</div>
-          {debugInfo.conflicts.map((c, i) => (
-            <div key={i} className="text-zinc-400 truncate">{c.type}: {c.message}</div>
+          {debugInfo.conflicts.map((c) => (
+            <div key={`${c.type}-${c.message}`} className="text-zinc-400 truncate">{c.type}: {c.message}</div>
           ))}
         </div>
       )}

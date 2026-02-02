@@ -342,7 +342,7 @@ export function JcfSequenceAutocomplete({
       if (!suggestionValue.includes(')')) return;
 
       // Check for ST: pattern first
-      const stMatch = suggestionValue.match(/^ST:([A-Za-z0-9_]+)\(/i);
+      const stMatch = suggestionValue.match(/^ST:(\w+)\(/i);
       if (stMatch && onLearnSoustraitant) {
         onLearnSoustraitant({ name: stMatch[1] });
         return;
@@ -350,7 +350,7 @@ export function JcfSequenceAutocomplete({
 
       // Check for poste pattern
       if (!onLearnPoste) return;
-      const posteMatch = suggestionValue.match(/^([A-Za-z0-9_]+)\(/);
+      const posteMatch = suggestionValue.match(/^(\w+)\(/);
       if (!posteMatch) return;
 
       const posteName = posteMatch[1];

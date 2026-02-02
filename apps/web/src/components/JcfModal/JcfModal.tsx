@@ -88,8 +88,13 @@ export function JcfModal({
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      role="presentation"
       data-testid="jcf-modal-backdrop"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      aria-label="Close modal"
     >
       <div
         className="w-[70vw] max-w-[1400px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"

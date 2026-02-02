@@ -58,9 +58,10 @@ export interface JcfTemplateEditorModalProps {
 }
 
 /**
- * Convert JcfTemplateElement to JcfElement (form state).
+ * Convert between JcfTemplateElement and JcfElement.
+ * Both types have identical fields, so this works for both directions.
  */
-function templateElementToFormElement(el: JcfTemplateElement): JcfElement {
+function convertElement<T extends JcfElement | JcfTemplateElement>(el: T): T {
   return {
     name: el.name,
     precedences: el.precedences,
@@ -75,29 +76,12 @@ function templateElementToFormElement(el: JcfTemplateElement): JcfElement {
     qteFeuilles: el.qteFeuilles,
     commentaires: el.commentaires,
     sequence: el.sequence,
-  };
+  } as T;
 }
 
-/**
- * Convert JcfElement (form state) to JcfTemplateElement.
- */
-function formElementToTemplateElement(el: JcfElement): JcfTemplateElement {
-  return {
-    name: el.name,
-    precedences: el.precedences,
-    quantite: el.quantite,
-    format: el.format,
-    pagination: el.pagination,
-    papier: el.papier,
-    imposition: el.imposition,
-    impression: el.impression,
-    surfacage: el.surfacage,
-    autres: el.autres,
-    qteFeuilles: el.qteFeuilles,
-    commentaires: el.commentaires,
-    sequence: el.sequence,
-  };
-}
+// Type-safe wrappers
+const templateElementToFormElement = (el: JcfTemplateElement): JcfElement => convertElement(el);
+const formElementToTemplateElement = (el: JcfElement): JcfTemplateElement => convertElement(el);
 
 /**
  * Create empty template data.
@@ -334,8 +318,13 @@ function TemplateEditorContent({
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]"
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      role="presentation"
       data-testid="template-editor-backdrop"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      aria-label="Close modal"
     >
       <div
         className="w-[70vw] max-w-[1400px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"

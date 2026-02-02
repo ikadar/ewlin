@@ -470,7 +470,7 @@ export function JcfElementsTable({
         {/* Element headers */}
         {elements.map((element, index) => (
           <div
-            key={`header-${index}`}
+            key={`header-${element.name}-${index}`}
             className={`px-[10px] py-[7px] ${index < elements.length - 1 ? 'border-r border-zinc-800' : ''}`}
           >
             <div className="flex items-center justify-between gap-[7px]">

@@ -9,10 +9,10 @@
  */
 
 /** Poste line validation regex: Name(duration) or Name(setup+run) */
-const POSTE_REGEX = /^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/;
+const POSTE_REGEX = /^\w+\(\d+(\+\d+)?\)$/;
 
 /** ST line validation regex: ST:Name(duration):description */
-const ST_REGEX = /^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/;
+const ST_REGEX = /^ST:\w+\(\d+[jh]?\):.+$/;
 
 /** Default duration suggestions for poste mode */
 export const DEFAULT_DURATIONS = [
@@ -79,7 +79,7 @@ export interface CurrentLineInfo {
 export function parseLine(line: string): ParsedLine {
   // ST description: ST:Name(duration):... — typing free-text description
   // Must check before generic complete since ST desc also has (...)
-  const stDescMatch = line.match(/^ST:[A-Za-z0-9_]+\([^)]+\):(.*)$/i);
+  const stDescMatch = line.match(/^ST:\w+\([^)]+\):(.*)$/i);
   if (stDescMatch) {
     return {
       step: 'st-description',
@@ -99,7 +99,7 @@ export function parseLine(line: string): ParsedLine {
     const afterST = stMatch[2];
 
     // Inside parentheses (typing duration)
-    const parenMatch = afterST.match(/^([A-Za-z0-9_]+)\((.*)$/);
+    const parenMatch = afterST.match(/^(\w+)\((.*)$/);
     if (parenMatch) {
       return {
         step: 'st-duration',
@@ -128,7 +128,7 @@ export function parseLine(line: string): ParsedLine {
 
   // Poste with open paren (typing duration) — e.g., "G37(" or "G37(20"
   // No duration suggestions for postes (user types manually)
-  const posteParenMatch = line.match(/^([A-Za-z0-9_]+)\((.*)$/);
+  const posteParenMatch = line.match(/^(\w+)\((.*)$/);
   if (posteParenMatch) {
     return {
       step: 'complete',
