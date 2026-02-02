@@ -1713,24 +1713,38 @@ Two-part release following reference/jcf pattern.
 
 > Prepare frontend architecture for backend integration and production readiness.
 
-#### v0.4.36 - Redux Store & RTK Query Setup
+#### v0.4.36 - API Contract Design
+> **Goal:** Document TypeScript types matching backend DTOs, design RTK Query endpoints
+
+- [ ] TypeScript interfaces matching backend DTOs
+  - [ ] `ScheduleSnapshot` response type
+  - [ ] `CreateJobRequest` / `JobResponse` types
+  - [ ] `AssignTaskRequest` / `AssignmentResponse` types
+  - [ ] Error response types (ValidationError, ConflictError, etc.)
+- [ ] RTK Query endpoint design document
+  - [ ] Query endpoints: `getSnapshot`, `getClientSuggestions`, `lookupByReference`
+  - [ ] Mutation endpoints: `createJob`, `assignTask`, `rescheduleTask`, `unassignTask`, `toggleCompletion`
+  - [ ] Tag-based cache invalidation strategy
+- [ ] Request/response examples for each endpoint
+- [ ] Update `@flux/types` package if needed
+
+#### v0.4.37 - Redux Store & RTK Query Setup
 > **Goal:** Replace useState-based state management with Redux, prepare for API integration
 > **Pattern:** RTK Query + Mock Adapter (queryFn wraps existing mock/snapshot.ts)
 
 - [ ] Redux store configuration with Redux Toolkit
 - [ ] RTK Query API slice with mock adapter pattern
-  - [ ] `scheduleApi` with `useGetSnapshotQuery` hook
-  - [ ] Mutation endpoints (createAssignment, updateAssignment, etc.)
-  - [ ] Cache invalidation via tags
-- [ ] Migrate core state from App.tsx useState to Redux slices
-  - [ ] UI state (selectedJob, modals, zoom, etc.) → `uiSlice`
-  - [ ] JCF form state → `jcfSlice`
-  - [ ] Snapshot data via RTK Query (not separate slice)
+  - [ ] `scheduleApi` with endpoints designed in v0.4.36
+  - [ ] Snapshot data in RTK Query cache (no separate snapshotSlice)
+  - [ ] Mutation endpoints with cache invalidation
+- [ ] Redux slices for local UI state
+  - [ ] `uiSlice` - selectedJob, modals, zoom, contextMenu, etc.
+  - [ ] `jcfSlice` - JCF form state
 - [ ] Provider setup in main.tsx
-- [ ] DevTools integration
+- [ ] Redux DevTools integration
 - [ ] Existing fixture mechanism preserved (`?fixture=xxx` works)
 
-#### v0.4.37 - React Router Integration
+#### v0.4.38 - React Router Integration
 > **Goal:** Enable URL-based navigation and deep linking
 
 - [ ] React Router DOM installation and setup
@@ -1741,7 +1755,7 @@ Two-part release following reference/jcf pattern.
 - [ ] Navigation hooks integration
 - [ ] URL state sync (selected job, date, zoom)
 
-#### v0.4.38 - Code Quality & CI/CD
+#### v0.4.39 - Code Quality & CI/CD
 > **Goal:** Establish code quality gates and automated checks
 
 - [ ] SonarQube/SonarCloud integration
@@ -1751,7 +1765,7 @@ Two-part release following reference/jcf pattern.
 - [ ] GitHub Actions workflow for quality checks
 - [ ] Code coverage reporting to SonarCloud
 
-#### v0.4.39 - JSON Editor Contextual Autocomplete
+#### v0.4.40 - JSON Editor Contextual Autocomplete
 > **Deferred from v0.4.35**
 
 - [ ] Contextual autocomplete in JSON editor
@@ -1762,32 +1776,102 @@ Two-part release following reference/jcf pattern.
 
 ## Milestone 5: Backend API Integration (v0.5.x)
 
-### Phase 5A: Validator & API Setup
+> **Detailed plan:** See `docs/roadmap/milestone-5-plan.md`
 
-#### v0.5.0 - Validator Package Integration
-- [ ] Install @flux/schedule-validator in frontend
-- [ ] Validation utility wrapper
-- [ ] Error message formatting (French)
-- [ ] Conflict type to visual mapping
+### Phase 5A: Core API Integration
 
-#### v0.5.1 - API Client Setup
-- [ ] API client configuration (RTK Query)
-- [ ] Environment-based URL configuration
-- [ ] Error handling utilities
-- [ ] Request/response interceptors
+#### v0.5.0 - API Client Configuration
+> **Goal:** Configure RTK Query to call real backend
 
-#### v0.5.2 - Snapshot Loading
-- [ ] Replace mock with real API
-- [ ] Loading states (skeleton/spinner TBD post-MVP)
-- [ ] Error states
-- [ ] Retry logic
+- [ ] Environment-based API URL configuration (`VITE_API_URL`)
+- [ ] Base query setup with proper headers
+- [ ] CORS configuration verification
+- [ ] Error response normalization
+- [ ] Request/response logging in development
 
-#### v0.5.3 - Assignment Operations Integration
-- [ ] Create assignment via API
-- [ ] Recall via API
-- [ ] Reschedule via API
-- [ ] Toggle completion via API
-- [ ] Server validation response handling
+#### v0.5.1 - Snapshot Loading
+> **Goal:** Replace mock `getSnapshot()` with real API call
+
+- [ ] Update `scheduleApi.getSnapshot` to use `GET /api/v1/schedule/snapshot`
+- [ ] Loading state handling (skeleton/spinner)
+- [ ] Error state handling with retry
+- [ ] Verify data structure compatibility
+
+#### v0.5.2 - Assignment Operations
+> **Goal:** Connect drag-drop scheduling to real API
+
+- [ ] `createAssignment` mutation → `POST /api/v1/tasks/{id}/assign`
+- [ ] `rescheduleAssignment` mutation → `PUT /api/v1/tasks/{id}/assign`
+- [ ] `unassignTask` mutation → `DELETE /api/v1/tasks/{id}/assign`
+- [ ] Handle 409 Conflict (validation errors with `suggestedStart`)
+- [ ] Display validation error messages (French)
+
+#### v0.5.3 - Completion Toggle
+> **Goal:** Connect completion checkbox to real API
+
+- [ ] `toggleCompletion` mutation → `PUT /api/v1/tasks/{id}/completion`
+- [ ] Optimistic update with rollback on error
+
+### Phase 5B: JCF API Integration
+
+#### v0.5.4 - Job Creation via API
+> **Goal:** JCF form saves jobs to real backend
+
+- [ ] Map JCF form state to `CreateJobRequest` DTO
+- [ ] `createJob` mutation → `POST /api/v1/jobs`
+- [ ] Handle DSL validation errors from backend
+- [ ] On success: close modal, invalidate snapshot, select new job
+
+#### v0.5.5 - Client Autocomplete via API
+> **Goal:** JCF client field uses real suggestions
+
+- [ ] `getClientSuggestions` query → `GET /api/v1/jobs/clients?q={prefix}`
+- [ ] Debounced fetching
+- [ ] Replace hardcoded client list
+
+#### v0.5.6 - Reference Lookup via API
+> **Goal:** Auto-fill client when entering existing reference
+
+- [ ] `lookupByReference` query → `GET /api/v1/jobs/lookup-by-reference?ref={ref}`
+- [ ] Auto-fill client field if found
+
+### Phase 5C: Error Handling & UX
+
+#### v0.5.7 - Global Error Handling
+> **Goal:** Consistent error handling across all API calls
+
+- [ ] Error boundary for API errors
+- [ ] Toast notifications for transient errors
+- [ ] Inline error messages for form validation
+- [ ] Network error detection and retry UI
+- [ ] 503 Service Unavailable handling
+
+#### v0.5.8 - Optimistic Updates
+> **Goal:** Immediate UI feedback for common operations
+
+- [ ] Assignment creation optimistic update
+- [ ] Assignment move optimistic update
+- [ ] Completion toggle optimistic update
+- [ ] Rollback on error
+
+### Phase 5D: Testing & Verification
+
+#### v0.5.9 - E2E Tests with Real Backend
+> **Goal:** E2E tests run against actual PHP API
+
+- [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
+- [ ] Test database seeding
+- [ ] Playwright configuration for API mode
+- [ ] Key E2E tests with real backend
+- [ ] CI pipeline integration
+
+#### v0.5.10 - Performance Verification
+> **Goal:** Verify acceptable performance with real API
+
+- [ ] Snapshot load time < 2s
+- [ ] Assignment operation < 500ms
+- [ ] No UI jank during API calls
+- [ ] Performance testing with 100+ jobs
 
 ---
 
@@ -1906,8 +1990,8 @@ Two-part release following reference/jcf pattern.
 | M1        | v0.1.x  | 20       | Core Domain (Station + Job)               |
 | M2        | v0.2.x  | 19       | Scheduling Core (Assignment + Validation) |
 | M3        | v0.3.x  | 61       | Frontend Integration                      |
-| M4        | v0.4.x  | 32       | Job Creation Form (Element layer + JCF UI + Templates) |
-| M5        | v0.5.x  | 4        | Backend API Integration                   |
+| M4        | v0.4.x  | 41       | Job Creation Form + Frontend Infrastructure |
+| M5        | v0.5.x  | 11       | Backend API Integration                   |
 | M6        | v0.6.x  | 1        | DSL Syntax Highlighting (Post-MVP, optional) |
 | M7        | v1.0.x  | 9        | Production Readiness                      |
 | Post-MVP  | v1.1+   | —        | Branching, Optimization, Reporting        |
