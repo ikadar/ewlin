@@ -14,6 +14,45 @@ Milestone 5 connects the React frontend to the PHP backend API. The backend API 
 2. Error handling and loading states
 3. Optimistic updates for better UX
 4. E2E testing with real backend
+5. **Preserving fixture-based development and QA capabilities**
+
+---
+
+## Non-Functional Requirements
+
+### NFR-1: Fixture-Based QA Support
+
+**Requirement:** The `?fixture=xxx` query parameter must continue to work after API integration.
+
+**Rationale:**
+- Manual QA requires deterministic, reproducible test scenarios
+- E2E tests need predictable data
+- Development without backend access must remain possible
+- Regression testing requires stable fixtures
+
+**Implementation Strategy:**
+
+```typescript
+// In RTK Query baseQuery configuration
+const baseQueryWithFixtureSupport = async (args, api, extraOptions) => {
+  const fixture = new URLSearchParams(window.location.search).get('fixture');
+
+  if (fixture || import.meta.env.VITE_USE_MOCK === 'true') {
+    // Fixture/mock mode: use mock adapter
+    return mockBaseQuery(args, api, extraOptions);
+  }
+
+  // Production mode: use real API
+  return realBaseQuery(args, api, extraOptions);
+};
+```
+
+**Acceptance Criteria:**
+- [ ] `?fixture=xxx` loads mock data instead of calling real API
+- [ ] All existing fixtures continue to work
+- [ ] E2E tests can run in fixture mode
+- [ ] `VITE_USE_MOCK=true` enables mock mode without URL param
+- [ ] No fixture code in production bundle (tree-shaking)
 
 ---
 
@@ -72,22 +111,27 @@ Before M5 can begin, these M4 releases must be complete:
 
 ### v0.5.0 - API Client Configuration
 
-**Goal:** Configure RTK Query to call real backend instead of mocks.
+**Goal:** Configure RTK Query to call real backend, while preserving fixture/mock support.
 
 **Tasks:**
 - [ ] Environment-based API URL configuration (`VITE_API_URL`)
 - [ ] Base query setup with proper headers (Content-Type, Accept)
+- [ ] **Fixture adapter: `?fixture=xxx` bypasses real API** (NFR-1)
+- [ ] **Mock mode env var: `VITE_USE_MOCK=true`** (NFR-1)
 - [ ] CORS configuration verification
 - [ ] Error response normalization
 - [ ] Request/response logging in development
 
 **Files:**
 - `apps/web/src/store/api/baseApi.ts`
+- `apps/web/src/store/api/mockBaseQuery.ts` (new - adapter for fixtures)
 - `apps/web/.env.development`
 - `apps/web/.env.production`
 
 **Testing:**
 - [ ] API client can reach backend
+- [ ] **`?fixture=xxx` loads mock data instead of API**
+- [ ] **`VITE_USE_MOCK=true` enables mock mode**
 - [ ] Error responses are normalized
 - [ ] Environment switching works
 
@@ -418,6 +462,10 @@ M5 Phases
 2. **Real-time updates?** - WebSocket for multi-user awareness? (Currently Post-MVP)
 3. **Data seeding** - How to populate test database for E2E?
 4. **Staging environment** - Separate staging backend for testing?
+
+## Resolved Decisions
+
+1. **Fixture support after API integration** - ✅ Decided: Mock adapter pattern preserves `?fixture=xxx` functionality (NFR-1)
 
 ---
 
