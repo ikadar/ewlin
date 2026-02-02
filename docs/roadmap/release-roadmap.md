@@ -1713,20 +1713,20 @@ Two-part release following reference/jcf pattern.
 
 > Prepare frontend architecture for backend integration and production readiness.
 
-#### v0.4.36 - API Contract Design
+#### v0.4.36 - API Contract Design ✅
 > **Goal:** Document TypeScript types matching backend DTOs, design RTK Query endpoints
 
-- [ ] TypeScript interfaces matching backend DTOs
-  - [ ] `ScheduleSnapshot` response type
-  - [ ] `CreateJobRequest` / `JobResponse` types
-  - [ ] `AssignTaskRequest` / `AssignmentResponse` types
-  - [ ] Error response types (ValidationError, ConflictError, etc.)
-- [ ] RTK Query endpoint design document
-  - [ ] Query endpoints: `getSnapshot`, `getClientSuggestions`, `lookupByReference`
-  - [ ] Mutation endpoints: `createJob`, `assignTask`, `rescheduleTask`, `unassignTask`, `toggleCompletion`
-  - [ ] Tag-based cache invalidation strategy
-- [ ] Request/response examples for each endpoint
-- [ ] Update `@flux/types` package if needed
+- [x] TypeScript interfaces matching backend DTOs
+  - [x] `ScheduleSnapshot` response type
+  - [x] `CreateJobRequest` / `JobResponse` types
+  - [x] `AssignTaskRequest` / `AssignmentResponse` types
+  - [x] Error response types (ValidationError, ConflictError, etc.)
+- [x] RTK Query endpoint design document
+  - [x] Query endpoints: `getSnapshot`, `getClientSuggestions`, `lookupByReference`
+  - [x] Mutation endpoints: `createJob`, `assignTask`, `rescheduleTask`, `unassignTask`, `toggleCompletion`
+  - [x] Tag-based cache invalidation strategy
+- [x] Request/response examples for each endpoint
+- [x] Update `@flux/types` package if needed
 
 #### v0.4.37 - Redux Store & RTK Query Setup
 > **Goal:** Replace useState-based state management with Redux, prepare for API integration

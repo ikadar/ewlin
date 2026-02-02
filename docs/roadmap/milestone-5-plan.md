@@ -21,7 +21,7 @@ Milestone 5 connects the React frontend to the PHP backend API. The backend API 
 
 Before M5 can begin, these M4 releases must be complete:
 
-- [ ] **v0.4.36** - API Contract Documentation (TypeScript types matching backend DTOs)
+- [x] **v0.4.36** - API Contract Documentation (TypeScript types matching backend DTOs)
 - [ ] **v0.4.37** - Redux Store & RTK Query Setup (with mock adapter)
 - [ ] **v0.4.38** - React Router Setup
 - [ ] **v0.4.39** - SonarQube Integration
