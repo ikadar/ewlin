@@ -1773,12 +1773,13 @@ Two-part release following reference/jcf pattern.
 - GitHub Actions workflow for quality checks
 - Code coverage reporting to SonarCloud
 
-#### v0.4.40 - JSON Editor Contextual Autocomplete
-> **Deferred from v0.4.35**
+#### v0.4.40 - JSON Editor Contextual Autocomplete ✅
+> **Released:** 2026-02-02
 
-- [ ] Contextual autocomplete in JSON editor
-- [ ] Field-aware suggestions based on cursor position
-- [ ] Integration with reference data
+- [x] Contextual autocomplete in JSON editor
+- [x] Field-aware suggestions based on cursor position
+- [x] Integration with reference data
+- [x] Support for: name, format, impression, surfacage, papier, sequence
 
 ---
 
