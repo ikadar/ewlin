@@ -1839,11 +1839,12 @@ Two-part release following reference/jcf pattern.
 - [x] Debounced fetching (useDebouncedValue hook, 300ms)
 - [x] Replace hardcoded client list in JcfJobHeader and JcfTemplateHeaderForm
 
-#### v0.5.6 - Reference Lookup via API
+#### v0.5.6 - Reference Lookup via API ✅
 > **Goal:** Auto-fill client when entering existing reference
 
-- [ ] `lookupByReference` query → `GET /api/v1/jobs/lookup-by-reference?ref={ref}`
-- [ ] Auto-fill client field if found
+- [x] `lookupByReference` query → `GET /api/v1/jobs/lookup-by-reference?ref={ref}`
+- [x] Auto-fill client field if found
+- [x] Make ID field editable for reference input
 
 ### Phase 5C: Error Handling & UX
 
