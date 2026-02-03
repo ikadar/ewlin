@@ -1824,13 +1824,13 @@ Two-part release following reference/jcf pattern.
 
 ### Phase 5B: JCF API Integration
 
-#### v0.5.4 - Job Creation via API
+#### v0.5.4 - Job Creation via API ✅
 > **Goal:** JCF form saves jobs to real backend
 
-- [ ] Map JCF form state to `CreateJobRequest` DTO
-- [ ] `createJob` mutation → `POST /api/v1/jobs`
-- [ ] Handle DSL validation errors from backend
-- [ ] On success: close modal, invalidate snapshot, select new job
+- [x] Map JCF form state to `CreateJobRequest` DTO
+- [x] `createJob` mutation → `POST /api/v1/jobs`
+- [x] Handle DSL validation errors from backend
+- [x] On success: close modal, invalidate snapshot, select new job
 
 #### v0.5.5 - Client Autocomplete via API
 > **Goal:** JCF client field uses real suggestions
