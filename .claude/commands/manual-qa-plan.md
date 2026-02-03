@@ -135,24 +135,94 @@ Csak a jóváhagyás után!
 
 ## Teszt szcenárió írási útmutató
 
+### FONTOS: Minden feature-nek kell teszt szcenárió!
+
+**Egyetlen feature sem maradhat ki a QA dokumentumból!**
+
+- A Feature Katalógusban szereplő MINDEN feature-hez tartoznia kell legalább egy teszt szcenáriónak
+- Ha egy feature közvetlenül nem tesztelhető (pl. domain entity, enum, value object), akkor az API-n vagy UI-on keresztül **közvetetten** kell tesztelni
+- Példa: `StationStatus Enum` → teszteld az API-n keresztül, hogy mind a 4 státusz érték elfogadott
+
 ### Preconditions
-- Mindig add meg a fixture URL-t
-- Írd le az alkalmazás kezdő állapotát
-- Sorold fel az előfeltételeket (pl. "At least one tile visible")
+- Mindig add meg a fixture URL-t (UI) vagy az API base URL-t (API)
+- Írd le az alkalmazás/rendszer kezdő állapotát
+- Sorold fel az előfeltételeket (pl. "At least one tile visible" vagy "Station category exists")
 
 ### Steps
 - Konkrét, végrehajtható lépések
-- Használj pontos UI elemneveket
+- Használj pontos UI elemneveket vagy API endpoint URL-eket
 - Kerüld az általános utasításokat ("kattints valahova")
 
 ### Expected Results
 - Checkbox formátumban (`- [ ]`)
 - Specifikus, ellenőrizhető eredmények
-- Vizuális visszajelzések részletesen (szín, ikon, animáció)
+- Vizuális visszajelzések részletesen (szín, ikon, animáció) - UI esetén
+- Response mezők és HTTP státusz kódok - API esetén
 
-### Példa:
+---
+
+## API-specifikus teszt formátum
+
+**API csoportoknál (station-management, job-management, scheduling) kötelező:**
+
+### Request formátum
+- HTTP method és teljes endpoint URL
+- **Teljes JSON request payload** kódblokkal
+- Query paraméterek ahol releváns
+
+### Expected Results formátum
+- HTTP státusz kód (pl. `201 Created`, `400 Bad Request`)
+- **Response mezők ellenőrzése** checkboxokkal
+- Error response struktúra ellenőrzése hiba esetén
+
+### API teszt példa:
 
 ```markdown
+### API-009 - DaySchedule Value Object
+
+#### Scenario: Overlapping time slots rejected
+
+**Steps:**
+1. PUT `/api/v1/stations/{id}/schedule` with overlapping slots:
+
+\`\`\`json
+{
+  "operatingSchedule": {
+    "monday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "14:00"},
+        {"start": "12:00", "end": "17:00"}
+      ]
+    },
+    "tuesday": {"isOperating": false, "slots": []},
+    "wednesday": {"isOperating": false, "slots": []},
+    "thursday": {"isOperating": false, "slots": []},
+    "friday": {"isOperating": false, "slots": []},
+    "saturday": {"isOperating": false, "slots": []},
+    "sunday": {"isOperating": false, "slots": []}
+  }
+}
+\`\`\`
+
+**Expected Results:**
+- [ ] HTTP 400 Bad Request
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message mentions "overlap"
+- [ ] Error details include day name ("monday")
+```
+
+---
+
+## UI-specifikus teszt formátum
+
+**UI csoportoknál (layout-grid, drag-drop, navigation-ux, stb.) kötelező:**
+
+### UI teszt példa:
+
+```markdown
+### SCHED-045 - Context Menu Toggle Completion
+
 #### Scenario: Toggle task completion via context menu
 
 **Preconditions:**
