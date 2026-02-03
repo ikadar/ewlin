@@ -13,8 +13,11 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
+import { Toast } from './components/Toast';
+import { useToast } from './hooks';
+import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
@@ -414,6 +417,14 @@ function AppContent() {
     conflicts: [],
     lateJobs: [],
   };
+
+  // v0.5.2: RTK Query mutations for assignment operations
+  const [assignTask] = useAssignTaskMutation();
+  const [rescheduleTask] = useRescheduleTaskMutation();
+  const [unassignTask] = useUnassignTaskMutation();
+
+  // v0.5.2: Toast notifications for errors
+  const { toast, showToast, hideToast } = useToast();
 
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
@@ -1101,27 +1112,27 @@ function AppContent() {
   }, [snapshot.stations, pixelsPerHour, gridStartDate]);
 
   // Handle recall - remove assignment (double-click on tile)
-  const handleRecallAssignment = useCallback((assignmentId: string) => {
-    updateSnapshot((currentSnapshot) => {
-      const assignment = currentSnapshot.assignments.find((a) => a.id === assignmentId);
-      if (!assignment) {
-        console.warn('Assignment not found for recall:', assignmentId);
-        return currentSnapshot;
-      }
+  // v0.5.2: Now uses RTK Query mutation
+  const handleRecallAssignment = useCallback(async (assignmentId: string) => {
+    const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    if (!assignment) {
+      console.warn('Assignment not found for recall:', assignmentId);
+      return;
+    }
 
-      console.log('Recalling assignment:', {
-        assignmentId,
-        taskId: assignment.taskId,
-      });
-
-      // Remove the assignment
-      return {
-        ...currentSnapshot,
-        assignments: currentSnapshot.assignments.filter((a) => a.id !== assignmentId),
-      };
+    console.log('Recalling assignment:', {
+      assignmentId,
+      taskId: assignment.taskId,
     });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+
+    try {
+      await unassignTask(assignment.taskId).unwrap();
+      // Cache invalidation is automatic via invalidatesTags
+    } catch (error) {
+      console.error('Failed to recall assignment:', error);
+      showToast(getErrorMessage(error));
+    }
+  }, [snapshot.assignments, unassignTask, showToast]);
 
   // v0.4.32a: Handle element prerequisite status change
   const handleElementStatusChange = useCallback((update: ElementStatusUpdate) => {
@@ -1306,7 +1317,8 @@ function AppContent() {
   }, []);
 
   // Quick Placement: handle click to place task
-  const handleQuickPlacementClick = useCallback((stationId: string, y: number) => {
+  // v0.5.2: Now uses RTK Query mutation
+  const handleQuickPlacementClick = useCallback(async (stationId: string, y: number) => {
     if (!selectedJob || !isQuickPlacementMode) return;
 
     // Get the available task for this station
@@ -1328,10 +1340,8 @@ function AppContent() {
     const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
     const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate, pixelsPerHour);
     const scheduledStart = dropTime.toISOString();
-    const station = snapshot.stations.find((s) => s.id === stationId);
-    const scheduledEnd = calculateEndTime(taskToPlace, scheduledStart, station);
 
-    // Validate placement before creating assignment
+    // Client-side validation before API call
     const proposedAssignment: ProposedAssignment = {
       taskId: taskToPlace.id,
       targetId: stationId,
@@ -1355,52 +1365,30 @@ function AppContent() {
       return;
     }
 
-    // Create the assignment
-    const newAssignment: TaskAssignment = {
-      id: generateId(),
-      taskId: taskToPlace.id,
-      targetId: stationId,
-      isOutsourced: false,
-      scheduledStart,
-      scheduledEnd,
-      isCompleted: false,
-      completedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Update snapshot with new assignment and push-down logic
-    updateSnapshot((currentSnapshot) => {
-      const { updatedAssignments, shiftedIds } = applyPushDown(
-        currentSnapshot.assignments,
-        stationId,
-        scheduledStart,
-        scheduledEnd,
-        taskToPlace.id
-      );
-
-      if (shiftedIds.length > 0) {
-        console.log('Push-down applied to assignments:', shiftedIds);
-      }
-
-      return {
-        ...currentSnapshot,
-        assignments: [...updatedAssignments, newAssignment],
-      };
-    });
-
-    // Trigger re-render
-    invalidateSnapshot();
-
-    console.log('Quick placement assignment created:', {
-      assignmentId: newAssignment.id,
+    console.log('Quick placement creating assignment:', {
       taskId: taskToPlace.id,
       stationId,
       scheduledStart,
-      scheduledEnd,
     });
+
+    try {
+      const result = await assignTask({
+        taskId: taskToPlace.id,
+        body: {
+          targetId: stationId,
+          scheduledStart,
+          isOutsourced: false,
+        },
+      }).unwrap();
+
+      console.log('Quick placement assignment created:', result);
+      // Cache invalidation is automatic via invalidatesTags
+    } catch (error) {
+      console.error('Failed to create assignment:', error);
+      showToast(getErrorMessage(error));
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, gridStartDate, pixelsPerHour, invalidateSnapshot]);
+  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, snapshot.elements, gridStartDate, pixelsPerHour, assignTask, showToast]);
 
   // Calculate which stations have available tasks (for quick placement cursor)
   const stationsWithAvailableTasks = useMemo(() => {
@@ -1557,7 +1545,8 @@ function AppContent() {
 
   // v0.3.54: Handle click to place during pick
   // v0.3.57: Added reschedule support (when pickedAssignmentId exists)
-  const handlePickClick = useCallback((stationId: string, clientX: number, clientY: number, relativeY: number) => {
+  // v0.5.2: Now uses RTK Query mutations
+  const handlePickClick = useCallback(async (stationId: string, clientX: number, clientY: number, relativeY: number) => {
     if (!pickedTask || !pickedJob) return;
 
     // Calculate tile top from cursor position (cursor is PICK_CURSOR_OFFSET_Y pixels inside the tile)
@@ -1625,24 +1614,41 @@ function AppContent() {
     // v0.3.57: Determine if this is a reschedule (grid pick with assignmentId)
     const isRescheduleOp = pickedAssignmentId !== null;
 
-    // Create/update assignment
-    updateSnapshot((currentSnapshot) => processDropAssignment({
-      currentSnapshot,
-      task,
-      stationId,
-      scheduledStart,
-      scheduledEnd,
-      isRescheduleOp,
-      assignmentId: pickedAssignmentId ?? undefined,
-      bypassedPrecedence,
-    }));
+    // v0.5.2: Use RTK Query mutations for assignment operations
+    try {
+      if (isRescheduleOp) {
+        // Reschedule existing assignment
+        await rescheduleTask({
+          taskId: task.id,
+          body: {
+            targetId: stationId,
+            scheduledStart,
+            isOutsourced: false,
+          },
+        }).unwrap();
+        console.log('Pick reschedule completed:', { taskId: task.id, scheduledStart });
+      } else {
+        // Create new assignment
+        await assignTask({
+          taskId: task.id,
+          body: {
+            targetId: stationId,
+            scheduledStart,
+            isOutsourced: false,
+          },
+        }).unwrap();
+        console.log('Pick placement created:', { taskId: task.id, scheduledStart });
+      }
+      // Cache invalidation is automatic via invalidatesTags
+    } catch (error) {
+      console.error('Failed to place/reschedule task:', error);
+      showToast(getErrorMessage(error));
+    }
 
-    invalidateSnapshot();
     pickActions.completePlacement();
     lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking on successful placement
     setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
-    console.log(isRescheduleOp ? 'Pick reschedule completed:' : 'Pick placement created:', { taskId: task.id, scheduledStart });
-  }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, invalidateSnapshot]);
+  }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, assignTask, rescheduleTask, showToast]);
 
   // Handle global timeline compaction (v0.3.35)
   const handleCompactTimeline = useCallback((horizonHours: CompactHorizon) => {
@@ -1871,6 +1877,14 @@ function AppContent() {
           sequence: el.sequence,
         }))}
         initialClientName={jcfClient}
+      />
+
+      {/* v0.5.2: Toast notifications for errors */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onDismiss={hideToast}
       />
     </>
   );

@@ -9,3 +9,5 @@ export type { UseLazyLoadSuggestionsResult } from './useLazyLoadSuggestions';
 
 export { useSessionLearning } from './useSessionLearning';
 export type { SessionLearningState, SessionLearningActions } from './useSessionLearning';
+
+export { useToast } from './useToast';
