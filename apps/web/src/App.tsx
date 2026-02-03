@@ -13,7 +13,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -422,6 +422,7 @@ function AppContent() {
   const [assignTask] = useAssignTaskMutation();
   const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
+  const [toggleCompletion] = useToggleCompletionMutation();
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -1181,39 +1182,29 @@ function AppContent() {
     });
   }, [pixelsPerHour, gridStartDate]);
 
-  // Handle toggle completion (v0.3.33)
-  const handleToggleComplete = useCallback((assignmentId: string) => {
-    updateSnapshot((currentSnapshot) => {
-      const assignmentIndex = currentSnapshot.assignments.findIndex((a) => a.id === assignmentId);
-      if (assignmentIndex === -1) {
-        console.warn('Assignment not found for toggle:', assignmentId);
-        return currentSnapshot;
-      }
+  // Handle toggle completion (v0.3.33, v0.5.3: migrated to RTK Query mutation)
+  const handleToggleComplete = useCallback(async (assignmentId: string) => {
+    const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    if (!assignment) {
+      console.warn('Assignment not found for toggle:', assignmentId);
+      return;
+    }
 
-      const assignment = currentSnapshot.assignments[assignmentIndex];
-      const newIsCompleted = !assignment.isCompleted;
-
-      console.log('Toggling completion:', {
-        assignmentId,
-        from: assignment.isCompleted,
-        to: newIsCompleted,
-      });
-
-      // Update the assignment
-      const newAssignments = [...currentSnapshot.assignments];
-      newAssignments[assignmentIndex] = {
-        ...assignment,
-        isCompleted: newIsCompleted,
-        completedAt: newIsCompleted ? new Date().toISOString() : null,
-      };
-
-      return {
-        ...currentSnapshot,
-        assignments: newAssignments,
-      };
+    console.log('Toggling completion:', {
+      assignmentId,
+      taskId: assignment.taskId,
+      from: assignment.isCompleted,
+      to: !assignment.isCompleted,
     });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+
+    try {
+      // Optimistic update is handled in the mutation's onQueryStarted
+      await toggleCompletion(assignment.taskId).unwrap();
+    } catch (error) {
+      // Rollback is handled in the mutation's onQueryStarted
+      showToast(getErrorMessage(error));
+    }
+  }, [snapshot.assignments, toggleCompletion, showToast]);
 
   // v0.3.58: Handle context menu "Toggle completion" action
   const handleContextMenuToggleComplete = useCallback(() => {

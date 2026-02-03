@@ -1816,11 +1816,11 @@ Two-part release following reference/jcf pattern.
 - [ ] Handle 409 Conflict (validation errors with `suggestedStart`)
 - [ ] Display validation error messages (French)
 
-#### v0.5.3 - Completion Toggle
+#### v0.5.3 - Completion Toggle ✅
 > **Goal:** Connect completion checkbox to real API
 
-- [ ] `toggleCompletion` mutation → `PUT /api/v1/tasks/{id}/completion`
-- [ ] Optimistic update with rollback on error
+- [x] `toggleCompletion` mutation → `PUT /api/v1/tasks/{id}/completion`
+- [x] Optimistic update with rollback on error
 
 ### Phase 5B: JCF API Integration
 

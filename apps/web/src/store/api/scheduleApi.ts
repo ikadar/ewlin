@@ -130,7 +130,12 @@ export const scheduleApi = createApi({
      * Mock mode: mockBaseQuery handles this
      * Real mode: PUT /tasks/{taskId}/completion
      *
+     * Uses optimistic update for instant UI feedback:
+     * - Immediately toggles isCompleted in cache
+     * - Automatically rolls back on error
+     *
      * @see docs/architecture/rtk-query-design.md#toggleCompletion
+     * @see docs/releases/v0.5.3-completion-toggle.md
      */
     toggleCompletion: builder.mutation<CompletionResponse, string>({
       query: (taskId) => ({
@@ -138,6 +143,27 @@ export const scheduleApi = createApi({
         method: 'PUT',
       }),
       invalidatesTags: ['Snapshot'],
+      async onQueryStarted(taskId, { dispatch, queryFulfilled }) {
+        // Optimistic update: immediately toggle completion in cache
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const assignment = draft.assignments.find((a) => a.taskId === taskId);
+            if (assignment) {
+              assignment.isCompleted = !assignment.isCompleted;
+              assignment.completedAt = assignment.isCompleted
+                ? new Date().toISOString()
+                : null;
+              assignment.updatedAt = new Date().toISOString();
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          // Rollback on error
+          patchResult.undo();
+        }
+      },
     }),
   }),
 });
