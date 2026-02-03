@@ -3,9 +3,10 @@ import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
-import { MOCK_CLIENTS } from '../../mock/reference-data';
 import { getTemplates } from '../../mock/templateApi';
 import type { JcfTemplate } from '@flux/types';
+import { useGetClientSuggestionsQuery } from '../../store';
+import { useDebouncedValue } from '../../hooks';
 
 export interface JcfJobHeaderProps {
   jobId: string;
@@ -55,6 +56,13 @@ export function JcfJobHeader({
   // Note: setTemplates unused - templates are refreshed on component mount
   const [templates, _setTemplates] = useState<JcfTemplate[]>(() => getTemplates());
 
+  // v0.5.5: Client autocomplete via RTK Query with debounce
+  // Skip only for single character (too vague); empty string fetches all, 2+ chars filters
+  const debouncedClient = useDebouncedValue(client, 300);
+  const { data: apiClients = [] } = useGetClientSuggestionsQuery(debouncedClient, {
+    skip: debouncedClient.length === 1,
+  });
+
   const labelClass = 'block text-xs leading-[13px] text-zinc-500 mb-[3px]';
   const inputBaseClass =
     'w-full bg-zinc-900 border border-zinc-700 rounded-[3px] px-[7px] py-[5px] text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500';
@@ -63,24 +71,26 @@ export function JcfJobHeader({
 
   const clientSuggestions: Suggestion[] = useMemo(
     () => [
-      ...MOCK_CLIENTS.map((c) => ({ label: c.name, value: c.name })),
-      ...sessionClients.map((s) => ({ label: s, value: s, category: 'nouveau' })),
+      ...apiClients.map((name) => ({ label: name, value: name })),
+      ...sessionClients
+        .filter((s) => !apiClients.includes(s)) // Avoid duplicates
+        .map((s) => ({ label: s, value: s, category: 'nouveau' })),
     ],
-    [sessionClients]
+    [apiClients, sessionClients]
   );
 
   const handleClientBlur = () => {
     const trimmed = client.trim();
     if (!trimmed) return;
 
-    const existsInMock = MOCK_CLIENTS.some(
-      (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+    const existsInApi = apiClients.some(
+      (name) => name.toLowerCase() === trimmed.toLowerCase()
     );
     const existsInSession = sessionClients.some(
       (s) => s.toLowerCase() === trimmed.toLowerCase()
     );
 
-    if (!existsInMock && !existsInSession) {
+    if (!existsInApi && !existsInSession) {
       setSessionClients((prev) => [...prev, trimmed]);
     }
   };

@@ -11,3 +11,5 @@ export { useSessionLearning } from './useSessionLearning';
 export type { SessionLearningState, SessionLearningActions } from './useSessionLearning';
 
 export { useToast } from './useToast';
+
+export { useDebouncedValue } from './useDebouncedValue';

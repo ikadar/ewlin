@@ -515,11 +515,56 @@ const handleCreateJob = async (
 // Route Configuration
 // ============================================================================
 
+// ============================================================================
+// Client Suggestions Handler
+// ============================================================================
+
+/**
+ * Mock client names for suggestions
+ */
+const MOCK_CLIENT_NAMES = [
+  'Imprimerie Léon',
+  'Éditions Gallimard',
+  'Hachette Livre',
+  'Publicis France',
+  'La Poste',
+  'SNCF Communication',
+  'Air France Corporate',
+  'Carrefour Marketing',
+];
+
+/**
+ * GET /jobs/clients?q={prefix} - Get client suggestions
+ *
+ * Filters mock clients by prefix (case-insensitive).
+ * Returns all clients if prefix is empty.
+ *
+ * @see docs/releases/v0.5.5-client-autocomplete-api.md
+ */
+const handleGetClientSuggestions = async (
+  args: FetchArgs
+): Promise<{ data: string[] }> => {
+  // Extract query parameter from URL
+  const url = new URL(args.url, 'http://localhost');
+  const prefix = url.searchParams.get('q') || '';
+  const normalizedPrefix = prefix.toLowerCase().trim();
+
+  // Filter clients by prefix
+  const suggestions = normalizedPrefix
+    ? MOCK_CLIENT_NAMES.filter((name) =>
+        name.toLowerCase().includes(normalizedPrefix)
+      )
+    : MOCK_CLIENT_NAMES;
+
+  return { data: suggestions };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
 
   // Jobs
+  { method: 'GET', pattern: /^\/jobs\/clients/, handler: handleGetClientSuggestions },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
 
   // Task assignments

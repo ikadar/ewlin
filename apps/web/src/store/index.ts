@@ -64,6 +64,7 @@ export const useAppSelector = useSelector.withTypes<RootState>();
 // Re-export RTK Query hooks
 export {
   useGetSnapshotQuery,
+  useGetClientSuggestionsQuery,
   useCreateJobMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
