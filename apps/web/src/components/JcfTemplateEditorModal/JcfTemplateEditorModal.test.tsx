@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
+import { render } from '../../test/testUtils';
 import { JcfTemplateEditorModal } from './JcfTemplateEditorModal';
 import type { JcfTemplate, JcfTemplateElement } from '@flux/types';
 import { resetTemplates } from '../../mock/templateApi';

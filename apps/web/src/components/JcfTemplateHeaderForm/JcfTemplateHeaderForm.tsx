@@ -10,8 +10,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
-import { MOCK_CLIENTS } from '../../mock/reference-data';
 import { getTemplateCategories } from '../../mock/templateApi';
+import { useGetClientSuggestionsQuery } from '../../store';
+import { useDebouncedValue } from '../../hooks';
 
 export interface TemplateHeaderData {
   name: string;
@@ -41,6 +42,13 @@ export function JcfTemplateHeaderForm({
 
   // Load existing categories from templates
   const existingCategories = useMemo(() => getTemplateCategories(), []);
+
+  // v0.5.5: Client autocomplete via RTK Query with debounce
+  // Skip only for single character (too vague); empty string fetches all, 2+ chars filters
+  const debouncedClient = useDebouncedValue(value.clientName, 300);
+  const { data: apiClients = [] } = useGetClientSuggestionsQuery(debouncedClient, {
+    skip: debouncedClient.length === 1,
+  });
 
   // Styles harmonized with JcfJobHeader (13px base)
   const labelClass = 'block text-xs leading-[13px] text-zinc-500 mb-[3px]';
@@ -85,27 +93,29 @@ export function JcfTemplateHeaderForm({
 
   const clientSuggestions: Suggestion[] = useMemo(
     () => [
-      ...MOCK_CLIENTS.map((c) => ({ label: c.name, value: c.name })),
-      ...sessionClients.map((s) => ({ label: s, value: s, category: 'nouveau' })),
+      ...apiClients.map((name) => ({ label: name, value: name })),
+      ...sessionClients
+        .filter((s) => !apiClients.includes(s)) // Avoid duplicates
+        .map((s) => ({ label: s, value: s, category: 'nouveau' })),
     ],
-    [sessionClients]
+    [apiClients, sessionClients]
   );
 
   const handleClientBlur = useCallback(() => {
     const trimmed = value.clientName.trim();
     if (!trimmed) return;
 
-    const existsInMock = MOCK_CLIENTS.some(
-      (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+    const existsInApi = apiClients.some(
+      (name) => name.toLowerCase() === trimmed.toLowerCase()
     );
     const existsInSession = sessionClients.some(
       (s) => s.toLowerCase() === trimmed.toLowerCase()
     );
 
-    if (!existsInMock && !existsInSession) {
+    if (!existsInApi && !existsInSession) {
       setSessionClients((prev) => [...prev, trimmed]);
     }
-  }, [value.clientName, sessionClients]);
+  }, [value.clientName, apiClients, sessionClients]);
 
   return (
     <div
