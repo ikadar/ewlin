@@ -1832,12 +1832,12 @@ Two-part release following reference/jcf pattern.
 - [x] Handle DSL validation errors from backend
 - [x] On success: close modal, invalidate snapshot, select new job
 
-#### v0.5.5 - Client Autocomplete via API
+#### v0.5.5 - Client Autocomplete via API ✅
 > **Goal:** JCF client field uses real suggestions
 
-- [ ] `getClientSuggestions` query → `GET /api/v1/jobs/clients?q={prefix}`
-- [ ] Debounced fetching
-- [ ] Replace hardcoded client list
+- [x] `getClientSuggestions` query → `GET /api/v1/jobs/clients?q={prefix}`
+- [x] Debounced fetching (useDebouncedValue hook, 300ms)
+- [x] Replace hardcoded client list in JcfJobHeader and JcfTemplateHeaderForm
 
 #### v0.5.6 - Reference Lookup via API
 > **Goal:** Auto-fill client when entering existing reference
