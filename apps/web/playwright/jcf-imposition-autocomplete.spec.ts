@@ -131,12 +131,12 @@ test.describe('v0.4.18: JCF Imposition Autocomplete', () => {
       await expect(dropdown).toBeVisible();
 
       // First item highlighted by default
-      const firstItem = dropdown.locator('> div').nth(0);
+      const firstItem = dropdown.locator('> button').nth(0);
       await expect(firstItem).toHaveClass(/bg-blue-600/);
 
       // ArrowDown — second item highlighted
       await page.keyboard.press('ArrowDown');
-      const secondItem = dropdown.locator('> div').nth(1);
+      const secondItem = dropdown.locator('> button').nth(1);
       await expect(secondItem).toHaveClass(/bg-blue-600/);
 
       // ArrowUp — first item highlighted again

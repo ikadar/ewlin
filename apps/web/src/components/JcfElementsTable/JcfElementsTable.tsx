@@ -259,6 +259,7 @@ export function JcfElementsTable({
         handleSaveName(index);
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation(); // Prevent modal from closing
         setEditingElementIndex(null);
       }
     },
@@ -354,6 +355,7 @@ export function JcfElementsTable({
       // Escape — blur current cell
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation(); // Prevent modal from closing
         (e.target as HTMLElement).blur();
         return;
       }

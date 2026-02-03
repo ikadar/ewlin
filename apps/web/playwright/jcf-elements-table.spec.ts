@@ -96,6 +96,9 @@ test.describe('v0.4.9: JCF Elements Table Grid Layout', () => {
     await input.fill('COUV');
     await input.press('Enter');
 
+    // Wait for input to disappear (edit mode ends)
+    await expect(input).not.toBeVisible();
+
     // Verify name changed
     await expect(
       page.locator('[data-testid="jcf-element-name-0"]'),
@@ -107,8 +110,12 @@ test.describe('v0.4.9: JCF Elements Table Grid Layout', () => {
   }) => {
     await page.locator('[data-testid="jcf-element-name-0"]').click();
     const input = page.locator('[data-testid="jcf-element-name-input-0"]');
+    await expect(input).toBeVisible();
     await input.fill('NEWNAME');
     await input.press('Escape');
+
+    // Wait for input to disappear (edit mode ends)
+    await expect(input).not.toBeVisible();
 
     // Name should be restored to ELT
     await expect(

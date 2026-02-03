@@ -114,6 +114,7 @@ export function JcfAutocomplete({
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation(); // Prevent modal from closing
       (e.target as HTMLElement).blur();
       return true;
     }

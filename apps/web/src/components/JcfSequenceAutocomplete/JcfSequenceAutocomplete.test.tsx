@@ -178,7 +178,7 @@ describe('JcfSequenceAutocomplete', () => {
       );
       if (dropdown) {
         const firstItem = dropdown.querySelector(
-          'div[class*="cursor-pointer"]',
+          'button',
         );
         if (firstItem) {
           fireEvent.mouseDown(firstItem);
@@ -341,7 +341,7 @@ describe('JcfSequenceAutocomplete', () => {
         expect(dropdown.textContent).toContain('CustomMachine');
         // Session postes should appear before presets
         const items = dropdown.querySelectorAll(
-          'div[class*="cursor-pointer"]',
+          'button',
         );
         if (items.length > 0) {
           expect(items[0].textContent).toContain('CustomMachine');
@@ -427,7 +427,7 @@ describe('JcfSequenceAutocomplete', () => {
       );
       if (dropdown) {
         const firstItem = dropdown.querySelector(
-          'div[class*="cursor-pointer"]',
+          'button',
         );
         if (firstItem) {
           fireEvent.mouseDown(firstItem);
@@ -561,7 +561,7 @@ describe('JcfSequenceAutocomplete', () => {
       if (dropdown) {
         expect(dropdown.textContent).toContain('CustomST');
         const items = dropdown.querySelectorAll(
-          'div[class*="cursor-pointer"]',
+          'button',
         );
         if (items.length > 0) {
           expect(items[0].textContent).toContain('CustomST');
@@ -621,7 +621,7 @@ describe('JcfSequenceAutocomplete', () => {
       );
       if (dropdown) {
         const items = dropdown.querySelectorAll(
-          'div[class*="cursor-pointer"]',
+          'button',
         );
         // Massicot machines (P137, VM) should come before others
         // First items should be priority ones

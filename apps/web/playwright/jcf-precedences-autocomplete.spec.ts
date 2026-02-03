@@ -111,14 +111,14 @@ test.describe('v0.4.19: JCF Precedences Autocomplete', () => {
       await expect(dropdown).toBeVisible();
 
       // First item highlighted by default
-      const firstItem = dropdown.locator('> div').nth(0);
+      const firstItem = dropdown.locator('> button').nth(0);
       await expect(firstItem).toHaveClass(/bg-blue-600/);
 
       // If there are multiple items, ArrowDown should move highlight
-      const itemCount = await dropdown.locator('> div').count();
+      const itemCount = await dropdown.locator('> button').count();
       if (itemCount > 1) {
         await page.keyboard.press('ArrowDown');
-        const secondItem = dropdown.locator('> div').nth(1);
+        const secondItem = dropdown.locator('> button').nth(1);
         await expect(secondItem).toHaveClass(/bg-blue-600/);
 
         await page.keyboard.press('ArrowUp');

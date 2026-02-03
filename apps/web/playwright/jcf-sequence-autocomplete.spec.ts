@@ -225,8 +225,9 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
   /**
    * v0.4.22: Workflow-Guided Suggestions Tests
    *
-   * When a test fixture is active (?fixture=test), the JCF elements table
-   * receives a test workflow: ['Presse offset, Presse numérique', 'Massicot', 'Plieuse', 'Conditionnement']
+   * These tests require a template with workflow to be selected.
+   * The workflow defines expected production step categories:
+   * ['Presse offset', 'Massicot', 'Plieuse', 'Conditionnement']
    *
    * These tests verify:
    * - Priority postes (matching expected category) appear first
@@ -234,6 +235,19 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
    * - Step advances after completing each line
    */
   test.describe('v0.4.22: Workflow-guided suggestions', () => {
+    // Select template to activate workflow before each test
+    test.beforeEach(async ({ page }) => {
+      const templateInput = page.locator('#jcf-template');
+      await templateInput.click();
+      await templateInput.fill('Brochure A4');
+
+      const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
+      await expect(templateDropdown).toBeVisible();
+      // Select "Brochure A4" (not "Brochure A4 piquée")
+      await templateDropdown.locator('button').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+      await page.waitForTimeout(300);
+    });
+
     test('shows star marker for priority postes at step 0', async ({ page }) => {
       const sequenceTextarea = page.locator('#cell-0-11');
       await sequenceTextarea.click();
@@ -254,7 +268,7 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       await expect(dropdown).toBeVisible();
 
       // Get all suggestion items
-      const items = dropdown.locator('div[class*="cursor-pointer"]');
+      const items = dropdown.locator('> button');
       const firstItemText = await items.first().textContent();
 
       // First item should be a priority poste (Presse offset or Presse numérique machine)
@@ -381,8 +395,8 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     await expect(templateDropdown).toBeVisible();
 
     // Click the exact "Brochure A4" option (not "Brochure A4 piquée")
-    // Each dropdown item is a div, find the one where first span contains exactly "Brochure A4"
-    await templateDropdown.locator('div').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+    // Each dropdown item is a button, find the one where first span contains exactly "Brochure A4"
+    await templateDropdown.locator('button').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
 
     // Wait for template to be applied (elements table updates)
     await page.waitForTimeout(300);
@@ -409,7 +423,7 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     // Select from dropdown - exact match to avoid "Brochure A4 piquée"
     const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
     await expect(templateDropdown).toBeVisible();
-    await templateDropdown.locator('div').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+    await templateDropdown.locator('button').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
     await page.waitForTimeout(300);
 
     // Clear template

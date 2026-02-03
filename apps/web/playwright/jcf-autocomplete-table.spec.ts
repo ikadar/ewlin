@@ -53,7 +53,7 @@ test.describe('v0.4.11: JCF Autocomplete Table Integration', () => {
       await page.keyboard.press('ArrowDown');
       const dropdown = page.locator('[data-testid="jcf-client-dropdown"]');
       // Second item should be highlighted (bg-blue-600)
-      const secondItem = dropdown.locator('> div').nth(1);
+      const secondItem = dropdown.locator('> button').nth(1);
       await expect(secondItem).toHaveClass(/bg-blue-600/);
     });
 
@@ -67,7 +67,7 @@ test.describe('v0.4.11: JCF Autocomplete Table Integration', () => {
       await page.keyboard.press('ArrowUp');
       const dropdown = page.locator('[data-testid="jcf-client-dropdown"]');
       // First item should be highlighted again
-      const firstItem = dropdown.locator('> div').nth(0);
+      const firstItem = dropdown.locator('> button').nth(0);
       await expect(firstItem).toHaveClass(/bg-blue-600/);
     });
   });

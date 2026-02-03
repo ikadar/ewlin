@@ -181,6 +181,7 @@ export function JcfPrecedencesAutocomplete({
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation(); // Prevent modal from closing
       (e.target as HTMLElement).blur();
       return true;
     }
