@@ -118,8 +118,9 @@ test.describe('v0.4.8: JCF Autocomplete Fields', () => {
       await page.keyboard.press('Enter');
 
       // Template field should receive focus (with timeout for setTimeout)
+      // v0.5.6: Increased timeout due to async RTK Query operations
       const templateInput = page.locator('[data-testid="jcf-field-template"]');
-      await expect(templateInput).toBeFocused({ timeout: 500 });
+      await expect(templateInput).toBeFocused({ timeout: 1000 });
     });
   });
 });

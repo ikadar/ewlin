@@ -5,11 +5,13 @@ import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
 import { getTemplates } from '../../mock/templateApi';
 import type { JcfTemplate } from '@flux/types';
-import { useGetClientSuggestionsQuery } from '../../store';
+import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery } from '../../store';
 import { useDebouncedValue } from '../../hooks';
 
 export interface JcfJobHeaderProps {
   jobId: string;
+  /** Called when job ID/reference is changed (v0.5.6) */
+  onJobIdChange?: (value: string) => void;
   client: string;
   onClientChange: (value: string) => void;
   template: string;
@@ -35,6 +37,7 @@ export interface JcfJobHeaderProps {
  */
 export function JcfJobHeader({
   jobId,
+  onJobIdChange,
   client,
   onClientChange,
   template,
@@ -62,6 +65,27 @@ export function JcfJobHeader({
   const { data: apiClients = [] } = useGetClientSuggestionsQuery(debouncedClient, {
     skip: debouncedClient.length === 1,
   });
+
+  // v0.5.6: Lazy reference lookup for auto-filling client on blur
+  const [triggerLookup] = useLazyLookupByReferenceQuery();
+
+  // v0.5.6: Handle job ID blur - trigger lookup if client is empty
+  const handleJobIdBlur = useCallback(async () => {
+    const trimmedJobId = jobId.trim();
+    const trimmedClient = client.trim();
+
+    // Only lookup if jobId has value and client is empty
+    if (trimmedJobId && !trimmedClient) {
+      try {
+        const result = await triggerLookup(trimmedJobId).unwrap();
+        if (result.client) {
+          onClientChange(result.client);
+        }
+      } catch {
+        // Silently ignore lookup errors - just don't auto-fill
+      }
+    }
+  }, [jobId, client, triggerLookup, onClientChange]);
 
   const labelClass = 'block text-xs leading-[13px] text-zinc-500 mb-[3px]';
   const inputBaseClass =
@@ -166,7 +190,7 @@ export function JcfJobHeader({
       data-testid="jcf-job-header"
     >
       <div className="flex gap-[10px] flex-wrap">
-        {/* ID — readonly */}
+        {/* ID — editable for reference lookup (v0.5.6) */}
         <div className="w-[91px]">
           <label htmlFor="jcf-job-id" className={labelClass}>
             ID
@@ -175,9 +199,15 @@ export function JcfJobHeader({
             id="jcf-job-id"
             type="text"
             value={jobId}
-            readOnly
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-[3px] px-[7px] py-[5px] text-zinc-400 font-mono cursor-not-allowed"
-            tabIndex={-1}
+            onChange={onJobIdChange ? (e) => onJobIdChange(e.target.value) : undefined}
+            onBlur={handleJobIdBlur}
+            readOnly={!onJobIdChange}
+            className={`w-full border border-zinc-700 rounded-[3px] px-[7px] py-[5px] font-mono ${
+              onJobIdChange
+                ? 'bg-zinc-900 text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500'
+                : 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
+            }`}
+            tabIndex={onJobIdChange ? 0 : -1}
             data-testid="jcf-field-id"
           />
         </div>

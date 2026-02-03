@@ -1815,6 +1815,7 @@ function AppContent() {
       >
         <JcfJobHeader
           jobId={jcfJobId}
+          onJobIdChange={setJcfJobId}
           client={jcfClient}
           onClientChange={setJcfClient}
           template={jcfTemplate}

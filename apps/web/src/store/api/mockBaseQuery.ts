@@ -22,6 +22,7 @@ import type {
   Job,
   Element,
   Task,
+  ReferenceLookupResponse,
 } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
@@ -559,12 +560,46 @@ const handleGetClientSuggestions = async (
   return { data: suggestions };
 };
 
+/**
+ * GET /jobs/lookup-by-reference?ref={reference} - Lookup job by reference
+ *
+ * Searches existing jobs for matching reference (case-insensitive).
+ * Returns client name if found, null otherwise.
+ *
+ * @see docs/releases/v0.5.6-reference-lookup-api.md
+ */
+const handleLookupByReference = async (
+  args: FetchArgs
+): Promise<{ data: ReferenceLookupResponse }> => {
+  // Extract query parameter from URL
+  const url = new URL(args.url, 'http://localhost');
+  const reference = url.searchParams.get('ref') || '';
+  const normalizedRef = reference.toLowerCase().trim();
+
+  if (!normalizedRef) {
+    return { data: { client: null } };
+  }
+
+  // Search existing jobs
+  const currentSnapshot = getSnapshot();
+  const matchingJob = currentSnapshot.jobs.find(
+    (job) => job.reference.toLowerCase() === normalizedRef
+  );
+
+  return {
+    data: {
+      client: matchingJob?.client ?? null,
+    },
+  };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
 
   // Jobs
   { method: 'GET', pattern: /^\/jobs\/clients/, handler: handleGetClientSuggestions },
+  { method: 'GET', pattern: /^\/jobs\/lookup-by-reference/, handler: handleLookupByReference },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
 
   // Task assignments

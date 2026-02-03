@@ -65,6 +65,8 @@ export const useAppSelector = useSelector.withTypes<RootState>();
 export {
   useGetSnapshotQuery,
   useGetClientSuggestionsQuery,
+  useLookupByReferenceQuery,
+  useLazyLookupByReferenceQuery,
   useCreateJobMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,

@@ -40,9 +40,14 @@ test.describe('v0.4.7: JCF Job Header Basic Fields', () => {
       expect(value).toMatch(/^J-\d{4}-\d{4}$/);
     });
 
-    test('ID field is readonly', async ({ page }) => {
+    test('ID field is editable for reference lookup (v0.5.6)', async ({ page }) => {
       const idField = page.locator('[data-testid="jcf-field-id"]');
-      await expect(idField).toHaveAttribute('readonly', '');
+      // v0.5.6: ID field is now editable to support reference lookup
+      await expect(idField).not.toHaveAttribute('readonly');
+      // Can type into the field
+      await idField.clear();
+      await idField.fill('TEST-REF');
+      await expect(idField).toHaveValue('TEST-REF');
     });
   });
 

@@ -222,5 +222,76 @@ describe('mockBaseQuery', () => {
       expect((result.data as any).taskId).toBe('task-1');
       expect((result.data as any).isCompleted).toBe(true);
     });
+
+    describe('GET /jobs/lookup-by-reference', () => {
+      it('returns client when reference matches existing job', async () => {
+        const mockSnapshot = {
+          jobs: [
+            { id: 'job-1', reference: 'J-2026-0001', client: 'Imprimerie Léon' },
+            { id: 'job-2', reference: 'J-2026-0002', client: 'Hachette Livre' },
+          ],
+        };
+        vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
+
+        const result = await mockBaseQuery(
+          '/jobs/lookup-by-reference?ref=J-2026-0001',
+          {} as any,
+          {}
+        );
+
+        expect(result.data).toEqual({ client: 'Imprimerie Léon' });
+      });
+
+      it('returns null client when reference does not match', async () => {
+        const mockSnapshot = {
+          jobs: [
+            { id: 'job-1', reference: 'J-2026-0001', client: 'Imprimerie Léon' },
+          ],
+        };
+        vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
+
+        const result = await mockBaseQuery(
+          '/jobs/lookup-by-reference?ref=J-2026-9999',
+          {} as any,
+          {}
+        );
+
+        expect(result.data).toEqual({ client: null });
+      });
+
+      it('matches reference case-insensitively', async () => {
+        const mockSnapshot = {
+          jobs: [
+            { id: 'job-1', reference: 'J-2026-0001', client: 'Imprimerie Léon' },
+          ],
+        };
+        vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
+
+        const result = await mockBaseQuery(
+          '/jobs/lookup-by-reference?ref=j-2026-0001',
+          {} as any,
+          {}
+        );
+
+        expect(result.data).toEqual({ client: 'Imprimerie Léon' });
+      });
+
+      it('returns null for empty reference', async () => {
+        const mockSnapshot = {
+          jobs: [
+            { id: 'job-1', reference: 'J-2026-0001', client: 'Imprimerie Léon' },
+          ],
+        };
+        vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
+
+        const result = await mockBaseQuery(
+          '/jobs/lookup-by-reference?ref=',
+          {} as any,
+          {}
+        );
+
+        expect(result.data).toEqual({ client: null });
+      });
+    });
   });
 });

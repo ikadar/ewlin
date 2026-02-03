@@ -18,6 +18,7 @@ import type {
   CompletionResponse,
   UnassignmentResponse,
   ClientSuggestionsResponse,
+  ReferenceLookupResponse,
 } from '@flux/types';
 
 /**
@@ -76,6 +77,20 @@ export const scheduleApi = createApi({
     getClientSuggestions: builder.query<ClientSuggestionsResponse, string>({
       query: (prefix) => `/jobs/clients?q=${encodeURIComponent(prefix)}`,
       providesTags: ['ClientSuggestions'],
+    }),
+
+    /**
+     * Lookup job by reference to get associated client name.
+     *
+     * Mock mode: mockBaseQuery checks existing jobs in snapshot
+     * Real mode: GET /jobs/lookup-by-reference?ref={reference}
+     *
+     * @param reference - Job reference to lookup
+     * @returns { client: string | null } - Client name if found, null otherwise
+     * @see docs/releases/v0.5.6-reference-lookup-api.md
+     */
+    lookupByReference: builder.query<ReferenceLookupResponse, string>({
+      query: (reference) => `/jobs/lookup-by-reference?ref=${encodeURIComponent(reference)}`,
     }),
 
     // ========================================================================
@@ -207,6 +222,8 @@ export const scheduleApi = createApi({
 export const {
   useGetSnapshotQuery,
   useGetClientSuggestionsQuery,
+  useLookupByReferenceQuery,
+  useLazyLookupByReferenceQuery,
   useCreateJobMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
