@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { ErrorState } from './components/ErrorState';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
@@ -12,6 +14,7 @@ import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
 import { useGetSnapshotQuery, scheduleApi } from './store';
+import { shouldUseMockMode } from './store/api/baseApi';
 import { useAppDispatch } from './store';
 import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
@@ -379,8 +382,15 @@ function handlePageScroll(e: KeyboardEvent, ctx: KeyboardContext): boolean {
 // Inner App component that uses drag state context
 function AppContent() {
   // v0.4.37: RTK Query for snapshot data
+  // v0.5.1: Added loading and error state handling
   const dispatch = useAppDispatch();
-  const { data: snapshotData } = useGetSnapshotQuery();
+  const {
+    data: snapshotData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useGetSnapshotQuery();
 
   // Helper to trigger refetch after local updateSnapshot calls
   // This bridges the gap between the mock layer and RTK Query cache
@@ -388,28 +398,22 @@ function AppContent() {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
   }, [dispatch]);
 
-  // Memoized snapshot with loading guard (mock layer always returns data synchronously)
-  // The empty snapshot is a fallback that should never actually be used
-  const snapshot = useMemo(() => {
-    if (!snapshotData) {
-      // Return minimal valid snapshot during initial load (should be instant with mock)
-      return {
-        version: 0,
-        generatedAt: new Date().toISOString(),
-        stations: [],
-        categories: [],
-        groups: [],
-        providers: [],
-        jobs: [],
-        elements: [],
-        tasks: [],
-        assignments: [],
-        conflicts: [],
-        lateJobs: [],
-      };
-    }
-    return snapshotData;
-  }, [snapshotData]);
+  // Memoized snapshot with loading guard
+  // snapshotData may be undefined during loading or error states
+  const snapshot = snapshotData ?? {
+    version: 0,
+    generatedAt: new Date().toISOString(),
+    stations: [],
+    categories: [],
+    groups: [],
+    providers: [],
+    jobs: [],
+    elements: [],
+    tasks: [],
+    assignments: [],
+    conflicts: [],
+    lateJobs: [],
+  };
 
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
@@ -1659,6 +1663,19 @@ function AppContent() {
       setIsCompactingTimeline(false);
     }, 300); // Small delay for visual feedback
   }, [invalidateSnapshot]);
+
+  // v0.5.1: Show loading spinner during initial fetch (real API mode only)
+  // In mock mode, data is always instantly available, so we skip the loading state
+  // This check is placed after all hooks to comply with Rules of Hooks
+  const isMockMode = shouldUseMockMode();
+  if (isLoading && !isMockMode) {
+    return <LoadingSpinner message="Chargement des données..." />;
+  }
+
+  // v0.5.1: Show error state with retry button if fetch failed
+  if (isError) {
+    return <ErrorState error={error} onRetry={refetch} />;
+  }
 
   return (
     <>
