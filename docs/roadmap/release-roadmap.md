@@ -1789,14 +1789,14 @@ Two-part release following reference/jcf pattern.
 
 ### Phase 5A: Core API Integration
 
-#### v0.5.0 - API Client Configuration
+#### ✅ v0.5.0 - API Client Configuration
 > **Goal:** Configure RTK Query to call real backend
 
-- [ ] Environment-based API URL configuration (`VITE_API_URL`)
-- [ ] Base query setup with proper headers
-- [ ] CORS configuration verification
-- [ ] Error response normalization
-- [ ] Request/response logging in development
+- [x] Environment-based API URL configuration (`VITE_API_URL`)
+- [x] Base query setup with proper headers
+- [x] Hybrid base query with fixture support (NFR-1)
+- [x] Error response normalization
+- [x] Request/response logging in development
 
 #### v0.5.1 - Snapshot Loading
 > **Goal:** Replace mock `getSnapshot()` with real API call
