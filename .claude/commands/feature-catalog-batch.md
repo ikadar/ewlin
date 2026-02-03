@@ -6,6 +6,146 @@ description: Feature katalógus batch feldolgozása
 
 Dolgozd fel a megadott batch-et a Feature Katalógus készítéséhez.
 
+---
+
+## 0. FÁZIS: Fájl inicializálás (ha szükséges)
+
+**ELŐSZÖR** ellenőrizd, hogy létezik-e a `docs/features/feature-catalog.md` fájl.
+
+Ha **NEM létezik**, hozd létre az alábbi sablonnal:
+
+````markdown
+# Feature Catalog
+
+> **Status:** In Progress
+>
+> **Last Updated:** {TODAY}
+>
+> **Purpose:** Single Source of Truth az alkalmazás összes aktív feature-jéről.
+
+---
+
+## Overview
+
+Ez a dokumentum az alkalmazás összes aktív feature-jét tartalmazza, logikai csoportokba rendezve. A Manual QA Plan ebből a katalógusból származik.
+
+### Státuszok
+
+| Státusz | Jelentés |
+|---------|----------|
+| `Active` | Működő, tesztelt feature |
+| `Suspicious` | Gyanús (nincs teszt, de kód létezik) - review szükséges |
+| `Deprecated` | Felülírt vagy eltávolított - nem kerül a QA Plan-be |
+
+### ID Prefixek
+
+| Prefix | Terület |
+|--------|---------|
+| `API-` | Backend API (M1, M2) |
+| `SCHED-` | Scheduler UI (M3) |
+| `JCF-` | Job Creation Form (M4) |
+
+---
+
+## Backend API Features
+
+### B1: Station Management API (v0.1.0 - v0.1.7)
+
+*Pending - B1 batch feldolgozás után*
+
+### B2: Job Management API (v0.1.9 - v0.1.19)
+
+*Pending - B2 batch feldolgozás után*
+
+### B3: Validation & Assignment API (v0.2.7 - v0.2.18)
+
+*Pending - B3 batch feldolgozás után*
+
+---
+
+## Scheduler UI Features
+
+### B4: Mock Data, Layout, Grid (v0.3.0 - v0.3.10)
+
+*Pending - B4 batch feldolgozás után*
+
+### B5: Drag & Drop Basics (v0.3.11 - v0.3.20)
+
+*Pending - B5 batch feldolgozás után*
+
+### B6: Station Compact, Fixes (v0.3.21 - v0.3.33)
+
+*Pending - B6 batch feldolgozás után*
+
+### B7: Navigation, Layout, UX (v0.3.34 - v0.3.46)
+
+*Pending - B7 batch feldolgozás után*
+
+### B8: DateStrip, Validation, Pick&Place (v0.3.47 - v0.3.60)
+
+*Pending - B8 batch feldolgozás után*
+
+---
+
+## Job Creation Form Features
+
+### B9: Element Layer, JCF Basics (v0.4.0 - v0.4.12)
+
+*Pending - B9 batch feldolgozás után*
+
+### B10: JCF Autocomplete Fields (v0.4.13 - v0.4.24)
+
+*Pending - B10 batch feldolgozás után*
+
+### B11: JCF Validation, Templates, API (v0.4.25 - v0.4.40)
+
+*Pending - B11 batch feldolgozás után*
+
+---
+
+## QA Document Mapping
+
+Ez a szekció definiálja, hogy a Feature Katalógus batch-ei hogyan képződnek le a Manual QA dokumentumokra. A `/manual-qa-plan` parancs ezt a mappinget használja.
+
+| QA Csoport | Batch-ek | Output fájl | Leírás |
+|------------|----------|-------------|--------|
+| station-management | B1 | `api/station-management.md` | Station, Category, Group, Provider CRUD + Schedule API |
+| job-management | B2 | `api/job-management.md` | Job, Task, Element, Comments API |
+| scheduling | B3 | `api/scheduling.md` | Assignment, Validation, Conflict detection API |
+| layout-grid | B4 | `scheduler/layout-grid.md` | Sidebar, Jobs List, Grid layout, Station columns |
+| drag-drop | B5, B6 | `scheduler/drag-drop.md` | Drag & Drop, Validation feedback, Station compact view |
+| navigation-ux | B7 | `scheduler/navigation-ux.md` | Keyboard navigation, Layout modes, UX improvements |
+| datestrip-pickplace | B8 | `scheduler/datestrip-pickplace.md` | DateStrip, Pick & Place, Context menu |
+| elements-table | B9 | `jcf/elements-table.md` | Element layer, JcfElementsTable, Row operations |
+| autocomplete | B10 | `jcf/autocomplete.md` | JCF Autocomplete mezők (Papier, Imposition, etc.) |
+| validation-templates | B11 | `jcf/validation-templates.md` | JCF Validation, Templates, JSON Editor |
+
+**Megjegyzés:** A mapping finomítható a batch-ek feldolgozása során, ha az összevonás vagy szétbontás logikusabb struktúrát eredményez.
+
+---
+
+## Statistics
+
+| Batch | Status | Features | Active | Suspicious | Deprecated |
+|-------|--------|----------|--------|------------|------------|
+| B1 | ⏳ Pending | - | - | - | - |
+| B2 | ⏳ Pending | - | - | - | - |
+| B3 | ⏳ Pending | - | - | - | - |
+| B4 | ⏳ Pending | - | - | - | - |
+| B5 | ⏳ Pending | - | - | - | - |
+| B6 | ⏳ Pending | - | - | - | - |
+| B7 | ⏳ Pending | - | - | - | - |
+| B8 | ⏳ Pending | - | - | - | - |
+| B9 | ⏳ Pending | - | - | - | - |
+| B10 | ⏳ Pending | - | - | - | - |
+| B11 | ⏳ Pending | - | - | - | - |
+| **Total** | | **0** | **0** | **0** | **0** |
+````
+
+Ha **LÉTEZIK** a fájl, olvasd be és folytasd a következő fázissal.
+
+---
+
 ## Batch információk
 
 Olvasd be a `docs/qa/feature-catalog-planning.md` dokumentumot a batch-ek listájáért és a teljes workflow leírásáért.
@@ -169,9 +309,35 @@ Kérdezd meg:
 
 Csak a jóváhagyás után!
 
-1. **Ha még nem létezik, hozd létre:** `docs/features/feature-catalog.md`
-2. **Add hozzá a batch feature-eit** a katalógushoz
-3. **Csak az `Active` és `Suspicious` státuszú feature-öket** vedd fel
+1. **Olvasd be a meglévő katalógust:** `docs/features/feature-catalog.md`
+
+2. **Keresd meg a batch placeholder-ét** és cseréld le a feature táblázatra:
+   ```
+   *Pending - B{N} batch feldolgozás után*
+   ```
+   ↓
+   ```markdown
+   | ID | Feature | Leírás | Státusz | Release |
+   |----|---------|--------|---------|---------|
+   | ... | ... | ... | Active | v... |
+   ```
+
+3. **Ha vannak Deprecated feature-ök**, add hozzá külön szekcióban:
+   ```markdown
+   #### Deprecated Features (v{VERSION})
+
+   | ID | Feature | Mi váltotta fel |
+   |----|---------|-----------------|
+   | ... | ... | ... |
+   ```
+
+4. **Frissítsd a Statistics táblát:**
+   - Batch Status: `⏳ Pending` → `✅ Complete`
+   - Features: összes feature szám
+   - Active/Suspicious/Deprecated: bontás szerint
+   - Total sor: összesítés frissítése
+
+5. **Frissítsd a "Last Updated" dátumot** a fejlécben
 
 ---
 
