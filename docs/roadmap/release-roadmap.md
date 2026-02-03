@@ -1806,12 +1806,13 @@ Two-part release following reference/jcf pattern.
 - [x] Loading skipped in mock mode (instant data)
 - [ ] Verify data structure compatibility
 
-#### v0.5.2 - Assignment Operations
+#### ✅ v0.5.2 - Assignment Operations
 > **Goal:** Connect drag-drop scheduling to real API
 
-- [ ] `createAssignment` mutation → `POST /api/v1/tasks/{id}/assign`
-- [ ] `rescheduleAssignment` mutation → `PUT /api/v1/tasks/{id}/assign`
-- [ ] `unassignTask` mutation → `DELETE /api/v1/tasks/{id}/assign`
+- [x] `assignTask` mutation for new assignments
+- [x] `rescheduleTask` mutation for tile moves
+- [x] `unassignTask` mutation for recall
+- [x] Toast notifications for errors
 - [ ] Handle 409 Conflict (validation errors with `suggestedStart`)
 - [ ] Display validation error messages (French)
 
