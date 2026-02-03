@@ -18,6 +18,22 @@ import type {
   CompletionResponse,
   UnassignmentResponse,
 } from '@flux/types';
+
+/**
+ * Response from createJob mutation.
+ * Simplified response with essential job info.
+ */
+interface CreateJobResponse {
+  id: string;
+  reference: string;
+  client: string;
+  description: string;
+  workshopExitDate: string;
+  status: string;
+  elementIds: string[];
+  taskIds: string[];
+  createdAt: string;
+}
 import { baseQueryWithFixtureSupport } from './baseApi';
 
 // ============================================================================
@@ -54,12 +70,13 @@ export const scheduleApi = createApi({
     /**
      * Create a new job from JCF form data.
      *
-     * Mock mode: Currently a no-op (job creation uses existing api/jobs.ts)
+     * Mock mode: Creates job, elements, and tasks in mock snapshot
      * Real mode: POST /jobs
      *
      * @see docs/architecture/rtk-query-design.md#createJob
+     * @see docs/releases/v0.5.4-job-creation-via-api.md
      */
-    createJob: builder.mutation<void, CreateJobRequest>({
+    createJob: builder.mutation<CreateJobResponse, CreateJobRequest>({
       query: (body) => ({
         url: '/jobs',
         method: 'POST',

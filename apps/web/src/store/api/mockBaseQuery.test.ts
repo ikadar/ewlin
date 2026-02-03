@@ -93,13 +93,43 @@ describe('mockBaseQuery', () => {
     });
 
     it('handles POST /jobs (createJob)', async () => {
+      const mockSnapshot = {
+        jobs: [],
+        elements: [],
+        tasks: [],
+        stations: [],
+        assignments: [],
+      };
+      vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
+      vi.mocked(snapshotModule.updateSnapshot).mockImplementation(() => {});
+
       const result = await mockBaseQuery(
-        { url: '/jobs', method: 'POST', body: { reference: 'JOB-001' } },
+        {
+          url: '/jobs',
+          method: 'POST',
+          body: {
+            reference: 'JOB-001',
+            client: 'Test Client',
+            description: 'Test Job',
+            workshopExitDate: '2026-02-10',
+            elements: [
+              {
+                name: 'ELT',
+                label: 'Test Element',
+                sequence: '[Offset] 30 | [Massicot] 15',
+              },
+            ],
+          },
+        },
         {} as any,
         {}
       );
 
-      expect(result).toEqual({ data: undefined });
+      expect(result.data).toBeDefined();
+      expect((result.data as any).reference).toBe('JOB-001');
+      expect((result.data as any).client).toBe('Test Client');
+      expect((result.data as any).elementIds).toHaveLength(1);
+      expect((result.data as any).taskIds).toHaveLength(2); // 2 tasks from sequence
     });
 
     it('handles POST /tasks/:id/assign', async () => {

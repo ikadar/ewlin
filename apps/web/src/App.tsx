@@ -13,7 +13,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCreateJobMutation } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -31,7 +31,7 @@ import {
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
-import { createJob, transformJcfToRequest, JobApiError } from './api';
+import { transformJcfToRequest } from './api';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -423,6 +423,7 @@ function AppContent() {
   const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
+  const [createJob] = useCreateJobMutation();
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -527,7 +528,7 @@ function AppContent() {
   // v0.4.33: API error state
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
 
-  // v0.4.33: Save job via API
+  // v0.4.33: Save job via API (v0.5.4: migrated to RTK Query mutation)
   const handleJcfSave = useCallback(async () => {
     if (!jcfSaveAttemptRef.current) return;
 
@@ -545,9 +546,10 @@ function AppContent() {
         jcfDeadline,
         jcfElements
       );
-      await createJob(request);
+      await createJob(request).unwrap();
 
       // Success: close modal and reset form
+      // Cache invalidation is automatic via invalidatesTags: ['Snapshot']
       setIsJcfSaving(false);
       navigate('/'); // v0.4.38: Navigate away to close modal
       setJcfClient('');
@@ -559,21 +561,12 @@ function AppContent() {
       setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
     } catch (error) {
       setIsJcfSaving(false);
-      if (error instanceof JobApiError) {
-        // Format validation errors if present
-        if (error.violations && error.violations.length > 0) {
-          const messages = error.violations.map((v) => `${v.propertyPath}: ${v.message}`);
-          setJcfSaveError(messages.join('\n'));
-        } else {
-          setJcfSaveError(error.message);
-        }
-      } else if (error instanceof Error) {
-        setJcfSaveError(error.message);
-      } else {
-        setJcfSaveError('An unexpected error occurred');
-      }
+      // v0.5.4: Use getErrorMessage for normalized error handling
+      const errorMessage = getErrorMessage(error);
+      setJcfSaveError(errorMessage);
+      showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, navigate]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, navigate, createJob, showToast]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {

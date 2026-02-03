@@ -18,6 +18,10 @@ import type {
   InternalTask,
   Station,
   TaskAssignment,
+  CreateJobRequest,
+  Job,
+  Element,
+  Task,
 } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
@@ -248,19 +252,268 @@ const handleToggleCompletion = async (
 };
 
 // ============================================================================
-// Route Configuration
+// Job Creation Handler
 // ============================================================================
 
 /**
- * POST /jobs - Create job (mock implementation)
- * Note: In mock mode, job creation is currently a no-op.
- * The actual mock job creation is handled by the JCF form's direct mock calls.
+ * Response type for create job operation
  */
-const handleCreateJob = async (): Promise<{ data: void }> => {
-  // Mock implementation - return success
-  // Actual job creation in mock mode uses existing mock/api.ts
-  return { data: undefined };
+interface CreateJobResponse {
+  id: string;
+  reference: string;
+  client: string;
+  description: string;
+  workshopExitDate: string;
+  status: string;
+  elementIds: string[];
+  taskIds: string[];
+  createdAt: string;
+}
+
+/**
+ * Parsed task from sequence DSL
+ */
+interface ParsedTask {
+  actionType: string;
+  durationMinutes: number;
+}
+
+/**
+ * Action type to station ID mapping
+ */
+const ACTION_TO_STATION: Record<string, string> = {
+  // Offset printing
+  offset: 'sta-komori-g40',
+  'presse offset': 'sta-komori-g40',
+  impression: 'sta-komori-g40',
+  // Digital printing
+  numérique: 'sta-xerox',
+  'presse numérique': 'sta-xerox',
+  digital: 'sta-xerox',
+  // Cutting
+  massicot: 'sta-polar-137',
+  coupe: 'sta-polar-137',
+  découpe: 'sta-polar-137',
+  // Folding
+  plieuse: 'sta-stahl',
+  pliage: 'sta-stahl',
+  // Binding/Finishing
+  reliure: 'sta-muller',
+  assemblage: 'sta-muller',
+  conditionnement: 'sta-horizon',
+  finition: 'sta-horizon',
 };
+
+/**
+ * Job color palette (cycles through for new jobs)
+ */
+const JOB_COLORS = [
+  '#3B82F6', // blue
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#F59E0B', // amber
+  '#10B981', // emerald
+  '#EF4444', // red
+  '#06B6D4', // cyan
+  '#84CC16', // lime
+];
+
+/**
+ * Parse sequence DSL into individual tasks.
+ *
+ * Format: "[Action] duration | [Action2] duration2"
+ * Example: "[Offset] 30 | [Massicot] 15" → [{actionType: "offset", duration: 30}, ...]
+ *
+ * @param sequence - The sequence DSL string
+ * @returns Array of parsed tasks
+ */
+function parseSequenceDsl(sequence: string): ParsedTask[] {
+  if (!sequence || sequence.trim() === '') {
+    return [];
+  }
+
+  const tasks: ParsedTask[] = [];
+  const parts = sequence.split('|').map((p) => p.trim()).filter((p) => p.length > 0);
+
+  for (const part of parts) {
+    // Match pattern: [ActionType] duration
+    const match = part.match(/\[([^\]]+)\]\s*(\d+)/);
+    if (match) {
+      const actionType = match[1].toLowerCase().trim();
+      const durationMinutes = parseInt(match[2], 10);
+      tasks.push({ actionType, durationMinutes });
+    }
+  }
+
+  return tasks;
+}
+
+/**
+ * Get station ID for an action type
+ */
+function getStationForAction(actionType: string): string {
+  const normalizedAction = actionType.toLowerCase().trim();
+
+  // Direct match
+  if (ACTION_TO_STATION[normalizedAction]) {
+    return ACTION_TO_STATION[normalizedAction];
+  }
+
+  // Partial match
+  for (const [key, stationId] of Object.entries(ACTION_TO_STATION)) {
+    if (normalizedAction.includes(key) || key.includes(normalizedAction)) {
+      return stationId;
+    }
+  }
+
+  // Default to first offset press
+  return 'sta-komori-g40';
+}
+
+/**
+ * POST /jobs - Create job (mock implementation)
+ *
+ * Creates a new job with elements and tasks in the mock snapshot.
+ * Parses the sequence DSL to create internal tasks.
+ *
+ * @see docs/releases/v0.5.4-job-creation-via-api.md
+ */
+const handleCreateJob = async (
+  args: FetchArgs
+): Promise<{ data: CreateJobResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as CreateJobRequest;
+  const now = new Date().toISOString();
+  const currentSnapshot = getSnapshot();
+
+  // Generate unique job ID
+  const existingJobCount = currentSnapshot.jobs.length;
+  const jobId = `job-api-${Date.now()}-${existingJobCount}`;
+
+  // Pick a color for the new job (cycle through colors)
+  const colorIndex = existingJobCount % JOB_COLORS.length;
+  const jobColor = JOB_COLORS[colorIndex];
+
+  // Process elements and create tasks
+  const newElements: Element[] = [];
+  const newTasks: Task[] = [];
+  const elementIds: string[] = [];
+  const allTaskIds: string[] = [];
+
+  // Map element names to IDs for prerequisite resolution
+  const elementNameToId: Record<string, string> = {};
+
+  // First pass: create elements and their tasks
+  const elements = body.elements || [];
+  for (let elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+    const elementInput = elements[elementIndex];
+    const elementId = `elem-${jobId}-${elementIndex}`;
+    elementIds.push(elementId);
+    elementNameToId[elementInput.name] = elementId;
+
+    // Parse sequence DSL to create tasks
+    const parsedTasks = parseSequenceDsl(elementInput.sequence || '');
+    const taskIds: string[] = [];
+
+    for (let taskIndex = 0; taskIndex < parsedTasks.length; taskIndex++) {
+      const parsedTask = parsedTasks[taskIndex];
+      const taskId = `task-${jobId}-${elementIndex}-${taskIndex}`;
+      taskIds.push(taskId);
+      allTaskIds.push(taskId);
+
+      const stationId = getStationForAction(parsedTask.actionType);
+
+      // Calculate setup and run times (roughly 20% setup, 80% run)
+      const setupMinutes = Math.max(15, Math.round(parsedTask.durationMinutes * 0.2));
+      const runMinutes = parsedTask.durationMinutes - setupMinutes;
+
+      const task: InternalTask = {
+        id: taskId,
+        elementId,
+        sequenceOrder: taskIndex,
+        status: 'Ready',
+        type: 'Internal',
+        stationId,
+        duration: {
+          setupMinutes,
+          runMinutes,
+        },
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      newTasks.push(task);
+    }
+
+    // Create element
+    const element: Element = {
+      id: elementId,
+      jobId,
+      name: elementInput.name,
+      label: elementInput.label,
+      prerequisiteElementIds: [], // Will be resolved in second pass
+      taskIds,
+      paperStatus: 'in_stock',
+      batStatus: 'bat_approved',
+      plateStatus: 'ready',
+    };
+
+    newElements.push(element);
+  }
+
+  // Second pass: resolve prerequisite element names to IDs
+  for (let i = 0; i < elements.length; i++) {
+    const elementInput = elements[i];
+    if (elementInput.prerequisiteNames && elementInput.prerequisiteNames.length > 0) {
+      newElements[i].prerequisiteElementIds = elementInput.prerequisiteNames
+        .map((name) => elementNameToId[name])
+        .filter((id) => id !== undefined);
+    }
+  }
+
+  // Create job
+  const job: Job = {
+    id: jobId,
+    reference: body.reference,
+    client: body.client,
+    description: body.description,
+    status: 'Draft',
+    workshopExitDate: body.workshopExitDate,
+    fullyScheduled: false,
+    color: jobColor,
+    comments: [],
+    elementIds,
+    taskIds: allTaskIds,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // Update snapshot
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    jobs: [...snapshot.jobs, job],
+    elements: [...snapshot.elements, ...newElements],
+    tasks: [...snapshot.tasks, ...newTasks],
+  }));
+
+  // Return response
+  const response: CreateJobResponse = {
+    id: jobId,
+    reference: body.reference,
+    client: body.client,
+    description: body.description,
+    workshopExitDate: body.workshopExitDate,
+    status: 'Draft',
+    elementIds,
+    taskIds: allTaskIds,
+    createdAt: now,
+  };
+
+  return { data: response };
+};
+
+// ============================================================================
+// Route Configuration
+// ============================================================================
 
 const routes: MockRoute[] = [
   // Schedule
