@@ -1889,15 +1889,15 @@ Two-part release following reference/jcf pattern.
 - [x] API endpoint updates for new fields
 - [x] Backward compatibility for existing data
 
-#### v0.5.10 - Remove Provider Columns
+#### v0.5.10 - Remove Provider Columns ✅
 > **Goal:** Simplify grid by removing provider columns
 
-- [ ] Remove `ProviderColumn` component
-- [ ] Remove `ProviderHeader` component
-- [ ] Remove provider column rendering from `SchedulingGrid`
-- [ ] Remove `isOutsourced` prop from `Tile` component
-- [ ] Update mock data and fixtures
-- [ ] Remove obsolete tests
+- [x] Remove `ProviderColumn` component
+- [x] Remove `ProviderHeader` component
+- [x] Remove provider column rendering from `SchedulingGrid`
+- [x] Remove `isOutsourced` prop from `Tile` component
+- [x] Update mock data and fixtures
+- [x] Remove obsolete tests
 
 #### v0.5.11 - Outsourcing Mini-Form
 > **Goal:** Editable outsourcing parameters in Job Details Panel
