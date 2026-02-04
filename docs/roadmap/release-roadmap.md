@@ -1919,12 +1919,14 @@ Two-part release following reference/jcf pattern.
 - [x] Update `precedenceConstraints.ts`
 - [x] Comprehensive unit tests
 
-#### v0.5.13 - Outsourcing Drag Visualization
+#### ✅ v0.5.13 - Outsourcing Drag Visualization
 > **Goal:** Show outsourcing constraints during drag operations
 
-- [ ] Display outsourcing constraint duration during drag (like drying time)
-- [ ] Show earliest valid drop position accounting for outsourcing timeline
-- [ ] Alt+drag bypass with warning
+- [x] Display outsourcing constraint duration during drag (like drying time)
+- [x] Show earliest valid drop position accounting for outsourcing timeline
+- [x] OutsourcingTimeIndicator component (cyan/teal color)
+- [x] getOutsourcingTimeInfo utility function
+- [x] Test fixture: outsourcing-drag
 - [ ] E2E tests for drag behavior
 
 ### Phase 5E: Testing & Verification
