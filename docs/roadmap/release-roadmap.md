@@ -1899,25 +1899,25 @@ Two-part release following reference/jcf pattern.
 - [x] Update mock data and fixtures
 - [x] Remove obsolete tests
 
-#### v0.5.11 - Outsourcing Mini-Form
+#### v0.5.11 - Outsourcing Mini-Form ✅
 > **Goal:** Editable outsourcing parameters in Job Details Panel
 
-- [ ] Create `OutsourcingMiniForm` component
-- [ ] Integrate into `TaskTile` for outsourced tasks
-- [ ] Work days (JO) number input
-- [ ] Departure date/time picker
-- [ ] Return date/time picker (hidden for final outsourcing)
-- [ ] Auto-calculate from predecessor when scheduled
+- [x] Create `OutsourcingMiniForm` component
+- [x] Integrate into `TaskTile` for outsourced tasks
+- [x] Work days (JO) number input
+- [x] Departure date/time picker
+- [x] Return date/time picker (hidden for final outsourcing)
+- [x] Auto-calculate from predecessor when scheduled
 
-#### v0.5.12 - Outsourcing Precedence Calculation
+#### v0.5.12 - Outsourcing Precedence Calculation ✅
 > **Goal:** New duration calculation with transit days
 
-- [ ] Forward calculation: `earliestStart(successor)` from predecessor end
-- [ ] Backward calculation: `latestEnd(predecessor)` from successor start
-- [ ] Business day utilities (add/subtract, skip weekends)
-- [ ] Manual override support (`manualDeparture`, `manualReturn`)
-- [ ] Update `precedenceConstraints.ts`
-- [ ] Comprehensive unit tests
+- [x] Forward calculation: `earliestStart(successor)` from predecessor end
+- [x] Backward calculation: `latestEnd(predecessor)` from successor start
+- [x] Business day utilities (add/subtract, skip weekends)
+- [x] Manual override support (`manualDeparture`, `manualReturn`)
+- [x] Update `precedenceConstraints.ts`
+- [x] Comprehensive unit tests
 
 #### v0.5.13 - Outsourcing Drag Visualization
 > **Goal:** Show outsourcing constraints during drag operations
