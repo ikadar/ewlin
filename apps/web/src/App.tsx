@@ -1075,6 +1075,72 @@ function AppContent() {
     invalidateSnapshot();
   }, [invalidateSnapshot]);
 
+  // v0.5.11: Handle outsourcing work days change (local state only)
+  const handleOutsourcingWorkDaysChange = useCallback((taskId: string, workDays: number) => {
+    updateSnapshot((currentSnapshot) => {
+      const taskIndex = currentSnapshot.tasks.findIndex((t) => t.id === taskId);
+      if (taskIndex === -1) return currentSnapshot;
+
+      const task = currentSnapshot.tasks[taskIndex];
+      if (task.type !== 'Outsourced') return currentSnapshot;
+
+      const newTasks = [...currentSnapshot.tasks];
+      newTasks[taskIndex] = {
+        ...task,
+        duration: {
+          ...task.duration,
+          openDays: workDays,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+
+      return { ...currentSnapshot, tasks: newTasks };
+    });
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
+
+  // v0.5.11: Handle outsourcing departure change (local state only)
+  const handleOutsourcingDepartureChange = useCallback((taskId: string, departure: Date | undefined) => {
+    updateSnapshot((currentSnapshot) => {
+      const taskIndex = currentSnapshot.tasks.findIndex((t) => t.id === taskId);
+      if (taskIndex === -1) return currentSnapshot;
+
+      const task = currentSnapshot.tasks[taskIndex];
+      if (task.type !== 'Outsourced') return currentSnapshot;
+
+      const newTasks = [...currentSnapshot.tasks];
+      newTasks[taskIndex] = {
+        ...task,
+        manualDeparture: departure?.toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      return { ...currentSnapshot, tasks: newTasks };
+    });
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
+
+  // v0.5.11: Handle outsourcing return change (local state only)
+  const handleOutsourcingReturnChange = useCallback((taskId: string, returnDate: Date | undefined) => {
+    updateSnapshot((currentSnapshot) => {
+      const taskIndex = currentSnapshot.tasks.findIndex((t) => t.id === taskId);
+      if (taskIndex === -1) return currentSnapshot;
+
+      const task = currentSnapshot.tasks[taskIndex];
+      if (task.type !== 'Outsourced') return currentSnapshot;
+
+      const newTasks = [...currentSnapshot.tasks];
+      newTasks[taskIndex] = {
+        ...task,
+        manualReturn: returnDate?.toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      return { ...currentSnapshot, tasks: newTasks };
+    });
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
+
   // REQ-14: Handle date click - scroll grid to the clicked date
   const handleDateClick = useCallback((date: Date) => {
     if (!gridRef.current) return;
@@ -1615,6 +1681,7 @@ function AppContent() {
           elements={snapshot.elements}
           assignments={snapshot.assignments}
           stations={snapshot.stations}
+          providers={snapshot.providers}
           activeTaskId={lastUnscheduledTask?.id}
           pickedTaskId={pickedTask?.id}
           onJumpToTask={handleJumpToTask}
@@ -1623,6 +1690,9 @@ function AppContent() {
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
           onElementStatusChange={handleElementStatusChange}
+          onWorkDaysChange={handleOutsourcingWorkDaysChange}
+          onDepartureChange={handleOutsourcingDepartureChange}
+          onReturnChange={handleOutsourcingReturnChange}
         />
         <DateStrip
           startDate={gridStartDate}

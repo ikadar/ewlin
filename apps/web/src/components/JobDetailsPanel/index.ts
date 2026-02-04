@@ -26,3 +26,6 @@ export type { PrerequisiteDropdownProps } from './PrerequisiteDropdown';
 
 export { paperOptions, batOptions, plateOptions } from './prerequisiteOptions';
 export type { PrerequisiteOption } from './prerequisiteOptions';
+
+export { OutsourcingMiniForm, WorkDaysInput, DateTimePicker } from './OutsourcingMiniForm';
+export type { OutsourcingMiniFormProps, WorkDaysInputProps, DateTimePickerProps } from './OutsourcingMiniForm';
