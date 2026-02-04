@@ -4,6 +4,8 @@
  * @see v0.5.5 - Required for testing components that use RTK Query hooks
  */
 
+/* eslint-disable react-refresh/only-export-components */
+
 import { ReactNode } from 'react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';

@@ -22,7 +22,7 @@ import { Toast } from './components/Toast';
 import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
-import { generateId, calculateEndTime, applyPushDown, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
+import { calculateEndTime, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
@@ -87,92 +87,6 @@ function getLayoutDimensions(): {
 // ============================================================================
 // Helper functions extracted to reduce nesting depth (SonarQube S2004)
 // ============================================================================
-
-/**
- * Options for processing a drop assignment.
- */
-interface ProcessDropOptions {
-  currentSnapshot: ScheduleSnapshot;
-  task: InternalTask;
-  stationId: string;
-  scheduledStart: string;
-  scheduledEnd: string;
-  isRescheduleOp: boolean;
-  assignmentId: string | undefined;
-  bypassedPrecedence: boolean;
-}
-
-/**
- * Process a drop operation and return the updated snapshot.
- * Extracted from onDrop to reduce function nesting.
- */
-function processDropAssignment(options: ProcessDropOptions): ScheduleSnapshot {
-  const {
-    currentSnapshot,
-    task,
-    stationId,
-    scheduledStart,
-    scheduledEnd,
-    isRescheduleOp,
-    assignmentId,
-    bypassedPrecedence,
-  } = options;
-  let assignmentsWithoutCurrent = currentSnapshot.assignments;
-  let existingAssignment: TaskAssignment | undefined;
-
-  if (isRescheduleOp && assignmentId) {
-    existingAssignment = currentSnapshot.assignments.find((a) => a.id === assignmentId);
-    assignmentsWithoutCurrent = currentSnapshot.assignments.filter((a) => a.id !== assignmentId);
-  }
-
-  const { updatedAssignments, shiftedIds } = applyPushDown(
-    assignmentsWithoutCurrent,
-    stationId,
-    scheduledStart,
-    scheduledEnd,
-    task.id
-  );
-
-  if (shiftedIds.length > 0) {
-    console.log('Push-down applied:', shiftedIds);
-  }
-
-  const finalAssignment: TaskAssignment = isRescheduleOp && existingAssignment
-    ? { ...existingAssignment, scheduledStart, scheduledEnd, updatedAt: new Date().toISOString() }
-    : {
-        id: generateId(),
-        taskId: task.id,
-        targetId: stationId,
-        isOutsourced: false,
-        scheduledStart,
-        scheduledEnd,
-        isCompleted: false,
-        completedAt: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-  // Remove any existing PrecedenceConflict for this task (it may have been resolved by moving to valid position)
-  const newConflicts = currentSnapshot.conflicts.filter(
-    (c) => !(c.type === 'PrecedenceConflict' && c.taskId === task.id)
-  );
-  // Add new conflict if bypassed
-  if (bypassedPrecedence) {
-    newConflicts.push({
-      type: 'PrecedenceConflict',
-      message: 'Task placed before predecessor completes (Alt-key bypass)',
-      taskId: task.id,
-      targetId: stationId,
-      details: { bypassedByUser: true },
-    });
-  }
-
-  return {
-    ...currentSnapshot,
-    assignments: [...updatedAssignments, finalAssignment],
-    conflicts: newConflicts,
-  };
-}
 
 /**
  * Find the earliest start time for a task based on predecessor constraints.
@@ -1582,24 +1496,8 @@ function AppContent() {
       return;
     }
 
-    // Calculate end time
+    // Cast to InternalTask for API call
     const task = pickedTask as InternalTask;
-    const station = snapshot.stations.find((s) => s.id === stationId);
-    const scheduledEnd = calculateEndTime(task, scheduledStart, station);
-
-    // Check for bypassed precedence
-    let bypassedPrecedence = false;
-    if (isAltPressed) {
-      const conflictCheckProposal: ProposedAssignment = {
-        taskId: task.id,
-        targetId: stationId,
-        isOutsourced: false,
-        scheduledStart,
-        bypassPrecedence: false,
-      };
-      const conflictCheckResult = validateAssignment(conflictCheckProposal, snapshot);
-      bypassedPrecedence = conflictCheckResult.conflicts.some(c => c.type === 'PrecedenceConflict');
-    }
 
     // v0.3.57: Determine if this is a reschedule (grid pick with assignmentId)
     const isRescheduleOp = pickedAssignmentId !== null;

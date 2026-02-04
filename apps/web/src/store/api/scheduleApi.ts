@@ -5,7 +5,12 @@
  * - In mock mode (?fixture=xxx or VITE_USE_MOCK=true): uses mockBaseQuery
  * - In real mode: uses realBaseQuery (fetchBaseQuery)
  *
+ * v0.5.8: Optimistic updates for all assignment operations.
+ * - Immediate UI feedback before API response
+ * - Automatic rollback on error
+ *
  * @see docs/releases/v0.5.0-api-client-configuration.md
+ * @see docs/releases/v0.5.8-optimistic-updates.md
  * @see docs/architecture/rtk-query-design.md
  */
 
@@ -19,7 +24,11 @@ import type {
   UnassignmentResponse,
   ClientSuggestionsResponse,
   ReferenceLookupResponse,
+  InternalTask,
+  TaskAssignment,
 } from '@flux/types';
+import { isInternalTask } from '@flux/types';
+import { calculateEndTime } from '@/utils/timeCalculations';
 
 /**
  * Response from createJob mutation.
@@ -37,6 +46,38 @@ interface CreateJobResponse {
   createdAt: string;
 }
 import { baseQueryWithFixtureSupport } from './baseApi';
+
+// ============================================================================
+// Optimistic Update Helpers
+// ============================================================================
+
+/**
+ * Generate a temporary ID for optimistic assignments.
+ * Will be replaced by server-generated ID on successful response.
+ */
+function generateTempId(): string {
+  return `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Calculate scheduled end time for a task.
+ * Uses station operating hours if available.
+ */
+function calculateOptimisticEndTime(
+  snapshot: ScheduleSnapshot,
+  taskId: string,
+  targetId: string,
+  scheduledStart: string
+): string {
+  const task = snapshot.tasks.find((t) => t.id === taskId);
+  if (!task || !isInternalTask(task)) {
+    // For outsourced tasks or if task not found, use start time as fallback
+    return scheduledStart;
+  }
+
+  const station = snapshot.stations.find((s) => s.id === targetId);
+  return calculateEndTime(task as InternalTask, scheduledStart, station);
+}
 
 // ============================================================================
 // API Slice Definition
@@ -121,7 +162,12 @@ export const scheduleApi = createApi({
      * Mock mode: mockBaseQuery handles this
      * Real mode: POST /tasks/{taskId}/assign
      *
+     * Uses optimistic update for instant UI feedback (v0.5.8):
+     * - Immediately adds assignment to cache
+     * - Automatically rolls back on error
+     *
      * @see docs/architecture/rtk-query-design.md#assignTask
+     * @see docs/releases/v0.5.8-optimistic-updates.md
      */
     assignTask: builder.mutation<
       AssignmentResponse,
@@ -133,6 +179,56 @@ export const scheduleApi = createApi({
         body,
       }),
       invalidatesTags: ['Snapshot'],
+      async onQueryStarted({ taskId, body }, { dispatch, queryFulfilled, getState }) {
+        // Get current snapshot from cache
+        const state = getState() as { scheduleApi: { queries: Record<string, { data?: ScheduleSnapshot }> } };
+        const snapshotQuery = Object.values(state.scheduleApi.queries).find(
+          (q) => q?.data && 'assignments' in q.data
+        );
+        const snapshot = snapshotQuery?.data as ScheduleSnapshot | undefined;
+
+        if (!snapshot) {
+          // No snapshot in cache, skip optimistic update
+          return;
+        }
+
+        // Calculate end time
+        const scheduledEnd = calculateOptimisticEndTime(
+          snapshot,
+          taskId,
+          body.targetId,
+          body.scheduledStart
+        );
+
+        // Create optimistic assignment
+        const now = new Date().toISOString();
+        const optimisticAssignment: TaskAssignment = {
+          id: generateTempId(),
+          taskId,
+          targetId: body.targetId,
+          isOutsourced: body.isOutsourced ?? false,
+          scheduledStart: body.scheduledStart,
+          scheduledEnd,
+          isCompleted: false,
+          completedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // Optimistic update: immediately add assignment to cache
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            draft.assignments.push(optimisticAssignment);
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          // Rollback on error
+          patchResult.undo();
+        }
+      },
     }),
 
     /**
@@ -141,7 +237,12 @@ export const scheduleApi = createApi({
      * Mock mode: mockBaseQuery handles this
      * Real mode: PUT /tasks/{taskId}/assign
      *
+     * Uses optimistic update for instant UI feedback (v0.5.8):
+     * - Immediately updates assignment in cache
+     * - Automatically rolls back on error
+     *
      * @see docs/architecture/rtk-query-design.md#rescheduleTask
+     * @see docs/releases/v0.5.8-optimistic-updates.md
      */
     rescheduleTask: builder.mutation<
       AssignmentResponse,
@@ -153,6 +254,48 @@ export const scheduleApi = createApi({
         body,
       }),
       invalidatesTags: ['Snapshot'],
+      async onQueryStarted({ taskId, body }, { dispatch, queryFulfilled, getState }) {
+        // Get current snapshot from cache
+        const state = getState() as { scheduleApi: { queries: Record<string, { data?: ScheduleSnapshot }> } };
+        const snapshotQuery = Object.values(state.scheduleApi.queries).find(
+          (q) => q?.data && 'assignments' in q.data
+        );
+        const snapshot = snapshotQuery?.data as ScheduleSnapshot | undefined;
+
+        if (!snapshot) {
+          // No snapshot in cache, skip optimistic update
+          return;
+        }
+
+        // Calculate end time
+        const scheduledEnd = calculateOptimisticEndTime(
+          snapshot,
+          taskId,
+          body.targetId,
+          body.scheduledStart
+        );
+
+        // Optimistic update: immediately update assignment in cache
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const assignment = draft.assignments.find((a) => a.taskId === taskId);
+            if (assignment) {
+              assignment.targetId = body.targetId;
+              assignment.isOutsourced = body.isOutsourced ?? assignment.isOutsourced;
+              assignment.scheduledStart = body.scheduledStart;
+              assignment.scheduledEnd = scheduledEnd;
+              assignment.updatedAt = new Date().toISOString();
+            }
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          // Rollback on error
+          patchResult.undo();
+        }
+      },
     }),
 
     /**
@@ -161,7 +304,12 @@ export const scheduleApi = createApi({
      * Mock mode: mockBaseQuery handles this
      * Real mode: DELETE /tasks/{taskId}/assign
      *
+     * Uses optimistic update for instant UI feedback (v0.5.8):
+     * - Immediately removes assignment from cache
+     * - Automatically rolls back on error
+     *
      * @see docs/architecture/rtk-query-design.md#unassignTask
+     * @see docs/releases/v0.5.8-optimistic-updates.md
      */
     unassignTask: builder.mutation<UnassignmentResponse, string>({
       query: (taskId) => ({
@@ -169,6 +317,24 @@ export const scheduleApi = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['Snapshot'],
+      async onQueryStarted(taskId, { dispatch, queryFulfilled }) {
+        // Optimistic update: immediately remove assignment from cache
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const index = draft.assignments.findIndex((a) => a.taskId === taskId);
+            if (index !== -1) {
+              draft.assignments.splice(index, 1);
+            }
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          // Rollback on error
+          patchResult.undo();
+        }
+      },
     }),
 
     /**

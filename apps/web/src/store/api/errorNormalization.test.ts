@@ -17,6 +17,14 @@ import {
   createSuccessResponse,
 } from './errorNormalization';
 
+/** Type for error data structure in our API errors */
+interface ErrorData {
+  error: string;
+  message?: string;
+  conflicts?: unknown[];
+  suggestedStart?: string;
+}
+
 describe('errorNormalization', () => {
   describe('error detection', () => {
     describe('isNetworkError', () => {
@@ -162,8 +170,8 @@ describe('errorNormalization', () => {
       it('creates 404 error with message', () => {
         const error = createNotFoundError('Resource not found');
         expect(error.status).toBe(404);
-        expect((error.data as any).error).toBe('NotFound');
-        expect((error.data as any).message).toBe('Resource not found');
+        expect((error.data as ErrorData).error).toBe('NotFound');
+        expect((error.data as ErrorData).message).toBe('Resource not found');
       });
     });
 
@@ -175,9 +183,9 @@ describe('errorNormalization', () => {
         const error = createValidationError('Validation failed', conflicts, '2026-02-03T10:00:00Z');
 
         expect(error.status).toBe(409);
-        expect((error.data as any).error).toBe('ValidationFailed');
-        expect((error.data as any).conflicts).toEqual(conflicts);
-        expect((error.data as any).suggestedStart).toBe('2026-02-03T10:00:00Z');
+        expect((error.data as ErrorData).error).toBe('ValidationFailed');
+        expect((error.data as ErrorData).conflicts).toEqual(conflicts);
+        expect((error.data as ErrorData).suggestedStart).toBe('2026-02-03T10:00:00Z');
       });
     });
 
@@ -185,7 +193,7 @@ describe('errorNormalization', () => {
       it('creates 500 error', () => {
         const error = createServerError('Internal server error');
         expect(error.status).toBe(500);
-        expect((error.data as any).error).toBe('ServerError');
+        expect((error.data as ErrorData).error).toBe('ServerError');
       });
     });
 

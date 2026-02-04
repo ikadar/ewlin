@@ -2,6 +2,8 @@
  * Tests for mockBaseQuery.ts - Mock adapter for RTK Query
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockBaseQuery, __testing__ } from './mockBaseQuery';
 import * as snapshotModule from '../../mock/snapshot';
@@ -21,7 +23,7 @@ vi.mock('../../utils', () => ({
     date.setMinutes(date.getMinutes() + 60);
     return date.toISOString();
   }),
-  applyPushDown: vi.fn((assignments, targetId, start, end, taskId) => ({
+  applyPushDown: vi.fn((assignments, _targetId, _start, _end, _taskId) => ({
     updatedAssignments: assignments,
   })),
 }));

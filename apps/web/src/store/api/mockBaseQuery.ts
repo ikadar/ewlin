@@ -26,7 +26,7 @@ import type {
 } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
-import { normalizeError, createNotFoundError, createSuccessResponse } from './errorNormalization';
+import { normalizeError, createNotFoundError } from './errorNormalization';
 
 // ============================================================================
 // Types
