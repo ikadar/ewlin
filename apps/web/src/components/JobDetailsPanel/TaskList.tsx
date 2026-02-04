@@ -1,4 +1,4 @@
-import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
+import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
 import { isMultiElementJob } from '@flux/types';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
@@ -23,6 +23,8 @@ export interface TaskListProps {
   assignments: TaskAssignment[];
   /** All stations to get station names */
   stations: Station[];
+  /** v0.5.11: All providers for outsourced tasks */
+  providers?: OutsourcedProvider[];
   /** Task ID that is the active placement target in Quick Placement Mode */
   activeTaskId?: string | null;
   /** Task ID that is currently picked (v0.3.54 Pick & Place) */
@@ -35,12 +37,34 @@ export interface TaskListProps {
   onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
   /** Callback when element prerequisite status changes (v0.4.32a) */
   onElementStatusChange?: (update: ElementStatusUpdate) => void;
+  /** v0.5.11: Callback when work days changes for outsourced task */
+  onWorkDaysChange?: (taskId: string, workDays: number) => void;
+  /** v0.5.11: Callback when manual departure changes for outsourced task */
+  onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
+  /** v0.5.11: Callback when manual return changes for outsourced task */
+  onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
 }
 
 /**
  * Scrollable list of task tiles for the selected job, grouped by element.
  */
-export function TaskList({ tasks, elements, job, assignments, stations, activeTaskId, pickedTaskId, onJumpToTask, onRecallTask, onPick, onElementStatusChange }: TaskListProps) {
+export function TaskList({
+  tasks,
+  elements,
+  job,
+  assignments,
+  stations,
+  providers = [],
+  activeTaskId,
+  pickedTaskId,
+  onJumpToTask,
+  onRecallTask,
+  onPick,
+  onElementStatusChange,
+  onWorkDaysChange,
+  onDepartureChange,
+  onReturnChange,
+}: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
     assignments.map((a) => [a.taskId, a])
@@ -50,6 +74,10 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
   );
   const taskById = new Map(
     tasks.map((t) => [t.id, t])
+  );
+  // v0.5.11: Provider lookup map
+  const providerById = new Map(
+    providers.map((p) => [p.id, p])
   );
 
   if (tasks.length === 0) {
@@ -127,8 +155,15 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
       const stationId = task.type === 'Internal' ? task.stationId : undefined;
       const station = stationId ? stationById.get(stationId) : undefined;
 
-      // Check if previous task is a printing task (for dry time label)
+      // v0.5.11: Get provider for outsourced tasks
+      const provider = task.type === 'Outsourced' ? providerById.get(task.providerId) : undefined;
+
+      // v0.5.11: Get predecessor end time for outsourcing calculations
       const prevTask = index > 0 ? sortedTasks[index - 1] : null;
+      const prevAssignment = prevTask ? assignmentByTaskId.get(prevTask.id) : undefined;
+      const predecessorEndTime = prevAssignment?.scheduledEnd;
+
+      // Check if previous task is a printing task (for dry time label)
       const showDryTimeLabel = prevTask && isPrintingTask(prevTask);
 
       return (
@@ -145,6 +180,11 @@ export function TaskList({ tasks, elements, job, assignments, stations, activeTa
             onJumpToTask={onJumpToTask}
             onRecallTask={onRecallTask}
             onPick={!assignment ? onPick : undefined}
+            provider={provider}
+            predecessorEndTime={predecessorEndTime}
+            onWorkDaysChange={onWorkDaysChange}
+            onDepartureChange={onDepartureChange}
+            onReturnChange={onReturnChange}
           />
         </div>
       );

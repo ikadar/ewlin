@@ -1,4 +1,5 @@
-import type { Task, TaskAssignment, Station, Job } from '@flux/types';
+import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask } from '@flux/types';
+import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 
 export interface TaskTileProps {
   /** The task to display */
@@ -21,26 +22,69 @@ export interface TaskTileProps {
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
   onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
+  /** v0.5.11: Provider for outsourced tasks */
+  provider?: OutsourcedProvider;
+  /** v0.5.11: End time of predecessor task (ISO string) for outsourcing calculations */
+  predecessorEndTime?: string;
+  /** v0.5.11: Callback when work days changes for outsourced task */
+  onWorkDaysChange?: (taskId: string, workDays: number) => void;
+  /** v0.5.11: Callback when manual departure changes for outsourced task */
+  onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
+  /** v0.5.11: Callback when manual return changes for outsourced task */
+  onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
 }
 
 /**
  * Individual task tile with state-based styling.
- * Unscheduled: job color, border-l-4, clickable for Pick & Place
- * Scheduled: dark placeholder with station + datetime
+ * Internal tasks:
+ *   - Unscheduled: job color, border-l-4, clickable for Pick & Place
+ *   - Scheduled: dark placeholder with station + datetime
+ * Outsourced tasks:
+ *   - Always show mini-form (not schedulable, just configurable)
  * v0.3.57: Drag & drop removed, now uses Pick & Place only
+ * v0.5.11: Outsourcing Mini-Form for outsourced tasks
  */
-export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false, isPicked = false, onJumpToTask, onRecallTask, onPick }: TaskTileProps) {
+export function TaskTile({
+  task,
+  job,
+  jobColor,
+  assignment,
+  station,
+  isActivePlacement = false,
+  isPicked = false,
+  onJumpToTask,
+  onRecallTask,
+  onPick,
+  provider,
+  predecessorEndTime,
+  onWorkDaysChange,
+  onDepartureChange,
+  onReturnChange,
+}: TaskTileProps) {
+  // v0.5.11: Outsourced tasks render as mini-form
+  if (task.type === 'Outsourced') {
+    return (
+      <OutsourcingMiniForm
+        task={task as OutsourcedTask}
+        provider={provider}
+        jobColor={jobColor}
+        predecessorEndTime={predecessorEndTime}
+        onWorkDaysChange={onWorkDaysChange}
+        onDepartureChange={onDepartureChange}
+        onReturnChange={onReturnChange}
+      />
+    );
+  }
+
+  // Internal task handling
   const isScheduled = !!assignment;
 
   // Format duration as Xh YY
   const formatDuration = (): string => {
-    if (task.type === 'Internal') {
-      const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      return `${hours}h${minutes.toString().padStart(2, '0')}`;
-    }
-    return `${task.duration.openDays}j`;
+    const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h${minutes.toString().padStart(2, '0')}`;
   };
 
   // Format scheduled datetime as "Di 15/12 07:00"
@@ -55,18 +99,10 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     return `${dayName} ${day}/${month} ${hours}:${minutes}`;
   };
 
-  // Get display name based on task type
-  const getDisplayName = (): string => {
-    if (task.type === 'Internal') {
-      return station?.name || 'Unknown';
-    }
-    // Outsourced task - show action type (e.g., "Pelliculage", "Reliure")
-    return task.actionType || 'Sous-traitance';
-  };
-  const displayName = getDisplayName();
+  // Get display name (station name for internal tasks)
+  const displayName = station?.name || 'Unknown';
 
   // Convert hex color to Tailwind-compatible classes
-  // For now, we'll use inline styles for the job color
   const getColorStyles = () => {
     if (isScheduled) {
       return {
@@ -85,8 +121,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
 
   // Get a lighter text color based on the job color
   const getTextColorFromHex = (hex: string): string => {
-    // For simplicity, just return a class based on common color families
-    // In a real app, you'd compute this from the hex
     const colorLower = hex.toLowerCase();
     if (colorLower.includes('purple') || colorLower === '#8b5cf6' || colorLower === '#a855f7') {
       return 'text-purple-300';
@@ -103,7 +137,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     if (colorLower.includes('red') || colorLower === '#ef4444' || colorLower === '#f87171') {
       return 'text-red-300';
     }
-    // Default to using inline style
     return '';
   };
 
@@ -111,8 +144,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
 
   if (isScheduled) {
     // Scheduled (placed) task - dark placeholder (not draggable)
-    // Single-click: jump to grid position
-    // Double-click: recall (unschedule)
     const handleClick = () => {
       if (onJumpToTask && assignment) {
         onJumpToTask(assignment);
@@ -158,8 +189,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
       }
     : undefined;
 
-  // v0.3.54: Handle click for pick & place (when onPick is provided)
-  // v0.4.29: Pass click coordinates for ghost positioning
+  // Handle click for pick & place
   const handleClick = (e: React.MouseEvent) => {
     if (onPick) {
       onPick(task, job, e.clientX, e.clientY);
@@ -169,7 +199,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
   // Determine cursor style
   const getCursorClass = () => {
     if (isPicked) return 'cursor-default';
-    if (onPick) return 'cursor-pointer'; // Pick mode
+    if (onPick) return 'cursor-pointer';
     return 'cursor-default';
   };
 

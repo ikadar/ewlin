@@ -57,3 +57,18 @@ export {
 } from './prerequisites';
 export type { PrerequisiteBlockingInfo } from './prerequisites';
 export { formatDateDDMMYYYY } from './dateFormat';
+export {
+  isBusinessDay,
+  addBusinessDays,
+  subtractBusinessDays,
+  getNextBusinessDay,
+  getPreviousBusinessDay,
+} from './businessDays';
+export {
+  calculateDepartureDate,
+  calculateReturnDate,
+  calculateOutsourcingDates,
+  formatOutsourcingDateTime,
+  parseOutsourcingDateTime,
+} from './outsourcingCalculation';
+export type { OutsourcingParams } from './outsourcingCalculation';
