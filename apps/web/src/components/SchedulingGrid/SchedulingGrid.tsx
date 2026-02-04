@@ -1,5 +1,5 @@
 import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element } from '@flux/types';
-import type { DryingTimeInfo } from '../../utils';
+import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
@@ -120,6 +120,8 @@ export interface SchedulingGridProps {
   pickPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** v0.3.54: Drying time info during pick */
   pickDryingTimeInfo?: DryingTimeInfo | null;
+  /** v0.5.13: Outsourcing time info during pick */
+  pickOutsourcingTimeInfo?: OutsourcingTimeInfo | null;
   /** v0.3.57: Assignment ID of picked tile (for showing placeholder) */
   pickedAssignmentId?: string | null;
   /** v0.3.57: Callback when tile is clicked to pick from grid */
@@ -177,6 +179,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onPickClick,
       pickPrecedenceConstraints,
       pickDryingTimeInfo,
+      pickOutsourcingTimeInfo,
       // v0.3.57: Pick from grid props
       pickedAssignmentId,
       onPickFromGrid,
@@ -481,6 +484,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               // v0.3.51: Drying time info - show only on the predecessor's station
               const effectiveDryingTimeInfo = pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined;
 
+              // v0.5.13: Outsourcing time info - show on the pick target station
+              const effectiveOutsourcingTimeInfo = isPickTarget ? pickOutsourcingTimeInfo : undefined;
+
               return (
                 <StationColumn
                   key={station.id}
@@ -500,6 +506,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onQuickPlacementClick={onQuickPlacementClick}
                   precedenceConstraints={effectivePrecedenceConstraints}
                   dryingTimeInfo={effectiveDryingTimeInfo}
+                  outsourcingTimeInfo={effectiveOutsourcingTimeInfo}
                   visibleDayRange={virtualScroll.visibleRange}
                   isPicking={isPicking}
                   isPickTarget={isPickTarget}

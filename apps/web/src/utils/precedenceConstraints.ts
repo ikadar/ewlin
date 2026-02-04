@@ -374,6 +374,14 @@ export interface DryingTimeInfo {
   dryingEndY: number;
 }
 
+/** Information about outsourcing time for visualization (v0.5.13) */
+export interface OutsourcingTimeInfo {
+  /** Y position of outsourced task departure */
+  departureY: number;
+  /** Y position where outsourced task returns */
+  returnY: number;
+}
+
 /**
  * Calculate Y position for the successor constraint line (orange).
  *
@@ -507,5 +515,67 @@ export function getDryingTimeInfo(
     predecessorStationId: mostConstraining.targetId,
     predecessorEndY: timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate),
     dryingEndY: timeToYPosition(dryingEnd, startHour, pixelsPerHour, gridStartDate),
+  };
+}
+
+/**
+ * Get outsourcing time visualization info for a task (v0.5.13).
+ *
+ * Checks both intra-element and cross-element predecessors.
+ * Returns info for the most constraining outsourced predecessor.
+ */
+export function getOutsourcingTimeInfo(
+  task: Task,
+  snapshot: ScheduleSnapshot,
+  startHour: number,
+  pixelsPerHour: number,
+  gridStartDate?: Date
+): OutsourcingTimeInfo | null {
+  // Collect all outsourced predecessor assignments
+  const outsourcedPredecessors: { assignment: TaskAssignment; task: OutsourcedTask }[] = [];
+
+  // Intra-element predecessor
+  const predecessor = getPredecessorTask(snapshot, task);
+  if (predecessor && isOutsourcedTask(predecessor)) {
+    const predAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
+    if (predAssignment && predAssignment.isOutsourced) {
+      outsourcedPredecessors.push({ assignment: predAssignment, task: predecessor });
+    }
+  }
+
+  // Cross-element predecessors
+  const crossPreds = getCrossElementPredecessors(snapshot, task);
+  for (const crossPred of crossPreds) {
+    if (isOutsourcedTask(crossPred)) {
+      const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
+      if (crossAssignment && crossAssignment.isOutsourced) {
+        outsourcedPredecessors.push({ assignment: crossAssignment, task: crossPred });
+      }
+    }
+  }
+
+  if (outsourcedPredecessors.length === 0) return null;
+
+  // Pick the most constraining (latest return time)
+  let mostConstraining = outsourcedPredecessors[0];
+  for (let i = 1; i < outsourcedPredecessors.length; i++) {
+    const currentReturn = parseTimestamp(outsourcedPredecessors[i].assignment.scheduledEnd);
+    const bestReturn = parseTimestamp(mostConstraining.assignment.scheduledEnd);
+    if (currentReturn > bestReturn) {
+      mostConstraining = outsourcedPredecessors[i];
+    }
+  }
+
+  // Get departure time (scheduledStart is departure for outsourced)
+  const departureTime = parseTimestamp(mostConstraining.assignment.scheduledStart);
+
+  // Get return time - use manual override if set, otherwise scheduledEnd
+  const returnTime = mostConstraining.task.manualReturn
+    ? new Date(mostConstraining.task.manualReturn)
+    : parseTimestamp(mostConstraining.assignment.scheduledEnd);
+
+  return {
+    departureY: timeToYPosition(departureTime, startHour, pixelsPerHour, gridStartDate),
+    returnY: timeToYPosition(returnTime, startHour, pixelsPerHour, gridStartDate),
   };
 }

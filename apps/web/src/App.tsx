@@ -22,9 +22,9 @@ import { Toast } from './components/Toast';
 import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
-import { calculateEndTime, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
+import { calculateEndTime, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
-import type { DryingTimeInfo } from './utils';
+import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
 import {
   PickStateProvider,
@@ -669,6 +669,14 @@ function AppContent() {
       return null;
     }
     return getDryingTimeInfo(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+  }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
+
+  // v0.5.13: Calculate outsourcing time info during pick
+  const pickOutsourcingTimeInfo = useMemo((): OutsourcingTimeInfo | null => {
+    if (!pickedTask) {
+      return null;
+    }
+    return getOutsourcingTimeInfo(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
   }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // REQ-14: Auto-scroll to today on initial load
@@ -1747,6 +1755,7 @@ function AppContent() {
           onPickClick={handlePickClick}
           pickPrecedenceConstraints={pickPrecedenceConstraints}
           pickDryingTimeInfo={pickDryingTimeInfo}
+          pickOutsourcingTimeInfo={pickOutsourcingTimeInfo}
           pickedAssignmentId={pickedAssignmentId}
           onPickFromGrid={handlePickFromGrid}
           onContextMenu={handleContextMenuOpen}

@@ -5,7 +5,8 @@ import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import { PlacementIndicator } from '../PlacementIndicator';
 import { PrecedenceLines } from '../PrecedenceLines';
 import { DryingTimeIndicator } from '../DryingTimeIndicator';
-import type { DryingTimeInfo } from '../../utils';
+import { OutsourcingTimeIndicator } from '../OutsourcingTimeIndicator';
+import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
 
 export interface StationColumnProps {
   /** Station to display */
@@ -44,6 +45,8 @@ export interface StationColumnProps {
   precedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** v0.3.51: Drying time visualization info during drag */
   dryingTimeInfo?: DryingTimeInfo;
+  /** v0.5.13: Outsourcing time visualization info during drag */
+  outsourcingTimeInfo?: OutsourcingTimeInfo;
   /** v0.3.46: Visible day range for virtual scrolling (only render overlays/lines for these days) */
   visibleDayRange?: { start: number; end: number };
   /** v0.3.54: Whether a task is currently picked (Pick & Place mode) */
@@ -104,6 +107,7 @@ export const StationColumn = memo(function StationColumn({
   onQuickPlacementClick,
   precedenceConstraints,
   dryingTimeInfo,
+  outsourcingTimeInfo,
   visibleDayRange,
   // v0.3.54: Pick & Place props
   isPicking = false,
@@ -338,6 +342,16 @@ export const StationColumn = memo(function StationColumn({
         <DryingTimeIndicator
           predecessorEndY={dryingTimeInfo.predecessorEndY}
           dryingEndY={dryingTimeInfo.dryingEndY}
+          isVisible={isPicking}
+        />
+      )}
+
+      {/* v0.5.13: Outsourcing Time Indicator (during pick) */}
+      {/* Note: outsourcingTimeInfo is only passed when this IS the outsourced predecessor's provider */}
+      {outsourcingTimeInfo && (
+        <OutsourcingTimeIndicator
+          departureY={outsourcingTimeInfo.departureY}
+          returnY={outsourcingTimeInfo.returnY}
           isVisible={isPicking}
         />
       )}
