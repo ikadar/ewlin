@@ -1865,13 +1865,13 @@ Two-part release following reference/jcf pattern.
 - [x] Network error detection with retry UI
 - [x] 503 Service Unavailable handling (MaintenanceState)
 
-#### v0.5.8 - Optimistic Updates
+#### v0.5.8 - Optimistic Updates ✅
 > **Goal:** Immediate UI feedback for common operations
 
-- [ ] Assignment creation optimistic update
-- [ ] Assignment move optimistic update
-- [ ] Completion toggle optimistic update
-- [ ] Rollback on error
+- [x] Assignment creation optimistic update
+- [x] Assignment move optimistic update
+- [x] Completion toggle optimistic update
+- [x] Rollback on error
 
 ### Phase 5D: Outsourcing Refactor
 
