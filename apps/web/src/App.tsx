@@ -3,6 +3,9 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { GlobalToast } from './components/GlobalToast';
+import { MaintenanceState } from './components/MaintenanceState';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
@@ -13,7 +16,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCreateJobMutation } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCreateJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -394,6 +397,9 @@ function AppContent() {
     error,
     refetch,
   } = useGetSnapshotQuery();
+
+  // v0.5.7: Global error handling - service unavailable state
+  const isServiceUnavailable = useAppSelector(selectIsServiceUnavailable);
 
   // Helper to trigger refetch after local updateSnapshot calls
   // This bridges the gap between the mock layer and RTK Query cache
@@ -1662,6 +1668,11 @@ function AppContent() {
     return <LoadingSpinner message="Chargement des données..." />;
   }
 
+  // v0.5.7: Show maintenance page for 503 Service Unavailable
+  if (isServiceUnavailable) {
+    return <MaintenanceState onRetry={refetch} />;
+  }
+
   // v0.5.1: Show error state with retry button if fetch failed
   if (isError) {
     return <ErrorState error={error} onRetry={refetch} />;
@@ -1864,23 +1875,28 @@ function AppContent() {
         initialClientName={jcfClient}
       />
 
-      {/* v0.5.2: Toast notifications for errors */}
+      {/* v0.5.2: Toast notifications for JCF errors */}
       <Toast
         message={toast.message}
         type={toast.type}
         isVisible={toast.isVisible}
         onDismiss={hideToast}
       />
+
+      {/* v0.5.7: Global toast for API errors */}
+      <GlobalToast />
     </>
   );
 }
 
-// Main App component wrapping with PickStateProvider
+// Main App component wrapping with PickStateProvider and ErrorBoundary
 function App() {
   return (
-    <PickStateProvider>
-      <AppContent />
-    </PickStateProvider>
+    <ErrorBoundary>
+      <PickStateProvider>
+        <AppContent />
+      </PickStateProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -11,6 +11,7 @@ import { render, RenderOptions } from '@testing-library/react';
 import { scheduleApi } from '../store/api/scheduleApi';
 import { uiReducer } from '../store/slices/uiSlice';
 import { jcfReducer } from '../store/slices/jcfSlice';
+import { errorReducer } from '../store/slices/errorSlice';
 
 /**
  * Create a test store with optional preloaded state
@@ -21,6 +22,7 @@ export function createTestStore(preloadedState?: Record<string, unknown>) {
       [scheduleApi.reducerPath]: scheduleApi.reducer,
       ui: uiReducer,
       jcf: jcfReducer,
+      error: errorReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(scheduleApi.middleware),

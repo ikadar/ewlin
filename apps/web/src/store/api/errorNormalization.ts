@@ -106,6 +106,19 @@ export function isServerError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * Check if an error is a service unavailable error (503)
+ */
+export function isServiceUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  if ('status' in error && error.status === 503) {
+    return true;
+  }
+
+  return false;
+}
+
 // ============================================================================
 // Error Normalization
 // ============================================================================

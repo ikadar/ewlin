@@ -12,6 +12,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { scheduleApi } from './api/scheduleApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
+import { errorReducer } from './slices/errorSlice';
 
 // ============================================================================
 // Store Configuration
@@ -25,6 +26,8 @@ export const store = configureStore({
     ui: uiReducer,
     // JCF form state slice
     jcf: jcfReducer,
+    // Error state slice
+    error: errorReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(scheduleApi.middleware),
@@ -109,3 +112,12 @@ export {
   setJcfSaveError,
   resetJcfForm,
 } from './slices/jcfSlice';
+
+export {
+  setError,
+  clearError,
+  setServiceUnavailable,
+  resetErrorState,
+  selectCurrentError,
+  selectIsServiceUnavailable,
+} from './slices/errorSlice';

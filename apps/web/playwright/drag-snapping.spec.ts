@@ -35,12 +35,14 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       const taskTile = page.locator('[data-testid="task-tile-task-sidebar-1"]');
       await expect(taskTile).toBeVisible();
 
-      // ACT: Pick & place to a position between grid lines (Y=185 is between 8:00 and 8:30)
-      await pickAndPlace(
+      // ACT: Pick & place at 8:17 (between 8:00 and 8:30 grid lines)
+      // Using pickAndPlaceAtTime to avoid scroll-position timing issues
+      await pickAndPlaceAtTime(
         page,
         '[data-testid="task-tile-task-sidebar-1"]',
         'station-komori',
-        185
+        8,  // hour
+        17  // minute (between grid lines)
       );
 
       // ASSERT: Tile should be created at snapped position
@@ -53,7 +55,7 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
 
       expect(scheduledStart).toBeTruthy();
       const time = parseTime(scheduledStart!);
-      console.log(`Placed at Y=185, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+      console.log(`Placed at 8:17, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
       // Should be on a 15-minute boundary (snapped)
       expect(isOnSnapBoundary(time)).toBe(true);
@@ -98,12 +100,14 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       const taskTile = page.locator('[data-testid="task-tile-task-sidebar-1"]');
       await expect(taskTile).toBeVisible();
 
-      // ACT: Pick & place to Y=195, which is just before 8:30 (200px)
-      await pickAndPlace(
+      // ACT: Pick & place at 8:27 (just before 8:30, should snap to 8:30)
+      // Using pickAndPlaceAtTime to avoid scroll-position timing issues
+      await pickAndPlaceAtTime(
         page,
         '[data-testid="task-tile-task-sidebar-1"]',
         'station-komori',
-        195
+        8,  // hour
+        27  // minute (should snap to 30)
       );
 
       // ASSERT: Tile should be at a 15-minute boundary (snapped)
@@ -113,7 +117,7 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
 
       expect(scheduledStart).toBeTruthy();
       const time = parseTime(scheduledStart!);
-      console.log(`Placed at Y=195, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+      console.log(`Placed at 8:27, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
       // Should be on a 15-minute boundary
       expect(isOnSnapBoundary(time)).toBe(true);
