@@ -1,16 +1,13 @@
-import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, OutsourcedProvider, Element } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element } from '@flux/types';
 import type { DryingTimeInfo } from '../../utils';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
-import { ProviderColumn } from '../ProviderColumn/ProviderColumn';
-import { ProviderHeader } from '../ProviderColumn/ProviderHeader';
 import { Tile, compareSimilarity } from '../Tile';
 import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
-import { calculateSubcolumnLayout, getSubcolumnLayout } from '../../utils/subcolumnLayout';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { getJobIdForTask } from '../../utils/taskHelpers';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
@@ -99,8 +96,6 @@ export interface SchedulingGridProps {
   conflicts?: ScheduleConflict[];
   /** Station groups for capacity visualization (REQ-18) */
   groups?: StationGroup[];
-  /** Outsourced providers for provider columns (REQ-19) */
-  providers?: OutsourcedProvider[];
   /** REQ-09.2: Callback when grid scrolls (for DateStrip sync) */
   onScroll?: (scrollTop: number) => void;
   /** v0.3.46: Total number of days for virtual scrolling (default: 365) */
@@ -169,7 +164,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onCompact,
       conflicts = [],
       groups = [],
-      providers = [],
       onScroll,
       totalDays = 365,
       bufferDays = 3,
@@ -358,54 +352,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return grouped;
   }, [assignments, stations, startDate, virtualScroll.visibleRange]);
 
-  // REQ-19: Group outsourced assignments by provider, v0.3.46: filtered to visible range
-  const assignmentsByProvider = useMemo(() => {
-    const grouped = new Map<string, TaskAssignment[]>();
-    providers.forEach((provider) => grouped.set(provider.id, []));
-
-    // Calculate grid start date for visibility check
-    const gridStart = startDate || new Date();
-
-    assignments.forEach((assignment) => {
-      // Only include outsourced assignments
-      if (!assignment.isOutsourced) return;
-
-      // v0.3.46: Skip assignments outside visible range
-      if (!isAssignmentVisible(
-        assignment.scheduledStart,
-        assignment.scheduledEnd,
-        gridStart,
-        virtualScroll.visibleRange
-      )) {
-        return;
-      }
-
-      const providerAssignments = grouped.get(assignment.targetId);
-      if (providerAssignments) {
-        providerAssignments.push(assignment);
-      }
-    });
-
-    // Sort assignments within each provider by scheduled start time
-    grouped.forEach((providerAssignments) => {
-      providerAssignments.sort(
-        (a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime()
-      );
-    });
-
-    return grouped;
-  }, [assignments, providers, startDate, virtualScroll.visibleRange]);
-
-  // REQ-19: Calculate subcolumn layouts for each provider
-  const providerSubcolumnLayouts = useMemo(() => {
-    const layouts = new Map<string, Map<string, ReturnType<typeof getSubcolumnLayout>>>();
-    providers.forEach((provider) => {
-      const providerAssignments = assignmentsByProvider.get(provider.id) || [];
-      layouts.set(provider.id, calculateSubcolumnLayout(providerAssignments));
-    });
-    return layouts;
-  }, [providers, assignmentsByProvider]);
-
   // Calculate departure marker position (if selected job has workshopExitDate)
   // Multi-day: show marker regardless of day (REQ-15)
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) : null;
@@ -464,13 +410,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                 />
               );
             })}
-            {/* REQ-19: Provider headers */}
-            {providers.map((provider) => (
-              <ProviderHeader
-                key={provider.id}
-                provider={provider}
-              />
-            ))}
             {/* v0.3.55: Spacer to allow rightmost column to scroll to left edge */}
             <div className="shrink-0" style={{ width: 'calc(100vw - 300px)' }} aria-hidden="true" />
           </div>
@@ -633,68 +572,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     );
                   })}
                 </StationColumn>
-              );
-            })}
-
-            {/* REQ-19: Provider columns */}
-            {providers.map((provider) => {
-              const providerAssignments = assignmentsByProvider.get(provider.id) || [];
-              const subcolumnLayoutMap = providerSubcolumnLayouts.get(provider.id) || new Map();
-
-              return (
-                <ProviderColumn
-                  key={provider.id}
-                  provider={provider}
-                  startHour={startHour}
-                  hoursToDisplay={hoursToDisplay}
-                  pixelsPerHour={pixelsPerHour}
-                >
-                  {providerAssignments.map((assignment) => {
-                    const task = taskMap.get(assignment.taskId);
-                    const jobId = task ? getJobIdForTask(task, elements) : null;
-                    const job = jobId ? jobMap.get(jobId) : null;
-
-                    // Skip if we don't have the task/job data or if task is not internal
-                    if (!task || !job || !isInternalTask(task)) return null;
-
-                    // v0.4.32b: Get element for blocking status
-                    const element = elements.find((e) => e.id === task.elementId);
-                    const blocked = element ? isElementBlocked(element) : false;
-                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element) : undefined;
-
-                    // Calculate top position from assignment.scheduledStart
-                    const startTime = new Date(assignment.scheduledStart);
-                    const top = timeToYPosition(startTime, startHour, pixelsPerHour, startDate);
-
-                    // Get subcolumn layout for this assignment
-                    const layout = getSubcolumnLayout(assignment.id, subcolumnLayoutMap);
-
-                    return (
-                      <Tile
-                        key={assignment.id}
-                        assignment={assignment}
-                        task={task}
-                        job={job}
-                        top={top}
-                        isSelected={selectedJobId === job.id}
-                        showSwapUp={false}
-                        showSwapDown={false}
-                        onSelect={onSelectJob}
-                        onRecall={onRecallAssignment}
-                        selectedJobId={selectedJobId ?? undefined}
-                        hasConflict={conflictTaskIds.has(task.id)}
-                        pixelsPerHour={pixelsPerHour}
-                        isOutsourced={true}
-                        subcolumnLayout={layout}
-                        isPickingActive={isPicking}
-                        onContextMenu={onContextMenu}
-                        onToggleComplete={onToggleComplete}
-                        isBlocked={blocked}
-                        blockingInfo={blockingInfo}
-                      />
-                    );
-                  })}
-                </ProviderColumn>
               );
             })}
             {/* v0.3.55: Spacer to allow rightmost column to scroll to left edge */}

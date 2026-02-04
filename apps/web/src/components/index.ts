@@ -19,9 +19,6 @@ export type { StationHeadersProps, StationHeaderProps, OffScreenInfo, OffScreenI
 export { StationColumns, StationColumn, UnavailabilityOverlay } from './StationColumns';
 export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProps } from './StationColumns';
 
-export { ProviderColumn, ProviderHeader } from './ProviderColumn';
-export type { ProviderColumnProps, ProviderHeaderProps } from './ProviderColumn';
-
 export { SchedulingGrid } from './SchedulingGrid';
 export type { SchedulingGridProps, SchedulingGridHandle } from './SchedulingGrid';
 

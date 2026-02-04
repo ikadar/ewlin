@@ -1668,7 +1668,6 @@ function AppContent() {
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
-          providers={snapshot.providers}
           isPicking={isPicking}
           pickTargetStationId={pickTargetStationId}
           pickRingState={pickValidation.ringState}

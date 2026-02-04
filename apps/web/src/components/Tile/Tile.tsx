@@ -7,7 +7,6 @@ import { SimilarityIndicators } from './SimilarityIndicators';
 import { PrerequisiteTooltip } from './PrerequisiteTooltip';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
-import type { SubcolumnLayout } from '../../utils/subcolumnLayout';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 
 export interface TileProps {
@@ -43,10 +42,6 @@ export interface TileProps {
   onToggleComplete?: (assignmentId: string) => void;
   /** Pixels per hour for height calculation (default: 80) */
   pixelsPerHour?: number;
-  /** Whether this is an outsourced assignment (REQ-19) */
-  isOutsourced?: boolean;
-  /** Subcolumn layout for provider columns (REQ-19) */
-  subcolumnLayout?: SubcolumnLayout;
   /** v0.3.57: Whether this tile is currently picked (shows placeholder) */
   isPicked?: boolean;
   /** v0.3.57: Callback when tile is clicked to pick for reschedule */
@@ -91,8 +86,6 @@ export const Tile = memo(function Tile({
   hasConflict = false,
   onToggleComplete,
   pixelsPerHour = PIXELS_PER_HOUR,
-  isOutsourced = false,
-  subcolumnLayout,
   isPicked = false,
   onPickFromGrid,
   isPickingActive = false,
@@ -167,8 +160,8 @@ export const Tile = memo(function Tile({
     // Don't start a new pick from a tile while picking is active
     if (isPickingActive) return;
 
-    // If not completed and not outsourced, pick for reschedule
-    if (!isCompleted && !isOutsourced && onPickFromGrid) {
+    // If not completed, pick for reschedule
+    if (!isCompleted && onPickFromGrid) {
       onPickFromGrid(task, job, assignment.id);
       return;
     }
@@ -237,35 +230,18 @@ export const Tile = memo(function Tile({
   };
   const mutingStyle = getMutingStyle();
 
-  // REQ-19: Subcolumn layout for outsourced tiles
-  const getSubcolumnStyle = (): React.CSSProperties => {
-    if (!subcolumnLayout) return {};
-    return {
-      left: `${subcolumnLayout.leftPercent}%`,
-      width: `${subcolumnLayout.widthPercent}%`,
-    };
-  };
-  const subcolumnStyle = getSubcolumnStyle();
-
-  // REQ-19: Outsourced tile styling
   // v0.4.32b: Blocked tiles show dashed border
-  const getBorderClass = () => {
-    if (isOutsourced) {
-      return 'border-2 border-dashed';
-    }
-    // Internal tiles: dashed when blocked, solid when ready
-    return isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
-  };
-  const borderStyleClass = getBorderClass();
-  // v0.3.57: Cursor is pointer for pickable tiles (not completed, not outsourced)
-  const cursorClass = !isCompleted && !isOutsourced && onPickFromGrid ? 'cursor-pointer' : 'cursor-default';
+  const borderStyleClass = isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
+
+  // v0.3.57: Cursor is pointer for pickable tiles (not completed)
+  const cursorClass = !isCompleted && onPickFromGrid ? 'cursor-pointer' : 'cursor-default';
 
   // v0.3.57: Pulsating placeholder shown at original position when tile is picked
   if (isPicked) {
     return (
       <div
         className="absolute left-0 right-0 border-2 border-dashed border-zinc-500 bg-zinc-800/30 rounded pointer-events-none animate-pulse-opacity"
-        style={{ top: `${top}px`, height: `${totalHeight}px`, ...subcolumnStyle }}
+        style={{ top: `${top}px`, height: `${totalHeight}px` }}
         data-testid={`tile-placeholder-${assignment.id}`}
         aria-hidden="true"
       />
@@ -278,10 +254,10 @@ export const Tile = memo(function Tile({
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
+        left: 0,
+        right: 0,
         ...glowStyle,
         ...mutingStyle,
-        // Apply subcolumn layout for outsourced tiles, or full width for station tiles
-        ...(subcolumnLayout ? subcolumnStyle : { left: 0, right: 0 }),
       }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -294,7 +270,6 @@ export const Tile = memo(function Tile({
       data-task-id={task.id}
       data-station-id={task.stationId}
       data-has-conflict={hasConflict ? 'true' : undefined}
-      data-is-outsourced={isOutsourced ? 'true' : undefined}
       data-is-blocked={isBlocked ? 'true' : undefined}
       role="button"
       tabIndex={0}
@@ -409,9 +384,7 @@ function haveDataPropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.job !== next.job ||
     prev.top !== next.top ||
     prev.pixelsPerHour !== next.pixelsPerHour ||
-    prev.isOutsourced !== next.isOutsourced ||
-    prev.similarityResults !== next.similarityResults ||
-    prev.subcolumnLayout !== next.subcolumnLayout
+    prev.similarityResults !== next.similarityResults
   );
 }
 
