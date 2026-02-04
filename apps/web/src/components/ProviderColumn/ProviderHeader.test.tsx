@@ -16,6 +16,7 @@ const createProvider = (id: string = 'prov-1', name: string = 'Clément'): Outso
   supportedActionTypes: ['binding', 'laminating'],
   latestDepartureTime: '14:00',
   receptionTime: '09:00',
+  transitDays: 1,
   groupId: 'grp-clement',
 });
 

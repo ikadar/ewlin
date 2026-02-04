@@ -1880,14 +1880,14 @@ Two-part release following reference/jcf pattern.
 >
 > This phase implements the new outsourcing model where outsourced tasks become **precedence constraints** (like drying time) rather than scheduled tiles with dedicated provider columns.
 
-#### v0.5.9 - Outsourcing Types & Backend
+#### v0.5.9 - Outsourcing Types & Backend ✅
 > **Goal:** Foundation for new outsourcing model
 
-- [ ] Add `transitDays` field to OutsourcedProvider entity (PHP API)
-- [ ] Add `manualDeparture`, `manualReturn` fields to OutsourcedTask (PHP API)
-- [ ] Update `@flux/types` package with new fields
-- [ ] API endpoint updates for new fields
-- [ ] Backward compatibility for existing data
+- [x] Add `transitDays` field to OutsourcedProvider entity (PHP API)
+- [x] Add `manualDeparture`, `manualReturn` fields to OutsourcedTask (PHP API)
+- [x] Update `@flux/types` package with new fields
+- [x] API endpoint updates for new fields
+- [x] Backward compatibility for existing data
 
 #### v0.5.10 - Remove Provider Columns
 > **Goal:** Simplify grid by removing provider columns

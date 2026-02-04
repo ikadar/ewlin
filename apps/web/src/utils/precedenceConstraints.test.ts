@@ -259,6 +259,7 @@ describe('getPredecessorConstraint', () => {
         supportedActionTypes: ['offset'],
         latestDepartureTime: '14:00',
         receptionTime: '09:00',
+        transitDays: 1,
         groupId: 'grp-external',
       }],
     });

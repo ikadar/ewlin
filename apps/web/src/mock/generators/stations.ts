@@ -284,6 +284,7 @@ export function generateProviders(): OutsourcedProvider[] {
       supportedActionTypes: ['Pelliculage', 'Dorure', 'Vernis UV', 'Gaufrage'],
       latestDepartureTime: '14:00',
       receptionTime: '09:00',
+      transitDays: 1,
       groupId: 'grp-clement',
     },
     {
@@ -293,6 +294,7 @@ export function generateProviders(): OutsourcedProvider[] {
       supportedActionTypes: ['Reliure dos carré collé', 'Reliure spirale', 'Reliure Wire-O'],
       latestDepartureTime: '12:00',
       receptionTime: '10:00',
+      transitDays: 1,
       groupId: 'grp-reliure',
     },
   ];
