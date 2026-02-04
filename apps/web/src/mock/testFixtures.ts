@@ -36,6 +36,7 @@ import { createBlockingVisualFixture } from './fixtures/blocking-visual';
 import { createFormeDateTrackingFixture } from './fixtures/forme-date-tracking';
 import { createPickRescheduleFixture } from './fixtures/pick-reschedule';
 import { createOutsourcingMiniFormFixture } from './fixtures/outsourcing-mini-form';
+import { createOutsourcingPrecedenceFixture } from './fixtures/outsourcing-precedence';
 
 // Re-export createBasicFixture for direct usage
 export { createBasicFixture };
@@ -44,7 +45,7 @@ export { createBasicFixture };
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay' | 'element-precedence' | 'scale-harmonization' | 'blocking-visual' | 'forme-date-tracking' | 'pick-reschedule' | 'outsourcing-mini-form';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay' | 'element-precedence' | 'scale-harmonization' | 'blocking-visual' | 'forme-date-tracking' | 'pick-reschedule' | 'outsourcing-mini-form' | 'outsourcing-precedence';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -75,6 +76,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'forme-date-tracking': createFormeDateTrackingFixture,
   'pick-reschedule': createPickRescheduleFixture,
   'outsourcing-mini-form': createOutsourcingMiniFormFixture,
+  'outsourcing-precedence': createOutsourcingPrecedenceFixture,
 };
 
 /**
