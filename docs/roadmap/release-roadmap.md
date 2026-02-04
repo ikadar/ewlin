@@ -47,7 +47,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 | **M2** | Scheduling Core (Assignment + Validation) |
 | **M3** | Frontend Integration |
 | **M4** | Job Creation Form (Element layer + JCF UI + Templates) |
-| **M5** | Backend API Integration |
+| **M5** | Backend API Integration + Outsourcing Refactor |
 | **M6** | DSL Syntax Highlighting (Post-MVP, optional) |
 | **M7** | Production Readiness |
 | **Post-MVP** | Schedule Branching, Optimization |
@@ -1783,9 +1783,16 @@ Two-part release following reference/jcf pattern.
 
 ---
 
-## Milestone 5: Backend API Integration (v0.5.x)
+## Milestone 5: Backend API Integration + Outsourcing Refactor (v0.5.x)
 
 > **Detailed plan:** See `docs/roadmap/milestone-5-plan.md`
+>
+> **Phases:**
+> - Phase 5A: Core API Integration (v0.5.0–v0.5.4)
+> - Phase 5B: JCF API Integration (v0.5.5–v0.5.6)
+> - Phase 5C: Error Handling & UX (v0.5.7–v0.5.8)
+> - Phase 5D: Outsourcing Refactor (v0.5.9–v0.5.13)
+> - Phase 5E: Testing & Verification (v0.5.14–v0.5.15)
 
 ### Phase 5A: Core API Integration
 
@@ -1851,11 +1858,12 @@ Two-part release following reference/jcf pattern.
 #### v0.5.7 - Global Error Handling
 > **Goal:** Consistent error handling across all API calls
 
-- [ ] Error boundary for API errors
-- [ ] Toast notifications for transient errors
-- [ ] Inline error messages for form validation
-- [ ] Network error detection and retry UI
-- [ ] 503 Service Unavailable handling
+- [x] ErrorBoundary component for React error catching
+- [x] Redux error slice for global error state
+- [x] Toast notifications for transient errors (GlobalToast)
+- [x] Inline error messages for form validation (JCF - existing)
+- [x] Network error detection with retry UI
+- [x] 503 Service Unavailable handling (MaintenanceState)
 
 #### v0.5.8 - Optimistic Updates
 > **Goal:** Immediate UI feedback for common operations
@@ -1865,9 +1873,63 @@ Two-part release following reference/jcf pattern.
 - [ ] Completion toggle optimistic update
 - [ ] Rollback on error
 
-### Phase 5D: Testing & Verification
+### Phase 5D: Outsourcing Refactor
 
-#### v0.5.9 - E2E Tests with Real Backend
+> **Specification:** [outsourcing.md](./outsourcing.md)
+> **Impact Assessment:** [outsourcing-impact-assessment.md](./outsourcing-impact-assessment.md)
+>
+> This phase implements the new outsourcing model where outsourced tasks become **precedence constraints** (like drying time) rather than scheduled tiles with dedicated provider columns.
+
+#### v0.5.9 - Outsourcing Types & Backend
+> **Goal:** Foundation for new outsourcing model
+
+- [ ] Add `transitDays` field to OutsourcedProvider entity (PHP API)
+- [ ] Add `manualDeparture`, `manualReturn` fields to OutsourcedTask (PHP API)
+- [ ] Update `@flux/types` package with new fields
+- [ ] API endpoint updates for new fields
+- [ ] Backward compatibility for existing data
+
+#### v0.5.10 - Remove Provider Columns
+> **Goal:** Simplify grid by removing provider columns
+
+- [ ] Remove `ProviderColumn` component
+- [ ] Remove `ProviderHeader` component
+- [ ] Remove provider column rendering from `SchedulingGrid`
+- [ ] Remove `isOutsourced` prop from `Tile` component
+- [ ] Update mock data and fixtures
+- [ ] Remove obsolete tests
+
+#### v0.5.11 - Outsourcing Mini-Form
+> **Goal:** Editable outsourcing parameters in Job Details Panel
+
+- [ ] Create `OutsourcingMiniForm` component
+- [ ] Integrate into `TaskTile` for outsourced tasks
+- [ ] Work days (JO) number input
+- [ ] Departure date/time picker
+- [ ] Return date/time picker (hidden for final outsourcing)
+- [ ] Auto-calculate from predecessor when scheduled
+
+#### v0.5.12 - Outsourcing Precedence Calculation
+> **Goal:** New duration calculation with transit days
+
+- [ ] Forward calculation: `earliestStart(successor)` from predecessor end
+- [ ] Backward calculation: `latestEnd(predecessor)` from successor start
+- [ ] Business day utilities (add/subtract, skip weekends)
+- [ ] Manual override support (`manualDeparture`, `manualReturn`)
+- [ ] Update `precedenceConstraints.ts`
+- [ ] Comprehensive unit tests
+
+#### v0.5.13 - Outsourcing Drag Visualization
+> **Goal:** Show outsourcing constraints during drag operations
+
+- [ ] Display outsourcing constraint duration during drag (like drying time)
+- [ ] Show earliest valid drop position accounting for outsourcing timeline
+- [ ] Alt+drag bypass with warning
+- [ ] E2E tests for drag behavior
+
+### Phase 5E: Testing & Verification
+
+#### v0.5.14 - E2E Tests with Real Backend
 > **Goal:** E2E tests run against actual PHP API
 
 - [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
@@ -1876,7 +1938,7 @@ Two-part release following reference/jcf pattern.
 - [ ] Key E2E tests with real backend
 - [ ] CI pipeline integration
 
-#### v0.5.10 - Performance Verification
+#### v0.5.15 - Performance Verification
 > **Goal:** Verify acceptable performance with real API
 
 - [ ] Snapshot load time < 2s
