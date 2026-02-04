@@ -1,0 +1,222 @@
+/**
+ * Fixture for pick-reschedule E2E tests
+ *
+ * Same as basic fixture but with 7-day operating schedule to avoid
+ * flaky tests when running on weekends.
+ */
+
+import type {
+  ScheduleSnapshot,
+  Job,
+  Task,
+  InternalTask,
+  TaskAssignment,
+  Station,
+} from '@flux/types';
+import {
+  today,
+  isoDate,
+  baseSnapshot,
+  generateElementsForJobs,
+  sevenDayOperatingSchedule,
+  categories,
+  groups,
+  providers,
+  type JobWithoutElementIds,
+} from './shared';
+
+// Stations with 7-day operating schedule for E2E tests
+const stationsWithSevenDaySchedule: Station[] = [
+  {
+    id: 'station-komori',
+    name: 'Komori G40',
+    status: 'Available',
+    categoryId: 'cat-offset',
+    groupId: 'grp-offset',
+    capacity: 1,
+    operatingSchedule: sevenDayOperatingSchedule,
+    exceptions: [],
+  },
+  {
+    id: 'station-heidelberg',
+    name: 'Heidelberg Speedmaster',
+    status: 'Available',
+    categoryId: 'cat-offset',
+    groupId: 'grp-offset',
+    capacity: 1,
+    operatingSchedule: sevenDayOperatingSchedule,
+    exceptions: [],
+  },
+  {
+    id: 'station-polar',
+    name: 'Polar 137',
+    status: 'Available',
+    categoryId: 'cat-cutting',
+    groupId: 'grp-cutting',
+    capacity: 1,
+    operatingSchedule: sevenDayOperatingSchedule,
+    exceptions: [],
+  },
+];
+
+export function createPickRescheduleFixture(): ScheduleSnapshot {
+  const jobs: JobWithoutElementIds[] = [
+    {
+      id: 'job-test-1',
+      reference: 'TEST-001',
+      client: 'Test Client A',
+      description: 'Test Job 1 - Brochures',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 7),
+      color: '#8b5cf6',
+      comments: [],
+      taskIds: ['task-test-1-print', 'task-test-1-cut'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    {
+      id: 'job-test-2',
+      reference: 'TEST-002',
+      client: 'Test Client B',
+      description: 'Test Job 2 - Flyers',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 5),
+      color: '#3b82f6',
+      comments: [],
+      taskIds: ['task-test-2-print', 'task-test-2-cut'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    {
+      id: 'job-test-3',
+      reference: 'TEST-003',
+      client: 'Test Client C',
+      description: 'Test Job 3 - Posters',
+      status: 'InProgress',
+      workshopExitDate: isoDate(0, 0, 3),
+      color: '#22c55e',
+      comments: [],
+      taskIds: ['task-test-3-print'],
+      fullyScheduled: false,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  const tasks: Task[] = [
+    {
+      id: 'task-test-1-print',
+      elementId: 'elem-job-test-1',
+      sequenceOrder: 0,
+      status: 'Assigned',
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 60 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    {
+      id: 'task-test-1-cut',
+      elementId: 'elem-job-test-1',
+      sequenceOrder: 1,
+      status: 'Ready',
+      type: 'Internal',
+      stationId: 'station-polar',
+      duration: { setupMinutes: 15, runMinutes: 30 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    {
+      id: 'task-test-2-print',
+      elementId: 'elem-job-test-2',
+      sequenceOrder: 0,
+      status: 'Assigned',
+      type: 'Internal',
+      stationId: 'station-komori',
+      duration: { setupMinutes: 30, runMinutes: 90 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    {
+      id: 'task-test-2-cut',
+      elementId: 'elem-job-test-2',
+      sequenceOrder: 1,
+      status: 'Ready',
+      type: 'Internal',
+      stationId: 'station-polar',
+      duration: { setupMinutes: 15, runMinutes: 45 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    {
+      id: 'task-test-3-print',
+      elementId: 'elem-job-test-3',
+      sequenceOrder: 0,
+      status: 'Assigned',
+      type: 'Internal',
+      stationId: 'station-heidelberg',
+      duration: { setupMinutes: 30, runMinutes: 60 },
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+  ];
+
+  const assignments: TaskAssignment[] = [
+    {
+      id: 'assign-test-1-print',
+      taskId: 'task-test-1-print',
+      targetId: 'station-komori',
+      isOutsourced: false,
+      scheduledStart: isoDate(7, 0),
+      scheduledEnd: isoDate(8, 30),
+      isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    {
+      id: 'assign-test-2-print',
+      taskId: 'task-test-2-print',
+      targetId: 'station-komori',
+      isOutsourced: false,
+      scheduledStart: isoDate(9, 0),
+      scheduledEnd: isoDate(11, 0),
+      isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    {
+      id: 'assign-test-3-print',
+      taskId: 'task-test-3-print',
+      targetId: 'station-heidelberg',
+      isOutsourced: false,
+      scheduledStart: isoDate(8, 0),
+      scheduledEnd: isoDate(9, 30),
+      isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+  ];
+
+  // Use baseSnapshot but override stations with 7-day schedule
+  const base = baseSnapshot();
+  const elements = generateElementsForJobs(jobs, tasks);
+
+  return {
+    ...base,
+    stations: stationsWithSevenDaySchedule,
+    categories,
+    groups,
+    providers,
+    jobs: jobs as Job[],
+    elements,
+    tasks,
+    assignments,
+    conflicts: [],
+    lateJobs: [],
+  };
+}

@@ -30,8 +30,11 @@ Tiles have different visual appearances based on their state, location, and vali
 |-------|------------|
 | **Normal** | Job color, setup/run sections visible |
 | **Selected (job active)** | Highlighted border/glow (when job is selected) |
+| **Muted (other job selected)** | Desaturated, reduced opacity (60%), but **still clickable** |
 | **Dragging** | Slight transparency, follows cursor |
 | **Hovered** | Swap buttons visible at bottom-right; slight highlight |
+
+> **REQ-06 (v0.3.42):** Muted tiles remain clickable to allow switching job selection by clicking any tile.
 
 ### Click Behavior on Grid
 

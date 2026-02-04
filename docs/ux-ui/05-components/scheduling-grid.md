@@ -231,6 +231,16 @@ Before compact:           After compact:
 
 ---
 
+## Zoom Levels
+
+> Implemented from REQ-08
+
+The grid supports 6 zoom levels (25%, 50%, 75%, 100%, 150%, 200%) that control time density.
+
+See [Grid Navigation - Zoom Levels](../03-navigation/grid-navigation.md#zoom-levels)
+
+---
+
 ## View Modes
 
 The grid supports two display modes:

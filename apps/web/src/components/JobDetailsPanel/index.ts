@@ -1,11 +1,8 @@
 export { JobDetailsPanel } from './JobDetailsPanel';
-export type { JobDetailsPanelProps } from './JobDetailsPanel';
+export type { JobDetailsPanelProps, ElementStatusUpdate } from './JobDetailsPanel';
 
 export { JobInfo } from './JobInfo';
 export type { JobInfoProps } from './JobInfo';
-
-export { JobStatus } from './JobStatus';
-export type { JobStatusProps } from './JobStatus';
 
 export { InfoField } from './InfoField';
 export type { InfoFieldProps } from './InfoField';
@@ -15,3 +12,20 @@ export type { TaskListProps } from './TaskList';
 
 export { TaskTile } from './TaskTile';
 export type { TaskTileProps } from './TaskTile';
+
+export { DryTimeLabel } from './DryTimeLabel';
+
+export { ElementSection } from './ElementSection';
+export type { ElementSectionProps } from './ElementSection';
+
+export { PrerequisiteStatus } from './PrerequisiteStatus';
+export type { PrerequisiteStatusProps } from './PrerequisiteStatus';
+
+export { PrerequisiteDropdown } from './PrerequisiteDropdown';
+export type { PrerequisiteDropdownProps } from './PrerequisiteDropdown';
+
+export { paperOptions, batOptions, plateOptions } from './prerequisiteOptions';
+export type { PrerequisiteOption } from './prerequisiteOptions';
+
+export { OutsourcingMiniForm, WorkDaysInput, DateTimePicker } from './OutsourcingMiniForm';
+export type { OutsourcingMiniFormProps, WorkDaysInputProps, DateTimePickerProps } from './OutsourcingMiniForm';

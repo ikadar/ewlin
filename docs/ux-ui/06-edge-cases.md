@@ -204,6 +204,115 @@ This document catalogs edge cases — unusual situations that the UI must handle
 
 ---
 
+## Error Messages Catalog
+
+### Validation Errors
+
+| Error Code | Message | User Action |
+|------------|---------|-------------|
+| `ERR_STATION_MISMATCH` | "Task must be placed on {stationName}" | Drop on correct station |
+| `ERR_PRECEDENCE` | "Task cannot start before {predecessorTask} ends" | Move to later time or Alt+bypass |
+| `ERR_BAT_NOT_APPROVED` | "BAT approval required before scheduling" | Contact supervisor |
+| `ERR_PAST_TIME` | "Cannot schedule in the past" | Choose future time |
+| `ERR_STATION_UNAVAILABLE` | "Station unavailable at this time" | Choose different time |
+
+### System Errors
+
+| Error Code | Message | Recovery |
+|------------|---------|----------|
+| `ERR_NETWORK` | "Connection lost. Changes may not be saved." | Retry or refresh |
+| `ERR_CONFLICT` | "Schedule was modified by another user" | Refresh to see changes |
+| `ERR_TIMEOUT` | "Request timed out. Please try again." | Retry action |
+| `ERR_UNKNOWN` | "An unexpected error occurred" | Refresh page |
+
+### Warning Messages (Non-Blocking)
+
+| Warning Code | Message | Visual |
+|--------------|---------|--------|
+| `WARN_PLATES_PENDING` | "Plates approval pending" | Orange indicator |
+| `WARN_PRECEDENCE_BYPASS` | "Precedence constraint bypassed" | Amber indicator |
+| `WARN_CAPACITY_NEAR` | "Station near capacity" | Yellow highlight |
+
+---
+
+## Error Display Patterns
+
+### Inline Validation
+
+During drag operations, errors are shown through visual indicators:
+
+```
+┌─────────────────────────────────────────┐
+│  Station Column                         │
+│  ┌─────────────────────────────────┐   │
+│  │  ████████████████████████████   │   │  ← Red ring = invalid drop
+│  │  ████████████████████████████   │   │
+│  └─────────────────────────────────┘   │
+│                                         │
+│  Drop blocked: BAT approval required    │  ← Tooltip on hover
+└─────────────────────────────────────────┘
+```
+
+### Toast Notifications (Post-MVP)
+
+For system errors, toast notifications will appear:
+
+```
+┌──────────────────────────────────────────┐
+│ ⚠️ Connection lost                       │
+│ Changes may not be saved.                │
+│                        [Retry] [Dismiss] │
+└──────────────────────────────────────────┘
+```
+
+### Problems Section
+
+Validation issues appear in the Jobs List "Problems" section:
+
+```
+┌─────────────────────────────────────────┐
+│  ⚠️ Problems (2)                        │
+│  ─────────────────────────────────────  │
+│  🔴 Job ABC-123                         │
+│     Task "Print" past due               │
+│                                         │
+│  🟡 Job DEF-456                         │
+│     Precedence conflict                 │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Error Recovery Strategies
+
+### Optimistic Updates
+
+1. UI updates immediately on user action
+2. Server validates in background
+3. If rejected:
+   - Revert UI to previous state
+   - Show error message
+   - Provide retry option
+
+### Drag Cancellation
+
+| Cancel Method | Behavior |
+|---------------|----------|
+| Drop outside grid | Tile returns to origin |
+| Escape key | Tile returns to origin |
+| Network error during drop | Tile returns to origin + error message |
+
+### State Recovery
+
+| Scenario | Recovery Action |
+|----------|-----------------|
+| Browser refresh | Reload from server |
+| Tab sleep/wake | Refresh data on focus |
+| Network reconnect | Sync pending changes |
+| Concurrent edit | Show conflict resolution dialog (post-MVP) |
+
+---
+
 ## Future Considerations
 
 - Multi-user conflicts (same schedule edited by multiple users)

@@ -1,15 +1,20 @@
-import type { Station, Job, TaskAssignment, Task, StationCategory } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element } from '@flux/types';
+import type { DryingTimeInfo } from '../../utils';
 import { isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
-import { StationHeader } from '../StationHeaders/StationHeader';
+import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
 import { Tile, compareSimilarity } from '../Tile';
 import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
+import { buildGroupCapacityMap } from '../../utils/groupCapacity';
+import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
+import { getJobIdForTask } from '../../utils/taskHelpers';
+import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
-  /** Scroll to a specific Y position */
+  /** Scroll to a specific Y position (preserves X) */
   scrollToY: (y: number, behavior?: ScrollBehavior) => void;
   /** Scroll by a delta amount */
   scrollByY: (deltaY: number, behavior?: ScrollBehavior) => void;
@@ -17,20 +22,14 @@ export interface SchedulingGridHandle {
   getScrollY: () => number;
   /** Get viewport height */
   getViewportHeight: () => number;
-}
-
-/** Validation state during drag */
-export interface ValidationState {
-  /** Target station ID being hovered */
-  targetStationId: string | null;
-  /** Whether the current drop position is valid */
-  isValid: boolean;
-  /** Whether there's a precedence conflict */
-  hasPrecedenceConflict: boolean;
-  /** Suggested start time if precedence conflict exists */
-  suggestedStart: string | null;
-  /** Whether Alt key is pressed (bypass precedence) */
-  isAltPressed: boolean;
+  /** Scroll to a specific X position (preserves Y) */
+  scrollToX: (x: number, behavior?: ScrollBehavior) => void;
+  /** Get current horizontal scroll position */
+  getScrollX: () => number;
+  /** Get viewport width */
+  getViewportWidth: () => number;
+  /** Scroll to both X and Y positions at once */
+  scrollTo: (x: number, y: number, behavior?: ScrollBehavior) => void;
 }
 
 export interface SchedulingGridProps {
@@ -40,6 +39,8 @@ export interface SchedulingGridProps {
   categories?: StationCategory[];
   /** All jobs (for looking up job data by ID) */
   jobs?: Job[];
+  /** All elements (for task-to-job lookup) */
+  elements?: Element[];
   /** All tasks (for looking up task data) */
   tasks?: Task[];
   /** Task assignments to display as tiles */
@@ -50,6 +51,10 @@ export interface SchedulingGridProps {
   startHour?: number;
   /** Number of hours to display (default: 24) */
   hoursToDisplay?: number;
+  /** Start date for multi-day grid (REQ-14) */
+  startDate?: Date;
+  /** Pixels per hour for grid scaling (default: 80) */
+  pixelsPerHour?: number;
   /** Callback when a tile is clicked (select job) */
   onSelectJob?: (jobId: string) => void;
   /** Callback when a tile is double-clicked (recall) */
@@ -58,12 +63,8 @@ export interface SchedulingGridProps {
   onSwapUp?: (assignmentId: string) => void;
   /** Callback when swap down is clicked */
   onSwapDown?: (assignmentId: string) => void;
-  /** Currently dragged task (for column focus) */
-  activeTask?: Task | null;
-  /** Job of the currently dragged task (for tile muting) */
-  activeJob?: Job | null;
-  /** Validation state during drag */
-  validationState?: ValidationState;
+  /** Callback when completion icon is clicked */
+  onToggleComplete?: (assignmentId: string) => void;
   /** Whether quick placement mode is active */
   isQuickPlacementMode?: boolean;
   /** Station IDs that have available tasks for quick placement */
@@ -78,6 +79,53 @@ export interface SchedulingGridProps {
   onQuickPlacementMouseLeave?: () => void;
   /** Callback when user clicks to place a task in quick placement mode */
   onQuickPlacementClick?: (stationId: string, y: number) => void;
+  /** Quick placement validation result (for green/red border) */
+  quickPlacementValidation?: {
+    isValid: boolean;
+    hasPrecedenceConflict: boolean;
+    suggestedStart: string | null;
+    hasWarningOnly: boolean;
+  };
+  /** Quick placement precedence constraint Y positions */
+  quickPlacementPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** Station ID currently being compacted (for loading state) */
+  compactingStationId?: string | null;
+  /** Callback when compact button is clicked */
+  onCompact?: (stationId: string) => void;
+  /** Schedule conflicts for conflict visualization (REQ-12) */
+  conflicts?: ScheduleConflict[];
+  /** Station groups for capacity visualization (REQ-18) */
+  groups?: StationGroup[];
+  /** REQ-09.2: Callback when grid scrolls (for DateStrip sync) */
+  onScroll?: (scrollTop: number) => void;
+  /** v0.3.46: Total number of days for virtual scrolling (default: 365) */
+  totalDays?: number;
+  /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
+  bufferDays?: number;
+  /** v0.3.54: Whether a task is currently picked (Pick & Place mode) */
+  isPicking?: boolean;
+  /** v0.3.54: Target station ID for the picked task */
+  pickTargetStationId?: string | null;
+  /** v0.3.54: Ring color state for pick operation */
+  pickRingState?: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
+  /** v0.3.55: Source of the pick operation (sidebar vs grid) */
+  pickSource?: 'sidebar' | 'grid' | null;
+  /** v0.3.54: Callback for mouse move during pick */
+  onPickMouseMove?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
+  /** v0.3.54: Callback for mouse leave during pick */
+  onPickMouseLeave?: () => void;
+  /** v0.3.54: Callback for click to place during pick */
+  onPickClick?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
+  /** v0.3.54: Precedence constraint Y positions during pick */
+  pickPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
+  /** v0.3.54: Drying time info during pick */
+  pickDryingTimeInfo?: DryingTimeInfo | null;
+  /** v0.3.57: Assignment ID of picked tile (for showing placeholder) */
+  pickedAssignmentId?: string | null;
+  /** v0.3.57: Callback when tile is clicked to pick from grid */
+  onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
+  /** v0.3.58: Callback when tile is right-clicked (context menu) */
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
 }
 
 /**
@@ -90,18 +138,19 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       stations,
       categories = [],
       jobs = [],
+      elements = [],
       tasks = [],
       assignments = [],
       selectedJobId,
       startHour = 6,
       hoursToDisplay = 24,
+      startDate,
+      pixelsPerHour = PIXELS_PER_HOUR,
       onSelectJob,
       onRecallAssignment,
       onSwapUp,
       onSwapDown,
-      activeTask,
-      activeJob,
-      validationState,
+      onToggleComplete,
       isQuickPlacementMode = false,
       stationsWithAvailableTasks = new Set(),
       quickPlacementIndicatorY,
@@ -109,22 +158,74 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onQuickPlacementMouseMove,
       onQuickPlacementMouseLeave,
       onQuickPlacementClick,
+      quickPlacementValidation,
+      quickPlacementPrecedenceConstraints,
+      compactingStationId,
+      onCompact,
+      conflicts = [],
+      groups = [],
+      onScroll,
+      totalDays = 365,
+      bufferDays = 3,
+      // v0.3.54: Pick & Place props
+      isPicking = false,
+      pickTargetStationId,
+      pickRingState = 'none',
+      pickSource,
+      onPickMouseMove,
+      onPickMouseLeave,
+      onPickClick,
+      pickPrecedenceConstraints,
+      pickDryingTimeInfo,
+      // v0.3.57: Pick from grid props
+      pickedAssignmentId,
+      onPickFromGrid,
+      // v0.3.58: Context menu props
+      onContextMenu,
     },
     ref
   ) {
     const [now, setNow] = useState(() => new Date());
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    // v0.3.46: Track scroll position and viewport for virtual scrolling
+    const [scrollTop, setScrollTop] = useState(0);
+    const [viewportHeight, setViewportHeight] = useState(600);
+
+    // v0.3.46: Calculate day height from pixels per hour
+    const dayHeightPx = 24 * pixelsPerHour;
+
+    // v0.3.46: Virtual scroll calculation
+    const virtualScroll = useVirtualScroll({
+      totalDays,
+      bufferDays,
+      dayHeightPx,
+      scrollTop,
+      viewportHeight,
+    });
+
     // Expose scroll methods via ref
     useImperativeHandle(ref, () => ({
       scrollToY: (y: number, behavior: ScrollBehavior = 'smooth') => {
-        scrollContainerRef.current?.scrollTo({ top: y, behavior });
+        // Preserve current X position when scrolling Y
+        const currentX = scrollContainerRef.current?.scrollLeft ?? 0;
+        scrollContainerRef.current?.scrollTo({ top: y, left: currentX, behavior });
       },
       scrollByY: (deltaY: number, behavior: ScrollBehavior = 'smooth') => {
         scrollContainerRef.current?.scrollBy({ top: deltaY, behavior });
       },
       getScrollY: () => scrollContainerRef.current?.scrollTop ?? 0,
       getViewportHeight: () => scrollContainerRef.current?.clientHeight ?? 0,
+      scrollToX: (x: number, behavior: ScrollBehavior = 'smooth') => {
+        // Preserve current Y position when scrolling X
+        const currentY = scrollContainerRef.current?.scrollTop ?? 0;
+        scrollContainerRef.current?.scrollTo({ left: x, top: currentY, behavior });
+      },
+      getScrollX: () => scrollContainerRef.current?.scrollLeft ?? 0,
+      getViewportWidth: () => scrollContainerRef.current?.clientWidth ?? 0,
+      scrollTo: (x: number, y: number, behavior: ScrollBehavior = 'smooth') => {
+        scrollContainerRef.current?.scrollTo({ left: x, top: y, behavior });
+      },
     }));
 
   // Update current time every minute
@@ -135,11 +236,42 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate total height
-  const totalHeight = hoursToDisplay * PIXELS_PER_HOUR;
+  // v0.3.46: Track scroll position and viewport size for virtual scrolling
+  // Also REQ-09.2: Notify parent of scroll position for DateStrip sync
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-  // Calculate now line position
-  const nowPosition = timeToYPosition(now, startHour);
+    // Update viewport height
+    setViewportHeight(container.clientHeight);
+
+    const handleScroll = () => {
+      const newScrollTop = container.scrollTop;
+      setScrollTop(newScrollTop);
+      onScroll?.(newScrollTop);
+    };
+
+    const handleResize = () => {
+      setViewportHeight(container.clientHeight);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize);
+
+    // Report initial scroll position
+    handleScroll();
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [onScroll]);
+
+  // v0.3.46: Use virtual scroll total height for proper scrollbar sizing
+  const totalHeight = virtualScroll.totalHeight;
+
+  // Calculate now line position (multi-day aware)
+  const nowPosition = timeToYPosition(now, startHour, pixelsPerHour, startDate);
 
   // Create lookup maps for jobs and tasks
   const jobMap = useMemo(() => {
@@ -160,14 +292,49 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return map;
   }, [categories]);
 
-  // Group assignments by station (internal assignments only, not outsourced)
+  // REQ-18: Calculate group capacity info for each station
+  const groupCapacityMap = useMemo((): Map<string, GroupCapacityInfo> => {
+    if (groups.length === 0) return new Map();
+    return buildGroupCapacityMap(stations, groups, assignments, now);
+  }, [stations, groups, assignments, now]);
+
+  // REQ-12 & REQ-18: Calculate set of task IDs with conflicts for visual feedback
+  const conflictTaskIds = useMemo(() => {
+    const taskIds = new Set<string>();
+    conflicts.forEach((conflict) => {
+      // REQ-12: Precedence conflicts
+      if (conflict.type === 'PrecedenceConflict' && conflict.taskId) {
+        taskIds.add(conflict.taskId);
+      }
+      // REQ-18: Group capacity conflicts
+      if (conflict.type === 'GroupCapacityConflict' && conflict.taskId) {
+        taskIds.add(conflict.taskId);
+      }
+    });
+    return taskIds;
+  }, [conflicts]);
+
+  // v0.3.46: Group assignments by station, filtering to only visible ones
   const assignmentsByStation = useMemo(() => {
     const grouped = new Map<string, TaskAssignment[]>();
     stations.forEach((station) => grouped.set(station.id, []));
 
+    // Calculate grid start date for visibility check
+    const gridStart = startDate || new Date();
+
     assignments.forEach((assignment) => {
       // Skip outsourced assignments - they go to providers, not stations
       if (assignment.isOutsourced) return;
+
+      // v0.3.46: Skip assignments outside visible range
+      if (!isAssignmentVisible(
+        assignment.scheduledStart,
+        assignment.scheduledEnd,
+        gridStart,
+        virtualScroll.visibleRange
+      )) {
+        return;
+      }
 
       const stationAssignments = grouped.get(assignment.targetId);
       if (stationAssignments) {
@@ -183,20 +350,27 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     });
 
     return grouped;
-  }, [assignments, stations]);
+  }, [assignments, stations, startDate, virtualScroll.visibleRange]);
 
   // Calculate departure marker position (if selected job has workshopExitDate)
+  // Multi-day: show marker regardless of day (REQ-15)
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) : null;
   let departurePosition: number | null = null;
   if (selectedJob?.workshopExitDate) {
     const departureDate = new Date(selectedJob.workshopExitDate);
-    const today = new Date();
-    if (
-      departureDate.getDate() === today.getDate() &&
-      departureDate.getMonth() === today.getMonth() &&
-      departureDate.getFullYear() === today.getFullYear()
-    ) {
-      departurePosition = timeToYPosition(departureDate, startHour);
+    // In multi-day mode (when startDate provided), always show the marker
+    // In single-day mode, only show if departure is today
+    if (startDate) {
+      departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour, startDate);
+    } else {
+      const today = new Date();
+      if (
+        departureDate.getDate() === today.getDate() &&
+        departureDate.getMonth() === today.getMonth() &&
+        departureDate.getFullYear() === today.getFullYear()
+      ) {
+        departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour);
+      }
     }
   }
 
@@ -215,18 +389,29 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           {/* Station headers */}
           <div className="flex gap-3 px-3 border-b border-white/10">
             {stations.map((station) => {
-              // Determine if this header should be collapsed during drag
-              const targetStationId =
-                activeTask?.type === 'Internal' ? activeTask.stationId : null;
-              const isCollapsed = targetStationId !== null && targetStationId !== station.id;
+              // v0.3.57: Column collapse removed (was only for drag & drop)
+              const isCollapsed = false;
+              // Check if station has tiles
+              const stationAssignments = assignmentsByStation.get(station.id) || [];
+              const hasTiles = stationAssignments.length > 0;
+              // Check if this station is being compacted
+              const isCompacting = compactingStationId === station.id;
+              // REQ-18: Get group capacity info for this station
+              const groupCapacity = groupCapacityMap.get(station.id);
               return (
                 <StationHeader
                   key={station.id}
                   station={station}
                   isCollapsed={isCollapsed}
+                  hasTiles={hasTiles}
+                  isCompacting={isCompacting}
+                  onCompact={onCompact}
+                  groupCapacity={groupCapacity}
                 />
               );
             })}
+            {/* v0.3.55: Spacer to allow rightmost column to scroll to left edge */}
+            <div className="shrink-0" style={{ width: 'calc(100vw - 300px)' }} aria-hidden="true" />
           </div>
         </div>
 
@@ -239,6 +424,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               hourCount={hoursToDisplay}
               currentTime={now}
               showNowLine={false}
+              pixelsPerHour={pixelsPerHour}
+              visibleDayRange={virtualScroll.visibleRange}
             />
           </div>
 
@@ -266,23 +453,33 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const category = categoryMap.get(station.categoryId);
               const criteria = category?.similarityCriteria || [];
 
-              // Determine if this column should be collapsed during drag
-              // Target station stays full width, others collapse
-              const targetStationId =
-                activeTask?.type === 'Internal' ? activeTask.stationId : null;
-              const isCollapsed = targetStationId !== null && targetStationId !== station.id;
-
-              // Determine validation visual state for this column
-              const isValidationTarget = validationState?.targetStationId === station.id;
-              const isValidDrop = isValidationTarget && validationState?.isValid;
-              const isInvalidDrop = isValidationTarget && !validationState?.isValid;
-              const showBypassWarning = isValidationTarget &&
-                validationState?.hasPrecedenceConflict &&
-                validationState?.isAltPressed;
+              // v0.3.57: Column collapse removed (was only for drag & drop)
+              const isCollapsed = false;
 
               // Quick placement state for this column
               const isHoveredForQuickPlacement = quickPlacementHoverStationId === station.id;
               const hasAvailableTaskForQuickPlacement = stationsWithAvailableTasks.has(station.id);
+
+              // Quick placement validation
+              const isQuickPlacementValid = isHoveredForQuickPlacement &&
+                hasAvailableTaskForQuickPlacement &&
+                quickPlacementValidation?.isValid;
+              const isQuickPlacementInvalid = isHoveredForQuickPlacement &&
+                hasAvailableTaskForQuickPlacement &&
+                !quickPlacementValidation?.isValid;
+
+              // Precedence constraints: show for quick placement or pick
+              const isPickTarget = isPicking && pickTargetStationId === station.id;
+              const showQuickPlacementConstraints = isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement;
+              let effectivePrecedenceConstraints;
+              if (showQuickPlacementConstraints) {
+                effectivePrecedenceConstraints = quickPlacementPrecedenceConstraints;
+              } else if (isPickTarget) {
+                effectivePrecedenceConstraints = pickPrecedenceConstraints;
+              }
+
+              // v0.3.51: Drying time info - show only on the predecessor's station
+              const effectiveDryingTimeInfo = pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined;
 
               return (
                 <StationColumn
@@ -290,27 +487,45 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   station={station}
                   startHour={startHour}
                   hoursToDisplay={hoursToDisplay}
+                  pixelsPerHour={pixelsPerHour}
+                  gridStartDate={startDate}
                   isCollapsed={isCollapsed}
-                  isValidDrop={isValidDrop}
-                  isInvalidDrop={isInvalidDrop}
-                  showBypassWarning={showBypassWarning}
+                  isValidDrop={isQuickPlacementValid}
+                  isInvalidDrop={isQuickPlacementInvalid}
                   isQuickPlacementMode={isQuickPlacementMode}
                   hasAvailableTask={hasAvailableTaskForQuickPlacement}
                   placementIndicatorY={isHoveredForQuickPlacement ? quickPlacementIndicatorY : undefined}
                   onQuickPlacementMouseMove={onQuickPlacementMouseMove}
                   onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
                   onQuickPlacementClick={onQuickPlacementClick}
+                  precedenceConstraints={effectivePrecedenceConstraints}
+                  dryingTimeInfo={effectiveDryingTimeInfo}
+                  visibleDayRange={virtualScroll.visibleRange}
+                  isPicking={isPicking}
+                  isPickTarget={isPickTarget}
+                  pickRingState={isPickTarget ? pickRingState : 'none'}
+                  pickSource={pickSource}
+                  onPickMouseMove={onPickMouseMove}
+                  onPickMouseLeave={onPickMouseLeave}
+                  onPickClick={onPickClick}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
-                    const job = task ? jobMap.get(task.jobId) : null;
+                    const jobId = task ? getJobIdForTask(task, elements) : null;
+                    const job = jobId ? jobMap.get(jobId) : null;
 
                     // Skip if we don't have the task/job data or if task is not internal
                     if (!task || !job || !isInternalTask(task)) return null;
 
+                    // v0.4.32b: Get element for blocking status
+                    const element = elements.find((e) => e.id === task.elementId);
+                    const blocked = element ? isElementBlocked(element) : false;
+                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element) : undefined;
+
                     // Calculate top position from assignment.scheduledStart
+                    // Use multi-day calculation when startDate is provided (REQ-14)
                     const startTime = new Date(assignment.scheduledStart);
-                    const top = timeToYPosition(startTime, startHour);
+                    const top = timeToYPosition(startTime, startHour, pixelsPerHour, startDate);
 
                     // Determine swap button visibility
                     const showSwapUp = index > 0;
@@ -321,7 +536,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     if (index > 0 && criteria.length > 0) {
                       const prevAssignment = stationAssignments[index - 1];
                       const prevTask = taskMap.get(prevAssignment.taskId);
-                      const prevJob = prevTask ? jobMap.get(prevTask.jobId) : null;
+                      const prevJobId = prevTask ? getJobIdForTask(prevTask, elements) : null;
+                      const prevJob = prevJobId ? jobMap.get(prevJobId) : null;
                       if (prevJob) {
                         similarityResults = compareSimilarity(prevJob, job, criteria);
                       }
@@ -342,13 +558,24 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onRecall={onRecallAssignment}
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
-                        activeJobId={activeJob?.id}
+                        onToggleComplete={onToggleComplete}
+                        selectedJobId={selectedJobId ?? undefined}
+                        hasConflict={conflictTaskIds.has(task.id)}
+                        pixelsPerHour={pixelsPerHour}
+                        isPicked={pickedAssignmentId === assignment.id}
+                        onPickFromGrid={onPickFromGrid}
+                        isPickingActive={isPicking}
+                        onContextMenu={onContextMenu}
+                        isBlocked={blocked}
+                        blockingInfo={blockingInfo}
                       />
                     );
                   })}
                 </StationColumn>
               );
             })}
+            {/* v0.3.55: Spacer to allow rightmost column to scroll to left edge */}
+            <div className="shrink-0" style={{ width: 'calc(100vw - 300px)' }} aria-hidden="true" />
           </div>
         </div>
       </div>

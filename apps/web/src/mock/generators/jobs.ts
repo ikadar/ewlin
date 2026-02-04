@@ -7,14 +7,17 @@ import { faker } from '@faker-js/faker/locale/fr';
 import type {
   Job,
   JobStatus,
-  PaperPurchaseStatus,
-  PlatesStatus,
   Task,
   InternalTask,
   OutsourcedTask,
   TaskStatus,
   LateJob,
+  Element,
+  PaperStatus,
+  BatStatus,
+  PlateStatus,
 } from '@flux/types';
+import { createElement, getElementIdForJob } from './elements';
 
 // ============================================================================
 // Constants
@@ -35,6 +38,8 @@ const JOB_COLORS = [
 
 const PAPER_TYPES = ['CB 135g', 'CB 300g', 'CB 350g', 'Couché mat 170g', 'Couché brillant 250g', 'Offset 80g', 'Kraft 120g'];
 const PAPER_FORMATS = ['45x64', '52x74', '63x88', '70x100', 'A4', 'A3', 'SRA3'];
+const PAPER_WEIGHTS = [80, 100, 120, 150, 170, 200, 250, 300, 350];
+const INKINGS = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0'];
 
 const CLIENT_NAMES = [
   'Autosphere',
@@ -125,7 +130,7 @@ function generateInternalTask(
 
   return {
     id: `task-${jobId}-${sequenceOrder}`,
-    jobId,
+    elementId: getElementIdForJob(jobId),
     sequenceOrder,
     status,
     type: 'Internal',
@@ -150,7 +155,7 @@ function generateOutsourcedTask(
   const now = new Date();
   return {
     id: `task-${jobId}-${sequenceOrder}`,
-    jobId,
+    elementId: getElementIdForJob(jobId),
     sequenceOrder,
     status,
     type: 'Outsourced',
@@ -216,12 +221,16 @@ interface GenerateJobOptions {
   forceFirstStation?: string;
   /** Keep the first task unscheduled */
   keepFirstUnscheduled?: boolean;
-  /** Ensure all approval gates are satisfied (BAT approved, Plates done) */
-  forceApproved?: boolean;
+  /** Element prerequisites (for deterministic testing) */
+  elementPrerequisites?: {
+    paperStatus?: PaperStatus;
+    batStatus?: BatStatus;
+    plateStatus?: PlateStatus;
+  };
 }
 
-function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
-  const { index, isLate = false, forceFirstStation, keepFirstUnscheduled = false, forceApproved = false } = options;
+function generateJob(options: GenerateJobOptions): { job: Job; element: Element; tasks: Task[] } {
+  const { index, isLate = false, forceFirstStation, keepFirstUnscheduled = false, elementPrerequisites } = options;
   const now = new Date();
   const jobId = `job-${String(index).padStart(5, '0')}`;
 
@@ -264,6 +273,9 @@ function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
   const description = randomElement(JOB_DESCRIPTIONS);
   const quantity = randomElement([100, 250, 500, 1000, 2500, 5000]);
 
+  // Element ID is derived from job ID (deterministic)
+  const elementId = getElementIdForJob(jobId);
+
   const job: Job = {
     id: jobId,
     reference: `${now.getFullYear()}-${String(index).padStart(4, '0')}`,
@@ -275,29 +287,31 @@ function generateJob(options: GenerateJobOptions): { job: Job; tasks: Task[] } {
     color: JOB_COLORS[index % JOB_COLORS.length],
     paperType: randomElement(PAPER_TYPES),
     paperFormat: randomElement(PAPER_FORMATS),
-    paperPurchaseStatus: randomElement(['InStock', 'Ordered', 'Received'] as PaperPurchaseStatus[]),
-    proofApproval: forceApproved
-      ? {
-          sentAt: formatDate(addDays(now, -randomInt(5, 10))),
-          approvedAt: formatDate(addDays(now, -randomInt(1, 4))),
-        }
-      : {
-          sentAt: Math.random() > 0.3 ? formatDate(addDays(now, -randomInt(3, 10))) : 'AwaitingFile',
-          approvedAt: Math.random() > 0.5 ? formatDate(addDays(now, -randomInt(1, 5))) : null,
-        },
-    platesStatus: forceApproved ? 'Done' : randomElement(['Todo', 'Done'] as PlatesStatus[]),
-    requiredJobIds: [],
+    paperWeight: randomElement(PAPER_WEIGHTS),
+    inking: randomElement(INKINGS),
     comments: [],
+    elementIds: [elementId],
     taskIds: tasks.map((t) => t.id),
     createdAt: formatTimestamp(addDays(now, -randomInt(5, 30))),
     updatedAt: formatTimestamp(now),
   };
 
-  return { job, tasks };
+  // Create element for this job (1:1 relationship for v0.4.0)
+  // Use provided prerequisites or random defaults
+  const element = createElement({
+    jobId,
+    taskIds: tasks.map((t) => t.id),
+    paperStatus: elementPrerequisites?.paperStatus ?? randomElement(['in_stock', 'ordered', 'delivered'] as PaperStatus[]),
+    batStatus: elementPrerequisites?.batStatus ?? randomElement(['bat_sent', 'bat_approved'] as BatStatus[]),
+    plateStatus: elementPrerequisites?.plateStatus ?? randomElement(['to_make', 'ready'] as PlateStatus[]),
+  });
+
+  return { job, element, tasks };
 }
 
 export interface JobData {
   jobs: Job[];
+  elements: Element[];
   tasks: Task[];
 }
 
@@ -305,26 +319,33 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   const { count = 15, includeLateJobs = 2, includeConflictJobs = 1 } = options;
 
   const jobs: Job[] = [];
+  const elements: Element[] = [];
   const tasks: Task[] = [];
 
-  // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved)
-  const { job: qaJob, tasks: qaTasks } = generateJob({
+  // First, generate the QA test job (non-late, with Komori G40, unscheduled, approved prerequisites)
+  const { job: qaJob, element: qaElement, tasks: qaTasks } = generateJob({
     index: 1,
     isLate: false, // NOT late so deadline is in the future
     forceFirstStation: 'sta-komori-g40',
     keepFirstUnscheduled: true,
-    forceApproved: true,
+    elementPrerequisites: {
+      paperStatus: 'in_stock',
+      batStatus: 'bat_approved',
+      plateStatus: 'ready',
+    },
   });
   jobs.push(qaJob);
+  elements.push(qaElement);
   tasks.push(...qaTasks);
 
   // Generate late jobs (starting from index 2)
   for (let i = 0; i < includeLateJobs && i + 1 < count; i++) {
-    const { job, tasks: jobTasks } = generateJob({
+    const { job, element, tasks: jobTasks } = generateJob({
       index: i + 2,
       isLate: true,
     });
     jobs.push(job);
+    elements.push(element);
     tasks.push(...jobTasks);
   }
 
@@ -332,11 +353,12 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
   // QA job = 1, late jobs = 2 to (includeLateJobs+1), normal jobs start after
   const normalStartIndex = 1 + includeLateJobs + 1; // +1 for QA job, +1 because indexes are 1-based
   for (let i = normalStartIndex; i <= count; i++) {
-    const { job, tasks: jobTasks } = generateJob({
+    const { job, element, tasks: jobTasks } = generateJob({
       index: i,
       isLate: false,
     });
     jobs.push(job);
+    elements.push(element);
     tasks.push(...jobTasks);
   }
 
@@ -346,7 +368,7 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
     jobs[i].notes = 'CONFLICT_TEST';
   }
 
-  return { jobs, tasks };
+  return { jobs, elements, tasks };
 }
 
 // ============================================================================

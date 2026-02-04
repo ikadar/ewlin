@@ -1,6 +1,5 @@
-import { useDraggable } from '@dnd-kit/core';
-import type { Task, TaskAssignment, Station, Job } from '@flux/types';
-import type { TaskDragData } from '../../App';
+import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask } from '@flux/types';
+import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 
 export interface TaskTileProps {
   /** The task to display */
@@ -15,41 +14,77 @@ export interface TaskTileProps {
   station?: Station;
   /** Whether this task is the active placement target in Quick Placement Mode */
   isActivePlacement?: boolean;
+  /** Whether this task is currently picked (for Pick & Place) */
+  isPicked?: boolean;
+  /** Callback when a scheduled task is clicked (jump to grid) */
+  onJumpToTask?: (assignment: TaskAssignment) => void;
+  /** Callback when a scheduled task is double-clicked (recall) */
+  onRecallTask?: (assignmentId: string) => void;
+  /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
+  onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
+  /** v0.5.11: Provider for outsourced tasks */
+  provider?: OutsourcedProvider;
+  /** v0.5.11: End time of predecessor task (ISO string) for outsourcing calculations */
+  predecessorEndTime?: string;
+  /** v0.5.11: Callback when work days changes for outsourced task */
+  onWorkDaysChange?: (taskId: string, workDays: number) => void;
+  /** v0.5.11: Callback when manual departure changes for outsourced task */
+  onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
+  /** v0.5.11: Callback when manual return changes for outsourced task */
+  onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
 }
 
 /**
  * Individual task tile with state-based styling.
- * Unscheduled: job color, border-l-4, cursor-grab, draggable
- * Scheduled: dark placeholder with station + datetime
+ * Internal tasks:
+ *   - Unscheduled: job color, border-l-4, clickable for Pick & Place
+ *   - Scheduled: dark placeholder with station + datetime
+ * Outsourced tasks:
+ *   - Always show mini-form (not schedulable, just configurable)
+ * v0.3.57: Drag & drop removed, now uses Pick & Place only
+ * v0.5.11: Outsourcing Mini-Form for outsourced tasks
  */
-export function TaskTile({ task, job, jobColor, assignment, station, isActivePlacement = false }: TaskTileProps) {
+export function TaskTile({
+  task,
+  job,
+  jobColor,
+  assignment,
+  station,
+  isActivePlacement = false,
+  isPicked = false,
+  onJumpToTask,
+  onRecallTask,
+  onPick,
+  provider,
+  predecessorEndTime,
+  onWorkDaysChange,
+  onDepartureChange,
+  onReturnChange,
+}: TaskTileProps) {
+  // v0.5.11: Outsourced tasks render as mini-form
+  if (task.type === 'Outsourced') {
+    return (
+      <OutsourcingMiniForm
+        task={task as OutsourcedTask}
+        provider={provider}
+        jobColor={jobColor}
+        predecessorEndTime={predecessorEndTime}
+        onWorkDaysChange={onWorkDaysChange}
+        onDepartureChange={onDepartureChange}
+        onReturnChange={onReturnChange}
+      />
+    );
+  }
+
+  // Internal task handling
   const isScheduled = !!assignment;
-
-  // Set up draggable for unscheduled tasks only
-  const dragData: TaskDragData = {
-    type: 'task',
-    task,
-    job,
-  };
-
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `task-${task.id}`,
-    data: dragData,
-    disabled: isScheduled, // Only unscheduled tasks are draggable
-  });
-
-  // Note: We don't apply transform here because we use DragOverlay for the preview.
-  // The source element stays in place while dragging.
 
   // Format duration as Xh YY
   const formatDuration = (): string => {
-    if (task.type === 'Internal') {
-      const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      return `${hours}h${minutes.toString().padStart(2, '0')}`;
-    }
-    return `${task.duration.openDays}j`;
+    const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h${minutes.toString().padStart(2, '0')}`;
   };
 
   // Format scheduled datetime as "Di 15/12 07:00"
@@ -64,29 +99,10 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     return `${dayName} ${day}/${month} ${hours}:${minutes}`;
   };
 
-  // Get display name based on task type
-  const getDisplayName = (): string => {
-    if (task.type === 'Internal') {
-      return station?.name || 'Unknown';
-    }
-    // Outsourced task - show action type (e.g., "Pelliculage", "Reliure")
-    return task.actionType || 'Sous-traitance';
-  };
-  const displayName = getDisplayName();
-
-  // Calculate height based on duration (for visual representation)
-  // 1 hour = 100px, minimum 20px
-  const getHeight = (): number => {
-    if (task.type === 'Internal') {
-      const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-      const height = Math.max(20, Math.round((totalMinutes / 60) * 100));
-      return Math.min(height, 200); // Cap at 200px for list view
-    }
-    return 60; // Default for outsourced
-  };
+  // Get display name (station name for internal tasks)
+  const displayName = station?.name || 'Unknown';
 
   // Convert hex color to Tailwind-compatible classes
-  // For now, we'll use inline styles for the job color
   const getColorStyles = () => {
     if (isScheduled) {
       return {
@@ -105,8 +121,6 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
 
   // Get a lighter text color based on the job color
   const getTextColorFromHex = (hex: string): string => {
-    // For simplicity, just return a class based on common color families
-    // In a real app, you'd compute this from the hex
     const colorLower = hex.toLowerCase();
     if (colorLower.includes('purple') || colorLower === '#8b5cf6' || colorLower === '#a855f7') {
       return 'text-purple-300';
@@ -123,20 +137,32 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
     if (colorLower.includes('red') || colorLower === '#ef4444' || colorLower === '#f87171') {
       return 'text-red-300';
     }
-    // Default to using inline style
     return '';
   };
 
   const colorStyles = getColorStyles();
-  const height = getHeight();
 
   if (isScheduled) {
     // Scheduled (placed) task - dark placeholder (not draggable)
+    const handleClick = () => {
+      if (onJumpToTask && assignment) {
+        onJumpToTask(assignment);
+      }
+    };
+
+    const handleDoubleClick = () => {
+      if (onRecallTask && assignment) {
+        onRecallTask(assignment.id);
+      }
+    };
+
     return (
-      <div
-        className="pt-0.5 px-2 pb-2 text-sm border-l-4 border-slate-700 bg-slate-800/40"
-        style={{ height: `${height}px` }}
+      <button
+        type="button"
+        className="h-8 pt-0.5 px-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full"
         data-testid={`task-tile-${task.id}`}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
       >
         <div className="flex items-center justify-between gap-2">
           <span className="text-zinc-400 font-medium truncate min-w-0">{displayName}</span>
@@ -144,7 +170,7 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
             {formatScheduledTime(assignment.scheduledStart)}
           </span>
         </div>
-      </div>
+      </button>
     );
   }
 
@@ -155,32 +181,72 @@ export function TaskTile({ task, job, jobColor, assignment, station, isActivePla
       }
     : undefined;
 
-  // Unscheduled task - job color styling, draggable
+  // Picked state styling (v0.3.54)
+  const pickedStyle = isPicked
+    ? {
+        boxShadow: '0 0 0 2px #3b82f6, 0 0 12px rgba(59, 130, 246, 0.4)',
+        opacity: 0.7,
+      }
+    : undefined;
+
+  // Handle click for pick & place
+  const handleClick = (e: React.MouseEvent) => {
+    if (onPick) {
+      onPick(task, job, e.clientX, e.clientY);
+    }
+  };
+
+  // Determine cursor style
+  const getCursorClass = () => {
+    if (isPicked) return 'cursor-default';
+    if (onPick) return 'cursor-pointer';
+    return 'cursor-default';
+  };
+
+  // Unscheduled task - job color styling, clickable for Pick & Place
+  const baseClassName = `h-8 pt-0.5 px-2 text-sm border-l-4 select-none transition-all duration-150 ${getCursorClass()}`;
+  const tileStyle = {
+    borderLeftColor: jobColor,
+    backgroundColor: colorStyles.backgroundColor,
+    ...activePlacementStyle,
+    ...pickedStyle,
+  };
+
+  const content = (
+    <div className="flex items-center justify-between gap-2">
+      <span
+        className={`font-medium truncate min-w-0 ${colorStyles.textColor}`}
+        style={colorStyles.textColor ? undefined : { color: jobColor }}
+      >
+        {displayName}
+      </span>
+      <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
+    </div>
+  );
+
+  // Use button when interactive (onPick provided)
+  if (onPick) {
+    return (
+      <button
+        type="button"
+        className={`${baseClassName} w-full text-left`}
+        style={tileStyle}
+        data-testid={`task-tile-${task.id}`}
+        onClick={handleClick}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  // Non-interactive display
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`pt-0.5 px-2 text-sm border-l-4 touch-none select-none ${
-        isDragging ? 'opacity-50 cursor-grabbing' : 'cursor-grab'
-      }`}
-      style={{
-        height: `${height}px`,
-        borderLeftColor: jobColor,
-        backgroundColor: colorStyles.backgroundColor,
-        ...activePlacementStyle,
-      }}
+      className={baseClassName}
+      style={tileStyle}
       data-testid={`task-tile-${task.id}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={`font-medium truncate min-w-0 ${colorStyles.textColor}`}
-          style={colorStyles.textColor ? undefined : { color: jobColor }}
-        >
-          {displayName}
-        </span>
-        <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
-      </div>
+      {content}
     </div>
   );
 }

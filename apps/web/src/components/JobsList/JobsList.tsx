@@ -1,23 +1,30 @@
 import { useState, useMemo } from 'react';
-import type { Job, Task, LateJob, ScheduleConflict } from '@flux/types';
+import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
 import { JobsListHeader } from './JobsListHeader';
 import { ProblemsSection } from './ProblemsSection';
 import { JobsSection } from './JobsSection';
 import { JobCard, type JobProblemType } from './JobCard';
+import { getJobIdForTask, groupTasksByJob, createTaskToJobMap } from '../../utils/taskHelpers';
 
 export interface JobsListProps {
   /** All jobs */
   jobs: Job[];
   /** All tasks */
   tasks: Task[];
+  /** All elements */
+  elements: Element[];
+  /** All assignments */
+  assignments: TaskAssignment[];
   /** Late jobs */
   lateJobs: LateJob[];
   /** Schedule conflicts */
   conflicts: ScheduleConflict[];
   /** Currently selected job ID */
   selectedJobId?: string | null;
-  /** Job selection handler */
-  onSelectJob?: (jobId: string) => void;
+  /** Job selection handler (null to deselect - REQ-03 toggle) */
+  onSelectJob?: (jobId: string | null) => void;
+  /** Add job handler (opens JCF modal) */
+  onAddJob?: () => void;
 }
 
 /**
@@ -26,10 +33,13 @@ export interface JobsListProps {
 export function JobsList({
   jobs,
   tasks,
+  elements,
+  assignments,
   lateJobs,
   conflicts,
   selectedJobId,
   onSelectJob,
+  onAddJob,
 }: JobsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -44,23 +54,34 @@ export function JobsList({
     conflicts.forEach((c) => {
       // Get job IDs from tasks involved in conflicts
       const task = tasks.find((t) => t.id === c.taskId);
-      if (task) ids.add(task.jobId);
+      if (task) {
+        const jobId = getJobIdForTask(task, elements);
+        if (jobId) ids.add(jobId);
+      }
     });
     return ids;
-  }, [conflicts, tasks]);
+  }, [conflicts, tasks, elements]);
 
-  // Calculate task counts per job
-  const taskCountsByJob = useMemo(() => {
-    const counts = new Map<string, { total: number; completed: number }>();
-    jobs.forEach((job) => {
-      const jobTasks = tasks.filter((t) => t.jobId === job.id);
-      counts.set(job.id, {
-        total: jobTasks.length,
-        completed: jobTasks.filter((t) => t.status === 'Completed').length,
-      });
+  // Group tasks by job ID using elements
+  const tasksByJob = useMemo(() => {
+    return groupTasksByJob(tasks, elements);
+  }, [tasks, elements]);
+
+  // Group assignments by job ID (via tasks and elements)
+  const assignmentsByJob = useMemo(() => {
+    const taskJobMap = createTaskToJobMap(tasks, elements);
+
+    const map = new Map<string, TaskAssignment[]>();
+    assignments.forEach((assignment) => {
+      const jobId = taskJobMap.get(assignment.taskId);
+      if (jobId) {
+        const existing = map.get(jobId) || [];
+        existing.push(assignment);
+        map.set(jobId, existing);
+      }
     });
-    return counts;
-  }, [jobs, tasks]);
+    return map;
+  }, [tasks, elements, assignments]);
 
   // Filter jobs by search query
   const filteredJobs = useMemo(() => {
@@ -116,7 +137,9 @@ export function JobsList({
   };
 
   const renderJobCard = (job: Job) => {
-    const counts = taskCountsByJob.get(job.id) || { total: 0, completed: 0 };
+    const jobTasks = tasksByJob.get(job.id) || [];
+    const jobAssignments = assignmentsByJob.get(job.id) || [];
+
     return (
       <JobCard
         key={job.id}
@@ -124,21 +147,22 @@ export function JobsList({
         reference={job.reference}
         client={job.client}
         description={job.description}
-        taskCount={counts.total}
-        completedTaskCount={counts.completed}
+        tasks={jobTasks}
+        assignments={jobAssignments}
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
         problemType={getProblemType(job.id)}
         isSelected={selectedJobId === job.id}
-        onClick={() => onSelectJob?.(job.id)}
+        onClick={() => onSelectJob?.(selectedJobId === job.id ? null : job.id)}
       />
     );
   };
 
   return (
-    <aside className="w-72 shrink-0 bg-zinc-900/30 flex flex-col border-r border-white/5">
+    <aside className="w-72 shrink-0 bg-zinc-900/30 flex flex-col border-r border-white/5" data-testid="jobs-list">
       <JobsListHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onAddJob={onAddJob}
       />
 
       <div className="flex-1 overflow-y-auto">

@@ -25,5 +25,8 @@ export {
   generateAssignments,
   generateConflicts,
   generateAllAssignmentData,
+  createStretchedAssignment,
   type AssignmentData,
 } from './assignments';
+
+export { createElement, getElementIdForJob } from './elements';

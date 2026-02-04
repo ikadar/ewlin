@@ -96,17 +96,19 @@ PROCESS: Job Cancellation
 
 ---
 
-# 3. Task Workflow (within Job)
+# 3. Task Workflow (within Element)
 
 ## State Machine: Task
 #### WF-TASK-SM-001
-> **References:** [DM-ENUM-TASK-001](domain-model.md#dm-enum-task-001), [BR-TASK-001](business-rules.md#br-task-001), [BR-ASSIGN-007](business-rules.md#br-assign-007)
+> **References:** [DM-ENUM-TASK-001](domain-model.md#dm-enum-task-001), [BR-TASK-001](business-rules.md#br-task-001), [BR-TASK-007](business-rules.md#br-task-007), [BR-ELEM-004](business-rules.md#br-elem-004), [BR-ASSIGN-007](business-rules.md#br-assign-007)
 
 ```
 STATE MACHINE: Task
 Initial: Defined
 
-Defined → Ready          (when previous task completed, or first task with approval gates cleared)
+Defined → Ready          (when intra-element predecessor completed;
+                          for first task of element: cross-element prerequisites also satisfied;
+                          element prerequisites checked — warning only if not ready, v0.4.32)
 Ready → Assigned         (when scheduled on station with time slot)
 Assigned → Executing     (when scheduled time arrives and work begins)
 Executing → Completed    (normal completion)
@@ -120,7 +122,8 @@ Executing → Cancelled    (job cancellation during execution)
 ```
 
 ### Notes
-- **Ready** means previous task completed and approval gates satisfied.
+- **Ready** means intra-element predecessor task completed. For the first task of an element, cross-element prerequisites (last tasks of prerequisite elements) must also have completed.
+- Element prerequisites (paper, BAT, plates, forme) are checked but only generate warnings in MVP (v0.4.32). Tasks can be scheduled even if element is blocked.
 - **Assigned** means scheduled with specific time slot on station.
 - **Failed** tasks can be retried by returning to Ready.
 - Recalling a tile moves from Assigned back to Ready.
@@ -128,66 +131,100 @@ Executing → Cancelled    (job cancellation during execution)
 
 ---
 
-# 4. Approval Gate Workflows
+# 4. Element Prerequisite Workflows (v0.4.32)
 
 ## Process: BAT (Proof) Approval
-#### WF-GATE-PROC-001
-> **References:** [BR-GATE-001](business-rules.md#br-gate-001), [BR-GATE-003](business-rules.md#br-gate-003)
+#### WF-PREREQ-PROC-001
+> **References:** [BR-PREREQ-002](business-rules.md#br-prereq-002)
 
 ```
-PROCESS: BAT Approval
+PROCESS: BAT Approval (Element-level)
 
-1. Job created with proofSentAt = null
-2. User actions:
-   a) Set proofSentAt = "AwaitingFile" → waiting for client file
-   b) Set proofSentAt = "NoProofRequired" → bypass proof, tasks can be scheduled
-   c) Set proofSentAt = <datetime> → proof sent to client
-3. If proof sent, wait for client response:
-   a) Client approves → set proofApprovedAt = <datetime>
-   b) Client requests changes → send revised proof (update proofSentAt)
-4. When proofApprovedAt is set (or proofSentAt = "NoProofRequired"):
-   → Tasks can be scheduled
+1. Element created with batStatus = "none" (no BAT required) or "waiting_files"
+2. User actions on element:
+   a) Set batStatus = "waiting_files" → waiting for client file
+   b) Set batStatus = "files_received" → client files received
+      → System records filesReceivedAt = now()
+   c) Set batStatus = "bat_sent" → BAT sent to client
+      → System records batSentAt = now()
+   d) Set batStatus = "bat_approved" → client approved
+      → System records batApprovedAt = now()
+3. Element blocking status:
+   → Ready states: "none", "bat_approved"
+   → Blocking states: "waiting_files", "files_received", "bat_sent"
 ```
 
-## Process: Plates Approval
-#### WF-GATE-PROC-002
-> **References:** [BR-GATE-002](business-rules.md#br-gate-002)
+## Process: Plates Preparation
+#### WF-PREREQ-PROC-002
+> **References:** [BR-PREREQ-003](business-rules.md#br-prereq-003)
 
 ```
-PROCESS: Plates Approval
+PROCESS: Plates Preparation (Element-level)
 
-1. Job created with platesStatus = "Todo"
-2. Plates preparation work happens (external to system)
-3. User marks platesStatus = "Done"
-4. When platesStatus = "Done":
-   → Printing tasks on offset stations can proceed
+1. Element created with plateStatus = "none" (no plates required) or "to_make"
+2. User actions on element:
+   a) Set plateStatus = "to_make" → plates need to be prepared
+   b) Set plateStatus = "ready" → plates are ready
+3. Element blocking status:
+   → Ready states: "none", "ready"
+   → Blocking states: "to_make"
 ```
+
+## Process: Forme (Die-Cutting Tool) Preparation
+#### WF-PREREQ-PROC-003
+> **References:** [BR-PREREQ-005](business-rules.md#br-prereq-005), [BR-PREREQ-006](business-rules.md#br-prereq-006)
+
+```
+PROCESS: Forme Preparation (Element-level)
+
+1. Element created with formeStatus = "none" (default)
+2. If element has die-cutting task (internal or outsourced):
+   a) User sets formeStatus = "in_stock" → forme already available
+   b) User sets formeStatus = "to_order" → forme needs to be ordered
+   c) User sets formeStatus = "ordered" → forme ordered
+      → System records formeOrderedAt = now()
+   d) User sets formeStatus = "delivered" → forme delivered
+      → System records formeDeliveredAt = now()
+3. Element blocking status:
+   → Ready states: "none", "in_stock", "delivered"
+   → Blocking states: "to_order", "ordered"
+4. Note: Forme field only shown in UI for elements with die-cutting tasks
+```
+
+### Notes (Element Prerequisites)
+- All prerequisites are tracked at element level (not job level) as of v0.4.32
+- An element is blocked if ANY prerequisite is not in a ready state
+- Blocked elements display a dashed left border on scheduler tiles
+- Prerequisites are warnings only (MVP) — users can still schedule blocked elements
 
 ---
 
-# 5. Paper Procurement Workflow
+# 5. Paper Procurement Workflow (Element-level, v0.4.32)
 
 ## Process: Paper Procurement
-#### WF-PAPER-PROC-001
-> **References:** [BR-PAPER-001](business-rules.md#br-paper-001), [BR-PAPER-002](business-rules.md#br-paper-002), [BR-PAPER-003](business-rules.md#br-paper-003)
+#### WF-PREREQ-PROC-004
+> **References:** [BR-PAPER-001](business-rules.md#br-paper-001), [BR-PAPER-002](business-rules.md#br-paper-002), [BR-PREREQ-004](business-rules.md#br-prereq-004)
 
 ```
-PROCESS: Paper Procurement
+PROCESS: Paper Procurement (Element-level)
 
-1. Job created with paperPurchaseStatus:
-   a) "InStock" → paper already available, proceed immediately
-   b) "ToOrder" → paper needs to be ordered
+1. Element created with paperStatus:
+   a) "none" → no paper tracking needed for this element
+   b) "in_stock" → paper already available, proceed immediately
+   c) "to_order" → paper needs to be ordered
 
-2. If "ToOrder":
+2. If "to_order":
    a) User places order externally
-   b) User updates status to "Ordered"
+   b) User updates element status to "ordered"
    c) System records paperOrderedAt = now()
 
 3. When paper arrives:
-   a) User updates status to "Received"
+   a) User updates element status to "delivered"
+   b) System records paperDeliveredAt = now()
 
-4. Production should wait until:
-   → paperPurchaseStatus = "InStock" OR "Received"
+4. Element blocking status:
+   → Ready states: "none", "in_stock", "delivered"
+   → Blocking states: "to_order", "ordered"
 ```
 
 ---
@@ -201,24 +238,28 @@ PROCESS: Paper Procurement
 ```
 PROCESS: Task Assignment (Internal)
 
-1. Check task is in Ready state (previous task completed)
-2. Check approval gates:
-   a) proofApprovedAt is set OR proofSentAt = "NoProofRequired"
-   b) platesStatus = "Done" (if printing task)
+1. Check task is in Ready state:
+   a) Intra-element: previous task in element completed (by sequenceOrder)
+   b) Cross-element: prerequisite elements' last tasks completed (first task of element only)
+   c) Dry time respected if predecessor is printing task (+4h, BR-ELEM-005)
+2. Check element prerequisites (v0.4.32):
+   a) paperStatus is ready (none, in_stock, delivered)
+   b) batStatus is ready (none, bat_approved)
+   c) plateStatus is ready (none, ready) — especially for printing tasks
+   d) formeStatus is ready (none, in_stock, delivered) — for die-cutting tasks
+   → If any not ready: warn but allow (MVP)
 3. Check station:
    a) Station exists and is Available
    b) No conflicting assignments at proposed time
    c) Station group has capacity
-4. Check job dependencies:
-   a) All required jobs are completed
-5. If all valid:
+4. If all valid:
    a) Create TaskAssignment with scheduledStart and scheduledEnd
    b) Update task state → Assigned
    c) Reserve station time slot
    d) Publish TaskAssigned event
-6. If validation fails:
-   a) Report conflicts
-   b) Task remains in Ready state
+5. If validation fails:
+   a) Report conflicts (including PrerequisiteConflict for blocked elements)
+   b) Task remains in Ready state (or proceeds with warning in MVP)
 ```
 
 ## Process: Task Assignment (Outsourced Task)
@@ -229,7 +270,9 @@ PROCESS: Task Assignment (Internal)
 PROCESS: Task Assignment (Outsourced)
 
 1. Check task is in Ready state
-2. Check approval gates
+2. Check element prerequisites (v0.4.32):
+   a) All prerequisites ready (paper, BAT, plates, forme)
+   → If any not ready: warn but allow (MVP)
 3. Check provider:
    a) Provider exists and is Active
    b) Provider supports the action type
@@ -306,19 +349,24 @@ PROCESS: Assignment Validation
    - No station double-booking
 
    [Sequence Validation]
-   - Previous task in job completed (or this is first task)
-   - All required jobs completed
+   - Intra-element: previous task in element completed (by sequenceOrder)
+   - Cross-element: prerequisite elements' last tasks completed (first task of element only)
+   - Dry time: if predecessor is printing task, +4h wait respected (BR-ELEM-005)
+   - Most constraining predecessor (latest effectiveEnd) determines earliest valid start
 
-   [Gate Validation]
-   - Proof approved or not required
-   - Plates done (for printing tasks)
+   [Prerequisite Validation] (v0.4.32)
+   - Element paperStatus is ready (none, in_stock, delivered)
+   - Element batStatus is ready (none, bat_approved)
+   - Element plateStatus is ready (none, ready)
+   - Element formeStatus is ready (none, in_stock, delivered) — for die-cutting tasks
+   - If any not ready: PrerequisiteConflict (warning only in MVP)
 
    [Deadline Validation]
    - Task completes before job workshopExitDate
 
 4. Return validation result:
    - Valid → proceed with assignment
-   - Invalid → list all conflicts found
+   - Invalid → list all conflicts found (including PrerequisiteConflict)
 ```
 
 ---
@@ -337,8 +385,8 @@ TRIGGER: Station availability change / Task modification / New assignment
 1. Identify affected tasks:
    a) Tasks assigned to changed station
    b) Tasks in same station group
-   c) Tasks in same job (sequence dependencies)
-   d) Tasks in dependent jobs
+   c) Tasks in same element (intra-element sequence dependencies)
+   d) Tasks across elements in same job (cross-element dependencies via prerequisiteElementIds)
 
 2. For each affected task:
    a) Re-validate current assignment
@@ -347,10 +395,11 @@ TRIGGER: Station availability change / Task modification / New assignment
       - Mark task assignment as invalid
 
 3. Conflict types to detect:
+   - StationMismatchConflict: task assigned to wrong station
    - StationConflict: double-booking
    - GroupCapacityConflict: exceeds MaxConcurrent
-   - PrecedenceConflict: wrong sequence order
-   - ApprovalGateConflict: gates not satisfied
+   - PrecedenceConflict: intra-element or cross-element predecessor's effectiveEnd exceeds task start (includes dry time)
+   - PrerequisiteConflict: element prerequisite not ready (paper, BAT, plates, forme) — v0.4.32
    - AvailabilityConflict: outside station operating hours
    - DeadlineConflict: exceeds workshopExitDate
 
@@ -369,14 +418,16 @@ StationCategoryCreated
 → StationCreated
 → ProviderCreated (optional)
 → JobCreated
-→ TasksDefinedFromDSL
-→ ProofSent (or NoProofRequired)
-→ ProofApproved
-→ PlatesDone
-→ PaperReceived
+→ ElementsCreated
+→ TasksDefinedFromDSL (within elements)
+→ ElementPrerequisitesSet (v0.4.32):
+   → PaperStatusUpdated (per element)
+   → BatStatusUpdated (per element)
+   → PlateStatusUpdated (per element)
+   → FormeStatusUpdated (per element, if die-cutting)
 → JobPlanned
 → TaskReady
-→ TaskAssigned (tile placed)
+→ TaskAssigned (tile placed — may show blocked indicator if prerequisites not ready)
 → TaskExecuting
 → TaskCompleted
 → AllTasksCompleted
@@ -412,6 +463,11 @@ JobCompleted
 JobCancelled
 JobDelayed
 
+// Element Events
+ElementCreated
+ElementDependencyAdded
+ElementDependencyRemoved
+
 // Task Events
 TaskAddedToJob
 TaskRemovedFromJob
@@ -424,11 +480,11 @@ TaskCompleted
 TaskFailed
 TaskCancelled
 
-// Approval Gate Events
-ProofSent
-ProofApproved
-PlatesCompleted
-PaperStatusChanged
+// Element Prerequisite Events (v0.4.32)
+ElementPaperStatusUpdated
+ElementBatStatusUpdated
+ElementPlateStatusUpdated
+ElementFormeStatusUpdated
 
 // Comment Events
 CommentAdded

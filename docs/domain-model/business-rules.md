@@ -224,12 +224,41 @@ A task assignment is considered "future" if scheduledStart > current system time
 
 ---
 
+## Element
+
+#### BR-ELEM-001
+**Element must belong to exactly one job**
+
+Every Element MUST belong to exactly one Job (via `jobId`) and cannot exist independently.
+
+#### BR-ELEM-002
+**Prerequisite elements must be in the same job**
+
+`prerequisiteElementIds` MUST only reference elements that belong to the same job. Cross-job element dependencies are not allowed.
+
+#### BR-ELEM-003
+**No circular element dependencies**
+
+Element dependencies (via `prerequisiteElementIds`) MUST NOT form cycles. Elements within a job form a DAG (Directed Acyclic Graph).
+
+#### BR-ELEM-004
+**Finish-to-start element dependencies**
+
+All tasks of a prerequisite element MUST complete before the dependent element's first task can start. Only the last task of a prerequisite element and the first task of a dependent element participate in the cross-element precedence check.
+
+#### BR-ELEM-005
+**Dry time after printing tasks**
+
+If a predecessor task is a printing task (internal task on an offset press station, category `cat-offset`), the successor MUST wait an additional 4-hour drying time (`DRY_TIME_MINUTES = 240`) after the predecessor's `scheduledEnd`. This applies to both intra-element predecessors (previous task in same element) and cross-element predecessors (last task of prerequisite element). Drying is a physical process that continues outside working hours; the successor's earliest start is `predecessorEnd + 4h`, then snapped to the next working time slot if needed.
+
+---
+
 ## Task
 
 #### BR-TASK-001
-**Task must belong to exactly one job**
+**Task must belong to exactly one element**
 
-Every Task MUST belong to exactly one Job and cannot exist independently.
+Every Task MUST belong to exactly one Element (via `elementId`) and through the element to exactly one Job. Tasks cannot exist independently.
 
 #### BR-TASK-002
 **Task duration must be positive**
@@ -238,9 +267,9 @@ For internal tasks: setup + run minutes MUST be greater than zero.
 For outsourced tasks: durationOpenDays MUST be greater than zero.
 
 #### BR-TASK-003
-**Tasks follow linear sequence**
+**Tasks follow element-scoped linear sequence**
 
-Tasks within a job MUST follow a single straight sequence (Task N depends on Task N-1).
+Tasks within an element MUST follow a single straight sequence ordered by `sequenceOrder` (Task N depends on Task N-1 within the same element).
 
 #### BR-TASK-004
 **Internal task must reference valid station**
@@ -260,7 +289,7 @@ The raw DSL input for a task MUST parse correctly according to the DSL specifica
 #### BR-TASK-007
 **Previous task must complete first**
 
-A Task can ONLY start after its predecessor task (if any) has been completed.
+A Task can ONLY start after its intra-element predecessor task (previous `sequenceOrder` within the same element) has been completed. For the first task of an element, cross-element predecessors (last tasks of prerequisite elements, per BR-ELEM-004) must also have completed.
 
 #### BR-TASK-008
 **Outsourced task departure time**
@@ -279,45 +308,71 @@ The end time of an outsourced task is calculated as: the ReceptionTime on the bu
 
 ---
 
-## Approval Gates
+## Element Prerequisites (v0.4.32)
 
-#### BR-GATE-001
-**BAT approval before scheduling**
+#### BR-PREREQ-001
+**Element blocking logic**
 
-Tasks CANNOT be scheduled until the job's proof is approved (`proofApprovedAt` is set) OR `proofSentAt` is "NoProofRequired".
+An element is **blocked** if ANY of its prerequisites is not in a ready state:
+- Paper ready states: `none`, `in_stock`, `delivered`
+- BAT ready states: `none`, `bat_approved`
+- Plates ready states: `none`, `ready`
+- Forme ready states: `none`, `in_stock`, `delivered`
 
-#### BR-GATE-002
-**Plates approval before printing**
+#### BR-PREREQ-002
+**BAT approval before production**
 
-Printing tasks on offset stations CANNOT start until the job's `platesStatus` is "Done".
+Tasks of an element CANNOT start until the element's BAT status is `bat_approved` OR `none` (no BAT required).
 
-#### BR-GATE-003
-**AwaitingFile blocks BAT**
+#### BR-PREREQ-003
+**Plates readiness before printing**
 
-When `proofSentAt` is "AwaitingFile", the job is waiting for client file and scheduling is blocked.
+Printing tasks on offset stations CANNOT start until the element's `plateStatus` is `ready` OR `none` (no plates required).
+
+#### BR-PREREQ-004
+**Paper availability before production**
+
+Production tasks SHOULD NOT start until the element's paper status is `in_stock` or `delivered`. Blocking states are `to_order` and `ordered`.
+
+#### BR-PREREQ-005
+**Forme readiness for die-cutting**
+
+Die-cutting tasks (internal on category `cat-die-cutting` OR outsourced with die-cutting action type) CANNOT start until the element's `formeStatus` is `in_stock` or `delivered`. This prerequisite only applies to elements with die-cutting tasks.
+
+#### BR-PREREQ-006
+**Forme prerequisite visibility**
+
+The Forme prerequisite field SHOULD only be visible in UI when the element has at least one die-cutting task (detected by station category or outsourced action type keywords: "découpe", "die-cut", "stancolás").
+
+#### BR-PREREQ-007
+**Blocked element visual indicator**
+
+Blocked elements (any prerequisite not ready) MUST display a dashed left border on their scheduler tiles instead of a solid border.
 
 ---
 
-## Paper Procurement
+## Paper Procurement (Element-level, v0.4.32)
 
 #### BR-PAPER-001
 **Paper status progression**
 
-PaperPurchaseStatus MUST follow the progression: InStock | ToOrder → Ordered → Received.
-- InStock: Paper available, no progression needed
-- ToOrder → Ordered: When order is placed
-- Ordered → Received: When paper arrives
-Backward transitions (e.g., Ordered → ToOrder) are NOT permitted. If an order is cancelled, a new job or manual correction is needed.
+Element `paperStatus` MUST follow the progression: `in_stock` | `to_order` → `ordered` → `delivered`.
+- `none`: No paper tracking needed for this element
+- `in_stock`: Paper available, no progression needed
+- `to_order` → `ordered`: When order is placed
+- `ordered` → `delivered`: When paper arrives
+Backward transitions (e.g., `ordered` → `to_order`) are NOT permitted.
 
 #### BR-PAPER-002
 **Order timestamp on status change**
 
-When PaperPurchaseStatus changes to "Ordered", `paperOrderedAt` MUST be set to current timestamp.
+When element `paperStatus` changes to `ordered`, `paperOrderedAt` MUST be set to current timestamp.
+When element `paperStatus` changes to `delivered`, `paperDeliveredAt` MUST be set to current timestamp.
 
 #### BR-PAPER-003
 **Paper required before production**
 
-Production tasks SHOULD NOT start until paper status is "InStock" or "Received".
+Production tasks SHOULD NOT start until element paper status is `none`, `in_stock`, or `delivered`. See BR-PREREQ-004.
 
 ---
 
@@ -402,13 +457,17 @@ The system MUST prevent any state where a station (capacity=1) has overlapping t
 The system MUST prevent any state where station group concurrent task count exceeds MaxConcurrent.
 
 #### BR-SCHED-003
-**Task sequence enforcement**
+**Task sequence enforcement (intra-element + cross-element)**
 
-The system MUST warn (not block) when scheduling a task whose predecessor is scheduled to complete after the proposed task starts.
+The system MUST warn (not block) when scheduling a task whose predecessor is scheduled to complete after the proposed task starts. Predecessors include:
+- **Intra-element:** The previous task in the same element (by `sequenceOrder`)
+- **Cross-element:** The last tasks of prerequisite elements (per BR-ELEM-004), applicable only to the first task of an element
+
+The most constraining predecessor (latest `effectiveEnd`) determines the earliest valid start time. If the predecessor is a printing task, `effectiveEnd` includes the 4-hour dry time (BR-ELEM-005).
 
 **Important clarification:** If a predecessor task is **unscheduled**, no conflict is raised. This enables backward scheduling workflow where users place the last task first and work backwards. Conflicts only occur when:
 1. Predecessor IS scheduled, AND
-2. Predecessor's scheduledEnd > proposed task's scheduledStart
+2. Predecessor's effectiveEnd > proposed task's scheduledStart
 
 #### BR-SCHED-004
 **Job dependency enforcement**
@@ -421,9 +480,9 @@ The system MUST prevent starting a job's tasks before all required jobs are comp
 The system MUST warn when scheduled task completion exceeds the job's workshopExitDate.
 
 #### BR-SCHED-006
-**Approval gate enforcement**
+**Element prerequisite enforcement (v0.4.32)**
 
-The system MUST prevent scheduling tasks when required approval gates are not satisfied.
+The system MUST warn (not block) when scheduling tasks of elements with prerequisites not ready. See BR-PREREQ-001 for blocking logic.
 
 #### BR-SCHED-007
 **Schedule version increment**
@@ -457,7 +516,7 @@ The system MUST prevent any state where a station group exceeds its MaxConcurren
 #### INV-004
 **Task sequence integrity**
 
-Task completion times within a job MUST respect the sequential order.
+Task completion times within an element MUST respect the sequential order (`sequenceOrder`). Across elements, cross-element finish-to-start dependencies (per BR-ELEM-004) MUST also be respected.
 
 #### INV-005
 **State transition consistency**
@@ -467,7 +526,7 @@ All entities MUST follow their defined state machines; invalid transitions are n
 #### INV-006
 **Referential integrity**
 
-All references between entities (stationId, providerId, jobId, taskId) MUST point to existing, valid entities.
+All references between entities (stationId, providerId, jobId, elementId, taskId) MUST point to existing, valid entities.
 
 ---
 
@@ -482,7 +541,7 @@ Before accepting an assignment, the system MUST verify:
 - Group capacity is not exceeded
 - Task sequence is respected
 - Job dependencies are satisfied
-- Approval gates are cleared
+- Element prerequisites are ready (paper, BAT, plates, forme) — warning only (v0.4.32)
 - Workshop exit date can be met
 
 #### VAL-002
@@ -492,7 +551,7 @@ The system MUST detect and report all types of conflicts:
 - Station conflicts (double-booking)
 - Group capacity conflicts (exceeds MaxConcurrent)
 - Precedence conflicts (wrong task sequence order)
-- Approval gate conflicts (gates not satisfied)
+- Prerequisite conflicts (element prerequisites not ready — v0.4.32)
 - Availability conflicts (outside station operating hours)
 - Deadline conflicts (cannot meet workshopExitDate)
 
@@ -582,11 +641,10 @@ The following table provides a quick reference for validation rules, their corre
 | VAL-001.1 | Station exists and is Available | AvailabilityConflict | High | Yes |
 | VAL-001.2 | No station double-booking | StationConflict | High | Yes |
 | VAL-001.3 | Group capacity not exceeded | GroupCapacityConflict | High | Yes |
-| VAL-001.4 | Task sequence respected (only when predecessor is scheduled) | PrecedenceConflict | Medium | Soft* |
+| VAL-001.4 | Intra-element + cross-element sequence respected (only when predecessor is scheduled) | PrecedenceConflict | Medium | Soft* |
 | VAL-001.5 | Job dependencies satisfied | PrecedenceConflict | High | Yes |
-| VAL-001.6 | Approval gates cleared (BAT) | ApprovalGateConflict | High | Yes |
-| VAL-001.7 | Approval gates cleared (Plates) | ApprovalGateConflict | Medium | Warning |
-| VAL-001.8 | Workshop exit date achievable | DeadlineConflict | Medium | Warning |
+| VAL-001.6 | Element prerequisites ready (paper, BAT, plates, forme) | PrerequisiteConflict | Medium | Warning |
+| VAL-001.7 | Workshop exit date achievable | DeadlineConflict | Medium | Warning |
 | BR-ASSIGN-002 | Within operating hours | AvailabilityConflict | High | Yes |
 | BR-ASSIGN-004 | Not in the past | — | High | Yes |
 
@@ -598,8 +656,8 @@ The following table provides a quick reference for validation rules, their corre
 |---------------|-------------|------------------|
 | StationConflict | Station double-booked (overlapping assignments) | Red highlight on both tiles |
 | GroupCapacityConflict | Station group MaxConcurrent exceeded | Yellow/orange time slot |
-| PrecedenceConflict | Scheduled predecessor ends after proposed task starts | Red halo on violating tile |
-| ApprovalGateConflict | BAT or Plates approval not satisfied | Tile grayed out / blocked |
+| PrecedenceConflict | Intra-element or cross-element predecessor's effectiveEnd exceeds proposed task start (includes dry time for printing predecessors) | Red halo on violating tile |
+| PrerequisiteConflict | Element prerequisite not ready (paper, BAT, plates, forme) | Dashed left border on tile (v0.4.32) |
 | AvailabilityConflict | Outside station operating hours | Gray hatched overlay |
 | DeadlineConflict | Task completion exceeds workshopExitDate | Job in "Late Jobs" panel |
 

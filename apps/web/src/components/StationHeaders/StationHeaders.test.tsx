@@ -92,11 +92,18 @@ describe('OffScreenIndicator', () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClick on Enter key press', () => {
+  it('is keyboard accessible (native button)', () => {
     const handleClick = vi.fn();
     render(<OffScreenIndicator count={2} direction="up" onClick={handleClick} />);
 
-    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
+    // Native buttons are keyboard accessible by default
+    // Browser handles Enter/Space -> click automatically
+    // We verify the element is a proper button
+    const button = screen.getByRole('button');
+    expect(button.tagName).toBe('BUTTON');
+
+    // Verify clicking works (which Enter triggers natively)
+    fireEvent.click(button);
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 

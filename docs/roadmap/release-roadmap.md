@@ -46,7 +46,10 @@ This document contains the development roadmap for the Flux print shop schedulin
 | **M1** | Core Domain MVP (Station + Job Management) |
 | **M2** | Scheduling Core (Assignment + Validation) |
 | **M3** | Frontend Integration |
-| **M4** | Production Readiness |
+| **M4** | Job Creation Form (Element layer + JCF UI + Templates) |
+| **M5** | Backend API Integration + Outsourcing Refactor |
+| **M6** | DSL Syntax Highlighting (Post-MVP, optional) |
+| **M7** | Production Readiness |
 | **Post-MVP** | Schedule Branching, Optimization |
 
 ---
@@ -450,8 +453,8 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [x] **Task List** with two visual states:
   - Unscheduled: Full job color, border-l-4, draggable
   - Scheduled: Dark placeholder, station + datetime only
-- [ ] Single-click scheduled task → scroll grid to tile (deferred - requires grid)
-- [ ] Double-click scheduled task → recall (deferred - requires grid integration)
+- [x] Single-click scheduled task → scroll grid to tile (implemented in v0.3.18)
+- [x] Double-click scheduled task → recall (implemented in v0.3.18)
 
 #### v0.3.5 - Date Strip Component ✅
 - [x] Fixed width (w-12 / 48px)
@@ -557,105 +560,1411 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ### Phase 3F: UX/UI Enhancements
 
-#### v0.3.18 - Job Details Task Interactions
-- [ ] Single-click scheduled task → scroll grid to tile position
-- [ ] Double-click scheduled task → recall (unschedule)
-- [ ] Visual indicator for scheduled vs unscheduled tasks
-- [ ] Grid scroll integration with Job Details Panel
+#### v0.3.18 - Job Details Task Interactions ✅
+- [x] Single-click scheduled task → scroll grid to tile position (X and Y)
+- [x] Double-click scheduled task → recall (unschedule)
+- [x] Visual indicator for scheduled vs unscheduled tasks (cursor-pointer, hover state)
+- [x] Grid scroll integration with Job Details Panel
 
-#### v0.3.19 - Selection Glow Effect
-- [ ] Replace ring border with box-shadow glow for selected tiles
-- [ ] Glow effect: `box-shadow: 0 0 12px 4px rgba(color, 0.6)`
-- [ ] Works with all job colors
+#### v0.3.19 - Selection Glow Effect ✅
+- [x] Replace ring border with box-shadow glow for selected tiles
+- [x] Glow effect: `box-shadow: 0 0 12px 4px rgba(color, 0.6)`
+- [x] Works with all job colors
 
-#### v0.3.20 - Tile-Based Drop Position
-- [ ] Calculate drop position from tile top edge (not cursor)
-- [ ] Track grab offset on drag start
-- [ ] Prevents tile "jumping" on drop
-- [ ] Applies to both new placements and repositioning
+#### v0.3.20 - Tile-Based Drop Position ✅
+- [x] Calculate drop position from tile top edge (not cursor)
+- [x] Track grab offset on drag start
+- [x] Prevents tile "jumping" on drop
+- [x] Applies to both new placements and repositioning
 
 ### Phase 3G: Station Compact (Backend + Frontend)
 
-#### v0.3.21 - Station Compact API (Backend)
-- [ ] `POST /api/stations/{id}/compact` endpoint
-- [ ] CompactStationService with gap removal algorithm
-- [ ] Respects precedence rules (no conflicts created)
-- [ ] Single transaction for all assignment updates
-- [ ] PHPStan level 8, unit tests
+#### v0.3.21 - Station Compact API (Backend) ✅
+- [x] `POST /api/v1/stations/{id}/compact` endpoint
+- [x] CompactStationService with gap removal algorithm
+- [x] Respects precedence rules (no conflicts created)
+- [x] Single transaction for all assignment updates
+- [x] PHPStan level 8, unit tests (7 unit + 3 integration)
 
-#### v0.3.22 - Station Compact UI (Frontend)
-- [ ] Compact button in station headers
-- [ ] API integration (call compact endpoint)
-- [ ] Loading state during operation
-- [ ] Refresh assignments after successful compact
+#### v0.3.22 - Station Compact UI (Frontend) ✅
+- [x] Compact button in station headers
+- [x] API integration (call compact endpoint)
+- [x] Loading state during operation
+- [x] Refresh assignments after successful compact
 
 ### Phase 3H: Additional UX Features
 
-#### v0.3.23 - Downtime-Aware Tile Height
-- [ ] Tile height based on `scheduledEnd - scheduledStart`
-- [ ] Visual representation of time-stretched tasks
-- [ ] Setup/run sections scale proportionally
+#### v0.3.23 - Downtime-Aware Tile Height ✅
+- [x] Tile height based on `scheduledEnd - scheduledStart`
+- [x] Visual representation of time-stretched tasks
+- [x] Setup/run sections scale proportionally
 
-#### v0.3.24 - No Conflict for Unscheduled Predecessors (Validator)
-- [ ] Update `@flux/schedule-validator` precedence logic
-- [ ] Unscheduled predecessors don't create conflicts
-- [ ] Enables backward scheduling workflow
-- [ ] Update validator tests
+#### v0.3.24 - No Conflict for Unscheduled Predecessors (Validator) ✅
+- [x] Update `@flux/schedule-validator` precedence logic
+- [x] Unscheduled predecessors don't create conflicts
+- [x] Enables backward scheduling workflow
+- [x] Update validator tests
 
-#### v0.3.25 - Grid Tile Repositioning
-- [ ] Drag scheduled tiles within same station column
-- [ ] Reschedule to new time position on drop
-- [ ] Ghost placeholder at original position
-- [ ] Push-down behavior when dropping onto other tiles
-- [ ] Reuses tile-based drop position calculation
+#### v0.3.25 - Grid Tile Repositioning ✅
+- [x] Drag scheduled tiles within same station column
+- [x] Reschedule to new time position on drop
+- [x] Ghost placeholder at original position
+- [x] Push-down behavior when dropping onto other tiles
+- [x] Reuses tile-based drop position calculation
 
-### Phase 3I: Backend API Integration
+#### v0.3.26 - Manual QA Fixes ✅
+- [x] Custom collision detection (`document.elementsFromPoint()`)
+- [x] DragPreview pointer-events-none (prevents infinite loop)
+- [x] Reschedule uses same validation as new placement (per UX spec)
+- [x] Validator package rebuild (v0.3.24 changes)
+- [x] Mock data fixes (group capacity, BAT approval)
+- [x] Local compact implementation (mock mode)
+- [x] Disable column collapse during reschedule
+- [x] Operating hours validation timezone fix (UTC → local)
+- [x] Precedence conflict auto-snap to valid position
+- [x] Compact respects precedence (task.sequenceOrder)
+- [x] Plates ApprovalGateConflict is warning only
+- [x] End time stretching (BR-ASSIGN-003b)
+- [x] Compact uses calculateEndTime for stretching
+- [x] Initial assignments use BR-ASSIGN-003b stretching
+- [x] Orange warning color for non-blocking conflicts (Plates approval)
 
-#### v0.3.26 - Validator Package Integration
-- [ ] Install @flux/schedule-validator in frontend
-- [ ] Validation utility wrapper
-- [ ] Error message formatting (French)
-- [ ] Conflict type to visual mapping
+#### v0.3.27 - Drag-Drop E2E Test Suite ✅
+- [x] Deterministic test fixtures (6 fixtures: test, push-down, precedence, approval-gates, swap, sidebar-drag)
+- [x] Reusable drag helpers (`playwright/helpers/drag.ts`)
+- [x] UC-01: Sidebar-to-grid task placement tests (5 tests)
+- [x] UC-02/UC-03: Tile reschedule + grid snapping tests (3 tests)
+- [x] UC-04: Push-down collision tests (4 tests)
+- [x] UC-06: Precedence validation tests (4 tests)
+- [x] UC-07: Approval gate tests (4 tests)
+- [x] UC-09: Swap operation tests (5 tests)
+- [x] EC-02/EC-04: Edge case tests (4 tests)
+- [x] 100% test reliability (5/5 runs without failure)
+- [x] HTML5 DragEvent API with DataTransfer (pragmatic-drag-and-drop)
+- [x] **UX-UI Specifications** - Complete documentation structure:
+  - [x] `user-stories.md` - 16 UI user stories (US-UI-*)
+  - [x] `acceptance-criteria.md` - Given-When-Then format (AC-UI-*)
+  - [x] `non-functional-requirements.md` - Performance, accessibility, i18n
+  - [x] `design-tokens.md` - Colors, spacing, typography, animations
+  - [x] `state-machines.md` - Drag, tile, quick placement states
+  - [x] `keyboard-shortcuts.md` - Complete shortcuts reference
+  - [x] `component-api.md` - Component props and interfaces
+- [x] `06-edge-cases.md` expanded with error messages and recovery
 
-#### v0.3.27 - API Client Setup
-- [ ] API client configuration (RTK Query)
-- [ ] Environment-based URL configuration
-- [ ] Error handling utilities
-- [ ] Request/response interceptors
+#### v0.3.28 - Alt+Drag Bypass Bug Fix ✅
+> **Implements:** [REQ-13](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-13-fix-altdrag-bypass-conflict-recording-bug)
+> **Released:** 2025-12-22
 
-#### v0.3.28 - Snapshot Loading
-- [ ] Replace mock with real API
-- [ ] Loading states (skeleton/spinner TBD post-MVP)
-- [ ] Error states
-- [ ] Retry logic
+- [x] Fix `useDropValidation` hook: bypass-independent precedence check
+- [x] Fix `bypassedPrecedence` calculation in `App.tsx`
+- [x] Amber ring appears during Alt+drag over conflict position
+- [x] Record `PrecedenceConflict` when Alt+drop is used
+- [x] Clear conflict when task moved to valid position
+- [x] E2E tests for Alt+drop scenarios
 
-#### v0.3.29 - Assignment Operations Integration
-- [ ] Create assignment via API
-- [ ] Recall via API
-- [ ] Reschedule via API
-- [ ] Toggle completion via API
-- [ ] Server validation response handling
+#### v0.3.29 - Job Focus & Conflict Visual Feedback ✅
+> **Implements:** [REQ-01](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-01-job-focus-visual-effect), [REQ-12](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-12-persistent-visual-feedback-for-precedence-violations)
+> **Released:** 2025-12-22
 
-### Phase 3J: DSL Editor (Post-MVP scope)
+- [x] **REQ-01:** Mute non-selected job tiles when job is focused (not just during drag)
+- [x] Extend `isMuted` logic: muted if `selectedJobId !== undefined && selectedJobId !== job.id`
+- [x] **REQ-12:** Persistent amber glow on tiles with precedence conflict
+- [x] New `hasConflict` prop on Tile component
+- [x] Amber glow: `box-shadow: 0 0 12px 4px #F59E0B99`
+- [x] Conflict glow overrides selection glow
+- [x] E2E tests for visual feedback states
+- [x] Bug fix: Amber ring only on compatible stations
 
-> **Note:** Job creation modal and DSL editor moved to post-MVP. Current MVP focuses on scheduling UI with existing jobs.
+#### v0.3.30 - Job Deselection Methods ✅
+> **Implements:** [REQ-02/03](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-0203-job-deselection-methods)
+> **Released:** 2025-12-22
 
-#### v0.3.30 - DSL Parser Package (Post-MVP)
-- [ ] `@flux/task-dsl-parser` package setup
-- [ ] Lezer grammar definition
-- [ ] CodeMirror 6 integration
-- [ ] Syntax highlighting
+- [x] Close button (X) in JobDetailsPanel header
+- [x] `onClose` prop for JobDetailsPanel
+- [x] Toggle click in JobsList: click selected job → deselect
+- [x] Both methods set `selectedJobId(null)`
+- [x] E2E test: close button and toggle click (6 tests)
 
-#### v0.3.31 - Job Creation Modal (Post-MVP)
-- [ ] Modal component
-- [ ] DSL textarea with highlighting
-- [ ] Autocomplete integration
+#### v0.3.31 - Real-Time Drag Snapping ✅
+> **Implements:** [REQ-08/09](../ux-ui/additional-requirements/refactored-new-requirements-en.md#req-0809-snapping-drag-preview-with-vertical-constraint)
+> **Released:** 2025-12-22
+
+- [x] **REQ-08:** Snap drag preview to 30-minute grid during drag (not just on drop)
+- [x] Modify DragLayer.tsx: snap `top` position in real-time
+- [x] **REQ-09:** Vertical-only drag (already implemented, verified)
+- [x] Horizontal position remains fixed to column center
+- [x] E2E test: drag preview snaps during drag (5 tests)
+
+#### v0.3.32 - Enhanced Job Progression Visualization ✅
+> **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-en.md#req-07-enhanced-job-progression-visualization)
+
+- [x] New `ProgressSegments` component (replaces `ProgressDots`)
+- [x] Task states: unscheduled (empty), scheduled (gray), completed (green), late (red)
+- [x] Segment width based on duration: `setupMinutes + runMinutes`
+- [x] Standard size for ≤30min, proportional for >30min
+- [x] Outsourced tasks: 5× standard width with duration label (e.g., "2JO")
+- [x] Flex-wrap layout for multiple rows
+- [x] Unit tests for state calculation (21 tests)
+- [x] Visual test fixture
+
+#### v0.3.33 - Task Completion Toggle ✅
+> **Implements:** Task completion interaction on Tiles
+> **Released:** 2025-12-22
+
+- [x] Add `onToggleComplete` prop to `Tile` component
+- [x] Make Circle/CircleCheck icon clickable with `stopPropagation`
+- [x] Hover state on icon (cursor-pointer, color change)
+- [x] Wire up handler in `App.tsx` to update `assignment.isCompleted`
+- [x] ProgressSegments automatically reflects state change
+- [x] Unit tests for toggle behavior (5 tests)
+- [x] E2E test: click icon toggles completion state (4 tests)
+
+#### v0.3.34 - Top Navigation Bar ✅
+> **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-en.md#req-040506-top-navigation-bar-with-controls)
+> **Released:** 2025-12-22
+
+- [x] **REQ-04:** New `TopNavBar` component (`h-12`, `bg-zinc-900`)
+- [x] Logo/app name on left
+- [x] **REQ-05:** Quick Placement toggle button (visual alternative to ALT+Q)
+- [x] Button disabled when no job selected
+- [x] **REQ-06:** Zoom control: `[-] 100% [+]` or dropdown
+- [x] Zoom levels: 50%, 75%, 100%, 150%, 200%
+- [x] `PIXELS_PER_HOUR` state: 40px, 60px, 80px, 120px, 160px
+- [x] User/Settings section on right (placeholder)
+- [x] Adjust main layout to accommodate nav bar
+- [x] E2E tests for zoom and quick placement button (15 tests)
+
+#### v0.3.35 - Global Timeline Compaction ✅
+> **Implements:** [REQ-10](../ux-ui/tmp/refactored-new-requirements-en.md#req-10-global-timeline-compaction)
+> **Released:** 2025-12-22
+
+- [x] Segmented buttons in TopNavBar: `[4h] [8h] [24h]`
+- [x] `compactTimeline(horizon)` function
+- [x] Compaction starts from current time (`now`)
+- [x] Tasks in progress are immobile
+- [x] Respects precedence rules (no violations created)
+- [x] Processes all stations left-to-right, top-to-bottom
+- [x] Mock implementation (local state)
+- [x] E2E test: compact 4h removes gaps
+
+#### v0.3.36 - Dry Time Precedence ✅
+> **Implements:** [REQ-11](../ux-ui/tmp/refactored-new-requirements-en.md#req-11-dry-time-drying-delay-after-printing)
+> **Released:** 2025-12-23
+
+- [x] `DRY_TIME_MINUTES = 240` constant (4 hours)
+- [x] Update `@flux/schedule-validator` precedence logic
+- [x] If predecessor is printing task: `scheduledEnd + DRY_TIME`
+- [x] Identify printing tasks by station category
+- [x] Label in JobDetailsPanel: `+4h drying` on precedence bar
+- [x] Validator unit tests
+- [x] E2E test: precedence with dry time
+
+#### v0.3.37 - Multi-Day Grid Navigation ✅
+> **Implements:** [REQ-14/15/16/17](../ux-ui/tmp/refactored-new-requirements-en.md#req-14151617-multi-day-grid-navigation--date-strip-integration)
+> **Released:** 2025-12-23
+
+- [x] **REQ-14:** Multi-day grid support (21 days / 504 hours)
+- [x] DateStrip click-to-scroll: `onDateClick` connected in App.tsx
+- [x] Auto-scroll to today on initial load
+- [x] DateStrip scrolls with grid (synchronized Y-scroll)
+- [x] **REQ-15:** Departure date highlight on DateStrip (red styling)
+- [x] **REQ-16:** Scheduled days highlight (emerald indicator dots)
+- [x] **REQ-17:** Extended grid background for multi-day
+- [x] E2E tests for navigation and highlighting (11 tests)
+
+#### v0.3.38 - Group Capacity Visualization ✅
+> **Implements:** [REQ-18](../ux-ui/tmp/refactored-new-requirements-en.md#req-18-machine-group-capacity-limits-visualization)
+
+- [x] Station header shows group name and capacity (e.g., "Offset Press (2/3)")
+- [x] Red text and warning icon when group capacity exceeded
+- [x] Red ring during drag when drop would exceed group capacity
+- [x] Extended conflict detection for `GroupCapacityConflict` type
+- [x] E2E tests for group capacity visualization (7 tests)
+
+#### v0.3.39 - Outsourcing Columns ✅
+> **Implements:** [REQ-19](../ux-ui/tmp/refactored-new-requirements-en.md#req-19-outsourcing-columns-provider-display)
+
+- [x] Provider columns appear after station columns
+- [x] `ProviderColumn` and `ProviderHeader` components
+- [x] Provider header with Building2 icon
+- [x] Dotted border on provider column
+- [x] Dotted thick border on outsourced tiles
+- [x] Subcolumn layout for parallel tasks (calendar-style)
+- [x] Greedy subcolumn index assignment algorithm
+- [x] E2E tests for provider columns (11 tests)
+
+#### v0.3.40 - Similarities Feature Completion ✅
+> **Implements:** [REQ-20](../ux-ui/tmp/refactored-new-requirements-en.md#req-20-similarities-feature-completion)
+
+- [x] Extend `Job` type: add `paperWeight?: number`, `inking?: string`
+- [x] Update `@flux/types` package
+- [x] Extend mock job generator with `paperWeight` and `inking` values
+- [x] `PAPER_WEIGHTS = [80, 100, 120, 150, 170, 200, 250, 300, 350]`
+- [x] `INKINGS = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0']`
+- [x] Similarity indicators now show real comparisons (not always matched)
+- [x] Unit tests for similarity comparison (11 new tests)
+
+#### v0.3.41 - Drag Snapping Consistency ✅
+> **Implements:** [REQ-01/02/03](../ux-ui/tmp/refactored-new-requirements-02-en.md#req-010203-drag-snapping-consistency)
+> **Released:** 2026-01-06
+
+- [x] **REQ-01:** Tile snaps to correct position during drag-over (not just on drop)
+- [x] **REQ-02:** Border color (green/red/amber) based on snapped tile position, not cursor
+- [x] **REQ-03:** `calculateScheduledStartFromPointer` applies `snapToGrid` before validation
+- [x] Fix: `const snappedY = snapToGrid(absoluteY)` before `yPositionToTime`
+- [x] Fix: DragLayer uses station column coordinates for scroll-aware snapping
+- [x] E2E tests for snapping consistency
+
+#### v0.3.42 - UI Bug Fixes ✅
+> **Implements:** [REQ-04/05/06](../ux-ui/tmp/refactored-new-requirements-02-en.md#req-04)
+> **Released:** 2026-01-06
+
+- [x] **REQ-04:** `UnavailabilityOverlay` renders on all days in multi-day grid
+- [x] Add `yOffset` prop to UnavailabilityOverlay, render per-day overlays
+- [x] **REQ-05:** Job card overflow fix in sidebar
+- [x] Add `overflow-hidden min-w-0` to header, `w-[calc(100%-1rem)]` for border clipping
+- [x] **REQ-06:** Non-selected job tiles remain clickable
+- [x] `pointer-events: none` only during drag, not selection mute
+- [x] E2E tests for all fixes (6 tests)
+
+#### v0.3.43 - Layout Redesign & Zoom ✅
+> **Implements:** [REQ-07/08](../ux-ui/tmp/new-requirements-02.md#req-07-toolbarsidebar-layout-átszervezés)
+> **Released:** 2026-01-06
+
+- [x] **REQ-07.1:** Sidebar full height (viewport top to bottom)
+- [x] **REQ-07.2:** Remove "Flux" logo from toolbar
+- [x] **REQ-07.3:** Move toolbar right icons to sidebar bottom
+- [x] Layout restructure: sidebar primary, toolbar secondary
+- [x] **REQ-08:** Zoom levels: 25%, 50%, 75%, 100%, 150%, 200%
+- [x] Update zoom dropdown/controls
+- [x] E2E tests for layout and zoom (9 tests)
+
+#### v0.3.44 - DateStrip Redesign ✅
+> **Implements:** [REQ-09](../ux-ui/tmp/new-requirements-02.md#req-09-datestrip-átdolgozás)
+
+- [x] **REQ-09.1:** Infinite scroll DateStrip (no fixed `dayCount`)
+- [x] **REQ-09.2:** Focused day always centered, synced with grid scroll
+- [x] **REQ-09.3:** Visual states overhaul:
+  - Current day: thin line indicator (not background color)
+  - Focused day: highlighted background/border
+  - Departure date: red (existing)
+  - Scheduled day: green dot (existing)
+- [x] Update `DateCell.tsx` styling
+- [x] E2E tests for DateStrip interactions (6 tests)
+
+#### v0.3.45 - Precedence Constraint Visualization ✅
+> **Implements:** [REQ-10](../ux-ui/tmp/new-requirements-02.md#req-10-precedence-constraint-vizualizáció)
+> **Released:** 2026-01-07
+
+- [x] Purple line: earliest possible start (predecessor end + dry time)
+- [x] Orange line: latest possible start (successor start - task duration)
+- [x] Lines visible during drag and quick placement mode
+- [x] No lines if no scheduled predecessor/successor
+- [x] Reuse `getEffectivePredecessorEnd` from validator
+- [x] New `PrecedenceLines` component
+- [x] Successor constraint validation (blocks drops below orange line)
+- [x] Quick Placement Mode: lines and validation while hovering
+- [x] E2E tests for precedence visualization
+
+#### v0.3.46 - Virtual Scrolling for Multi-Day Grid ✅
+> **Fixes:** Performance regression from v0.3.44 (DateStrip Redesign)
+> **Completes:** REQ-09.1 (Infinite scroll) properly
+> **Released:** 2026-01-07
+
+- [x] `useVirtualScroll` hook: calculate visible day range from scroll position
+- [x] Virtual scroll container: full height maintained, content rendered with transform
+- [x] Grid windowing: only render ±3 days around focused day (7 days DOM vs 365)
+- [x] DateStrip windowing: only render visible date cells
+- [x] Station column day-slice rendering
+- [x] TimelineColumn windowing (8760 → ~168 HourMarkers)
+- [x] Scroll synchronization preserved between Grid and DateStrip
+- [x] Performance targets: DOM <1500 elements, drag 60 FPS
+- [x] React.memo optimizations (Tile, StationColumn, JobCard)
+- [x] useDeferredValue for non-blocking selection
+- [x] E2E tests for virtual scroll behavior
+
+#### v0.3.47 - DateStrip Task Markers ✅
+> **Implements:** DateStrip visual enhancements for task status overview
+
+- [x] **Viewport Indicator (A):** Light gray rectangle showing visible portion of day
+- [x] **"Now" Line (B):** Red line within viewport indicator at current time
+- [x] **Exit Triangle (C):** White triangle at workshop exit date (departure)
+- [x] **Task Timeline (D):** Dotted line from earliest task to exit date
+- [x] **Task Markers (E):** Colored horizontal lines for task status:
+  - Gray: scheduled (future)
+  - Orange: precedence conflict
+  - Red: late (past incomplete)
+  - Green: completed
+- [x] New components: ViewportIndicator, TaskMarkers, ExitTriangle
+- [x] E2E tests for marker functionality
+
+#### v0.3.48 - Zoom-Aware Tile Snapping (Bugfix) ✅
+> **Bug:** Tile snapping works at 100% zoom but breaks at other zoom levels
+
+**Root cause:** `snapToGrid` and `yPositionToTime` support `pixelsPerHour` parameter, but several call sites use default value instead of current zoom level.
+
+**Affected code:**
+- [x] `DragLayer.tsx:74` - `snapToGrid(contentY)` missing pixelsPerHour
+- [x] `DragLayer.tsx:79` - `snapToGrid(position.y - grabOffset.y)` missing pixelsPerHour
+- [x] `App.tsx` - `handleQuickPlacementMouseMove` missing pixelsPerHour
+- [x] `App.tsx` - `handleQuickPlacementClick` missing pixelsPerHour for snapToGrid and yPositionToTime
+
+**Solution:**
+- [x] Add `pixelsPerHour` to DragStateContext or pass via props to DragLayer
+- [x] Update Quick Placement handlers to use current pixelsPerHour state
+- [x] Add E2E test for snapping at different zoom levels
+
+### Phase 3I: UX Polish & Performance
+
+> **Reference:** [Refactored Requirements Part 3](../ux-ui/tmp/refactored-new-requirements-03-en.md)
+
+#### v0.3.49 - Hide DateStrip Scrollbar ✅
+> **Implements:** [REQ-08](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-08-hide-datestrip-scrollbar)
+
+- [x] Hide scrollbar with CSS (webkit, Firefox, Edge)
+- [x] Maintain scroll functionality (mouse wheel, touch)
+- [x] Tailwind arbitrary value CSS classes
+
+**Affected files:**
+- `apps/web/src/components/DateStrip/DateStrip.tsx`
+
+#### v0.3.50 - DateStrip & UX Improvements ✅
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-01-month-visibility-in-datestrip) (tooltip), [REQ-02](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-02-clickable-dates-in-job-details-panel)
+
+- [x] **REQ-01:** Date tooltip on hover (custom, instant appearance, French locale)
+- [x] **REQ-02:** Clickable Départ date in Job Details Panel
+- [x] **REQ-02:** Clickable BAT approval date when approved
+- [x] Station header cleanup (removed group capacity display)
+
+**Affected files:**
+- `apps/web/src/components/DateStrip/DateCell.tsx`
+- `apps/web/src/components/JobDetailsPanel/InfoField.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobInfo.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobStatus.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
+- `apps/web/src/components/StationHeaders/StationHeader.tsx`
+- `apps/web/src/App.tsx`
+
+#### v0.3.51 - Drying Time Visualization ✅
+> **Implements:** Visual enhancement for precedence understanding
+
+- [x] Yellow arrow from predecessor task end to "End of drying" position
+- [x] Dashed horizontal line at drying end
+- [x] "End of drying" label
+- [x] Only when there is drying time required
+- [x] Test fixture
+
+**Affected files:**
+- `apps/web/src/components/DryingTimeIndicator/DryingTimeIndicator.tsx` (new)
+- `apps/web/src/components/StationColumns/StationColumn.tsx`
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
+- `apps/web/src/utils/precedenceConstraints.ts`
+- `apps/web/src/App.tsx`
+
+#### v0.3.52 - Human-Readable Validation Messages ✅
+> **Implements:** [REQ-07](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-07-human-readable-validation-messages)
+
+- [x] Generate human-readable messages for each conflict type
+- [x] Display validation message during drag (tooltip below preview)
+- [x] Message types: station unavailable, precedence, BAT, group capacity, deadline
+- [x] French localization
+- [x] Test fixture
+
+**Affected files:**
+- `apps/web/src/components/DragPreview/ValidationMessage.tsx` (new)
+- `apps/web/src/utils/validationMessages.ts` (new)
+- `apps/web/src/dnd/DragLayer.tsx`
+- `apps/web/src/hooks/useDropValidation.ts`
+
+#### v0.3.53 - Precedence Lines + Working Hours ✅
+> **Implements:** [REQ-03](../ux-ui/tmp/refactored-new-requirements-03-en.md#req-03-precedence-lines-should-respect-non-working-hours)
+
+- [x] `snapToNextWorkingTime` utility function - snap to next working slot
+- [x] `addWorkingTime` / `subtractWorkingTime` utilities
+- [x] Drying time uses simple addition (physical process)
+- [x] Work start snaps to working hours if drying ends outside
+- [x] Update precedence line positions
+- [x] Test fixture: `?fixture=precedence-working-hours`
+
+**Key insight:** Drying is physical (continues during lunch), work requires humans (working hours only).
+
+**Affected files:**
+- `apps/web/src/utils/workingTime.ts` - new utility functions
+- `apps/web/src/utils/precedenceConstraints.ts` - updated calculations
+
+### Phase 3J: Pick & Place Interaction
+> **Reference:** [Refactored Requirements Part 4](../ux-ui/tmp/refactored-new-requirements-04-en.md)
+
+#### ✅ v0.3.54 - Pick & Place from Sidebar (REQ-01 partial)
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (sidebar tasks only)
+> **Replaces:** Dragover Performance Optimization (P&P solves the root cause)
+> **Released:** 2026-01-22
+
+Pick & Place is a two-click interaction replacing drag-and-drop for performance:
+- Drag-and-drop: ~60 validations/second (mousemove events)
+- Pick & Place: 2 validations total (pick + place)
+
+- [x] `PickStateContext.tsx` - State management (pickedTask, pickSource, ghostPositionRef)
+- [x] `PickPreview.tsx` - Ghost tile rendering (portal-based, RAF positioning)
+- [x] Click handler in Job Details Panel tasks (unscheduled only)
+- [x] Ghost tile follows cursor (direct DOM manipulation, no React re-renders)
+- [x] ESC key cancels pick (tile returns to unpicked state)
+- [x] Click on valid position places tile
+- [x] Click on invalid position returns tile to origin
+- [x] Ring color feedback (green/red/amber) on hover
+- [x] E2E tests for sidebar pick & place
+
+**Affected files:**
+- `apps/web/src/pick/PickStateContext.tsx` (new)
+- `apps/web/src/pick/PickPreview.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/TaskTile.tsx`
+- `apps/web/src/App.tsx`
+
+#### ✅ v0.3.55 - Column Focus on Sidebar Pick (REQ-03)
+> **Implements:** [REQ-03](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-03-column-focus-during-pick-from-job-details)
+
+- [x] Save scroll position on pick (for cancel restoration)
+- [x] Scroll target station column to left edge (smooth, 300ms)
+- [x] Fade non-target columns to 15% opacity
+- [x] Disable pointer events on non-target columns
+- [x] Restore scroll position on cancel (ESC)
+- [x] Restore opacity on place/cancel
+- [x] Only for sidebar picks (grid picks keep all columns visible)
+- [x] Grid spacer to ensure rightmost column can scroll to left edge
+- [x] E2E tests for column focus behavior
+
+**Affected files:**
+- `apps/web/src/App.tsx` - scroll/opacity logic
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx` - pickSource prop, spacer
+- `apps/web/src/components/StationColumns/StationColumn.tsx` - opacity classes
+
+#### ✅ v0.3.56 - Pick Visual Feedback
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (visual refinements)
+> **Released:** 2026-01-22
+
+- [x] Global `cursor: grabbing` during pick mode (body.pick-mode-active)
+- [x] CSS animation preparation: `@keyframes pulse-opacity` + `.animate-pulse-opacity`
+- [x] Validation throttle with early-exit (same 15-min slot)
+- [x] E2E tests for cursor state (4 tests)
+
+**Affected files:**
+- `apps/web/src/index.css` (CSS animation, cursor)
+- `apps/web/src/App.tsx` (body class toggle, validation throttle)
+- `apps/web/src/components/StationColumns/StationColumn.tsx` (simplified cursor logic)
+
+#### v0.3.57 - Pick & Place from Grid (REQ-01 complete) ✅
+> **Implements:** [REQ-01](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-01-pick-and-place-replaces-drag-and-drop) (grid tiles)
+> **Released:** 2026-01-22
+
+**Pick from Grid:**
+- [x] Click handler on grid tiles (non-completed, non-outsourced)
+- [x] `isPicked` prop on Tile for placeholder rendering
+- [x] Pulsating placeholder at original position (uses CSS from v0.3.56)
+- [x] No opacity change (all columns visible for grid picks)
+- [x] No scroll (user is at tile location)
+- [x] Place on same or different station
+
+**Remove Drag & Drop:**
+- [x] Delete `apps/web/src/dnd/` folder entirely
+  - `DragStateContext.tsx` - removed provider and hooks
+  - `DragLayer.tsx` - removed drag preview overlay
+  - `types.ts` - removed drag types
+  - `index.ts` - removed exports
+- [x] Remove `pragmatic-drag-and-drop` from `package.json`
+- [x] Clean up `App.tsx`:
+  - Removed `DragStateProvider` wrapper
+  - Removed `useDragMonitor` hook and related handlers
+  - Removed drag-related state (`dragValidation`, `grabOffset`, etc.)
+  - Removed `handleDragEnd` callback
+- [x] Clean up `Tile.tsx`:
+  - Removed `draggable` prop and `draggableForElements` setup
+  - Removed drag-related data attributes
+  - Keep only click handler for pick
+- [x] Clean up `StationColumn.tsx`:
+  - Removed `dropTargetForElements` setup
+  - Removed `useDragStateValue` hook
+  - Removed `isOver`, `isValidDropTarget` state
+  - Keep pick-related props only
+- [x] Clean up `TaskTile.tsx` (Job Details Panel):
+  - Removed `draggableForElements` setup
+  - Keep only click handler for pick
+- [x] Update E2E tests:
+  - Created `pick-from-grid.spec.ts` with pick-based tests
+  - Existing `pick-place-sidebar.spec.ts` uses pick interactions
+  - Removed drag helper usage from tests
+
+**Affected files:**
+- `apps/web/src/dnd/` - DELETED entire folder
+- `apps/web/src/components/Tile/Tile.tsx` (isPicked, removed draggable)
+- `apps/web/src/components/StationColumns/StationColumn.tsx` (removed drop target)
+- `apps/web/src/components/JobDetailsPanel/TaskTile.tsx` (removed draggable)
+- `apps/web/src/App.tsx` (removed DragStateProvider, drag handlers)
+- `apps/web/package.json` (removed pragmatic-drag-and-drop)
+- `apps/web/playwright/pick-from-grid.spec.ts` (new E2E tests)
+
+#### v0.3.58 - Right Click Context Menu (REQ-02) ✅
+> **Implements:** [REQ-02](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-02-right-click-context-menu)
+> **Released:** 2026-01-22
+
+- [x] `TileContextMenu.tsx` component (portal-based, z-9999)
+- [x] Menu options: View details, Toggle completion, Move up, Move down
+- [x] Position at cursor (x, y)
+- [x] Auto-flip near viewport edges (right/bottom)
+- [x] Close on: click outside, ESC, scroll
+- [x] Only on tiles (not empty cells)
+- [x] French labels (Voir détails, Marquer terminé, etc.)
+- [x] E2E tests for context menu (13 tests)
+
+**Affected files:**
+- `apps/web/src/components/Tile/TileContextMenu.tsx` (new)
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
+- `apps/web/src/App.tsx`
+- `apps/web/playwright/context-menu.spec.ts` (new)
+
+#### v0.3.59 - Job Details Panel Fixed Tile Height (REQ-04) ✅
+> **Implements:** [REQ-04](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-04-job-details-panel---fixed-tile-height)
+> **Released:** 2026-01-22
+
+- [x] Change task tile height from proportional to fixed 32px
+- [x] Remove duration-based height calculation
+- [x] Ensure content fits within 32px (truncation if needed)
+- [x] Visual test for consistent list appearance
+
+**Affected files:**
+- `apps/web/src/components/JobDetailsPanel/TaskTile.tsx`
+- `apps/web/src/components/JobDetailsPanel/TaskList.tsx`
+
+#### v0.3.60 - Unavailability Overlay SVG (REQ-05) ✅
+> **Implements:** [REQ-05](../ux-ui/tmp/refactored-new-requirements-04-en.md#req-05-unavailability-overlay---css-gradient-to-svg)
+> **Released:** 2026-01-22
+
+- [x] Create `stripes.svg` (45°, 10px stripe, rgba(255,255,255,0.03))
+- [x] Update `.bg-stripes-dark` to use SVG instead of CSS gradient
+- [x] Verify visual appearance matches current implementation
+- [x] Test fixture: `?fixture=unavailability-overlay`
+
+**Affected files:**
+- `apps/web/public/stripes.svg` (new)
+- `apps/web/src/index.css`
+- `apps/web/src/mock/testFixtures.ts`
 
 ---
 
-## Milestone 4: Production Readiness (v1.0.x)
+## Milestone 4: Job Creation Form Implementation (v0.4.x)
 
-### Phase 4A: Security & Auth
+> **Context:** JCF (Job Creation Form) integration from `reference/jcf/`
+> **Reference:** [Implicit Logic Specification](../../reference/jcf/docs/implicit-logic-specification.md)
+>
+> **Strategy:** Hybrid approach — spec-driven reimplementation with visual reference:
+> - The `reference/jcf/` codebase is a vibe-coding prototype. It is **never merged** into the main app.
+> - The [Implicit Logic Specification](../../reference/jcf/docs/implicit-logic-specification.md) (71KB) is the primary "what" source.
+> - The reference app is the visual/behavioral "how it looks/works" source (run side-by-side for UX verification).
+> - All code is reimplemented cleanly following main app conventions (`@flux/types`, Tailwind design tokens, `memo()`, barrel exports).
+> - Granular releases (1 feature = 1 release) for maximum UX fidelity control and vibe-code firewall.
+>
+> **Phases:**
+> 1. Element layer foundation (v0.4.0–v0.4.3)
+> 2. JCF foundation: type mapping, reference data, page shell (v0.4.4–v0.4.6)
+> 3. Job header form (v0.4.7–v0.4.8)
+> 4. Elements table structure (v0.4.9–v0.4.10)
+> 5. Base autocomplete & session learning (v0.4.11–v0.4.12)
+> 6. Simple autocompletes: format, impression, surfacage, quantité/pagination (v0.4.13–v0.4.16)
+> 7. DSL autocompletes: papier, imposition, precedences (v0.4.17–v0.4.19)
+> 8. Sequence autocomplete: poste, ST, workflow (v0.4.20–v0.4.22)
+> 9. Validation & scaling (v0.4.23–v0.4.31)
+> 10. Production readiness tracking (v0.4.32a–v0.4.32e)
+> 11. Job save & backend integration (v0.4.33)
+> 12. Template system (v0.4.34–v0.4.35)
+> 13. Frontend infrastructure: Redux, Router, Code Quality (v0.4.36–v0.4.38)
+
+### Phase 4A: Element Entity Foundation
+
+#### v0.4.0 - Element Layer: Frontend Types & Tests ✅
+- [x] TypeScript types update (@flux/types)
+  - [x] Element interface (id, jobId, taskIds)
+  - [x] Task.elementId added (jobId kept for backward compatibility)
+  - [x] ScheduleSnapshot includes elements
+- [x] Frontend mock data update
+  - [x] Mock generators create Elements (1:1 Job-Element for now)
+  - [x] Snapshot includes elements array
+- [x] Frontend unit tests update
+  - [x] All 638 tests pass with Element layer
+- [x] Playwright E2E tests update
+  - [x] All test fixtures include Elements
+  - [x] 7-day operating schedules for weekend-proof testing
+  - [x] SNAP_INTERVAL_MINUTES used consistently (15 min)
+- [x] Test fixtures update
+  - [x] All fixtures include Element data
+
+#### v0.4.1 - Element Layer: Task.jobId Removal ✅
+- [x] Remove Task.jobId from @flux/types
+  - [x] Update BaseTask interface (remove jobId)
+  - [x] Rebuild types package
+- [x] Update all Task usages to use elementId → element.jobId path
+  - [x] App.tsx (~7 locations)
+  - [x] JobsList.tsx (~4 locations)
+  - [x] JobDetailsPanel.tsx (~1 location)
+  - [x] SchedulingGrid.tsx (~3 locations)
+  - [x] precedenceConstraints.ts
+  - [x] compactTimeline.ts
+  - [x] keyboardNavigation.ts
+  - [x] quickPlacement.ts
+- [x] Add taskHelpers.ts utility functions
+  - [x] getJobIdForTask(task, elements)
+  - [x] getTasksForJob(jobId, tasks, elements)
+  - [x] createTaskToJobMap(tasks, elements)
+  - [x] groupTasksByJob(tasks, elements)
+- [x] Update test fixtures (testFixtures.ts)
+  - [x] Replace jobId with elementId in all task definitions
+  - [x] Add elementIds to all Job definitions (via generateElementsForJobs mutation)
+- [x] Update mock generators
+  - [x] jobs.ts: Add elementIds to generated jobs
+  - [x] Remove jobId from generated tasks
+- [x] Update unit tests
+  - [x] Fix all test files with outdated mock data
+- [x] All tests pass (638 unit + 199 E2E)
+- [x] ESLint passes
+
+#### v0.4.2 - Element Layer: Documentation ✅
+- [x] Domain vocabulary update (domain-vocabulary.md)
+  - [x] New Element term definition
+  - [x] New ElementDependency term definition
+  - [x] Job section update (Job → Element → Task hierarchy)
+  - [x] Task section update (element-scoped sequencing, elementId)
+- [x] Business rules update (business-rules.md)
+  - [x] BR-ELEM-001..005 rules (element ownership, dependencies, precedence)
+  - [x] BR-TASK-001/003/007 update (element-scoped sequencing)
+- [x] Domain model update (domain-model.md)
+  - [x] Element entity within Job aggregate
+  - [x] Job aggregate updated (ElementIds, Elements collection)
+  - [x] Task entity updated (ElementId replaces direct Job reference)
+  - [x] ScheduleSnapshot updated (Elements collection)
+  - [x] Relationships and invariants updated
+- [x] Bounded context map update (bounded-context-map.md)
+  - [x] Element added to Job Management Context owned models
+  - [x] Element-related domain events added
+  - [x] Text-based context map updated
+- [x] Workflow definitions update (workflow-definitions.md)
+  - [x] Task sequencing updated to element-scoped
+  - [x] Cross-element precedence validation added
+  - [x] Assignment validation process updated
+  - [x] Element dependency events added
+- [x] Architecture documentation update
+  - [x] aggregate-design.md — Element within Job aggregate
+  - [x] decision-records.md — ADR for Element layer introduction
+  - [x] dependency-graphs.md — Element dependencies in graph
+  - [x] event-message-design.md — Element-related events
+  - [x] interface-contracts.md — Element in API contracts
+  - [x] nonfunctional-design-notes.md — Element impact on validation performance
+  - [x] project-structure.md — Element-related files
+  - [x] sequence-design.md — Element-aware validation sequences
+  - [x] service-boundaries.md — Element in Job Management service
+  - [x] ui-backend-compatibility-report.md — Element frontend/backend alignment
+
+#### v0.4.3 - Element Layer: Backend Implementation ✅
+- [x] Element entity (PHP)
+  - [x] Entity class with id, job relationship
+  - [x] ElementRepository
+- [x] Job-Element relationship
+  - [x] Job.elements (OneToMany)
+  - [x] Job.addElement() method
+- [x] Element-Task relationship
+  - [x] Task.element (ManyToOne)
+  - [x] Task.job removed, accessible via element.job
+- [x] Database migration
+  - [x] Create elements table
+  - [x] Migrate existing data (create Element per Job)
+  - [x] Update tasks.job_id → tasks.element_id
+- [x] Service updates
+  - [x] JobService creates Element with Job
+  - [x] ScheduleSnapshotService includes elements
+- [x] Unit tests
+- [x] Integration tests
+- [x] PHPStan level 8
+
+### Phase 4B: JCF Foundation
+
+> **Note:** Phase 4B–4K can start with mock data, in parallel with v0.4.3 (backend).
+
+#### v0.4.4 - JCF: Type Mapping & Data Model
+> **Spec source:** §1 (Input Format Conventions), §9 (Reference Data), §11.6 (Domain Model Analysis)
+
+- [x] Map reference Element (12 string fields) → `@flux/types` model
+  - [x] Architectural decision: ElementSpec value object vs. flat fields on Element
+  - [x] Reference Element.name → Element.suffix
+  - [x] Reference Element.precedences → Element.prerequisiteElementIds
+  - [x] Reference Element.sequence → Task[] entities within Element
+  - [x] Production metadata fields (format, papier, pagination, imposition, impression, surfacage, quantite, qteFeuilles, autres, commentaires)
+- [x] Update `@flux/types` package with new types
+- [x] Type mapping documentation
+
+#### v0.4.5 - JCF: Reference Data & Mock API
+> **Spec source:** §9 (Reference Data)
+
+- [x] Reference data types: Paper, Format, Impression, Surfacage, Imposition
+- [x] Mock reference data (from `reference/jcf/data/*.json`)
+- [x] Mock API endpoints for reference data (GET /papers, /formats, etc.)
+- [x] Preset data: papers (5 types × 14 grammages), formats (A-series + custom), impressions (9), surfacages (10), impositions (10 × 8 poses)
+
+#### v0.4.6 - JCF: Page Shell ✅
+- [x] Full-screen modal overlay (architectural decision: modal, not page route)
+- [x] Navigation integration ("+" button in JobsList opens modal)
+- [x] Modal layout: header (title + close), scrollable content, keyboard hints footer
+- [x] Close behavior: X button, Escape key, backdrop click (mouseDown+mouseUp)
+- [x] Google Fonts integration (Inter + JetBrains Mono)
+- [x] Pixel-perfect rem→px conversion (13px base matching reference/jcf)
+
+### Phase 4C: Job Header
+
+#### v0.4.7 - JCF: Job Header Basic Fields ✅
+- [x] ID field (readonly, auto-generated J-YYYY-NNNN)
+- [x] Intitulé text field
+- [x] Quantity numeric input
+- [x] Deadline date picker
+  - [x] French format input (jj/mm or jj/mm/aaaa)
+  - [x] ISO 8601 storage (UTC-safe)
+  - [x] French display format
+- [x] State management lifted to App.tsx
+
+#### v0.4.8 - JCF: Autocomplete Fields (Client & Template) ✅
+- [x] Generic JcfAutocomplete component (reusable for all JCF fields)
+- [x] highlightMatch utility — bold+blue matching text
+- [x] useLazyLoadSuggestions hook — initial 10, scroll to load more, max 25
+- [x] Client field with autocomplete, session learning, focus → Template
+- [x] Template field with client-filtered suggestions, focus → Intitulé
+- [x] Mock client data (8 entries) + mock template data (6 entries)
+- [x] Keyboard navigation (↑↓ Enter Esc Tab)
+- [x] Category badges ("nouveau", client name, "universel")
+
+### Phase 4D: Elements Table Structure
+
+#### v0.4.9 - JCF: Elements Table Grid Layout ✅
+> **Spec source:** reference `ElementsTable.tsx`
+
+- [x] 12-column table layout (name, precedences, quantite, format, pagination, papier, imposition, impression, surfacage, autres, qteFeuilles, commentaires)
+- [x] Sequence column (multi-line, separate treatment)
+- [x] Add/remove element rows
+- [x] Element name field (COUV, INT, FINITION, etc.)
+- [x] Plain text inputs for all fields (autocomplete added later)
+
+#### v0.4.10 - JCF: Cell Navigation ✅
+> **Spec source:** §8 (Keyboard Navigation)
+
+- [x] Tab / Shift+Tab navigation between cells
+- [x] Enter to confirm and move to next cell
+- [x] Escape to cancel edit
+- [x] Focus management across rows and columns
+
+### Phase 4E: Base Autocomplete Infrastructure
+
+#### v0.4.11 - JCF: Base Autocomplete Component (Table Integration) ✅
+> **Spec source:** reference `Autocomplete.tsx` — Tab/Alt+Arrow delegation pattern
+> **Note:** Base autocomplete features (dropdown, filtering, highlighting, keyboard nav, lazy loading, click-outside) were implemented in v0.4.8. This release adds table navigation delegation.
+
+- [x] `onTabOut` prop for Tab/Shift+Tab delegation to parent table
+- [x] `onArrowNav` prop for Alt+Arrow delegation to parent table
+- [x] handleKeyDown updated for Tab delegation (close dropdown → delegate)
+- [x] handleKeyDown updated for Alt+Arrow delegation (close dropdown → delegate)
+- [x] Unit tests for delegation callbacks (11 tests)
+- [x] E2E tests for backward compatibility (9 tests)
+- [x] Backward compatible: no change when props not provided
+
+#### v0.4.12 - JCF: Session Learning ✅
+> **Spec source:** §7 (Session Learning)
+
+- [x] Track user inputs per field type during session (useSessionLearning hook, 6 learn handlers)
+- [x] Session-learned values appear as top suggestions (mergeWithSession utility)
+- [x] Priority: session values > API values (mergeWithSession puts session first)
+- [x] Clear on page reload (session-scoped, React state only)
+
+### Phase 4F: Simple Autocompletes (1 field = 1 release)
+
+> **Parallelizable:** v0.4.13–v0.4.16 are independent, all depend on v0.4.11–v0.4.12.
+
+#### v0.4.13 - JCF: Format Autocomplete ✅
+> **Spec source:** §1.5 (Format DSL)
+
+- [x] ISO format lookup (A0–A10)
+- [x] Custom dimension input (e.g., 210x297)
+- [x] "Fermé" variants (A4f, A5fi)
+- [x] Composite formats (A3/A6)
+- [x] Pretty ↔ DSL bidirectional conversion
+- [x] Dimension lookup from API formats
+
+#### v0.4.14 - JCF: Impression Autocomplete ✅
+> **Spec source:** §1.3 (Impression DSL)
+
+- [x] Preset patterns: Q/Q, Q/, Q+V/Q+V, Q+V/Q, Q+V/, N/N, N/, Q/N, N/Q
+- [x] Recto/verso validation (must contain `/`)
+- [x] Dropdown with all presets
+- [x] Free-text input with validation
+
+#### v0.4.15 - JCF: Surfacage Autocomplete ✅
+> **Spec source:** §1.4 (Surfacage DSL)
+
+- [x] Preset patterns: mat/mat, satin/satin, brillant/brillant, UV/UV, dorure/dorure
+- [x] Single-side variants: mat/, satin/, brillant/, UV/, dorure/
+- [x] Recto/verso validation (must contain `/`)
+
+#### v0.4.16 - JCF: Quantité & Pagination Inputs ✅
+> **Spec source:** §1.6 (Pagination)
+
+- [x] Quantité: numeric multiplier input with validation
+- [x] Pagination: validation rule — value must be 2 (feuillet) or multiple of 4 (cahier: 4, 8, 12, 16, ...)
+- [x] Visual error feedback on invalid values
+
+### Phase 4G: DSL Autocompletes (1 field = 1 release)
+
+> **Parallelizable:** v0.4.17–v0.4.19 are independent, all depend on v0.4.11–v0.4.12.
+
+#### v0.4.17 - JCF: Papier Autocomplete ✅
+> **Spec source:** §1.1 (Papier DSL)
+
+- [x] Type:Grammage DSL format (e.g., `Couché mat:135`)
+- [x] Two-step autocomplete: type selection → grammage selection
+- [x] Pretty display conversion: `Couché mat:135` → `Couché mat 135g`
+- [x] Bidirectional DSL ↔ pretty conversion
+- [x] Auto-create new paper type on save (if not exists)
+
+#### v0.4.18 - JCF: Imposition Autocomplete ✅
+> **Spec source:** §1.2 (Imposition DSL)
+
+- [x] LxH(poses) format (e.g., `50x70(8)`)
+- [x] Format-aware suggestions (based on selected format field)
+- [x] Poses extraction (supports `50x70(8)` and `50x70(8p)` variants)
+- [x] Validation regex: `/^[1-9]\d*x[1-9]\d*\([1-9]\d*\)$/i`
+
+#### v0.4.19 - JCF: Precedences Autocomplete ✅
+- [x] Element name reference selection (autocomplete with other element names)
+- [x] Multi-value support (element can depend on multiple predecessors)
+- [x] Self-reference prevention and already-selected exclusion
+- [x] Cascading update on element rename/remove
+
+### Phase 4H: Sequence Autocomplete (most complex field — 3 releases)
+
+> **Sequential:** v0.4.20 → v0.4.21 → v0.4.22 (each builds on previous).
+
+#### v0.4.20 - JCF: Sequence — Multi-line Editor & Poste Mode ✅
+> **Spec source:** §5.1–5.2 (Sequence State Machine — Poste mode)
+
+- [x] Multi-line text editor within table cell
+- [x] Poste mode: suggest poste names from presets (G37, 754, GTO, Stahl, etc.)
+- [x] Duration input: `PosteName(duration)` or `PosteName(setup+run)` format
+- [x] Poste validation regex: `/^[A-Za-z0-9_]+\(\d+(\+\d+)?\)$/`
+- [x] Per-line parsing and validation
+
+#### v0.4.21 - JCF: Sequence — ST (Sous-Traitant) Mode ✅
+> **Spec source:** §5.3 (Sequence State Machine — ST mode)
+
+- [x] `ST:` prefix detection → switch to ST mode
+- [x] ST name suggestions (MCA, F37, LGI, AVN, JF)
+- [x] Duration formats: Nj (days), Nh (hours), N (plain)
+- [x] Full format: `ST:Name(duration):description`
+- [x] ST validation regex: `/^ST:[A-Za-z0-9_]+\(\d+[jh]?\):.+$/`
+
+#### v0.4.22 - JCF: Sequence — Workflow-Guided Suggestions ✅
+> **Spec source:** §6 (Workflow-Guided Suggestions)
+
+- [x] `sequenceWorkflow` array: ordered list of poste categories
+  - Example: `["Presse offset", "Massicot", "Conditionnement"]`
+- [x] "Next step" suggestion based on current position in workflow
+- [x] Category-based filtering of poste suggestions
+- [x] Visual indication of expected workflow progression (★ marker)
+
+### Phase 4I: Validation & Calculated Fields
+
+> **Sequential:** v0.4.23 → v0.4.24 → v0.4.29 → v0.4.30 → v0.4.31 → v0.4.32a → v0.4.32b → v0.4.32c → v0.4.32d → v0.4.32e
+
+#### v0.4.23 - JCF: Live Format Validation (Level 1) ✅
+> **Spec source:** §2.1 (Three-Level Validation — Level 1)
+
+- [x] Per-field regex validation during typing
+- [x] Red background + ErrorTooltip on invalid format
+- [x] Lenient for incomplete input (no error while still typing)
+- [x] Smart sequence validation: lines without closing `)` are not flagged
+- [x] Validation rules per field type (papier `:`, impression `/`, surfacage `/`, imposition regex, format regex, pagination rule)
+
+#### v0.4.24 - JCF: Required Indicators & Calculated Fields (Level 2) ✅
+> **Spec source:** §2.2 (Required Field Logic), §3 (Calculated Fields)
+
+- [x] Amber dot indicator for required-but-empty fields
+- [x] BLOC SUPPORT trigger: if any of (imposition, impression, surfacage, format) → papier, pagination, format, qteFeuilles, imposition required
+- [x] BLOC IMPRESSION trigger: if any of (imposition, impression) → impression required
+- [x] **qteFeuilles auto-calculation**: `ceil((jobQuantity × elementQuantity) / poses)`
+- [x] Auto/manual toggle for qteFeuilles per element
+- [x] Recalculation triggers: jobQuantity, elementQuantity, or imposition changes
+
+#### v0.4.25, v0.4.26, v0.4.27 - SKIPPED
+> **Note:** These version numbers were skipped due to release numbering reorganization.
+
+#### v0.4.29 - UI Scale Harmonization (80% Base App) ✅
+> **Purpose:** Font-size standardization + 80% grid scaling
+
+Two-part release following reference/jcf pattern.
+
+**Part 1: Font-size Standardization**
+- [x] Set root font-size to 13px (`html { font-size: 13px }`)
+- [x] Convert `text-[11px]` → `text-sm` (11.375px with 13px root)
+- [x] Convert `text-[13px]` → `text-base` (13px with 13px root)
+- [x] Convert `text-[10px]` → `text-xs` (9.75px with 13px root)
+- [x] Keep edge cases: `text-[6px]`, `text-[9px]`, `text-[15px]`
+
+**Part 2: 80% Grid Scaling**
+- [x] Scale ALL zoom levels to 80%: 25%=16, 50%=32, 75%=48, 100%=64, 150%=96, 200%=128
+- [x] Fix `DragPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
+- [x] Fix `PickPreview.tsx` hardcoded `* 80` → use `pixelsPerHour` prop
+- [x] Add `getLayoutDimensions()` helper for rem-based calculations
+- [x] E2E tests updated for 64px/hour at 100% zoom
+
+**Affected files:**
+- `apps/web/src/index.css`
+- `apps/web/src/components/TopNavBar/constants.ts`
+- `apps/web/src/components/DragPreview/DragPreview.tsx`
+- `apps/web/src/pick/PickPreview.tsx`
+- JCF components (10 files) - font-size conversion
+- Base app components (5 files) - font-size conversion
+
+#### v0.4.30 - JCF: Submit Validation (Level 3) ✅
+> **Spec source:** §2.1 (Three-Level Validation — Level 3)
+
+- [x] Strict full-form validation on Save button click
+- [x] All required fields must be filled (converted from amber indicators to red errors)
+- [x] All format validations must pass (strict mode, no leniency)
+- [x] French error messages with HTML formatting
+- [x] Form blocking until errors resolved
+- [x] Save button with ⌘S keyboard shortcut
+
+#### v0.4.31 - Sequence Autocomplete: Template-Free Mode ✅
+> **Bug:** Sequence input suggests workflow-based categories even when no template is selected
+
+- [x] Detect when no template is selected (empty `sequenceWorkflow`)
+- [x] Template-free mode: show all postes without category filtering
+- [x] Template-free mode: no workflow step progression indicators (★)
+- [x] Template mode: current behavior (workflow-guided suggestions)
+- [x] E2E tests for both modes
+
+**Affected files:**
+- `apps/web/src/mock/reference-data.ts` (MockTemplate.workflow)
+- `apps/web/src/components/JcfJobHeader/JcfJobHeader.tsx` (onTemplateSelect)
+- `apps/web/src/App.tsx` (sequenceWorkflow state)
+
+#### v0.4.32a - Element Prerequisites Data Model & Job Details Panel UI ✅
+> **Purpose:** Move prerequisite tracking from Job level to Element level
+> **Spec:** See `docs/releases/v0.4.32a-element-prerequisites-data-model.md`
+
+- [x] New status types: PaperStatus, BatStatus, PlateStatus (snake_case, with 'none' option)
+- [x] Extend Element interface with prerequisite fields
+- [x] Remove job-level tracking from Job interface (paperPurchaseStatus, platesStatus, proofApproval)
+- [x] Prerequisite dropdowns in Job Details Panel (ElementSection)
+- [x] Plates dropdown only for elements with offset action (cat-offset)
+- [x] Assembly elements show "(pas de prérequis)"
+
+**Affected files:**
+- `packages/types/src/element.ts` - New status types, Element extension
+- `packages/types/src/job.ts` - Remove job-level tracking
+- `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteDropdown.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteStatus.tsx` (new)
+- `apps/web/src/components/JobDetailsPanel/TaskList.tsx`
+- `apps/web/src/components/JobDetailsPanel/JobDetailsPanel.tsx`
+- `apps/web/src/App.tsx`
+
+#### v0.4.32b - Scheduler Tile Blocking Visual & Tooltip ✅
+> **Purpose:** Visual feedback for blocked elements on scheduler tiles
+> **Spec:** See `docs/releases/v0.4.32b-scheduler-tile-blocking-visual.md`
+
+- [x] Blocking logic: isElementBlocked utility
+- [x] Dashed left border for blocked tiles (vs solid for ready)
+- [x] Custom tooltip on 2-second hover (blocked tiles only)
+- [x] Tooltip shows ⚠/✓ indicators with French labels
+
+**Affected files:**
+- `apps/web/src/utils/prerequisites.ts` (new)
+- `apps/web/src/components/Tile/Tile.tsx`
+- `apps/web/src/components/Tile/PrerequisiteTooltip.tsx` (new)
+- `apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx`
+
+#### v0.4.32c - Forme Status & Date Tracking ✅
+> **Purpose:** Die-cutting tool tracking and automatic date recording
+> **Spec:** See `docs/releases/v0.4.32c-forme-status-date-tracking.md`
+
+- [x] FormeStatus type and formeStatus field on Element
+- [x] Die-cutting action detection (cat-die-cutting or outsourced "découpe")
+- [x] Forme dropdown in Job Details Panel
+- [x] Date fields: paperOrderedAt, paperDeliveredAt, filesReceivedAt, batSentAt, batApprovedAt, formeOrderedAt, formeDeliveredAt
+- [x] Automatic date recording on status transitions
+- [x] Date display inline next to dropdowns (DD/MM/YYYY)
+
+**Affected files:**
+- `packages/types/src/element.ts` - FormeStatus, date fields
+- `apps/web/src/components/JobDetailsPanel/ElementSection.tsx`
+- `apps/web/src/components/JobDetailsPanel/PrerequisiteStatus.tsx`
+- `apps/web/src/utils/prerequisites.ts`
+- `apps/web/src/utils/dateFormat.ts` (new)
+
+#### v0.4.32d - Element Prerequisites Documentation ✅
+> **Purpose:** Documentation updates for element-level prerequisites
+> **Spec:** See `docs/releases/v0.4.32d-element-prerequisites-documentation.md`
+> **Released:** 2026-01-31
+
+**Domain Model Updates (5 files):**
+- [x] Update domain model (`docs/domain-model/domain-model.md`)
+- [x] Update business rules (`docs/domain-model/business-rules.md`)
+- [x] Update domain vocabulary (`docs/domain-model/domain-vocabulary.md`)
+- [x] Update workflow definitions (`docs/domain-model/workflow-definitions.md`)
+- [x] Update bounded context map (`docs/domain-model/bounded-context-map.md`)
+
+**Architecture Updates (4 files):**
+- [x] Update service boundaries (`docs/architecture/service-boundaries.md`)
+- [x] Update interface contracts (`docs/architecture/interface-contracts.md`)
+- [x] Update aggregate design (`docs/architecture/aggregate-design.md`)
+- [x] Update event message design (`docs/architecture/event-message-design.md`)
+
+**Requirements Updates (4 files):**
+- [x] Update initial data model (`docs/requirements/initial-data-model.md`)
+- [x] Update acceptance criteria (`docs/requirements/acceptance-criteria.md`)
+- [x] Update API interface drafts (`docs/requirements/api-interface-drafts.md`)
+- [x] Update user stories (`docs/requirements/user-stories.md`)
+
+**Affected files (13 total):**
+- `docs/domain-model/domain-model.md`
+- `docs/domain-model/business-rules.md`
+- `docs/domain-model/domain-vocabulary.md`
+- `docs/domain-model/workflow-definitions.md`
+- `docs/domain-model/bounded-context-map.md`
+- `docs/architecture/service-boundaries.md`
+- `docs/architecture/interface-contracts.md`
+- `docs/architecture/aggregate-design.md`
+- `docs/architecture/event-message-design.md`
+- `docs/requirements/initial-data-model.md`
+- `docs/requirements/acceptance-criteria.md`
+- `docs/requirements/api-interface-drafts.md`
+- `docs/requirements/user-stories.md`
+
+#### v0.4.32e - Element Prerequisites Backend API ✅
+> **Purpose:** Backend API support for element-level prerequisites
+> **Spec:** See `docs/releases/v0.4.32e-element-prerequisites-backend.md`
+> **Released:** 2026-01-31
+
+- [x] Add prerequisite fields to Element entity (PHP)
+- [x] Remove prerequisite fields from Job entity (PHP)
+- [x] Create database migration (add to element, remove from job)
+- [x] Update Job API endpoints (remove prerequisite endpoints)
+- [x] Create Element prerequisites endpoint
+- [x] Run PHPStan level 8
+
+**Implemented:**
+- `services/php-api/src/Entity/Element.php` - 4 status + 7 date fields
+- `services/php-api/src/Entity/Job.php` - removed prerequisite fields
+- `services/php-api/migrations/Version20260131000000.php`
+- `services/php-api/src/Controller/ElementController.php`
+- `services/php-api/src/Entity/PaperStatus.php`, `BatStatus.php`, `PlateStatus.php`, `FormeStatus.php`
+
+### Phase 4J: Save
+
+#### v0.4.33 - JCF: Job Save & API Integration ✅
+> **Spec source:** §10 (Backend Logic)
+> **Spec:** See `docs/releases/v0.4.33-jcf-job-save-api-integration.md`
+> **Released:** 2026-01-31
+
+**Part 1: Naming Alignment (suffix → name):**
+- [x] Element `suffix` → `name` across all layers (packages/types, php-api, apps/web)
+- [x] Database migration for column rename
+- [x] All tests updated (1116 PHP + 1521 JS tests passing)
+
+**Part 2: Multi-Element Job Creation:**
+- [x] JcfElementInput DTO for element input
+- [x] POST /api/v1/jobs accepts `elements[]` array
+- [x] Parse each element's `sequence` into Tasks via DSL
+- [x] Resolve element prerequisites by name lookup
+
+**Part 3: Frontend API Integration:**
+- [x] Job API client (`src/api/jobApi.ts`)
+- [x] Form data → API request mapping (transformJcfToRequest)
+- [x] POST /api/v1/jobs integration (mock + real API support)
+- [x] Error handling and display in JcfModal
+- [x] Modal closes on success
+
+### Phase 4K: Template System
+
+#### v0.4.34 - JCF: Template CRUD & Apply ✅
+> **Spec source:** reference `TemplateList.tsx`, `TemplateEditorModal.tsx`
+
+- [x] Create template from existing job
+- [x] Apply template to new job (populate elements table)
+- [x] Template list with search (JcfTemplateList component)
+- [x] Template categories
+- [x] Category auto-creation on new category name
+- [x] Template name and description fields
+
+#### v0.4.35 - JCF: Link Propagation & Dual-Mode Editor ✅
+> **Spec source:** §4 (Link Propagation)
+
+- [x] Link toggle per field: format, papier, imposition, impression, surfacage
+- [x] Value inheritance from previous element when linked
+- [x] Visual link/unlink indicator per field
+- [x] Dual-mode template editor: Form tab + JSON tab
+- [x] CodeMirror 6 integration for JSON editing
+- [ ] Contextual autocomplete in JSON editor (deferred to v0.4.36)
+- [x] Bidirectional sync between form and JSON
+
+### Phase 4L: Frontend Infrastructure
+
+> Prepare frontend architecture for backend integration and production readiness.
+
+#### v0.4.36 - API Contract Design ✅
+> **Goal:** Document TypeScript types matching backend DTOs, design RTK Query endpoints
+
+- [x] TypeScript interfaces matching backend DTOs
+  - [x] `ScheduleSnapshot` response type
+  - [x] `CreateJobRequest` / `JobResponse` types
+  - [x] `AssignTaskRequest` / `AssignmentResponse` types
+  - [x] Error response types (ValidationError, ConflictError, etc.)
+- [x] RTK Query endpoint design document
+  - [x] Query endpoints: `getSnapshot`, `getClientSuggestions`, `lookupByReference`
+  - [x] Mutation endpoints: `createJob`, `assignTask`, `rescheduleTask`, `unassignTask`, `toggleCompletion`
+  - [x] Tag-based cache invalidation strategy
+- [x] Request/response examples for each endpoint
+- [x] Update `@flux/types` package if needed
+
+#### v0.4.37 - Redux Store & RTK Query Setup ✅
+> **Goal:** Replace useState-based state management with Redux, prepare for API integration
+> **Pattern:** RTK Query + Mock Adapter (queryFn wraps existing mock/snapshot.ts)
+
+- [x] Redux store configuration with Redux Toolkit
+- [x] RTK Query API slice with mock adapter pattern
+  - [x] `scheduleApi` with endpoints designed in v0.4.36
+  - [x] Snapshot data in RTK Query cache (no separate snapshotSlice)
+  - [x] Mutation endpoints with cache invalidation
+- [x] Redux slices for local UI state
+  - [x] `uiSlice` - selectedJob, modals, zoom, contextMenu, etc.
+  - [x] `jcfSlice` - JCF form state
+- [x] Provider setup in main.tsx
+- [x] Redux DevTools integration
+- [x] Existing fixture mechanism preserved (`?fixture=xxx` works)
+
+#### v0.4.38 - React Router Integration ✅
+> **Goal:** Enable URL-based navigation and deep linking
+
+- [x] React Router DOM installation and setup
+- [x] Route structure definition
+  - [x] `/` - Main scheduler view
+  - [x] `/job/:jobId` - Job details (deep link)
+  - [x] `/job/new` - JCF modal route
+- [x] Navigation hooks integration
+- [x] URL state sync (selected job)
+
+#### v0.4.39 - SonarQube Integration ✅
+> **Goal:** Establish code quality analysis and fix issues
+> **Released:** 2026-02-02
+
+- [x] SonarQube integration with `/sonar` command
+- [x] CRITICAL issues fixed (17 → 0)
+- [x] MAJOR issues fixed (24 → 4)
+- [x] Cognitive complexity reduction
+- [x] Accessibility improvements (native buttons)
+- [x] Code cleanup (duplicate functions, redundant assignments)
+
+*Deferred to future release:*
+- Quality gate configuration (coverage thresholds)
+- ESLint strict mode review
+- Pre-commit hooks (husky + lint-staged)
+- GitHub Actions workflow for quality checks
+- Code coverage reporting to SonarCloud
+
+#### v0.4.40 - JSON Editor Contextual Autocomplete ✅
+> **Released:** 2026-02-02
+
+- [x] Contextual autocomplete in JSON editor
+- [x] Field-aware suggestions based on cursor position
+- [x] Integration with reference data
+- [x] Support for: name, format, impression, surfacage, papier, sequence
+
+---
+
+## Milestone 5: Backend API Integration + Outsourcing Refactor (v0.5.x)
+
+> **Detailed plan:** See `docs/roadmap/milestone-5-plan.md`
+>
+> **Phases:**
+> - Phase 5A: Core API Integration (v0.5.0–v0.5.4)
+> - Phase 5B: JCF API Integration (v0.5.5–v0.5.6)
+> - Phase 5C: Error Handling & UX (v0.5.7–v0.5.8)
+> - Phase 5D: Outsourcing Refactor (v0.5.9–v0.5.13)
+> - Phase 5E: Testing & Verification (v0.5.14–v0.5.15)
+
+### Phase 5A: Core API Integration
+
+#### ✅ v0.5.0 - API Client Configuration
+> **Goal:** Configure RTK Query to call real backend
+
+- [x] Environment-based API URL configuration (`VITE_API_URL`)
+- [x] Base query setup with proper headers
+- [x] Hybrid base query with fixture support (NFR-1)
+- [x] Error response normalization
+- [x] Request/response logging in development
+
+#### ✅ v0.5.1 - Snapshot Loading
+> **Goal:** Loading and error state handling for API calls
+
+- [x] LoadingSpinner component for initial fetch
+- [x] ErrorState component with retry button
+- [x] Loading skipped in mock mode (instant data)
+- [ ] Verify data structure compatibility
+
+#### ✅ v0.5.2 - Assignment Operations
+> **Goal:** Connect drag-drop scheduling to real API
+
+- [x] `assignTask` mutation for new assignments
+- [x] `rescheduleTask` mutation for tile moves
+- [x] `unassignTask` mutation for recall
+- [x] Toast notifications for errors
+- [ ] Handle 409 Conflict (validation errors with `suggestedStart`)
+- [ ] Display validation error messages (French)
+
+#### v0.5.3 - Completion Toggle ✅
+> **Goal:** Connect completion checkbox to real API
+
+- [x] `toggleCompletion` mutation → `PUT /api/v1/tasks/{id}/completion`
+- [x] Optimistic update with rollback on error
+
+### Phase 5B: JCF API Integration
+
+#### v0.5.4 - Job Creation via API ✅
+> **Goal:** JCF form saves jobs to real backend
+
+- [x] Map JCF form state to `CreateJobRequest` DTO
+- [x] `createJob` mutation → `POST /api/v1/jobs`
+- [x] Handle DSL validation errors from backend
+- [x] On success: close modal, invalidate snapshot, select new job
+
+#### v0.5.5 - Client Autocomplete via API ✅
+> **Goal:** JCF client field uses real suggestions
+
+- [x] `getClientSuggestions` query → `GET /api/v1/jobs/clients?q={prefix}`
+- [x] Debounced fetching (useDebouncedValue hook, 300ms)
+- [x] Replace hardcoded client list in JcfJobHeader and JcfTemplateHeaderForm
+
+#### v0.5.6 - Reference Lookup via API ✅
+> **Goal:** Auto-fill client when entering existing reference
+
+- [x] `lookupByReference` query → `GET /api/v1/jobs/lookup-by-reference?ref={ref}`
+- [x] Auto-fill client field if found
+- [x] Make ID field editable for reference input
+
+### Phase 5C: Error Handling & UX
+
+#### v0.5.7 - Global Error Handling
+> **Goal:** Consistent error handling across all API calls
+
+- [x] ErrorBoundary component for React error catching
+- [x] Redux error slice for global error state
+- [x] Toast notifications for transient errors (GlobalToast)
+- [x] Inline error messages for form validation (JCF - existing)
+- [x] Network error detection with retry UI
+- [x] 503 Service Unavailable handling (MaintenanceState)
+
+#### v0.5.8 - Optimistic Updates ✅
+> **Goal:** Immediate UI feedback for common operations
+
+- [x] Assignment creation optimistic update
+- [x] Assignment move optimistic update
+- [x] Completion toggle optimistic update
+- [x] Rollback on error
+
+### Phase 5D: Outsourcing Refactor
+
+> **Specification:** [outsourcing.md](./outsourcing.md)
+> **Impact Assessment:** [outsourcing-impact-assessment.md](./outsourcing-impact-assessment.md)
+>
+> This phase implements the new outsourcing model where outsourced tasks become **precedence constraints** (like drying time) rather than scheduled tiles with dedicated provider columns.
+
+#### v0.5.9 - Outsourcing Types & Backend ✅
+> **Goal:** Foundation for new outsourcing model
+
+- [x] Add `transitDays` field to OutsourcedProvider entity (PHP API)
+- [x] Add `manualDeparture`, `manualReturn` fields to OutsourcedTask (PHP API)
+- [x] Update `@flux/types` package with new fields
+- [x] API endpoint updates for new fields
+- [x] Backward compatibility for existing data
+
+#### v0.5.10 - Remove Provider Columns ✅
+> **Goal:** Simplify grid by removing provider columns
+
+- [x] Remove `ProviderColumn` component
+- [x] Remove `ProviderHeader` component
+- [x] Remove provider column rendering from `SchedulingGrid`
+- [x] Remove `isOutsourced` prop from `Tile` component
+- [x] Update mock data and fixtures
+- [x] Remove obsolete tests
+
+#### v0.5.11 - Outsourcing Mini-Form
+> **Goal:** Editable outsourcing parameters in Job Details Panel
+
+- [ ] Create `OutsourcingMiniForm` component
+- [ ] Integrate into `TaskTile` for outsourced tasks
+- [ ] Work days (JO) number input
+- [ ] Departure date/time picker
+- [ ] Return date/time picker (hidden for final outsourcing)
+- [ ] Auto-calculate from predecessor when scheduled
+
+#### v0.5.12 - Outsourcing Precedence Calculation
+> **Goal:** New duration calculation with transit days
+
+- [ ] Forward calculation: `earliestStart(successor)` from predecessor end
+- [ ] Backward calculation: `latestEnd(predecessor)` from successor start
+- [ ] Business day utilities (add/subtract, skip weekends)
+- [ ] Manual override support (`manualDeparture`, `manualReturn`)
+- [ ] Update `precedenceConstraints.ts`
+- [ ] Comprehensive unit tests
+
+#### v0.5.13 - Outsourcing Drag Visualization
+> **Goal:** Show outsourcing constraints during drag operations
+
+- [ ] Display outsourcing constraint duration during drag (like drying time)
+- [ ] Show earliest valid drop position accounting for outsourcing timeline
+- [ ] Alt+drag bypass with warning
+- [ ] E2E tests for drag behavior
+
+### Phase 5E: Testing & Verification
+
+#### v0.5.14 - E2E Tests with Real Backend
+> **Goal:** E2E tests run against actual PHP API
+
+- [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
+- [ ] Test database seeding
+- [ ] Playwright configuration for API mode
+- [ ] Key E2E tests with real backend
+- [ ] CI pipeline integration
+
+#### v0.5.15 - Performance Verification
+> **Goal:** Verify acceptable performance with real API
+
+- [ ] Snapshot load time < 2s
+- [ ] Assignment operation < 500ms
+- [ ] No UI jank during API calls
+- [ ] Performance testing with 100+ jobs
+
+---
+
+## Milestone 6: DSL Editor (v0.6.x, Post-MVP)
+
+> **Note:** The original Job Creation Modal (v0.6.1) and DSL textarea approach have been **superseded by the JCF implementation in M4** (v0.4.4–v0.4.34), which provides a full-featured form-based job creation UI with specialized autocompletes. The Lezer-based DSL parser remains as an optional post-MVP enhancement for syntax highlighting in the sequence field.
+
+### Phase 6A: DSL Parser (Optional Enhancement)
+
+#### v0.6.0 - DSL Parser Package
+- [ ] `@flux/task-dsl-parser` package setup
+- [ ] Lezer grammar definition for sequence field syntax
+- [ ] CodeMirror 6 integration (extends v0.4.34 JSON editor)
+- [ ] Syntax highlighting for sequence field
+
+---
+
+## Milestone 7: Production Readiness (v1.0.x)
+
+### Phase 7A: Security & Auth
 
 #### v1.0.0 - Authentication
 - [ ] JWT authentication implementation
@@ -669,7 +1978,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Permission checks on endpoints
 - [ ] Frontend permission guards
 
-### Phase 4B: Performance & Reliability
+### Phase 7B: Performance & Reliability
 
 #### v1.0.2 - Caching Layer
 - [ ] Redis cache integration
@@ -689,7 +1998,7 @@ This document contains the development roadmap for the Flux print shop schedulin
 - [ ] Memoization optimization
 - [ ] 60 FPS verification
 
-### Phase 4C: Operations
+### Phase 7C: Operations
 
 #### v1.0.5 - Monitoring & Logging
 - [ ] Prometheus metrics endpoints
@@ -748,14 +2057,17 @@ This document contains the development roadmap for the Flux print shop schedulin
 
 ## Summary Table
 
-| Milestone | Version | Focus |
-|-----------|---------|-------|
-| M0 | v0.0.x | Infrastructure & Foundation |
-| M1 | v0.1.x | Core Domain (Station + Job) |
-| M2 | v0.2.x | Scheduling Core (Assignment + Validation) |
-| M3 | v0.3.x | Frontend Integration |
-| M4 | v1.0.x | Production Readiness |
-| Post-MVP | v1.1+ | Branching, Optimization, Reporting |
+| Milestone | Version | Releases | Focus                                     |
+|-----------|---------|----------|-------------------------------------------|
+| M0        | v0.0.x  | 9        | Infrastructure & Foundation               |
+| M1        | v0.1.x  | 20       | Core Domain (Station + Job)               |
+| M2        | v0.2.x  | 19       | Scheduling Core (Assignment + Validation) |
+| M3        | v0.3.x  | 61       | Frontend Integration                      |
+| M4        | v0.4.x  | 41       | Job Creation Form + Frontend Infrastructure |
+| M5        | v0.5.x  | 11       | Backend API Integration                   |
+| M6        | v0.6.x  | 1        | DSL Syntax Highlighting (Post-MVP, optional) |
+| M7        | v1.0.x  | 9        | Production Readiness                      |
+| Post-MVP  | v1.1+   | —        | Branching, Optimization, Reporting        |
 
 ---
 
@@ -776,8 +2088,11 @@ Stream 2: Validation (TypeScript)
 
 Stream 3: Frontend (React)
 ├── Mock mode development
-├── UI components
-├── Drag & drop
+├── Scheduling UI components
+├── Pick & Place interactions
+├── Job Creation Form (v0.4.4–v0.4.34)
+│   ├── Autocompletes (parallelizable: v0.4.13–v0.4.22)
+│   └── Template system (v0.4.33–v0.4.34)
 └── API integration
 
 Stream 4: Infrastructure
@@ -813,3 +2128,4 @@ Scheduling View ◄──────── All domain events
 - The order can be adjusted based on business priorities
 - Schedule branching and optimization are clearly post-MVP
 - **MVP Validation Behavior:** All validation rules result in visual warnings only — no hard blocks prevent scheduling decisions. Hard blocking behavior may be introduced post-MVP.
+- **JCF Strategy:** The `reference/jcf/` codebase is a vibe-coding prototype used only as visual/behavioral reference. It is never merged. All JCF code is reimplemented cleanly using the [Implicit Logic Specification](../../reference/jcf/docs/implicit-logic-specification.md) as the primary source. Granular releases (1 feature = 1 release) ensure UX fidelity and prevent vibe-code leakage.

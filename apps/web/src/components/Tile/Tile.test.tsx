@@ -15,11 +15,8 @@ const mockJob: Job = {
   status: 'Planned',
   workshopExitDate: new Date().toISOString(),
   color: '#8B5CF6', // Purple
-  paperPurchaseStatus: 'InStock',
-  platesStatus: 'Done',
   proofSentAt: null,
   proofApprovedAt: null,
-  requiredJobIds: [],
 };
 
 const mockTask: InternalTask = {
@@ -37,10 +34,15 @@ const mockTask: InternalTask = {
 const mockAssignment: TaskAssignment = {
   id: 'assignment-1',
   taskId: 'task-1',
-  stationId: 'station-1',
-  sequence: 1,
-  startTime: '2025-12-15T09:00:00Z',
+  targetId: 'station-1',
+  isOutsourced: false,
+  // 90 minutes span (30 setup + 60 run) = 1.5 hours = 120px at 80px/hour
+  scheduledStart: '2025-12-15T09:00:00Z',
+  scheduledEnd: '2025-12-15T10:30:00Z',
   isCompleted: false,
+  completedAt: null,
+  createdAt: '2025-12-15T08:00:00Z',
+  updatedAt: '2025-12-15T08:00:00Z',
 };
 
 describe('colorUtils', () => {
@@ -243,15 +245,16 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} isSelected={true} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).toHaveClass('ring-2');
-    expect(tile).toHaveClass('ring-white/30');
+    // Selection now uses box-shadow glow effect with job color at 60% opacity
+    expect(tile).toHaveStyle({ boxShadow: '0 0 12px 4px #8B5CF699' });
   });
 
   it('does not apply selection styling when not selected', () => {
     render(<Tile {...defaultProps} isSelected={false} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).not.toHaveClass('ring-2');
+    // No box-shadow glow when not selected
+    expect(tile.style.boxShadow).toBeFalsy();
   });
 
   it('calls onSelect with job id when clicked', () => {
@@ -307,12 +310,53 @@ describe('Tile', () => {
     expect(onSwapDown).toHaveBeenCalledWith('assignment-1');
   });
 
-  it('calculates correct height based on duration', () => {
+  it('calculates correct height based on scheduled time span', () => {
     render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    // 30 + 60 = 90 minutes = 1.5 hours = 120px (at 80px/hour)
+    // scheduledEnd - scheduledStart = 90 minutes = 1.5 hours = 120px (at 80px/hour)
     expect(tile).toHaveStyle({ height: '120px' });
+  });
+
+  it('calculates stretched height for overnight assignments (downtime-aware)', () => {
+    // Assignment that spans overnight: 17:00 to 09:00 next day = 16 hours
+    const stretchedAssignment: TaskAssignment = {
+      ...mockAssignment,
+      id: 'stretched-1',
+      scheduledStart: '2025-12-15T17:00:00Z',
+      scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
+    };
+
+    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+
+    const tile = screen.getByTestId('tile-stretched-1');
+    // 16 hours = 960 minutes = 1280px (at 80px/hour)
+    expect(tile).toHaveStyle({ height: '1280px' });
+  });
+
+  it('maintains setup/run ratio for stretched tiles', () => {
+    // Assignment that spans overnight: 17:00 to 09:00 next day = 16 hours
+    const stretchedAssignment: TaskAssignment = {
+      ...mockAssignment,
+      id: 'stretched-2',
+      scheduledStart: '2025-12-15T17:00:00Z',
+      scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
+    };
+
+    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+
+    const setupSection = screen.getByTestId('tile-setup-section');
+    const runSection = screen.getByTestId('tile-run-section');
+
+    // Original ratio: 30 setup / 90 total = 1/3
+    // Stretched total height: 1280px
+    // Setup height: 1280 * (30/90) = 426.67px ≈ 426.6666...px
+    // Run height: 1280 * (60/90) = 853.33px ≈ 853.3333...px
+    const setupHeight = parseFloat(setupSection.style.height);
+    const runHeight = parseFloat(runSection.style.height);
+
+    // Check ratio is maintained (setup should be 1/3 of total)
+    expect(setupHeight / (setupHeight + runHeight)).toBeCloseTo(30 / 90, 2);
   });
 
   it('positions at correct top position', () => {
@@ -342,6 +386,7 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
+    // Tile uses div with role="button" due to nested interactive elements (SwapButtons)
     expect(tile).toHaveAttribute('role', 'button');
     expect(tile).toHaveAttribute('tabIndex', '0');
   });
@@ -370,23 +415,23 @@ describe('Tile', () => {
     expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
   });
 
-  describe('muting during drag', () => {
-    it('has muted styles when activeJobId differs from job.id', () => {
-      render(<Tile {...defaultProps} activeJobId="other-job" />);
+  describe('muting during selection', () => {
+    it('has muted styles when selectedJobId differs from job.id', () => {
+      render(<Tile {...defaultProps} selectedJobId="other-job" />);
 
       const tile = screen.getByTestId('tile-assignment-1');
       expect(tile).toHaveStyle({ filter: 'saturate(0.2)', opacity: '0.6' });
     });
 
-    it('has normal styles when activeJobId matches job.id', () => {
-      render(<Tile {...defaultProps} activeJobId="job-1" />);
+    it('has normal styles when selectedJobId matches job.id', () => {
+      render(<Tile {...defaultProps} selectedJobId="job-1" />);
 
       const tile = screen.getByTestId('tile-assignment-1');
       expect(tile).not.toHaveStyle({ filter: 'saturate(0.2)' });
       expect(tile).not.toHaveStyle({ opacity: '0.6' });
     });
 
-    it('has normal styles when activeJobId is undefined (no drag)', () => {
+    it('has normal styles when selectedJobId is undefined (no selection)', () => {
       render(<Tile {...defaultProps} />);
 
       const tile = screen.getByTestId('tile-assignment-1');
@@ -398,9 +443,60 @@ describe('Tile', () => {
       render(<Tile {...defaultProps} />);
 
       const tile = screen.getByTestId('tile-assignment-1');
-      expect(tile).toHaveClass('transition-[filter,opacity]');
+      // Also includes box-shadow for selection glow transition
+      expect(tile).toHaveClass('transition-[filter,opacity,box-shadow]');
       expect(tile).toHaveClass('duration-150');
       expect(tile).toHaveClass('ease-out');
+    });
+  });
+
+  describe('completion toggle (v0.3.33)', () => {
+    it('calls onToggleComplete with assignment id when incomplete icon is clicked', () => {
+      const onToggleComplete = vi.fn();
+      render(<Tile {...defaultProps} onToggleComplete={onToggleComplete} />);
+
+      fireEvent.click(screen.getByTestId('tile-incomplete-icon'));
+      expect(onToggleComplete).toHaveBeenCalledWith('assignment-1');
+    });
+
+    it('calls onToggleComplete with assignment id when completed icon is clicked', () => {
+      const completedAssignment: TaskAssignment = {
+        ...mockAssignment,
+        isCompleted: true,
+      };
+      const onToggleComplete = vi.fn();
+      render(
+        <Tile {...defaultProps} assignment={completedAssignment} onToggleComplete={onToggleComplete} />
+      );
+
+      fireEvent.click(screen.getByTestId('tile-completed-icon'));
+      expect(onToggleComplete).toHaveBeenCalledWith('assignment-1');
+    });
+
+    it('does not call onSelect when icon is clicked (stopPropagation)', () => {
+      const onSelect = vi.fn();
+      const onToggleComplete = vi.fn();
+      render(
+        <Tile {...defaultProps} onSelect={onSelect} onToggleComplete={onToggleComplete} />
+      );
+
+      fireEvent.click(screen.getByTestId('tile-incomplete-icon'));
+      expect(onToggleComplete).toHaveBeenCalled();
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('icon has hover cursor class', () => {
+      render(<Tile {...defaultProps} />);
+
+      const icon = screen.getByTestId('tile-incomplete-icon');
+      expect(icon).toHaveClass('cursor-pointer');
+    });
+
+    it('icon has transition class for hover effect', () => {
+      render(<Tile {...defaultProps} />);
+
+      const icon = screen.getByTestId('tile-incomplete-icon');
+      expect(icon).toHaveClass('transition-colors');
     });
   });
 });

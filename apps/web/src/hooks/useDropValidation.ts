@@ -6,6 +6,7 @@ import type {
   ValidationResult,
   Task,
 } from '@flux/types';
+import { getPrimaryValidationMessage } from '../utils';
 
 export interface DropValidationParams {
   /** Current schedule snapshot */
@@ -23,7 +24,7 @@ export interface DropValidationParams {
 export interface DropValidationResult {
   /** Whether the drop is valid */
   isValid: boolean;
-  /** Whether there's a precedence conflict */
+  /** Whether there's a precedence conflict (checked WITHOUT bypass for accurate detection) */
   hasPrecedenceConflict: boolean;
   /** Suggested start time if precedence conflict exists */
   suggestedStart: string | null;
@@ -31,6 +32,12 @@ export interface DropValidationResult {
   validationResult: ValidationResult | null;
   /** All conflicts */
   conflicts: ValidationResult['conflicts'];
+  /** Whether there are only warning conflicts (non-blocking, like Plates approval) */
+  hasWarningOnly: boolean;
+  /** Whether there's a group capacity conflict (REQ-18) */
+  hasGroupCapacityConflict: boolean;
+  /** v0.3.52: Human-readable validation message (French) */
+  message: string | null;
 }
 
 /**
@@ -73,6 +80,30 @@ export function useDropValidation({
     return validateAssignment(proposedAssignment, snapshot);
   }, [proposedAssignment, snapshot]);
 
+  // REQ-13 Fix: Also check for precedence conflict WITHOUT bypass
+  // This is needed to correctly show amber ring and record conflicts when Alt is pressed
+  const hasPrecedenceConflictWithoutBypass = useMemo((): boolean => {
+    if (!task || !targetStationId || !scheduledStart || task.type !== 'Internal') {
+      return false;
+    }
+
+    // If bypass is not active, use the main validation result
+    if (!bypassPrecedence && validationResult) {
+      return validationResult.conflicts.some((c) => c.type === 'PrecedenceConflict');
+    }
+
+    // When bypass is active, run a separate validation without bypass
+    const proposalWithoutBypass: ProposedAssignment = {
+      taskId: task.id,
+      targetId: targetStationId,
+      isOutsourced: false,
+      scheduledStart,
+      bypassPrecedence: false,
+    };
+    const resultWithoutBypass = validateAssignment(proposalWithoutBypass, snapshot);
+    return resultWithoutBypass.conflicts.some((c) => c.type === 'PrecedenceConflict');
+  }, [task, targetStationId, scheduledStart, bypassPrecedence, validationResult, snapshot]);
+
   // Extract relevant information
   const result = useMemo((): DropValidationResult => {
     if (!validationResult) {
@@ -82,11 +113,40 @@ export function useDropValidation({
         suggestedStart: null,
         validationResult: null,
         conflicts: [],
+        hasWarningOnly: false,
+        hasGroupCapacityConflict: false,
+        message: null,
       };
     }
 
-    const hasPrecedenceConflict = validationResult.conflicts.some(
-      (c) => c.type === 'PrecedenceConflict'
+    // Use the bypass-independent check for precedence conflict
+    const hasPrecedenceConflict = hasPrecedenceConflictWithoutBypass;
+
+    // REQ-18: Check for group capacity conflict
+    const hasGroupCapacityConflict = validationResult.conflicts.some(
+      (c) => c.type === 'GroupCapacityConflict'
+    );
+
+    // Check if there are only warning conflicts (non-blocking)
+    // Warning-only conflicts: Plates ApprovalGateConflict
+    // Non-blocking (handled by system): StationConflict (push-down), PrecedenceConflict with suggestedStart (auto-snap)
+    const hasConflicts = validationResult.conflicts.length > 0;
+    const blockingConflicts = validationResult.conflicts.filter(
+      (c) =>
+        c.type !== 'StationConflict' &&
+        !(c.type === 'PrecedenceConflict' && validationResult.suggestedStart) &&
+        !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+    );
+    const warningConflicts = validationResult.conflicts.filter(
+      (c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates'
+    );
+    const hasWarningOnly = hasConflicts && blockingConflicts.length === 0 && warningConflicts.length > 0;
+
+    // v0.3.52: Get primary validation message (French)
+    const message = getPrimaryValidationMessage(
+      validationResult.conflicts,
+      validationResult.valid,
+      hasWarningOnly
     );
 
     return {
@@ -95,8 +155,11 @@ export function useDropValidation({
       suggestedStart: validationResult.suggestedStart ?? null,
       validationResult,
       conflicts: validationResult.conflicts,
+      hasWarningOnly,
+      hasGroupCapacityConflict,
+      message,
     };
-  }, [validationResult]);
+  }, [validationResult, hasPrecedenceConflictWithoutBypass]);
 
   return result;
 }

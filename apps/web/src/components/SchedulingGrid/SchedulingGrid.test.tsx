@@ -75,11 +75,8 @@ const mockJob: Job = {
   status: 'Planned',
   workshopExitDate: new Date().toISOString(),
   color: '#8b5cf6',
-  paperPurchaseStatus: 'InStock',
-  platesStatus: 'Done',
   proofSentAt: null,
   proofApprovedAt: null,
-  requiredJobIds: [],
 };
 
 describe('SchedulingGrid', () => {
@@ -180,7 +177,8 @@ describe('SchedulingGrid', () => {
   });
 
   it('renders hour grid lines in station columns', () => {
-    render(<SchedulingGrid stations={mockStations} />);
+    // v0.3.46: Virtual scrolling - pass small hoursToDisplay for single-day test
+    render(<SchedulingGrid stations={mockStations} hoursToDisplay={24} totalDays={1} />);
 
     const gridLines = screen.getAllByTestId('hour-grid-line');
     // Each station has 25 lines (24 hours + 1), 3 stations = 75 lines

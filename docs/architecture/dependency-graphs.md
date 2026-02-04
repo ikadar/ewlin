@@ -4,9 +4,9 @@ tags:
   - architecture
 ---
 
-# Dependency Graphs — Operations Research System
+# Dependency Graphs — Flux Print Shop Scheduling System
 
-This document illustrates how to document service‑ and module‑level dependencies in a format that is stable, AI‑friendly, and consistent with the Dependency Graph Guidelines.
+This document illustrates service‑ and module‑level dependencies in a format that is stable, AI‑friendly, and consistent with the Dependency Graph Guidelines.
 
 It shows:
 - all components involved,
@@ -15,13 +15,15 @@ It shows:
 
 ## Components
 
-- **Resource Management Service** — manages operators, equipment, skills, and availability
-- **Job Management Service** — manages jobs, tasks, and dependencies
-- **Assignment & Validation Service** — performs scheduling, validation, and conflict detection
-- **Scheduling View Service** — provides read-optimized views and reports
-- **Execution Tracking Service** — tracks actual task execution and variances
+- **Station Management Service** — manages stations, station categories, station groups, outsourced providers, and operating schedules
+- **Job Management Service** — manages jobs, elements, tasks, approval gates, and comments
+- **Assignment & Validation Service** — performs scheduling, validation (element-scoped and cross-element precedence), and conflict detection
+- **Scheduling View Service** — provides read-optimized views, snapshots, similarity indicators, and reports
+- **Business Calendar Service** — calculates open days (business days) for outsourced task durations
 
 Internal modules (API, Application Layer, Domain, Infrastructure) are shown inside each service.
+
+> **Note:** Execution Tracking Service is planned for post-MVP and is not included in current dependency graphs.
 
 ---
 
@@ -31,45 +33,49 @@ Internal modules (API, Application Layer, Domain, Infrastructure) are shown insi
 
 ```mermaid
 flowchart TD
-    Resource[Resource Management Service]
+    Station[Station Management Service]
     Job[Job Management Service]
     Assignment[Assignment & Validation Service]
     View[Scheduling View Service]
-    Execution[Execution Tracking Service]
+    Calendar[Business Calendar Service]
 
-    Assignment -->|queries| Resource
+    Assignment -->|queries| Station
     Assignment -->|queries| Job
-    Assignment -->|TaskScheduled event| Execution
+    Assignment -->|sync call| Calendar
     Assignment -->|events| View
-    Resource -->|events| Assignment
-    Resource -->|events| View
+    Station -->|events| Assignment
+    Station -->|events| View
     Job -->|events| Assignment
     Job -->|events| View
-    Execution -->|TaskProgressUpdate event| Job
-    Execution -->|events| View
+    Assignment -->|events| Job
 ```
 
 ### Textual Representation
 
 ```
-[Assignment & Validation Service] --(synchronous query)--> [Resource Management Service]
+[Assignment & Validation Service] --(synchronous query)--> [Station Management Service]
 [Assignment & Validation Service] --(synchronous query)--> [Job Management Service]
+[Assignment & Validation Service] --(synchronous call)--> [Business Calendar Service]
 
-[Resource Management Service] --(publishes event: ResourceManagement.OperatorAvailabilityChanged)--> [Assignment & Validation Service]
-[Resource Management Service] --(publishes event: ResourceManagement.EquipmentStatusChanged)--> [Assignment & Validation Service]
+[Station Management Service] --(publishes event: StationManagement.StationScheduleUpdated)--> [Assignment & Validation Service]
+[Station Management Service] --(publishes event: StationManagement.StationExceptionAdded)--> [Assignment & Validation Service]
+[Station Management Service] --(publishes event: StationManagement.StationStatusChanged)--> [Assignment & Validation Service]
 
 [Job Management Service] --(publishes event: JobManagement.TaskStructureChanged)--> [Assignment & Validation Service]
+[Job Management Service] --(publishes event: JobManagement.ElementCreated)--> [Assignment & Validation Service]
+[Job Management Service] --(publishes event: JobManagement.ElementDependencyAdded)--> [Assignment & Validation Service]
+[Job Management Service] --(publishes event: JobManagement.ApprovalGateChanged)--> [Assignment & Validation Service]
 
-[Assignment & Validation Service] --(publishes event: Assignment.TaskScheduled)--> [Execution Tracking Service]
+[Assignment & Validation Service] --(publishes event: Assignment.TaskAssigned)--> [Job Management Service]
 [Assignment & Validation Service] --(publishes event: Assignment.ConflictDetected)--> [Scheduling View Service]
-
-[Execution Tracking Service] --(publishes event: Execution.TaskProgressUpdate)--> [Job Management Service]
+[Assignment & Validation Service] --(publishes event: Assignment.ScheduleSnapshotUpdated)--> [Scheduling View Service]
 
 [All Services] --(publish domain events)--> [Scheduling View Service]
 ```
 
 **Interpretation:**
-- Assignment Service has **synchronous read dependencies** on Resource and Job services
+- Assignment Service has **synchronous read dependencies** on Station and Job services
+- Assignment Service uses Business Calendar for open day calculations (outsourced tasks)
 - All other communication is through **asynchronous events**
 - Scheduling View Service consumes events from all services (CQRS read model)
 - No circular dependencies exist
@@ -79,13 +85,13 @@ flowchart TD
 
 ## 2. Module-Level Dependencies Inside Each Service
 
-### 2.1 Resource Management Service
+### 2.1 Station Management Service
 
-#### Mermaid Diagram (Resource Management Modules)
+#### Mermaid Diagram (Station Management Modules)
 
 ```mermaid
 flowchart TD
-    API[Resource API Layer]
+    API[Station API Layer]
     App[Application Layer]
     Domain[Domain Layer]
     Infra[Infrastructure Layer]
@@ -97,13 +103,13 @@ flowchart TD
 ```
 
 ```
-Resource API Layer (REST Controllers)
+Station API Layer (REST Controllers)
    ↓ sync call
-Application Layer (RegisterOperatorHandler, UpdateAvailabilityHandler)
+Application Layer (RegisterStationHandler, UpdateScheduleHandler, RegisterProviderHandler)
    ↓ sync call
-Domain Layer (Operator Aggregate, Equipment Aggregate, OperatorSkill VO)
+Domain Layer (Station Aggregate, StationCategory Aggregate, StationGroup Aggregate, OutsourcedProvider Aggregate)
    ↓ repository interface
-Infrastructure Layer (OperatorRepositoryImpl, EquipmentRepositoryImpl, EventPublisher)
+Infrastructure Layer (StationRepositoryImpl, StationCategoryRepositoryImpl, StationGroupRepositoryImpl, OutsourcedProviderRepositoryImpl, EventPublisher)
 ```
 
 Dependency types:
@@ -134,9 +140,9 @@ flowchart TD
 ```
 Job API Layer (REST Controllers)
    ↓ sync call
-Application Layer (CreateJobHandler, AddTaskHandler, SetDependencyHandler)
+Application Layer (CreateJobHandler, CreateElementHandler, AddTaskHandler, AddElementDependencyHandler)
    ↓ sync call
-Domain Layer (Job Aggregate, Task Entity, TaskDependency VO, Critical Path Calculator)
+Domain Layer (Job Aggregate, Element Entity, Task Entity)
    ↓ repository interface
 Infrastructure Layer (JobRepositoryImpl, EventPublisher)
 ```
@@ -165,11 +171,13 @@ flowchart TD
 ```
 Assignment API Layer (REST Controllers)
    ↓ sync call
-Application Layer (AssignResourcesHandler, ValidateScheduleHandler, SchedulingService)
+Application Layer (AssignTaskHandler, ValidateScheduleHandler, SchedulingService)
    ↓ sync call                          ↓ queries
 Domain Layer (Schedule Aggregate,        External Service Clients
-ValidatedAssignment VO,                  (ResourceClient, JobClient)
-ScheduleConflict VO)
+TaskAssignment VO,                       (StationClient, JobClient,
+ScheduleConflict VO,                      BusinessCalendarClient)
+Element-scoped & cross-element
+precedence validation)
    ↓ repository interface
 Infrastructure Layer (ScheduleRepositoryImpl, EventPublisher)
 ```
@@ -199,7 +207,7 @@ flowchart TD
 ```
 View API Layer (REST Controllers for Reports)
    ↓ query
-Projections (GanttView, CalendarView, UtilizationReport)
+Projections (ScheduleSnapshot, TileView, SimilarityIndicator, LateJobReport)
    ↑ updates
 Event Consumers (listening to all domain events)
    ↓ read/write
@@ -210,24 +218,15 @@ This is a pure read model with no domain logic, only projections.
 
 ---
 
-### 2.5 Execution Tracking Service
+### 2.5 Business Calendar Service
 
-#### Mermaid Diagram (Execution Tracking Modules)
-
-```mermaid
-flowchart TD
-    API[Execution API Layer]
-    App[Application Layer]
-    Domain[Domain Layer]
-    Infra[Infrastructure Layer]
-    External[Assignment Client]
-
-    API -->|sync call| App
-    App -->|sync call| Domain
-    Domain -->|repository interface| Infra
-    App -->|event publishing| Infra
-    App -->|queries| External
 ```
+Calendar API Layer (synchronous request/response)
+   ↓ sync call
+Open Day Calculator (weekend exclusion, future: French holidays)
+```
+
+This is a lightweight, stateless, foundational service with no external dependencies.
 
 ---
 
@@ -238,43 +237,40 @@ flowchart TD
 ```mermaid
 flowchart TB
     subgraph Command Services
-        Resource[Resource Management]
+        Station[Station Management]
         Job[Job Management]
         Assignment[Assignment & Validation]
-        Execution[Execution Tracking]
     end
-    
+
     subgraph Query Service
         View[Scheduling View]
     end
-    
-    subgraph Communication Types
-        Sync[Synchronous Queries]
-        Async[Async Events]
+
+    subgraph Support Services
+        Calendar[Business Calendar]
     end
 
-    Assignment -.->|sync query| Resource
+    Assignment -.->|sync query| Station
     Assignment -.->|sync query| Job
-    Execution -.->|sync query| Assignment
-    
-    Resource ==>|events| Assignment
+    Assignment -.->|sync call| Calendar
+
+    Station ==>|events| Assignment
     Job ==>|events| Assignment
-    Assignment ==>|events| Execution
-    Execution ==>|events| Job
-    
-    Resource ==>|events| View
+    Assignment ==>|events| Job
+
+    Station ==>|events| View
     Job ==>|events| View
     Assignment ==>|events| View
-    Execution ==>|events| View
 ```
 
 Constraints:
-- **No reverse dependencies** (e.g., Resource Service cannot query Assignment Service)
-- **No circular dependencies** between services
-- **No cross-service database access** - each service owns its data
-- **Synchronous calls only for queries**, never for state changes
+- **No reverse dependencies** (e.g., Station Service cannot query Assignment Service)
+- **No circular synchronous dependencies** between services
+- **No cross-service database access** — each service owns its data
+- **Synchronous calls only for queries and stateless computations**, never for state changes
 - **All state changes through events** to maintain consistency
-- **View Service is event-only** - no synchronous dependencies
+- **View Service is event-only** — no synchronous dependencies
+- **Support Services are stateless** — Business Calendar has no persistence
 
 ---
 
@@ -284,25 +280,22 @@ Constraints:
 
 ```mermaid
 flowchart TD
-    RR[Resource Registration]
+    SS[Station Setup]
     JC[Job Creation]
+    ED[Element Definition]
     TP[Task Planning]
     TA[Task Assignment]
     SV[Schedule Validation]
-    TE[Task Execution]
-    PC[Progress Tracking]
-    RC[Report Generation]
+    RC[Report & View Generation]
 
-    RR -->|enables| TA
-    JC -->|enables| TP
+    SS -->|enables| TA
+    JC -->|enables| ED
+    ED -->|enables| TP
     TP -->|enables| TA
     TA -->|requires| SV
-    SV -->|enables| TE
-    TE -->|produces| PC
-    PC -->|feeds| RC
-    
+    SV -->|feeds| RC
+
     subgraph Feedback Loops
-        PC -.->|updates| JC
         SV -.->|conflicts affect| TA
     end
 ```
@@ -310,21 +303,19 @@ flowchart TD
 ### Textual Business Flow
 
 ```
-Resource Registration (Operators & Equipment)
+Station Setup (Stations, Categories, Groups, Providers)
    ↓ enables
-Job Creation (with deadline)
+Job Creation (with deadline, client, description)
    ↓ enables
-Task Planning (dependencies, durations)
+Element Definition (single or multi-element with cross-element dependencies)
    ↓ enables
-Task Assignment (operator + equipment + timing)
+Task Planning (element-scoped task sequences, durations)
+   ↓ enables
+Task Assignment (station + timing, element-scoped & cross-element precedence)
    ↓ requires
-Schedule Validation (conflict detection)
-   ↓ enables
-Task Execution (actual work)
-   ↓ produces
-Progress Tracking (variances, quality)
+Schedule Validation (conflict detection, dry time, approval gates)
    ↓ feeds
-Report Generation (Gantt, utilization)
+Report & View Generation (schedule snapshots, similarity indicators, late jobs)
 ```
 
 This describes the **business flow**, independent of technical services.
@@ -337,23 +328,21 @@ This describes the **business flow**, independent of technical services.
 
 ```mermaid
 flowchart LR
-    System[OR System Core]
-    HR[HR System]
-    IoT[IoT Sensors]
+    System[Flux Scheduling System]
     ERP[ERP System]
     Email[Notification Service]
-    
-    HR -->|operator data| System
-    IoT -->|equipment status| System
+
+    ERP -->|job/client data| System
     System -->|job completion| ERP
     System -->|alerts| Email
 ```
 
 External Dependencies:
-- **HR System** → Resource Management (operator master data)
-- **IoT Sensors** → Resource Management (equipment status updates)
-- **ERP System** ← Job Management (job completion notifications)
-- **Email/SMS** ← All Services (notifications and alerts)
+- **ERP System** → Job Management (job/client master data import — future)
+- **ERP System** ← Job Management (job completion notifications — future)
+- **Email/SMS** ← All Services (notifications and alerts — future)
+
+> **Note:** External system integrations are planned for post-MVP. The MVP operates as a standalone scheduling system.
 
 ---
 
@@ -369,14 +358,14 @@ flowchart TD
         WriteDB[(Write Database)]
         Events[Domain Events]
     end
-    
+
     subgraph Read Path
         EventStore[Event Bus]
         Projections[Read Projections]
         ReadDB[(Read Database)]
         Queries[Queries/Reports]
     end
-    
+
     Commands --> Aggregates
     Aggregates --> WriteDB
     Aggregates --> Events
@@ -397,25 +386,21 @@ This shows the CQRS separation and event-driven synchronization.
 ```mermaid
 flowchart TD
     subgraph Application Layer
-        Services[All Services]
+        PHP[PHP/Symfony Modular Monolith]
+        Node[Node.js Validation Service]
     end
-    
+
     subgraph Data Layer
         MariaDB[(MariaDB)]
         Redis[(Redis Cache)]
         MessageBus[Message Bus]
     end
-    
-    subgraph External
-        S3[Object Storage]
-        SMTP[Email Service]
-    end
-    
-    Services --> MariaDB
-    Services --> Redis
-    Services --> MessageBus
-    Services --> S3
-    Services --> SMTP
+
+    PHP --> MariaDB
+    PHP --> Redis
+    PHP --> MessageBus
+    PHP -->|HTTP internal| Node
+    Node --> Redis
 ```
 
 Infrastructure dependencies that affect deployment and operations.
@@ -428,5 +413,6 @@ Infrastructure dependencies that affect deployment and operations.
 - All arrows are directional and represent explicit, allowed dependencies
 - The Assignment & Validation Service is the central orchestrator but depends on others for data
 - The Scheduling View Service has no outbound dependencies (pure read model)
-- External systems are integrated through well-defined interfaces
+- Business Calendar is a stateless support service
+- External system integrations are post-MVP
 - The architecture supports both monolithic and microservice deployment

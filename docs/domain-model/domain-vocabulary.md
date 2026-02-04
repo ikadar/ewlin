@@ -87,25 +87,84 @@ This document defines the core domain terms used in the **print shop scheduling*
 
 ---
 
+## Element
+
+- **Definition:** A segment of a job's production process, containing one or more sequential tasks. Every job has at least one element. Multi-element jobs enable complex production workflows (e.g., book production with separate cover, interior, and binding elements).
+- **Notes:** The Element is an intermediate layer between Job and Task. Tasks belong to an Element (via `elementId`), and Elements belong to a Job (via `jobId`). Single-element jobs behave identically to the pre-Element flat task list — the element layer is transparent. **As of v0.4.32, prerequisite tracking (paper, BAT, plates, forme) is at element level.**
+- **Fields:**
+  - `id` – unique identifier
+  - `jobId` – parent job ID
+  - `suffix` – short identifier (e.g., `"couv"`, `"int"`, `"fin"`, `"ELT"`)
+  - `label` – optional display label (e.g., `"Couverture"`, `"Intérieur"`)
+  - `spec` – optional ElementSpec with additional specifications
+  - `prerequisiteElementIds` – element IDs (same job) that must complete before this element can start
+  - `taskIds` – task IDs in execution order within this element
+  - **Prerequisite Status Fields (v0.4.32):**
+    - `paperStatus` – paper availability: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+    - `batStatus` – BAT approval: `none` | `waiting_files` | `files_received` | `bat_sent` | `bat_approved`
+    - `plateStatus` – plates preparation: `none` | `to_make` | `ready`
+    - `formeStatus` – forme (die-cutting tool): `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+  - **Date Tracking Fields (v0.4.32):**
+    - `paperOrderedAt` – timestamp when paper was ordered
+    - `paperDeliveredAt` – timestamp when paper was delivered
+    - `filesReceivedAt` – timestamp when client files were received
+    - `batSentAt` – timestamp when BAT was sent to client
+    - `batApprovedAt` – timestamp when BAT was approved
+    - `formeOrderedAt` – timestamp when forme was ordered
+    - `formeDeliveredAt` – timestamp when forme was delivered
+- **Blocking Logic (v0.4.32):** An element is blocked if ANY prerequisite is not ready:
+  - Paper ready: `none`, `in_stock`, `delivered`
+  - BAT ready: `none`, `bat_approved`
+  - Plates ready: `none`, `ready`
+  - Forme ready: `none`, `in_stock`, `delivered`
+- **Examples:**
+  - Single-element job: one element with suffix `"ELT"`, all tasks in sequence
+  - Book production: Element A "Couverture" (cover), Element B "Intérieur" (interior), Element C "Reliure" (binding, depends on A and B)
+- **Helper:** `isMultiElementJob(elementIds)` returns `true` when `elementIds.length > 1`
+- **Related terms:** Job, Task, ElementDependency, ElementPrerequisite.
+
+---
+
+## ElementDependency
+
+- **Definition:** A finish-to-start relationship between two elements within the same job, defined by `prerequisiteElementIds`.
+- **Notes:**
+  - All tasks of the prerequisite element must complete before the dependent element's first task can start.
+  - Only elements within the same job can have dependencies (no cross-job element dependencies).
+  - Circular dependencies are not allowed (elements form a DAG).
+  - If the prerequisite element's last task is a printing task (offset press), the dependent element's first task must wait an additional 4-hour drying time.
+- **Distinction from JobDependency:** JobDependency is between separate jobs; ElementDependency is between elements within the same job.
+- **Related terms:** Element, Job, DryTime.
+
+---
+
+## DryTime
+
+- **Definition:** A mandatory 4-hour drying period after printing tasks before dependent work can begin.
+- **Notes:**
+  - Applies when a predecessor task is a printing task on an offset press station (category: `cat-offset`).
+  - Drying is a physical process that continues outside working hours (not restricted to operating schedule).
+  - The successor task's earliest start = predecessor's `scheduledEnd + 4 hours`, then snapped to the next working time slot if the result falls outside operating hours.
+  - Applies to both intra-element predecessors and cross-element predecessors.
+- **Constant:** `DRY_TIME_MINUTES = 240` (4 hours)
+- **Related terms:** ElementDependency, Task, StationCategory.
+
+---
+
 ## Job
 
-- **Definition:** A complete print order consisting of one or more sequential tasks that must be completed by a deadline.
-- **Notes:** Jobs have rich metadata specific to print production including client info, paper specifications, and approval gates.
+- **Definition:** A complete print order consisting of one or more elements, each containing sequential tasks, that must be completed by a deadline.
+- **Notes:** Jobs have rich metadata specific to print production including client info and paper specifications. **As of v0.4.32, prerequisite tracking (paper, BAT, plates, forme) moved to Element level.**
 - **Typical fields:**
   - `reference` – order reference (user-manipulated for order lines/parts)
   - `client` – customer name
+  - `elementIds` – list of element IDs belonging to this job
   - `fullyScheduled` – boolean, true if all tasks are scheduled
   - `notes` – free-form comments
   - `description` – product description (e.g., "Cartes de voeux - 9,9 x 21 cm - off 350g - 350 ex")
   - `workshopExitDate` – date job MUST leave the factory
-  - `paperPurchaseStatus` – enum: InStock / ToOrder / Ordered / Received
-  - `paperOrderedAt` – timestamp when paper was ordered
   - `paperType` – paper type and weight (e.g., "CB300")
   - `paperFormat` – paper dimensions (e.g., "63x88")
-  - `proofSentAt` – date proof (BAT) sent to client, or special values
-  - `proofApprovedAt` – date proof approval received
-  - `platesStatus` – approval gate: Todo / Done
-  - `requiredJobs` – list of job references that must complete first
   - `comments` – thread of dated/authored messages
 - **Status values:**
   - `Draft` – job is being defined
@@ -114,19 +173,19 @@ This document defines the core domain terms used in the **print shop scheduling*
   - `Delayed` – job at risk of missing deadline
   - `Completed` – all tasks finished
   - `Cancelled` – job was cancelled
-- **Related terms:** Task, ApprovalGate, Comment.
+- **Related terms:** Element, Task, ElementPrerequisite, Comment.
 
 ---
 
 ## Task
 
-- **Definition:** A specific production operation within a job, performed on a station or outsourced to a provider.
-- **Notes:** Tasks are defined using a DSL syntax (see task-dsl-specification.md). Tasks follow a single straight sequence within a job.
+- **Definition:** A specific production operation within an element of a job, performed on a station or outsourced to a provider.
+- **Notes:** Tasks are defined using a DSL syntax (see task-dsl-specification.md). Tasks follow a single straight sequence within their element (ordered by `sequenceOrder`). Tasks reference their parent element via `elementId`; the job is accessible via `Element.jobId`.
 - **Types:**
   - **Internal Task** – performed on a workshop station with setup and run times
   - **Outsourced Task** – performed by external provider with duration in open days
-- **Typical fields (internal):** station, setup minutes, run minutes, comment
-- **Typical fields (outsourced):** provider, action type, duration in open days, comment
+- **Typical fields (internal):** elementId, station, sequenceOrder, setup minutes, run minutes, comment
+- **Typical fields (outsourced):** elementId, provider, action type, sequenceOrder, duration in open days, comment
 - **Status values:**
   - `Defined` – task created, not yet ready
   - `Ready` – dependencies satisfied, can be scheduled
@@ -135,7 +194,7 @@ This document defines the core domain terms used in the **print shop scheduling*
   - `Completed` – finished successfully
   - `Failed` – error during execution
   - `Cancelled` – cancelled (typically via job cancellation)
-- **Related terms:** Job, Station, OutsourcedProvider, Assignment.
+- **Related terms:** Element, Job, Station, OutsourcedProvider, Assignment.
 
 ---
 
@@ -186,17 +245,26 @@ This document defines the core domain terms used in the **print shop scheduling*
 
 ---
 
-## ApprovalGate
+## ElementPrerequisite (v0.4.32)
 
-- **Definition:** A checkpoint that must be cleared before production can proceed.
-- **Instances:**
+- **Definition:** A production readiness checkpoint tracked at the element level. Prerequisites must be ready before production can proceed efficiently.
+- **Prerequisite Types:**
+  - **Paper** – paper availability for production
+    - `paperStatus`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+    - Ready states: `none`, `in_stock`, `delivered`
   - **BAT (Bon à Tirer)** – proof approval from client
-    - `proofSentAt`: Date sent (or "AwaitingFile" / "NoProofRequired")
-    - `proofApprovedAt`: Date approved
+    - `batStatus`: `none` | `waiting_files` | `files_received` | `bat_sent` | `bat_approved`
+    - Ready states: `none`, `bat_approved`
   - **Plates** – printing plates preparation
-    - `platesStatus`: Todo / Done
-- **Notes:** Tasks cannot proceed until their required approval gates are satisfied.
-- **Related terms:** Job, Task.
+    - `plateStatus`: `none` | `to_make` | `ready`
+    - Ready states: `none`, `ready`
+  - **Forme** – die-cutting tool availability (only for elements with die-cutting tasks)
+    - `formeStatus`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+    - Ready states: `none`, `in_stock`, `delivered`
+- **Blocking Logic:** An element is blocked if ANY prerequisite is not in a ready state.
+- **Visual Indicator:** Blocked elements display a dashed left border on their scheduler tiles.
+- **Notes:** Prerequisites are warnings only (MVP) — users can still schedule blocked elements. Hard blocking may be introduced post-MVP.
+- **Related terms:** Element, Task, PrerequisiteConflict.
 
 ---
 
@@ -269,7 +337,9 @@ This document defines the core domain terms used in the **print shop scheduling*
   - Job-level only (not task-level cross-job dependencies).
   - Strictly finish-to-start: the first task of the dependent job cannot start until the last task of all required jobs are completed.
   - No other dependency types (start-to-start, finish-to-finish) are supported.
-- **Related terms:** Job, requiredJobs field.
+  - Currently backend-only (`requiredJobIds` on Job entity); removed from shared frontend types in v0.4.1.
+- **Distinction from ElementDependency:** JobDependency is between separate jobs; ElementDependency is between elements within the same job.
+- **Related terms:** Job, ElementDependency.
 
 ---
 
@@ -277,13 +347,14 @@ This document defines the core domain terms used in the **print shop scheduling*
 
 - **Definition:** A situation where scheduling constraints are violated.
 - **Types:**
+  - `StationMismatchConflict` – task assigned to wrong station (internal task on different station than specified)
   - `StationConflict` – station double-booked
   - `GroupCapacityConflict` – station group max concurrent exceeded
-  - `PrecedenceConflict` – task scheduled before predecessor task completes
-  - `ApprovalGateConflict` – approval gate not satisfied
+  - `PrecedenceConflict` – task scheduled before predecessor completes (covers both intra-element sequencing and cross-element finish-to-start dependencies)
+  - `PrerequisiteConflict` – element prerequisite not ready (paper, BAT, plates, forme) — v0.4.32
   - `AvailabilityConflict` – task scheduled outside station operating hours
   - `DeadlineConflict` – task completion exceeds job workshop exit date
-- **Related terms:** Schedule, Assignment, Validation.
+- **Related terms:** Schedule, Assignment, Validation, ElementPrerequisite.
 
 ---
 

@@ -11,6 +11,8 @@ export interface SidebarButtonProps {
   isDisabled?: boolean;
   /** Click handler */
   onClick?: () => void;
+  /** Test ID for E2E testing */
+  testId?: string;
 }
 
 /**
@@ -23,15 +25,17 @@ export function SidebarButton({
   isActive = false,
   isDisabled = false,
   onClick,
+  testId,
 }: SidebarButtonProps) {
   const baseClasses =
     'w-10 h-10 flex items-center justify-center rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-zinc-900';
 
-  const stateClasses = isDisabled
-    ? 'text-zinc-700 cursor-not-allowed'
-    : isActive
-      ? 'bg-white/10 text-zinc-300 hover:bg-white/15 hover:text-white'
-      : 'text-zinc-500 hover:bg-white/10 hover:text-zinc-300';
+  const getStateClasses = () => {
+    if (isDisabled) return 'text-zinc-700 cursor-not-allowed';
+    if (isActive) return 'bg-white/10 text-zinc-300 hover:bg-white/15 hover:text-white';
+    return 'text-zinc-500 hover:bg-white/10 hover:text-zinc-300';
+  };
+  const stateClasses = getStateClasses();
 
   return (
     <button
@@ -41,6 +45,7 @@ export function SidebarButton({
       aria-current={isActive ? 'page' : undefined}
       disabled={isDisabled}
       onClick={isDisabled ? undefined : onClick}
+      data-testid={testId}
     >
       <Icon className="w-5 h-5" />
     </button>

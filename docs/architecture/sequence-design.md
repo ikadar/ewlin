@@ -6,7 +6,7 @@ tags:
 
 # Sequence Design — Flux Print Shop Scheduling System
 
-This document provides both **textual** and **Mermaid‑based** sequence specifications for key interactions in the Station → Job → Task assignment and scheduling workflow.
+This document provides both **textual** and **Mermaid‑based** sequence specifications for key interactions in the Station → Job → Element → Task assignment and scheduling workflow.
 
 Each sequence describes:
 - **Trigger** — what starts the interaction
@@ -41,12 +41,14 @@ Each sequence describes:
    - Checks task precedence
    - Provides real-time feedback (< 10ms)
 3. Scheduler drops tile at Station "Komori G37", 09:00.
-4. **Frontend** sends `AssignTask(taskId, stationId, scheduledStart)` to **Assignment Service**.
+4. **Frontend** sends `AssignTask(taskId, targetId, isOutsourced=false, scheduledStart)` to **Assignment Service**.
 5. **Assignment Service** calls **Validation Service** for authoritative validation:
-   - Station exists and is Available
+   - Target station exists and is Available
    - No scheduling conflicts
    - Group capacity not exceeded
-   - Task sequence respected
+   - Element-scoped precedence (intra-element sequenceOrder) respected
+   - Cross-element precedence (prerequisiteElementIds finish-to-start) respected
+   - Dry time (4h) after printing predecessors respected
    - Approval gates satisfied (BAT, Plates)
 6. If valid:
    - Assignment Service creates assignment
@@ -63,8 +65,12 @@ Task is assigned to station with timing, visible on the grid.
 **Exceptions:**
 - **StationConflict:** Double-booking detected → Show conflicting assignments
 - **GroupCapacityConflict:** MaxConcurrent exceeded → Show capacity warning
-- **PrecedenceConflict:** Task sequence violated → Snap to valid position or show warning
+- **PrecedenceConflict:** Element-scoped or cross-element precedence violated → Snap to valid position or show warning
+- **DryTimeConflict:** 4h dry time after printing not respected → Snap forward or show warning
 - **ApprovalGateConflict:** BAT or Plates not ready → Block with explanation
+- **StationMismatchConflict:** Task assigned to wrong station type → Show warning
+
+> **Note:** Scheduler can bypass precedence constraints by holding Alt-key during drop (`bypassPrecedence=true`).
 
 ```mermaid
 sequenceDiagram
@@ -77,7 +83,7 @@ sequenceDiagram
     Scheduler->>Frontend: Drag task over grid
     Frontend->>Frontend: Client-side validation<br>(@flux/schedule-validator)<br>< 10ms feedback
     Scheduler->>Frontend: Drop at Komori, 09:00
-    Frontend->>Assignment: AssignTask(taskId, stationId,<br>scheduledStart)
+    Frontend->>Assignment: AssignTask(taskId, targetId,<br>isOutsourced=false, scheduledStart)
     Assignment->>Validation: Validate assignment
     Validation-->>Assignment: ValidationResult<br>(valid/conflicts)
     alt Validation Success
@@ -95,69 +101,63 @@ sequenceDiagram
 
 ---
 
-## 2. Job Creation with DSL Tasks
+## 2. Job Creation with Elements
 
-**Trigger:** User creates a new print job with tasks defined via DSL.
+**Trigger:** User creates a new print job with one or more elements, each containing tasks.
 
 **Participants:**
 - Production Planner (user)
 - Job Management Service
-- DSL Parsing Service (embedded)
-- Station Management Service
 - Scheduling View Service
 
 **Sequence:**
-1. Planner opens job creation modal.
+1. Planner opens job creation form.
 2. Planner enters job details: reference "45113 A", client "Fibois Grand Est", workshopExitDate "2025-12-15".
-3. Planner enters task DSL:
-   ```
-   [Komori G37] 20+180 "tirage principal"
-   [Massicot] 15
-   ST [Clément] Pelliculage 2JO
-   ```
-4. **DSL Parsing Service** parses each line:
-   - Validates syntax
-   - Resolves station/provider names against **Station Management Service**
-   - Returns structured task data or parse errors
-5. Planner saves job.
-6. **Job Management Service** creates Job aggregate:
+3. **Job Management Service** creates Job aggregate:
    - Status = Draft
-   - Adds tasks with sequence order
-   - Validates task requirements
-7. Job Service emits `JobCreated` and `TaskAddedToJob` events.
-8. Job Service publishes **`JobManagement.TaskStructureChanged`**.
-9. **Scheduling View Service** receives event and updates job list.
+   - Assigns random color from predefined palette
+   - Creates default Element (suffix: "ELT")
+4. Job Service emits `JobCreated` and `ElementCreated` domain events.
+5. Planner adds tasks to the default element (with station targets and durations).
+6. For multi-element jobs (e.g., book production):
+   - Planner creates additional elements (e.g., "Cover", "Interior", "Binding")
+   - Planner adds cross-element dependencies via `prerequisiteElementIds`
+   - Job Service validates: same-job elements only, no cycles (DAG)
+7. Job Service emits `TaskAddedToJob`, `ElementDependencyAdded` events.
+8. Job Service publishes **`JobManagement.TaskStructureChanged`** and **`JobManagement.ElementStructureChanged`**.
+9. **Scheduling View Service** receives events and updates job list.
 
 **Outcome:**
-Job created with parsed tasks ready for scheduling.
+Job created with elements and tasks, ready for scheduling. Cross-element dependencies define execution order.
 
 ```mermaid
 sequenceDiagram
     participant Planner
     participant Frontend
     participant Job as Job Management Service
-    participant DSL as DSL Parsing Service
-    participant Station as Station Management Service
     participant View as Scheduling View Service
 
-    Planner->>Frontend: Open job creation modal
     Planner->>Frontend: Enter job details<br>(reference, client, deadline)
-    Planner->>Frontend: Enter task DSL
-    Frontend->>DSL: Parse DSL text
-    DSL->>Station: Validate station/provider names
-    Station-->>DSL: Station/Provider data
-    DSL-->>Frontend: Parsed tasks or errors
+    Frontend->>Job: CreateJob(details)
+    Job->>Job: Create Job aggregate<br>Status = Draft<br>Assign random color<br>Create default Element
+    Job-->>Job: JobCreated<br>ElementCreated<br>(domain events)
+    Job-->>View: JobManagement.<br>TaskStructureChanged
 
-    alt DSL Valid
-        Planner->>Frontend: Save job
-        Frontend->>Job: CreateJob(details, tasks)
-        Job->>Job: Create Job aggregate<br>Status = Draft<br>Add tasks with sequence
-        Job-->>Job: JobCreated<br>TaskAddedToJob<br>(domain events)
-        Job-->>View: JobManagement.<br>TaskStructureChanged<br>(integration event)
-        View->>View: Update job list
-    else DSL Errors
-        Frontend->>Frontend: Highlight error lines<br>Show error messages
+    Planner->>Frontend: Add tasks to element
+    Frontend->>Job: AddTask(elementId, task)
+    Job-->>Job: TaskAddedToJob
+
+    opt Multi-element job
+        Planner->>Frontend: Create additional elements
+        Frontend->>Job: CreateElement(jobId, suffix)
+        Job-->>Job: ElementCreated
+        Planner->>Frontend: Add cross-element dependency
+        Frontend->>Job: AddElementDependency<br>(elementId, prerequisiteElementId)
+        Job->>Job: Validate same-job, no cycles (DAG)
+        Job-->>Job: ElementDependencyAdded
+        Job-->>View: JobManagement.<br>ElementStructureChanged
     end
+    View->>View: Update job list
 ```
 
 ---
@@ -174,11 +174,11 @@ sequenceDiagram
 
 **Sequence:**
 1. Coordinator receives client approval for proof.
-2. Coordinator updates job: `proofApprovedAt = now()`.
+2. Coordinator updates job: `proofApproval.approvedAt = now()`.
 3. **Job Management Service** validates:
-   - `proofSentAt` was set (proof was sent)
-   - Sets `proofApprovedAt` timestamp
-4. Job Service emits domain event `ProofStatusUpdated`.
+   - `proofApproval.sentAt` was set (proof was sent)
+   - Sets `proofApproval.approvedAt` timestamp
+4. Job Service emits domain event `ProofApprovalUpdated`.
 5. Job Service publishes **`JobManagement.ApprovalGateChanged`**:
    - gateType = "Proof"
    - isBlocking = false
@@ -197,9 +197,9 @@ sequenceDiagram
     participant Assignment as Assignment Service
     participant View as Scheduling View Service
 
-    Coordinator->>Job: UpdateProofStatus<br>(jobId, proofApprovedAt=now)
-    Job->>Job: Validate proofSentAt exists<br>Set proofApprovedAt
-    Job-->>Job: ProofStatusUpdated<br>(domain event)
+    Coordinator->>Job: UpdateProofApproval<br>(jobId, proofApproval.approvedAt=now)
+    Job->>Job: Validate proofApproval.sentAt exists<br>Set proofApproval.approvedAt
+    Job-->>Job: ProofApprovalUpdated<br>(domain event)
     Job-->>Assignment: JobManagement.<br>ApprovalGateChanged<br>(gateType=Proof, isBlocking=false)
     Assignment->>Assignment: Revalidate job's assignments<br>Clear gate conflicts
     Job-->>View: ApprovalGateChanged
@@ -331,10 +331,10 @@ sequenceDiagram
    - Compare with job's workshopExitDate
    - If completion > deadline: mark as late
 3. For each late job:
-   - Calculate delay in hours/days
+   - Calculate delay in days
    - Add to `lateJobs` collection in snapshot
 4. Snapshot includes late job warnings:
-   - jobId, reference, workshopExitDate, expectedCompletion, delayHours
+   - jobId, reference, deadline, expectedCompletion, delayDays
 5. **Frontend** displays late jobs in right panel "Late Jobs" section.
 6. Visual indicator on job tiles shows deadline risk.
 
@@ -373,7 +373,7 @@ sequenceDiagram
 **Sequence:**
 1. Scheduler drags outsourced task (e.g., "Pelliculage 2JO") to provider column.
 2. Scheduler drops at Monday 15:00.
-3. **Frontend** sends `AssignTask(taskId, providerId, scheduledStart=15:00)`.
+3. **Frontend** sends `AssignTask(taskId, targetId, isOutsourced=true, scheduledStart=15:00)`.
 4. **Assignment Service** checks provider's `latestDepartureTime` (e.g., 14:00):
    - Since 15:00 > 14:00, effective start day = Tuesday (next business day)
 5. Assignment Service queries **Business Calendar Service**:
@@ -403,7 +403,7 @@ sequenceDiagram
     participant Calendar as Business Calendar Service
     participant View as Scheduling View Service
 
-    Scheduler->>Assignment: AssignTask(taskId, providerId,<br>scheduledStart=Monday 15:00)
+    Scheduler->>Assignment: AssignTask(taskId, targetId,<br>isOutsourced=true,<br>scheduledStart=Monday 15:00)
     Assignment->>Assignment: Check latestDepartureTime<br>(14:00)
     Assignment->>Assignment: 15:00 > 14:00<br>→ effective start = Tuesday
     Assignment->>Calendar: CalculateEndDate<br>(Tuesday, 2 open days)
@@ -441,7 +441,7 @@ sequenceDiagram
 4. Scheduler reviews conflict and suggestions.
 5. Scheduler resolves by either:
    - Rescheduling one task to different time
-   - Moving task to different station
+   - Moving task to different target (station or provider)
    - Recalling one of the conflicting tasks
 6. On resolution, conflicts automatically cleared.
 
@@ -461,8 +461,8 @@ sequenceDiagram
     Scheduler->>Scheduler: Review options
     alt Reschedule
         Scheduler->>Assignment: RescheduleTask<br>(taskId, newStart)
-    else Move Station
-        Scheduler->>Assignment: RescheduleTask<br>(taskId, newStationId)
+    else Move to Different Target
+        Scheduler->>Assignment: RescheduleTask<br>(taskId, newTargetId, isOutsourced)
     else Recall
         Scheduler->>Assignment: UnassignTask(taskId)
     end
@@ -535,7 +535,7 @@ sequenceDiagram
    - Job is not already Completed or Cancelled
 3. Job Service processes cancellation:
    - Changes job status to Cancelled
-   - Changes all task statuses to Cancelled
+   - Changes all task statuses across all elements to Cancelled
 4. Job Service evaluates each task's assignment:
    - **Future assignments** (scheduledStart > now): Recall (remove) assignment
    - **Past assignments** (scheduledStart < now): Preserve for historical reference
@@ -591,7 +591,7 @@ sequenceDiagram
 
 **Sequence:**
 1. Scheduler drags task tile to position between existing tiles A and B on a capacity-1 station.
-2. **Frontend** sends `AssignTask(taskId, stationId, scheduledStart)`.
+2. **Frontend** sends `AssignTask(taskId, targetId, isOutsourced=false, scheduledStart)`.
 3. **Assignment Service** checks station capacity:
    - Capacity = 1 → tiles CANNOT overlap
 4. Assignment Service detects overlap with existing tiles.
@@ -627,7 +627,7 @@ sequenceDiagram
     participant Assignment as Assignment Service
     participant View as Scheduling View Service
 
-    Scheduler->>Assignment: AssignTask(taskId, stationId,<br>scheduledStart between A and B)
+    Scheduler->>Assignment: AssignTask(taskId, targetId,<br>isOutsourced=false,<br>scheduledStart between A and B)
     Assignment->>Assignment: Check station capacity = 1
     Assignment->>Assignment: Detect overlap with tile B
     Assignment->>Assignment: Push-down: Move B later

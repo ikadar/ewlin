@@ -1,4 +1,4 @@
-import { LayoutGrid, Calendar, Settings } from 'lucide-react';
+import { LayoutGrid, Calendar, Settings, User } from 'lucide-react';
 import { SidebarButton } from './SidebarButton';
 
 export interface SidebarProps {
@@ -12,34 +12,52 @@ export interface SidebarProps {
  * Sidebar navigation component.
  * Provides top-level navigation between main application views.
  * Always visible on the left side of the screen.
+ * REQ-07: Full viewport height with User/Settings at bottom.
  */
 export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
   return (
-    <aside
-      className="w-14 shrink-0 bg-zinc-900/50 border-r border-white/5"
-      role="navigation"
+    <nav
+      className="w-14 shrink-0 bg-zinc-900/50 border-r border-white/5 h-full"
       aria-label="Main navigation"
+      data-testid="sidebar"
     >
-      <div className="h-full flex flex-col items-center py-3 gap-2">
-      <SidebarButton
-        icon={LayoutGrid}
-        label="Scheduling view"
-        isActive={activeView === 'schedule'}
-        onClick={() => onNavigate?.('schedule')}
-      />
-      <SidebarButton
-        icon={Calendar}
-        label="Calendar view"
-        isActive={activeView === 'calendar'}
-        onClick={() => onNavigate?.('calendar')}
-      />
-      <SidebarButton
-        icon={Settings}
-        label="Settings"
-        isActive={activeView === 'settings'}
-        isDisabled
-      />
+      <div className="h-full flex flex-col">
+        {/* Top navigation section */}
+        <div className="flex flex-col items-center py-3 gap-2">
+          <SidebarButton
+            icon={LayoutGrid}
+            label="Scheduling view"
+            isActive={activeView === 'schedule'}
+            onClick={() => onNavigate?.('schedule')}
+          />
+          <SidebarButton
+            icon={Calendar}
+            label="Calendar view"
+            isActive={activeView === 'calendar'}
+            onClick={() => onNavigate?.('calendar')}
+          />
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Bottom section: Settings/User (REQ-07.3) */}
+        <div className="flex flex-col items-center py-3 gap-2 border-t border-white/5">
+          <SidebarButton
+            icon={Settings}
+            label="Settings"
+            isActive={activeView === 'settings'}
+            isDisabled
+            testId="sidebar-settings-button"
+          />
+          <SidebarButton
+            icon={User}
+            label="User"
+            isDisabled
+            testId="sidebar-user-button"
+          />
+        </div>
       </div>
-    </aside>
+    </nav>
   );
 }

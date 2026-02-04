@@ -1,18 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DndContext } from '@dnd-kit/core';
 import { JobDetailsPanel } from './JobDetailsPanel';
 import { JobInfo } from './JobInfo';
-import { JobStatus } from './JobStatus';
 import { InfoField } from './InfoField';
 import { TaskList } from './TaskList';
 import { TaskTile } from './TaskTile';
-import type { Job, Task, TaskAssignment, Station } from '@flux/types';
-
-// Helper to wrap components with DndContext
-const DndWrapper = ({ children }: { children: React.ReactNode }) => (
-  <DndContext>{children}</DndContext>
-);
+import type { Job, Task, TaskAssignment, Station, Element } from '@flux/types';
 
 // Mock data
 const mockJob: Job = {
@@ -24,20 +17,32 @@ const mockJob: Job = {
   workshopExitDate: '2025-12-18',
   fullyScheduled: false,
   color: '#8B5CF6',
-  paperPurchaseStatus: 'Ordered',
-  proofApproval: { sentAt: '2025-12-12T14:30:00Z', approvedAt: null },
-  platesStatus: 'Done',
-  requiredJobIds: [],
   comments: [],
   taskIds: ['task-1', 'task-2'],
+  elementIds: ['element-1'],
   createdAt: '2025-12-15T10:00:00Z',
   updatedAt: '2025-12-15T10:00:00Z',
 };
 
+const mockElements: Element[] = [
+  {
+    id: 'element-1',
+    jobId: 'job-1',
+    name: 'ELT',
+    prerequisiteElementIds: [],
+    taskIds: ['task-1', 'task-2'],
+    paperStatus: 'in_stock',
+    batStatus: 'bat_approved',
+    plateStatus: 'ready',
+    createdAt: '2025-12-15T10:00:00Z',
+    updatedAt: '2025-12-15T10:00:00Z',
+  },
+];
+
 const mockTasks: Task[] = [
   {
     id: 'task-1',
-    jobId: 'job-1',
+    elementId: 'element-1',
     sequenceOrder: 0,
     status: 'Assigned',
     type: 'Internal',
@@ -48,7 +53,7 @@ const mockTasks: Task[] = [
   },
   {
     id: 'task-2',
-    jobId: 'job-1',
+    elementId: 'element-1',
     sequenceOrder: 1,
     status: 'Ready',
     type: 'Internal',
@@ -59,40 +64,43 @@ const mockTasks: Task[] = [
   },
 ];
 
+const weekdaySchedule = { isOperating: true, slots: [{ start: '07:00', end: '19:00' }] };
+const weekendSchedule = { isOperating: false, slots: [] };
+
 const mockStations: Station[] = [
   {
     id: 'station-1',
     name: 'Komori G40',
-    status: 'Operational',
+    status: 'Available',
     categoryId: 'cat-1',
     groupId: 'group-1',
     capacity: 1,
     operatingSchedule: {
-      monday: { start: '07:00', end: '19:00' },
-      tuesday: { start: '07:00', end: '19:00' },
-      wednesday: { start: '07:00', end: '19:00' },
-      thursday: { start: '07:00', end: '19:00' },
-      friday: { start: '07:00', end: '19:00' },
-      saturday: null,
-      sunday: null,
+      monday: weekdaySchedule,
+      tuesday: weekdaySchedule,
+      wednesday: weekdaySchedule,
+      thursday: weekdaySchedule,
+      friday: weekdaySchedule,
+      saturday: weekendSchedule,
+      sunday: weekendSchedule,
     },
     exceptions: [],
   },
   {
     id: 'station-2',
     name: 'Polar 137',
-    status: 'Operational',
+    status: 'Available',
     categoryId: 'cat-2',
     groupId: 'group-2',
     capacity: 1,
     operatingSchedule: {
-      monday: { start: '07:00', end: '19:00' },
-      tuesday: { start: '07:00', end: '19:00' },
-      wednesday: { start: '07:00', end: '19:00' },
-      thursday: { start: '07:00', end: '19:00' },
-      friday: { start: '07:00', end: '19:00' },
-      saturday: null,
-      sunday: null,
+      monday: weekdaySchedule,
+      tuesday: weekdaySchedule,
+      wednesday: weekdaySchedule,
+      thursday: weekdaySchedule,
+      friday: weekdaySchedule,
+      saturday: weekendSchedule,
+      sunday: weekendSchedule,
     },
     exceptions: [],
   },
@@ -116,28 +124,26 @@ const mockAssignments: TaskAssignment[] = [
 describe('JobDetailsPanel', () => {
   it('renders nothing when no job is selected', () => {
     const { container } = render(
-      <DndWrapper>
-        <JobDetailsPanel
-          job={null}
-          tasks={mockTasks}
-          assignments={mockAssignments}
-          stations={mockStations}
-        />
-      </DndWrapper>
+      <JobDetailsPanel
+        job={null}
+        tasks={mockTasks}
+        elements={mockElements}
+        assignments={mockAssignments}
+        stations={mockStations}
+      />
     );
     expect(container.querySelector('[class]')).toBeNull();
   });
 
   it('renders when job is selected', () => {
     render(
-      <DndWrapper>
-        <JobDetailsPanel
-          job={mockJob}
-          tasks={mockTasks}
-          assignments={mockAssignments}
-          stations={mockStations}
-        />
-      </DndWrapper>
+      <JobDetailsPanel
+        job={mockJob}
+        tasks={mockTasks}
+        elements={mockElements}
+        assignments={mockAssignments}
+        stations={mockStations}
+      />
     );
     expect(screen.getByText('12345')).toBeInTheDocument();
     expect(screen.getByText('Autosphere')).toBeInTheDocument();
@@ -145,14 +151,13 @@ describe('JobDetailsPanel', () => {
 
   it('displays all job info fields', () => {
     render(
-      <DndWrapper>
-        <JobDetailsPanel
-          job={mockJob}
-          tasks={mockTasks}
-          assignments={mockAssignments}
-          stations={mockStations}
-        />
-      </DndWrapper>
+      <JobDetailsPanel
+        job={mockJob}
+        tasks={mockTasks}
+        elements={mockElements}
+        assignments={mockAssignments}
+        stations={mockStations}
+      />
     );
     expect(screen.getByText('Code')).toBeInTheDocument();
     expect(screen.getByText('Client')).toBeInTheDocument();
@@ -160,32 +165,15 @@ describe('JobDetailsPanel', () => {
     expect(screen.getByText('Départ')).toBeInTheDocument();
   });
 
-  it('displays job status fields', () => {
-    render(
-      <DndWrapper>
-        <JobDetailsPanel
-          job={mockJob}
-          tasks={mockTasks}
-          assignments={mockAssignments}
-          stations={mockStations}
-        />
-      </DndWrapper>
-    );
-    expect(screen.getByText('BAT')).toBeInTheDocument();
-    expect(screen.getByText('Papier')).toBeInTheDocument();
-    expect(screen.getByText('Plaques')).toBeInTheDocument();
-  });
-
   it('displays task tiles', () => {
     render(
-      <DndWrapper>
-        <JobDetailsPanel
-          job={mockJob}
-          tasks={mockTasks}
-          assignments={mockAssignments}
-          stations={mockStations}
-        />
-      </DndWrapper>
+      <JobDetailsPanel
+        job={mockJob}
+        tasks={mockTasks}
+        elements={mockElements}
+        assignments={mockAssignments}
+        stations={mockStations}
+      />
     );
     expect(screen.getByText('Komori G40')).toBeInTheDocument();
     expect(screen.getByText('Polar 137')).toBeInTheDocument();
@@ -216,32 +204,16 @@ describe('JobInfo', () => {
   });
 });
 
-describe('JobStatus', () => {
-  it('displays formatted status values', () => {
-    render(<JobStatus job={mockJob} />);
-    expect(screen.getByText('Commandé')).toBeInTheDocument();
-    expect(screen.getByText('Prêtes')).toBeInTheDocument();
-  });
-
-  it('displays BAT status with date when sent', () => {
-    render(<JobStatus job={mockJob} />);
-    // The BAT was sent, so it should show "Reçu DD/MM HH:MM"
-    // Time varies by timezone, so just check for the pattern
-    expect(screen.getByText(/Reçu 12\/12 \d{2}:\d{2}/)).toBeInTheDocument();
-  });
-});
-
 describe('TaskList', () => {
   it('renders task tiles sorted by sequence order', () => {
     render(
-      <DndWrapper>
-        <TaskList
-          tasks={mockTasks}
-          job={mockJob}
-          assignments={mockAssignments}
-          stations={mockStations}
-        />
-      </DndWrapper>
+      <TaskList
+        tasks={mockTasks}
+        elements={mockElements}
+        job={mockJob}
+        assignments={mockAssignments}
+        stations={mockStations}
+      />
     );
     const tiles = screen.getAllByText(/Komori|Polar/);
     expect(tiles).toHaveLength(2);
@@ -249,9 +221,7 @@ describe('TaskList', () => {
 
   it('shows empty state when no tasks', () => {
     render(
-      <DndWrapper>
-        <TaskList tasks={[]} job={mockJob} assignments={[]} stations={mockStations} />
-      </DndWrapper>
+      <TaskList tasks={[]} elements={mockElements} job={mockJob} assignments={[]} stations={mockStations} />
     );
     expect(screen.getByText('Aucune tâche')).toBeInTheDocument();
   });
@@ -261,14 +231,12 @@ describe('TaskTile', () => {
   it('renders unscheduled task with duration', () => {
     const task = mockTasks[1]; // Unscheduled task
     render(
-      <DndWrapper>
-        <TaskTile
-          task={task}
-          job={mockJob}
-          jobColor={mockJob.color}
-          station={mockStations[1]}
-        />
-      </DndWrapper>
+      <TaskTile
+        task={task}
+        job={mockJob}
+        jobColor={mockJob.color}
+        station={mockStations[1]}
+      />
     );
     expect(screen.getByText('Polar 137')).toBeInTheDocument();
     expect(screen.getByText('0h45')).toBeInTheDocument();
@@ -277,15 +245,13 @@ describe('TaskTile', () => {
   it('renders scheduled task with datetime', () => {
     const task = mockTasks[0]; // Scheduled task
     render(
-      <DndWrapper>
-        <TaskTile
-          task={task}
-          job={mockJob}
-          jobColor={mockJob.color}
-          assignment={mockAssignments[0]}
-          station={mockStations[0]}
-        />
-      </DndWrapper>
+      <TaskTile
+        task={task}
+        job={mockJob}
+        jobColor={mockJob.color}
+        assignment={mockAssignments[0]}
+        station={mockStations[0]}
+      />
     );
     expect(screen.getByText('Komori G40')).toBeInTheDocument();
     // Should show scheduled time instead of duration
@@ -293,62 +259,37 @@ describe('TaskTile', () => {
     expect(screen.getByText(/[A-Z][a-z] 15\/12 \d{2}:\d{2}/)).toBeInTheDocument();
   });
 
-  it('has cursor-grab class for unscheduled tasks', () => {
+  it('has cursor-pointer class for unscheduled pickable tasks', () => {
     const task = mockTasks[1];
+    const onPick = vi.fn();
     render(
-      <DndWrapper>
-        <TaskTile task={task} job={mockJob} jobColor={mockJob.color} station={mockStations[1]} />
-      </DndWrapper>
+      <TaskTile task={task} job={mockJob} jobColor={mockJob.color} station={mockStations[1]} onPick={onPick} />
     );
     const tile = screen.getByTestId(`task-tile-${task.id}`);
-    expect(tile).toHaveClass('cursor-grab');
+    expect(tile).toHaveClass('cursor-pointer');
   });
 
   it('has dark styling for scheduled tasks', () => {
     const task = mockTasks[0];
     render(
-      <DndWrapper>
-        <TaskTile
-          task={task}
-          job={mockJob}
-          jobColor={mockJob.color}
-          assignment={mockAssignments[0]}
-          station={mockStations[0]}
-        />
-      </DndWrapper>
+      <TaskTile
+        task={task}
+        job={mockJob}
+        jobColor={mockJob.color}
+        assignment={mockAssignments[0]}
+        station={mockStations[0]}
+      />
     );
     const tile = screen.getByTestId(`task-tile-${task.id}`);
     expect(tile).toHaveClass('bg-slate-800/40');
   });
 
-  it('is not draggable when scheduled', () => {
-    const task = mockTasks[0];
-    render(
-      <DndWrapper>
-        <TaskTile
-          task={task}
-          job={mockJob}
-          jobColor={mockJob.color}
-          assignment={mockAssignments[0]}
-          station={mockStations[0]}
-        />
-      </DndWrapper>
-    );
-    const tile = screen.getByTestId(`task-tile-${task.id}`);
-    // Scheduled tiles don't have drag attributes
-    expect(tile).not.toHaveClass('touch-none');
-    expect(tile).not.toHaveClass('select-none');
-  });
-
-  it('has draggable attributes when unscheduled', () => {
+  it('has select-none class for unscheduled tasks', () => {
     const task = mockTasks[1];
     render(
-      <DndWrapper>
-        <TaskTile task={task} job={mockJob} jobColor={mockJob.color} station={mockStations[1]} />
-      </DndWrapper>
+      <TaskTile task={task} job={mockJob} jobColor={mockJob.color} station={mockStations[1]} />
     );
     const tile = screen.getByTestId(`task-tile-${task.id}`);
-    expect(tile).toHaveClass('touch-none');
     expect(tile).toHaveClass('select-none');
   });
 });

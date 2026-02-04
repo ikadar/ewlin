@@ -4,9 +4,9 @@ tags:
   - architecture
 ---
 
-# Security, Performance & Scalability Design Notes – Operations Research System
+# Security, Performance & Scalability Design Notes – Flux Print Shop Scheduling System
 
-This document captures **architectural decisions** related to security, performance, and scalability for the Equipment → Operator → Job → Task assignment and validation workflow.
+This document captures **architectural decisions** related to security, performance, and scalability for the Station → Job → Element → Task assignment and scheduling workflow.
 
 These are *design-level* notes, complementing the non-functional requirements (NFRs) with concrete architectural choices.
 
@@ -16,30 +16,29 @@ These are *design-level* notes, complementing the non-functional requirements (N
 
 ### 1.1 Authentication & Authorization
 - All APIs require authentication via JWT tokens with 30-minute expiry
-- Authorization uses **role + resource ownership** model:
-  - Operators may only view their own assignments and schedules
-  - Production Schedulers can create/modify all assignments
-  - Production Managers can manage jobs and resources
+- Authorization uses **role-based access control** model:
+  - Production Schedulers can create/modify all assignments and schedules
+  - Production Managers can manage jobs, stations, and station groups
   - Administrators have full system access
 - Service-to-service communication uses API keys with request signing
 - Frontend authentication via OAuth2 with refresh tokens
 
 ### 1.2 Data Protection
-- Operator personal data (contact info) encrypted at rest using AES-256
+- Client data (contact info, job descriptions) encrypted at rest using AES-256
 - TLS 1.3 enforced for all API communication
-- Sensitive operations logged without PII (operator/job IDs only)
+- Sensitive operations logged with entity IDs only (station/job IDs)
 - Database connections use SSL with certificate validation
 - No credentials or sensitive data in environment variables
 
 ### 1.3 Audit & Compliance
 - Critical events must be logged with immutable audit trail:
-  - Task assignments (who assigned what to whom and when)
+  - Task assignments (who assigned what to which station and when)
   - Schedule modifications (before/after state)
-  - Resource status changes (equipment breakdowns)
+  - Station status changes (maintenance, out of service)
   - Access to sensitive reports
 - Audit logs stored separately from operational data
 - 1-year retention for compliance
-- GDPR compliance for operator data (right to deletion, data portability)
+- GDPR compliance for client data (right to deletion, data portability)
 
 ---
 
@@ -52,29 +51,29 @@ These are *design-level* notes, complementing the non-functional requirements (N
   - **5s p99** for full schedule validation
 - Heavy operations run asynchronously:
   - Schedule optimization
-  - Gantt chart generation for large datasets
+  - Schedule snapshot generation for large datasets
   - Bulk assignment operations
 
 ### 2.2 Database Access
 - Indexes required on:
-  - operatorId, equipmentId (for availability queries)
-  - jobId, taskId (for job management)
+  - stationId, jobId, elementId (for entity lookups)
+  - taskId, targetId (for assignment queries)
   - scheduled_start, scheduled_end (for time-based queries)
   - Foreign key relationships
 - Query optimization:
-  - Eager loading for job → tasks → dependencies
+  - Eager loading for job → elements → tasks
   - Pagination mandatory for lists (max 100 items)
   - Database views for complex schedule queries
 - Connection pooling: 20 connections per service instance
 
 ### 2.3 Caching Strategy
 - **Redis** for frequently accessed data:
-  - Operator skills and availability (5-minute TTL)
-  - Equipment status and capabilities (5-minute TTL)
-  - Job structure and dependencies (invalidate on change)
+  - Station schedules and availability (5-minute TTL)
+  - Station status and categories (5-minute TTL)
+  - Job structure with elements and tasks (invalidate on change)
 - **Application-level caching**:
-  - Calculated critical paths (invalidate on task change)
-  - Validation results (1-minute TTL)
+  - Precedence validation results (invalidate on element/task change)
+  - Schedule conflict state (1-minute TTL)
 - **CDN** for static assets and read-only reports
 
 ### 2.4 Real-time Updates
@@ -95,12 +94,14 @@ These are *design-level* notes, complementing the non-functional requirements (N
 
 ### 3.2 Service Boundaries for Scaling
 - Services can be independently scaled based on load:
-  - **Resource Management**: Low write, high read volume
-  - **Job Management**: Moderate read/write
+  - **Station Management**: Low write, high read volume
+  - **Job Management**: Moderate read/write (element and task operations)
   - **Assignment & Validation**: CPU-intensive, scale horizontally
   - **Scheduling View**: Read-heavy, use read replicas
-  - **Execution Tracking**: High-frequency writes, partition by job
+  - **Business Calendar**: Stateless, lightweight computation
 - Event bus handles backpressure between services
+
+> **Note:** Execution Tracking Service is planned for post-MVP and is not included in current scaling considerations.
 
 ### 3.3 Database Scalability
 - **Read replicas** for:
@@ -109,7 +110,7 @@ These are *design-level* notes, complementing the non-functional requirements (N
   - Analytics dashboards
 - **Partitioning strategy**:
   - Schedule tables partitioned by month
-  - Execution logs partitioned by week
+  - Audit logs partitioned by week
   - Archive completed jobs after 6 months
 - **Write scaling**:
   - Schedule aggregate uses optimistic locking
@@ -148,9 +149,9 @@ These are *design-level* notes, complementing the non-functional requirements (N
   - Show cached assignments
   - Disable real-time conflict detection
   - Queue assignment requests
-- If Resource Service unavailable:
-  - Use cached resource data (with warning)
-  - Prevent new resource modifications
+- If Station Management Service unavailable:
+  - Use cached station data (with warning)
+  - Prevent new station modifications
 - If database read replica fails:
   - Fallback to primary (with increased latency)
 
@@ -195,9 +196,9 @@ These are *design-level* notes, complementing the non-functional requirements (N
 
 ### 5.3 Performance Testing
 - Load testing scenarios:
-  - 100 concurrent schedulers
-  - 1000 operators checking assignments
-  - 10,000 tasks scheduled per hour
+  - 10 concurrent schedulers managing assignments
+  - 50 concurrent users viewing schedules and reports
+  - 1,000 tasks scheduled per day
 - Stress testing for peak periods
 - Chaos engineering for resilience validation
 
@@ -235,7 +236,7 @@ These are *design-level* notes, complementing the non-functional requirements (N
 - Serverless for infrequent operations
 
 ### 7.2 Data Management
-- Compress old execution logs
+- Compress old audit and event logs
 - Archive completed jobs to cold storage
 - Purge unnecessary audit logs after retention
 - Optimize image storage and delivery

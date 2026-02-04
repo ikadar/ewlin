@@ -18,6 +18,17 @@ Stations have operating schedules defining when they are available. Non-operatin
 - Clearly distinguishes operating vs non-operating periods
 - Pattern spans the full column width
 
+### Multi-Day Grid Behavior
+
+> Implemented from REQ-04 (v0.3.42)
+
+In a multi-day grid, the unavailability overlay renders **for each day separately**:
+
+- Each day gets its own overlay with the correct day-of-week schedule
+- Overlays are positioned at the correct Y offset (day index × 24 hours × pixels per hour)
+- Weekend days show full-day unavailability based on station's operating schedule
+- The grid's `startDate` determines which day-of-week each grid day represents
+
 ### Sources of Unavailability
 
 | Source | Example |

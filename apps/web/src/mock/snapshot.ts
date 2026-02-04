@@ -10,6 +10,8 @@ import {
   generateAllAssignmentData,
   identifyLateJobs,
 } from './generators';
+import { getFixtureFromUrl, shouldUseFixture } from './testFixtures';
+import { getTasksForJob as getTasksForJobHelper } from '../utils/taskHelpers';
 
 // ============================================================================
 // Snapshot Creation
@@ -38,6 +40,7 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
   const assignmentData = generateAllAssignmentData(
     jobData.tasks,
     jobData.jobs,
+    jobData.elements,
     stationData.stations
   );
 
@@ -53,6 +56,7 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
     groups: stationData.groups,
     providers: stationData.providers,
     jobs: jobData.jobs,
+    elements: jobData.elements,
     tasks: jobData.tasks,
     assignments: assignmentData.assignments,
     conflicts: assignmentData.conflicts,
@@ -75,6 +79,16 @@ let cacheOptions: SnapshotOptions = {};
  * @returns The cached or newly created snapshot
  */
 export function getSnapshot(options?: SnapshotOptions): ScheduleSnapshot {
+  // Check for test fixture mode (URL parameter ?fixture=<name>)
+  if (shouldUseFixture()) {
+    if (!cachedSnapshot) {
+      cachedSnapshot = getFixtureFromUrl();
+    }
+    if (cachedSnapshot) {
+      return cachedSnapshot;
+    }
+  }
+
   // If options changed, invalidate cache
   if (options && JSON.stringify(options) !== JSON.stringify(cacheOptions)) {
     cachedSnapshot = null;
@@ -126,7 +140,8 @@ export function getJobById(jobId: string): ReturnType<typeof getSnapshot>['jobs'
  * Get tasks for a specific job.
  */
 export function getTasksForJob(jobId: string): ReturnType<typeof getSnapshot>['tasks'] {
-  return getSnapshot().tasks.filter((task) => task.jobId === jobId);
+  const snapshot = getSnapshot();
+  return getTasksForJobHelper(jobId, snapshot.tasks, snapshot.elements);
 }
 
 /**

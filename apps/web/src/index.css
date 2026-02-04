@@ -1,6 +1,19 @@
 @import "tailwindcss";
 
+/* Base font size: 13px (reference/jcf compatible)
+ * This makes Tailwind rem-based classes map to:
+ * - text-xs (0.75rem) = 9.75px
+ * - text-sm (0.875rem) = 11.375px ≈ 11px
+ * - text-base (1rem) = 13px
+ * - text-lg (1.125rem) = 14.625px
+ */
+html {
+  font-size: 13px;
+}
+
 @theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(222.2 84% 4.9%);
   --color-card: hsl(0 0% 100%);
@@ -26,20 +39,41 @@
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
-  font-size: 14px;
+  font-family: var(--font-sans);
+  font-size: 1rem; /* Inherits 13px from html */
   font-weight: 500;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Striped pattern for unavailability overlay */
+/* Striped pattern for unavailability overlay (v0.3.60: CSS gradient → SVG for performance) */
 .bg-stripes-dark {
-  background-image: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 10px,
-    rgba(255, 255, 255, 0.03) 10px,
-    rgba(255, 255, 255, 0.03) 20px
-  );
+  background-image: url('/stripes.svg');
+  background-repeat: repeat;
+}
+
+/* v0.3.56: Pick & Place visual feedback */
+
+/* Pulse opacity animation for picked tile placeholder (v0.3.57) */
+@keyframes pulse-opacity {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-opacity {
+  animation: pulse-opacity 1.5s ease-in-out infinite;
+}
+
+/* Global cursor during pick mode */
+body.pick-mode-active {
+  cursor: grabbing !important;
+}
+
+body.pick-mode-active * {
+  cursor: grabbing !important;
 }

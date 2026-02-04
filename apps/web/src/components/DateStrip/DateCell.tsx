@@ -1,10 +1,33 @@
+import { useState } from 'react';
+import { ViewportIndicator } from './ViewportIndicator';
+import { TaskMarkers, type TaskMarker } from './TaskMarkers';
+import { ExitTriangle } from './ExitTriangle';
+
 export interface DateCellProps {
   /** The date to display */
   date: Date;
+  /** Day index from grid start (0 = first day) - used for viewport indicator positioning */
+  dayIndex: number;
   /** Whether this is today */
   isToday?: boolean;
+  /** Whether this is the focused day in the grid (REQ-09.2) */
+  isFocused?: boolean;
+  /** Whether this is the departure date for the selected job (REQ-15) */
+  isDepartureDate?: boolean;
+  /** Whether the selected job has scheduled tasks on this day (REQ-16) */
+  hasScheduledTasks?: boolean;
   /** Click handler */
   onClick?: () => void;
+  /** v0.3.47: Viewport indicator - start hour from grid start (can be any value) */
+  viewportStartHour?: number;
+  /** v0.3.47: Viewport indicator - end hour from grid start (can be any value) */
+  viewportEndHour?: number;
+  /** v0.3.47: Current hour for "now" line (0-24, fractional) */
+  currentHour?: number;
+  /** v0.3.47: Task markers for this day */
+  taskMarkers?: TaskMarker[];
+  /** v0.3.47: Whether this day is on the task timeline (between earliest task and exit) */
+  isOnTimeline?: boolean;
 }
 
 /** French day abbreviations (Monday = 0 after adjustment) */
@@ -24,36 +47,151 @@ function getFrenchDayAbbrev(date: Date): string {
 /**
  * DateCell - Individual day cell in the Date Strip.
  * Shows French day abbreviation and day number.
+ * Supports highlighting for today, departure date (REQ-15), and scheduled days (REQ-16).
  */
-export function DateCell({ date, isToday = false, onClick }: DateCellProps) {
+export function DateCell({
+  date,
+  dayIndex,
+  isToday = false,
+  isFocused = false,
+  isDepartureDate = false,
+  hasScheduledTasks = false,
+  onClick,
+  viewportStartHour,
+  viewportEndHour,
+  currentHour,
+  taskMarkers = [],
+  isOnTimeline = false,
+}: DateCellProps) {
   const dayAbbrev = getFrenchDayAbbrev(date);
   const dayNumber = date.getDate().toString().padStart(2, '0');
 
-  if (isToday) {
-    return (
-      <div
-        className="h-10 flex flex-col items-center justify-center text-xs font-mono text-amber-200 border-b border-amber-500/30 cursor-pointer bg-amber-500/15"
-        onClick={onClick}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
-      >
-        <span className="text-[10px]">{dayAbbrev}</span>
-        <span className="font-medium">{dayNumber}</span>
-      </div>
-    );
+  // REQ-01: Full date tooltip in French (e.g., "Vendredi 9 janvier 2026")
+  const fullDateString = date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  // Capitalize first letter (toLocaleDateString returns lowercase weekday)
+  const tooltipDate = fullDateString.charAt(0).toUpperCase() + fullDateString.slice(1);
+
+  // Custom tooltip state for fast appearance
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+
+  // Calculate tooltip position on mouse enter
+  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipPosition({
+      top: rect.top + rect.height / 2,
+      left: rect.right + 8, // 8px gap from the cell
+    });
+    setShowTooltip(true);
+  };
+
+  // Determine styling based on state (priority: departure > focused > normal)
+  // REQ-09.3: Today is now indicated by a thin line, not background color
+  let textColor = 'text-zinc-500';
+  let bgColor = '';
+  let borderColor = 'border-white/5';
+  let dayNumberColor = 'text-zinc-400';
+
+  if (isDepartureDate) {
+    // REQ-15: Departure date - v0.3.47: now indicated by exit triangle only, no background
+    // Only override textColor; borderColor and dayNumberColor stay at defaults
+    textColor = 'text-zinc-400';
+  } else if (isFocused) {
+    // REQ-09.3: Focused day styling (white/light highlight)
+    textColor = 'text-zinc-200';
+    bgColor = 'bg-white/10';
+    borderColor = 'border-white/20';
+    dayNumberColor = 'text-zinc-100';
   }
 
+  // Calculate viewport indicator position for this specific day
+  // The viewport can span multiple days, so we calculate the overlap with this day
+  const dayStartHour = dayIndex * 24;
+  const dayEndHour = dayStartHour + 24;
+
+  // Check if viewport overlaps with this day
+  const hasViewportOverlap =
+    viewportStartHour !== undefined &&
+    viewportEndHour !== undefined &&
+    viewportEndHour > dayStartHour &&
+    viewportStartHour < dayEndHour;
+
+  // Calculate the viewport position within this day (can be negative or >24)
+  const viewportStartWithinDay = hasViewportOverlap
+    ? (viewportStartHour ?? 0) - dayStartHour
+    : 0;
+  const viewportEndWithinDay = hasViewportOverlap
+    ? (viewportEndHour ?? 0) - dayStartHour
+    : 0;
+
   return (
-    <div
-      className="h-10 flex flex-col items-center justify-center text-xs font-mono text-zinc-500 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
+    <button
+      type="button"
+      className={`h-10 w-full flex flex-col items-center justify-center text-xs font-mono ${textColor} border-b ${borderColor} cursor-pointer hover:bg-white/5 transition-colors ${bgColor} relative overflow-visible`}
       onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowTooltip(false)}
+      data-testid={`date-cell-${date.toISOString().split('T')[0]}`}
     >
-      <span className="text-[10px]">{dayAbbrev}</span>
-      <span className="font-medium text-zinc-400">{dayNumber}</span>
-    </div>
+      {/* REQ-01: Custom tooltip with fast appearance - uses fixed position to escape overflow */}
+      {showTooltip && (
+        <div
+          className="fixed z-50 px-2 py-1 bg-zinc-800 text-zinc-200 text-xs rounded shadow-lg whitespace-nowrap pointer-events-none -translate-y-1/2"
+          style={{ top: tooltipPosition.top, left: tooltipPosition.left }}
+          role="tooltip"
+        >
+          {tooltipDate}
+        </div>
+      )}
+      {/* v0.3.47: Viewport indicator (gray rectangle showing visible portion) */}
+      {/* Shows on all days that overlap with the viewport, not just the focused day */}
+      {hasViewportOverlap && (
+        <ViewportIndicator
+          viewportStartHour={viewportStartWithinDay}
+          viewportEndHour={viewportEndWithinDay}
+          isToday={isToday}
+          currentHour={currentHour}
+        />
+      )}
+
+      {/* v0.3.47: Task timeline dotted line (from earliest task to exit) */}
+      {isOnTimeline && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-0 border-l-2 border-dotted border-zinc-400 pointer-events-none"
+          data-testid="task-timeline"
+        />
+      )}
+
+      {/* REQ-09.3: Today indicator - thin red line (like grid's "now" line) */}
+      {/* Only show if viewport indicator is not present (viewport indicator has its own "now" line) */}
+      {isToday && !hasViewportOverlap && (
+        <div
+          className="absolute left-1 right-1 top-1/2 h-0.5 bg-red-500 -translate-y-1/2 pointer-events-none"
+          data-testid="today-indicator-line"
+        />
+      )}
+
+      <span className="text-xs relative z-10">{dayAbbrev}</span>
+      <span className={`font-medium ${dayNumberColor} relative z-10`}>{dayNumber}</span>
+
+      {/* v0.3.47: Task markers (colored lines for each task on this day) */}
+      {taskMarkers.length > 0 && <TaskMarkers markers={taskMarkers} />}
+
+      {/* v0.3.47: Exit triangle (workshop exit date) */}
+      {isDepartureDate && <ExitTriangle />}
+
+      {/* REQ-16: Scheduled tasks indicator dot (legacy - keep for backward compat if no task markers) */}
+      {hasScheduledTasks && taskMarkers.length === 0 && (
+        <span
+          className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"
+          data-testid="scheduled-indicator"
+        />
+      )}
+    </button>
   );
 }

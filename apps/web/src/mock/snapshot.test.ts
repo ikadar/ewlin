@@ -167,8 +167,12 @@ describe('utility functions', () => {
 
       const tasks = getTasksForJob(firstJob.id);
       expect(tasks.length).toBeGreaterThan(0);
+      // Verify tasks belong to job via elements
+      const jobElementIds = new Set(
+        snapshot.elements.filter(e => e.jobId === firstJob.id).map(e => e.id)
+      );
       for (const task of tasks) {
-        expect(task.jobId).toBe(firstJob.id);
+        expect(jobElementIds.has(task.elementId)).toBe(true);
       }
     });
 
@@ -239,12 +243,18 @@ describe('data integrity', () => {
     invalidateSnapshot();
   });
 
-  it('all task jobIds reference existing jobs', () => {
+  it('all task elementIds reference existing elements that belong to jobs', () => {
     const snapshot = createSnapshot();
+    const elementIds = new Set(snapshot.elements.map((e) => e.id));
+    const elementToJob = new Map(snapshot.elements.map((e) => [e.id, e.jobId]));
     const jobIds = new Set(snapshot.jobs.map((j) => j.id));
 
     for (const task of snapshot.tasks) {
-      expect(jobIds.has(task.jobId)).toBe(true);
+      // Task has valid elementId
+      expect(elementIds.has(task.elementId)).toBe(true);
+      // Element belongs to a valid job
+      const jobId = elementToJob.get(task.elementId);
+      expect(jobIds.has(jobId!)).toBe(true);
     }
   });
 

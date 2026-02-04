@@ -6,7 +6,7 @@ tags:
 
 # Interface Contracts – Flux Print Shop Scheduling System
 
-This document defines **service-to-service interface contracts** for the Station → Job → Task assignment and validation workflow.
+This document defines **service-to-service interface contracts** for the Station → Job → Element → Task assignment and validation workflow.
 
 The goal is to provide **stable, technology-agnostic API contracts** that describe the operations each service exposes to other services.
 
@@ -351,7 +351,8 @@ Interfaces are described in:
   "assignments": [
     {
       "taskId": "string",
-      "stationId": "string",
+      "targetId": "string",
+      "isOutsourced": false,
       "scheduledStart": "ISO-8601-datetime",
       "scheduledEnd": "ISO-8601-datetime"
     }
@@ -485,10 +486,21 @@ Interfaces are described in:
   "status": "Draft",
   "fullyScheduled": false,
   "color": "#RRGGBB",
+  "elementIds": ["string"],
+  "elements": [
+    {
+      "elementId": "string",
+      "suffix": "ELT",
+      "label": "string | null",
+      "prerequisiteElementIds": [],
+      "taskIds": ["string"]
+    }
+  ],
   "tasks": [
     {
       "taskId": "string",
-      "sequenceOrder": 1,
+      "elementId": "string",
+      "sequenceOrder": 0,
       "type": "internal | outsourced",
       "stationId": "string | null",
       "providerId": "string | null",
@@ -504,12 +516,15 @@ Interfaces are described in:
 ```
 
 **Notes:**
-- `color`: Randomly assigned from predefined palette; dependent jobs use shades of required job's color
+- `color`: Randomly assigned from predefined palette
+- At least one element (default suffix `"ELT"`) is created with the job
+- `sequenceOrder`: 0-indexed position within element's task sequence
 
 **Postconditions**
 - Job aggregate created in Draft state
-- Tasks created from DSL parsing
-- Domain event `JobCreated` emitted
+- Default element created
+- Tasks created from DSL parsing and assigned to element
+- Domain events `JobCreated`, `ElementCreated`, `TaskAddedToJob` emitted
 
 **Error responses**
 - `DEADLINE_IN_PAST` – Workshop exit date is not in future
@@ -562,17 +577,19 @@ Interfaces are described in:
 #### IC-JOB-003
 > **References:** [API-TASK-001](../requirements/api-interface-drafts.md#api-task-001), [BR-TASK-003](../domain-model/business-rules.md#br-task-003)
 
-**Purpose:** Change the sequence order of tasks within a job.
+**Purpose:** Change the sequence order of tasks within an element.
 
 **Preconditions**
 - Job exists
-- All task IDs belong to the job
+- Element belongs to the job
+- All task IDs belong to the element
 - Job is not Completed or Cancelled
 
 **Request**
 ```json
 {
   "jobId": "string",
+  "elementId": "string",
   "taskOrder": ["taskId1", "taskId2", "taskId3"]
 }
 ```
@@ -586,13 +603,14 @@ Interfaces are described in:
 ```
 
 **Postconditions**
-- Task sequence updated
-- Domain event `TasksReordered` emitted
-- Existing assignments revalidated for precedence
+- Task sequence updated within element
+- Domain event `TasksReordered` emitted (with elementId)
+- Existing assignments revalidated for element-scoped precedence
 
 **Error responses**
 - `JOB_NOT_FOUND` – Job does not exist
-- `TASK_NOT_IN_JOB` – Task ID not part of this job
+- `ELEMENT_NOT_FOUND` – Element does not exist in this job
+- `TASK_NOT_IN_ELEMENT` – Task ID not part of this element
 - `JOB_INVALID_STATE` – Job is Completed or Cancelled
 
 ### 5.4 SetJobDependency
@@ -629,107 +647,66 @@ Interfaces are described in:
 - `JOB_NOT_FOUND` – One or both jobs don't exist
 - `CIRCULAR_DEPENDENCY` – Would create a cycle
 
-### 5.5 UpdateProofStatus
+### 5.5 UpdateElementPrerequisite (v0.4.32)
 #### IC-JOB-005
-> **References:** [API-JOB-004](../requirements/api-interface-drafts.md#api-job-004), [AC-GATE-001](../requirements/acceptance-criteria.md#ac-gate-001-bat-blocking), [AC-GATE-002](../requirements/acceptance-criteria.md#ac-gate-002-bat-bypass), [BR-GATE-001](../domain-model/business-rules.md#br-gate-001), [BR-GATE-003](../domain-model/business-rules.md#br-gate-003)
+> **References:** [BR-PREREQ-001](../domain-model/business-rules.md#br-prereq-001), [BR-PREREQ-002](../domain-model/business-rules.md#br-prereq-002), [BR-PREREQ-003](../domain-model/business-rules.md#br-prereq-003), [BR-PREREQ-004](../domain-model/business-rules.md#br-prereq-004), [BR-PREREQ-005](../domain-model/business-rules.md#br-prereq-005)
 
-**Purpose:** Update BAT (Bon à Tirer) approval status.
+**Purpose:** Update element-level prerequisite status (paper, BAT, plates, forme).
 
 **Preconditions**
-- Job exists
+- Element exists
+- Job is not Completed or Cancelled
 
 **Request**
 ```json
 {
-  "jobId": "string",
-  "proofSentAt": "ISO-8601-datetime | AwaitingFile | NoProofRequired",
-  "proofApprovedAt": "ISO-8601-datetime | null"
+  "elementId": "string",
+  "prerequisiteType": "paper | bat | plates | forme",
+  "status": "string"
 }
 ```
+
+**Status values by type:**
+- `paper`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
+- `bat`: `none` | `waiting_files` | `files_received` | `bat_sent` | `bat_approved`
+- `plates`: `none` | `to_make` | `ready`
+- `forme`: `none` | `in_stock` | `to_order` | `ordered` | `delivered`
 
 **Response**
 ```json
 {
-  "status": "updated",
+  "elementId": "string",
+  "prerequisiteType": "string",
+  "status": "string",
+  "isBlocked": "boolean",
+  "dateTracking": {
+    "paperOrderedAt": "ISO-8601-timestamp | null",
+    "paperDeliveredAt": "ISO-8601-timestamp | null",
+    "filesReceivedAt": "ISO-8601-timestamp | null",
+    "batSentAt": "ISO-8601-timestamp | null",
+    "batApprovedAt": "ISO-8601-timestamp | null",
+    "formeOrderedAt": "ISO-8601-timestamp | null",
+    "formeDeliveredAt": "ISO-8601-timestamp | null"
+  },
   "updatedAt": "ISO-8601-timestamp"
 }
 ```
 
-**Postconditions**
-- Proof status updated
-- Domain event `ProofStatusChanged` emitted
-- If proof approved, blocked tasks become schedulable
-
-**Error responses**
-- `JOB_NOT_FOUND` – Job does not exist
-- `INVALID_PROOF_STATE` – Cannot approve without sending first
-
-### 5.6 UpdatePlatesStatus
-#### IC-JOB-006
-> **References:** [API-JOB-005](../requirements/api-interface-drafts.md#api-job-005), [AC-GATE-003](../requirements/acceptance-criteria.md#ac-gate-003-plates-blocking), [BR-GATE-002](../domain-model/business-rules.md#br-gate-002)
-
-**Purpose:** Update plates preparation status.
-
-**Preconditions**
-- Job exists
-
-**Request**
-```json
-{
-  "jobId": "string",
-  "platesStatus": "Todo | Done"
-}
-```
-
-**Response**
-```json
-{
-  "status": "updated",
-  "updatedAt": "ISO-8601-timestamp"
-}
-```
+**Notes:**
+- Date tracking fields are automatically set when status changes to relevant state
+- `isBlocked` returns true if ANY prerequisite is not in ready state
+- Ready states: paper (`none`, `in_stock`, `delivered`), bat (`none`, `bat_approved`), plates (`none`, `ready`), forme (`none`, `in_stock`, `delivered`)
 
 **Postconditions**
-- Plates status updated
-- Domain event `PlatesStatusChanged` emitted
-- If plates done, printing tasks become schedulable
+- Element prerequisite status updated
+- Date tracking field set if applicable
+- Domain event `ElementPaperStatusUpdated` / `ElementBatStatusUpdated` / `ElementPlateStatusUpdated` / `ElementFormeStatusUpdated` emitted
+- Element blocking state recalculated
 
 **Error responses**
-- `JOB_NOT_FOUND` – Job does not exist
-
-### 5.7 UpdatePaperStatus
-#### IC-JOB-007
-> **References:** [API-JOB-006](../requirements/api-interface-drafts.md#api-job-006), [AC-GATE-004](../requirements/acceptance-criteria.md#ac-gate-004-paper-status-timestamp), [BR-PAPER-001](../domain-model/business-rules.md#br-paper-001), [BR-PAPER-002](../domain-model/business-rules.md#br-paper-002)
-
-**Purpose:** Update paper procurement status.
-
-**Preconditions**
-- Job exists
-
-**Request**
-```json
-{
-  "jobId": "string",
-  "paperPurchaseStatus": "InStock | ToOrder | Ordered | Received"
-}
-```
-
-**Response**
-```json
-{
-  "paperPurchaseStatus": "string",
-  "paperOrderedAt": "ISO-8601-timestamp | null",
-  "updatedAt": "ISO-8601-timestamp"
-}
-```
-
-**Postconditions**
-- Paper status updated
-- If changed to Ordered, paperOrderedAt set
-- Domain event `PaperStatusChanged` emitted
-
-**Error responses**
-- `JOB_NOT_FOUND` – Job does not exist
+- `ELEMENT_NOT_FOUND` – Element does not exist
+- `JOB_INVALID_STATE` – Job is Completed or Cancelled
+- `INVALID_STATUS` – Status value not valid for prerequisite type
 
 ### 5.8 AddComment
 #### IC-JOB-008
@@ -872,17 +849,31 @@ Interfaces are described in:
   "status": "Draft | Planned | InProgress | Delayed | Completed | Cancelled",
   "workshopExitDate": "ISO-8601-datetime",
   "fullyScheduled": "boolean",
+  "color": "#RRGGBB",
   "paperType": "string | null",
   "paperFormat": "string | null",
   "paperPurchaseStatus": "InStock | ToOrder | Ordered | Received",
   "paperOrderedAt": "ISO-8601-timestamp | null",
-  "proofSentAt": "ISO-8601-datetime | AwaitingFile | NoProofRequired | null",
-  "proofApprovedAt": "ISO-8601-datetime | null",
+  "proofApproval": {
+    "sentAt": "ISO-8601-datetime | null",
+    "approvedAt": "ISO-8601-datetime | null"
+  },
   "platesStatus": "Todo | Done",
+  "elementIds": ["string"],
+  "elements": [
+    {
+      "elementId": "string",
+      "suffix": "string",
+      "label": "string | null",
+      "prerequisiteElementIds": ["string"],
+      "taskIds": ["string"]
+    }
+  ],
   "tasks": [
     {
       "taskId": "string",
-      "sequenceOrder": 1,
+      "elementId": "string",
+      "sequenceOrder": 0,
       "type": "internal | outsourced",
       "stationId": "string | null",
       "stationName": "string | null",
@@ -894,10 +885,9 @@ Interfaces are described in:
       "totalMinutes": 60,
       "durationOpenDays": "integer | null",
       "comment": "string | null",
-      "status": "Defined | Ready | Assigned | Completed | Cancelled"
+      "status": "Defined | Ready | Assigned | Executing | Completed | Failed | Cancelled"
     }
   ],
-  "dependencies": ["jobId1", "jobId2"],
   "comments": [
     {
       "author": "string",
@@ -914,6 +904,87 @@ Interfaces are described in:
 **Error responses**
 - `JOB_NOT_FOUND` – Job does not exist
 
+### 5.12 CreateElement
+#### IC-JOB-012
+> **References:** [BR-ELEM-001](../domain-model/business-rules.md#br-elem-001)
+
+**Purpose:** Create a new element within a job for multi-element workflows.
+
+**Preconditions**
+- Job exists
+- Job is in Draft state
+- Element suffix is unique within the job
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "suffix": "string",
+  "label": "string | null"
+}
+```
+
+**Response**
+```json
+{
+  "elementId": "string",
+  "jobId": "string",
+  "suffix": "string",
+  "label": "string | null",
+  "prerequisiteElementIds": [],
+  "taskIds": [],
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Element entity created within Job aggregate
+- Domain event `ElementCreated` emitted
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `JOB_INVALID_STATE` – Job is not in Draft state
+- `ELEMENT_SUFFIX_EXISTS` – Suffix already used in this job
+
+### 5.13 AddElementDependency
+#### IC-JOB-013
+> **References:** [BR-ELEM-002](../domain-model/business-rules.md#br-elem-002), [BR-ELEM-003](../domain-model/business-rules.md#br-elem-003)
+
+**Purpose:** Add a cross-element finish-to-start dependency.
+
+**Preconditions**
+- Job exists
+- Both elements belong to the same job
+- Dependency would not create a cycle (DAG constraint)
+
+**Request**
+```json
+{
+  "jobId": "string",
+  "elementId": "string",
+  "prerequisiteElementId": "string"
+}
+```
+
+**Response**
+```json
+{
+  "status": "created",
+  "createdAt": "ISO-8601-timestamp"
+}
+```
+
+**Postconditions**
+- Element dependency added (finish-to-start)
+- Domain event `ElementDependencyAdded` emitted
+- Affected assignments revalidated for cross-element precedence
+
+**Error responses**
+- `JOB_NOT_FOUND` – Job does not exist
+- `ELEMENT_NOT_FOUND` – One or both elements not found in this job
+- `CIRCULAR_DEPENDENCY` – Would create a cycle in element DAG
+- `SELF_DEPENDENCY` – Element cannot depend on itself
+
 ---
 
 ## 6. Assignment & Validation Service – Public Interface
@@ -927,25 +998,32 @@ Interfaces are described in:
 **Preconditions**
 - Task exists
 - Station/Provider available at scheduled time
-- Approval gates satisfied (BAT, Plates)
-- Predecessor tasks scheduled (precedence check)
+- Element prerequisites ready (paper, BAT, plates, forme) — warning only in MVP (v0.4.32)
+- Element-scoped and cross-element precedence satisfied (unless bypassPrecedence)
 - No scheduling conflicts
 
 **Request**
 ```json
 {
   "taskId": "string",
-  "stationId": "string",
-  "scheduledStart": "ISO-8601-datetime"
+  "targetId": "string",
+  "isOutsourced": false,
+  "scheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false
 }
 ```
+
+**Notes:**
+- `targetId`: Station ID or Provider ID depending on `isOutsourced`
+- `bypassPrecedence`: When true, skips element-scoped and cross-element precedence checks (Alt-key in UI)
 
 **Response (Valid)**
 ```json
 {
   "taskId": "string",
   "assignment": {
-    "stationId": "string",
+    "targetId": "string",
+    "isOutsourced": false,
     "scheduledStart": "ISO-8601-datetime",
     "scheduledEnd": "ISO-8601-datetime"
   },
@@ -965,12 +1043,14 @@ Interfaces are described in:
     "valid": false,
     "conflicts": [
       {
-        "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
-        "description": "string",
-        "affectedTaskIds": ["taskId1", "taskId2"],
-        "severity": "High | Medium | Low"
+        "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
+        "message": "string",
+        "taskId": "string",
+        "relatedTaskId": "string | null",
+        "targetId": "string | null"
       }
-    ]
+    ],
+    "suggestedStart": "ISO-8601-datetime | null"
   }
 }
 ```
@@ -1028,13 +1108,16 @@ Interfaces are described in:
 **Preconditions**
 - Assignment exists
 - New time doesn't create conflicts
-- Precedence still satisfied
+- Element-scoped and cross-element precedence still satisfied (unless bypassPrecedence)
 
 **Request**
 ```json
 {
   "taskId": "string",
-  "newScheduledStart": "ISO-8601-datetime"
+  "newTargetId": "string",
+  "isOutsourced": false,
+  "newScheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false
 }
 ```
 
@@ -1075,8 +1158,10 @@ Interfaces are described in:
 ```json
 {
   "taskId": "string",
-  "stationId": "string",
-  "scheduledStart": "ISO-8601-datetime"
+  "targetId": "string",
+  "isOutsourced": false,
+  "scheduledStart": "ISO-8601-datetime",
+  "bypassPrecedence": false
 }
 ```
 
@@ -1086,27 +1171,26 @@ Interfaces are described in:
   "valid": "boolean",
   "conflicts": [
     {
-      "type": "string",
-      "description": "string",
-      "affectedTaskIds": ["string"],
-      "severity": "High | Medium | Low"
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
+      "message": "string",
+      "taskId": "string",
+      "relatedTaskId": "string | null",
+      "targetId": "string | null"
     }
   ],
-  "warnings": [
-    {
-      "type": "DeadlineRisk",
-      "description": "Only 4 hours buffer before workshop exit date"
-    }
-  ]
+  "suggestedStart": "ISO-8601-datetime | null"
 }
 ```
+
+**Notes:**
+- `suggestedStart`: For PrecedenceConflict, the earliest valid start time respecting all predecessors
 
 **Postconditions**
 - None — this operation is read-only
 
 **Error responses**
 - `TASK_NOT_FOUND` – Task does not exist
-- `STATION_NOT_FOUND` – Station does not exist
+- `TARGET_NOT_FOUND` – Station or Provider does not exist
 
 ### 6.5 ValidateScheduleScope
 #### IC-ASSIGN-005
@@ -1135,18 +1219,19 @@ Interfaces are described in:
   "status": "valid | conflicts_found",
   "conflicts": [
     {
-      "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict",
-      "severity": "High | Medium | Low",
-      "affectedTaskIds": ["task1", "task2"],
-      "description": "string"
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
+      "message": "string",
+      "taskId": "string",
+      "relatedTaskId": "string | null",
+      "targetId": "string | null"
     }
   ],
   "lateJobs": [
     {
       "jobId": "string",
-      "workshopExitDate": "ISO-8601-datetime",
+      "deadline": "ISO-8601-datetime",
       "expectedCompletion": "ISO-8601-datetime",
-      "delayHours": "integer"
+      "delayDays": "integer"
     }
   ],
   "validatedAt": "ISO-8601-timestamp"
@@ -1228,33 +1313,59 @@ Interfaces are described in:
       "color": "#RRGGBB",
       "workshopExitDate": "ISO-8601-datetime",
       "status": "string",
-      "tasks": [...]
+      "elementIds": ["string"]
+    }
+  ],
+  "elements": [
+    {
+      "elementId": "string",
+      "jobId": "string",
+      "suffix": "string",
+      "label": "string | null",
+      "prerequisiteElementIds": ["string"],
+      "taskIds": ["string"],
+      "paperStatus": "none | in_stock | to_order | ordered | delivered",
+      "batStatus": "none | waiting_files | files_received | bat_sent | bat_approved",
+      "plateStatus": "none | to_make | ready",
+      "formeStatus": "none | in_stock | to_order | ordered | delivered",
+      "isBlocked": "boolean"
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "string",
+      "elementId": "string",
+      "sequenceOrder": 0,
+      "type": "internal | outsourced",
+      "status": "string"
     }
   ],
   "assignments": [
     {
       "taskId": "string",
-      "jobId": "string",
-      "stationId": "string",
+      "targetId": "string",
+      "isOutsourced": false,
       "scheduledStart": "ISO-8601-datetime",
-      "scheduledEnd": "ISO-8601-datetime"
+      "scheduledEnd": "ISO-8601-datetime",
+      "isCompleted": false,
+      "completedAt": "ISO-8601-timestamp | null"
     }
   ],
   "conflicts": [
     {
-      "type": "string",
-      "affectedTaskIds": ["string"],
-      "description": "string",
-      "severity": "string"
+      "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict",
+      "message": "string",
+      "taskId": "string",
+      "relatedTaskId": "string | null",
+      "targetId": "string | null"
     }
   ],
   "lateJobs": [
     {
       "jobId": "string",
-      "reference": "string",
-      "workshopExitDate": "ISO-8601-datetime",
+      "deadline": "ISO-8601-datetime",
       "expectedCompletion": "ISO-8601-datetime",
-      "delayHours": "integer"
+      "delayDays": "integer"
     }
   ]
 }
@@ -1488,9 +1599,11 @@ fetches suggestions from these endpoints.
 ### ConflictType
 ```json
 {
-  "type": "StationConflict | GroupCapacityConflict | PrecedenceConflict | ApprovalGateConflict | AvailabilityConflict | DeadlineConflict"
+  "type": "StationMismatchConflict | StationConflict | GroupCapacityConflict | PrecedenceConflict | PrerequisiteConflict | AvailabilityConflict | DeadlineConflict"
 }
 ```
+
+**Note (v0.4.32):** `PrerequisiteConflict` replaces `ApprovalGateConflict` for element-level prerequisite tracking.
 
 ### SimilarityCriterion
 ```json
@@ -1526,7 +1639,7 @@ All services return errors using a uniform schema:
 | `NOT_FOUND` | Resource not found |
 | `CONFLICT` | Operation would create conflict |
 | `CIRCULAR_DEPENDENCY` | Dependency would create cycle |
-| `APPROVAL_GATE_BLOCKED` | Approval gate not satisfied |
+| `PREREQUISITE_NOT_READY` | Element prerequisite not in ready state (v0.4.32) |
 | `INTERNAL_ERROR` | Unexpected server error |
 
 ---

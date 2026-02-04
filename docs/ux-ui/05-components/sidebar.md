@@ -12,16 +12,24 @@ The Sidebar provides top-level navigation between main application views. It's a
 
 ## Structure
 
+> Implemented from REQ-07.1, REQ-07.3
+
 ```
 +--------+
 |  [□]   |  ← Grid view (active)
 |  [📅]  |  ← Calendar view
-|  [⚙]   |  ← Settings
 |        |
+|        |  ← Spacer (flex-1)
 |        |
-|        |
+|--------|  ← Border separator
+|  [⚙]   |  ← Settings (disabled)
+|  [👤]  |  ← User (disabled)
 +--------+
 ```
+
+The sidebar is divided into two sections:
+- **Top section:** Navigation items (Grid, Calendar)
+- **Bottom section:** User and Settings icons (separated by a border)
 
 ---
 
@@ -38,11 +46,19 @@ The Sidebar provides top-level navigation between main application views. It's a
 
 ## Navigation Items
 
+### Top Section
+
 | Icon | Lucide Name | Purpose | Route |
 |------|-------------|---------|-------|
 | Grid | `layout-grid` | Scheduling view (default) | `/schedule` |
 | Calendar | `calendar` | Calendar overview | `/calendar` |
-| Settings | `settings` | Application settings | `/settings` |
+
+### Bottom Section (REQ-07.3)
+
+| Icon | Lucide Name | Purpose | Status |
+|------|-------------|---------|--------|
+| Settings | `settings` | Application settings | Disabled (future) |
+| User | `user` | User profile/logout | Disabled (future) |
 
 ---
 
@@ -74,6 +90,7 @@ The Sidebar provides top-level navigation between main application views. It's a
 | **Inactive + Hover** | `bg-white/10` | `text-zinc-300` |
 | **Active** | `bg-white/10` | `text-zinc-300` |
 | **Active + Hover** | `bg-white/15` | `text-white` |
+| **Disabled** | transparent | `text-zinc-700` |
 
 ---
 

@@ -1,14 +1,14 @@
 export { Sidebar, SidebarButton } from './Sidebar';
 export type { SidebarProps, SidebarButtonProps } from './Sidebar';
 
-export { JobsList, JobsListHeader, ProblemsSection, JobsSection, JobCard, ProgressDots } from './JobsList';
-export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSectionProps, JobCardProps, JobProblemType, ProgressDotsProps } from './JobsList';
+export { JobsList, JobsListHeader, ProblemsSection, JobsSection, JobCard, ProgressSegments, getSegmentState, getSegmentWidth, getOutsourcedLabel } from './JobsList';
+export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSectionProps, JobCardProps, JobProblemType, ProgressSegmentsProps, SegmentState } from './JobsList';
 
-export { JobDetailsPanel, JobInfo, JobStatus, InfoField, TaskList, TaskTile } from './JobDetailsPanel';
-export type { JobDetailsPanelProps, JobInfoProps, JobStatusProps, InfoFieldProps, TaskListProps, TaskTileProps } from './JobDetailsPanel';
+export { JobDetailsPanel, JobInfo, InfoField, TaskList, TaskTile, ElementSection, PrerequisiteStatus, OutsourcingMiniForm, WorkDaysInput, DateTimePicker } from './JobDetailsPanel';
+export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, PrerequisiteStatusProps, ElementStatusUpdate, OutsourcingMiniFormProps, WorkDaysInputProps, DateTimePickerProps } from './JobDetailsPanel';
 
-export { DateStrip, DateCell } from './DateStrip';
-export type { DateStripProps, DateCellProps } from './DateStrip';
+export { DateStrip, DateCell, TaskMarkers, ViewportIndicator, ExitTriangle } from './DateStrip';
+export type { DateStripProps, DateCellProps, TaskMarker, TaskMarkerStatus, TaskMarkersProps, ViewportIndicatorProps, ExitTriangleProps } from './DateStrip';
 
 export { TimelineColumn, HourMarker, NowLine, PIXELS_PER_HOUR, timeToYPosition } from './TimelineColumn';
 export type { TimelineColumnProps, HourMarkerProps, NowLineProps } from './TimelineColumn';
@@ -17,16 +17,37 @@ export { StationHeaders, StationHeader, OffScreenIndicator } from './StationHead
 export type { StationHeadersProps, StationHeaderProps, OffScreenInfo, OffScreenIndicatorProps } from './StationHeaders';
 
 export { StationColumns, StationColumn, UnavailabilityOverlay } from './StationColumns';
-export type { StationColumnsProps, StationColumnProps, StationDropData, UnavailabilityOverlayProps } from './StationColumns';
+export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProps } from './StationColumns';
 
 export { SchedulingGrid } from './SchedulingGrid';
 export type { SchedulingGridProps, SchedulingGridHandle } from './SchedulingGrid';
 
-export { Tile, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
-export type { TileProps, SwapButtonsProps, TailwindColor } from './Tile';
+export { Tile, TileContextMenu, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
+export type { TileProps, TileContextMenuProps, SwapButtonsProps, TailwindColor } from './Tile';
 
-export { DragPreview, snapToGrid, yPositionToTime, formatTime, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
+export { DragPreview, snapToGrid, yPositionToTime, formatTime, getPixelsPerSnap, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
 export type { DragPreviewProps } from './DragPreview';
 
 export { PlacementIndicator } from './PlacementIndicator';
 export type { PlacementIndicatorProps } from './PlacementIndicator';
+
+export { PrecedenceLines } from './PrecedenceLines';
+export type { PrecedenceLinesProps } from './PrecedenceLines';
+
+export { DryingTimeIndicator } from './DryingTimeIndicator';
+export type { DryingTimeIndicatorProps } from './DryingTimeIndicator';
+
+export { TopNavBar, ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from './TopNavBar';
+export type { TopNavBarProps } from './TopNavBar';
+
+export { JcfModal } from './JcfModal';
+export type { JcfModalProps } from './JcfModal';
+
+export { JcfJobHeader, parseFrenchDate, formatToFrench, generateJobId } from './JcfJobHeader';
+export type { JcfJobHeaderProps } from './JcfJobHeader';
+
+export { JcfAutocomplete, highlightMatch } from './JcfAutocomplete';
+export type { JcfAutocompleteProps, Suggestion } from './JcfAutocomplete';
+
+export { JcfElementsTable, generateElementName, DEFAULT_ELEMENT } from './JcfElementsTable';
+export type { JcfElementsTableProps, JcfElement, JcfFieldKey } from './JcfElementsTable';

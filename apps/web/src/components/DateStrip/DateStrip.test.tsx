@@ -7,7 +7,7 @@ describe('DateCell', () => {
   it('renders day abbreviation and number', () => {
     // Monday, December 9, 2024
     const date = new Date(2024, 11, 9);
-    render(<DateCell date={date} />);
+    render(<DateCell date={date} dayIndex={0} />);
 
     expect(screen.getByText('Lu')).toBeInTheDocument();
     expect(screen.getByText('09')).toBeInTheDocument();
@@ -25,8 +25,8 @@ describe('DateCell', () => {
       { date: new Date(2024, 11, 15), abbrev: 'Di' }, // Sunday
     ];
 
-    testCases.forEach(({ date, abbrev }) => {
-      const { unmount } = render(<DateCell date={date} />);
+    testCases.forEach(({ date, abbrev }, index) => {
+      const { unmount } = render(<DateCell date={date} dayIndex={index} />);
       expect(screen.getByText(abbrev)).toBeInTheDocument();
       unmount();
     });
@@ -34,23 +34,23 @@ describe('DateCell', () => {
 
   it('displays day number with leading zero', () => {
     const date = new Date(2024, 11, 5);
-    render(<DateCell date={date} />);
+    render(<DateCell date={date} dayIndex={0} />);
     expect(screen.getByText('05')).toBeInTheDocument();
   });
 
-  it('applies today styling when isToday is true', () => {
+  it('applies today styling when isToday is true (REQ-09.3: thin red line)', () => {
     const date = new Date();
-    const { container } = render(<DateCell date={date} isToday />);
+    const { container } = render(<DateCell date={date} dayIndex={0} isToday />);
 
-    const cell = container.firstChild as HTMLElement;
-    expect(cell).toHaveClass('bg-amber-500/15');
-    expect(cell).toHaveClass('text-amber-200');
-    expect(cell).toHaveClass('border-amber-500/30');
+    // REQ-09.3: Today now shows a thin red line, not amber background
+    const todayLine = container.querySelector('[data-testid="today-indicator-line"]');
+    expect(todayLine).toBeInTheDocument();
+    expect(todayLine).toHaveClass('bg-red-500');
   });
 
   it('applies normal styling when isToday is false', () => {
     const date = new Date(2024, 11, 9);
-    const { container } = render(<DateCell date={date} isToday={false} />);
+    const { container } = render(<DateCell date={date} dayIndex={0} isToday={false} />);
 
     const cell = container.firstChild as HTMLElement;
     expect(cell).toHaveClass('text-zinc-500');
@@ -61,19 +61,19 @@ describe('DateCell', () => {
   it('calls onClick when clicked', () => {
     const handleClick = vi.fn();
     const date = new Date(2024, 11, 9);
-    render(<DateCell date={date} onClick={handleClick} />);
+    render(<DateCell date={date} dayIndex={0} onClick={handleClick} />);
 
     fireEvent.click(screen.getByRole('button'));
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClick on Enter key press', () => {
-    const handleClick = vi.fn();
+  it('is a focusable button element', () => {
     const date = new Date(2024, 11, 9);
-    render(<DateCell date={date} onClick={handleClick} />);
+    render(<DateCell date={date} dayIndex={0} />);
 
-    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
-    expect(handleClick).toHaveBeenCalledTimes(1);
+    // Button elements are implicitly focusable and handle Enter key natively
+    const button = screen.getByRole('button');
+    expect(button.tagName).toBe('BUTTON');
   });
 });
 
@@ -96,7 +96,7 @@ describe('DateStrip', () => {
     expect(screen.getByText('Me')).toBeInTheDocument(); // Wednesday
   });
 
-  it('highlights today', () => {
+  it('highlights today with thin red line (REQ-09.3)', () => {
     // Create a date range that includes today
     const today = new Date();
     const startDate = new Date(today);
@@ -104,9 +104,10 @@ describe('DateStrip', () => {
 
     const { container } = render(<DateStrip startDate={startDate} dayCount={7} />);
 
-    // Find the cell with amber styling (today)
-    const todayCell = container.querySelector('.bg-amber-500\\/15');
-    expect(todayCell).toBeInTheDocument();
+    // REQ-09.3: Find the cell with today indicator line (thin red line)
+    const todayLine = container.querySelector('[data-testid="today-indicator-line"]');
+    expect(todayLine).toBeInTheDocument();
+    expect(todayLine).toHaveClass('bg-red-500');
   });
 
   it('calls onDateClick with correct date when day is clicked', () => {
@@ -124,12 +125,19 @@ describe('DateStrip', () => {
     expect(clickedDate.getMonth()).toBe(11); // December
   });
 
-  it('uses default dayCount of 21', () => {
+  it('uses default dayCount of 365 with virtual scrolling (REQ-09.1: extended range, v0.3.46)', () => {
     const startDate = new Date(2024, 11, 9);
-    render(<DateStrip startDate={startDate} />);
+    const { container } = render(<DateStrip startDate={startDate} />);
 
+    // v0.3.46: Virtual scrolling - only visible cells are rendered
+    // Total virtual height should be 365 days * 40px = 14600px
+    const virtualContainer = container.querySelector('[class*="relative"]');
+    expect(virtualContainer).toHaveStyle({ height: '14600px' });
+
+    // Only a subset of buttons should be rendered (bufferDays=10 means ~21 visible cells)
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(21);
+    expect(buttons.length).toBeLessThan(50); // Much less than 365
+    expect(buttons.length).toBeGreaterThan(10); // But still a reasonable amount
   });
 
   it('has correct container styling', () => {

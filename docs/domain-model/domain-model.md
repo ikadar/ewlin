@@ -77,9 +77,8 @@ This domain model describes the core entities, value objects, and aggregates for
 - **Identifier:** `JobId`
 - **Responsibilities:**
   - Represents a complete print order with deadline.
-  - Contains and manages its sequential tasks.
-  - Tracks approval gates (BAT, Plates).
-  - Manages job-level dependencies on other jobs.
+  - Contains and manages its elements, each containing sequential tasks.
+  - Prerequisite tracking (paper, BAT, plates, forme) is delegated to Element level (v0.4.32).
 - **Key attributes:**
   - `JobId` (value object)
   - `Reference` (user-manipulated order reference)
@@ -88,48 +87,83 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Notes` (free-form comments)
   - `WorkshopExitDate` (deadline for leaving factory)
   - `FullyScheduled` (boolean, computed)
-  - `PaperPurchaseStatus` (enum: InStock, ToOrder, Ordered, Received)
-  - `PaperOrderedAt` (DateTime, nullable)
   - `PaperType` (string, e.g., "CB300")
   - `PaperFormat` (string, e.g., "63x88")
-  - `ProofSentAt` (DateTime or special value: AwaitingFile, NoProofRequired)
-  - `ProofApprovedAt` (DateTime, nullable)
-  - `PlatesStatus` (enum: Todo, Done)
-  - `RequiredJobIds` (collection of JobId references)
-  - `Tasks` (ordered collection of Task entities)
+  - `PaperWeight` (integer, nullable, g/m², e.g., 300)
+  - `Inking` (string, nullable, e.g., "CMYK", "4C+0", "Pantone 123")
+  - `ElementIds` (ordered collection of ElementId references)
+  - `TaskIds` (ordered collection of TaskId references — deprecated, use Element.taskIds)
   - `Comments` (collection of Comment value objects)
   - `Status` (Draft, Planned, InProgress, Delayed, Completed, Cancelled)
-  - `Color` (hex string, e.g., "#3B82F6", randomly assigned at creation; dependent jobs use shades of the same color)
+  - `Color` (hex string, e.g., "#3B82F6", randomly assigned at creation)
   - `CreatedAt` (DateTime)
+- **Note:** Prerequisite tracking (paper, BAT, plates, forme) moved to Element level in v0.4.32.
 
-### Task (Entity within Job Aggregate)
+### Element (Entity within Job Aggregate)
+#### DM-ENT-ELEM-001
+
+- **Identifier:** `ElementId`
+- **Responsibilities:**
+  - Represents a segment of a job's production process (e.g., cover, interior, binding).
+  - Contains and orders its sequential tasks (via `taskIds`).
+  - Defines finish-to-start dependencies on other elements in the same job (via `prerequisiteElementIds`).
+  - Tracks prerequisite status for production readiness (paper, BAT, plates, forme).
+- **Key attributes:**
+  - `ElementId` (value object)
+  - `JobId` (reference to parent Job)
+  - `Suffix` (string, short identifier, e.g., "couv", "int", "fin", "ELT")
+  - `Label` (string, optional display label, e.g., "Couverture", "Intérieur")
+  - `Spec` (ElementSpec, optional specification details)
+  - `PrerequisiteElementIds` (collection of ElementId references — same job only)
+  - `TaskIds` (ordered collection of TaskId references — execution order within element)
+  - **Prerequisite Status Fields (v0.4.32):**
+    - `PaperStatus` (enum: none, in_stock, to_order, ordered, delivered)
+    - `BatStatus` (enum: none, waiting_files, files_received, bat_sent, bat_approved)
+    - `PlateStatus` (enum: none, to_make, ready)
+    - `FormeStatus` (enum: none, in_stock, to_order, ordered, delivered)
+  - **Date Tracking Fields (v0.4.32):**
+    - `PaperOrderedAt` (DateTime, nullable)
+    - `PaperDeliveredAt` (DateTime, nullable)
+    - `FilesReceivedAt` (DateTime, nullable)
+    - `BatSentAt` (DateTime, nullable)
+    - `BatApprovedAt` (DateTime, nullable)
+    - `FormeOrderedAt` (DateTime, nullable)
+    - `FormeDeliveredAt` (DateTime, nullable)
+  - `CreatedAt` (DateTime)
+  - `UpdatedAt` (DateTime)
+- **Helper:** `isMultiElementJob(elementIds)` returns `true` when `elementIds.length > 1`
+- **Blocking Logic:** An element is blocked if ANY prerequisite is not ready:
+  - Paper ready: `none`, `in_stock`, `delivered`
+  - BAT ready: `none`, `bat_approved`
+  - Plates ready: `none`, `ready`
+  - Forme ready: `none`, `in_stock`, `delivered`
+
+### Task (Entity within Job Aggregate, scoped to Element)
 #### DM-ENT-TASK-001
 
 - **Identifier:** `TaskId`
 - **Responsibilities:**
-  - Represents a specific production operation within a job.
+  - Represents a specific production operation within an element of a job.
   - Can be internal (on a station) or outsourced (to a provider).
   - Tracks its assignment and schedule.
 - **Key attributes (common):**
   - `TaskId` (value object)
-  - `SequenceOrder` (integer, position in job's task list)
+  - `ElementId` (reference to parent Element)
+  - `SequenceOrder` (integer, position in element's task list, 0-indexed)
   - `Comment` (string, nullable)
-  - `RawDSLInput` (original DSL line for reference)
-  - `Assignment` (TaskAssignment value object, nullable)
   - `Status` (Defined, Ready, Assigned, Executing, Completed, Failed, Cancelled)
+  - `CreatedAt` (DateTime)
+  - `UpdatedAt` (DateTime)
+- **Note:** Task does not embed its assignment. TaskAssignment is a separate entity in the Schedule aggregate, linked via `taskId`.
 - **Key attributes (internal task):**
-  - `Type`: 'internal'
+  - `Type`: 'Internal'
   - `StationId` (reference to Station)
-  - `SetupMinutes` (integer, 0 if not specified)
-  - `RunMinutes` (integer)
-  - `TotalMinutes` (computed: SetupMinutes + RunMinutes)
+  - `Duration` (InternalDuration: `setupMinutes` integer, `runMinutes` integer)
 - **Key attributes (outsourced task):**
-  - `Type`: 'outsourced'
+  - `Type`: 'Outsourced'
   - `ProviderId` (reference to OutsourcedProvider)
   - `ActionType` (string, e.g., "Pelliculage")
-  - `DurationOpenDays` (integer) — lead time in business days
-  - `LatestDepartureTime` (time, e.g., "14:00") — latest time to send work to provider for that day to count as first business day
-  - `ReceptionTime` (time, e.g., "10:00") — time when completed work is received back from provider
+  - `Duration` (OutsourcedDuration: `openDays` integer, `latestDepartureTime` time, `receptionTime` time)
 
 ### Schedule (Aggregate Root)
 #### DM-AGG-SCHEDULE-001
@@ -155,7 +189,7 @@ This domain model describes the core entities, value objects, and aggregates for
 
 ## Value Objects
 
-### StationId / StationCategoryId / StationGroupId / ProviderId / JobId / TaskId / ScheduleId
+### StationId / StationCategoryId / StationGroupId / ProviderId / JobId / ElementId / TaskId / ScheduleId
 - **Fields:**
   - `Value` (UUID or string)
 - **Rules:**
@@ -283,10 +317,12 @@ This domain model describes the core entities, value objects, and aggregates for
 #### DM-VO-CONFLICT-001
 
 - **Fields:**
-  - `Type` (enum: StationConflict, GroupCapacityConflict, PrecedenceConflict, ApprovalGateConflict, AvailabilityConflict, DeadlineConflict)
-  - `AffectedTaskIds` (collection)
-  - `Description` (string)
-  - `Severity` (High, Medium, Low)
+  - `Type` (enum: StationMismatchConflict, StationConflict, GroupCapacityConflict, PrecedenceConflict, PrerequisiteConflict, AvailabilityConflict, DeadlineConflict)
+  - `TaskId` (reference to Task — the task that has the conflict)
+  - `Message` (string, human-readable description)
+  - `RelatedTaskId` (reference to Task, optional — e.g., predecessor for PrecedenceConflict)
+  - `TargetId` (StationId or ProviderId, optional)
+  - `Details` (key-value map, optional — additional conflict context)
 
 ### ScheduleSnapshot
 #### DM-VO-VIEW-001
@@ -299,6 +335,7 @@ This domain model describes the core entities, value objects, and aggregates for
   - `Groups` (collection of StationGroup)
   - `Providers` (collection of OutsourcedProvider)
   - `Jobs` (collection of Job)
+  - `Elements` (collection of Element)
   - `Tasks` (collection of Task)
   - `Assignments` (collection of TaskAssignment)
   - `Conflicts` (collection of ScheduleConflict)
@@ -362,25 +399,38 @@ This domain model describes the core entities, value objects, and aggregates for
 - **Allowed values:** Defined, Ready, Assigned, Executing, Completed, Failed, Cancelled
 - Represents the lifecycle state of a Task within a Job.
 
-### PaperPurchaseStatus
+### PaperStatus (Element-level, v0.4.32)
 #### DM-ENUM-PAPER-001
 
-- **Allowed values:** InStock, ToOrder, Ordered, Received
-- Represents the paper procurement state for a Job.
+- **Allowed values:** `none`, `in_stock`, `to_order`, `ordered`, `delivered`
+- Represents the paper procurement state for an Element.
+- Ready states (not blocking): `none`, `in_stock`, `delivered`
+- Blocking states: `to_order`, `ordered`
 
-### PlatesStatus
-#### DM-ENUM-GATE-001
+### BatStatus (Element-level, v0.4.32)
+#### DM-ENUM-BAT-001
 
-- **Allowed values:** Todo, Done
-- Represents the plates preparation approval gate.
+- **Allowed values:** `none`, `waiting_files`, `files_received`, `bat_sent`, `bat_approved`
+- Represents the BAT (Bon à Tirer / proof approval) state for an Element.
+- Ready states (not blocking): `none`, `bat_approved`
+- Blocking states: `waiting_files`, `files_received`, `bat_sent`
 
-### ProofStatus (Special Values)
-#### DM-ENUM-GATE-002
+### PlateStatus (Element-level, v0.4.32)
+#### DM-ENUM-PLATE-001
 
-- `ProofSentAt` can be:
-  - A DateTime (actual date sent)
-  - `AwaitingFile` (waiting for client to provide file)
-  - `NoProofRequired` (no proof needed for this job)
+- **Allowed values:** `none`, `to_make`, `ready`
+- Represents the plates preparation state for an Element.
+- Ready states (not blocking): `none`, `ready`
+- Blocking states: `to_make`
+
+### FormeStatus (Element-level, v0.4.32)
+#### DM-ENUM-FORME-001
+
+- **Allowed values:** `none`, `in_stock`, `to_order`, `ordered`, `delivered`
+- Represents the forme (die-cutting tool) state for an Element.
+- Ready states (not blocking): `none`, `in_stock`, `delivered`
+- Blocking states: `to_order`, `ordered`
+- Only relevant for elements with die-cutting tasks (internal or outsourced).
 
 ---
 
@@ -388,19 +438,21 @@ This domain model describes the core entities, value objects, and aggregates for
 
 ### Within Aggregates
 
-- A **Job** owns its **Tasks** completely — tasks cannot exist without a job.
-- **Tasks** within a job are ordered (sequence) and must have unique IDs.
-- Tasks within a job follow a single straight sequence (linear dependencies).
-- All tasks in a job must complete before the job workshop exit date.
+- A **Job** owns its **Elements** completely — elements cannot exist without a job.
+- An **Element** owns its **Tasks** completely — tasks cannot exist without an element.
+- Hierarchy: **Job → Element → Task** (Task references Element via `elementId`; Element references Job via `jobId`).
+- **Tasks** within an element are ordered by `sequenceOrder` and must have unique IDs.
+- Tasks within an element follow a single straight sequence (linear dependencies).
+- **Elements** within a job can have finish-to-start dependencies via `prerequisiteElementIds` (same job only, forming a DAG).
+- All tasks across all elements in a job must complete before the job workshop exit date.
 
 ### Between Aggregates
 
 - A **Station** belongs to exactly one **StationCategory**.
 - A **Station** belongs to exactly one **StationGroup**.
 - An **OutsourcedProvider** has its own dedicated **StationGroup** with unlimited capacity.
-- A **Task** (within Job) references **Station** or **OutsourcedProvider** by ID only.
-- A **Job** can reference other **Jobs** as prerequisites (requiredJobIds).
-- **Schedule** references Jobs, Tasks, Stations, and Providers by ID to maintain aggregate boundaries.
+- A **Task** (within Element, within Job) references **Station** or **OutsourcedProvider** by ID only.
+- **Schedule** references Jobs, Elements, Tasks, Stations, and Providers by ID to maintain aggregate boundaries.
 
 ### Business Invariants
 
@@ -411,16 +463,19 @@ This domain model describes the core entities, value objects, and aggregates for
    - At any time, the number of active tasks on stations in a group cannot exceed MaxConcurrent.
    - Outsourced provider groups have unlimited capacity.
 
-3. **Task Sequencing:**
-   - Within a job, tasks must be executed in sequence order.
-   - Task N cannot start before Task N-1 completes.
+3. **Task Sequencing (Element-Scoped):**
+   - Within an element, tasks must be executed in `sequenceOrder`.
+   - Task N cannot start before Task N-1 completes (within the same element).
 
-4. **Job Dependencies:**
-   - A job cannot start until all required jobs are completed.
+4. **Cross-Element Dependencies:**
+   - All tasks of a prerequisite element must complete before the dependent element's first task can start.
+   - If the predecessor is a printing task, a 4-hour dry time is added (BR-ELEM-005).
 
-5. **Approval Gates:**
-   - Tasks requiring BAT cannot start until proof is approved (or marked NoProofRequired).
-   - Tasks requiring plates cannot start until plates are Done.
+5. **Element Prerequisites (v0.4.32):**
+   - An element is blocked if any prerequisite is not in a ready state.
+   - Blocked elements display a dashed left border in the scheduler UI.
+   - Prerequisites are tracked at element level: paper, BAT, plates, forme.
+   - Forme prerequisite only applies to elements with die-cutting tasks.
 
 6. **Deadline Constraints:**
    - All tasks must complete before the job's workshop exit date.
@@ -452,15 +507,23 @@ This domain model describes the core entities, value objects, and aggregates for
 - `TaskAddedToJob`
 - `TaskRemovedFromJob`
 - `TasksReordered`
-- `JobDependencyAdded`
-- `ApprovalGateUpdated`
-- `PaperStatusChanged`
 - `CommentAdded`
 - `JobPlanned`
 - `JobStarted`
 - `JobCompleted`
 - `JobDelayed`
 - `JobCancelled`
+
+**Note (v0.4.32):** `ApprovalGateUpdated` and `PaperStatusChanged` moved to Element Events.
+
+### Element Events
+- `ElementCreated`
+- `ElementDependencyAdded`
+- `ElementDependencyRemoved`
+- `ElementPaperStatusUpdated` (v0.4.32)
+- `ElementBatStatusUpdated` (v0.4.32)
+- `ElementPlateStatusUpdated` (v0.4.32)
+- `ElementFormeStatusUpdated` (v0.4.32)
 
 ### Schedule Events
 - `ScheduleCreated`
@@ -490,10 +553,11 @@ This domain model describes the core entities, value objects, and aggregates for
    - Providers have their own lifecycle.
    - Each provider creates its own station group automatically.
 
-5. **Job as Aggregate Root containing Tasks:**
-   - Tasks are meaningless without their parent job.
-   - Job deadline affects all contained tasks.
-   - Task sequencing is a job-internal concern.
+5. **Job as Aggregate Root containing Elements and Tasks:**
+   - Elements are meaningless without their parent job; tasks are meaningless without their parent element.
+   - Job deadline affects all contained elements and their tasks.
+   - Task sequencing is element-scoped; cross-element dependencies are job-internal concerns.
+   - The Element layer enables multi-element jobs (e.g., book production with cover, interior, binding) while single-element jobs behave identically to pre-Element flat task lists.
 
 6. **Schedule as Separate Aggregate:**
    - Schedule validation requires cross-aggregate data.
@@ -508,14 +572,20 @@ This design ensures clear boundaries, minimal coupling between aggregates, and e
 
 ### Current Implementation Status (@flux/types)
 
-As of v0.0.7, the `@flux/types` package is fully aligned with this domain model. All documented fields are implemented:
+As of v0.4.1, the `@flux/types` package is fully aligned with this domain model. Key implementation milestones:
 
 | Entity | Field | Status |
 |--------|-------|--------|
 | Station | `capacity` | ✅ Implemented |
 | StationGroup | `isOutsourcedProviderGroup` | ✅ Implemented |
 | OutsourcedProvider | `status` (ProviderStatus) | ✅ Implemented |
-| ScheduleSnapshot | Full structure | ✅ Implemented |
+| Element | Full structure (`id`, `jobId`, `suffix`, `label`, `prerequisiteElementIds`, `taskIds`) | ✅ Implemented (v0.4.0) |
+| Element | Prerequisite status (`paperStatus`, `batStatus`, `plateStatus`, `formeStatus`) | ✅ Implemented (v0.4.32) |
+| Element | Date tracking (`paperOrderedAt`, `paperDeliveredAt`, `filesReceivedAt`, `batSentAt`, `batApprovedAt`, `formeOrderedAt`, `formeDeliveredAt`) | ✅ Implemented (v0.4.32) |
+| Task | `elementId` (replaces former `jobId`) | ✅ Implemented (v0.4.0) |
+| Job | `elementIds` | ✅ Implemented (v0.4.0) |
+| Job | Prerequisite fields removed (moved to Element) | ✅ Implemented (v0.4.32) |
+| ScheduleSnapshot | `elements` collection | ✅ Implemented (v0.4.0) |
 | LateJob | Full structure | ✅ Implemented |
 | ProposedAssignment | Full structure | ✅ Implemented |
 | ValidationResult | Full structure | ✅ Implemented |
@@ -524,8 +594,16 @@ As of v0.0.7, the `@flux/types` package is fully aligned with this domain model.
 
 All entities in the implementation include `createdAt` and `updatedAt` timestamps for audit purposes. This is consistent with the types defined in `@flux/types`.
 
-### Type Guards
+### Type Guards and Helpers
 
-The implementation includes type guard functions for runtime type checking:
+The implementation includes type guard functions and helpers for runtime use:
 - `isInternalTask(task)` - Check if task is internal
 - `isOutsourcedTask(task)` - Check if task is outsourced
+- `isMultiElementJob(elementIds)` - Check if a job has multiple elements
+- `getTotalMinutes(duration)` - Calculate total duration for internal task
+- `isElementBlocked(element)` - Check if element is blocked by prerequisites (v0.4.32)
+- `isPaperReady(status)` - Check if paper status is ready (v0.4.32)
+- `isBatReady(status)` - Check if BAT status is ready (v0.4.32)
+- `isPlatesReady(status)` - Check if plates status is ready (v0.4.32)
+- `isFormeReady(status)` - Check if forme status is ready (v0.4.32)
+- `hasDieCuttingAction(element, tasks, stations)` - Check if element has die-cutting (v0.4.32)

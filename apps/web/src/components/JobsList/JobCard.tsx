@@ -1,5 +1,7 @@
+import { memo } from 'react';
+import type { Task, TaskAssignment } from '@flux/types';
 import { AlertCircle, Shuffle } from 'lucide-react';
-import { ProgressDots } from './ProgressDots';
+import { ProgressSegments } from './ProgressSegments';
 
 export type JobProblemType = 'late' | 'conflict' | null;
 
@@ -12,10 +14,10 @@ export interface JobCardProps {
   client: string;
   /** Job description */
   description: string;
-  /** Total number of tasks */
-  taskCount: number;
-  /** Number of completed tasks */
-  completedTaskCount: number;
+  /** Tasks for this job */
+  tasks: Task[];
+  /** Assignments for this job's tasks */
+  assignments: TaskAssignment[];
   /** Deadline date string (e.g., "17/12") */
   deadline?: string;
   /** Problem type if any */
@@ -27,20 +29,23 @@ export interface JobCardProps {
 }
 
 /**
- * Individual job card with reference, client, description, and progress dots.
+ * Individual job card with reference, client, description, and progress segments.
  * Supports normal, late, conflict, and selected states.
+ * v0.3.46: Memoized to prevent unnecessary re-renders during selection changes.
  */
-export function JobCard({
+export const JobCard = memo(function JobCard({
+  id,
   reference,
   client,
   description,
-  taskCount,
-  completedTaskCount,
+  tasks,
+  assignments,
   deadline,
   problemType,
   isSelected = false,
   onClick,
 }: JobCardProps) {
+  // REQ-05: block display respects margins (w-full + margins caused overflow)
   const baseClasses = 'mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors';
 
   const stateClasses = (() => {
@@ -65,32 +70,33 @@ export function JobCard({
     return 'text-zinc-500';
   })();
 
-  const ProblemIcon = problemType === 'late' ? AlertCircle : problemType === 'conflict' ? Shuffle : null;
   const iconColor = problemType === 'late' ? 'text-red-400' : 'text-amber-400';
 
+  // Render problem icon based on type (avoids creating component during render)
+  const renderProblemIcon = () => {
+    if (problemType === 'late') {
+      return <AlertCircle className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />;
+    }
+    if (problemType === 'conflict') {
+      return <Shuffle className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />;
+    }
+    return null;
+  };
+
   return (
-    <div
-      className={`${baseClasses} ${stateClasses}`}
+    <button
+      type="button"
+      className={`${baseClasses} ${stateClasses} text-left w-[calc(100%-1rem)]`}
       onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick?.();
-        }
-      }}
+      data-testid={`job-card-${id}`}
     >
-      {/* Header row: reference · client + date/icon */}
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`font-mono text-[13px] ${referenceColor}`}>{reference}</span>
-        <span className="text-zinc-600">·</span>
-        <span className="text-zinc-400 truncate">{client}</span>
-        {ProblemIcon ? (
-          <ProblemIcon className={`w-4 h-4 ml-auto ${iconColor}`} />
-        ) : deadline ? (
-          <span className="text-zinc-600 text-xs ml-auto">{deadline}</span>
-        ) : null}
+      {/* Header row: reference · client + date/icon - REQ-05: overflow fix */}
+      <div className="flex items-center gap-2 mb-1 overflow-hidden min-w-0">
+        <span className={`font-mono text-base shrink-0 ${referenceColor}`}>{reference}</span>
+        <span className="text-zinc-600 shrink-0">·</span>
+        <span className="text-zinc-400 truncate min-w-0">{client}</span>
+        {renderProblemIcon()}
+        {!problemType && deadline && <span className="text-zinc-600 text-xs ml-auto shrink-0">{deadline}</span>}
       </div>
 
       {/* Description */}
@@ -98,9 +104,9 @@ export function JobCard({
         {description}
       </div>
 
-      {/* Footer: progress dots (left) + badge (right) */}
+      {/* Footer: progress segments (left) + badge (right) */}
       <div className="flex items-center justify-between">
-        <ProgressDots total={taskCount} completed={completedTaskCount} />
+        <ProgressSegments tasks={tasks} assignments={assignments} />
         {problemType === 'late' && (
           <span className="text-xs font-medium text-red-400">En retard</span>
         )}
@@ -108,6 +114,6 @@ export function JobCard({
           <span className="text-xs font-medium text-amber-400">Conflit</span>
         )}
       </div>
-    </div>
+    </button>
   );
-}
+});

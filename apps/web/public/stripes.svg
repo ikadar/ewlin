@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+  <!-- 45° diagonal stripes: 10px transparent, 10px colored (3% white opacity) -->
+  <!-- Pattern repeats every ~28px (20px * sqrt(2) ≈ 28.28, rounded to 28) -->
+  <line x1="0" y1="28" x2="28" y2="0" stroke="rgba(255,255,255,0.03)" stroke-width="14"/>
+  <line x1="-14" y1="14" x2="14" y2="-14" stroke="rgba(255,255,255,0.03)" stroke-width="14"/>
+  <line x1="14" y1="42" x2="42" y2="14" stroke="rgba(255,255,255,0.03)" stroke-width="14"/>
+</svg>

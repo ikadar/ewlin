@@ -177,39 +177,55 @@ Each story follows the standard format:
 
 ---
 
-## Approval Gates
+## Element Prerequisites (v0.4.32)
 
 ### Track BAT (Proof) Approval
-#### US-GATE-001
-> **References:** [BR-GATE-001](../domain-model/business-rules.md#br-gate-001), [BR-GATE-003](../domain-model/business-rules.md#br-gate-003)
+#### US-PREREQ-001
+> **References:** [BR-PREREQ-001](../domain-model/business-rules.md#br-prereq-001), [BR-PREREQ-007](../domain-model/business-rules.md#br-prereq-007)
 
-> As a **scheduler**, I want to **track proof approval status**, so that **I know when a job is ready for production**.
-
-**Acceptance Criteria:**
-- Can mark proof as "Awaiting File", "Sent", or "No Proof Required"
-- Can record proof approval date
-- Tasks are blocked until proof approved (or not required)
-
-### Track Plates Approval
-#### US-GATE-002
-> **References:** [BR-GATE-002](../domain-model/business-rules.md#br-gate-002)
-
-> As a **scheduler**, I want to **track plates preparation status**, so that **printing tasks wait for plates to be ready**.
+> As a **scheduler**, I want to **track BAT approval status per element**, so that **I know when an element is ready for production**.
 
 **Acceptance Criteria:**
-- Can mark plates as Todo or Done
-- Printing tasks are blocked until plates Done
+- Can set batStatus: 'none', 'waiting_files', 'files_received', 'bat_sent', 'bat_approved'
+- System records timestamps (filesReceivedAt, batSentAt, batApprovedAt)
+- Element tasks are blocked until BAT approved (or batStatus = 'none')
+- Blocked elements show dashed left border on tiles
+
+### Track Plates Status
+#### US-PREREQ-002
+> **References:** [BR-PREREQ-003](../domain-model/business-rules.md#br-prereq-003), [BR-PREREQ-007](../domain-model/business-rules.md#br-prereq-007)
+
+> As a **scheduler**, I want to **track plates preparation status per element**, so that **printing tasks wait for plates to be ready**.
+
+**Acceptance Criteria:**
+- Can set plateStatus: 'none', 'to_make', 'ready'
+- Element tasks are blocked until plates ready (or plateStatus = 'none')
+- Blocked elements show dashed left border on tiles
 
 ### Track Paper Procurement
-#### US-GATE-003
-> **References:** [BR-PAPER-001](../domain-model/business-rules.md#br-paper-001), [BR-PAPER-002](../domain-model/business-rules.md#br-paper-002), [BR-PAPER-003](../domain-model/business-rules.md#br-paper-003)
+#### US-PREREQ-003
+> **References:** [BR-PREREQ-002](../domain-model/business-rules.md#br-prereq-002), [BR-PREREQ-007](../domain-model/business-rules.md#br-prereq-007)
 
-> As a **scheduler**, I want to **track paper purchase status**, so that **I know if material is available**.
+> As a **scheduler**, I want to **track paper purchase status per element**, so that **I know if material is available**.
 
 **Acceptance Criteria:**
-- Can set status: InStock, ToOrder, Ordered, Received
-- System records timestamp when paper ordered
-- Production tasks should wait for paper
+- Can set paperStatus: 'none', 'in_stock', 'to_order', 'ordered', 'delivered'
+- System records timestamps (paperOrderedAt, paperDeliveredAt)
+- Element tasks blocked until paper ready ('none', 'in_stock', or 'delivered')
+- Blocked elements show dashed left border on tiles
+
+### Track Forme Status
+#### US-PREREQ-004
+> **References:** [BR-PREREQ-005](../domain-model/business-rules.md#br-prereq-005), [BR-PREREQ-006](../domain-model/business-rules.md#br-prereq-006)
+
+> As a **scheduler**, I want to **track forme (die) status per element**, so that **die-cutting tasks wait for forme to be available**.
+
+**Acceptance Criteria:**
+- Forme field visible only for elements with tasks targeting 'cat-die-cutting' category
+- Can set formeStatus: 'none', 'in_stock', 'to_order', 'ordered', 'delivered'
+- System records timestamps (formeOrderedAt, formeDeliveredAt)
+- Element tasks blocked until forme ready ('none', 'in_stock', or 'delivered')
+- Blocked elements show dashed left border on tiles
 
 ---
 

@@ -17,7 +17,7 @@ describe('generateTasksForJob', () => {
     const tasks = generateTasksForJob({ jobId: 'test-job' });
     for (const task of tasks) {
       expect(task).toHaveProperty('id');
-      expect(task).toHaveProperty('jobId');
+      expect(task).toHaveProperty('elementId');
       expect(task).toHaveProperty('sequenceOrder');
       expect(task).toHaveProperty('status');
       expect(task).toHaveProperty('type');
@@ -26,11 +26,12 @@ describe('generateTasksForJob', () => {
     }
   });
 
-  it('tasks reference the correct jobId', () => {
+  it('tasks reference the correct element for the job', () => {
     const jobId = 'my-test-job';
     const tasks = generateTasksForJob({ jobId });
     for (const task of tasks) {
-      expect(task.jobId).toBe(jobId);
+      // Element ID should be derived from jobId using elem- prefix
+      expect(task.elementId).toBe(`elem-${jobId}`);
     }
   });
 
@@ -82,11 +83,50 @@ describe('generateJobs', () => {
       expect(job).toHaveProperty('workshopExitDate');
       expect(job).toHaveProperty('fullyScheduled');
       expect(job).toHaveProperty('color');
-      expect(job).toHaveProperty('paperPurchaseStatus');
-      expect(job).toHaveProperty('proofApproval');
-      expect(job).toHaveProperty('platesStatus');
       expect(job).toHaveProperty('taskIds');
     }
+  });
+
+  it('each element has prerequisite status fields', () => {
+    const result = generateJobs({ count: 5 });
+    for (const element of result.elements) {
+      expect(element).toHaveProperty('paperStatus');
+      expect(element).toHaveProperty('batStatus');
+      expect(element).toHaveProperty('plateStatus');
+      // Verify valid status values
+      expect(['none', 'in_stock', 'to_order', 'ordered', 'delivered']).toContain(element.paperStatus);
+      expect(['none', 'waiting_files', 'files_received', 'bat_sent', 'bat_approved']).toContain(element.batStatus);
+      expect(['none', 'to_make', 'ready']).toContain(element.plateStatus);
+    }
+  });
+
+  // REQ-20: Similarities Feature Completion - paperWeight and inking fields
+  it('each job has paperWeight field with valid value', () => {
+    const result = generateJobs({ count: 10 });
+    const validWeights = [80, 100, 120, 150, 170, 200, 250, 300, 350];
+    for (const job of result.jobs) {
+      expect(job).toHaveProperty('paperWeight');
+      expect(validWeights).toContain(job.paperWeight);
+    }
+  });
+
+  it('each job has inking field with valid value', () => {
+    const result = generateJobs({ count: 10 });
+    const validInkings = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0'];
+    for (const job of result.jobs) {
+      expect(job).toHaveProperty('inking');
+      expect(validInkings).toContain(job.inking);
+    }
+  });
+
+  it('jobs have varied paperWeight and inking values for similarity comparison', () => {
+    const result = generateJobs({ count: 20 });
+    const uniqueWeights = new Set(result.jobs.map(j => j.paperWeight));
+    const uniqueInkings = new Set(result.jobs.map(j => j.inking));
+
+    // With 20 jobs, we should have at least 2 different values for each
+    expect(uniqueWeights.size).toBeGreaterThan(1);
+    expect(uniqueInkings.size).toBeGreaterThan(1);
   });
 
   it('job colors are valid hex colors', () => {
@@ -121,11 +161,17 @@ describe('generateJobs', () => {
     }
   });
 
-  it('each task belongs to a job', () => {
+  it('each task belongs to a job via element', () => {
     const result = generateJobs({ count: 5 });
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    const elementToJob = new Map(result.elements.map((e) => [e.id, e.jobId]));
     const jobIds = new Set(result.jobs.map((j) => j.id));
     for (const task of result.tasks) {
-      expect(jobIds.has(task.jobId)).toBe(true);
+      // Task has elementId
+      expect(elementIds.has(task.elementId)).toBe(true);
+      // Element belongs to a job
+      const jobId = elementToJob.get(task.elementId);
+      expect(jobIds.has(jobId!)).toBe(true);
     }
   });
 });
