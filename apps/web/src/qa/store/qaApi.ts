@@ -19,6 +19,7 @@ import type {
   KOLogEntry,
   FixtureRequest,
   ResultStatus,
+  SelectionState,
 } from '../types';
 
 export const qaApi = createApi({
@@ -126,6 +127,20 @@ export const qaApi = createApi({
       }),
       invalidatesTags: ['FixtureRequests'],
     }),
+
+    // Get selection from file
+    getSelection: builder.query<SelectionState, void>({
+      query: () => '/selection',
+    }),
+
+    // Save selection to file
+    saveSelection: builder.mutation<SelectionState, SelectionState>({
+      query: (body) => ({
+        url: '/selection',
+        method: 'PUT',
+        body,
+      }),
+    }),
   }),
 });
 
@@ -139,4 +154,6 @@ export const {
   useResolveKOLogMutation,
   useGetFixtureRequestsQuery,
   useCreateFixtureRequestMutation,
+  useGetSelectionQuery,
+  useSaveSelectionMutation,
 } = qaApi;

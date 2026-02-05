@@ -7,6 +7,7 @@ import { statusRouter } from './routes/status.js';
 import { koLogsRouter } from './routes/ko-logs.js';
 import { fixtureRequestsRouter } from './routes/fixture-requests.js';
 import { rawRouter } from './routes/raw.js';
+import { selectionRouter } from './routes/selection.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -23,6 +24,7 @@ app.use('/qa-api/status', statusRouter);
 app.use('/qa-api/ko-logs', koLogsRouter);
 app.use('/qa-api/fixture-requests', fixtureRequestsRouter);
 app.use('/qa-api/raw', rawRouter);
+app.use('/qa-api/selection', selectionRouter);
 
 // Health check
 app.get('/qa-api/health', (_req, res) => {

@@ -210,3 +210,37 @@ export function updateFixtureRequestStatus(
 
   return request || null;
 }
+
+// Selection persistence
+const SELECTION_FILE = path.join(TRACKING_DIR, 'selection.json');
+
+export interface SelectionData {
+  selectedFolder: string | null;
+  selectedFile: string | null;
+  selectedTestId: string | null;
+  updatedAt: string;
+}
+
+export function getSelection(): SelectionData | null {
+  ensureTrackingDir();
+  try {
+    if (fs.existsSync(SELECTION_FILE)) {
+      return JSON.parse(fs.readFileSync(SELECTION_FILE, 'utf-8')) as SelectionData;
+    }
+  } catch (e) {
+    console.error('Failed to load selection:', e);
+  }
+  return null;
+}
+
+export function saveSelection(
+  data: Omit<SelectionData, 'updatedAt'>
+): SelectionData {
+  ensureTrackingDir();
+  const saved: SelectionData = {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(SELECTION_FILE, JSON.stringify(saved, null, 2));
+  return saved;
+}

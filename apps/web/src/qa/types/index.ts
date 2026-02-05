@@ -113,3 +113,10 @@ export interface FixtureRequest {
   status: 'pending' | 'implemented' | 'rejected';
   createdAt: string;
 }
+
+// Selection state for persistence
+export interface SelectionState {
+  selectedFolder: string | null;
+  selectedFile: string | null;
+  selectedTestId: string | null;
+}
