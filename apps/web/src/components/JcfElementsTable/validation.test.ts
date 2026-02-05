@@ -14,6 +14,8 @@ import {
   isValidFormat,
   isValidSequenceLenient,
   isValidSequenceStrict,
+  isValidPrecedences,
+  getInvalidPrecedences,
   validateElementLive,
   validateAllElements,
   getCellError,
@@ -235,6 +237,63 @@ describe('isValidSequenceStrict', () => {
   });
 });
 
+// ── Precedences Validation ────────────────────────────────────────────────────
+
+describe('getInvalidPrecedences', () => {
+  it('returns empty array for empty precedences', () => {
+    const validNames = new Set(['E1', 'E2', 'E3']);
+    expect(getInvalidPrecedences('', validNames, 'E1')).toEqual([]);
+  });
+
+  it('returns empty array for dash (no prerequisites)', () => {
+    const validNames = new Set(['E1', 'E2', 'E3']);
+    expect(getInvalidPrecedences('-', validNames, 'E1')).toEqual([]);
+  });
+
+  it('returns empty array when all precedences are valid', () => {
+    const validNames = new Set(['E1', 'E2', 'E3']);
+    expect(getInvalidPrecedences('E2,E3', validNames, 'E1')).toEqual([]);
+  });
+
+  it('returns invalid element names', () => {
+    const validNames = new Set(['E1', 'E2', 'E3']);
+    expect(getInvalidPrecedences('E2,UNKNOWN', validNames, 'E1')).toEqual(['UNKNOWN']);
+  });
+
+  it('returns multiple invalid element names', () => {
+    const validNames = new Set(['E1', 'E2']);
+    expect(getInvalidPrecedences('FOO,BAR,E2', validNames, 'E1')).toEqual(['FOO', 'BAR']);
+  });
+
+  it('ignores self-reference (not an error here)', () => {
+    // Self-reference prevention is handled by autocomplete UI hints, not validation error
+    const validNames = new Set(['E1', 'E2']);
+    expect(getInvalidPrecedences('E1', validNames, 'E1')).toEqual([]);
+  });
+
+  it('handles whitespace in comma-separated values', () => {
+    const validNames = new Set(['E1', 'E2', 'E3']);
+    expect(getInvalidPrecedences('E2 , E3', validNames, 'E1')).toEqual([]);
+  });
+});
+
+describe('isValidPrecedences', () => {
+  it('returns true for empty precedences', () => {
+    const validNames = new Set(['E1', 'E2']);
+    expect(isValidPrecedences('', validNames, 'E1')).toBe(true);
+  });
+
+  it('returns true when all precedences exist', () => {
+    const validNames = new Set(['E1', 'E2', 'E3']);
+    expect(isValidPrecedences('E2,E3', validNames, 'E1')).toBe(true);
+  });
+
+  it('returns false when any precedence is invalid', () => {
+    const validNames = new Set(['E1', 'E2']);
+    expect(isValidPrecedences('E2,UNKNOWN', validNames, 'E1')).toBe(false);
+  });
+});
+
 // ── validateElementLive ───────────────────────────────────────────────────────
 
 describe('validateElementLive', () => {
@@ -334,6 +393,28 @@ describe('validateElementLive', () => {
     expect(errors).toHaveLength(1);
     expect(errors[0].field).toBe('sequence');
   });
+
+  it('validates precedences when validElementNames is provided', () => {
+    const element: JcfElement = { ...baseElement, precedences: 'UNKNOWN' };
+    const validNames = new Set(['E1', 'E2']);
+    const errors = validateElementLive(element, 0, { validElementNames: validNames });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe('precedences');
+    expect(errors[0].message).toContain('UNKNOWN');
+  });
+
+  it('does not validate precedences when validElementNames is not provided', () => {
+    const element: JcfElement = { ...baseElement, precedences: 'UNKNOWN' };
+    const errors = validateElementLive(element, 0);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('accepts options object for configuration', () => {
+    const element: JcfElement = { ...baseElement, sequence: 'G37(' };
+    const errors = validateElementLive(element, 0, { useStrictSequence: true });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe('sequence');
+  });
 });
 
 // ── validateAllElements ───────────────────────────────────────────────────────
@@ -370,6 +451,28 @@ describe('validateAllElements', () => {
     expect(errorMap.size).toBe(2);
     expect(errorMap.has('0-pagination')).toBe(true);
     expect(errorMap.has('1-papier')).toBe(true);
+  });
+
+  it('validates precedences against all element names', () => {
+    const elements: JcfElement[] = [
+      { ...baseElement, name: 'INT', precedences: '' },
+      { ...baseElement, name: 'COUV', precedences: 'INT' }, // Valid
+      { ...baseElement, name: 'FIN', precedences: 'INT,UNKNOWN' }, // Invalid: UNKNOWN doesn't exist
+    ];
+    const errorMap = validateAllElements(elements);
+    expect(errorMap.has('2-precedences')).toBe(true);
+    expect(errorMap.get('2-precedences')?.message).toContain('UNKNOWN');
+  });
+
+  it('does not flag valid precedences', () => {
+    const elements: JcfElement[] = [
+      { ...baseElement, name: 'INT', precedences: '' },
+      { ...baseElement, name: 'COUV', precedences: 'INT' },
+      { ...baseElement, name: 'FIN', precedences: 'INT,COUV' },
+    ];
+    const errorMap = validateAllElements(elements);
+    expect(errorMap.has('1-precedences')).toBe(false);
+    expect(errorMap.has('2-precedences')).toBe(false);
   });
 });
 
@@ -515,6 +618,18 @@ describe('validateForSubmit', () => {
     const errors = validateForSubmit(elements, 'job');
     expect(errors.some((e) => e.elementIndex === 0 && e.field === 'pagination')).toBe(true);
     expect(errors.some((e) => e.elementIndex === 1 && e.field === 'sequence')).toBe(true);
+  });
+
+  it('validates precedences on submit', () => {
+    const elements: JcfElement[] = [
+      { ...baseElement, name: 'INT', precedences: '' },
+      { ...baseElement, name: 'COUV', precedences: 'NONEXISTENT' },
+    ];
+    const errors = validateForSubmit(elements, 'job');
+    const precedenceErrors = errors.filter((e) => e.field === 'precedences');
+    expect(precedenceErrors).toHaveLength(1);
+    expect(precedenceErrors[0].elementIndex).toBe(1);
+    expect(precedenceErrors[0].message).toContain('NONEXISTENT');
   });
 });
 

@@ -153,7 +153,7 @@ describe('transformJcfToRequest', () => {
     expect(result.client).toBe('ACME Corp');
     expect(result.description).toBe('Brochure A4');
     expect(result.workshopExitDate).toBe('2025-02-15');
-    expect(result.status).toBe('draft');
+    expect(result.status).toBe('planned');
     expect(result.elements).toHaveLength(2);
     expect(result.elements[0].name).toBe('INT');
     expect(result.elements[0].prerequisiteNames).toEqual([]);

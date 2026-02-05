@@ -144,7 +144,7 @@ export function transformJcfToRequest(
     client,
     description: intitule,
     workshopExitDate: deadline,
-    status: 'draft',
+    status: 'planned',
     elements: elements.map(transformJcfElementToRequest),
   };
 }
