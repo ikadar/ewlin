@@ -1,5 +1,6 @@
 import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Element } from '@flux/types';
 import { getJobIdForTask } from './taskHelpers';
+import { DRY_TIME_MS, isPrintingStation } from './precedenceConstraints';
 
 /** Compact horizon options in hours */
 export const COMPACT_HORIZONS = [
@@ -48,24 +49,30 @@ function findPredecessorTask(task: Task, allTasks: Task[], elements: Element[]):
 
 /**
  * Get the end time of a predecessor task, considering any updates made during compaction.
+ * Includes drying time if the predecessor is at a printing station.
  */
 function getPredecessorEndTime(
   task: Task,
-  allTasks: Task[],
-  elements: Element[],
-  assignments: TaskAssignment[],
+  snapshot: ScheduleSnapshot,
   updatedEndTimes: Map<string, Date>
 ): Date | null {
-  const predecessorTask = findPredecessorTask(task, allTasks, elements);
+  const predecessorTask = findPredecessorTask(task, snapshot.tasks, snapshot.elements);
   if (!predecessorTask) return null;
 
-  // Check if predecessor was already updated during this compaction
-  const updatedEnd = updatedEndTimes.get(predecessorTask.id);
-  if (updatedEnd) return updatedEnd;
+  // Find the predecessor's assignment
+  const predecessorAssignment = snapshot.assignments.find((a) => a.taskId === predecessorTask.id);
+  if (!predecessorAssignment) return null;
 
-  // Otherwise, look up the original assignment
-  const predecessorAssignment = assignments.find((a) => a.taskId === predecessorTask.id);
-  return predecessorAssignment ? new Date(predecessorAssignment.scheduledEnd) : null;
+  // Get end time (either updated during compaction or original)
+  const updatedEnd = updatedEndTimes.get(predecessorTask.id);
+  const predecessorEnd = updatedEnd ?? new Date(predecessorAssignment.scheduledEnd);
+
+  // Add drying time if predecessor is at a printing station
+  if (isPrintingStation(snapshot, predecessorAssignment.targetId)) {
+    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+  }
+
+  return predecessorEnd;
 }
 
 /**
@@ -154,9 +161,9 @@ function processAssignment(ctx: ProcessAssignmentContext): ProcessAssignmentResu
   // Calculate earliest possible start time
   let earliestStart = nextAvailableTime;
 
-  // Check precedence constraint
+  // Check precedence constraint (includes drying time for printing stations)
   if (task) {
-    const predecessorEnd = getPredecessorEndTime(task, snapshot.tasks, snapshot.elements, snapshot.assignments, updatedEndTimes);
+    const predecessorEnd = getPredecessorEndTime(task, snapshot, updatedEndTimes);
     if (predecessorEnd && predecessorEnd > earliestStart) {
       earliestStart = predecessorEnd;
     }

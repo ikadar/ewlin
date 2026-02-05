@@ -91,15 +91,15 @@ function getLayoutDimensions(): {
 /**
  * Find the earliest start time for a task based on predecessor constraints.
  * Tasks in the same element (job) share the same elementId.
+ * Includes drying time if predecessor is at a printing station.
  */
 function findPredecessorEndTime(
   task: Task,
-  tasks: Task[],
-  assignments: TaskAssignment[],
+  snapshot: ScheduleSnapshot,
   updatedEndTimes: Map<string, Date>
 ): Date | null {
   // Tasks in the same element share the same elementId
-  const elementTasks = tasks
+  const elementTasks = snapshot.tasks
     .filter((t) => t.elementId === task.elementId)
     .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
   const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
@@ -107,12 +107,24 @@ function findPredecessorEndTime(
   if (taskIndex <= 0) return null;
 
   const predecessorTask = elementTasks[taskIndex - 1];
+  const predecessorAssignment = snapshot.assignments.find((a) => a.taskId === predecessorTask.id);
+  if (!predecessorAssignment) return null;
+
+  // Get end time (either updated during compaction or original)
   const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
+  const predecessorEnd = updatedPredecessorEnd ?? new Date(predecessorAssignment.scheduledEnd);
 
-  if (updatedPredecessorEnd) return updatedPredecessorEnd;
+  // Check if predecessor is at a printing (offset) station - add drying time
+  const station = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
+  if (station) {
+    const category = snapshot.categories.find((c) => c.id === station.categoryId);
+    if (category?.name.toLowerCase().includes('offset')) {
+      const DRY_TIME_MS = 4 * 60 * 60 * 1000; // 4 hours
+      return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+    }
+  }
 
-  const predecessorAssignment = assignments.find((a) => a.taskId === predecessorTask.id);
-  return predecessorAssignment ? new Date(predecessorAssignment.scheduledEnd) : null;
+  return predecessorEnd;
 }
 
 /**
@@ -155,9 +167,9 @@ function compactStationAssignments(
     const task = taskMap.get(assignment.taskId);
     let earliestStart = nextStartTime;
 
-    // Check predecessor constraint
+    // Check predecessor constraint (includes drying time for printing stations)
     if (task) {
-      const predecessorEnd = findPredecessorEndTime(task, currentSnapshot.tasks, currentSnapshot.assignments, updatedEndTimes);
+      const predecessorEnd = findPredecessorEndTime(task, currentSnapshot, updatedEndTimes);
       if (predecessorEnd && predecessorEnd > earliestStart) {
         earliestStart = predecessorEnd;
       }

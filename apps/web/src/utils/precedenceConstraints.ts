@@ -19,7 +19,7 @@ import { getElementTasks } from './taskHelpers';
 import { calculateDepartureDate, calculateReturnDate } from './outsourcingCalculation';
 
 // Dry time in milliseconds (4 hours) - same as in @flux/schedule-validator
-const DRY_TIME_MS = 4 * 60 * 60 * 1000;
+export const DRY_TIME_MS = 4 * 60 * 60 * 1000;
 
 // ============================================================================
 // Element / Lookup helpers
@@ -47,7 +47,7 @@ function findTaskById(snapshot: ScheduleSnapshot, taskId: string): Task | undefi
 /**
  * Check if a station is a printing (offset) station that requires dry time.
  */
-function isPrintingStation(snapshot: ScheduleSnapshot, stationId: string): boolean {
+export function isPrintingStation(snapshot: ScheduleSnapshot, stationId: string): boolean {
   const station = snapshot.stations.find((s) => s.id === stationId);
   if (!station) return false;
 
