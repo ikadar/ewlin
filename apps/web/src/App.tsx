@@ -1570,11 +1570,38 @@ function AppContent() {
       return;
     }
 
+    // Check for precedence conflict WITHOUT bypass (to detect actual conflicts)
+    // This is needed because when ALT is pressed, the validation passes and conflicts are empty
+    const proposalWithoutBypass: ProposedAssignment = {
+      ...proposedAssignment,
+      bypassPrecedence: false,
+    };
+    const validationWithoutBypass = validateAssignment(proposalWithoutBypass, snapshot);
+    const hasPrecedenceConflict = validationWithoutBypass.conflicts.some(
+      (c) => c.type === 'PrecedenceConflict' && c.details?.constraintType === 'predecessor'
+    );
+
+    // Auto-snap to suggestedStart if there's a precedence conflict (without Alt bypass)
+    // This ensures the tile is placed at the earliest valid position
+    const effectiveStart = (!isAltPressed && hasPrecedenceConflict && validationWithoutBypass.suggestedStart)
+      ? validationWithoutBypass.suggestedStart
+      : scheduledStart;
+
+    if (effectiveStart !== scheduledStart) {
+      console.log('Auto-snap: precedence conflict detected, using suggestedStart:', {
+        original: scheduledStart,
+        snapped: effectiveStart,
+      });
+    }
+
     // Cast to InternalTask for API call
     const task = pickedTask as InternalTask;
 
     // v0.3.57: Determine if this is a reschedule (grid pick with assignmentId)
     const isRescheduleOp = pickedAssignmentId !== null;
+
+    // Determine if we're creating a precedence conflict via ALT bypass
+    const creatingPrecedenceConflict = isAltPressed && hasPrecedenceConflict;
 
     // v0.5.2: Use RTK Query mutations for assignment operations
     try {
@@ -1584,22 +1611,24 @@ function AppContent() {
           taskId: task.id,
           body: {
             targetId: stationId,
-            scheduledStart,
+            scheduledStart: effectiveStart,
             isOutsourced: false,
+            bypassPrecedence: creatingPrecedenceConflict,
           },
         }).unwrap();
-        console.log('Pick reschedule completed:', { taskId: task.id, scheduledStart });
+        console.log('Pick reschedule completed:', { taskId: task.id, scheduledStart: effectiveStart, bypassPrecedence: creatingPrecedenceConflict });
       } else {
         // Create new assignment
         await assignTask({
           taskId: task.id,
           body: {
             targetId: stationId,
-            scheduledStart,
+            scheduledStart: effectiveStart,
             isOutsourced: false,
+            bypassPrecedence: creatingPrecedenceConflict,
           },
         }).unwrap();
-        console.log('Pick placement created:', { taskId: task.id, scheduledStart });
+        console.log('Pick placement created:', { taskId: task.id, scheduledStart: effectiveStart, bypassPrecedence: creatingPrecedenceConflict });
       }
       // Cache invalidation is automatic via invalidatesTags
     } catch (error) {

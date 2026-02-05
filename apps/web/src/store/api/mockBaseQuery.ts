@@ -23,7 +23,10 @@ import type {
   Element,
   Task,
   ReferenceLookupResponse,
+  ScheduleConflict,
+  ProposedAssignment,
 } from '@flux/types';
+import { validateAssignment } from '@flux/schedule-validator';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
 import { normalizeError, createNotFoundError } from './errorNormalization';
@@ -99,10 +102,33 @@ const handleAssignTask = async (
     updatedAt: new Date().toISOString(),
   };
 
+  // Check for precedence conflicts when bypassPrecedence is true
+  let newConflicts: ScheduleConflict[] = [];
+  if (body.bypassPrecedence) {
+    const proposedAssignment: ProposedAssignment = {
+      taskId,
+      targetId: body.targetId,
+      isOutsourced: body.isOutsourced ?? false,
+      scheduledStart: body.scheduledStart,
+      bypassPrecedence: false, // Check without bypass to detect actual conflicts
+    };
+    const validationResult = validateAssignment(proposedAssignment, currentSnapshot);
+
+    // Record any precedence conflicts
+    newConflicts = validationResult.conflicts.filter(
+      (c) => c.type === 'PrecedenceConflict'
+    );
+
+    if (newConflicts.length > 0) {
+      console.log('[Mock] Recording precedence conflicts for bypass placement:', newConflicts);
+    }
+  }
+
   // Update snapshot
   updateSnapshot((snapshot) => ({
     ...snapshot,
     assignments: [...updatedAssignments, newAssignment],
+    conflicts: [...snapshot.conflicts, ...newConflicts],
   }));
 
   const response: AssignmentResponse = {
@@ -160,9 +186,42 @@ const handleRescheduleTask = async (
     updatedAt: new Date().toISOString(),
   };
 
+  // Check for precedence conflicts when bypassPrecedence is true
+  let newConflicts: ScheduleConflict[] = [];
+  if (body.bypassPrecedence) {
+    // Create a temporary snapshot without this task's assignment for validation
+    const tempSnapshot = {
+      ...currentSnapshot,
+      assignments: assignmentsWithoutCurrent,
+    };
+    const proposedAssignment: ProposedAssignment = {
+      taskId,
+      targetId: body.targetId,
+      isOutsourced: body.isOutsourced ?? false,
+      scheduledStart: body.scheduledStart,
+      bypassPrecedence: false, // Check without bypass to detect actual conflicts
+    };
+    const validationResult = validateAssignment(proposedAssignment, tempSnapshot);
+
+    // Record any precedence conflicts
+    newConflicts = validationResult.conflicts.filter(
+      (c) => c.type === 'PrecedenceConflict'
+    );
+
+    if (newConflicts.length > 0) {
+      console.log('[Mock] Recording precedence conflicts for bypass reschedule:', newConflicts);
+    }
+  }
+
+  // Remove old conflicts for this task before adding new ones
+  const conflictsWithoutTask = currentSnapshot.conflicts.filter(
+    (c) => c.taskId !== taskId
+  );
+
   updateSnapshot((snapshot) => ({
     ...snapshot,
     assignments: [...updatedAssignments, updatedAssignment],
+    conflicts: [...conflictsWithoutTask, ...newConflicts],
   }));
 
   const response: AssignmentResponse = {
@@ -199,6 +258,8 @@ const handleUnassignTask = async (
   updateSnapshot((snapshot) => ({
     ...snapshot,
     assignments: snapshot.assignments.filter((a) => a.taskId !== taskId),
+    // Also remove any conflicts for this task
+    conflicts: snapshot.conflicts.filter((c) => c.taskId !== taskId),
   }));
 
   const response: UnassignmentResponse = {
