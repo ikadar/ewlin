@@ -53,12 +53,12 @@ export function createSwapFixture(): ScheduleSnapshot {
       id: 'job-swap-3',
       reference: 'SWAP-003',
       client: 'Swap Client C',
-      description: 'Swap Job 3 (Bottom)',
+      description: 'Swap Job 3 (Bottom) - has predecessor',
       status: 'InProgress',
       workshopExitDate: isoDate(0, 0, 7),
       color: '#22c55e',
       comments: [],
-      taskIds: ['task-swap-3'],
+      taskIds: ['task-swap-3-pred', 'task-swap-3'],
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -88,10 +88,23 @@ export function createSwapFixture(): ScheduleSnapshot {
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     } as InternalTask,
+    // Predecessor task for SWAP-003: scheduled on Polar, ends at 9:00
+    {
+      id: 'task-swap-3-pred',
+      elementId: 'elem-job-swap-3',
+      sequenceOrder: 0,
+      status: 'Assigned',
+      type: 'Internal',
+      stationId: 'station-polar',
+      duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    } as InternalTask,
+    // Main task for SWAP-003: must start after predecessor ends
     {
       id: 'task-swap-3',
       elementId: 'elem-job-swap-3',
-      sequenceOrder: 0,
+      sequenceOrder: 1, // After predecessor
       status: 'Assigned',
       type: 'Internal',
       stationId: 'station-komori',
@@ -127,6 +140,20 @@ export function createSwapFixture(): ScheduleSnapshot {
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
     },
+    // Predecessor for SWAP-003: on Polar, 8:00-9:00 (ends when task-swap-3 starts)
+    {
+      id: 'assign-swap-3-pred',
+      taskId: 'task-swap-3-pred',
+      targetId: 'station-polar',
+      isOutsourced: false,
+      scheduledStart: isoDate(8, 0),
+      scheduledEnd: isoDate(9, 0),
+      isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
+    },
+    // SWAP-003 main task: on Komori, 9:00-10:00
     {
       id: 'assign-swap-3',
       taskId: 'task-swap-3',

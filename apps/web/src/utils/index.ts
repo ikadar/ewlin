@@ -72,3 +72,4 @@ export {
   parseOutsourcingDateTime,
 } from './outsourcingCalculation';
 export type { OutsourcingParams } from './outsourcingCalculation';
+export { recalculatePrecedenceConflicts, updateSnapshotConflicts } from './conflictRecalculation';

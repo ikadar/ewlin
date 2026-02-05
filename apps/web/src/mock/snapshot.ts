@@ -12,6 +12,7 @@ import {
 } from './generators';
 import { getFixtureFromUrl, shouldUseFixture } from './testFixtures';
 import { getTasksForJob as getTasksForJobHelper } from '../utils/taskHelpers';
+import { updateSnapshotConflicts } from '../utils/conflictRecalculation';
 
 // ============================================================================
 // Snapshot Creation
@@ -113,15 +114,21 @@ export function invalidateSnapshot(): void {
 /**
  * Update the cached snapshot with new data.
  * Useful for optimistic updates.
+ * Automatically recalculates all precedence conflicts after the update.
  * @param updater - Function that receives the current snapshot and returns updated snapshot
  */
 export function updateSnapshot(
   updater: (snapshot: ScheduleSnapshot) => ScheduleSnapshot
 ): ScheduleSnapshot {
   const current = getSnapshot();
-  cachedSnapshot = updater(current);
-  cachedSnapshot.version += 1;
-  cachedSnapshot.generatedAt = new Date().toISOString();
+  let updated = updater(current);
+  updated.version += 1;
+  updated.generatedAt = new Date().toISOString();
+
+  // Automatically recalculate conflicts after every update
+  updated = updateSnapshotConflicts(updated);
+
+  cachedSnapshot = updated;
   return cachedSnapshot;
 }
 

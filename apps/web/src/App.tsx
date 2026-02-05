@@ -935,6 +935,7 @@ function AppContent() {
   }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId]);
 
   // Handle swap up - exchange position with tile above
+  // Note: Conflicts are automatically recalculated by updateSnapshot
   const handleSwapUp = useCallback((assignmentId: string) => {
     updateSnapshot((currentSnapshot) => {
       const result = applySwap(currentSnapshot.assignments, assignmentId, 'up');
@@ -951,6 +952,7 @@ function AppContent() {
   }, [invalidateSnapshot]);
 
   // Handle swap down - exchange position with tile below
+  // Note: Conflicts are automatically recalculated by updateSnapshot
   const handleSwapDown = useCallback((assignmentId: string) => {
     updateSnapshot((currentSnapshot) => {
       const result = applySwap(currentSnapshot.assignments, assignmentId, 'down');
