@@ -740,8 +740,16 @@ function AppContent() {
     snapshot.assignments
       .filter((a) => taskIds.has(a.taskId))
       .forEach((assignment) => {
+        const scheduledStart = new Date(assignment.scheduledStart);
         const scheduledEnd = new Date(assignment.scheduledEnd);
-        const dateKey = new Date(assignment.scheduledStart).toISOString().split('T')[0];
+        // Use local date for dateKey (to match DateStrip's local calendar display)
+        const year = scheduledStart.getFullYear();
+        const month = String(scheduledStart.getMonth() + 1).padStart(2, '0');
+        const day = String(scheduledStart.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`;
+
+        // Extract start hour within the day (0-24, fractional)
+        const startHour = scheduledStart.getHours() + scheduledStart.getMinutes() / 60;
 
         // Determine task marker status
         let status: TaskMarker['status'] = 'scheduled';
@@ -756,6 +764,7 @@ function AppContent() {
         const marker: TaskMarker = {
           taskId: assignment.taskId,
           status,
+          startHour,
         };
 
         const existing = markers.get(dateKey) ?? [];

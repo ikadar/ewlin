@@ -4,6 +4,8 @@ export type TaskMarkerStatus = 'scheduled' | 'conflict' | 'late' | 'completed';
 export interface TaskMarker {
   taskId: string;
   status: TaskMarkerStatus;
+  /** Start hour within the day (0-24, fractional, e.g., 9.5 = 9:30 AM) */
+  startHour: number;
 }
 
 export interface TaskMarkersProps {
@@ -29,9 +31,9 @@ function getMarkerColorClass(status: TaskMarkerStatus): string {
 /**
  * TaskMarkers - Colored horizontal lines indicating tasks scheduled on a day.
  *
- * Multiple tasks are stacked vertically within the cell.
- * Each line is 2px tall with a small gap between them.
- * Positioned on the right side of the cell (starts at ~70%, ends at right edge).
+ * Each marker is positioned vertically at its start time (percentage of 24 hours).
+ * Lines span 50% of cell width (left-[50%] to right-1).
+ * Multiple markers at similar times have small vertical offset to prevent overlap.
  *
  * Colors:
  * - Gray (zinc-500): Scheduled future task
@@ -44,17 +46,25 @@ export function TaskMarkers({ markers }: TaskMarkersProps) {
 
   return (
     <div
-      className="absolute bottom-1 left-[70%] right-1 flex flex-col gap-0.5 pointer-events-none"
+      className="absolute inset-0 pointer-events-none"
       data-testid="task-markers"
     >
-      {markers.map((marker) => (
-        <div
-          key={marker.taskId}
-          className={`h-0.5 w-full rounded-full ${getMarkerColorClass(marker.status)}`}
-          data-testid={`task-marker-${marker.taskId}`}
-          data-status={marker.status}
-        />
-      ))}
+      {markers.map((marker, index) => {
+        // Position marker at its start time (percentage of 24 hours)
+        const topPercent = (marker.startHour / 24) * 100;
+        // Small offset for multiple markers at same time to prevent overlap
+        const offsetPx = index * 3;
+
+        return (
+          <div
+            key={marker.taskId}
+            className={`absolute left-[50%] right-1 h-0.5 rounded-full ${getMarkerColorClass(marker.status)}`}
+            style={{ top: `calc(${topPercent}% + ${offsetPx}px)` }}
+            data-testid={`task-marker-${marker.taskId}`}
+            data-status={marker.status}
+          />
+        );
+      })}
     </div>
   );
 }
