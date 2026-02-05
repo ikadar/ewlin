@@ -84,7 +84,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
       sequenceOrder: i,
       status: 'Assigned',
       type: 'Internal',
-      stationId: i % 2 === 0 ? 'station-komori' : 'station-heidelberg',
+      stationId: i % 2 === 0 ? 'station-offset' : 'station-plieuse',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -93,7 +93,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     assignments.push({
       id: `assign-vs-1${job1TaskSuffixes[i]}`,
       taskId: `task-vs-1${job1TaskSuffixes[i]}`,
-      targetId: i % 2 === 0 ? 'station-komori' : 'station-heidelberg',
+      targetId: i % 2 === 0 ? 'station-offset' : 'station-plieuse',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, dayOffset),
       scheduledEnd: isoDate(9, 30, dayOffset),
@@ -114,7 +114,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
       sequenceOrder: i,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -123,7 +123,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     assignments.push({
       id: `assign-vs-2${job2TaskSuffixes[i]}`,
       taskId: `task-vs-2${job2TaskSuffixes[i]}`,
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, dayOffset),
       scheduledEnd: isoDate(11, 0, dayOffset),
@@ -141,7 +141,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     sequenceOrder: 0,
     status: 'Assigned',
     type: 'Internal',
-    stationId: 'station-heidelberg',
+    stationId: 'station-plieuse',
     duration: { setupMinutes: 30, runMinutes: 90 }, // 2h
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
@@ -150,7 +150,7 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
   assignments.push({
     id: 'assign-vs-3',
     taskId: 'task-vs-3',
-    targetId: 'station-heidelberg',
+    targetId: 'station-plieuse',
     isOutsourced: false,
     scheduledStart: isoDate(7, 0, 180),
     scheduledEnd: isoDate(9, 0, 180),

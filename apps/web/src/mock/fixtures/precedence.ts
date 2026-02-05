@@ -44,7 +44,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,  // First task
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -55,7 +55,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 1,  // Second task (must wait for first)
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 30 }, // 45min
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -68,7 +68,7 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-1',
       taskId: 'task-prec-1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 30),

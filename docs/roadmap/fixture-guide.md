@@ -219,6 +219,110 @@ Always use **French print industry terminology**:
 
 ---
 
+## 11. Production Routes
+
+Typical production routes for common print products. Use these when building fixtures.
+
+### Flyer (job simple, 1 élément)
+
+```
+Offset → Massicot → Conditionnement
+```
+
+### Dépliant (job simple, 1 élément)
+
+```
+Offset → Massicot → Plieuse → Conditionnement
+```
+
+### Brochure piquée (job multi-éléments, 4 éléments)
+
+```
+Element "couv" (Couverture) :    Offset → Massicot
+Element "cah1" (Cahier 1) :      Offset → Plieuse
+Element "cah2" (Cahier 2) :      Offset → Plieuse
+Element "fin"  (Finalisation) :  Encarteuse-Piqueuse → Conditionnement
+                                  prérequis: couv + cah1 + cah2
+```
+
+### Key rules
+
+- Les cahiers vont **directement** de l'offset à la plieuse (PAS de massicot — on plie la feuille entière)
+- Seule la couverture passe par le massicot (on coupe au format)
+- La finalisation (encartage + conditionnement) attend que TOUS les éléments précédents soient terminés
+- Séchage 4h entre offset et le poste suivant (règle BR-ELEM-005)
+- Tous les éléments ne commencent pas par l'impression — l'élément "fin" commence par l'encarteuse
+
+### Precedence rules
+
+1. Le conditionnement est TOUJOURS la dernière opération interne
+2. Séchage 4h après impression offset avant toute opération suivante
+3. Un élément d'assemblage/finalisation n'a pas d'impression — il commence directement au poste d'assemblage
+
+### Duration guidelines for fixtures
+
+| Poste | Durée | Ratio | Exemples |
+|---|---|---|---|
+| Impression (offset) | 30min - 2h | Base | setup 15min + run 15min à 1h45 |
+| Massicot | 15min ou 30min | Fixe, court | setup 5-10min + run 10-20min |
+| Plieuse | 2× impression | Plus lent | Si impression = 1h → plieuse = 2h |
+| Encarteuse-piqueuse | 3× impression | Le plus lent | Si impression = 1h → encarteuse = 3h |
+| Conditionnement | 15min, 30min ou 45min | Fixe, court | setup 5-10min + run 10-35min |
+
+---
+
+## 12. Multi-Element Jobs
+
+### When to use multi-element jobs
+
+A job is multi-element when the finished product is **assembled from parts manufactured separately**. Canonical example: the saddle-stitched brochure.
+
+### Reference pattern: Brochure piquée
+
+```
+Job "Brochure A4 - 16 pages - 1000 ex" (client: Carrefour)
+│
+├─ Element "couv" (Couverture)
+│  ├─ Task 1: Offset (station-offset)      [setup: 15min, run: 45min] = 1h
+│  └─ Task 2: Massicot (station-massicot)  [setup: 5min, run: 10min]  = 15min
+│     (séchage 4h entre task 1 et task 2)
+│
+├─ Element "cah1" (Cahier 1)
+│  ├─ Task 1: Offset (station-offset)      [setup: 15min, run: 45min] = 1h
+│  └─ Task 2: Plieuse (station-plieuse)    [setup: 15min, run: 105min] = 2h (2× impression)
+│     (séchage 4h entre task 1 et task 2)
+│
+├─ Element "cah2" (Cahier 2)
+│  ├─ Task 1: Offset (station-offset)      [setup: 15min, run: 45min] = 1h
+│  └─ Task 2: Plieuse (station-plieuse)    [setup: 15min, run: 105min] = 2h (2× impression)
+│     (séchage 4h entre task 1 et task 2)
+│
+└─ Element "fin" (Finalisation)
+   │  prerequisiteElementIds: [couv, cah1, cah2]
+   │  (PAS d'impression — commence directement à l'encarteuse)
+   ├─ Task 1: Encarteuse (station-encarteuse)       [setup: 15min, run: 165min] = 3h (3× impression)
+   └─ Task 2: Conditionnement (station-conditionnement) [setup: 5min, run: 25min] = 30min
+```
+
+### Naming conventions
+
+| Element name | Label | Usage |
+|---|---|---|
+| `couv` | Couverture | Partie couverture |
+| `cah1`, `cah2`... | Cahier 1, Cahier 2... | Cahiers intérieurs |
+| `fin` | Finalisation | Assemblage + conditionnement final |
+| `ELT` | (élément unique) | Job simple, un seul élément |
+
+### Prerequisites by element type
+
+| Element | paperStatus | batStatus | plateStatus | formeStatus |
+|---|---|---|---|---|
+| Couverture (offset) | in_stock ou to_order | bat_sent→approved | to_make→ready | none |
+| Cahier (offset) | in_stock ou to_order | bat_sent→approved | to_make→ready | none |
+| Finalisation | none | none | none | none |
+
+---
+
 ## Historical Changes
 
 | Date | Commit | Description |

@@ -68,7 +68,7 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 5, runMinutes: 10 }, // 15 minutes total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -79,7 +79,7 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-plieuse',
       duration: { setupMinutes: 10, runMinutes: 20 }, // 30 minutes total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -90,7 +90,7 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2 hours total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -101,7 +101,7 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       sequenceOrder: 3,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 60, runMinutes: 180 }, // 4 hours total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -114,7 +114,7 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1 hour
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -125,7 +125,7 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-plieuse',
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2 hours
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -137,7 +137,7 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
     {
       id: 'assign-h-sched',
       taskId: 'task-h-sched',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(9, 0),

@@ -46,7 +46,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori', // OFFSET station - requires drying time
+      stationId: 'station-offset', // OFFSET station - requires drying time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -60,7 +60,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar', // Cutting station
+      stationId: 'station-massicot', // Cutting station
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -73,7 +73,7 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
     {
       id: 'assign-dry-1',
       taskId: 'task-dry-1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(10, 0),

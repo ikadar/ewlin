@@ -60,7 +60,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -71,7 +71,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 30 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -82,7 +82,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 90 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -95,7 +95,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     {
       id: 'assign-ds-1-a',
       taskId: 'task-ds-1-a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 0), // Today at 8:00
       scheduledEnd: isoDate(9, 30, 0),
@@ -108,7 +108,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     {
       id: 'assign-ds-1-b',
       taskId: 'task-ds-1-b',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, 3), // Day 3 at 10:00
       scheduledEnd: isoDate(10, 45, 3),
@@ -121,7 +121,7 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     {
       id: 'assign-ds-2',
       taskId: 'task-ds-2',
-      targetId: 'station-heidelberg',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0, 10), // Day 10 at 7:00
       scheduledEnd: isoDate(9, 0, 10),

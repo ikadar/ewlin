@@ -113,7 +113,7 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -126,7 +126,7 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -154,7 +154,7 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 30 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -167,7 +167,7 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -179,7 +179,7 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 30 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -207,7 +207,7 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
     {
       id: 'assign-drag-2a',
       taskId: 'task-drag-2a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 0), // Today 8:00
       scheduledEnd: isoDate(9, 30, 0), // Today 9:30
@@ -233,7 +233,7 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
     {
       id: 'assign-drag-3a',
       taskId: 'task-drag-3a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, 0), // Today 10:00
       scheduledEnd: isoDate(11, 30, 0), // Today 11:30

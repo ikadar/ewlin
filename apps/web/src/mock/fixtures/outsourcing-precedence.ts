@@ -120,7 +120,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -147,7 +147,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 30 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -160,7 +160,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 90 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -189,7 +189,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -203,7 +203,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -234,7 +234,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -245,7 +245,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 30 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -258,7 +258,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-1a',
       taskId: 'task-prec-1a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 0), // Today 8:00
       scheduledEnd: isoDate(9, 30, 0), // Today 9:30
@@ -276,7 +276,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-1c',
       taskId: 'task-prec-1c',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, 5), // Day 5 at 10:00 (after outsourced return)
       scheduledEnd: isoDate(10, 45, 5), // Day 5 at 10:45
@@ -287,7 +287,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-2a',
       taskId: 'task-prec-2a',
-      targetId: 'station-heidelberg',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 1), // Day 1 at 8:00
       scheduledEnd: isoDate(10, 0, 1), // Day 1 at 10:00
@@ -305,7 +305,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-2c',
       taskId: 'task-prec-2c',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(11, 0, 5), // Day 5 at 11:00 (after manual return)
       scheduledEnd: isoDate(12, 0, 5), // Day 5 at 12:00
@@ -316,7 +316,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-3a',
       taskId: 'task-prec-3a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 2), // Day 2 at 8:00
       scheduledEnd: isoDate(9, 30, 2), // Day 2 at 9:30
@@ -336,7 +336,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-4a',
       taskId: 'task-prec-4a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 3), // Day 3 at 8:00
       scheduledEnd: isoDate(9, 30, 3), // Day 3 at 9:30
@@ -345,7 +345,7 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     {
       id: 'assign-prec-4b',
       taskId: 'task-prec-4b',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, 3), // Day 3 at 10:00
       scheduledEnd: isoDate(10, 45, 3), // Day 3 at 10:45

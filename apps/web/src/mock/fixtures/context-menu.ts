@@ -60,7 +60,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -71,7 +71,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -82,7 +82,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -95,7 +95,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-plieuse',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -107,7 +107,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     {
       id: 'assign-menu-1a',
       taskId: 'task-menu-1a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(9, 0),
@@ -119,7 +119,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     {
       id: 'assign-menu-1b',
       taskId: 'task-menu-1b',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(10, 0),
@@ -131,7 +131,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     {
       id: 'assign-menu-1c',
       taskId: 'task-menu-1c',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0),
       scheduledEnd: isoDate(11, 0),
@@ -144,7 +144,7 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     {
       id: 'assign-menu-2a',
       taskId: 'task-menu-2a',
-      targetId: 'station-heidelberg',
+      targetId: 'station-plieuse',
       isOutsourced: false,
       scheduledStart: isoDate(14, 0),
       scheduledEnd: isoDate(15, 30),

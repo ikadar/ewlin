@@ -76,7 +76,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori', // Offset - has dry time
+      stationId: 'station-offset', // Offset - has dry time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -88,7 +88,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar', // Cutting
+      stationId: 'station-massicot', // Cutting
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -100,7 +100,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -112,7 +112,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -125,7 +125,7 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     {
       id: 'assign-val-1',
       taskId: 'task-val-1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(10, 0),

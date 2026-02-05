@@ -60,7 +60,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -72,7 +72,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-plieuse',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -84,7 +84,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -96,7 +96,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 3,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -108,7 +108,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 4,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-plieuse',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -120,7 +120,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -132,7 +132,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m1',
       taskId: 'task-m1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, -1), // Yesterday
       scheduledEnd: isoDate(11, 30, -1),
@@ -145,7 +145,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m2',
       taskId: 'task-m2',
-      targetId: 'station-heidelberg',
+      targetId: 'station-plieuse',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 0), // Today
       scheduledEnd: isoDate(9, 30, 0),
@@ -158,7 +158,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m3',
       taskId: 'task-m3',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0, 1), // Tomorrow
       scheduledEnd: isoDate(11, 0, 1),
@@ -172,7 +172,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m4',
       taskId: 'task-m4',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0, 2), // Day 2, before task-m3 ends
       scheduledEnd: isoDate(8, 0, 2),
@@ -185,7 +185,7 @@ export function createDatestripMarkersFixture(): ScheduleSnapshot {
     {
       id: 'assign-m6',
       taskId: 'task-m6',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(14, 0, 0), // Today afternoon
       scheduledEnd: isoDate(15, 0, 0),

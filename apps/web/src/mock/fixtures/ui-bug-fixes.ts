@@ -90,7 +90,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -101,7 +101,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -112,7 +112,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -123,7 +123,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -135,7 +135,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     {
       id: 'assign-a',
       taskId: 'task-a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 30),
@@ -147,7 +147,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     {
       id: 'assign-b',
       taskId: 'task-b',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(10, 30),
@@ -159,7 +159,7 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     {
       id: 'assign-c',
       taskId: 'task-c',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0, 1), // Tomorrow at 8:00
       scheduledEnd: isoDate(9, 30, 1),   // Tomorrow at 9:30

@@ -72,7 +72,7 @@ export function createSwapFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -83,7 +83,7 @@ export function createSwapFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -95,7 +95,7 @@ export function createSwapFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -107,7 +107,7 @@ export function createSwapFixture(): ScheduleSnapshot {
       sequenceOrder: 1, // After predecessor
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -119,7 +119,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     {
       id: 'assign-swap-1',
       taskId: 'task-swap-1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(7, 0),
       scheduledEnd: isoDate(8, 0),
@@ -131,7 +131,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     {
       id: 'assign-swap-2',
       taskId: 'task-swap-2',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(9, 0),
@@ -144,7 +144,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     {
       id: 'assign-swap-3-pred',
       taskId: 'task-swap-3-pred',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(9, 0),
@@ -157,7 +157,7 @@ export function createSwapFixture(): ScheduleSnapshot {
     {
       id: 'assign-swap-3',
       taskId: 'task-swap-3',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(10, 0),
