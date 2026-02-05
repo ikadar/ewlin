@@ -9,7 +9,7 @@
 
 ## Overview
 
-Ez a dokumentum a DateStrip & Pick&Place feature-ök Manual QA tesztjeit tartalmazza. A feature csoport a következő fő területeket fedi le:
+This document contains Manual QA tests for the DateStrip & Pick&Place features. The feature group covers the following main areas:
 
 - **DateStrip Visual Markers** - ViewportIndicator, Task Markers, ExitTriangle, Task Timeline
 - **DateStrip UX** - Date tooltip, clickable dates, zoom-aware snapping
@@ -23,8 +23,8 @@ Ez a dokumentum a DateStrip & Pick&Place feature-ök Manual QA tesztjeit tartalm
 
 ## Test Fixtures
 
-| Fixture | URL | Leírás |
-|---------|-----|--------|
+| Fixture | URL | Description |
+|---------|-----|-------------|
 | `datestrip-markers` | `?fixture=datestrip-markers` | ViewportIndicator, task markers testing |
 | `validation-messages` | `?fixture=validation-messages` | Jobs with validation warnings |
 | `sidebar-drag` | `?fixture=sidebar-drag` | Sidebar pick: 1 job, 1 unscheduled task |

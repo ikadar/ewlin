@@ -13,6 +13,8 @@ import { scheduleApi } from './api/scheduleApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
+import { qaApi } from '../qa/store/qaApi';
+import { qaReducer } from '../qa/store/qaSlice';
 
 // ============================================================================
 // Store Configuration
@@ -20,17 +22,22 @@ import { errorReducer } from './slices/errorSlice';
 
 export const store = configureStore({
   reducer: {
-    // RTK Query API reducer
+    // RTK Query API reducers
     [scheduleApi.reducerPath]: scheduleApi.reducer,
+    [qaApi.reducerPath]: qaApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
     jcf: jcfReducer,
     // Error state slice
     error: errorReducer,
+    // QA tracker state slice
+    qa: qaReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(scheduleApi.middleware),
+    getDefaultMiddleware()
+      .concat(scheduleApi.middleware)
+      .concat(qaApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -121,3 +128,28 @@ export {
   selectCurrentError,
   selectIsServiceUnavailable,
 } from './slices/errorSlice';
+
+// Re-export QA tracker slice actions and selectors
+export {
+  setSelectedFolder,
+  setSelectedFile,
+  setSelectedTestId,
+  resetQAState,
+  selectSelectedFolder,
+  selectSelectedFile,
+  selectSelectedTestId,
+} from '../qa/store/qaSlice';
+
+// Re-export QA API hooks
+export {
+  useGetFoldersQuery,
+  useGetFilesQuery,
+  useGetContentQuery,
+  useUpdateStatusMutation,
+  useGetKOLogsQuery,
+  useCreateKOLogMutation,
+  useResolveKOLogMutation,
+  useGetFixtureRequestsQuery,
+  useCreateFixtureRequestMutation,
+  qaApi,
+} from '../qa/store/qaApi';

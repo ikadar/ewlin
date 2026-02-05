@@ -7,9 +7,11 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "dev:qa": "concurrently -n api,web -c yellow,cyan \"pnpm --filter qa-api dev\" \"pnpm --filter web dev:mock\""
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "typescript": "^5.7.2"
   },
   "pnpm": {

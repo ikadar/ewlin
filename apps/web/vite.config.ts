@@ -9,4 +9,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/qa-api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+    },
+  },
 });

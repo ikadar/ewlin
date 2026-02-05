@@ -9,9 +9,9 @@
 
 ## Overview
 
-Ez a dokumentum a JCF (Job Creation Form) Autocomplete mezők Manual QA tesztjeit tartalmazza. A feature csoport a következő fő területeket fedi le:
+This document contains the Manual QA tests for the JCF (Job Creation Form) Autocomplete fields. The feature group covers the following main areas:
 
-- **Field-Specific Autocompletes** - Format, Impression, Surfacage, Quantité, Pagination mezők
+- **Field-Specific Autocompletes** - Format, Impression, Surfacage, Quantité, Pagination fields
 - **Two-Step Autocompletes** - Papier (type→grammage), Imposition (format→poses), Precedences
 - **Sequence Multi-line Editor** - Poste mode, ST mode, Workflow-guided suggestions
 - **Validation & Calculated Fields** - Live DSL validation, Required field indicators, qteFeuilles auto-calculation
@@ -20,8 +20,8 @@ Ez a dokumentum a JCF (Job Creation Form) Autocomplete mezők Manual QA tesztjei
 
 ## Test Fixtures
 
-| Fixture | URL | Leírás |
-|---------|-----|--------|
+| Fixture | URL | Description |
+|---------|-----|-------------|
 | `elements-table` | `?fixture=elements-table` | JCF modal with default element for grid layout testing |
 | `test` | `?fixture=test` | Standard test data with multiple jobs |
 
@@ -1024,4 +1024,3 @@ Ez a dokumentum a JCF (Job Creation Form) Autocomplete mezők Manual QA tesztjei
 
 ### ST Presets (5)
 - MCA, F37, LGI, AVN, JF
-

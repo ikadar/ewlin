@@ -2,16 +2,16 @@
 
 > **Last Updated:** 2026-02-03
 >
-> **Related Features:** API-046 - API-076 (B3 batch, 31 aktív feature)
+> **Related Features:** API-046 - API-076 (B3 batch, 31 active features)
 >
-> **Fixtures:** N/A (API tesztelés, nincs UI fixture)
+> **Fixtures:** N/A (API testing, no UI fixture)
 
 ---
 
 ## Overview
 
-A Scheduling API a task assignment, validation, reschedule és completion funkcionalitásokat biztosítja. A rendszer két komponensből áll:
-1. **Validation Service** (Node.js) - `@flux/schedule-validator` csomag REST API-ként
+The Scheduling API provides task assignment, validation, reschedule, and completion functionalities. The system consists of two components:
+1. **Validation Service** (Node.js) - `@flux/schedule-validator` package as REST API
 2. **PHP API** - Assignment management, Schedule aggregate, Business Calendar
 
 **API Base URLs:**
@@ -22,16 +22,16 @@ A Scheduling API a task assignment, validation, reschedule és completion funkci
 
 ## Test Fixtures
 
-Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges előfeltételek:
+This is an API testing document, no UI fixture. Prerequisites for testing:
 
-| Előfeltétel | Leírás |
-|-------------|--------|
-| PHP API futás | `docker-compose up` a `services/php-api` könyvtárban |
-| Validation Service futás | `docker-compose up` vagy `pnpm dev` a `services/validation-service` könyvtárban |
-| Adatbázis | Friss migráció futtatva (`doctrine:migrations:migrate`) |
-| Station(s) | Legalább 1 station létezik operating schedule-lal |
-| Job(s) | Legalább 1 job taskokkal |
-| Task(s) | Legalább 1 task "Ready" státuszban |
+| Prerequisite | Description |
+|--------------|-------------|
+| PHP API running | `docker-compose up` in `services/php-api` directory |
+| Validation Service running | `docker-compose up` or `pnpm dev` in `services/validation-service` directory |
+| Database | Fresh migration run (`doctrine:migrations:migrate`) |
+| Station(s) | At least 1 station exists with operating schedule |
+| Job(s) | At least 1 job with tasks |
+| Task(s) | At least 1 task in "Ready" status |
 
 ---
 
@@ -1141,7 +1141,7 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 
 ## Edge Cases
 
-| Eset | Elvárt viselkedés |
+| Case | Expected Behavior |
 |------|-------------------|
 | Assign to non-existent station | HTTP 404 |
 | Assign to non-existent provider | HTTP 404 |
@@ -1160,8 +1160,8 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 
 ## Cross-feature Interactions
 
-| Kapcsolódó feature | Interakció típusa |
-|--------------------|-------------------|
+| Related Feature | Interaction Type |
+|-----------------|------------------|
 | Station Entity (API-001) | Target for internal task assignments |
 | Provider Entity (API-015) | Target for outsourced task assignments |
 | Task Entity (API-025) | Subject of assignment operations |
@@ -1172,8 +1172,8 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 
 ## Statistics
 
-| Metrika | Érték |
-|---------|-------|
-| Feldolgozott feature-ök | 31 |
-| Generált teszt szcenáriók | 42 |
-| Edge case-ek | 12 |
+| Metric | Value |
+|--------|-------|
+| Processed features | 31 |
+| Generated test scenarios | 42 |
+| Edge cases | 12 |

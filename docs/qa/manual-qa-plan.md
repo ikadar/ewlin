@@ -4,13 +4,13 @@
 >
 > **Last Updated:** 2026-02-03
 >
-> **Purpose:** Átfogó Manual QA dokumentáció az alkalmazás összes feature-jéhez.
+> **Purpose:** Comprehensive Manual QA documentation for all application features.
 
 ---
 
 ## Overview
 
-Ez a dokumentum a Flux Scheduler alkalmazás Manual QA Plan fő indexe. A részletes teszt szcenáriók feature-csoportonként külön dokumentumokban találhatók.
+This document is the main index for the Flux Scheduler application Manual QA Plan. Detailed test scenarios are found in separate documents organized by feature groups.
 
 ---
 
@@ -18,8 +18,8 @@ Ez a dokumentum a Flux Scheduler alkalmazás Manual QA Plan fő indexe. A részl
 
 ### Prerequisites
 
-| Követelmény | Leírás |
-|-------------|--------|
+| Requirement | Description |
+|-------------|-------------|
 | Docker | `docker-compose up -d` |
 | Backend | `http://localhost:8080` |
 | Frontend | `http://localhost:5173` |
@@ -27,13 +27,13 @@ Ez a dokumentum a Flux Scheduler alkalmazás Manual QA Plan fő indexe. A részl
 
 ### Browser Matrix
 
-| Böngésző | Verzió | Prioritás |
-|----------|--------|-----------|
+| Browser | Version | Priority |
+|---------|---------|----------|
 | Chrome | Latest | P1 |
 | Firefox | Latest | P1 |
 | Safari | Latest (macOS) | P2 |
 
-> **Note:** Desktop only - mobile/tablet nem scope.
+> **Note:** Desktop only - mobile/tablet not in scope.
 
 ---
 
@@ -41,16 +41,16 @@ Ez a dokumentum a Flux Scheduler alkalmazás Manual QA Plan fő indexe. A részl
 
 ### Backend API (M1 + M2)
 
-| Dokumentum | Feature-ök | Státusz |
-|------------|------------|---------|
+| Document | Features | Status |
+|----------|----------|--------|
 | [Station Management API](api/station-management.md) | API-001 - API-021 | Complete |
 | [Job Management API](api/job-management.md) | API-021 - API-045 | Complete |
 | [Scheduling API](api/scheduling.md) | API-046 - API-076 | Complete |
 
 ### Scheduler UI (M3)
 
-| Dokumentum | Feature-ök | Státusz |
-|------------|------------|---------|
+| Document | Features | Status |
+|----------|----------|--------|
 | [Layout & Grid](scheduler/layout-grid.md) | SCHED-001 - SCHED-034 | Complete |
 | [Drag & Drop](scheduler/drag-drop.md) | SCHED-041 - SCHED-083 | Complete |
 | [Navigation & UX](scheduler/navigation-ux.md) | SCHED-084 - SCHED-114 | Complete |
@@ -58,8 +58,8 @@ Ez a dokumentum a Flux Scheduler alkalmazás Manual QA Plan fő indexe. A részl
 
 ### Job Creation Form (M4)
 
-| Dokumentum | Feature-ök | Státusz |
-|------------|------------|---------|
+| Document | Features | Status |
+|----------|----------|--------|
 | [Elements Table](jcf/elements-table.md) | SCHED-153 - SCHED-165, JCF-001 - JCF-054 | Complete |
 | [Autocomplete Fields](jcf/autocomplete.md) | JCF-055 - JCF-111 | Complete |
 | [Validation & Templates](jcf/validation-templates.md) | JCF-112 - JCF-187 | Complete |
@@ -68,11 +68,11 @@ Ez a dokumentum a Flux Scheduler alkalmazás Manual QA Plan fő indexe. A részl
 
 ## Smoke Test Checklist
 
-Gyors ellenőrzés (~5-10 perc) a fő funkcionalitásokra:
+Quick verification (~5-10 minutes) for main functionalities:
 
 ### Backend API
 
-- [ ] Swagger UI elérhető (`/api/doc`)
+- [ ] Swagger UI accessible (`/api/doc`)
 - [ ] GET `/api/v1/stations` - 200 OK
 - [ ] GET `/api/v1/station-categories` - 200 OK
 - [ ] GET `/api/v1/station-groups` - 200 OK
@@ -80,25 +80,25 @@ Gyors ellenőrzés (~5-10 perc) a fő funkcionalitásokra:
 
 ### Scheduler UI
 
-- [ ] App betöltődik (`http://localhost:5173`)
-- [ ] Sidebar megjelenik
-- [ ] Grid megjelenik station oszlopokkal
-- [ ] DateStrip navigáció működik
+- [ ] App loads (`http://localhost:5173`)
+- [ ] Sidebar appears
+- [ ] Grid appears with station columns
+- [ ] DateStrip navigation works
 
 ### Job Creation Form
 
-- [ ] JCF dialog megnyílik (`/job/new` or "+" button)
-- [ ] Elements tábla működik
-- [ ] Autocomplete mezők működnek (papier, imposition, sequence)
-- [ ] Submit validation működik (Save button)
-- [ ] Template save/apply működik
-- [ ] URL navigation működik (browser back/forward)
+- [ ] JCF dialog opens (`/job/new` or "+" button)
+- [ ] Elements table works
+- [ ] Autocomplete fields work (papier, imposition, sequence)
+- [ ] Submit validation works (Save button)
+- [ ] Template save/apply works
+- [ ] URL navigation works (browser back/forward)
 
 ---
 
 ## Regression Test Suite
 
-Kritikus happy path-ok gyűjteménye release előtti teszteléshez.
+Collection of critical happy paths for pre-release testing.
 
 ### API Regression
 
@@ -138,10 +138,10 @@ Kritikus happy path-ok gyűjteménye release előtti teszteléshez.
 
 ## Test Fixtures
 
-A frontend teszteléshez használható fixture-ök:
+Fixtures available for frontend testing:
 
-| Fixture | URL | Leírás |
-|---------|-----|--------|
+| Fixture | URL | Description |
+|---------|-----|-------------|
 | `test` | `?fixture=test` | Basic: 3 jobs, 5 tasks, 3 assignments |
 | `swap` | `?fixture=swap` | Swap: 3 consecutive tiles on same station |
 | `layout-redesign` | `?fixture=layout-redesign` | Layout testing (zoom, sidebar) |
@@ -166,8 +166,8 @@ A frontend teszteléshez használható fixture-ök:
 
 ## Progress
 
-| Terület | Batch-ek | Dokumentumok | Státusz |
-|---------|----------|--------------|---------|
+| Area | Batches | Documents | Status |
+|------|---------|-----------|--------|
 | Backend API | B1-B3 | 3/3 | Complete |
 | Scheduler UI | B4-B8 | 4/4 | Complete |
 | Job Creation Form | B9-B11 | 3/3 | Complete |

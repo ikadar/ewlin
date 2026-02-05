@@ -4,31 +4,31 @@
 >
 > **Created:** 2026-02-03
 >
-> **Purpose:** Ez a dokumentum rögzíti a Manual QA Plan elkészítésének tervezési döntéseit és megközelítését.
+> **Purpose:** This document records the planning decisions and approach for creating the Manual QA Plan.
 >
-> **Kapcsolódó dokumentum:** [Feature Catalog Planning](./feature-catalog-planning.md)
+> **Related document:** [Feature Catalog Planning](./feature-catalog-planning.md)
 
 ---
 
-## 1. Célkitűzés
+## 1. Objective
 
-A projekt közel áll a befejezéshez. Szükség van egy átfogó Manual QA Plan-re, amely az alkalmazás **minden aktív feature-jét** lefedi, és tesztelők számára részletes útmutatót ad.
+The project is nearing completion. A comprehensive Manual QA Plan is needed that covers **all active features** of the application and provides detailed guidance for testers.
 
-A Manual QA Plan a [Feature Katalógus](../features/feature-catalog.md) alapján készül, amely az összes aktív feature-t tartalmazza.
+The Manual QA Plan is created based on the [Feature Catalog](../features/feature-catalog.md), which contains all active features.
 
 ---
 
-## 2. Döntések
+## 2. Decisions
 
-### Megközelítés
+### Approach
 
-A Manual QA Plan **feature-alapú újraírással** készül. A meglévő release dokumentumok és Playwright tesztek szolgálnak input forrásként – ezekből azonosítjuk a feature-öket és a teszt szcenáriókat. A végeredmény azonban nem a release dokumentumok egyszerű összefűzése, hanem egy logikai csoportokba rendezett, egységes struktúrájú QA dokumentáció. Ez biztosítja a konzisztenciát, elkerüli az átfedéseket, és könnyebben karbantartható, mint a release-enkénti szétszórt QA tervek.
+The Manual QA Plan is created through **feature-based rewriting**. Existing release documents and Playwright tests serve as input sources – features and test scenarios are identified from these. However, the end result is not a simple concatenation of release documents, but a QA documentation organized into logical groups with a unified structure. This ensures consistency, avoids overlaps, and is easier to maintain than scattered per-release QA plans.
 
-### Mélység
+### Depth
 
-A dokumentáció **tesztelő számára részletes** szinten készül. Minden teszt szcenárió tartalmazza az előfeltételeket, a konkrét lépéseket és az elvárt eredményeket. A cél, hogy egy tesztelő a dokumentáció alapján önállóan, további magyarázat nélkül el tudja végezni a tesztelést.
+The documentation is created at a **detailed level for testers**. Each test scenario contains preconditions, specific steps, and expected results. The goal is for a tester to be able to perform testing independently based on the documentation, without further explanation.
 
-**Példa teszt szcenárió:**
+**Example test scenario:**
 
 ```markdown
 #### Scenario: Toggle task completion via context menu
@@ -53,28 +53,28 @@ A dokumentáció **tesztelő számára részletes** szinten készül. Minden tes
 
 ### Scope
 
-A Manual QA Plan az alábbi területeket fedi le:
+The Manual QA Plan covers the following areas:
 
-- **Frontend – Scheduler UI (M3):** A fő ütemező felület, beleértve a grid navigációt, drag & drop műveleteket, pick & place funkciót, validációs visszajelzéseket és egyéb interakciókat.
-- **Frontend – Job Creation Form (M4):** A munka létrehozási űrlap, beleértve az Elements táblát, autocomplete mezőket, template kezelést és validációt.
-- **Backend API (M1 + M2):** A Station Management, Job Management és Scheduling API végpontok.
+- **Frontend – Scheduler UI (M3):** The main scheduler interface, including grid navigation, drag & drop operations, pick & place function, validation feedback, and other interactions.
+- **Frontend – Job Creation Form (M4):** The job creation form, including the Elements table, autocomplete fields, template management, and validation.
+- **Backend API (M1 + M2):** Station Management, Job Management, and Scheduling API endpoints.
 
 ---
 
-## 3. Folder struktúra
+## 3. Folder Structure
 
 ```
 docs/qa/
-├── feature-catalog-planning.md    # Feature katalógus készítés terve
-├── manual-qa-planning.md          # Ez a dokumentum (QA plan készítés terve)
-├── manual-qa-plan.md              # Fő QA dokumentum (index + közös setup)
-├── scheduler/                      # M3 - Scheduler UI feature-ök
+├── feature-catalog-planning.md    # Feature catalog creation plan
+├── manual-qa-planning.md          # This document (QA plan creation plan)
+├── manual-qa-plan.md              # Main QA document (index + common setup)
+├── scheduler/                      # M3 - Scheduler UI features
 │   ├── grid-navigation.md
 │   ├── drag-drop.md
 │   ├── pick-place.md
 │   ├── validation-feedback.md
 │   └── ...
-├── jcf/                           # M4 - Job Creation Form feature-ök
+├── jcf/                           # M4 - Job Creation Form features
 │   ├── elements-table.md
 │   ├── autocomplete-fields.md
 │   ├── templates.md
@@ -90,112 +90,111 @@ docs/qa/
 
 ---
 
-## 4. Tartalmi elemek (minden feature-höz)
+## 4. Content Elements (for each feature)
 
-Minden Manual QA dokumentum az alábbi szekciókat tartalmazza:
+Each Manual QA document contains the following sections:
 
 ### 4.1 Feature Overview
 
-- User Story (részletes leírás)
+- User Story (detailed description)
 - Acceptance Criteria
 
 ### 4.2 Test Fixtures
 
-- Milyen fixture-rel tesztelhető
-- Fixture URL és rövid leírás
+- Which fixture can be used for testing
+- Fixture URL and short description
 
-**Formátum:**
+**Format:**
 ```markdown
-| Fixture | URL | Leírás |
-|---------|-----|--------|
+| Fixture | URL | Description |
+|---------|-----|-------------|
 | `context-menu` | `?fixture=context-menu` | Multiple tiles on a station for swap testing |
 ```
 
 ### 4.3 Test Scenarios
 
-Minden szcenárióhoz:
-- **Preconditions** – előfeltételek
-- **Steps** – konkrét lépések
-- **Expected Results** – elvárt eredmények (checkbox formátumban)
+For each scenario:
+- **Preconditions** – prerequisites
+- **Steps** – specific steps
+- **Expected Results** – expected results (in checkbox format)
 
 ### 4.4 Visual Checklist
 
-- UI elemek kinézete
-- Színek, méretek, elrendezés
+- UI element appearance
+- Colors, sizes, layout
 
 ### 4.5 Edge Cases
 
-- Szélső esetek
-- Error állapotok
-- Üres állapotok
+- Edge cases
+- Error states
+- Empty states
 
 ### 4.6 Cross-feature Interactions
 
-- Más feature-ökkel való interakció
-- Integrációs pontok
+- Interaction with other features
+- Integration points
 
 ---
 
-## 5. Fő dokumentum szekciói
+## 5. Main Document Sections
 
-A `manual-qa-plan.md` fő dokumentum az alábbi plusz szekciókat tartalmazza:
+The `manual-qa-plan.md` main document contains the following additional sections:
 
-| Szekció | Leírás |
-|---------|--------|
-| **Index** | Linkek az összes feature QA dokumentumra |
-| **Regression Test Suite** | Kritikus happy path-ok gyűjteménye |
-| **Smoke Test Checklist** | 5-10 perc alatt lefuttatható alapvető tesztek |
-| **Browser Matrix** | Támogatott böngészők |
+| Section | Description |
+|---------|-------------|
+| **Index** | Links to all feature QA documents |
+| **Regression Test Suite** | Collection of critical happy paths |
+| **Smoke Test Checklist** | Basic tests that can be run in 5-10 minutes |
+| **Browser Matrix** | Supported browsers |
 
 ---
 
-## 6. Lezárt kérdések
+## 6. Closed Questions
 
-### Fixture dokumentáció
+### Fixture Documentation
 
-**Döntés:** Közepes mélység – Név, URL, rövid leírás (mit tartalmaz)
+**Decision:** Medium depth – Name, URL, short description (what it contains)
 
-### Browser mátrix
+### Browser Matrix
 
-**Döntés:** Desktop only
+**Decision:** Desktop only
 
-| Böngésző | Verzió | Prioritás |
-|----------|--------|-----------|
+| Browser | Version | Priority |
+|---------|---------|----------|
 | Chrome | Latest | P1 |
 | Firefox | Latest | P1 |
 | Safari | Latest (macOS) | P2 |
 
-> **Megjegyzés:** Mobile/tablet nem scope, desktop-first alkalmazás.
+> **Note:** Mobile/tablet not in scope, desktop-first application.
 
-### API tesztelés eszközei
+### API Testing Tools
 
-**Döntés:** Mindkettő – Markdown (curl példák) + Postman collection
+**Decision:** Both – Markdown (curl examples) + Postman collection
 
 ---
 
-## 7. Munkafolyamat
+## 7. Workflow
 
-A Manual QA Plan elkészítése a Feature Katalógus véglegesítése után kezdődik.
+The Manual QA Plan creation starts after the Feature Catalog is finalized.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  1. Feature Katalógus elkészítése                               │
-│     (lásd: feature-catalog-planning.md)                         │
+│  1. Create Feature Catalog                                       │
+│     (see: feature-catalog-planning.md)                           │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  2. Manual QA dokumentumok elkészítése                          │
-│     - Feature-kategóriánként (scheduler, jcf, api)              │
-│     - Részletes teszt szcenáriók                                │
+│  2. Create Manual QA documents                                   │
+│     - By feature category (scheduler, jcf, api)                  │
+│     - Detailed test scenarios                                    │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  3. Fő dokumentum összeállítása                                 │
-│     - Index                                                     │
-│     - Smoke test checklist                                      │
-│     - Regression suite                                          │
+│  3. Assemble main document                                       │
+│     - Index                                                      │
+│     - Smoke test checklist                                       │
+│     - Regression suite                                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
-

@@ -9,7 +9,7 @@
 
 ## Overview
 
-Ez a dokumentum a JCF (Job Creation Form) Validation, Templates és Infrastructure feature-ök Manual QA tesztjeit tartalmazza. A feature csoport a következő fő területeket fedi le:
+This document contains the Manual QA tests for the JCF (Job Creation Form) Validation, Templates, and Infrastructure features. The feature group covers the following main areas:
 
 - **UI Scale & Submit Validation** - 13px root font, 80% zoom, Level 3 validation
 - **Element Prerequisites** - PaperStatus, BatStatus, PlateStatus, FormeStatus, blocking logic
@@ -24,8 +24,8 @@ Ez a dokumentum a JCF (Job Creation Form) Validation, Templates és Infrastructu
 
 ## Test Fixtures
 
-| Fixture | URL | Leírás |
-|---------|-----|--------|
+| Fixture | URL | Description |
+|---------|-----|-------------|
 | `elements-table` | `?fixture=elements-table` | JCF modal with default element |
 | `submit-validation` | `?fixture=submit-validation` | JCF modal with partial data for validation testing |
 | `blocking-visual` | `?fixture=blocking-visual` | Tiles with various blocking states |
@@ -854,4 +854,3 @@ interface JcfTemplateElement {
 
 type JcfLinkableField = 'format' | 'papier' | 'imposition' | 'impression' | 'surfacage';
 ```
-

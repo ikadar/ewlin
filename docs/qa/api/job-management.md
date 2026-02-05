@@ -2,15 +2,15 @@
 
 > **Last Updated:** 2026-02-03
 >
-> **Related Features:** API-021 - API-045 (B2 batch, aktív: 21 feature, deprecated: 4)
+> **Related Features:** API-021 - API-045 (B2 batch, active: 21 features, deprecated: 4)
 >
-> **Fixtures:** N/A (API tesztelés, nincs UI fixture)
+> **Fixtures:** N/A (API testing, no UI fixture)
 
 ---
 
 ## Overview
 
-A Job Management API a nyomdaipari munkarendelések (job-ok) kezelését biztosítja. Tartalmazza a job CRUD műveleteket, a task entity-ket, a DSL alapú task létrehozást, az autocomplete endpoint-okat, a job függőségeket, a kommenteket, a domain event-eket és a job törlés funkcionalitást.
+The Job Management API provides management of print shop work orders (jobs). It includes job CRUD operations, task entities, DSL-based task creation, autocomplete endpoints, job dependencies, comments, domain events, and job cancellation functionality.
 
 **API Base URL:** `http://localhost:8080/api/v1`
 
@@ -18,14 +18,14 @@ A Job Management API a nyomdaipari munkarendelések (job-ok) kezelését biztos�
 
 ## Test Fixtures
 
-Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges előfeltételek:
+This is an API testing document, there is no UI fixture. Prerequisites for testing:
 
-| Előfeltétel | Leírás |
-|-------------|--------|
-| PHP API futás | `docker-compose up` a `services/php-api` könyvtárban |
-| Adatbázis | Friss migráció futtatva (`doctrine:migrations:migrate`) |
-| Station(s) | Legalább 1 station létezik (DSL teszteléshez) |
-| Provider(s) | Legalább 1 outsourced provider létezik (DSL teszteléshez) |
+| Prerequisite | Description |
+|--------------|-------------|
+| PHP API running | `docker-compose up` in `services/php-api` directory |
+| Database | Fresh migration run (`doctrine:migrations:migrate`) |
+| Station(s) | At least 1 station exists (for DSL testing) |
+| Provider(s) | At least 1 outsourced provider exists (for DSL testing) |
 
 ---
 
@@ -33,10 +33,10 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 
 ### API-021 - Job Entity
 
-#### Scenario: Job alapmezők validálása
+#### Scenario: Job basic field validation
 
 **Preconditions:**
-- API elérhető: `http://localhost:8080/api/v1`
+- API accessible: `http://localhost:8080/api/v1`
 
 **Steps:**
 1. POST `http://localhost:8080/api/v1/jobs`:
@@ -660,7 +660,7 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 ```json
 {
   "author": "Test User",
-  "content": "[5001 karakter - pl. 'x' ismételve 5001-szer]"
+  "content": "[5001 characters - e.g., 'x' repeated 5001 times]"
 }
 ```
 
@@ -782,7 +782,7 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 
 ## Edge Cases
 
-| Eset | Elvárt viselkedés |
+| Case | Expected Behavior |
 |------|-------------------|
 | Empty workshopExitDate | HTTP 400 - workshopExitDate required |
 | Invalid date format | HTTP 400 - Invalid date format |
@@ -799,8 +799,8 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 
 ## Cross-feature Interactions
 
-| Kapcsolódó feature | Interakció típusa |
-|--------------------|-------------------|
+| Related Feature | Interaction Type |
+|-----------------|------------------|
 | Station Entity (API-001) | Station referenced in DSL parsing |
 | Provider Entity (API-015) | Provider referenced in DSL parsing |
 | Assignment API (B3) | Tasks can be assigned to stations after creation |
@@ -810,8 +810,8 @@ Ez egy API tesztelési dokumentum, nincs UI fixture. A teszteléshez szükséges
 
 ## Statistics
 
-| Metrika | Érték |
-|---------|-------|
-| Feldolgozott feature-ök | 21 aktív + 4 deprecated = 25 |
-| Generált teszt szcenáriók | 38 |
-| Edge case-ek | 10 |
+| Metric | Value |
+|--------|-------|
+| Processed features | 21 active + 4 deprecated = 25 |
+| Generated test scenarios | 38 |
+| Edge cases | 10 |

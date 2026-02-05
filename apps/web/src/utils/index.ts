@@ -73,3 +73,4 @@ export {
 } from './outsourcingCalculation';
 export type { OutsourcingParams } from './outsourcingCalculation';
 export { recalculatePrecedenceConflicts, updateSnapshotConflicts } from './conflictRecalculation';
+export { cn } from './cn';

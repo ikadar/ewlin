@@ -9,10 +9,10 @@
 
 ## Overview
 
-Ez a dokumentum a JCF (Job Creation Form) alapvető feature-jeinek Manual QA tesztjeit tartalmazza. A feature csoport a következő fő területeket fedi le:
+This document contains the Manual QA tests for the JCF (Job Creation Form) basic features. The feature group covers the following main areas:
 
-- **Element Layer** - Job és Task közötti köztes réteg (Element entity, Element → Task relationship)
-- **JCF Type System** - ElementSpec value object, reference data types (Paper, Format, Imposition, stb.)
+- **Element Layer** - Intermediate layer between Job and Task (Element entity, Element → Task relationship)
+- **JCF Type System** - ElementSpec value object, reference data types (Paper, Format, Imposition, etc.)
 - **JCF Modal Shell** - Full-screen modal overlay, keyboard hints footer
 - **Job Header** - Job ID, Intitulé, Quantité, Deadline fields + Client/Template autocomplete
 - **Elements Table** - Grid layout (row-based), element header, add/remove buttons, name editing
@@ -24,8 +24,8 @@ Ez a dokumentum a JCF (Job Creation Form) alapvető feature-jeinek Manual QA tes
 
 ## Test Fixtures
 
-| Fixture | URL | Leírás |
-|---------|-----|--------|
+| Fixture | URL | Description |
+|---------|-----|-------------|
 | `test` | `?fixture=test` | Standard test data with JCF modal access |
 | `elements-table` | `?fixture=elements-table` | JCF modal with default element for grid layout testing |
 

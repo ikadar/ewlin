@@ -9,15 +9,15 @@
 
 ## Overview
 
-Ez a dokumentum a Navigation, Layout és UX feature-ök Manual QA tesztjeit tartalmazza. A feature csoport a következő fő területeket fedi le:
+This document contains the Manual QA tests for the Navigation, Layout, and UX features. The feature group covers the following main areas:
 
 - **Top Navigation Bar** - Zoom control, Quick Placement button
-- **Timeline Compaction** - Global 4h/8h/24h compact gombok
-- **Dry Time Precedence** - +4h száradási idő nyomtatás után
+- **Timeline Compaction** - Global 4h/8h/24h compact buttons
+- **Dry Time Precedence** - +4h drying time after printing
 - **Multi-Day DateStrip** - Click-to-scroll, departure date highlight, scheduled day markers
 - **Group Capacity** - Station header group info, capacity warning (DEPRECATED)
-- **Provider Columns** - Outsourcing megjelenítés subcolumn layout-tal
-- **Similarities** - paperWeight és inking mezők
+- **Provider Columns** - Outsourcing display with subcolumn layout
+- **Similarities** - paperWeight and inking fields
 - **Layout Redesign** - Full-height sidebar, 25% zoom level
 - **DateStrip Redesign** - Focused day, today indicator line
 - **Precedence Visualization** - Purple/orange constraint lines during pick
@@ -27,8 +27,8 @@ Ez a dokumentum a Navigation, Layout és UX feature-ök Manual QA tesztjeit tart
 
 ## Test Fixtures
 
-| Fixture | URL | Leírás |
-|---------|-----|--------|
+| Fixture | URL | Description |
+|---------|-----|-------------|
 | `test` | `?fixture=test` | Standard test data with multiple jobs |
 | `layout-redesign` | `?fixture=layout-redesign` | Layout testing (sidebar, zoom) |
 | `datestrip-redesign` | `?fixture=datestrip-redesign` | DateStrip visual states testing |
@@ -565,7 +565,7 @@ Ez a dokumentum a Navigation, Layout és UX feature-ök Manual QA tesztjeit tart
 
 ## Deprecated Features
 
-> **Note:** A következő feature-ök deprecated státuszúak és nem kerülnek tesztelésre:
+> **Note:** The following features have deprecated status and will not be tested:
 
 | ID | Feature | Reason |
 |----|---------|--------|

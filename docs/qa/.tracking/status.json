@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "updatedAt": "2026-02-05T20:02:45.808Z",
+  "tests": {
+    "scheduler/datestrip-pickplace.md::DS-001": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-05T19:45:29.618Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-003": {
+      "status": "untested",
+      "lastTestedAt": "2026-02-05T18:52:26.696Z",
+      "results": {
+        "0": "untested",
+        "1": "untested",
+        "2": "untested"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-002": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-05T20:02:45.808Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok",
+        "6": "ok"
+      }
+    }
+  }
+}

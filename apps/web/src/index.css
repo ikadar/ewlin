@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /* Base font size: 13px (reference/jcf compatible)
- * This makes Tailwind rem-based classes map to:
+ * Tailwind rem-based classes map to:
  * - text-xs (0.75rem) = 9.75px
- * - text-sm (0.875rem) = 11.375px ≈ 11px
+ * - text-sm (0.875rem) = 11.375px
  * - text-base (1rem) = 13px
  * - text-lg (1.125rem) = 14.625px
  */
