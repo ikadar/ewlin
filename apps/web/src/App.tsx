@@ -35,7 +35,6 @@ import {
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { transformJcfToRequest } from './api';
-import { QASidebarPanel } from './qa/components/QASidebarPanel';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -360,9 +359,6 @@ function AppContent() {
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
-
-  // QA Sidebar: activated via VITE_QA_SIDEBAR env var
-  const showQASidebar = import.meta.env.VITE_QA_SIDEBAR === 'true';
 
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
@@ -1710,9 +1706,6 @@ function AppContent() {
     <>
       {/* REQ-07: Layout restructure - sidebar full height */}
       <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
-        {/* QA Sidebar - extreme left */}
-        {showQASidebar && <QASidebarPanel />}
-
         {/* Sidebar - full viewport height (REQ-07.1) */}
         <Sidebar />
 

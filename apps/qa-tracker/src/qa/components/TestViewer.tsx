@@ -9,12 +9,10 @@
  * - Expected results with OK/KO buttons
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { ExternalLink, FileEdit } from 'lucide-react';
 import { useGetContentQuery, useUpdateStatusMutation } from '../store/qaApi';
-import { useAppSelector, useAppDispatch } from '@/store';
-import { scheduleApi } from '@/store';
-import { invalidateSnapshot } from '@/mock';
+import { useAppSelector } from '@/store';
 import {
   selectSelectedFolder,
   selectSelectedFile,
@@ -27,14 +25,14 @@ import { FixtureNotesPanel } from './FixtureNotesPanel';
 import { MarkdownEditorModal } from './MarkdownEditorModal';
 import type { ResultStatus } from '../types';
 
+const SCHEDULER_URL = import.meta.env.VITE_SCHEDULER_URL || 'http://localhost:5173';
+
 export function TestViewer() {
   const selectedFolder = useAppSelector(selectSelectedFolder);
   const selectedFile = useAppSelector(selectSelectedFile);
   const selectedTestId = useAppSelector(selectSelectedTestId);
-  const dispatch = useAppDispatch();
   const [updateStatus] = useUpdateStatusMutation();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const lastLoadedFixture = useRef<string | null>(null);
 
   const { data: content } = useGetContentQuery(
     { folder: selectedFolder!, file: selectedFile! },
@@ -42,24 +40,6 @@ export function TestViewer() {
   );
 
   const test = content?.tests.find((t) => t.fullId === selectedTestId);
-
-  // Auto-load fixture when test has one — update URL param without page reload
-  // Must be before early return to maintain consistent hook count
-  const testFixture = test?.fixture;
-  useEffect(() => {
-    if (!testFixture || testFixture === lastLoadedFixture.current) return;
-
-    lastLoadedFixture.current = testFixture;
-
-    // Update ?fixture= search param via replaceState (no reload)
-    const url = new URL(window.location.href);
-    url.searchParams.set('fixture', testFixture);
-    window.history.replaceState(null, '', url.toString());
-
-    // Clear mock cache and trigger RTK Query refetch
-    invalidateSnapshot();
-    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-  }, [testFixture, dispatch]);
 
   if (!test) {
     return null;
@@ -80,6 +60,15 @@ export function TestViewer() {
   const fixtureInfo = test.fixture
     ? content?.fixtures.find((f) => f.name === test.fixture)
     : null;
+
+  // Resolve fixture URL: relative URLs (e.g. "?fixture=x") → scheduler origin
+  const fixtureHref = (() => {
+    const raw = fixtureInfo?.url;
+    if (!raw) return `${SCHEDULER_URL}/?fixture=${test.fixture}`;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    // Relative URL → prepend scheduler origin
+    return `${SCHEDULER_URL}/${raw.replace(/^\//, '')}`;
+  })();
 
   return (
     <div className="p-6">
@@ -115,7 +104,7 @@ export function TestViewer() {
             Fixture
           </h3>
           <a
-            href={fixtureInfo?.url || `${window.location.origin}/?fixture=${test.fixture}`}
+            href={fixtureHref}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-base text-blue-400 hover:text-blue-300 transition-colors"

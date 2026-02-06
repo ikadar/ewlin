@@ -8,6 +8,7 @@
  * - Empty: Untested
  */
 
+import type React from 'react';
 import type { PriorityProgress } from '../types';
 
 interface StatusDotsProps {
@@ -16,7 +17,7 @@ interface StatusDotsProps {
 
 export function StatusDots({ progress }: StatusDotsProps) {
   const { ok, partial, ko, untested } = progress;
-  const dots: JSX.Element[] = [];
+  const dots: React.ReactElement[] = [];
 
   // Add OK dots
   for (let i = 0; i < ok; i++) {

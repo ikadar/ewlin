@@ -7,12 +7,10 @@
  * /                → Main scheduler view (no job selected)
  * /job/:jobId      → Main scheduler with job selected
  * /job/new         → Main scheduler with JCF modal open
- * /qa-tracker      → QA Tracker tool
  */
 
 import { Routes, Route } from 'react-router-dom';
 import App from './App';
-import { QATrackerPage } from './qa/QATrackerPage';
 
 /**
  * Application routes.
@@ -25,7 +23,6 @@ export function AppRoutes() {
       <Route path="/" element={<App />} />
       <Route path="/job/new" element={<App />} />
       <Route path="/job/:jobId" element={<App />} />
-      <Route path="/qa-tracker" element={<QATrackerPage />} />
     </Routes>
   );
 }
