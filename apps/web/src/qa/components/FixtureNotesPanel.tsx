@@ -15,7 +15,6 @@ import {
   Trash2,
   RotateCcw,
   Check,
-  X,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import {
@@ -90,11 +89,11 @@ function FixtureRequestItem({
                 <Check className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => onUpdateStatus(entry.id, 'rejected')}
-                title="Reject"
-                className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700 transition-colors"
+                onClick={() => onDelete(entry.id)}
+                title="Delete"
+                className="p-1 rounded text-zinc-600 hover:text-red-400 hover:bg-red-600/10 transition-colors"
               >
-                <X className="w-3.5 h-3.5" />
+                <Trash2 className="w-3 h-3" />
               </button>
             </>
           ) : (

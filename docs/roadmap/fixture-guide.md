@@ -247,6 +247,8 @@ Element "fin"  (Finalisation) :  Encarteuse-Piqueuse → Conditionnement
 
 ### Key rules
 
+- **No consecutive same-station:** Un élément ne peut JAMAIS avoir deux tâches consécutives sur le même type de poste.
+- **Max tasks = non-assembly stations:** Un job mono-élément ne peut pas avoir plus de tâches que le nombre de postes non-assemblage (offset, numérique, massicot, typo, plieuse, conditionnement = 6 max). L'encarteuse-piqueuse et l'assembleuse-piqueuse sont des machines d'assemblage — elles nécessitent plusieurs éléments.
 - Les cahiers vont **directement** de l'offset à la plieuse (PAS de massicot — on plie la feuille entière)
 - Seule la couverture passe par le massicot (on coupe au format)
 - La finalisation (encartage + conditionnement) attend que TOUS les éléments précédents soient terminés
