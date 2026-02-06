@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-02-05T22:41:00.001Z",
+  "updatedAt": "2026-02-06T19:04:07.952Z",
   "tests": {
     "scheduler/datestrip-pickplace.md::DS-001": {
       "status": "ok",
@@ -39,6 +39,943 @@
       "lastTestedAt": "2026-02-05T22:41:00.000Z",
       "results": {
         "0": "untested"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-004": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T10:21:27.574Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ko"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-001": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:16:29.423Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-006": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:23:25.890Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-007": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:24:18.359Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-010": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:25:37.533Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-011": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:26:03.027Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-012": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:28:54.659Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-015": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:32:21.860Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-017": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:41:00.141Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-021": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T10:45:44.356Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ko",
+        "4": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-022": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:47:21.352Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-025": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:48:03.852Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-031": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:49:42.258Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-032": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:51:23.080Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-033": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:51:56.416Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-034": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:53:37.433Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-035": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:54:33.225Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-036": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:54:57.814Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-038": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:57:53.127Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-041": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T10:59:22.338Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-002": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T11:00:58.004Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-003": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T11:02:46.570Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ko"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-005": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T11:03:25.374Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-008": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T11:04:33.414Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-009": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T16:50:08.541Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-013": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T16:50:58.127Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-014": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T16:52:34.467Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-016": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T16:57:48.868Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-018": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:00:19.176Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ko",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-019": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:01:13.215Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-020": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:03:19.965Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-023": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:05:24.908Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-024": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:06:57.443Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ok",
+        "3": "ko"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-026": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:08:09.093Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-028": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:11:47.912Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-029": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:12:34.821Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-037": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:13:40.962Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-039": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:13:53.520Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-040": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:14:38.193Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-042": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:14:53.036Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-043": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:16:07.403Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-027": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:17:21.598Z",
+      "results": {
+        "0": "ok",
+        "1": "ok"
+      }
+    },
+    "jcf/elements-table.md::EL-001": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:19:41.382Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok",
+        "6": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-001": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:20:41.044Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-003": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:21:46.600Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ok",
+        "3": "ko",
+        "4": "ko"
+      }
+    },
+    "jcf/elements-table.md::JCF-004": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:22:15.883Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-005": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:22:50.026Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-006": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:25:54.314Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ko",
+        "3": "ko",
+        "4": "ok",
+        "5": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-007": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:27:03.140Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok",
+        "6": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-008": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:28:56.400Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-011": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:30:07.880Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-013": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:30:53.416Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-015": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:32:14.640Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ko"
+      }
+    },
+    "jcf/elements-table.md::JCF-016": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:32:46.471Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-017": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:34:01.964Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-018": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:35:42.612Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-020": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:39:43.539Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-021": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:40:36.527Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok",
+        "6": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-022": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:45:47.533Z",
+      "results": {
+        "0": "ko",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-023": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:46:36.500Z",
+      "results": {
+        "0": "ok",
+        "1": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-028": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:48:14.435Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-002": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:48:58.324Z",
+      "results": {
+        "0": "ok",
+        "1": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-009": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:49:34.094Z",
+      "results": {
+        "0": "ok",
+        "1": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-012": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:50:27.507Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-014": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:51:25.360Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-019": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:51:37.975Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-024": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:54:13.419Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-025": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:55:03.191Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-026": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:55:20.520Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-027": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T17:55:54.058Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/elements-table.md::JCF-010": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T17:58:40.978Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ko",
+        "3": "ko"
+      }
+    },
+    "jcf/validation-templates.md::API-002": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T18:01:46.235Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko",
+        "3": "ok"
+      }
+    },
+    "jcf/validation-templates.md::PREREQ-001": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T18:03:39.097Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ko"
+      }
+    },
+    "jcf/validation-templates.md::PREREQ-004": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:05:05.265Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/validation-templates.md::PREREQ-005": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:05:31.799Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-002": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:12:28.762Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-003": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:13:08.062Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-007": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:13:57.630Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-008": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:15:08.807Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/validation-templates.md::VAL-003": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T18:16:56.729Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ko",
+        "3": "ok"
+      }
+    },
+    "jcf/validation-templates.md::VAL-005": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:17:53.577Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/validation-templates.md::API-001": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-06T18:19:41.512Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko"
+      }
+    },
+    "jcf/validation-templates.md::INFRA-002": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:20:08.670Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/validation-templates.md::API-003": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-06T18:20:15.192Z",
+      "results": {
+        "0": "ko",
+        "1": "ko"
+      }
+    },
+    "jcf/validation-templates.md::INFRA-003": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:24:13.224Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "jcf/validation-templates.md::INFRA-004": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T18:24:49.945Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ok"
+      }
+    },
+    "jcf/validation-templates.md::PREREQ-003": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-06T18:52:40.168Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko"
+      }
+    },
+    "jcf/validation-templates.md::PREREQ-006": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T18:53:47.787Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-001": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-06T18:55:12.319Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko",
+        "3": "ko"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-004": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-06T19:00:44.367Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-006": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T19:01:36.595Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-009": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T19:02:19.395Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "jcf/validation-templates.md::VAL-002": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T19:02:49.349Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "jcf/validation-templates.md::VAL-004": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T19:02:56.544Z",
+      "results": {
+        "0": "ok"
+      }
+    },
+    "jcf/validation-templates.md::TMPL-010": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-06T19:04:07.952Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
       }
     }
   }

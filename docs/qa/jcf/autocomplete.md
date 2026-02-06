@@ -109,6 +109,7 @@ This document contains the Manual QA tests for the JCF (Job Creation Form) Autoc
 - [ ] Each preset has French description (e.g., "Quadri recto-verso")
 - [ ] Selected value follows DSL: recto/verso pattern
 - [ ] On blur, pretty format displayed
+- [ ] There is validation for correct impression format
 
 ---
 

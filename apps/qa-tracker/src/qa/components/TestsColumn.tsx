@@ -80,16 +80,16 @@ export function TestsColumn({ className }: TestsColumnProps) {
   );
 
   return (
-    <div className={cn('flex flex-col h-full bg-zinc-900', className)}>
-      <div className="px-3 py-2 border-b border-zinc-800">
+    <div className={cn('flex flex-col h-full min-h-0 bg-zinc-900', className)}>
+      <div className="px-3 py-2 border-b border-zinc-800 shrink-0">
         <h2 className="text-base font-semibold text-zinc-400 uppercase tracking-wide">
           Tests
         </h2>
       </div>
 
-      {byPriority && <PrioritySummary byPriority={byPriority} />}
+      {byPriority && <div className="shrink-0"><PrioritySummary byPriority={byPriority} /></div>}
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-auto">
         {isLoading && (
           <div className="p-3 text-base text-zinc-500">Loading...</div>
         )}

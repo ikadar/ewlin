@@ -15,7 +15,7 @@ import { TestViewerColumn } from './TestViewerColumn';
 
 export function QALayout() {
   return (
-    <div className="flex-1 grid grid-cols-[140px_160px_220px_1fr] h-full">
+    <div className="flex-1 grid grid-cols-[140px_160px_220px_1fr] h-full min-h-0">
       <FolderColumn className="border-r border-zinc-800" />
       <ThemeColumn className="border-r border-zinc-800" />
       <TestsColumn className="border-r border-zinc-800" />
