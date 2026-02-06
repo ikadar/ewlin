@@ -1,31 +1,45 @@
-# QA Panel Guide
+# QA Tracker Guide
 
-The QA Panel is a sidebar tool integrated into the Flux Scheduler UI. It provides structured manual test tracking, bug reporting (KO logs), and fixture improvement requests — all wired into Claude Code skills for automated analysis and fixes.
+The QA Tracker is a standalone application (`apps/qa-tracker/`) for structured manual test tracking, bug reporting (KO logs), and fixture improvement requests — all wired into Claude Code skills for automated analysis and fixes.
 
-## Enabling the QA Panel
+## Architecture
 
-The panel is controlled by a Vite environment variable:
+The QA Tracker runs as an independent app, fully separated from the main Flux Scheduler (`apps/web/`):
 
-```env
-# apps/web/.env.local
-VITE_QA_SIDEBAR=true
+| Component | Path | Port | Purpose |
+|-----------|------|------|---------|
+| QA Tracker UI | `apps/qa-tracker/` | 5174 | React frontend for test tracking |
+| QA API | `apps/qa-api/` | 3002 | Express backend serving QA data |
+| Scheduler | `apps/web/` | 5173 | Main Flux Scheduler (no QA code) |
+
+The QA Tracker has its own Vite dev server, Redux store (only `qaApi` + `qaSlice`), and `package.json`. It does **not** appear in the scheduler's production bundle.
+
+## Starting the QA Tracker
+
+From the monorepo root (`ewlin/`):
+
+```bash
+# Start QA API + QA Tracker together
+pnpm dev:qa
+
+# Or start individually
+pnpm --filter qa-api dev       # port 3002
+pnpm --filter qa-tracker dev   # port 5174
 ```
 
-When enabled, the `<QASidebarPanel />` component renders on the left edge of the scheduler layout. It auto-collapses on narrow viewports (<1200px) and can be toggled manually.
+The QA Tracker requires the QA API to be running. The Vite dev server proxies `/qa-api` requests to `http://localhost:3002`.
 
-The check happens in `App.tsx`:
+## Environment variables
 
-```ts
-const showQASidebar = import.meta.env.VITE_QA_SIDEBAR === 'true';
-```
+Configured in `apps/qa-tracker/.env`:
 
-### Backend requirement
-
-The panel communicates with a dedicated QA API server on `http://localhost:3002` (proxied through Vite at `/qa-api`). The API serves QA test documents from `docs/qa/`, manages test status, KO logs, fixture requests, and selection persistence.
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `VITE_SCHEDULER_URL` | `http://localhost:5173` | Base URL of the Flux Scheduler, used for fixture links and "Back to Scheduler" navigation |
 
 ## Panel layout
 
-The sidebar opens into a 4-column drill-down:
+The tracker provides a 4-column drill-down:
 
 1. **Folders** — QA test folders with per-folder progress bars
 2. **Files** — Test files within the selected folder
@@ -35,6 +49,10 @@ The sidebar opens into a 4-column drill-down:
    - **Fixture Notes** — request fixture data improvements
 
 Keyboard shortcuts: **Alt+P** (previous test), **Alt+N** (next test).
+
+### Fixture links
+
+Test scenarios can reference fixture data (e.g. `?fixture=elements-table`). The QA Tracker resolves these links to the scheduler app using `VITE_SCHEDULER_URL`, so clicking a fixture link opens the scheduler with the correct mock data loaded.
 
 ### Selection persistence
 
