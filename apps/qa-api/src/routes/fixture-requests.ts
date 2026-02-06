@@ -4,6 +4,7 @@ import {
   getFixtureRequestsForTest,
   createFixtureRequest,
   updateFixtureRequestStatus,
+  deleteFixtureRequest,
 } from '../services/tracking-service.js';
 import type { CreateFixtureRequestRequest } from '../types/index.js';
 
@@ -63,5 +64,23 @@ fixtureRequestsRouter.put('/:id/status', (req, res) => {
   } catch (error) {
     console.error('Failed to update fixture request:', error);
     res.status(500).json({ error: 'Failed to update fixture request' });
+  }
+});
+
+// DELETE /qa-api/fixture-requests/:id - Delete fixture request
+fixtureRequestsRouter.delete('/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = deleteFixtureRequest(id);
+
+    if (!deleted) {
+      res.status(404).json({ error: 'Fixture request not found' });
+      return;
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Failed to delete fixture request:', error);
+    res.status(500).json({ error: 'Failed to delete fixture request' });
   }
 });

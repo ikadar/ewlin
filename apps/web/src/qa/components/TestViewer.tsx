@@ -9,10 +9,12 @@
  * - Expected results with OK/KO buttons
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ExternalLink, FileEdit } from 'lucide-react';
 import { useGetContentQuery, useUpdateStatusMutation } from '../store/qaApi';
-import { useAppSelector } from '@/store';
+import { useAppSelector, useAppDispatch } from '@/store';
+import { scheduleApi } from '@/store';
+import { invalidateSnapshot } from '@/mock';
 import {
   selectSelectedFolder,
   selectSelectedFile,
@@ -29,8 +31,10 @@ export function TestViewer() {
   const selectedFolder = useAppSelector(selectSelectedFolder);
   const selectedFile = useAppSelector(selectSelectedFile);
   const selectedTestId = useAppSelector(selectSelectedTestId);
+  const dispatch = useAppDispatch();
   const [updateStatus] = useUpdateStatusMutation();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const lastLoadedFixture = useRef<string | null>(null);
 
   const { data: content } = useGetContentQuery(
     { folder: selectedFolder!, file: selectedFile! },
@@ -38,6 +42,24 @@ export function TestViewer() {
   );
 
   const test = content?.tests.find((t) => t.fullId === selectedTestId);
+
+  // Auto-load fixture when test has one — update URL param without page reload
+  // Must be before early return to maintain consistent hook count
+  const testFixture = test?.fixture;
+  useEffect(() => {
+    if (!testFixture || testFixture === lastLoadedFixture.current) return;
+
+    lastLoadedFixture.current = testFixture;
+
+    // Update ?fixture= search param via replaceState (no reload)
+    const url = new URL(window.location.href);
+    url.searchParams.set('fixture', testFixture);
+    window.history.replaceState(null, '', url.toString());
+
+    // Clear mock cache and trigger RTK Query refetch
+    invalidateSnapshot();
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [testFixture, dispatch]);
 
   if (!test) {
     return null;

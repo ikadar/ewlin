@@ -76,9 +76,21 @@ function parseListItems(
     [];
 
   const lines = content.split('\n');
-  for (let line of lines) {
-    line = line.trim();
-    if (!line) continue;
+  for (const rawLine of lines) {
+    if (!rawLine.trim()) continue;
+
+    // Detect indentation: 2+ leading spaces = sub-item → append to parent
+    const indent = rawLine.match(/^(\s*)/)?.[1].length ?? 0;
+    const line = rawLine.trim();
+
+    if (indent >= 2 && items.length > 0) {
+      // Sub-item: extract text and append to last top-level item
+      const subMatch = line.match(BULLET_ITEM) ?? line.match(CHECKBOX_ITEM);
+      if (subMatch) {
+        items[items.length - 1].text += ` / ${subMatch[1].trim()}`;
+      }
+      continue;
+    }
 
     const checkboxMatch = line.match(CHECKBOX_ITEM);
     if (checkboxMatch) {

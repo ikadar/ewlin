@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "bc4b9583-004e-4aba-b44f-98709d58b66f",
+      "testId": "scheduler/datestrip-pickplace.md::DS-002",
+      "description": "test",
+      "severity": "major",
+      "createdAt": "2026-02-05T23:42:24.674Z",
+      "resolvedAt": null
+    }
+  ]
+}

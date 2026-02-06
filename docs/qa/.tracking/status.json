@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-02-05T20:02:45.808Z",
+  "updatedAt": "2026-02-05T22:41:00.001Z",
   "tests": {
     "scheduler/datestrip-pickplace.md::DS-001": {
       "status": "ok",
@@ -32,6 +32,13 @@
         "4": "ok",
         "5": "ok",
         "6": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-018": {
+      "status": "untested",
+      "lastTestedAt": "2026-02-05T22:41:00.000Z",
+      "results": {
+        "0": "untested"
       }
     }
   }

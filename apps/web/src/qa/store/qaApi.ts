@@ -103,6 +103,24 @@ export const qaApi = createApi({
       invalidatesTags: ['KOLogs'],
     }),
 
+    // Reopen KO log
+    reopenKOLog: builder.mutation<KOLogEntry, string>({
+      query: (id) => ({
+        url: `/ko-logs/${id}/reopen`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['KOLogs'],
+    }),
+
+    // Delete KO log
+    deleteKOLog: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/ko-logs/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['KOLogs'],
+    }),
+
     // Get fixture requests
     getFixtureRequests: builder.query<FixtureRequest[], string | void>({
       query: (testId) =>
@@ -124,6 +142,28 @@ export const qaApi = createApi({
         url: '/fixture-requests',
         method: 'POST',
         body,
+      }),
+      invalidatesTags: ['FixtureRequests'],
+    }),
+
+    // Update fixture request status
+    updateFixtureRequestStatus: builder.mutation<
+      FixtureRequest,
+      { id: string; status: 'pending' | 'implemented' | 'rejected' }
+    >({
+      query: ({ id, status }) => ({
+        url: `/fixture-requests/${id}/status`,
+        method: 'PUT',
+        body: { status },
+      }),
+      invalidatesTags: ['FixtureRequests'],
+    }),
+
+    // Delete fixture request
+    deleteFixtureRequest: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/fixture-requests/${id}`,
+        method: 'DELETE',
       }),
       invalidatesTags: ['FixtureRequests'],
     }),
@@ -152,8 +192,12 @@ export const {
   useGetKOLogsQuery,
   useCreateKOLogMutation,
   useResolveKOLogMutation,
+  useReopenKOLogMutation,
+  useDeleteKOLogMutation,
   useGetFixtureRequestsQuery,
   useCreateFixtureRequestMutation,
+  useUpdateFixtureRequestStatusMutation,
+  useDeleteFixtureRequestMutation,
   useGetSelectionQuery,
   useSaveSelectionMutation,
 } = qaApi;

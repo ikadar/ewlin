@@ -147,6 +147,29 @@ export function resolveKOLog(logId: string): KOLogEntry | null {
   return entry || null;
 }
 
+export function reopenKOLog(logId: string): KOLogEntry | null {
+  const data = loadKOLogsData();
+  const entry = data.entries.find((e) => e.id === logId);
+
+  if (entry) {
+    entry.resolvedAt = null;
+    saveKOLogsData(data);
+  }
+
+  return entry || null;
+}
+
+export function deleteKOLog(logId: string): boolean {
+  const data = loadKOLogsData();
+  const index = data.entries.findIndex((e) => e.id === logId);
+
+  if (index === -1) return false;
+
+  data.entries.splice(index, 1);
+  saveKOLogsData(data);
+  return true;
+}
+
 // Fixture Requests
 function loadFixtureRequestsData(): FixtureRequestsData {
   ensureTrackingDir();
@@ -209,6 +232,17 @@ export function updateFixtureRequestStatus(
   }
 
   return request || null;
+}
+
+export function deleteFixtureRequest(requestId: string): boolean {
+  const data = loadFixtureRequestsData();
+  const index = data.requests.findIndex((r) => r.id === requestId);
+
+  if (index === -1) return false;
+
+  data.requests.splice(index, 1);
+  saveFixtureRequestsData(data);
+  return true;
 }
 
 // Selection persistence

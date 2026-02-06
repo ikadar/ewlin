@@ -4,6 +4,8 @@ import {
   getKOLogsForTest,
   createKOLog,
   resolveKOLog,
+  reopenKOLog,
+  deleteKOLog,
 } from '../services/tracking-service.js';
 import type { CreateKOLogRequest } from '../types/index.js';
 
@@ -61,5 +63,41 @@ koLogsRouter.put('/:id/resolve', (req, res) => {
   } catch (error) {
     console.error('Failed to resolve KO log:', error);
     res.status(500).json({ error: 'Failed to resolve KO log' });
+  }
+});
+
+// PUT /qa-api/ko-logs/:id/reopen - Reopen resolved KO log
+koLogsRouter.put('/:id/reopen', (req, res) => {
+  try {
+    const { id } = req.params;
+    const entry = reopenKOLog(id);
+
+    if (!entry) {
+      res.status(404).json({ error: 'KO log not found' });
+      return;
+    }
+
+    res.json(entry);
+  } catch (error) {
+    console.error('Failed to reopen KO log:', error);
+    res.status(500).json({ error: 'Failed to reopen KO log' });
+  }
+});
+
+// DELETE /qa-api/ko-logs/:id - Delete KO log
+koLogsRouter.delete('/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = deleteKOLog(id);
+
+    if (!deleted) {
+      res.status(404).json({ error: 'KO log not found' });
+      return;
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Failed to delete KO log:', error);
+    res.status(500).json({ error: 'Failed to delete KO log' });
   }
 });
