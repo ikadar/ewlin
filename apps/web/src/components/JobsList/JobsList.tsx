@@ -125,6 +125,13 @@ export function JobsList({
       return 0;
     });
 
+    // Sort normal jobs: not fully scheduled first
+    normal.sort((a, b) => {
+      if (!a.fullyScheduled && b.fullyScheduled) return -1;
+      if (a.fullyScheduled && !b.fullyScheduled) return 1;
+      return 0;
+    });
+
     return { problemJobs: problems, normalJobs: normal, getProblemType: getType };
   }, [filteredJobs, lateJobIds, conflictJobIds]);
 

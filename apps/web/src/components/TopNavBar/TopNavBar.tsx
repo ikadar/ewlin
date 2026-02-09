@@ -72,7 +72,7 @@ export function TopNavBar({
 
       {/* Center section: Quick Placement + Compact + Zoom */}
       <div className="flex items-center gap-6">
-        {/* Quick Placement toggle */}
+        {/* Quick Placement toggle — temporarily hidden
         <button
           onClick={onToggleQuickPlacement}
           disabled={!canEnableQuickPlacement}
@@ -83,6 +83,7 @@ export function TopNavBar({
           <Crosshair className="w-4 h-4" />
           <span>Quick Place</span>
         </button>
+        */}
 
         {/* Compact timeline buttons */}
         <div className="flex items-center gap-1" data-testid="compact-control">
