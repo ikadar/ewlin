@@ -20,6 +20,8 @@ export interface JcfModalProps {
   isSaving?: boolean;
   /** v0.4.33: Error message to display (from API failure) */
   error?: string | null;
+  /** v0.5.13b: Custom label for save button (default: "Enregistrer") */
+  saveLabel?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function JcfModal({
   onSave,
   isSaving = false,
   error = null,
+  saveLabel,
 }: JcfModalProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
@@ -187,7 +190,7 @@ export function JcfModal({
                 data-testid="jcf-modal-save"
               >
                 <Save size={14} />
-                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                {isSaving ? 'Enregistrement...' : (saveLabel ?? 'Enregistrer')}
               </button>
             )}
           </div>

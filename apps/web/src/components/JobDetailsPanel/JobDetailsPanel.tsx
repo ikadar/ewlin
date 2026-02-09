@@ -1,5 +1,5 @@
 import type { Job, Task, TaskAssignment, Station, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
-import { X } from 'lucide-react';
+import { X, Pencil } from 'lucide-react';
 import { JobInfo } from './JobInfo';
 import { TaskList } from './TaskList';
 import { getTasksForJob } from '../../utils/taskHelpers';
@@ -46,6 +46,8 @@ export interface JobDetailsPanelProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** v0.5.13b: Callback when edit button is clicked */
+  onEditJob?: () => void;
 }
 
 /**
@@ -70,6 +72,7 @@ export function JobDetailsPanel({
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
+  onEditJob,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -88,17 +91,30 @@ export function JobDetailsPanel({
 
   return (
     <div className="w-72 shrink-0 bg-zinc-900/50 border-r border-white/5 flex flex-col" data-testid="job-details-panel">
-      {/* Panel header with close button */}
+      {/* Panel header with edit and close buttons */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
         <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Détails</span>
-        <button
-          onClick={onClose}
-          className="text-zinc-500 hover:text-zinc-300 transition-colors"
-          aria-label="Fermer"
-          data-testid="job-details-close-button"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onEditJob && (
+            <button
+              onClick={onEditJob}
+              className="flex items-center gap-1 px-1.5 py-0.5 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors"
+              aria-label="Modifier le job"
+              data-testid="job-details-edit-button"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Modifier</span>
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+            aria-label="Fermer"
+            data-testid="job-details-close-button"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Job details - simple key-value list */}

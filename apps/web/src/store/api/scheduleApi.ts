@@ -18,6 +18,7 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 import type {
   ScheduleSnapshot,
   CreateJobRequest,
+  UpdateJobRequest,
   AssignTaskRequest,
   AssignmentResponse,
   CompletionResponse,
@@ -44,6 +45,20 @@ interface CreateJobResponse {
   elementIds: string[];
   taskIds: string[];
   createdAt: string;
+}
+
+/**
+ * Response from updateJob mutation.
+ * Returns updated job metadata.
+ */
+interface UpdateJobResponse {
+  id: string;
+  reference: string;
+  client: string;
+  description: string;
+  workshopExitDate: string;
+  status: string;
+  updatedAt: string;
 }
 import { baseQueryWithFixtureSupport } from './baseApi';
 
@@ -151,6 +166,23 @@ export const scheduleApi = createApi({
       query: (body) => ({
         url: '/jobs',
         method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Update an existing job's metadata.
+     *
+     * Mock mode: Updates job in mock snapshot
+     * Real mode: PUT /jobs/{id}
+     *
+     * @see docs/releases/v0.5.13b-job-edit-via-jcf-modal.md
+     */
+    updateJob: builder.mutation<UpdateJobResponse, { jobId: string; body: UpdateJobRequest }>({
+      query: ({ jobId, body }) => ({
+        url: `/jobs/${jobId}`,
+        method: 'PUT',
         body,
       }),
       invalidatesTags: ['Snapshot'],
@@ -391,6 +423,7 @@ export const {
   useLookupByReferenceQuery,
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
+  useUpdateJobMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,

@@ -19,6 +19,7 @@ import type {
   Station,
   TaskAssignment,
   CreateJobRequest,
+  UpdateJobRequest,
   Job,
   Element,
   Task,
@@ -515,6 +516,80 @@ const handleCreateJob = async (
 };
 
 // ============================================================================
+// Job Update Handler
+// ============================================================================
+
+/**
+ * Response type for update job operation
+ */
+interface UpdateJobResponse {
+  id: string;
+  reference: string;
+  client: string;
+  description: string;
+  workshopExitDate: string;
+  status: string;
+  updatedAt: string;
+}
+
+/**
+ * PUT /jobs/:jobId - Update job metadata (mock implementation)
+ *
+ * Updates an existing job's metadata fields (reference, client, description,
+ * workshopExitDate, status). Only provided fields are updated.
+ *
+ * @see docs/releases/v0.5.13b-job-edit-via-jcf-modal.md
+ */
+const handleUpdateJob = async (
+  args: FetchArgs
+): Promise<{ data: UpdateJobResponse } | { error: FetchBaseQueryError }> => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const body = args.body as UpdateJobRequest;
+  const currentSnapshot = getSnapshot();
+
+  const jobIndex = currentSnapshot.jobs.findIndex((j) => j.id === jobId);
+  if (jobIndex === -1) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const existingJob = currentSnapshot.jobs[jobIndex];
+  const now = new Date().toISOString();
+
+  // Merge only provided fields
+  const updatedJob: Job = {
+    ...existingJob,
+    ...(body.reference !== undefined && { reference: body.reference }),
+    ...(body.client !== undefined && { client: body.client }),
+    ...(body.description !== undefined && { description: body.description }),
+    ...(body.workshopExitDate !== undefined && { workshopExitDate: body.workshopExitDate }),
+    updatedAt: now,
+  };
+
+  // Update snapshot
+  updateSnapshot((snapshot) => {
+    const newJobs = [...snapshot.jobs];
+    newJobs[jobIndex] = updatedJob;
+    return { ...snapshot, jobs: newJobs };
+  });
+
+  const response: UpdateJobResponse = {
+    id: updatedJob.id,
+    reference: updatedJob.reference,
+    client: updatedJob.client,
+    description: updatedJob.description,
+    workshopExitDate: updatedJob.workshopExitDate,
+    status: updatedJob.status,
+    updatedAt: now,
+  };
+
+  return { data: response };
+};
+
+// ============================================================================
 // Route Configuration
 // ============================================================================
 
@@ -603,6 +678,7 @@ const routes: MockRoute[] = [
   { method: 'GET', pattern: /^\/jobs\/clients/, handler: handleGetClientSuggestions },
   { method: 'GET', pattern: /^\/jobs\/lookup-by-reference/, handler: handleLookupByReference },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
+  { method: 'PUT', pattern: /^\/jobs\/[^/]+$/, handler: handleUpdateJob },
 
   // Task assignments
   { method: 'POST', pattern: /^\/tasks\/[^/]+\/assign$/, handler: handleAssignTask },

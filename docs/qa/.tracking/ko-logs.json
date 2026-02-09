@@ -34,20 +34,12 @@
       "resolvedAt": null
     },
     {
-      "id": "baa27200-a515-4997-819b-713ab92d4c97",
-      "testId": "jcf/autocomplete.md::AUTO-014",
-      "description": "I don't understand this: Replace-merge strategy: new type replaces same type",
-      "severity": "major",
-      "createdAt": "2026-02-06T16:52:53.154Z",
-      "resolvedAt": null
-    },
-    {
       "id": "8540b510-e53c-408a-8c3d-d65b7696d4bd",
       "testId": "jcf/autocomplete.md::AUTO-016",
       "description": "I don't understand this: Poses-merge strategy: new poses merge with existing format",
       "severity": "major",
       "createdAt": "2026-02-06T16:59:47.920Z",
-      "resolvedAt": null
+      "resolvedAt": "2026-02-09T13:59:44.169Z"
     },
     {
       "id": "49ee3d3a-7837-4c68-bffa-211a819b941e",
@@ -63,14 +55,6 @@
       "description": "Accepts letters",
       "severity": "major",
       "createdAt": "2026-02-06T17:25:19.189Z",
-      "resolvedAt": null
-    },
-    {
-      "id": "e6392f84-d449-4ab6-8af8-3aded932ddc2",
-      "testId": "jcf/elements-table.md::JCF-006",
-      "description": "Can't type into the input",
-      "severity": "major",
-      "createdAt": "2026-02-06T17:27:27.533Z",
       "resolvedAt": null
     },
     {
@@ -95,6 +79,22 @@
       "description": "I'm not sure what does this mean: Elements table in template mode",
       "severity": "major",
       "createdAt": "2026-02-06T18:58:17.430Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "137456ce-63f5-4d6e-84a5-40b0de0830fc",
+      "testId": "jcf/autocomplete.md::AUTO-014",
+      "description": "Learned weights should be ordered",
+      "severity": "major",
+      "createdAt": "2026-02-09T13:57:28.912Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "3741cc0a-ed69-48cc-a591-4374b8429122",
+      "testId": "jcf/autocomplete.md::AUTO-030",
+      "description": "The template sequence should offer station grous instead of stations.",
+      "severity": "blocker",
+      "createdAt": "2026-02-09T14:06:56.266Z",
       "resolvedAt": null
     }
   ]

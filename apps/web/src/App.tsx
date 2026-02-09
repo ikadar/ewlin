@@ -16,7 +16,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCreateJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCreateJobMutation, useUpdateJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -356,6 +356,7 @@ function AppContent() {
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
   const [createJob] = useCreateJobMutation();
+  const [updateJob] = useUpdateJobMutation();
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -447,6 +448,10 @@ function AppContent() {
   // v0.4.9: Elements table state
   const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
 
+  // v0.5.13b: Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+
   // v0.4.31: Sequence workflow from selected template (template-free mode when empty)
   const [sequenceWorkflow, setSequenceWorkflow] = useState<string[]>([]);
 
@@ -461,24 +466,41 @@ function AppContent() {
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
 
   // v0.4.33: Save job via API (v0.5.4: migrated to RTK Query mutation)
+  // v0.5.13b: Supports both create and update modes
   const handleJcfSave = useCallback(async () => {
-    if (!jcfSaveAttemptRef.current) return;
-
-    const isValid = jcfSaveAttemptRef.current();
-    if (!isValid) return;
+    // In edit mode, skip JCF validation (elements table not editable)
+    if (!isEditMode) {
+      if (!jcfSaveAttemptRef.current) return;
+      const isValid = jcfSaveAttemptRef.current();
+      if (!isValid) return;
+    }
 
     setIsJcfSaving(true);
     setJcfSaveError(null);
 
     try {
-      const request = transformJcfToRequest(
-        jcfJobId,
-        jcfClient,
-        jcfIntitule,
-        jcfDeadline,
-        jcfElements
-      );
-      await createJob(request).unwrap();
+      if (isEditMode && editingJobId) {
+        // v0.5.13b: Update existing job
+        await updateJob({
+          jobId: editingJobId,
+          body: {
+            reference: jcfJobId,
+            client: jcfClient,
+            description: jcfIntitule,
+            workshopExitDate: jcfDeadline,
+          },
+        }).unwrap();
+      } else {
+        // Create new job
+        const request = transformJcfToRequest(
+          jcfJobId,
+          jcfClient,
+          jcfIntitule,
+          jcfDeadline,
+          jcfElements
+        );
+        await createJob(request).unwrap();
+      }
 
       // Success: close modal and reset form
       // Cache invalidation is automatic via invalidatesTags: ['Snapshot']
@@ -491,6 +513,8 @@ function AppContent() {
       setJcfDeadline('');
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
       setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
+      setIsEditMode(false); // v0.5.13b: Reset edit mode
+      setEditingJobId(null);
     } catch (error) {
       setIsJcfSaving(false);
       // v0.5.4: Use getErrorMessage for normalized error handling
@@ -498,7 +522,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, navigate, createJob, showToast]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, navigate, createJob, updateJob, showToast, isEditMode, editingJobId]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -517,6 +541,8 @@ function AppContent() {
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
     setSequenceWorkflow([]); // v0.4.31: Reset workflow on close
     setJcfSaveError(null); // v0.4.33: Reset API error on close
+    setIsEditMode(false); // v0.5.13b: Reset edit mode on close
+    setEditingJobId(null);
   }, [navigate]);
 
   // v0.4.34: Handler for "Save as Template" button in JcfModal
@@ -656,6 +682,84 @@ function AppContent() {
 
   // Find selected job
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
+
+  // v0.5.13b: Handler for "Modifier" button in Job Details Panel
+  const handleEditJob = useCallback(() => {
+    if (!selectedJob) return;
+
+    // Map job data back to JCF form fields
+    setJcfJobId(selectedJob.reference);
+    setJcfClient(selectedJob.client);
+    setJcfIntitule(selectedJob.description);
+    setJcfDeadline(selectedJob.workshopExitDate);
+    setJcfQuantity('');
+    setJcfTemplate('');
+
+    // Build stationId → station name lookup for sequence DSL reconstruction
+    const stationNameMap = new Map(snapshot.stations.map((s) => [s.id, s.name]));
+    // Build provider lookup for outsourced tasks
+    const providerNameMap = new Map((snapshot.providers ?? []).map((p) => [p.id, p.name]));
+
+    // Map elements back to JcfElement[] format
+    const jobElements = snapshot.elements.filter((e) => selectedJob.elementIds.includes(e.id));
+    // Build elementId → name lookup for precedences
+    const elementNameMap = new Map(jobElements.map((el) => [el.id, el.name]));
+
+    if (jobElements.length > 0) {
+      const mappedElements: JcfElement[] = jobElements.map((el) => {
+        // Parse label back to format/pagination/papier (label = "format | pagination | papier")
+        const labelParts = el.label ? el.label.split(' | ') : [];
+
+        // Map prerequisiteElementIds back to comma-separated names
+        const precedences = el.prerequisiteElementIds
+          .map((id) => elementNameMap.get(id) ?? '')
+          .filter(Boolean)
+          .join(', ');
+
+        // Reconstruct sequence DSL from tasks
+        const elementTasks = snapshot.tasks
+          .filter((t) => t.elementId === el.id)
+          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        const sequenceParts = elementTasks.map((t) => {
+          if (t.type === 'Internal') {
+            const stationName = stationNameMap.get(t.stationId) ?? t.stationId;
+            const totalMinutes = t.duration.setupMinutes + t.duration.runMinutes;
+            return `[${stationName}] ${totalMinutes}`;
+          }
+          // Outsourced tasks (type === 'Outsourced')
+          const providerName = providerNameMap.get(t.providerId) ?? t.actionType ?? 'Externe';
+          return `[${providerName}] ${t.duration.openDays}j`;
+        });
+        const sequence = sequenceParts.join(' | ');
+
+        return {
+          name: el.name,
+          precedences,
+          quantite: '',
+          format: labelParts[0] ?? '',
+          pagination: labelParts[1] ?? '',
+          papier: labelParts[2] ?? '',
+          imposition: '',
+          impression: '',
+          surfacage: '',
+          autres: '',
+          qteFeuilles: '',
+          commentaires: '',
+          sequence,
+        };
+      });
+      setJcfElements(mappedElements);
+    }
+
+    // Set edit mode state
+    setIsEditMode(true);
+    setEditingJobId(selectedJob.id);
+    setSequenceWorkflow([]);
+    setJcfSaveError(null);
+
+    // Open modal via URL navigation
+    navigate('/job/new');
+  }, [selectedJob, snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, navigate]);
 
   // REQ-14: Calculate grid/DateStrip start date (6 days before today)
   const gridStartDate = useMemo(() => {
@@ -1753,6 +1857,7 @@ function AppContent() {
           onWorkDaysChange={handleOutsourcingWorkDaysChange}
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}
+          onEditJob={handleEditJob}
         />
         <DateStrip
           startDate={gridStartDate}
@@ -1846,20 +1951,22 @@ function AppContent() {
       <JcfModal
         isOpen={isJcfModalOpen}
         onClose={handleCloseJcf}
+        title={isEditMode ? `Modifier ${jcfJobId}` : undefined}
+        saveLabel={isEditMode ? 'Mettre à jour' : undefined}
         onSave={handleJcfSave}
         isSaving={isJcfSaving}
         error={jcfSaveError}
-        onSaveAsTemplate={handleSaveAsTemplate}
+        onSaveAsTemplate={isEditMode ? undefined : handleSaveAsTemplate}
         canSaveAsTemplate={jcfElements.length > 0 && jcfElements.some(el => el.name.trim() !== '')}
       >
         <JcfJobHeader
           jobId={jcfJobId}
-          onJobIdChange={setJcfJobId}
+          onJobIdChange={isEditMode ? undefined : setJcfJobId}
           client={jcfClient}
           onClientChange={setJcfClient}
           template={jcfTemplate}
           onTemplateChange={setJcfTemplate}
-          onTemplateSelect={handleTemplateSelect}
+          onTemplateSelect={isEditMode ? undefined : handleTemplateSelect}
           intitule={jcfIntitule}
           onIntituleChange={setJcfIntitule}
           quantity={jcfQuantity}

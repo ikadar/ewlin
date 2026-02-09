@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-02-09T12:04:23.433Z",
+  "updatedAt": "2026-02-09T14:26:43.303Z",
   "tests": {
     "scheduler/datestrip-pickplace.md::DS-001": {
       "status": "ok",
@@ -319,21 +319,21 @@
       }
     },
     "jcf/autocomplete.md::AUTO-016": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T16:57:48.868Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:59:25.968Z",
       "results": {
         "0": "ok",
-        "1": "ko",
+        "1": "ok",
         "2": "ok"
       }
     },
     "jcf/autocomplete.md::AUTO-018": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T17:00:19.176Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:01:05.872Z",
       "results": {
         "0": "ok",
         "1": "ok",
-        "2": "ko",
+        "2": "ok",
         "3": "ok"
       }
     },
@@ -486,14 +486,14 @@
       }
     },
     "jcf/elements-table.md::JCF-003": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T17:21:46.600Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:08:04.480Z",
       "results": {
         "0": "ok",
-        "1": "ko",
+        "1": "ok",
         "2": "ok",
-        "3": "ko",
-        "4": "ko"
+        "3": "ok",
+        "4": "ok"
       }
     },
     "jcf/elements-table.md::JCF-004": {
@@ -518,13 +518,13 @@
       }
     },
     "jcf/elements-table.md::JCF-006": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T17:25:54.314Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:09:17.733Z",
       "results": {
         "0": "ok",
-        "1": "ko",
-        "2": "ko",
-        "3": "ko",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
         "4": "ok",
         "5": "ok"
       }
@@ -543,11 +543,11 @@
       }
     },
     "jcf/elements-table.md::JCF-008": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T17:28:56.400Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:12:06.594Z",
       "results": {
         "0": "ok",
-        "1": "ko",
+        "1": "ok",
         "2": "ok",
         "3": "ok"
       }
@@ -575,15 +575,15 @@
       }
     },
     "jcf/elements-table.md::JCF-015": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T17:32:14.640Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:13:39.006Z",
       "results": {
         "0": "ok",
         "1": "ok",
         "2": "ok",
         "3": "ok",
         "4": "ok",
-        "5": "ko"
+        "5": "ok"
       }
     },
     "jcf/elements-table.md::JCF-016": {
@@ -746,13 +746,13 @@
       }
     },
     "jcf/elements-table.md::JCF-010": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T17:58:40.978Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:18:56.371Z",
       "results": {
         "0": "ok",
         "1": "ok",
-        "2": "ko",
-        "3": "ko"
+        "2": "ok",
+        "3": "ok"
       }
     },
     "jcf/validation-templates.md::API-002": {
@@ -766,13 +766,13 @@
       }
     },
     "jcf/validation-templates.md::PREREQ-001": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T18:03:39.097Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:21:18.847Z",
       "results": {
         "0": "ok",
         "1": "ok",
         "2": "ok",
-        "3": "ko"
+        "3": "ok"
       }
     },
     "jcf/validation-templates.md::PREREQ-004": {
@@ -835,12 +835,12 @@
       }
     },
     "jcf/validation-templates.md::VAL-003": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T18:16:56.729Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:22:53.106Z",
       "results": {
         "0": "ok",
         "1": "ok",
-        "2": "ko",
+        "2": "ok",
         "3": "ok"
       }
     },
@@ -889,11 +889,11 @@
       }
     },
     "jcf/validation-templates.md::INFRA-004": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-06T18:24:49.945Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:23:54.773Z",
       "results": {
-        "0": "ko",
-        "1": "ko",
+        "0": "ok",
+        "1": "ok",
         "2": "ok"
       }
     },
@@ -918,13 +918,13 @@
       }
     },
     "jcf/validation-templates.md::TMPL-001": {
-      "status": "ko",
-      "lastTestedAt": "2026-02-06T18:55:12.319Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T14:26:43.303Z",
       "results": {
-        "0": "ko",
-        "1": "ko",
-        "2": "ko",
-        "3": "ko"
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
       }
     },
     "jcf/validation-templates.md::TMPL-004": {
@@ -1086,23 +1086,23 @@
     },
     "scheduler/datestrip-pickplace.md::DS-027": {
       "status": "partial",
-      "lastTestedAt": "2026-02-09T10:59:25.316Z",
+      "lastTestedAt": "2026-02-09T13:33:38.196Z",
       "results": {
         "0": "ok",
         "1": "ok",
         "2": "ko",
-        "3": "ko",
+        "3": "ok",
         "4": "ok"
       }
     },
     "scheduler/datestrip-pickplace.md::DS-028": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-09T11:03:05.050Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:35:13.216Z",
       "results": {
-        "0": "ko",
+        "0": "ok",
         "1": "ok",
-        "2": "ko",
-        "3": "ko"
+        "2": "ok",
+        "3": "ok"
       }
     },
     "scheduler/datestrip-pickplace.md::DS-003": {
@@ -1176,12 +1176,12 @@
       }
     },
     "scheduler/datestrip-pickplace.md::DS-019": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-09T11:11:08.137Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:37:10.509Z",
       "results": {
         "0": "ok",
         "1": "ok",
-        "2": "ko",
+        "2": "ok",
         "3": "ok"
       }
     },
@@ -1295,13 +1295,13 @@
       }
     },
     "scheduler/drag-drop.md::SCHED-042": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-09T11:21:02.654Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:41:10.519Z",
       "results": {
         "0": "ok",
         "1": "ok",
         "2": "ok",
-        "3": "ko"
+        "3": "ok"
       }
     },
     "scheduler/drag-drop.md::SCHED-044/045": {
@@ -1316,12 +1316,12 @@
       }
     },
     "scheduler/drag-drop.md::SCHED-052": {
-      "status": "ko",
-      "lastTestedAt": "2026-02-09T11:22:41.073Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:41:24.298Z",
       "results": {
-        "0": "ko",
-        "1": "ko",
-        "2": "ko"
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
       }
     },
     "scheduler/drag-drop.md::SCHED-063": {
@@ -1344,11 +1344,11 @@
       }
     },
     "scheduler/drag-drop.md::SCHED-048/049": {
-      "status": "ko",
-      "lastTestedAt": "2026-02-09T11:27:48.764Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:41:45.248Z",
       "results": {
-        "0": "ko",
-        "1": "ko"
+        "0": "ok",
+        "1": "ok"
       }
     },
     "scheduler/drag-drop.md::SCHED-053": {
@@ -1545,12 +1545,12 @@
       }
     },
     "scheduler/layout-grid.md::SCHED-025": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-09T11:45:11.919Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:44:20.290Z",
       "results": {
         "0": "ok",
-        "1": "ko",
-        "2": "ko",
+        "1": "ok",
+        "2": "ok",
         "3": "ok"
       }
     },
@@ -1592,12 +1592,12 @@
       }
     },
     "scheduler/layout-grid.md::SCHED-027": {
-      "status": "ko",
-      "lastTestedAt": "2026-02-09T11:48:02.054Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:44:52.184Z",
       "results": {
-        "0": "ko",
-        "1": "ko",
-        "2": "ko"
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
       }
     },
     "scheduler/layout-grid.md::SCHED-034": {
@@ -1634,25 +1634,25 @@
       }
     },
     "scheduler/navigation-ux.md::NAV-006": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-09T11:50:21.763Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:48:15.370Z",
       "results": {
         "0": "ok",
         "1": "ok",
         "2": "ok",
-        "3": "ko"
+        "3": "ok"
       }
     },
     "scheduler/navigation-ux.md::NAV-009": {
-      "status": "ko",
-      "lastTestedAt": "2026-02-09T11:50:50.901Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:48:33.961Z",
       "results": {
-        "0": "ko",
-        "1": "ko",
-        "2": "ko",
-        "3": "ko",
-        "4": "ko",
-        "5": "ko"
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok"
       }
     },
     "scheduler/navigation-ux.md::NAV-011": {
@@ -1711,12 +1711,12 @@
       }
     },
     "scheduler/navigation-ux.md::NAV-007": {
-      "status": "partial",
-      "lastTestedAt": "2026-02-09T11:58:51.593Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T13:46:28.652Z",
       "results": {
-        "0": "ko",
-        "1": "ko",
-        "2": "ko",
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
         "3": "ok"
       }
     },
@@ -1809,6 +1809,13 @@
         "1": "ok",
         "2": "ok",
         "3": "ok"
+      }
+    },
+    "jcf/autocomplete.md::AUTO-030": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T14:06:11.739Z",
+      "results": {
+        "0": "ko"
       }
     }
   }

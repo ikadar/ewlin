@@ -1929,6 +1929,17 @@ Two-part release following reference/jcf pattern.
 - [x] Test fixture: outsourcing-drag
 - [ ] E2E tests for drag behavior
 
+#### v0.5.13b - Job Edit via JCF Modal
+> **Goal:** Allow editing existing jobs through the Job Creation Form
+
+- [ ] "Modifier" button on Job Details Panel header (next to close button)
+- [ ] `updateJob` RTK Query mutation + mock implementation
+- [ ] JCF modal edit mode: pre-fill form with selected job data (client, intitulé, deadline, elements)
+- [ ] Modal title: "Modifier {jobId}" instead of "Nouveau Job"
+- [ ] Save button calls updateJob (PUT) instead of createJob (POST)
+- [ ] Job ID field read-only in edit mode
+- [ ] App.tsx: `onEditJob` callback wiring (load job data → open modal in edit mode)
+
 ### Phase 5E: Testing & Verification
 
 #### v0.5.14 - E2E Tests with Real Backend
