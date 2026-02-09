@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-02-06T19:04:07.952Z",
+  "updatedAt": "2026-02-09T12:04:23.433Z",
   "tests": {
     "scheduler/datestrip-pickplace.md::DS-001": {
       "status": "ok",
@@ -13,12 +13,16 @@
       }
     },
     "scheduler/navigation-ux.md::NAV-003": {
-      "status": "untested",
-      "lastTestedAt": "2026-02-05T18:52:26.696Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:49:36.132Z",
       "results": {
-        "0": "untested",
-        "1": "untested",
-        "2": "untested"
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok",
+        "6": "ok"
       }
     },
     "scheduler/datestrip-pickplace.md::DS-002": {
@@ -35,10 +39,13 @@
       }
     },
     "scheduler/layout-grid.md::SCHED-018": {
-      "status": "untested",
-      "lastTestedAt": "2026-02-05T22:41:00.000Z",
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:37:23.781Z",
       "results": {
-        "0": "untested"
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
       }
     },
     "jcf/autocomplete.md::AUTO-004": {
@@ -971,6 +978,832 @@
     "jcf/validation-templates.md::TMPL-010": {
       "status": "ok",
       "lastTestedAt": "2026-02-06T19:04:07.952Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-005": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:47:29.520Z",
+      "results": {
+        "0": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-009": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:48:36.528Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-010": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:49:50.322Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-012": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:51:57.839Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-014": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:52:44.244Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-015": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:54:09.494Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-016": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:54:48.740Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-018": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:55:52.244Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-024": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:56:28.130Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-026": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T10:58:08.922Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-027": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T10:59:25.316Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ko",
+        "3": "ko",
+        "4": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-028": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:03:05.050Z",
+      "results": {
+        "0": "ko",
+        "1": "ok",
+        "2": "ko",
+        "3": "ko"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-003": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:03:49.614Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-004": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:04:35.288Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-006": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:05:57.471Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ok",
+        "3": "ko"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-008": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:06:43.601Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-011": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:07:19.447Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-013": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:07:52.760Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-017": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:08:03.608Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-019": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:11:08.137Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ko",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-020": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:11:36.438Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-021": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:12:20.612Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-023": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:13:25.295Z",
+      "results": {
+        "0": "ko",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-025": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:14:12.818Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ko",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-029": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:15:01.986Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-030": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:15:19.853Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-031": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:15:57.762Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-032": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:16:12.678Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-007": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:16:30.933Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/datestrip-pickplace.md::DS-022": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T11:17:01.312Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko",
+        "3": "ko"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-041": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:20:11.973Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-042": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:21:02.654Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ko"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-044/045": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:21:23.964Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-052": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T11:22:41.073Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-063": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:27:04.326Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-083": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:27:17.994Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-048/049": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T11:27:48.764Z",
+      "results": {
+        "0": "ko",
+        "1": "ko"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-053": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:28:17.054Z",
+      "results": {
+        "0": "ok",
+        "1": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-054": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:29:16.399Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-058": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:31:17.581Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-073": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:32:58.069Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-074": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:35:04.521Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-078": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:35:33.177Z",
+      "results": {
+        "0": "ok",
+        "1": "ok"
+      }
+    },
+    "scheduler/drag-drop.md::SCHED-075": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:36:06.661Z",
+      "results": {
+        "0": "ok",
+        "1": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-011": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:36:31.955Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-013": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:36:45.863Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-016": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:37:07.658Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-019": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:37:41.459Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-020": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:39:02.897Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-021": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:39:44.568Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-022": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:40:03.727Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-024": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:40:41.367Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-026": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:41:07.838Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-032": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:42:01.186Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ko",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-015": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T11:42:51.941Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-017": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:43:53.115Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-023": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:44:46.050Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-025": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:45:11.919Z",
+      "results": {
+        "0": "ok",
+        "1": "ko",
+        "2": "ko",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-028": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:45:24.634Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-029": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:45:44.427Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-030": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:46:06.389Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-033": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:46:30.597Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-027": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T11:48:02.054Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko"
+      }
+    },
+    "scheduler/layout-grid.md::SCHED-034": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T11:48:35.768Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko",
+        "3": "ko"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-001": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:48:52.797Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-002": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:49:18.736Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-006": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:50:21.763Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ko"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-009": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T11:50:50.901Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko",
+        "3": "ko",
+        "4": "ko",
+        "5": "ko"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-011": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:51:24.667Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-012": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:51:48.260Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-014": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:52:28.453Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-004": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:53:52.154Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok",
+        "5": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-005": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:56:28.800Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-007": {
+      "status": "partial",
+      "lastTestedAt": "2026-02-09T11:58:51.593Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko",
+        "3": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-008": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T11:59:03.108Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-013": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T12:00:01.264Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-015": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T12:01:03.317Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok",
+        "4": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-016": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T12:01:25.891Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-018": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T12:02:41.500Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-019": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T12:02:56.890Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-020": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T12:03:18.606Z",
+      "results": {
+        "0": "ok",
+        "1": "ok",
+        "2": "ok",
+        "3": "ok"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-010": {
+      "status": "ko",
+      "lastTestedAt": "2026-02-09T12:04:04.876Z",
+      "results": {
+        "0": "ko",
+        "1": "ko",
+        "2": "ko",
+        "3": "ko"
+      }
+    },
+    "scheduler/navigation-ux.md::NAV-017": {
+      "status": "ok",
+      "lastTestedAt": "2026-02-09T12:04:23.433Z",
       "results": {
         "0": "ok",
         "1": "ok",
