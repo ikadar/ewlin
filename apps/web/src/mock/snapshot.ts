@@ -45,8 +45,8 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
     stationData.stations
   );
 
-  // Identify late jobs
-  const lateJobs = identifyLateJobs(jobData.jobs, jobData.tasks);
+  // Identify late jobs (including tasks scheduled past deadline)
+  const lateJobs = identifyLateJobs(jobData.jobs, jobData.tasks, assignmentData.assignments);
 
   // Create the snapshot
   const snapshot: ScheduleSnapshot = {
@@ -125,8 +125,9 @@ export function updateSnapshot(
   updated.version += 1;
   updated.generatedAt = new Date().toISOString();
 
-  // Automatically recalculate conflicts after every update
+  // Automatically recalculate conflicts and late jobs after every update
   updated = updateSnapshotConflicts(updated);
+  updated = { ...updated, lateJobs: identifyLateJobs(updated.jobs, updated.tasks, updated.assignments) };
 
   cachedSnapshot = updated;
   return cachedSnapshot;
