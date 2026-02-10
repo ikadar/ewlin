@@ -16,9 +16,15 @@ import {
   getExpectedCategories,
   DEFAULT_ST_DURATIONS,
 } from './sequenceDsl';
-import type { PostePreset, SoustraitantPreset } from '@flux/types';
+import type { SoustraitantPreset } from '@flux/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+/** Widened poste type — accepts both PostePreset (from @flux/types) and snapshot-derived postes */
+export interface PostePresetLike {
+  name: string;
+  category: string;
+}
 
 interface Suggestion {
   label: string;
@@ -31,12 +37,12 @@ export interface JcfSequenceAutocompleteProps {
   value: string;
   /** Store value */
   onChange: (value: string) => void;
-  /** Poste presets from reference data */
-  postePresets: PostePreset[];
+  /** Poste presets (from reference data or snapshot-derived) */
+  postePresets: ReadonlyArray<PostePresetLike>;
   /** Session-learned postes */
-  sessionPostes?: PostePreset[];
+  sessionPostes?: ReadonlyArray<PostePresetLike>;
   /** Callback to learn a new poste */
-  onLearnPoste?: (poste: PostePreset) => void;
+  onLearnPoste?: (poste: PostePresetLike) => void;
   /** Sous-traitant presets from reference data */
   soustraitantPresets?: SoustraitantPreset[];
   /** Session-learned sous-traitants */

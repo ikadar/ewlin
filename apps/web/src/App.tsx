@@ -32,9 +32,9 @@ import {
   usePickState,
   PICK_CURSOR_OFFSET_Y,
 } from './pick';
-import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
+import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, StationCategory, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
-import { transformJcfToRequest } from './api';
+import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -45,9 +45,9 @@ const START_HOUR = 0;
  * @see docs/releases/v0.4.22-jcf-sequence-workflow-suggestions.md
  */
 const TEST_SEQUENCE_WORKFLOW = [
-  'Presse offset, Presse numérique', // Step 0: Print (offset or digital)
-  'Massicot', // Step 1: Cutting
-  'Plieuse', // Step 2: Folding
+  'Presses Offset', // Step 0: Print (matches fixture category name)
+  'Massicots', // Step 1: Cutting
+  'Plieuses', // Step 2: Folding
   'Conditionnement', // Step 3: Packaging
 ];
 // v0.3.46: Restored to 365 days with virtual scrolling for performance
@@ -311,6 +311,21 @@ function handlePageScroll(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   return false;
 }
 
+/**
+ * Derive poste presets from snapshot stations and categories.
+ * Station names have spaces removed (e.g., "Komori G40" → "KomoriG40").
+ */
+function stationsToPostes(
+  stations: Station[],
+  categories: StationCategory[]
+): Array<{ name: string; category: string }> {
+  const catNameMap = new Map(categories.map(c => [c.id, c.name]));
+  return stations.map(s => ({
+    name: s.name.replace(/\s+/g, ''),
+    category: catNameMap.get(s.categoryId) ?? '',
+  }));
+}
+
 // Inner App component that uses drag state context
 function AppContent() {
   // v0.4.37: RTK Query for snapshot data
@@ -349,6 +364,12 @@ function AppContent() {
     conflicts: [],
     lateJobs: [],
   };
+
+  // Derive poste presets from snapshot stations (single source of truth)
+  const snapshotPostes = useMemo(
+    () => stationsToPostes(snapshot.stations, snapshot.categories),
+    [snapshot.stations, snapshot.categories],
+  );
 
   // v0.5.2: RTK Query mutations for assignment operations
   const [assignTask] = useAssignTaskMutation();
@@ -480,7 +501,7 @@ function AppContent() {
 
     try {
       if (isEditMode && editingJobId) {
-        // v0.5.13b: Update existing job
+        // v0.5.13b: Update existing job (metadata + elements)
         await updateJob({
           jobId: editingJobId,
           body: {
@@ -488,6 +509,7 @@ function AppContent() {
             client: jcfClient,
             description: jcfIntitule,
             workshopExitDate: jcfDeadline,
+            elements: jcfElements.map(transformJcfElementToRequest),
           },
         }).unwrap();
       } else {
@@ -716,21 +738,20 @@ function AppContent() {
           .filter(Boolean)
           .join(', ');
 
-        // Reconstruct sequence DSL from tasks
+        // Reconstruct sequence DSL from tasks (JCF format)
         const elementTasks = snapshot.tasks
           .filter((t) => t.elementId === el.id)
           .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
         const sequenceParts = elementTasks.map((t) => {
           if (t.type === 'Internal') {
-            const stationName = stationNameMap.get(t.stationId) ?? t.stationId;
-            const totalMinutes = t.duration.setupMinutes + t.duration.runMinutes;
-            return `[${stationName}] ${totalMinutes}`;
+            const posteName = (stationNameMap.get(t.stationId) ?? t.stationId).replace(/\s+/g, '');
+            return `${posteName}(${t.duration.setupMinutes}+${t.duration.runMinutes})`;
           }
           // Outsourced tasks (type === 'Outsourced')
-          const providerName = providerNameMap.get(t.providerId) ?? t.actionType ?? 'Externe';
-          return `[${providerName}] ${t.duration.openDays}j`;
+          const providerName = providerNameMap.get(t.providerId) ?? 'Externe';
+          return `ST:${providerName}(${t.duration.openDays}j):${t.actionType ?? ''}`;
         });
-        const sequence = sequenceParts.join(' | ');
+        const sequence = sequenceParts.join('\n');
 
         return {
           name: el.name,
@@ -1979,6 +2000,7 @@ function AppContent() {
           <JcfElementsTable
             elements={jcfElements}
             onElementsChange={setJcfElements}
+            postePresets={snapshotPostes}
             sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : sequenceWorkflow}
             jobQuantity={jcfQuantity}
             onSaveAttemptRef={jcfSaveAttemptRef}

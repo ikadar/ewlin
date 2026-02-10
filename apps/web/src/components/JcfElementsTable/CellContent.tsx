@@ -9,6 +9,7 @@ import type { SequenceWorkflow } from './useSequenceWorkflow';
 import type { SessionLearning } from './useSessionLearning';
 import type { LinkPropagationState } from './useLinkPropagation';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
+import type { PostePresetLike } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete/JcfFormatAutocomplete';
 import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete/JcfImpressionAutocomplete';
 import { JcfSurfacageAutocomplete } from '../JcfSurfacageAutocomplete/JcfSurfacageAutocomplete';
@@ -19,7 +20,6 @@ import { JcfQuantiteInput } from '../JcfQuantiteInput/JcfQuantiteInput';
 import { JcfPaginationInput } from '../JcfPaginationInput/JcfPaginationInput';
 import { JcfLinkToggle } from '../JcfLinkToggle/JcfLinkToggle';
 import {
-  POSTE_PRESETS,
   SOUSTRAITANT_PRESETS,
   PRODUCT_FORMATS,
   IMPRESSION_PRESETS,
@@ -49,6 +49,7 @@ export interface CellContentProps {
   inputLinkedClass: string;
   elementNames: string[];
   currentElementName: string;
+  postePresets: ReadonlyArray<PostePresetLike>;
   sequenceWorkflow: SequenceWorkflow;
   sessionLearning: SessionLearning;
   linkPropagation: LinkPropagationState;
@@ -64,14 +65,14 @@ export interface CellContentProps {
 /** Render sequence autocomplete cell */
 function SequenceCell(props: CellContentProps) {
   const { cellId, value, inputFilledClass, elementIndex, rowIndex, rowCount, elementCount } = props;
-  const { sequenceWorkflow, sessionLearning, focusCell, handleCellChange, markFieldTouched } = props;
+  const { postePresets, sequenceWorkflow, sessionLearning, focusCell, handleCellChange, markFieldTouched } = props;
 
   return (
     <JcfSequenceAutocomplete
       id={cellId}
       value={value}
       onChange={(v) => handleCellChange(elementIndex, 'sequence', v)}
-      postePresets={POSTE_PRESETS}
+      postePresets={postePresets}
       sessionPostes={sessionLearning.postes}
       onLearnPoste={sessionLearning.learnPoste}
       soustraitantPresets={SOUSTRAITANT_PRESETS}

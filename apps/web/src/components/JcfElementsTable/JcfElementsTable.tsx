@@ -6,6 +6,7 @@ import { useLinkPropagation, isLinkableField } from '../../hooks/useLinkPropagat
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
 import { CellContent } from './CellContent';
+import type { PostePresetLike } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
 import { validateAllElements, validateAllForSubmit, getCellError } from './validation';
 import {
   getAllRequiredFields,
@@ -63,6 +64,8 @@ export interface JcfElementsTableProps {
   elements: JcfElement[];
   /** Callback when elements change */
   onElementsChange: (elements: JcfElement[]) => void;
+  /** Poste presets for sequence autocomplete (from snapshot or reference data) */
+  postePresets?: ReadonlyArray<PostePresetLike>;
   /**
    * Workflow-guided suggestion ordering for sequence autocomplete.
    * Array of expected production step categories in order.
@@ -89,6 +92,7 @@ export interface JcfElementsTableProps {
 export function JcfElementsTable({
   elements,
   onElementsChange,
+  postePresets = [],
   sequenceWorkflow,
   jobQuantity = '',
   mode = 'job',
@@ -620,6 +624,7 @@ export function JcfElementsTable({
                     inputLinkedClass={inputLinkedClass}
                     elementNames={elementNames}
                     currentElementName={element.name}
+                    postePresets={postePresets}
                     sequenceWorkflow={sequenceWorkflow}
                     sessionLearning={sessionLearning}
                     linkPropagation={linkPropagation}

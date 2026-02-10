@@ -280,6 +280,8 @@ interface CreateJobResponse {
 interface ParsedTask {
   actionType: string;
   durationMinutes: number;
+  setupMinutes?: number;
+  runMinutes?: number;
 }
 
 /**
@@ -325,8 +327,9 @@ const JOB_COLORS = [
 /**
  * Parse sequence DSL into individual tasks.
  *
- * Format: "[Action] duration | [Action2] duration2"
- * Example: "[Offset] 30 | [Massicot] 15" → [{actionType: "offset", duration: 30}, ...]
+ * Supports two formats:
+ * - JCF format: "PosteName(setup+run)" or "PosteName(total)" (one per line)
+ * - Legacy bracket format: "[ActionType] duration | [Action2] duration2"
  *
  * @param sequence - The sequence DSL string
  * @returns Array of parsed tasks
@@ -337,15 +340,30 @@ function parseSequenceDsl(sequence: string): ParsedTask[] {
   }
 
   const tasks: ParsedTask[] = [];
-  const parts = sequence.split('|').map((p) => p.trim()).filter((p) => p.length > 0);
+  const lines = sequence.split(/[\n|]/).map((p) => p.trim()).filter((p) => p.length > 0);
 
-  for (const part of parts) {
-    // Match pattern: [ActionType] duration
-    const match = part.match(/\[([^\]]+)\]\s*(\d+)/);
-    if (match) {
-      const actionType = match[1].toLowerCase().trim();
-      const durationMinutes = parseInt(match[2], 10);
-      tasks.push({ actionType, durationMinutes });
+  for (const line of lines) {
+    // JCF format: PosteName(setup+run) or PosteName(total)
+    const jcfMatch = line.match(/^(\w+)\((\d+)(?:\+(\d+))?\)$/);
+    if (jcfMatch) {
+      const setupMinutes = parseInt(jcfMatch[2], 10);
+      const runMinutes = jcfMatch[3] ? parseInt(jcfMatch[3], 10) : 0;
+      tasks.push({
+        actionType: jcfMatch[1],
+        durationMinutes: setupMinutes + runMinutes,
+        setupMinutes,
+        runMinutes,
+      });
+      continue;
+    }
+
+    // Legacy bracket format: [ActionType] duration
+    const bracketMatch = line.match(/\[([^\]]+)\]\s*(\d+)/);
+    if (bracketMatch) {
+      tasks.push({
+        actionType: bracketMatch[1].toLowerCase().trim(),
+        durationMinutes: parseInt(bracketMatch[2], 10),
+      });
     }
   }
 
@@ -353,25 +371,36 @@ function parseSequenceDsl(sequence: string): ParsedTask[] {
 }
 
 /**
- * Get station ID for an action type
+ * Get station ID for an action type.
+ * Dynamically looks up station by name from snapshot first,
+ * then falls back to ACTION_TO_STATION mapping.
  */
-function getStationForAction(actionType: string): string {
-  const normalizedAction = actionType.toLowerCase().trim();
+function getStationForAction(actionType: string, snapshot?: ScheduleSnapshot): string {
+  const normalized = actionType.toLowerCase().replace(/\s+/g, '');
 
-  // Direct match
+  // Dynamic lookup: match station name (spaces removed) from snapshot
+  if (snapshot) {
+    const station = snapshot.stations.find(
+      s => s.name.toLowerCase().replace(/\s+/g, '') === normalized
+    );
+    if (station) return station.id;
+  }
+
+  // Fallback to static mapping
+  const normalizedAction = actionType.toLowerCase().trim();
   if (ACTION_TO_STATION[normalizedAction]) {
     return ACTION_TO_STATION[normalizedAction];
   }
 
-  // Partial match
+  // Partial match in static mapping
   for (const [key, stationId] of Object.entries(ACTION_TO_STATION)) {
     if (normalizedAction.includes(key) || key.includes(normalizedAction)) {
       return stationId;
     }
   }
 
-  // Default to first offset press
-  return 'sta-komori-g40';
+  // Final fallback: first station in snapshot or hardcoded default
+  return snapshot?.stations[0]?.id ?? 'sta-komori-g40';
 }
 
 /**
@@ -424,11 +453,11 @@ const handleCreateJob = async (
       taskIds.push(taskId);
       allTaskIds.push(taskId);
 
-      const stationId = getStationForAction(parsedTask.actionType);
+      const stationId = getStationForAction(parsedTask.actionType, currentSnapshot);
 
-      // Calculate setup and run times (roughly 20% setup, 80% run)
-      const setupMinutes = Math.max(15, Math.round(parsedTask.durationMinutes * 0.2));
-      const runMinutes = parsedTask.durationMinutes - setupMinutes;
+      // Use explicit setup/run if provided (JCF format), otherwise estimate (20%/80%)
+      const setupMinutes = parsedTask.setupMinutes ?? Math.max(15, Math.round(parsedTask.durationMinutes * 0.2));
+      const runMinutes = parsedTask.runMinutes ?? (parsedTask.durationMinutes - setupMinutes);
 
       const task: InternalTask = {
         id: taskId,
@@ -533,10 +562,10 @@ interface UpdateJobResponse {
 }
 
 /**
- * PUT /jobs/:jobId - Update job metadata (mock implementation)
+ * PUT /jobs/:jobId - Update job (mock implementation)
  *
- * Updates an existing job's metadata fields (reference, client, description,
- * workshopExitDate, status). Only provided fields are updated.
+ * Updates an existing job's metadata fields and optionally replaces
+ * elements/tasks when `elements` array is provided in the body.
  *
  * @see docs/releases/v0.5.13b-job-edit-via-jcf-modal.md
  */
@@ -559,13 +588,83 @@ const handleUpdateJob = async (
   const existingJob = currentSnapshot.jobs[jobIndex];
   const now = new Date().toISOString();
 
-  // Merge only provided fields
+  // If elements provided, rebuild elements and tasks
+  let newElementIds = existingJob.elementIds;
+  let newTaskIds = existingJob.taskIds;
+  const newElements: Element[] = [];
+  const newTasks: Task[] = [];
+
+  if (body.elements && body.elements.length > 0) {
+    const elementNameToId: Record<string, string> = {};
+    newElementIds = [];
+    newTaskIds = [];
+
+    // First pass: create elements and tasks
+    for (let i = 0; i < body.elements.length; i++) {
+      const elementInput = body.elements[i];
+      const elementId = `elem-${jobId}-upd-${i}`;
+      newElementIds.push(elementId);
+      elementNameToId[elementInput.name] = elementId;
+
+      const parsedTasks = parseSequenceDsl(elementInput.sequence || '');
+      const taskIds: string[] = [];
+
+      for (let j = 0; j < parsedTasks.length; j++) {
+        const parsed = parsedTasks[j];
+        const taskId = `task-${jobId}-upd-${i}-${j}`;
+        taskIds.push(taskId);
+        newTaskIds.push(taskId);
+
+        const stationId = getStationForAction(parsed.actionType, currentSnapshot);
+        const setupMinutes = parsed.setupMinutes ?? Math.max(15, Math.round(parsed.durationMinutes * 0.2));
+        const runMinutes = parsed.runMinutes ?? (parsed.durationMinutes - setupMinutes);
+
+        newTasks.push({
+          id: taskId,
+          elementId,
+          sequenceOrder: j,
+          status: 'Ready',
+          type: 'Internal',
+          stationId,
+          duration: { setupMinutes, runMinutes },
+          createdAt: now,
+          updatedAt: now,
+        } as InternalTask);
+      }
+
+      newElements.push({
+        id: elementId,
+        jobId,
+        name: elementInput.name,
+        label: elementInput.label,
+        prerequisiteElementIds: [],
+        taskIds,
+        paperStatus: 'in_stock',
+        batStatus: 'bat_approved',
+        plateStatus: 'ready',
+      });
+    }
+
+    // Second pass: resolve prerequisite names to IDs
+    for (let i = 0; i < body.elements.length; i++) {
+      const prereqNames = body.elements[i].prerequisiteNames;
+      if (prereqNames && prereqNames.length > 0) {
+        newElements[i].prerequisiteElementIds = prereqNames
+          .map((name) => elementNameToId[name])
+          .filter((id) => id !== undefined);
+      }
+    }
+  }
+
+  // Merge metadata (only provided fields)
   const updatedJob: Job = {
     ...existingJob,
     ...(body.reference !== undefined && { reference: body.reference }),
     ...(body.client !== undefined && { client: body.client }),
     ...(body.description !== undefined && { description: body.description }),
     ...(body.workshopExitDate !== undefined && { workshopExitDate: body.workshopExitDate }),
+    elementIds: newElementIds,
+    taskIds: newTaskIds,
     updatedAt: now,
   };
 
@@ -573,6 +672,32 @@ const handleUpdateJob = async (
   updateSnapshot((snapshot) => {
     const newJobs = [...snapshot.jobs];
     newJobs[jobIndex] = updatedJob;
+
+    if (body.elements && body.elements.length > 0) {
+      // Remove old elements and tasks for this job, add new ones
+      const oldElementIds = new Set(existingJob.elementIds);
+      const oldTaskIds = new Set(existingJob.taskIds);
+
+      // Also remove assignments for deleted tasks
+      const filteredAssignments = snapshot.assignments.filter(
+        (a) => !oldTaskIds.has(a.taskId)
+      );
+
+      return {
+        ...snapshot,
+        jobs: newJobs,
+        elements: [
+          ...snapshot.elements.filter((e) => !oldElementIds.has(e.id)),
+          ...newElements,
+        ],
+        tasks: [
+          ...snapshot.tasks.filter((t) => !oldTaskIds.has(t.id)),
+          ...newTasks,
+        ],
+        assignments: filteredAssignments,
+      };
+    }
+
     return { ...snapshot, jobs: newJobs };
   });
 
