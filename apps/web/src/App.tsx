@@ -1435,6 +1435,34 @@ function AppContent() {
     return { earliestY, latestY };
   }, [quickPlacementTask, snapshot, pixelsPerHour, gridStartDate]);
 
+  // Quick Placement: auto-scroll grid to the target station and predecessor constraint line
+  useEffect(() => {
+    if (!isQuickPlacementMode || !lastUnscheduledTask || !gridRef.current) return;
+    if (lastUnscheduledTask.type !== 'Internal') return;
+
+    const stationIndex = snapshot.stations.findIndex((s) => s.id === lastUnscheduledTask.stationId);
+    if (stationIndex < 0) return;
+
+    // Horizontal: center the target station column in viewport
+    const { stationWidth, gap, paddingLeft, timelineWidth } = getLayoutDimensions();
+    const stationX = paddingLeft + stationIndex * (stationWidth + gap);
+    const viewportWidth = gridRef.current.getViewportWidth();
+    const scrollX = Math.max(0, stationX - (viewportWidth - timelineWidth - stationWidth) / 2);
+
+    // Vertical: scroll to predecessor constraint (purple line) if available, else successor (orange)
+    const earliestY = getPredecessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    const latestY = getSuccessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    const targetY = earliestY ?? latestY;
+
+    if (targetY !== null) {
+      const viewportHeight = gridRef.current.getViewportHeight();
+      const scrollY = Math.max(0, targetY - viewportHeight * 0.3);
+      gridRef.current.scrollTo(scrollX, scrollY, 'smooth');
+    } else {
+      gridRef.current.scrollToX(scrollX, 'smooth');
+    }
+  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, pixelsPerHour, gridStartDate]);
+
   // Quick Placement: handle mouse move in station column
   // v0.3.48: Use pixelsPerHour for zoom-aware snapping
   const handleQuickPlacementMouseMove = useCallback((stationId: string, y: number) => {

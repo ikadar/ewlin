@@ -2,87 +2,75 @@ import type { ScheduleSnapshot, OutsourcedTask, OutsourcedProvider } from '@flux
 import { louisBaseSnapshot, today } from './shared-louis';
 import { generateLouisJobs } from './generators-louis';
 
-// Outsourced provider for L-00010 pelliculage task
-const pelliProvider: OutsourcedProvider = {
-  id: 'provider-pelli',
-  name: 'Pelli Express',
-  status: 'Active',
-  supportedActionTypes: ['Pelliculage'],
-  latestDepartureTime: '14:00',
-  receptionTime: '09:00',
-  transitDays: 1,
-  groupId: 'grp-outsourced-pelli',
+// Outsourced provider for L-00010 DCC task
+const dccProvider: OutsourcedProvider = {
+    id: 'provider-dcc',
+    name: 'Clément',
+    status: 'Active',
+    supportedActionTypes: ['Reliure dos carré collé'],
+    latestDepartureTime: '14:00',
+    receptionTime: '09:00',
+    transitDays: 3,
+    groupId: 'grp-outsourced-dcc',
 };
 
 export function createLouisPhase1Fixture(): ScheduleSnapshot {
-  const { jobs, elements, tasks } = generateLouisJobs(10);
-  const base = louisBaseSnapshot();
+    const { jobs, elements, tasks } = generateLouisJobs(10);
+    const base = louisBaseSnapshot();
 
-  // --- Post-process: add outsourced element before FINITION on L-00010 (job-00010) ---
-  const jobId = 'job-00010';
-  const finElemId = `elem-${jobId}-fin`;
-  const outElemId = `elem-${jobId}-pelli`;
-  const outTaskId = `task-${jobId}-outsourced-pelli`;
+    // --- Post-process: replace FINITION tasks with outsourced DCC on L-00010 (job-00010) ---
+    const jobId = 'job-00010';
+    const finElemId = `elem-${jobId}-fin`;
+    const dccTaskId = `task-${jobId}-outsourced-dcc`;
 
-  // 1. Create the outsourced task
-  const outTask: OutsourcedTask = {
-    id: outTaskId,
-    elementId: outElemId,
-    sequenceOrder: 0,
-    status: 'Ready',
-    type: 'Outsourced',
-    providerId: pelliProvider.id,
-    actionType: 'Pelliculage',
-    duration: {
-      openDays: 2,
-      latestDepartureTime: '14:00',
-      receptionTime: '09:00',
-    },
-    createdAt: today.toISOString(),
-    updatedAt: today.toISOString(),
-  };
-  tasks.push(outTask);
+    // 1. Create the outsourced DCC task
+    const dccTask: OutsourcedTask = {
+        id: dccTaskId,
+        elementId: finElemId,
+        sequenceOrder: 0,
+        status: 'Ready',
+        type: 'Outsourced',
+        providerId: dccProvider.id,
+        actionType: 'Reliure dos carré collé',
+        duration: {
+            openDays: 3,
+            latestDepartureTime: '14:00',
+            receptionTime: '09:00',
+        },
+        createdAt: today.toISOString(),
+        updatedAt: today.toISOString(),
+    };
 
-  // 2. Create the outsourced element (prerequisite: all 3 print elements, same as FINITION had)
-  const finElem = elements.find((e) => e.id === finElemId)!;
-  const printPrereqs = [...finElem.prerequisiteElementIds]; // [couv, cah1, cah2]
+    // 2. Remove old FINITION tasks from the tasks array and replace with DCC task
+    const finElem = elements.find((e) => e.id === finElemId)!;
+    const oldFinTaskIds = new Set(finElem.taskIds);
+    const job = jobs.find((j) => j.id === jobId)!;
 
-  const finElemIdx = elements.indexOf(finElem);
-  elements.splice(finElemIdx, 0, {
-    id: outElemId,
-    jobId,
-    name: 'Pelliculage (ext.)',
-    prerequisiteElementIds: printPrereqs,
-    taskIds: [outTaskId],
-    paperStatus: 'none',
-    batStatus: 'none',
-    plateStatus: 'none',
-    formeStatus: 'none',
-    createdAt: today.toISOString(),
-    updatedAt: today.toISOString(),
-  });
+    // Remove old finition tasks from global tasks array
+    for (let i = tasks.length - 1; i >= 0; i--) {
+        if (oldFinTaskIds.has(tasks[i].id)) tasks.splice(i, 1);
+    }
+    tasks.push(dccTask);
 
-  // 3. Update FINITION prerequisiteElementIds: add outsourced element (keep print elements too)
-  finElem.prerequisiteElementIds = [...printPrereqs, outElemId];
+    // 3. Update FINITION element to only reference the DCC task
+    finElem.taskIds = [dccTaskId];
 
-  // 4. Update job: add new element and task references
-  const job = jobs.find((j) => j.id === jobId)!;
-  job.elementIds.splice(job.elementIds.indexOf(finElemId), 0, outElemId);
-  const firstFinTaskId = finElem.taskIds[0];
-  job.taskIds.splice(job.taskIds.indexOf(firstFinTaskId), 0, outTaskId);
+    // 4. Update job taskIds: remove old finition tasks, add DCC task
+    job.taskIds = job.taskIds.filter((id) => !oldFinTaskIds.has(id));
+    job.taskIds.push(dccTaskId);
 
-  return {
-    ...base,
-    providers: [pelliProvider],
-    groups: [
-      ...base.groups,
-      { id: 'grp-outsourced-pelli', name: 'Pelliculage (ext.)', maxConcurrent: 999, isOutsourcedProviderGroup: true },
-    ],
-    jobs,
-    elements,
-    tasks,
-    assignments: [],
-    conflicts: [],
-    lateJobs: [],
-  };
+    return {
+        ...base,
+        providers: [dccProvider],
+        groups: [
+            ...base.groups,
+            { id: 'grp-outsourced-dcc', name: 'Reliure DCC (ext.)', maxConcurrent: 999, isOutsourcedProviderGroup: true },
+        ],
+        jobs,
+        elements,
+        tasks,
+        assignments: [],
+        conflicts: [],
+        lateJobs: [],
+    };
 }

@@ -94,12 +94,13 @@ function autoAssignOutsourcedSuccessors(
 
     if (outsourcedTasks.length === 0) continue;
 
-    // Find the latest scheduled predecessor end time (at least one must be scheduled)
+    // Find the latest scheduled predecessor end time (ALL must be scheduled)
     let latestPredecessorEnd: string | undefined;
+    let allScheduled = true;
 
     for (const prereqId of depElem.prerequisiteElementIds) {
       const prereqElem = elements.find((e) => e.id === prereqId);
-      if (!prereqElem) continue;
+      if (!prereqElem) { allScheduled = false; break; }
 
       // Get last task by sequenceOrder
       const prereqTasks = prereqElem.taskIds
@@ -107,17 +108,17 @@ function autoAssignOutsourcedSuccessors(
         .filter((t): t is Task => t !== undefined)
         .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
       const lastTask = prereqTasks[prereqTasks.length - 1];
-      if (!lastTask) continue;
+      if (!lastTask) { allScheduled = false; break; }
 
       const lastAssignment = assignmentByTaskId.get(lastTask.id);
-      if (!lastAssignment) continue;
+      if (!lastAssignment) { allScheduled = false; break; }
 
       if (!latestPredecessorEnd || lastAssignment.scheduledEnd > latestPredecessorEnd) {
         latestPredecessorEnd = lastAssignment.scheduledEnd;
       }
     }
 
-    if (!latestPredecessorEnd) continue;
+    if (!allScheduled || !latestPredecessorEnd) continue;
 
     // Auto-assign or update each outsourced task
     for (const outTask of outsourcedTasks) {

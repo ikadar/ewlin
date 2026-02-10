@@ -151,19 +151,20 @@ export function TaskList({
   const getCrossElementPredecessorEnd = (element: Element): string | undefined => {
     if (element.prerequisiteElementIds.length === 0) return undefined;
 
+    // Only return a value when ALL prerequisite elements' last tasks are scheduled
     let latest: string | undefined;
     for (const prereqId of element.prerequisiteElementIds) {
       const prereqElem = elements.find((e) => e.id === prereqId);
-      if (!prereqElem) continue;
-      // Get the last task of the prerequisite element
+      if (!prereqElem) return undefined;
       const prereqTasks = prereqElem.taskIds
         .map((id) => taskById.get(id))
         .filter((t): t is Task => t !== undefined)
         .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
       const lastTask = prereqTasks[prereqTasks.length - 1];
-      if (!lastTask) continue;
+      if (!lastTask) return undefined;
       const lastAssignment = assignmentByTaskId.get(lastTask.id);
-      if (lastAssignment?.scheduledEnd && (!latest || lastAssignment.scheduledEnd > latest)) {
+      if (!lastAssignment?.scheduledEnd) return undefined;
+      if (!latest || lastAssignment.scheduledEnd > latest) {
         latest = lastAssignment.scheduledEnd;
       }
     }
