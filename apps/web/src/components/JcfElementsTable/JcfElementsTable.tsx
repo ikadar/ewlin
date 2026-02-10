@@ -485,6 +485,7 @@ export function JcfElementsTable({
                   onBlur={() => handleSaveName(index)}
                   autoFocus
                   onFocus={(e) => e.target.select()}
+                  autoComplete="off"
                   className="text-base text-zinc-100 font-medium bg-transparent border border-zinc-600 rounded-[3px] px-[3px] flex-1 min-w-0 focus:border-blue-500 focus:outline-none"
                   data-testid={`jcf-element-name-input-${index}`}
                 />

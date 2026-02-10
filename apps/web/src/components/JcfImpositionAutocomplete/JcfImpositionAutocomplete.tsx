@@ -327,6 +327,7 @@ export function JcfImpositionAutocomplete({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         className={inputClassName ?? defaultInputClass}
+        autoComplete="off"
         placeholder="ex: 65x90(16)"
         data-testid={id ? `jcf-field-${id.replace('jcf-', '')}` : undefined}
       />

@@ -208,6 +208,7 @@ export function JcfJobHeader({
                 : 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
             }`}
             tabIndex={onJobIdChange ? 0 : -1}
+            autoComplete="off"
             data-testid="jcf-field-id"
           />
         </div>
@@ -255,6 +256,7 @@ export function JcfJobHeader({
             value={intitule}
             onChange={(e) => onIntituleChange(e.target.value)}
             className={inputBaseClass}
+            autoComplete="off"
             data-testid="jcf-field-intitule"
           />
         </div>
@@ -270,6 +272,7 @@ export function JcfJobHeader({
             value={quantity}
             onChange={(e) => onQuantityChange(e.target.value)}
             className={`${inputBaseClass} text-right font-mono`}
+            autoComplete="off"
             data-testid="jcf-field-quantite"
           />
         </div>
@@ -289,6 +292,7 @@ export function JcfJobHeader({
               onChange={(e) => onDeadlineChange(e.target.value)}
               onBlur={handleDeadlineBlur}
               className={`${inputBaseClass} font-mono pr-[26px]`}
+              autoComplete="off"
               data-testid="jcf-field-deadline"
             />
             <input

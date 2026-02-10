@@ -173,6 +173,7 @@ export function JcfAutocomplete({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={inputClassName || defaultInputClass}
+        autoComplete="off"
         data-testid={id ? `jcf-field-${id.replace('jcf-', '')}` : undefined}
       />
 

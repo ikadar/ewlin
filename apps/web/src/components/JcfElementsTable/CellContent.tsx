@@ -299,6 +299,7 @@ function QteFeuillesCell(props: CellContentProps) {
         onChange={(e) => handleQteFeuillesChange(elementIndex, e.target.value)}
         onKeyDown={(e) => handleCellKeyDown(e, elementIndex, rowIndex)}
         className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-base flex-1`}
+        autoComplete="off"
         data-testid={`jcf-input-${elementIndex}-${rowKey}`}
       />
     </div>
@@ -318,6 +319,7 @@ function DefaultCell(props: CellContentProps) {
       onChange={(e) => handleCellChange(elementIndex, rowKey, e.target.value)}
       onKeyDown={(e) => handleCellKeyDown(e, elementIndex, rowIndex)}
       className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-base`}
+      autoComplete="off"
       data-testid={`jcf-input-${elementIndex}-${rowKey}`}
     />
   );
