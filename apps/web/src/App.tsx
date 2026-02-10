@@ -223,8 +223,12 @@ function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): b
   if (e.altKey && e.code === 'KeyQ') {
     e.preventDefault();
     if (ctx.selectedJobId) {
+      const wasActive = ctx.isQuickPlacementMode;
       ctx.setIsQuickPlacementMode((prev) => !prev);
       ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+      if (wasActive) {
+        ctx.setSelectedJobId(null);
+      }
     }
     return true;
   }
@@ -235,6 +239,7 @@ function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boo
   if (e.key === 'Escape' && ctx.isQuickPlacementMode) {
     ctx.setIsQuickPlacementMode(() => false);
     ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+    ctx.setSelectedJobId(null);
     return true;
   }
   return false;
@@ -1407,9 +1412,9 @@ function AppContent() {
     if (!quickPlacementHover.stationId || quickPlacementHover.snappedY === 0) {
       return null;
     }
-    const dropTime = yPositionToTime(quickPlacementHover.snappedY, START_HOUR, gridStartDate);
+    const dropTime = yPositionToTime(quickPlacementHover.snappedY, START_HOUR, gridStartDate, pixelsPerHour);
     return dropTime.toISOString();
-  }, [quickPlacementHover.stationId, quickPlacementHover.snappedY, gridStartDate]);
+  }, [quickPlacementHover.stationId, quickPlacementHover.snappedY, gridStartDate, pixelsPerHour]);
 
   // Quick Placement: validation using the same logic as drag
   const quickPlacementValidation = useDropValidation({
@@ -1557,7 +1562,13 @@ function AppContent() {
   // Toggle Quick Placement (for TopNavBar button)
   const handleToggleQuickPlacement = useCallback(() => {
     if (selectedJobId) {
-      setIsQuickPlacementMode((prev) => !prev);
+      setIsQuickPlacementMode((prev) => {
+        if (prev) {
+          // Turning off: clear job selection to remove tile muting
+          setSelectedJobId(null);
+        }
+        return !prev;
+      });
       setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
     }
   }, [selectedJobId]);

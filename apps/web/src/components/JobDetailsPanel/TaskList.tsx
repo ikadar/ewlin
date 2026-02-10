@@ -145,9 +145,35 @@ export function TaskList({
   };
 
   /**
+   * Get the latest scheduledEnd from cross-element predecessor tasks.
+   * Used when the first task in an element needs a predecessorEndTime from prerequisite elements.
+   */
+  const getCrossElementPredecessorEnd = (element: Element): string | undefined => {
+    if (element.prerequisiteElementIds.length === 0) return undefined;
+
+    let latest: string | undefined;
+    for (const prereqId of element.prerequisiteElementIds) {
+      const prereqElem = elements.find((e) => e.id === prereqId);
+      if (!prereqElem) continue;
+      // Get the last task of the prerequisite element
+      const prereqTasks = prereqElem.taskIds
+        .map((id) => taskById.get(id))
+        .filter((t): t is Task => t !== undefined)
+        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      const lastTask = prereqTasks[prereqTasks.length - 1];
+      if (!lastTask) continue;
+      const lastAssignment = assignmentByTaskId.get(lastTask.id);
+      if (lastAssignment?.scheduledEnd && (!latest || lastAssignment.scheduledEnd > latest)) {
+        latest = lastAssignment.scheduledEnd;
+      }
+    }
+    return latest;
+  };
+
+  /**
    * Render task tiles for an element
    */
-  const renderTaskTiles = (elementTasks: Task[]) => {
+  const renderTaskTiles = (elementTasks: Task[], element: Element) => {
     const sortedTasks = [...elementTasks].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
 
     return sortedTasks.map((task, index) => {
@@ -159,9 +185,11 @@ export function TaskList({
       const provider = task.type === 'Outsourced' ? providerById.get(task.providerId) : undefined;
 
       // v0.5.11: Get predecessor end time for outsourcing calculations
+      // First try intra-element predecessor, then fall back to cross-element predecessors
       const prevTask = index > 0 ? sortedTasks[index - 1] : null;
       const prevAssignment = prevTask ? assignmentByTaskId.get(prevTask.id) : undefined;
-      const predecessorEndTime = prevAssignment?.scheduledEnd;
+      const predecessorEndTime = prevAssignment?.scheduledEnd
+        ?? (index === 0 ? getCrossElementPredecessorEnd(element) : undefined);
 
       // Check if previous task is a printing task (for dry time label)
       const showDryTimeLabel = prevTask && isPrintingTask(prevTask);
@@ -233,7 +261,7 @@ export function TaskList({
             onPlateStatusChange={handlePlateStatusChange}
             onFormeStatusChange={handleFormeStatusChange}
           >
-            {renderTaskTiles(elementTasks)}
+            {renderTaskTiles(elementTasks, element)}
           </ElementSection>
         );
       })}

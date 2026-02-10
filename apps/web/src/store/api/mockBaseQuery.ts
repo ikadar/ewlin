@@ -16,6 +16,8 @@ import type {
   CompletionResponse,
   UnassignmentResponse,
   InternalTask,
+  OutsourcedTask,
+  OutsourcedProvider,
   Station,
   TaskAssignment,
   CreateJobRequest,
@@ -27,6 +29,7 @@ import type {
 } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
+import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
 import { normalizeError, createNotFoundError } from './errorNormalization';
 
 // ============================================================================
@@ -41,6 +44,190 @@ interface MockRoute {
   method: string;
   pattern: RegExp;
   handler: MockRouteHandler;
+}
+
+// ============================================================================
+// Auto-assign outsourced successor tasks
+// ============================================================================
+
+/**
+ * After assigning an internal task, check if any outsourced tasks in successor
+ * elements can now be auto-assigned (all their predecessor elements' last tasks
+ * are scheduled).
+ *
+ * Returns new TaskAssignment[] to add to the snapshot.
+ */
+function autoAssignOutsourcedSuccessors(
+  snapshot: ScheduleSnapshot,
+  assignedTaskId: string,
+  currentAssignments: TaskAssignment[],
+): { newAssignments: TaskAssignment[]; updatedAssignments: TaskAssignment[] } {
+  const elements = snapshot.elements ?? [];
+  const providers = snapshot.providers ?? [];
+  if (elements.length === 0 || providers.length === 0) {
+    return { newAssignments: [], updatedAssignments: [] };
+  }
+
+  const assignmentByTaskId = new Map(currentAssignments.map((a) => [a.taskId, a]));
+  const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
+
+  // Find the element containing the assigned task
+  const assignedTask = taskById.get(assignedTaskId);
+  if (!assignedTask) return { newAssignments: [], updatedAssignments: [] };
+
+  const assignedElement = elements.find((e) => e.id === assignedTask.elementId);
+  if (!assignedElement) return { newAssignments: [], updatedAssignments: [] };
+
+  // Find elements that list assignedElement as a prerequisite
+  const dependentElements = elements.filter((e) =>
+    e.prerequisiteElementIds.includes(assignedElement.id)
+  );
+
+  const newAssignments: TaskAssignment[] = [];
+  const updatedAssignments: TaskAssignment[] = [];
+
+  for (const depElem of dependentElements) {
+    // Find outsourced tasks in this element
+    const outsourcedTasks = depElem.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is OutsourcedTask => t !== undefined && t.type === 'Outsourced');
+
+    if (outsourcedTasks.length === 0) continue;
+
+    // Find the latest scheduled predecessor end time (at least one must be scheduled)
+    let latestPredecessorEnd: string | undefined;
+
+    for (const prereqId of depElem.prerequisiteElementIds) {
+      const prereqElem = elements.find((e) => e.id === prereqId);
+      if (!prereqElem) continue;
+
+      // Get last task by sequenceOrder
+      const prereqTasks = prereqElem.taskIds
+        .map((id) => taskById.get(id))
+        .filter((t): t is Task => t !== undefined)
+        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      const lastTask = prereqTasks[prereqTasks.length - 1];
+      if (!lastTask) continue;
+
+      const lastAssignment = assignmentByTaskId.get(lastTask.id);
+      if (!lastAssignment) continue;
+
+      if (!latestPredecessorEnd || lastAssignment.scheduledEnd > latestPredecessorEnd) {
+        latestPredecessorEnd = lastAssignment.scheduledEnd;
+      }
+    }
+
+    if (!latestPredecessorEnd) continue;
+
+    // Auto-assign or update each outsourced task
+    for (const outTask of outsourcedTasks) {
+      const provider = providers.find((p) => p.id === outTask.providerId);
+      if (!provider) continue;
+
+      const dates = calculateOutsourcingDates(latestPredecessorEnd, {
+        workDays: outTask.duration.openDays,
+        latestDepartureTime: outTask.duration.latestDepartureTime,
+        receptionTime: outTask.duration.receptionTime,
+        transitDays: provider.transitDays,
+      });
+      if (!dates) continue;
+
+      const existingAssignment = assignmentByTaskId.get(outTask.id);
+
+      if (existingAssignment) {
+        // Update if the new dates are later (more constraining)
+        const newEnd = dates.return.toISOString();
+        if (newEnd > existingAssignment.scheduledEnd) {
+          const updated: TaskAssignment = {
+            ...existingAssignment,
+            scheduledStart: dates.departure.toISOString(),
+            scheduledEnd: newEnd,
+            updatedAt: new Date().toISOString(),
+          };
+          updatedAssignments.push(updated);
+          assignmentByTaskId.set(outTask.id, updated);
+        }
+      } else {
+        // Create new assignment
+        const outAssignment: TaskAssignment = {
+          id: generateId(),
+          taskId: outTask.id,
+          targetId: provider.id,
+          isOutsourced: true,
+          scheduledStart: dates.departure.toISOString(),
+          scheduledEnd: dates.return.toISOString(),
+          isCompleted: false,
+          completedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        newAssignments.push(outAssignment);
+        assignmentByTaskId.set(outTask.id, outAssignment);
+      }
+    }
+  }
+
+  return { newAssignments, updatedAssignments };
+}
+
+/**
+ * Find auto-assigned outsourced task IDs that should be removed when a
+ * predecessor task is unassigned. An outsourced task's assignment is removed
+ * if it no longer has ANY scheduled predecessor element last-tasks.
+ */
+function getOutsourcedTasksToRemoveOnUnassign(
+  snapshot: ScheduleSnapshot,
+  unassignedTaskId: string,
+  remainingAssignments: TaskAssignment[],
+): string[] {
+  const elements = snapshot.elements ?? [];
+  if (elements.length === 0) return [];
+
+  const assignmentByTaskId = new Map(remainingAssignments.map((a) => [a.taskId, a]));
+  const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
+
+  const unassignedTask = taskById.get(unassignedTaskId);
+  if (!unassignedTask) return [];
+
+  const unassignedElement = elements.find((e) => e.id === unassignedTask.elementId);
+  if (!unassignedElement) return [];
+
+  // Find elements that depend on the unassigned task's element
+  const dependentElements = elements.filter((e) =>
+    e.prerequisiteElementIds.includes(unassignedElement.id)
+  );
+
+  const toRemove: string[] = [];
+
+  for (const depElem of dependentElements) {
+    const outsourcedTasks = depElem.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is OutsourcedTask => t !== undefined && t.type === 'Outsourced')
+      .filter((t) => assignmentByTaskId.has(t.id));
+
+    for (const outTask of outsourcedTasks) {
+      // Check if ANY prerequisite element still has a scheduled last task
+      let hasAnyScheduledPred = false;
+      for (const prereqId of depElem.prerequisiteElementIds) {
+        const prereqElem = elements.find((e) => e.id === prereqId);
+        if (!prereqElem) continue;
+        const prereqTasks = prereqElem.taskIds
+          .map((id) => taskById.get(id))
+          .filter((t): t is Task => t !== undefined)
+          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        const lastTask = prereqTasks[prereqTasks.length - 1];
+        if (lastTask && assignmentByTaskId.has(lastTask.id)) {
+          hasAnyScheduledPred = true;
+          break;
+        }
+      }
+      if (!hasAnyScheduledPred) {
+        toRemove.push(outTask.id);
+      }
+    }
+  }
+
+  return toRemove;
 }
 
 // ============================================================================
@@ -100,10 +287,24 @@ const handleAssignTask = async (
     updatedAt: new Date().toISOString(),
   };
 
+  // Auto-assign or update outsourced successor tasks based on scheduled predecessors
+  const allAssignments = [...updatedAssignments, newAssignment];
+  const { newAssignments: outsourcedNew, updatedAssignments: outsourcedUpdated } =
+    autoAssignOutsourcedSuccessors(currentSnapshot, taskId, allAssignments);
+
+  // Apply outsourced updates to existing assignments
+  const updatedIds = new Set(outsourcedUpdated.map((a) => a.taskId));
+  const finalAssignments = allAssignments
+    .map((a) => {
+      const updated = outsourcedUpdated.find((u) => u.taskId === a.taskId);
+      return updated ?? a;
+    })
+    .concat(outsourcedNew);
+
   // Update snapshot (conflicts are automatically recalculated by updateSnapshot)
   updateSnapshot((snapshot) => ({
     ...snapshot,
-    assignments: [...updatedAssignments, newAssignment],
+    assignments: finalAssignments,
   }));
 
   const response: AssignmentResponse = {
@@ -198,10 +399,18 @@ const handleUnassignTask = async (
     return { error: createNotFoundError('Assignment not found') };
   }
 
+  // Check which assignments remain after removing this one
+  const remainingAssignments = currentSnapshot.assignments.filter((a) => a.taskId !== taskId);
+
+  // Find auto-assigned outsourced tasks that should be removed
+  const outsourcedToRemove = new Set(
+    getOutsourcedTasksToRemoveOnUnassign(currentSnapshot, taskId, remainingAssignments)
+  );
+
   // Update snapshot (conflicts are automatically recalculated by updateSnapshot)
   updateSnapshot((snapshot) => ({
     ...snapshot,
-    assignments: snapshot.assignments.filter((a) => a.taskId !== taskId),
+    assignments: remainingAssignments.filter((a) => !outsourcedToRemove.has(a.taskId)),
   }));
 
   const response: UnassignmentResponse = {
