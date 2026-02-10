@@ -310,13 +310,10 @@ function getEarliestStartFromPredecessor(
   const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
 
   if (isPrintingStation(snapshot, predecessorAssignment.targetId)) {
-    const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-    const station = findStationById(snapshot, predecessorAssignment.targetId);
-    return station ? snapToNextWorkingTime(dryingEnd, station) : dryingEnd;
+    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
   }
 
-  const station = findStationById(snapshot, predecessorAssignment.targetId);
-  return station ? snapToNextWorkingTime(predecessorEnd, station) : predecessorEnd;
+  return predecessorEnd;
 }
 
 // ============================================================================
@@ -360,6 +357,14 @@ export function getPredecessorConstraint(
   }
 
   if (!latestEarliestStart) return null;
+
+  // Snap to the successor (picked) task's station working hours
+  if (task.type === 'Internal') {
+    const successorStation = findStationById(snapshot, task.stationId);
+    if (successorStation) {
+      latestEarliestStart = snapToNextWorkingTime(latestEarliestStart, successorStation);
+    }
+  }
 
   return timeToYPosition(latestEarliestStart, startHour, pixelsPerHour, gridStartDate);
 }
