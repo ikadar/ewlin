@@ -157,6 +157,7 @@ describe('OutsourcingMiniForm', () => {
         task={task}
         provider={provider}
         jobColor="#8b5cf6"
+        predecessorEndTime="2025-02-04T16:00:00.000Z"
       />
     );
 
@@ -176,6 +177,7 @@ describe('OutsourcingMiniForm', () => {
         task={task}
         provider={provider}
         jobColor="#8b5cf6"
+        predecessorEndTime="2025-02-04T16:00:00.000Z"
       />
     );
 

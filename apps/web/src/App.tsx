@@ -35,6 +35,7 @@ import {
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, StationCategory, ProposedAssignment } from '@flux/types';
 import { DRY_TIME_MS, PRINTING_CATEGORY_ID } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
+import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
@@ -1274,6 +1275,30 @@ function AppContent() {
         updatedAt: new Date().toISOString(),
       };
 
+      // If no manual return, recalculate return date and sync assignment scheduledEnd
+      if (!task.manualReturn) {
+        const assignmentIndex = currentSnapshot.assignments.findIndex(
+          (a) => a.taskId === taskId
+        );
+        if (assignmentIndex !== -1) {
+          const assignment = currentSnapshot.assignments[assignmentIndex];
+          const provider = currentSnapshot.providers?.find((p) => p.id === task.providerId);
+          if (provider && assignment.scheduledStart) {
+            const newReturn = calculateReturnDate(new Date(assignment.scheduledStart), {
+              workDays,
+              transitDays: provider.transitDays,
+              receptionTime: provider.receptionTime,
+            });
+            const newAssignments = [...currentSnapshot.assignments];
+            newAssignments[assignmentIndex] = {
+              ...assignment,
+              scheduledEnd: newReturn.toISOString(),
+            };
+            return { ...currentSnapshot, tasks: newTasks, assignments: newAssignments };
+          }
+        }
+      }
+
       return { ...currentSnapshot, tasks: newTasks };
     });
     invalidateSnapshot();
@@ -1295,6 +1320,19 @@ function AppContent() {
         updatedAt: new Date().toISOString(),
       };
 
+      // Sync assignment scheduledStart for conflict pipeline
+      const assignmentIndex = currentSnapshot.assignments.findIndex(
+        (a) => a.taskId === taskId
+      );
+      if (assignmentIndex !== -1) {
+        const newAssignments = [...currentSnapshot.assignments];
+        newAssignments[assignmentIndex] = {
+          ...newAssignments[assignmentIndex],
+          scheduledStart: departure?.toISOString() ?? newAssignments[assignmentIndex].scheduledStart,
+        };
+        return { ...currentSnapshot, tasks: newTasks, assignments: newAssignments };
+      }
+
       return { ...currentSnapshot, tasks: newTasks };
     });
     invalidateSnapshot();
@@ -1315,6 +1353,19 @@ function AppContent() {
         manualReturn: returnDate?.toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      // Sync assignment scheduledEnd for conflict pipeline
+      const assignmentIndex = currentSnapshot.assignments.findIndex(
+        (a) => a.taskId === taskId
+      );
+      if (assignmentIndex !== -1) {
+        const newAssignments = [...currentSnapshot.assignments];
+        newAssignments[assignmentIndex] = {
+          ...newAssignments[assignmentIndex],
+          scheduledEnd: returnDate?.toISOString() ?? newAssignments[assignmentIndex].scheduledEnd,
+        };
+        return { ...currentSnapshot, tasks: newTasks, assignments: newAssignments };
+      }
 
       return { ...currentSnapshot, tasks: newTasks };
     });

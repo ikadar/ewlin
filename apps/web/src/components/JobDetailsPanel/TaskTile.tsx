@@ -69,6 +69,7 @@ export function TaskTile({
         provider={provider}
         jobColor={jobColor}
         predecessorEndTime={predecessorEndTime}
+        workshopExitDate={job.workshopExitDate}
         onWorkDaysChange={onWorkDaysChange}
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
