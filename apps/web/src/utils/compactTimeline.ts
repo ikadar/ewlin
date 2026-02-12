@@ -1,16 +1,13 @@
 import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Element } from '@flux/types';
+import { DRY_TIME_MS } from '@flux/types';
 import { getJobIdForTask } from './taskHelpers';
-import { DRY_TIME_MS, isPrintingStation } from './precedenceConstraints';
+import { isPrintingStation } from './precedenceConstraints';
 import { snapToNextWorkingTime } from './workingTime';
+import { COMPACT_HORIZONS } from '../constants';
+import type { CompactHorizon } from '../constants';
 
-/** Compact horizon options in hours */
-export const COMPACT_HORIZONS = [
-  { label: '4h', hours: 4 },
-  { label: '8h', hours: 8 },
-  { label: '24h', hours: 24 },
-] as const;
-
-export type CompactHorizon = (typeof COMPACT_HORIZONS)[number]['hours'];
+export { COMPACT_HORIZONS };
+export type { CompactHorizon };
 
 /**
  * Round a date UP to the next 15-minute boundary.

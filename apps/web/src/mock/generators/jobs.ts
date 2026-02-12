@@ -18,6 +18,7 @@ import type {
   BatStatus,
   PlateStatus,
 } from '@flux/types';
+import { SHIPPING_DEPARTURE_HOUR } from '@flux/types';
 import { createElement, getElementIdForJob } from './elements';
 
 // ============================================================================
@@ -379,7 +380,7 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
 export function identifyLateJobs(jobs: Job[], tasks?: Task[], assignments?: TaskAssignment[]): LateJob[] {
   const lateJobs: LateJob[] = [];
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setHours(SHIPPING_DEPARTURE_HOUR, 0, 0, 0);
 
   // Build job task ID sets for assignment lookup
   const jobTaskIds = new Map<string, Set<string>>();
@@ -391,7 +392,7 @@ export function identifyLateJobs(jobs: Job[], tasks?: Task[], assignments?: Task
 
   for (const job of jobs) {
     const deadline = new Date(job.workshopExitDate);
-    deadline.setHours(0, 0, 0, 0);
+    deadline.setHours(SHIPPING_DEPARTURE_HOUR, 0, 0, 0);
 
     let isLate = false;
     let latestEnd: Date | null = null;

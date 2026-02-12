@@ -1,16 +1,9 @@
 import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
-import { isMultiElementJob } from '@flux/types';
+import { isMultiElementJob, PRINTING_CATEGORY_ID, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
 import type { ElementStatusUpdate } from './JobDetailsPanel';
-import { DIE_CUTTING_CATEGORY_ID } from '../../utils';
-
-/** Category ID for printing stations (offset press) */
-const PRINTING_CATEGORY_ID = 'cat-offset';
-
-/** Keywords for detecting die-cutting in outsourced action types */
-const DIE_CUTTING_KEYWORDS = ['découpe', 'die-cut', 'die cut', 'stancolás'];
 
 export interface TaskListProps {
   /** Tasks to display */

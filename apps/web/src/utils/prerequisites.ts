@@ -15,15 +15,16 @@ import type {
   Task,
   Station,
 } from '@flux/types';
+import {
+  PAPER_READY_STATES,
+  BAT_READY_STATES,
+  PLATES_READY_STATES,
+  FORME_READY_STATES,
+  DIE_CUTTING_CATEGORY_ID,
+  DIE_CUTTING_KEYWORDS,
+} from '@flux/types';
 
-/**
- * Ready states for each prerequisite type.
- * An element is NOT blocked if all its prerequisites are in these states.
- */
-export const PAPER_READY_STATES: PaperStatus[] = ['none', 'in_stock', 'delivered'];
-export const BAT_READY_STATES: BatStatus[] = ['none', 'bat_approved'];
-export const PLATES_READY_STATES: PlateStatus[] = ['none', 'ready'];
-export const FORME_READY_STATES: FormeStatus[] = ['none', 'in_stock', 'delivered'];
+export { PAPER_READY_STATES, BAT_READY_STATES, PLATES_READY_STATES, FORME_READY_STATES };
 
 /**
  * Check if an element's paper status is ready (not blocking).
@@ -53,15 +54,7 @@ export function isFormeReady(status: FormeStatus): boolean {
   return FORME_READY_STATES.includes(status);
 }
 
-/**
- * Die-cutting category ID for station detection.
- */
-export const DIE_CUTTING_CATEGORY_ID = 'cat-die-cutting';
-
-/**
- * Keywords for detecting die-cutting in outsourced action types.
- */
-const DIE_CUTTING_KEYWORDS = ['découpe', 'die-cut', 'die cut', 'stancolás'];
+export { DIE_CUTTING_CATEGORY_ID };
 
 /**
  * Check if an element has any die-cutting action (internal or outsourced).

@@ -33,6 +33,7 @@ import {
   PICK_CURSOR_OFFSET_Y,
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, StationCategory, ProposedAssignment } from '@flux/types';
+import { DRY_TIME_MS, PRINTING_CATEGORY_ID } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 
@@ -116,12 +117,8 @@ function findPredecessorEndTime(
 
   // Check if predecessor is at a printing (offset) station - add drying time
   const station = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
-  if (station) {
-    const category = snapshot.categories.find((c) => c.id === station.categoryId);
-    if (category?.name.toLowerCase().includes('offset')) {
-      const DRY_TIME_MS = 4 * 60 * 60 * 1000; // 4 hours
-      return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-    }
+  if (station?.categoryId === PRINTING_CATEGORY_ID) {
+    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
   }
 
   return predecessorEnd;

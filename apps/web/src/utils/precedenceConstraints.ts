@@ -11,15 +11,12 @@
  */
 
 import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element, OutsourcedTask, OutsourcedProvider } from '@flux/types';
-import { isOutsourcedTask } from '@flux/types';
+import { isOutsourcedTask, DRY_TIME_MS } from '@flux/types';
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
 import { subtractWorkingTime, snapToNextWorkingTime } from './workingTime';
 import { getElementTasks } from './taskHelpers';
 import { calculateDepartureDate, calculateReturnDate } from './outsourcingCalculation';
-
-// Dry time in milliseconds (4 hours) - same as in @flux/schedule-validator
-export const DRY_TIME_MS = 4 * 60 * 60 * 1000;
 
 // ============================================================================
 // Element / Lookup helpers

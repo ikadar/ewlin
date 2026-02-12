@@ -1,7 +1,7 @@
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
+import { SNAP_INTERVAL_MINUTES } from '../../constants';
 
-/** Snap interval in minutes */
-export const SNAP_INTERVAL_MINUTES = 15;
+export { SNAP_INTERVAL_MINUTES };
 
 /** Pixels per snap interval (calculated from SNAP_INTERVAL_MINUTES) */
 export const PIXELS_PER_SNAP = PIXELS_PER_HOUR * (SNAP_INTERVAL_MINUTES / 60);
