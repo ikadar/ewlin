@@ -1,6 +1,7 @@
 import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Element } from '@flux/types';
 import { getJobIdForTask } from './taskHelpers';
 import { DRY_TIME_MS, isPrintingStation } from './precedenceConstraints';
+import { snapToNextWorkingTime } from './workingTime';
 
 /** Compact horizon options in hours */
 export const COMPACT_HORIZONS = [
@@ -168,6 +169,9 @@ function processAssignment(ctx: ProcessAssignmentContext): ProcessAssignmentResu
       earliestStart = predecessorEnd;
     }
   }
+
+  // Snap to station operating hours (e.g., predecessor ends at 15:00 but station opens 07:00-14:00 → next day 07:00)
+  earliestStart = snapToNextWorkingTime(earliestStart, station);
 
   // Calculate new end time
   const newEnd = calculateCompactedEndTime(task, assignment, earliestStart, stationMap.get(station.id), calculateEndTimeFn);
