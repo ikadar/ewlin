@@ -86,6 +86,8 @@ export interface SchedulingGridProps {
     suggestedStart: string | null;
     hasWarningOnly: boolean;
   };
+  /** Whether ALT key is pressed (for precedence bypass in quick placement) */
+  isAltPressed?: boolean;
   /** Quick placement precedence constraint Y positions */
   quickPlacementPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** Station ID currently being compacted (for loading state) */
@@ -161,6 +163,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onQuickPlacementMouseLeave,
       onQuickPlacementClick,
       quickPlacementValidation,
+      isAltPressed = false,
       quickPlacementPrecedenceConstraints,
       compactingStationId,
       onCompact,
@@ -467,9 +470,15 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isQuickPlacementValid = isHoveredForQuickPlacement &&
                 hasAvailableTaskForQuickPlacement &&
                 quickPlacementValidation?.isValid;
+              const isQuickPlacementBypass = isHoveredForQuickPlacement &&
+                hasAvailableTaskForQuickPlacement &&
+                !quickPlacementValidation?.isValid &&
+                quickPlacementValidation?.hasPrecedenceConflict &&
+                isAltPressed;
               const isQuickPlacementInvalid = isHoveredForQuickPlacement &&
                 hasAvailableTaskForQuickPlacement &&
-                !quickPlacementValidation?.isValid;
+                !quickPlacementValidation?.isValid &&
+                !isQuickPlacementBypass;
 
               // Precedence constraints: show for quick placement or pick
               const isPickTarget = isPicking && pickTargetStationId === station.id;
@@ -498,6 +507,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   isCollapsed={isCollapsed}
                   isValidDrop={isQuickPlacementValid}
                   isInvalidDrop={isQuickPlacementInvalid}
+                  isQuickPlacementBypass={isQuickPlacementBypass}
                   isQuickPlacementMode={isQuickPlacementMode}
                   hasAvailableTask={hasAvailableTaskForQuickPlacement}
                   placementIndicatorY={isHoveredForQuickPlacement ? quickPlacementIndicatorY : undefined}

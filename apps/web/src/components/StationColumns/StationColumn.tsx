@@ -29,6 +29,8 @@ export interface StationColumnProps {
   isValidDrop?: boolean;
   /** Whether an invalid drop is being hovered over this column (quick placement) */
   isInvalidDrop?: boolean;
+  /** Whether a precedence bypass (ALT) drop is being hovered over this column (quick placement) */
+  isQuickPlacementBypass?: boolean;
   /** Whether quick placement mode is active */
   isQuickPlacementMode?: boolean;
   /** Whether there's an available task for this station in quick placement mode */
@@ -99,6 +101,7 @@ export const StationColumn = memo(function StationColumn({
   isCollapsed = false,
   isValidDrop = false,
   isInvalidDrop = false,
+  isQuickPlacementBypass = false,
   isQuickPlacementMode = false,
   hasAvailableTask = false,
   placementIndicatorY,
@@ -177,6 +180,10 @@ export const StationColumn = memo(function StationColumn({
     }
 
     // Quick placement validation highlighting
+    if (isQuickPlacementBypass) {
+      // Precedence bypass (ALT held) - amber indicator
+      return 'ring-2 ring-amber-500 bg-amber-500/10';
+    }
     if (isInvalidDrop) {
       // Invalid drop zone - red indicator (blocking conflicts)
       return 'ring-2 ring-red-500 bg-red-500/10';

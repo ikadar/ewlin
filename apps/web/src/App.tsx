@@ -1441,7 +1441,7 @@ function AppContent() {
     task: quickPlacementTask,
     targetStationId: quickPlacementHover.stationId,
     scheduledStart: quickPlacementScheduledStart,
-    bypassPrecedence: false, // No bypass in quick placement mode
+    bypassPrecedence: isAltPressed,
   });
 
   // Quick Placement: precedence constraint Y positions
@@ -1525,7 +1525,7 @@ function AppContent() {
       targetId: stationId,
       isOutsourced: false,
       scheduledStart,
-      bypassPrecedence: false,
+      bypassPrecedence: isAltPressed,
     };
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
@@ -1535,6 +1535,7 @@ function AppContent() {
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
+             !(c.type === 'PrecedenceConflict' && isAltPressed) &&
              !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
     );
 
@@ -1549,6 +1550,10 @@ function AppContent() {
       scheduledStart,
     });
 
+    const hasPrecedenceConflict = validationResult.conflicts.some(
+      (c) => c.type === 'PrecedenceConflict'
+    );
+
     try {
       const result = await assignTask({
         taskId: taskToPlace.id,
@@ -1556,6 +1561,7 @@ function AppContent() {
           targetId: stationId,
           scheduledStart,
           isOutsourced: false,
+          ...(isAltPressed && hasPrecedenceConflict ? { bypassPrecedence: true } : {}),
         },
       }).unwrap();
 
@@ -1566,7 +1572,7 @@ function AppContent() {
       showToast(getErrorMessage(error));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, snapshot.elements, gridStartDate, pixelsPerHour, assignTask, showToast]);
+  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, snapshot.elements, gridStartDate, pixelsPerHour, assignTask, showToast, isAltPressed]);
 
   // Calculate which stations have available tasks (for quick placement cursor)
   const stationsWithAvailableTasks = useMemo(() => {
@@ -2028,6 +2034,7 @@ function AppContent() {
           onQuickPlacementMouseLeave={handleQuickPlacementMouseLeave}
           onQuickPlacementClick={handleQuickPlacementClick}
           quickPlacementValidation={quickPlacementValidation}
+          isAltPressed={isAltPressed}
           quickPlacementPrecedenceConstraints={quickPlacementPrecedenceConstraints}
           compactingStationId={compactingStationId}
           onCompact={handleCompact}
