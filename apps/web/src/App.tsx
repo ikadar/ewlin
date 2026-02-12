@@ -675,6 +675,9 @@ function AppContent() {
   // v0.3.56: Track last validated slot for early-exit optimization
   const lastPickSlotRef = useRef<string | null>(null);
 
+  // v0.5.14: Store original assignment info for grid picks (to restore outsourced on cancel)
+  const gridPickInfoRef = useRef<{ taskId: string; targetId: string; scheduledStart: string } | null>(null);
+
   // v0.3.47: Zoom handler that maintains grid center position
   const handleZoomChange = useCallback((newPixelsPerHour: number) => {
     const grid = gridRef.current;
@@ -1059,8 +1062,27 @@ function AppContent() {
           savedScrollRef.current = null;
         }
         lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking
+
+        // v0.5.14: Restore outsourced successor assignments for grid picks
+        // Reschedule at original position to trigger autoAssignOutsourcedSuccessors
+        const savedGridPickInfo = gridPickInfoRef.current;
+        gridPickInfoRef.current = null;
+
         pickActions.cancelPick();
         setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+
+        if (savedGridPickInfo) {
+          rescheduleTask({
+            taskId: savedGridPickInfo.taskId,
+            body: {
+              targetId: savedGridPickInfo.targetId,
+              scheduledStart: savedGridPickInfo.scheduledStart,
+              isOutsourced: false,
+            },
+          }).catch((error: unknown) => {
+            console.error('Failed to restore outsourced assignments on cancel:', error);
+          });
+        }
       }, isPicking)) return;
       if (handleQuickPlacementKeyboard(e, ctx)) return;
       if (handleEscapeQuickPlacement(e, ctx)) return;
@@ -1083,7 +1105,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, rescheduleTask]);
 
   // Handle swap up - exchange position with tile above
   // Note: Conflicts are automatically recalculated by updateSnapshot
@@ -1632,12 +1654,48 @@ function AppContent() {
 
   // v0.3.57: Handle pick from grid (reschedule existing task)
   // No scroll needed as user is already at tile location
-  const handlePickFromGrid = useCallback((task: InternalTask, job: Job, assignmentId: string) => {
+  const handlePickFromGrid = useCallback(async (task: InternalTask, job: Job, assignmentId: string) => {
     pickActions.pickFromGrid(task, job, assignmentId);
     // Initialize ghost position at cursor (will be updated on mouse move)
     pickActions.updateGhostPosition(0, 0);
     // No scroll position saving for grid picks - no scroll restoration needed
-  }, [pickActions]);
+
+    // v0.5.14: Store original position for cancel restoration
+    const originalAssignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    gridPickInfoRef.current = originalAssignment
+      ? { taskId: task.id, targetId: originalAssignment.targetId, scheduledStart: originalAssignment.scheduledStart }
+      : null;
+
+    // v0.5.14: Remove outsourced successor assignments when picking the last task of a prerequisite element
+    const element = snapshot.elements.find((e) => e.id === task.elementId);
+    if (!element) return;
+
+    const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
+    const elementTasks = element.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is Task => t !== undefined)
+      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    const lastTask = elementTasks[elementTasks.length - 1];
+    if (!lastTask || lastTask.id !== task.id) return;
+
+    // Find dependent elements that have outsourced tasks with assignments
+    const dependentElements = snapshot.elements.filter((e) =>
+      e.prerequisiteElementIds.includes(element.id)
+    );
+
+    for (const depElem of dependentElements) {
+      for (const depTaskId of depElem.taskIds) {
+        const depTask = taskById.get(depTaskId);
+        if (depTask?.type === 'Outsourced' && snapshot.assignments.some((a) => a.taskId === depTask.id)) {
+          try {
+            await unassignTask(depTask.id).unwrap();
+          } catch (error) {
+            console.error('Failed to unassign outsourced successor on pick:', error);
+          }
+        }
+      }
+    }
+  }, [pickActions, snapshot, unassignTask]);
 
   // v0.3.54: Handle mouse move during pick (update ghost position and validate)
   // v0.3.56: Added early-exit optimization when cursor stays in same slot
@@ -1752,8 +1810,23 @@ function AppContent() {
     if (blockingConflicts.length > 0 && !isAltPressed) {
       console.log('Pick placement blocked: validation failed', blockingConflicts);
       // Cancel pick so the tile returns to its original state
+      // v0.5.14: Restore outsourced successor assignments (same as ESC cancel)
+      const savedGridPickInfo = gridPickInfoRef.current;
+      gridPickInfoRef.current = null;
       pickActions.cancelPick();
       setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+      if (savedGridPickInfo) {
+        rescheduleTask({
+          taskId: savedGridPickInfo.taskId,
+          body: {
+            targetId: savedGridPickInfo.targetId,
+            scheduledStart: savedGridPickInfo.scheduledStart,
+            isOutsourced: false,
+          },
+        }).catch((error: unknown) => {
+          console.error('Failed to restore outsourced assignments on blocked placement:', error);
+        });
+      }
       return;
     }
 
@@ -1823,6 +1896,7 @@ function AppContent() {
       showToast(getErrorMessage(error));
     }
 
+    gridPickInfoRef.current = null; // v0.5.14: Clear grid pick info on successful placement
     pickActions.completePlacement();
     lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking on successful placement
     setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });

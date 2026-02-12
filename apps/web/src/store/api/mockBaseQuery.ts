@@ -207,22 +207,23 @@ function getOutsourcedTasksToRemoveOnUnassign(
       .filter((t) => assignmentByTaskId.has(t.id));
 
     for (const outTask of outsourcedTasks) {
-      // Check if ANY prerequisite element still has a scheduled last task
-      let hasAnyScheduledPred = false;
+      // Check if ALL prerequisite elements' last tasks are still scheduled
+      // (symmetric with auto-assign which requires ALL to be scheduled)
+      let allPrereqsScheduled = true;
       for (const prereqId of depElem.prerequisiteElementIds) {
         const prereqElem = elements.find((e) => e.id === prereqId);
-        if (!prereqElem) continue;
+        if (!prereqElem) { allPrereqsScheduled = false; break; }
         const prereqTasks = prereqElem.taskIds
           .map((id) => taskById.get(id))
           .filter((t): t is Task => t !== undefined)
           .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
         const lastTask = prereqTasks[prereqTasks.length - 1];
-        if (lastTask && assignmentByTaskId.has(lastTask.id)) {
-          hasAnyScheduledPred = true;
+        if (!lastTask || !assignmentByTaskId.has(lastTask.id)) {
+          allPrereqsScheduled = false;
           break;
         }
       }
-      if (!hasAnyScheduledPred) {
+      if (!allPrereqsScheduled) {
         toRemove.push(outTask.id);
       }
     }
@@ -363,10 +364,23 @@ const handleRescheduleTask = async (
     updatedAt: new Date().toISOString(),
   };
 
+  // Auto-assign or update outsourced successor tasks based on rescheduled position
+  const allAssignments = [...updatedAssignments, updatedAssignment];
+  const { newAssignments: outsourcedNew, updatedAssignments: outsourcedUpdated } =
+    autoAssignOutsourcedSuccessors(currentSnapshot, taskId, allAssignments);
+
+  // Apply outsourced updates to existing assignments
+  const finalAssignments = allAssignments
+    .map((a) => {
+      const updated = outsourcedUpdated.find((u) => u.taskId === a.taskId);
+      return updated ?? a;
+    })
+    .concat(outsourcedNew);
+
   // Update snapshot (conflicts are automatically recalculated by updateSnapshot)
   updateSnapshot((snapshot) => ({
     ...snapshot,
-    assignments: [...updatedAssignments, updatedAssignment],
+    assignments: finalAssignments,
   }));
 
   const response: AssignmentResponse = {
