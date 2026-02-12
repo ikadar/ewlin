@@ -513,6 +513,7 @@ function AppContent() {
             description: jcfIntitule,
             workshopExitDate: jcfDeadline,
             elements: jcfElements.map(transformJcfElementToRequest),
+            ...(jcfQuantity ? { quantity: parseInt(jcfQuantity, 10) } : {}),
           },
         }).unwrap();
       } else {
@@ -522,7 +523,8 @@ function AppContent() {
           jcfClient,
           jcfIntitule,
           jcfDeadline,
-          jcfElements
+          jcfElements,
+          jcfQuantity
         );
         await createJob(request).unwrap();
       }
@@ -720,7 +722,7 @@ function AppContent() {
     setJcfClient(selectedJob.client);
     setJcfIntitule(selectedJob.description);
     setJcfDeadline(selectedJob.workshopExitDate);
-    setJcfQuantity('');
+    setJcfQuantity(selectedJob.quantity?.toString() ?? '');
     setJcfTemplate('');
 
     // Build stationId → station name lookup for sequence DSL reconstruction
@@ -762,16 +764,16 @@ function AppContent() {
         return {
           name: el.name,
           precedences,
-          quantite: '',
-          format: labelParts[0] ?? '',
-          pagination: labelParts[1] ?? '',
-          papier: labelParts[2] ?? '',
-          imposition: '',
-          impression: '',
-          surfacage: '',
-          autres: '',
-          qteFeuilles: '',
-          commentaires: '',
+          quantite: el.spec?.quantite?.toString() ?? '',
+          format: el.spec?.format ?? labelParts[0] ?? '',
+          pagination: el.spec?.pagination?.toString() ?? labelParts[1] ?? '',
+          papier: el.spec?.papier ?? labelParts[2] ?? '',
+          imposition: el.spec?.imposition ?? '',
+          impression: el.spec?.impression ?? '',
+          surfacage: el.spec?.surfacage ?? '',
+          autres: el.spec?.autres ?? '',
+          qteFeuilles: el.spec?.qteFeuilles?.toString() ?? '',
+          commentaires: el.spec?.commentaires ?? '',
           sequence,
         };
       });

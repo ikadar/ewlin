@@ -1,4 +1,4 @@
-import type { Job, Element, Task, InternalTask } from '@flux/types';
+import type { Job, Element, Task, InternalTask, ElementSpec } from '@flux/types';
 import { today, isoDate } from './shared-louis';
 
 
@@ -169,6 +169,7 @@ interface PrintElement {
   id: string;
   name: string;
   isPrint: boolean; // true = impression element, false = assembly/finition
+  spec?: ElementSpec;
 }
 
 function makeElement(
@@ -177,12 +178,21 @@ function makeElement(
   taskIds: string[],
   prerequisiteElementIds: string[],
 ): Element {
+  // Build spec and label from PrintElement production metadata
+  const spec: ElementSpec | undefined = elem.spec ? { ...elem.spec } : undefined;
+
+  const label = elem.spec
+    ? [elem.spec.format, elem.spec.pagination, elem.spec.papier].filter(Boolean).join(' | ')
+    : undefined;
+
   return {
     id: elem.id,
     jobId,
     name: elem.name,
+    ...(label ? { label } : {}),
     prerequisiteElementIds,
     taskIds,
+    ...(spec ? { spec } : {}),
     paperStatus:  elem.isPrint ? 'in_stock'      : 'none',
     batStatus:    elem.isPrint ? 'bat_approved'   : 'none',
     plateStatus:  elem.isPrint ? 'ready'          : 'none',
@@ -217,6 +227,8 @@ function monoRoute(
   routeKey: string,
   baseLabel: string,
   taskFactory: (ctx: TaskBuildContext, offsetDur: Duration) => InternalTask[],
+  spec?: PrintElement['spec'],
+  quantity?: number,
 ): RouteResult {
   const jobId = padJobId(jobNum);
   const elemId = `elem-${jobId}`;
@@ -225,7 +237,7 @@ function monoRoute(
   const tasks = taskFactory(ctx, offsetDur);
 
   const elem = makeElement(
-    { id: elemId, name: 'ELT', isPrint: true },
+    { id: elemId, name: 'ELT', isPrint: true, spec },
     jobId,
     tasks.map(t => t.id),
     [],
@@ -238,6 +250,7 @@ function monoRoute(
     description: pickDescription(routeKey, baseLabel, jobNum),
     status: 'Planned',
     workshopExitDate: isoDate(0, 0, rng(5, 30)),
+    ...(quantity !== undefined && { quantity }),
     fullyScheduled: false,
     color: JOB_COLORS[jobNum % JOB_COLORS.length],
     comments: [],
@@ -256,7 +269,7 @@ function generateFlyer(jobNum: number): RouteResult {
     makeTask(ctx, roundRobin(OFFSET_STATIONS, 'offset'), offsetDur, 0),
     makeTask(ctx, roundRobin(MASSICOT_STATIONS, 'massicot'), massicotDuration(), 1),
     makeTask(ctx, roundRobin(COND_STATIONS, 'cond'), condDuration(), 2),
-  ]);
+  ], { format: 'A5', papier: 'Couché mat:135', impression: 'Q/Q', quantite: 1, imposition: '50x70(8)' }, 1000);
 }
 
 // 2. Dépliant: Offset → Massicot → Plieuse → Conditionnement
@@ -266,7 +279,7 @@ function generateDepliant(jobNum: number): RouteResult {
     makeTask(ctx, roundRobin(MASSICOT_STATIONS, 'massicot'), massicotDuration(), 1),
     makeTask(ctx, roundRobin(PLIEUSE_STATIONS, 'plieuse'), plieuseDuration(offsetDur), 2),
     makeTask(ctx, roundRobin(COND_STATIONS, 'cond'), condDuration(), 3),
-  ]);
+  ], { format: 'A4/DL', papier: 'Couché brillant:170', pagination: 6, impression: 'Q/Q', quantite: 1, imposition: '50x70(6)' }, 1000);
 }
 
 // 3. Brochure piquée: couv (Offset→Massicot), cah1 (Offset→Plieuse), cah2 (Offset→Plieuse), fin (Encarteuse→Cond)
@@ -305,9 +318,9 @@ function generateBrochurePiquee(jobNum: number): RouteResult {
   const allTasks: Task[] = [...couvTasks, ...cah1Tasks, ...cah2Tasks, ...finTasks];
 
   const elements: Element[] = [
-    makeElement({ id: couvId, name: 'Couverture', isPrint: true }, jobId, couvTasks.map(t => t.id), []),
-    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true }, jobId, cah1Tasks.map(t => t.id), []),
-    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true }, jobId, cah2Tasks.map(t => t.id), []),
+    makeElement({ id: couvId, name: 'Couverture', isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, couvTasks.map(t => t.id), []),
+    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah1Tasks.map(t => t.id), []),
+    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah2Tasks.map(t => t.id), []),
     makeElement({ id: finId,  name: 'Finition',    isPrint: false }, jobId, finTasks.map(t => t.id), [couvId, cah1Id, cah2Id]),
   ];
 
@@ -318,6 +331,7 @@ function generateBrochurePiquee(jobNum: number): RouteResult {
     description: pickDescription('brochurePiquee', 'Brochure piquée', jobNum),
     status: 'Planned',
     workshopExitDate: isoDate(0, 0, rng(5, 30)),
+    quantity: 1000,
     fullyScheduled: false,
     color: JOB_COLORS[jobNum % JOB_COLORS.length],
     comments: [],
@@ -367,9 +381,9 @@ function generateBrochurePiqueePelli(jobNum: number): RouteResult {
   const allTasks: Task[] = [...couvTasks, ...cah1Tasks, ...cah2Tasks, ...finTasks];
 
   const elements: Element[] = [
-    makeElement({ id: couvId, name: 'Couverture', isPrint: true }, jobId, couvTasks.map(t => t.id), []),
-    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true }, jobId, cah1Tasks.map(t => t.id), []),
-    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true }, jobId, cah2Tasks.map(t => t.id), []),
+    makeElement({ id: couvId, name: 'Couverture', isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, couvTasks.map(t => t.id), []),
+    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah1Tasks.map(t => t.id), []),
+    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah2Tasks.map(t => t.id), []),
     makeElement({ id: finId,  name: 'Finition',    isPrint: false }, jobId, finTasks.map(t => t.id), [couvId, cah1Id, cah2Id]),
   ];
 
@@ -380,6 +394,7 @@ function generateBrochurePiqueePelli(jobNum: number): RouteResult {
     description: pickDescription('brochurePiqueePelli', 'Brochure piquée pelliculée', jobNum),
     status: 'Planned',
     workshopExitDate: isoDate(0, 0, rng(5, 30)),
+    quantity: 1000,
     fullyScheduled: false,
     color: JOB_COLORS[jobNum % JOB_COLORS.length],
     comments: [],
@@ -400,7 +415,7 @@ function generatePochetteRabat(jobNum: number): RouteResult {
     makeTask(ctx, 'station-semipack', pelliculeuseDuration(offsetDur), 2),
     makeTask(ctx, 'station-sbg', typoDuration(offsetDur), 3),
     makeTask(ctx, roundRobin(COND_STATIONS, 'cond'), condDuration(), 4),
-  ]);
+  ], { format: 'A4', papier: 'Couché mat:350', impression: 'Q/Q', quantite: 1, imposition: '50x70(2)' }, 500);
 }
 
 // 6. Liasse: feuil1/feuil2/feuil3 (Offset→Massicot), ass (Assembleuse→Cond)
@@ -440,9 +455,9 @@ function generateLiasse(jobNum: number): RouteResult {
   const allTasks: Task[] = [...f1Tasks, ...f2Tasks, ...f3Tasks, ...assTasks];
 
   const elements: Element[] = [
-    makeElement({ id: f1Id,  name: 'Feuillet 1',  isPrint: true },  jobId, f1Tasks.map(t => t.id), []),
-    makeElement({ id: f2Id,  name: 'Feuillet 2',  isPrint: true },  jobId, f2Tasks.map(t => t.id), []),
-    makeElement({ id: f3Id,  name: 'Feuillet 3',  isPrint: true },  jobId, f3Tasks.map(t => t.id), []),
+    makeElement({ id: f1Id,  name: 'Feuillet 1',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 1, imposition: '50x70(4)' } },  jobId, f1Tasks.map(t => t.id), []),
+    makeElement({ id: f2Id,  name: 'Feuillet 2',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 1, imposition: '50x70(4)' } },  jobId, f2Tasks.map(t => t.id), []),
+    makeElement({ id: f3Id,  name: 'Feuillet 3',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 1, imposition: '50x70(4)' } },  jobId, f3Tasks.map(t => t.id), []),
     makeElement({ id: assId, name: 'Assemblage',   isPrint: false }, jobId, assTasks.map(t => t.id), [f1Id, f2Id, f3Id]),
   ];
 
@@ -453,6 +468,7 @@ function generateLiasse(jobNum: number): RouteResult {
     description: pickDescription('liasse', 'Liasse', jobNum),
     status: 'Planned',
     workshopExitDate: isoDate(0, 0, rng(5, 30)),
+    quantity: 500,
     fullyScheduled: false,
     color: JOB_COLORS[jobNum % JOB_COLORS.length],
     comments: [],
@@ -495,8 +511,8 @@ function generateBrochureAssembleePiquee(jobNum: number): RouteResult {
   const allTasks: Task[] = [...intTasks, ...couvTasks, ...assTasks];
 
   const elements: Element[] = [
-    makeElement({ id: intId,  name: 'Intérieur',   isPrint: true },  jobId, intTasks.map(t => t.id), []),
-    makeElement({ id: couvId, name: 'Couverture',   isPrint: true },  jobId, couvTasks.map(t => t.id), []),
+    makeElement({ id: intId,  name: 'Intérieur',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 48, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } },  jobId, intTasks.map(t => t.id), []),
+    makeElement({ id: couvId, name: 'Couverture',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } },  jobId, couvTasks.map(t => t.id), []),
     makeElement({ id: assId,  name: 'Assemblage',   isPrint: false }, jobId, assTasks.map(t => t.id), [intId, couvId]),
   ];
 
@@ -507,6 +523,7 @@ function generateBrochureAssembleePiquee(jobNum: number): RouteResult {
     description: pickDescription('brochureAssembleePiquee', 'Brochure assemblée piquée', jobNum),
     status: 'Planned',
     workshopExitDate: isoDate(0, 0, rng(5, 30)),
+    quantity: 1000,
     fullyScheduled: false,
     color: JOB_COLORS[jobNum % JOB_COLORS.length],
     comments: [],

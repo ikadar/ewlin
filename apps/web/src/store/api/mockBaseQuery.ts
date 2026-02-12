@@ -24,6 +24,7 @@ import type {
   UpdateJobRequest,
   Job,
   Element,
+  ElementSpec,
   Task,
   ReferenceLookupResponse,
 } from '@flux/types';
@@ -627,6 +628,31 @@ function getStationForAction(actionType: string, snapshot?: ScheduleSnapshot): s
   return snapshot?.stations[0]?.id ?? 'sta-komori-g40';
 }
 
+/** Build ElementSpec from JcfElementInput request fields + parsed label. */
+function buildSpecFromInput(input: { label?: string; quantite?: number; imposition?: string; impression?: string; surfacage?: string; autres?: string; qteFeuilles?: number; commentaires?: string }): ElementSpec | undefined {
+  // Parse label → format, pagination, papier
+  const labelParts = input.label ? input.label.split(' | ') : [];
+  const format = labelParts[0] || undefined;
+  const paginationStr = labelParts[1];
+  const pagination = paginationStr ? parseInt(paginationStr, 10) : undefined;
+  const papier = labelParts[2] || undefined;
+
+  const spec: ElementSpec = {
+    ...(format && { format }),
+    ...(papier && { papier }),
+    ...(pagination && !isNaN(pagination) && { pagination }),
+    ...(input.imposition && { imposition: input.imposition }),
+    ...(input.impression && { impression: input.impression }),
+    ...(input.surfacage && { surfacage: input.surfacage }),
+    ...(input.quantite !== undefined && { quantite: input.quantite }),
+    ...(input.qteFeuilles !== undefined && { qteFeuilles: input.qteFeuilles }),
+    ...(input.autres && { autres: input.autres }),
+    ...(input.commentaires && { commentaires: input.commentaires }),
+  };
+
+  return Object.keys(spec).length > 0 ? spec : undefined;
+}
+
 /**
  * POST /jobs - Create job (mock implementation)
  *
@@ -702,6 +728,7 @@ const handleCreateJob = async (
     }
 
     // Create element
+    const spec = buildSpecFromInput(elementInput);
     const element: Element = {
       id: elementId,
       jobId,
@@ -709,6 +736,7 @@ const handleCreateJob = async (
       label: elementInput.label,
       prerequisiteElementIds: [], // Will be resolved in second pass
       taskIds,
+      ...(spec && { spec }),
       paperStatus: 'in_stock',
       batStatus: 'bat_approved',
       plateStatus: 'ready',
@@ -735,6 +763,7 @@ const handleCreateJob = async (
     description: body.description,
     status: 'Draft',
     workshopExitDate: body.workshopExitDate,
+    ...(body.quantity !== undefined && { quantity: body.quantity }),
     fullyScheduled: false,
     color: jobColor,
     comments: [],
@@ -856,6 +885,7 @@ const handleUpdateJob = async (
         } as InternalTask);
       }
 
+      const spec = buildSpecFromInput(elementInput);
       newElements.push({
         id: elementId,
         jobId,
@@ -863,6 +893,7 @@ const handleUpdateJob = async (
         label: elementInput.label,
         prerequisiteElementIds: [],
         taskIds,
+        ...(spec && { spec }),
         paperStatus: 'in_stock',
         batStatus: 'bat_approved',
         plateStatus: 'ready',
@@ -887,6 +918,7 @@ const handleUpdateJob = async (
     ...(body.client !== undefined && { client: body.client }),
     ...(body.description !== undefined && { description: body.description }),
     ...(body.workshopExitDate !== undefined && { workshopExitDate: body.workshopExitDate }),
+    ...(body.quantity !== undefined && { quantity: body.quantity }),
     elementIds: newElementIds,
     taskIds: newTaskIds,
     updatedAt: now,

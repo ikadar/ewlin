@@ -19,6 +19,13 @@ export interface CreateJobElementRequest {
   label?: string;
   sequence?: string;
   prerequisiteNames: string[];
+  quantite?: number;
+  imposition?: string;
+  impression?: string;
+  surfacage?: string;
+  autres?: string;
+  qteFeuilles?: number;
+  commentaires?: string;
 }
 
 /**
@@ -29,6 +36,7 @@ export interface CreateJobRequest {
   client: string;
   description: string;
   workshopExitDate: string;
+  quantity?: number;
   status: 'draft' | 'planned' | 'in_progress' | 'delayed' | 'completed' | 'cancelled';
   elements: CreateJobElementRequest[];
 }
@@ -126,6 +134,13 @@ export function transformJcfElementToRequest(element: JcfElement): CreateJobElem
     label,
     sequence: element.sequence || undefined,
     prerequisiteNames,
+    ...(element.quantite ? { quantite: parseInt(element.quantite, 10) } : {}),
+    ...(element.imposition ? { imposition: element.imposition } : {}),
+    ...(element.impression ? { impression: element.impression } : {}),
+    ...(element.surfacage ? { surfacage: element.surfacage } : {}),
+    ...(element.autres ? { autres: element.autres } : {}),
+    ...(element.qteFeuilles ? { qteFeuilles: parseInt(element.qteFeuilles, 10) } : {}),
+    ...(element.commentaires ? { commentaires: element.commentaires } : {}),
   };
 }
 
@@ -137,7 +152,8 @@ export function transformJcfToRequest(
   client: string,
   intitule: string,
   deadline: string,
-  elements: JcfElement[]
+  elements: JcfElement[],
+  quantity?: string,
 ): CreateJobRequest {
   return {
     reference: jobId,
@@ -146,6 +162,7 @@ export function transformJcfToRequest(
     workshopExitDate: deadline,
     status: 'planned',
     elements: elements.map(transformJcfElementToRequest),
+    ...(quantity ? { quantity: parseInt(quantity, 10) } : {}),
   };
 }
 
