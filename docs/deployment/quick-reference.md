@@ -6,62 +6,72 @@ Gyors referencia a leggyakoribb műveletekhez.
 
 | Mit | Hol |
 |-----|-----|
-| Projekt mappa | `/opt/flux` |
-| Környezeti változók | `/opt/flux/.env.production` |
+| Projekt mappa | `/home/ordo/ordo-replic-os` |
+| Környezeti változók | `/home/ordo/ordo-replic-os/.env.production` |
 | Apache config | `/etc/apache2/sites-available/flux.conf` |
-| SSL tanúsítványok | `/etc/letsencrypt/live/flux.example.com/` |
-| Database backups | `/opt/flux/backups/` |
+| Database backups | `/home/ordo/ordo-replic-os/backups/` |
 | Apache logok | `/var/log/apache2/flux_*.log` |
+
+## Docker Compose shorthand
+
+Minden parancshoz kell a `--env-file`, ezért érdemes alias-t használni:
+
+```bash
+DC="docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml"
+```
 
 ## Gyakori parancsok
 
 ```bash
 # Navigálás
-cd /opt/flux
+cd /home/ordo/ordo-replic-os
 
-# Deployment
-./scripts/deploy.sh
+# Deployment (szerveren)
+./scripts/deploy-server.sh
+
+# Deployment (lokálról — rsync + szerver deploy)
+DEPLOY_USER=user DEPLOY_HOST=server ./scripts/deploy-push.sh
 
 # Backup
 ./scripts/backup-db.sh
 
 # Konténerek állapota
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+$DC ps
 
 # Logok (összes)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
+$DC logs -f
 
 # Logok (egy szolgáltatás)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f php
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f nginx
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f validation-service
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f mariadb
+$DC logs -f php
+$DC logs -f validation-service
+$DC logs -f mariadb
 
 # Újraindítás
-docker compose -f docker-compose.yml -f docker-compose.prod.yml restart
+$DC restart
 
 # Leállítás
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+$DC down
 
 # Indítás
-docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d
+$DC up -d
 
 # Shell a konténerben
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec php bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec mariadb mysql -uflux_user -p
+$DC exec php bash
+$DC exec mariadb mysql -uflux_user -p
 
 # Symfony parancsok
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec php php bin/console cache:clear
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec php php bin/console doctrine:migrations:migrate
+$DC exec php php bin/console cache:clear --env=prod --no-warmup
+$DC exec php php bin/console cache:warmup --env=prod
+$DC exec php php bin/console doctrine:migrations:migrate --no-interaction
 ```
 
-## Health check URL-ek
+## Health check
 
-| Szolgáltatás | URL |
-|--------------|-----|
-| Frontend | `https://flux.example.com/` |
-| API | `https://flux.example.com/api/v1/schedule/snapshot` |
-| Nginx health | `http://127.0.0.1:8080/health` |
+| Szolgáltatás | Parancs |
+|--------------|---------|
+| Frontend | `curl http://localhost/` (böngészőből: `http://domain/`) |
+| API | `curl http://localhost/api/v1/schedule/snapshot` |
+| PHP-FPM | `$DC exec -T php php-fpm-healthcheck` |
 
 ## Alias-ok
 
@@ -69,12 +79,12 @@ Add hozzá a `~/.bashrc` fájlhoz:
 
 ```bash
 # Flux Scheduler aliases
-export FLUX_DIR="/opt/flux"
-alias flux-cd='cd $FLUX_DIR'
-alias flux-logs='docker compose -f $FLUX_DIR/docker-compose.yml -f $FLUX_DIR/docker-compose.prod.yml logs -f'
-alias flux-ps='docker compose -f $FLUX_DIR/docker-compose.yml -f $FLUX_DIR/docker-compose.prod.yml ps'
-alias flux-restart='docker compose -f $FLUX_DIR/docker-compose.yml -f $FLUX_DIR/docker-compose.prod.yml restart'
-alias flux-deploy='$FLUX_DIR/scripts/deploy.sh'
+export FLUX_DIR="/home/ordo/ordo-replic-os"
+alias flux-dc='docker compose --env-file $FLUX_DIR/.env.production -f $FLUX_DIR/docker-compose.yml -f $FLUX_DIR/docker-compose.prod.yml'
+alias flux-logs='flux-dc logs -f'
+alias flux-ps='flux-dc ps'
+alias flux-restart='flux-dc restart'
+alias flux-deploy='$FLUX_DIR/scripts/deploy-server.sh'
 alias flux-backup='$FLUX_DIR/scripts/backup-db.sh'
 ```
 
@@ -85,28 +95,28 @@ Aktiválás: `source ~/.bashrc`
 ### Teljes újraindítás
 
 ```bash
-cd /opt/flux
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
-docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d
+cd /home/ordo/ordo-replic-os
+$DC down
+$DC up -d
 ```
 
 ### Visszaállítás előző verzióra
 
+A szerveren nincs git. Lokál gépen checkout-old a kívánt verziót, majd push-old újra:
+
 ```bash
-cd /opt/flux
-git log --oneline -5  # Commit history
+# Lokál gépen:
 git checkout <commit-hash>
-git submodule update --init --recursive
-./scripts/deploy.sh
+DEPLOY_USER=user DEPLOY_HOST=server ./scripts/deploy-push.sh
 ```
 
 ### Database visszaállítás
 
 ```bash
-cd /opt/flux
+cd /home/ordo/ordo-replic-os
 source .env.production
 gunzip -c backups/flux_YYYYMMDD_HHMMSS.sql.gz | \
-  docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T mariadb \
+  $DC exec -T mariadb \
   mysql -uflux_user -p"$MARIADB_PASSWORD" flux_scheduler
 ```
 
@@ -114,9 +124,17 @@ gunzip -c backups/flux_YYYYMMDD_HHMMSS.sql.gz | \
 
 | Port | Szolgáltatás | Elérhető |
 |------|--------------|----------|
-| 80 | Apache (HTTP→HTTPS redirect) | Publikus |
-| 443 | Apache (HTTPS) | Publikus |
-| 8080 | Docker Nginx | Csak localhost |
+| 80 | Apache (HTTP) | Publikus |
+| 9000 | PHP-FPM (FastCGI) | Csak localhost (127.0.0.1) |
 | 3306 | MariaDB | Csak Docker hálózat |
-| 6379 | Redis | Csak Docker hálózat |
 | 3001 | Validation Service | Csak Docker hálózat |
+
+## Prod konténerek
+
+| Konténer | Leírás |
+|----------|--------|
+| php | PHP-FPM — Symfony API |
+| mariadb | MariaDB — adatbázis (persistent volume) |
+| validation-service | Node.js — ütemezés validáció |
+
+**Megjegyzés:** Nginx, Redis és Node (frontend dev) konténerek `dev-only` profile-lal vannak letiltva prod-ban.

@@ -1,43 +1,43 @@
 # Production overrides for docker-compose.yml
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Usage: docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
+  # Nginx disabled in prod — Apache serves static files and proxies PHP-FPM directly
   nginx:
-    ports:
-      - "127.0.0.1:8080:80"  # Only accessible from localhost (Apache proxies here)
-    volumes:
-      - ./apps/web/dist:/var/www/html:ro  # Built frontend (read-only)
-      - ./docker/nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
-    restart: unless-stopped
+    profiles:
+      - dev-only
 
   php:
+    ports:
+      - "127.0.0.1:9000:9000"  # FastCGI - localhost only (Apache needs this)
+    volumes:
+      - ./docker/php/php-prod.ini:/usr/local/etc/php/php.ini:ro
     environment:
       - APP_ENV=prod
       - APP_DEBUG=0
     restart: unless-stopped
 
   validation-service:
+    ports: !reset []  # Remove host port — only reachable via Docker network
     environment:
       - NODE_ENV=production
     restart: unless-stopped
 
   mariadb:
+    ports: !reset []  # Remove host port — only reachable via Docker network
     volumes:
-      - mariadb_data:/var/lib/mysql  # Persistent storage
+      - mariadb_data:/var/lib/mysql
     restart: unless-stopped
 
+  # Redis disabled in prod — not actively used (cache.yaml and messenger are commented out)
   redis:
-    volumes:
-      - redis_data:/data  # Persistent storage
-    restart: unless-stopped
+    profiles:
+      - dev-only
 
-  # Disable node service in production (only needed for dev)
   node:
     profiles:
       - dev-only
 
 volumes:
   mariadb_data:
-    driver: local
-  redis_data:
     driver: local

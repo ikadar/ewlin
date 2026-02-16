@@ -1,78 +1,94 @@
 # Flux Scheduler - Production Deployment Guide
 
-Ez a dokumentum leírja, hogyan telepítsd a Flux Scheduler alkalmazást production környezetbe Ubuntu szerveren.
+Ez a dokumentum leírja, hogyan telepítsd a Flux Scheduler alkalmazást production környezetbe Debian/Ubuntu szerveren.
+
+A részletes deployment tervet (tervezési döntésekkel) lásd: [deployment-plan.md](./deployment-plan.md)
 
 ## Architektúra
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Ubuntu szerver                                             │
-│                                                             │
-│  ┌──────────────────┐                                       │
-│  │ Apache (:443)    │  ← SSL (Let's Encrypt)                │
-│  │ VirtualHost      │                                       │
-│  └────────┬─────────┘                                       │
-│           │ reverse proxy                                   │
-│           ▼                                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Docker Compose (:8080)                              │   │
-│  │                                                     │   │
-│  │  ┌─────────┐  ┌─────────┐  ┌──────────────────┐   │   │
-│  │  │ Nginx   │→ │ PHP-FPM │→ │ MariaDB          │   │   │
-│  │  │         │  │ (API)   │  │ (persistent vol) │   │   │
-│  │  └────┬────┘  └────┬────┘  └──────────────────┘   │   │
-│  │       │            │                               │   │
-│  │       │            ▼                               │   │
-│  │       │       ┌──────────────────┐                │   │
-│  │       │       │ Validation Svc   │                │   │
-│  │       │       │ (Node.js)        │                │   │
-│  │       │       └──────────────────┘                │   │
-│  │       │                                            │   │
-│  │       └──→ Frontend (React static files)          │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Debian/Ubuntu szerver                                        │
+│  Előfeltételek: Apache + Docker                               │
+│                                                               │
+│  Lokál gép ──rsync──→ /home/ordo/ordo-replic-os/             │
+│                                                               │
+│  ┌──────────────────┐                                         │
+│  │ Apache (:80)     │                                         │
+│  │ VirtualHost      │                                         │
+│  └────────┬─────────┘                                         │
+│           │                                                   │
+│           ├──→ /apps/web/dist/ (frontend static files)        │
+│           │                                                   │
+│           └──→ fcgi://127.0.0.1:9000 (PHP-FPM)               │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────┐     │
+│  │ Docker Compose (3 konténer)                         │     │
+│  │                                                     │     │
+│  │  ┌─────────┐  ┌──────────────────┐                 │     │
+│  │  │ PHP-FPM │→ │ MariaDB          │                 │     │
+│  │  │ (:9000) │  │ (persistent vol) │                 │     │
+│  │  └────┬────┘  └──────────────────┘                 │     │
+│  │       │                                             │     │
+│  │       ▼                                             │     │
+│  │  ┌──────────────────┐                               │     │
+│  │  │ Validation Svc   │                               │     │
+│  │  │ (Node.js :3001)  │                               │     │
+│  │  └──────────────────┘                               │     │
+│  └─────────────────────────────────────────────────────┘     │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## Előfeltételek
 
 ### Szerver követelmények
 
-- Ubuntu 22.04 LTS vagy újabb
+- Debian 12+ vagy Ubuntu 22.04 LTS+
 - Minimum 2 GB RAM
 - Minimum 20 GB tárhely
-- Nyitott portok: 80, 443
+- Nyitott port: 80 (443 ha SSL kell)
 
 ### Szükséges szoftverek
 
+Csak Apache és Docker kell a szerveren. Node.js **nem** szükséges (a frontend Docker-ben épül).
+
 ```bash
-# Docker telepítése
+# Docker telepítése (ha még nincs)
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
-newgrp docker  # Vagy jelentkezz ki és vissza
-
-# Node.js és pnpm (frontend build-hez)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-npm install -g pnpm
+newgrp docker
 
 # Apache modulok engedélyezése
-sudo a2enmod proxy proxy_http ssl headers rewrite
+sudo a2enmod proxy proxy_fcgi headers deflate rewrite
+sudo systemctl restart apache2
 ```
 
 ## Telepítés
 
-### 1. Repository klónozása
+### 1. Mappa létrehozása
 
 ```bash
-cd /opt  # vagy más megfelelő mappa
-sudo git clone --recurse-submodules https://github.com/ikadar/ewlin.git flux
-sudo chown -R $USER:$USER flux
-cd flux
+sudo mkdir -p /home/ordo/ordo-replic-os
+sudo chown $USER:$USER /home/ordo/ordo-replic-os
 ```
 
-### 2. Környezeti változók beállítása
+### 2. Kód szinkronizálása (lokálról)
+
+A kód rsync-kel kerül a szerverre (git nem kell a szerveren):
 
 ```bash
+rsync -avz --delete \
+    --exclude='.git/' --exclude='node_modules/' \
+    --exclude='services/validation-service/node_modules/' \
+    --exclude='apps/web/dist/' --exclude='.env.production' \
+    --exclude='backups/' \
+    ./ user@server:/home/ordo/ordo-replic-os/
+```
+
+### 3. Környezeti változók beállítása (szerveren)
+
+```bash
+cd /home/ordo/ordo-replic-os
 cp .env.production.example .env.production
 nano .env.production
 ```
@@ -80,7 +96,7 @@ nano .env.production
 **Fontos:** Cseréld ki az összes `change_me_*` értéket erős, egyedi jelszavakra!
 
 ```bash
-# Jelszó generálás példa
+# Jelszó generálás
 openssl rand -hex 32
 ```
 
@@ -89,18 +105,12 @@ Kitöltendő mezők:
 - `MARIADB_PASSWORD` - Alkalmazás DB jelszó (32+ karakter)
 - `APP_SECRET` - Symfony titkos kulcs (32 karakter hex)
 - `DOMAIN` - A te domainded (pl. flux.example.com)
+- `CORS_ALLOW_ORIGIN` - `http://domain` (HTTP amíg nincs SSL)
 
-### 3. SSL tanúsítvány beszerzése
-
-```bash
-sudo apt install certbot python3-certbot-apache
-sudo certbot certonly --apache -d flux.example.com
-```
-
-### 4. Apache VirtualHost beállítása
+### 4. Apache VirtualHost beállítása (szerveren)
 
 ```bash
-sudo cp docker/apache/flux.conf.example /etc/apache2/sites-available/flux.conf
+sudo cp /home/ordo/ordo-replic-os/docker/apache/flux.conf /etc/apache2/sites-available/flux.conf
 sudo nano /etc/apache2/sites-available/flux.conf
 ```
 
@@ -108,49 +118,51 @@ Cseréld ki a `flux.example.com`-ot a saját domainedre!
 
 ```bash
 sudo a2ensite flux.conf
+sudo a2dissite 000-default.conf
 sudo systemctl reload apache2
 ```
 
-### 5. Scriptek futtathatóvá tétele
+### 5. Scriptek futtathatóvá tétele (szerveren)
 
 ```bash
-chmod +x scripts/deploy.sh scripts/backup-db.sh
+chmod +x scripts/deploy-server.sh scripts/deploy-push.sh scripts/backup-db.sh
 ```
 
-### 6. Első deployment
+### 6. Első deployment (szerveren)
 
 ```bash
-./scripts/deploy.sh
+./scripts/deploy-server.sh
 ```
 
 Ez a script:
-1. Frissíti a kódot git-ből
-2. Build-eli a frontend-et
-3. Build-eli a Docker image-eket
-4. Elindítja a konténereket
-5. Futtatja a database migrációkat
+1. Build-eli a frontend-et Docker-ben (Node.js nem kell)
+2. Build-eli a Docker image-eket (PHP-FPM, Validation Service)
+3. Elindítja a konténereket
+4. Javítja a fájl jogosultságokat
+5. Telepíti a PHP dependency-ket (composer install)
+6. Futtatja a database migrációkat
+7. Warmup-olja a Symfony cache-t
+8. Reload-olja az Apache-t
 
-### 7. Ellenőrzés
+### 7. Ellenőrzés (szerveren)
 
 ```bash
 # Konténerek állapota
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml ps
 
-# Logok megtekintése
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
+# API tesztelése
+curl http://localhost/api/v1/schedule/snapshot
 
-# Alkalmazás tesztelése
-curl -I https://flux.example.com
-curl https://flux.example.com/api/v1/schedule/snapshot
+# Frontend (böngészőből)
+# http://domain/
 ```
 
 ## Frissítés
 
-Új verzió telepítéséhez egyszerűen futtasd újra:
+Lokál gépről egyetlen paranccsal:
 
 ```bash
-cd /opt/flux
-./scripts/deploy.sh
+DEPLOY_USER=user DEPLOY_HOST=server ./scripts/deploy-push.sh
 ```
 
 ## Backup
@@ -171,17 +183,15 @@ crontab -e
 
 Add hozzá:
 ```
-0 3 * * * /opt/flux/scripts/backup-db.sh >> /var/log/flux-backup.log 2>&1
+0 3 * * * /home/ordo/ordo-replic-os/scripts/backup-db.sh >> /var/log/flux-backup.log 2>&1
 ```
-
-Ez minden nap hajnali 3-kor készít backup-ot.
 
 ### Backup visszaállítás
 
 ```bash
-# Tömörített backup kicsomagolása és visszaállítása
-gunzip -c backups/flux_20260204_030000.sql.gz | \
-  docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T mariadb \
+source .env.production
+gunzip -c backups/flux_YYYYMMDD_HHMMSS.sql.gz | \
+  docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml exec -T mariadb \
   mysql -uflux_user -p"$MARIADB_PASSWORD" flux_scheduler
 ```
 
@@ -190,51 +200,40 @@ gunzip -c backups/flux_20260204_030000.sql.gz | \
 ### Konténer nem indul
 
 ```bash
-# Részletes logok
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs php
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs validation-service
-
-# Konténer újraindítása
-docker compose -f docker-compose.yml -f docker-compose.prod.yml restart php
+DC="docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml"
+$DC logs php
+$DC logs validation-service
+$DC logs mariadb
+$DC restart php
 ```
 
 ### Database kapcsolati hiba
 
 ```bash
-# Database konténer állapota
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec mariadb \
-  mysql -uflux_user -p"$MARIADB_PASSWORD" -e "SELECT 1"
+$DC exec mariadb mysql -uflux_user -p"$MARIADB_PASSWORD" -e "SELECT 1"
 ```
 
-### 502 Bad Gateway
+### 502 Bad Gateway / API nem válaszol
 
-Apache nem éri el a Docker-t:
 ```bash
-# Ellenőrizd, hogy a Docker fut-e
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+# PHP-FPM fut-e
+$DC ps php
 
-# Ellenőrizd a portot
-curl http://127.0.0.1:8080/health
+# PHP-FPM health check (FastCGI — curl nem működik!)
+$DC exec -T php php-fpm-healthcheck
 ```
 
-### SSL hiba
+### Frontend nem tölt be
 
 ```bash
-# Tanúsítvány ellenőrzése
-sudo certbot certificates
+# dist/ létezik-e
+ls -la /home/ordo/ordo-replic-os/apps/web/dist/
 
-# Tanúsítvány megújítása
-sudo certbot renew
+# Apache config helyes-e
+sudo apache2ctl configtest
 ```
 
 ## Monitoring
-
-### Egyszerű health check
-
-```bash
-# Crontab-ba (5 percenként)
-*/5 * * * * curl -sf https://flux.example.com/health || echo "Flux is down!" | mail -s "Alert" admin@example.com
-```
 
 ### Logok
 
@@ -244,18 +243,20 @@ tail -f /var/log/apache2/flux_error.log
 tail -f /var/log/apache2/flux_access.log
 
 # Docker logok
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=100
+$DC logs -f --tail=100
 ```
 
 ## Hasznos parancsok
 
 ```bash
 # Alias-ok hozzáadása (~/.bashrc)
-alias flux-logs='docker compose -f /opt/flux/docker-compose.yml -f /opt/flux/docker-compose.prod.yml logs -f'
-alias flux-ps='docker compose -f /opt/flux/docker-compose.yml -f /opt/flux/docker-compose.prod.yml ps'
-alias flux-restart='docker compose -f /opt/flux/docker-compose.yml -f /opt/flux/docker-compose.prod.yml restart'
-alias flux-deploy='/opt/flux/scripts/deploy.sh'
-alias flux-backup='/opt/flux/scripts/backup-db.sh'
+export FLUX_DIR="/home/ordo/ordo-replic-os"
+alias flux-dc='docker compose --env-file $FLUX_DIR/.env.production -f $FLUX_DIR/docker-compose.yml -f $FLUX_DIR/docker-compose.prod.yml'
+alias flux-logs='flux-dc logs -f'
+alias flux-ps='flux-dc ps'
+alias flux-restart='flux-dc restart'
+alias flux-deploy='$FLUX_DIR/scripts/deploy-server.sh'
+alias flux-backup='$FLUX_DIR/scripts/backup-db.sh'
 ```
 
 ## Biztonsági javaslatok
@@ -263,7 +264,6 @@ alias flux-backup='/opt/flux/scripts/backup-db.sh'
 1. **Firewall beállítása**
    ```bash
    sudo ufw allow 80
-   sudo ufw allow 443
    sudo ufw allow 22
    sudo ufw enable
    ```
@@ -273,16 +273,11 @@ alias flux-backup='/opt/flux/scripts/backup-db.sh'
    sudo apt update && sudo apt upgrade -y
    ```
 
-3. **Backup-ok külső tárolása**
-   - Szinkronizáld a `backups/` mappát külső storage-ra (S3, rsync, stb.)
+3. **Backup-ok külső tárolása** — szinkronizáld a `backups/` mappát külső storage-ra
 
-4. **SSL tanúsítvány auto-renewal**
-   - A certbot alapértelmezetten beállít egy cron job-ot
-   - Ellenőrzés: `sudo certbot renew --dry-run`
-
-## Támogatás
-
-Ha problémába ütközöl:
-1. Ellenőrizd a logokat
-2. Nézd át ezt a dokumentációt
-3. Nyiss egy GitHub issue-t: https://github.com/ikadar/ewlin/issues
+4. **SSL tanúsítvány** (későbbi lépés)
+   ```bash
+   sudo apt install certbot python3-certbot-apache
+   sudo certbot --apache -d domain.com
+   # Utána CORS_ALLOW_ORIGIN-t frissíteni: http:// → https://
+   ```
