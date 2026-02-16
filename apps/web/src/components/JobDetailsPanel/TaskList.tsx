@@ -128,13 +128,12 @@ export function TaskList({
   };
 
   /**
-   * Check if an element is an assembly element (has prerequisite elements but no printing).
-   * Assembly elements typically only combine other elements without their own printing.
+   * Check if an element is an assembly element (no printing or die-cutting tasks).
+   * Uses structural task-type check rather than mutable status values so that
+   * manually setting all statuses to 'none' doesn't hide the dropdowns.
    */
   const isAssemblyElement = (element: Element): boolean => {
-    // An element is considered "assembly" if it has prerequisites but no tasks
-    // or if all its statuses are 'none' (explicitly marked as assembly)
-    return element.paperStatus === 'none' && element.batStatus === 'none' && element.plateStatus === 'none';
+    return !elementHasOffset(element) && !elementHasDieCutting(element);
   };
 
   /**

@@ -654,8 +654,8 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Expected Results:**
 - [ ] Polar task is removed from the grid
-- [ ] MBO S task remains scheduled BUT may now show **precedence conflict** (its predecessor Polar is no longer scheduled)
-- [ ] Carton task remains scheduled, may also show conflict (depends on whether transitive precedence is checked)
+- [ ] MBO S task remains scheduled and shows **no conflict** (unscheduled predecessor is not a constraint — backward scheduling is valid)
+- [ ] Carton task remains scheduled, no conflict (same reason)
 - [ ] The system does NOT automatically cascade-recall dependent tasks
 
 ---
