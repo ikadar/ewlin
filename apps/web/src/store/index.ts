@@ -76,6 +76,7 @@ export {
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
+  useCompactStationMutation,
   scheduleApi,
 } from './api/scheduleApi';
 

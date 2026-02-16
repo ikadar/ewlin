@@ -16,13 +16,13 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCreateJobMutation, useUpdateJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
-import { calculateEndTime, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
+import { calculateEndTime, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
@@ -33,7 +33,6 @@ import {
   PICK_CURSOR_OFFSET_Y,
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, StationCategory, ProposedAssignment } from '@flux/types';
-import { DRY_TIME_MS } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
@@ -84,111 +83,6 @@ function getLayoutDimensions(): {
     paddingLeft: 0.75 * rootFontSize,   // px-3 = 0.75rem
     timelineWidth: 3 * rootFontSize,    // w-12 = 3rem
   };
-}
-
-// ============================================================================
-// Helper functions extracted to reduce nesting depth (SonarQube S2004)
-// ============================================================================
-
-/**
- * Find the earliest start time for a task based on predecessor constraints.
- * Tasks in the same element (job) share the same elementId.
- * Includes drying time if predecessor is at a printing station.
- */
-function findPredecessorEndTime(
-  task: Task,
-  snapshot: ScheduleSnapshot,
-  updatedEndTimes: Map<string, Date>
-): Date | null {
-  // Tasks in the same element share the same elementId
-  const elementTasks = snapshot.tasks
-    .filter((t) => t.elementId === task.elementId)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
-
-  if (taskIndex <= 0) return null;
-
-  const predecessorTask = elementTasks[taskIndex - 1];
-  const predecessorAssignment = snapshot.assignments.find((a) => a.taskId === predecessorTask.id);
-  if (!predecessorAssignment) return null;
-
-  // Get end time (either updated during compaction or original)
-  const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
-  const predecessorEnd = updatedPredecessorEnd ?? new Date(predecessorAssignment.scheduledEnd);
-
-  // Check if predecessor is at a printing (offset) station - add drying time
-  const station = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
-  const category = snapshot.categories.find((c) => c.id === station?.categoryId);
-  if (category?.name.toLowerCase().includes('offset')) {
-    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-  }
-
-  return predecessorEnd;
-}
-
-/**
- * Calculate the new end time for an assignment during compacting.
- */
-function calculateCompactedEndTime(
-  task: Task | undefined,
-  assignment: TaskAssignment,
-  newStart: Date,
-  station: Station | undefined,
-  calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
-): string {
-  if (task?.type === 'Internal') {
-    return calculateEndTimeFn(task as InternalTask, newStart.toISOString(), station);
-  }
-  // Preserve original duration for non-internal tasks
-  const originalDuration = new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime();
-  return new Date(newStart.getTime() + originalDuration).toISOString();
-}
-
-function compactStationAssignments(
-  currentSnapshot: ScheduleSnapshot,
-  stationId: string,
-  calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
-): ScheduleSnapshot {
-  const stationAssignments = currentSnapshot.assignments
-    .filter((a) => a.targetId === stationId && !a.isOutsourced)
-    .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
-
-  if (stationAssignments.length === 0) return currentSnapshot;
-
-  const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
-  const station = currentSnapshot.stations.find((s) => s.id === stationId);
-  const updatedEndTimes = new Map<string, Date>();
-  const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
-
-  let nextStartTime = new Date(stationAssignments[0].scheduledStart);
-
-  for (const assignment of stationAssignments) {
-    const task = taskMap.get(assignment.taskId);
-    let earliestStart = nextStartTime;
-
-    // Check predecessor constraint (includes drying time for printing stations)
-    if (task) {
-      const predecessorEnd = findPredecessorEndTime(task, currentSnapshot, updatedEndTimes);
-      if (predecessorEnd && predecessorEnd > earliestStart) {
-        earliestStart = predecessorEnd;
-      }
-    }
-
-    const newEnd = calculateCompactedEndTime(task, assignment, earliestStart, station, calculateEndTimeFn);
-    updatedAssignmentsMap.set(assignment.id, { scheduledStart: earliestStart.toISOString(), scheduledEnd: newEnd });
-    updatedEndTimes.set(assignment.taskId, new Date(newEnd));
-    nextStartTime = new Date(newEnd);
-  }
-
-  const newAssignments = currentSnapshot.assignments.map((assignment) => {
-    const updated = updatedAssignmentsMap.get(assignment.id);
-    return updated
-      ? { ...assignment, scheduledStart: updated.scheduledStart, scheduledEnd: updated.scheduledEnd, updatedAt: new Date().toISOString() }
-      : assignment;
-  });
-
-  console.log('Station compacted:', { stationId, compactedCount: updatedAssignmentsMap.size });
-  return { ...currentSnapshot, assignments: newAssignments };
 }
 
 // ============================================================================
@@ -380,6 +274,7 @@ function AppContent() {
   const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
+  const [compactStation] = useCompactStationMutation();
   const [createJob] = useCreateJobMutation();
   const [updateJob] = useUpdateJobMutation();
 
@@ -1649,22 +1544,19 @@ function AppContent() {
     return stationIds;
   }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
-  // Handle station compact - remove gaps between tiles (mock implementation)
+  // Handle station compact - remove gaps between tiles
   // Respects precedence: tasks cannot start before their predecessor ends
-  const handleCompact = useCallback((stationId: string) => {
+  // Works in both mock and API modes via RTK Query mutation
+  const handleCompact = useCallback(async (stationId: string) => {
     setCompactingStationId(stationId);
-
-    // Simulate async operation for UI feedback
-    setTimeout(() => {
-      // Use extracted helper function to reduce nesting depth
-      updateSnapshot((currentSnapshot) =>
-        compactStationAssignments(currentSnapshot, stationId, calculateEndTime)
-      );
-
-      invalidateSnapshot();
+    try {
+      await compactStation(stationId).unwrap();
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error');
+    } finally {
       setCompactingStationId(null);
-    }, 300); // Small delay for visual feedback
-  }, [invalidateSnapshot]);
+    }
+  }, [compactStation, showToast]);
 
   // Toggle Quick Placement (for TopNavBar button)
   const handleToggleQuickPlacement = useCallback(() => {
@@ -1960,24 +1852,34 @@ function AppContent() {
   }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, assignTask, rescheduleTask, showToast]);
 
   // Handle global timeline compaction (v0.3.35)
-  const handleCompactTimeline = useCallback((horizonHours: CompactHorizon) => {
+  // Compacts each station that has assignments via the compact endpoint.
+  // Runs multiple passes to resolve cross-station dependencies: if a successor's
+  // station is compacted before its predecessor's station, the successor can only
+  // fully compact once the predecessor has been compacted in a previous pass.
+  const handleCompactTimeline = useCallback(async (_horizonHours: CompactHorizon) => {
     setIsCompactingTimeline(true);
-
-    // Simulate async operation for UI feedback
-    setTimeout(() => {
-      updateSnapshot((currentSnapshot) => {
-        const result = compactTimeline({
-          snapshot: currentSnapshot,
-          horizonHours,
-          calculateEndTime,
-        });
-        return result.snapshot;
-      });
-
-      invalidateSnapshot();
+    try {
+      const stationsWithAssignments = snapshot.stations.filter((s) =>
+        snapshot.assignments.some((a) => a.targetId === s.id && !a.isOutsourced)
+      );
+      // Multiple passes: each pass resolves one level of cross-station dependencies.
+      // $now advances between passes but only by seconds — negligible vs. hour-scale
+      // scheduling. Already-compacted tasks won't re-compact (earliestStart >= scheduledStart).
+      const MAX_PASSES = 5;
+      for (let pass = 0; pass < MAX_PASSES; pass++) {
+        let passCompacted = 0;
+        for (const station of stationsWithAssignments) {
+          const result = await compactStation(station.id).unwrap();
+          passCompacted += result.compactedCount;
+        }
+        if (passCompacted === 0) break;
+      }
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error');
+    } finally {
       setIsCompactingTimeline(false);
-    }, 300); // Small delay for visual feedback
-  }, [invalidateSnapshot]);
+    }
+  }, [snapshot.stations, snapshot.assignments, compactStation, showToast]);
 
   // v0.5.1: Show loading spinner during initial fetch (real API mode only)
   // In mock mode, data is always instantly available, so we skip the loading state

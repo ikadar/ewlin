@@ -23,6 +23,7 @@ import type {
   AssignmentResponse,
   CompletionResponse,
   UnassignmentResponse,
+  CompactStationResponse,
   ClientSuggestionsResponse,
   ReferenceLookupResponse,
   InternalTask,
@@ -410,6 +411,24 @@ export const scheduleApi = createApi({
         }
       },
     }),
+
+    /**
+     * Compact a station's assignments (remove gaps).
+     *
+     * Mock mode: mockBaseQuery handles this via handleCompactStation
+     * Real mode: POST /stations/{stationId}/compact
+     *
+     * Uses optimistic update for instant UI feedback:
+     * - Immediately compacts assignments in cache
+     * - Automatically rolls back on error
+     */
+    compactStation: builder.mutation<CompactStationResponse, string>({
+      query: (stationId) => ({
+        url: `/stations/${stationId}/compact`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
   }),
 });
 
@@ -428,4 +447,5 @@ export const {
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
+  useCompactStationMutation,
 } = scheduleApi;
