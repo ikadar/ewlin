@@ -33,7 +33,7 @@ import {
   PICK_CURSOR_OFFSET_Y,
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, StationCategory, ProposedAssignment } from '@flux/types';
-import { DRY_TIME_MS, PRINTING_CATEGORY_ID } from '@flux/types';
+import { DRY_TIME_MS } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
@@ -118,7 +118,8 @@ function findPredecessorEndTime(
 
   // Check if predecessor is at a printing (offset) station - add drying time
   const station = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
-  if (station?.categoryId === PRINTING_CATEGORY_ID) {
+  const category = snapshot.categories.find((c) => c.id === station?.categoryId);
+  if (category?.name.toLowerCase().includes('offset')) {
     return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
   }
 
@@ -2035,6 +2036,7 @@ function AppContent() {
           elements={snapshot.elements}
           assignments={snapshot.assignments}
           stations={snapshot.stations}
+          categories={snapshot.categories}
           providers={snapshot.providers}
           activeTaskId={lastUnscheduledTask?.id}
           pickedTaskId={pickedTask?.id}

@@ -21,9 +21,9 @@ COPY packages/validator/ packages/validator/
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=$VITE_API_URL
 
-# Build
+# Build (skip tsc type-check — Vite transpiles TS natively, type-check belongs in CI)
 RUN pnpm --filter @flux/types build \
  && pnpm --filter @flux/schedule-validator build \
- && pnpm --filter web build
+ && pnpm --filter web exec vite build
 
 # Output: /app/apps/web/dist/

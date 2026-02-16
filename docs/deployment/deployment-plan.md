@@ -77,15 +77,42 @@ sudo chown $USER:$USER /home/ordo/ordo-replic-os
 
 ### 3. Első rsync (lokálról)
 
-A teljes projekt szinkronizálása a szerverre. A `.git/`, `node_modules/`, `dist/`, `.env.production` és `backups/` kimarad.
+A szerverre csak a futtatáshoz szükséges fájlok kerülnek. Dokumentáció, IDE config, dev eszközök kimaradnak.
 
 ```bash
 rsync -avz --delete \
-    --exclude='.git/' --exclude='node_modules/' \
+    --exclude='.git/' \
+    --exclude='.claude/' \
+    --exclude='.claude-marketplace/' \
+    --exclude='.idea/' \
+    --exclude='.github/' \
+    --exclude='.env' \
+    --exclude='.env.production' \
+    --exclude='.DS_Store' \
+    --exclude='node_modules/' \
     --exclude='services/validation-service/node_modules/' \
-    --exclude='apps/web/dist/' --exclude='.env.production' \
+    --exclude='apps/web/dist/' \
+    --exclude='services/php-api/var/' \
+    --exclude='services/php-api/vendor/' \
+    --exclude='apps/qa-api/' \
+    --exclude='apps/qa-tracker/' \
+    --exclude='apps/web/cypress/' \
+    --exclude='apps/web/playwright/' \
+    --exclude='apps/web/playwright-report/' \
+    --exclude='apps/web/.scannerwork/' \
+    --exclude='apps/web/scripts/' \
+    --exclude='services/php-api/tests/' \
     --exclude='backups/' \
-    ./ user@server:/home/ordo/ordo-replic-os/
+    --exclude='reference/' \
+    --exclude='docs/' \
+    --exclude='docker-compose.sonarqube.yml' \
+    --exclude='CLAUDE.md' \
+    --exclude='CHANGELOG.md' \
+    --exclude='README.md' \
+    --exclude='.gitignore' \
+    --exclude='.gitmodules' \
+    --exclude='.env.example' \
+    ./ ordo@ordo.replic-os.com:/home/ordo/ordo-replic-os/
 ```
 
 ### 4. Environment konfigurálás (szerveren)
@@ -203,11 +230,28 @@ Időtartam: kb. 2-5 perc. A leghosszabb a frontend Docker build (~1-2 perc első
 | Exclude | Miért |
 |---------|-------|
 | `.git/` | Nem kell a szerveren, helyet foglal |
-| `node_modules/` | Docker build kezeli, nem kell a szerveren |
+| `.claude/`, `.claude-marketplace/` | Claude Code config — csak fejlesztői gépen |
+| `.idea/` | IDE beállítások |
+| `.github/` | GitHub Actions — szerveren nem kell |
+| `.env` | Lokál fejlesztői env |
+| `.env.production` | Szerver-specifikus jelszavak — soha ne szinkronizáld felül |
+| `.DS_Store` | macOS rendszerfájl |
+| `node_modules/` | Docker build kezeli |
 | `services/validation-service/node_modules/` | Docker image-be be van építve |
 | `apps/web/dist/` | Szerveren épül Docker multi-stage build-ben |
-| `.env.production` | Szerver-specifikus jelszavak — soha ne szinkronizáld felül |
+| `apps/qa-api/`, `apps/qa-tracker/` | QA eszközök — csak fejlesztéshez |
+| `apps/web/cypress/`, `apps/web/playwright/` | E2E tesztek |
+| `apps/web/playwright-report/`, `apps/web/.scannerwork/` | Teszt riportok, SonarQube |
+| `apps/web/scripts/` | Dev scriptek (sonar, export-fixture) |
+| `services/php-api/var/` | Symfony cache/log — szerveren újragenerálódik |
+| `services/php-api/vendor/` | Composer install a konténerben fut (--no-dev) |
+| `services/php-api/tests/` | PHPUnit tesztek |
 | `backups/` | Szerver-lokális database backup-ok |
+| `reference/` | Referencia fájlok — csak fejlesztéshez |
+| `docs/` | Dokumentáció — nem kell a futtatáshoz |
+| `docker-compose.sonarqube.yml` | SonarQube — csak dev |
+| `CLAUDE.md`, `CHANGELOG.md`, `README.md` | Dokumentáció — nem kell a szerveren |
+| `.gitignore`, `.gitmodules`, `.env.example` | Git/dev fájlok — nincs git a szerveren |
 
 ---
 

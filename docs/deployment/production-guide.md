@@ -78,11 +78,38 @@ A kód rsync-kel kerül a szerverre (git nem kell a szerveren):
 
 ```bash
 rsync -avz --delete \
-    --exclude='.git/' --exclude='node_modules/' \
+    --exclude='.git/' \
+    --exclude='.claude/' \
+    --exclude='.claude-marketplace/' \
+    --exclude='.idea/' \
+    --exclude='.github/' \
+    --exclude='.env' \
+    --exclude='.env.production' \
+    --exclude='.DS_Store' \
+    --exclude='node_modules/' \
     --exclude='services/validation-service/node_modules/' \
-    --exclude='apps/web/dist/' --exclude='.env.production' \
+    --exclude='apps/web/dist/' \
+    --exclude='services/php-api/var/' \
+    --exclude='services/php-api/vendor/' \
+    --exclude='apps/qa-api/' \
+    --exclude='apps/qa-tracker/' \
+    --exclude='apps/web/cypress/' \
+    --exclude='apps/web/playwright/' \
+    --exclude='apps/web/playwright-report/' \
+    --exclude='apps/web/.scannerwork/' \
+    --exclude='apps/web/scripts/' \
+    --exclude='services/php-api/tests/' \
     --exclude='backups/' \
-    ./ user@server:/home/ordo/ordo-replic-os/
+    --exclude='reference/' \
+    --exclude='docs/' \
+    --exclude='docker-compose.sonarqube.yml' \
+    --exclude='CLAUDE.md' \
+    --exclude='CHANGELOG.md' \
+    --exclude='README.md' \
+    --exclude='.gitignore' \
+    --exclude='.gitmodules' \
+    --exclude='.env.example' \
+    ./ ordo@ordo.replic-os.com:/home/ordo/ordo-replic-os/
 ```
 
 ### 3. Környezeti változók beállítása (szerveren)
@@ -239,11 +266,31 @@ sudo apache2ctl configtest
 
 ```bash
 # Apache logok
-tail -f /var/log/apache2/flux_error.log
-tail -f /var/log/apache2/flux_access.log
+tail -f /home/ordo/admin/logs/apache2/flux_error.log
+tail -f /home/ordo/admin/logs/apache2/flux_access.log
 
 # Docker logok
 $DC logs -f --tail=100
+```
+
+## Database elérés lokálról (SSH tunnel)
+
+A MariaDB csak localhost-ról érhető el (127.0.0.1:3307). Lokál gépről SSH tunnelen keresztül csatlakozható (pl. Sequel Ace, DBeaver, TablePlus):
+
+**Sequel Ace / GUI kliens beállítás:**
+- MySQL Host: `127.0.0.1`
+- MySQL Port: `3307`
+- Username: `flux_user` (vagy root)
+- Password: a `.env.production`-ből
+- Database: `flux_scheduler`
+- SSH Host: `ordo.replic-os.com`
+- SSH User: `ordo`
+
+**Parancssorból:**
+```bash
+ssh -L 3307:127.0.0.1:3307 ordo@ordo.replic-os.com
+# Másik terminálban:
+mysql -h 127.0.0.1 -P 3307 -u flux_user -p flux_scheduler
 ```
 
 ## Hasznos parancsok

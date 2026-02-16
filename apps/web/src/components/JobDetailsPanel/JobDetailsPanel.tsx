@@ -1,4 +1,4 @@
-import type { Job, Task, TaskAssignment, Station, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
 import { X, Pencil } from 'lucide-react';
 import { JobInfo } from './JobInfo';
 import { TaskList } from './TaskList';
@@ -22,6 +22,8 @@ export interface JobDetailsPanelProps {
   assignments: TaskAssignment[];
   /** All stations */
   stations: Station[];
+  /** Station categories for printing/die-cutting detection */
+  categories?: StationCategory[];
   /** v0.5.11: All providers for outsourced tasks */
   providers?: OutsourcedProvider[];
   /** Task ID that is the active placement target in Quick Placement Mode */
@@ -60,6 +62,7 @@ export function JobDetailsPanel({
   elements,
   assignments,
   stations,
+  categories,
   providers,
   activeTaskId,
   pickedTaskId,
@@ -129,6 +132,7 @@ export function JobDetailsPanel({
         job={job}
         assignments={jobAssignments}
         stations={stations}
+        categories={categories}
         providers={providers}
         activeTaskId={activeTaskId}
         pickedTaskId={pickedTaskId}

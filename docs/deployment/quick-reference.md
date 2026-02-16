@@ -10,7 +10,7 @@ Gyors referencia a leggyakoribb műveletekhez.
 | Környezeti változók | `/home/ordo/ordo-replic-os/.env.production` |
 | Apache config | `/etc/apache2/sites-available/flux.conf` |
 | Database backups | `/home/ordo/ordo-replic-os/backups/` |
-| Apache logok | `/var/log/apache2/flux_*.log` |
+| Apache logok | `/home/ordo/admin/logs/apache2/flux_*.log` |
 
 ## Docker Compose shorthand
 
@@ -126,7 +126,7 @@ gunzip -c backups/flux_YYYYMMDD_HHMMSS.sql.gz | \
 |------|--------------|----------|
 | 80 | Apache (HTTP) | Publikus |
 | 9000 | PHP-FPM (FastCGI) | Csak localhost (127.0.0.1) |
-| 3306 | MariaDB | Csak Docker hálózat |
+| 3307 | MariaDB | Csak localhost (127.0.0.1) — SSH tunnelen keresztül elérhető |
 | 3001 | Validation Service | Csak Docker hálózat |
 
 ## Prod konténerek

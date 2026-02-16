@@ -1,5 +1,5 @@
-import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
-import { isMultiElementJob, PRINTING_CATEGORY_ID, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
@@ -16,6 +16,8 @@ export interface TaskListProps {
   assignments: TaskAssignment[];
   /** All stations to get station names */
   stations: Station[];
+  /** Station categories for printing/die-cutting detection */
+  categories?: StationCategory[];
   /** v0.5.11: All providers for outsourced tasks */
   providers?: OutsourcedProvider[];
   /** Task ID that is the active placement target in Quick Placement Mode */
@@ -48,6 +50,7 @@ export function TaskList({
   assignments,
   stations,
   providers = [],
+  categories = [],
   activeTaskId,
   pickedTaskId,
   onJumpToTask,
@@ -84,12 +87,20 @@ export function TaskList({
   }
 
   /**
+   * Get category name for a station.
+   */
+  const getCategoryName = (categoryId: string): string => {
+    return categories.find((c) => c.id === categoryId)?.name.toLowerCase() ?? '';
+  };
+
+  /**
    * Check if a task is assigned to a printing station (offset press).
    */
   const isPrintingTask = (task: Task): boolean => {
     if (task.type !== 'Internal') return false;
     const station = stationById.get(task.stationId);
-    return station?.categoryId === PRINTING_CATEGORY_ID;
+    if (!station) return false;
+    return getCategoryName(station.categoryId).includes('offset');
   };
 
   /**
@@ -108,7 +119,8 @@ export function TaskList({
   const isDieCuttingTask = (task: Task): boolean => {
     if (task.type === 'Internal') {
       const station = stationById.get(task.stationId);
-      return station?.categoryId === DIE_CUTTING_CATEGORY_ID;
+      if (!station) return false;
+      return getCategoryName(station.categoryId).includes('découpe') || getCategoryName(station.categoryId).includes('die-cut');
     }
     if (task.type === 'Outsourced') {
       const actionLower = task.actionType?.toLowerCase() || '';
