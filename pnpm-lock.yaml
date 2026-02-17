@@ -317,6 +317,15 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.3)(jsdom@27.3.0)(lightningcss@1.30.2)
 
+  tests/e2e:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@24.10.3)(jsdom@27.3.0)(lightningcss@1.30.2)
+
 packages:
 
   '@acemir/cssom@0.9.29':

@@ -25,29 +25,33 @@ Key feature interactions covered:
 
 | Fixture | URL | Description |
 |---------|-----|-------------|
-| `louis-phase-1` | `?fixture=louis-phase-1` | 10 jobs, 14 stations, 1 outsourced provider (Clément DCC) |
+| `louis-phase-1` | `?fixture=louis-phase-1` | 10 jobs, 14 stations, 1 outsourced provider (Clément) |
 
 ### Key Jobs for Testing
 
 | Job | Type | Elements | Notable Stations |
 |-----|------|----------|------------------|
-| L-00001 | Brochure piquée | Couv (Komori→Polar), Cah1 (**Ryobi**→B26), Cah2 (SM52→MBO S), Fin (Hohner→Filmeuse) | Ryobi 524 (07:00-14:00) on Cahier 1 |
-| L-00003 | Brochure assemblée | Int (**Ryobi**→Polar), Couv (SM52→Polar), Ass (Horizon ASS→Filmeuse) | Ryobi 524 on Intérieur |
-| L-00007 | Brochure piquée | Couv (**Ryobi**→Polar), Cah1 (SM52→MBO M80), Cah2 (Komori→B26), Fin (Hohner→Filmeuse) | Ryobi 524 on Couverture |
-| L-00008 | Dépliant | ELT: **Ryobi**→Polar→MBO S→Carton | All 4 tasks in single element, Ryobi first |
-| L-00010 | Brochure piquée (DCC) | Couv (**Ryobi**→Polar), Cah1 (SM52→MBO M80), Cah2 (Komori→B26), Fin (**outsourced DCC**) | Outsourced task on Finition |
+| L-00001 | Brochure piquée 24p | Couv (Komori→Polar), Cah1 (**Ryobi**→B26), Cah2 (SM52→MBO S), Fin (Hohner→Filmeuse) | Ryobi 524 (07:00-14:00) on Cahier 1 |
+| L-00003 | Brochure assemblée piquée 56p | Int (**Ryobi**→Polar), Couv (SM52→Polar), Ass (Horizon ASS→Filmeuse) | Ryobi 524 on Intérieur |
+| L-00004 | Brochure piquée pelliculée 16p | Couv (Komori→Polar→**Semipack**), Cah1 (**Ryobi**→B26), Cah2 (SM52→MBO S), Fin (Hohner→Carton) | Semipack (pelliculeuse) on Couverture |
+| L-00007 | Brochure piquée 12p | Couv (**Ryobi**→Polar), Cah1 (SM52→MBO M80), Cah2 (Komori→B26), Fin (Hohner→Filmeuse) | Ryobi 524 on Couverture |
+| L-00008 | Dépliant 3 volets | ELT: **Ryobi**→Polar→MBO S→Carton | All 4 tasks in single element, Ryobi first |
+| L-00010 | Brochure piquée 16p (Clément) | Couv (**Ryobi**→Polar), Cah1 (SM52→MBO M80), Cah2 (Komori→B26), Fin (**outsourced Clément**) | Outsourced task on Finition |
 
 ### Key Stations
 
 | Station | Schedule | Category | Notes |
 |---------|----------|----------|-------|
-| Ryobi 524 | 07:00-14:00 | Offset | Narrow schedule → tasks span overnight |
-| Heidelberg SM52 | 07:00-14:30 | Offset | Similar narrow schedule |
-| Komori G40 | 00:00-23:59 | Offset | Effectively 24h → no overnight spillover |
-| Polar 137 | 07:00-14:00 | Massicot | Narrow schedule |
-| B26 / MBO S / MBO M80 | 06:00-19:00 | Plieuse | Wide schedule |
-| Hohner | 06:00-19:00 | Encarteuse | Wide schedule |
-| Horizon 60H / ASS | 06:00-13:00 | Assembleuse | Narrow schedule |
+| Komori G40 | 00:00-23:59 | Presses Offset | Effectively 24h → no overnight spillover |
+| Ryobi 524 | 07:00-14:00 | Presses Offset | Narrow schedule → tasks span overnight |
+| Heidelberg SM52 | 07:00-14:30 | Presses Offset | Similar narrow schedule |
+| Polar 137 | 07:00-14:00 | Massicots | Narrow schedule |
+| Semipack | 07:00-15:00 | Pelliculeuses | Used by L-00004 Couverture (pelliculage step) |
+| SBG | 07:30-14:30 | Typographie | Narrow schedule |
+| B26 / MBO S / MBO M80 | 06:00-19:00 | Plieuses | Wide schedule |
+| Hohner | 06:00-19:00 | Encarteuses-Piqueuses | Wide schedule |
+| Horizon 60H | 06:00-13:00 | Assembleuses | Narrow schedule |
+| Horizon ASS | 06:00-13:00 | Assembleuses-Piqueuses | Narrow schedule |
 | Filmeuse / Carton | 07:00-14:00 | Conditionnement | Narrow schedule |
 
 ---
@@ -67,16 +71,16 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Pick (click) the Cahier 1 Ryobi 524 task from sidebar
-2. Place it on the Ryobi 524 column at **12:00** today (the task will finish at ~13:30 depending on duration)
+2. Place it on the Ryobi 524 column at **12:00** today (task duration = 120min → ends at 14:00, exactly at Ryobi closing)
 3. Observe the drying time yellow arrow indicator on the tile
 4. Now pick the Cahier 1 B26 (plieuse) task from sidebar
 5. Observe the **purple line** on the B26 column
 
 **Expected Results:**
 - [ ] Yellow arrow appears at the bottom of the Ryobi tile
-- [ ] Drying ends 4 hours after the Ryobi task finishes (e.g., if task ends 13:30 → drying ends 17:30)
-- [ ] Purple line on B26 appears at **17:30** (or the equivalent drying end time) — NOT at 13:30
-- [ ] Since B26 operates 06:00-19:00, 17:30 is within working hours → purple line is at 17:30 same day
+- [ ] Drying ends 4 hours after the Ryobi task finishes (task ends 14:00 → drying ends 18:00)
+- [ ] Purple line on B26 appears at **18:00** (or the equivalent drying end time) — NOT at 14:00
+- [ ] Since B26 operates 06:00-19:00, 18:00 is within working hours → purple line is at 18:00 same day
 - [ ] Placing B26 task before purple line → **red ring** (invalid)
 - [ ] Placing B26 task after purple line → **green ring** (valid)
 
@@ -94,14 +98,14 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 **Steps:**
 1. Pick the Couverture Komori G40 (offset) task from sidebar
 2. Place it on Komori G40 at **20:00** today (Komori runs 00:00-23:59, so this is valid)
-3. Note when the task ends (e.g., ~21:00 depending on duration)
-4. Drying ends at ~01:00 next day (end + 4h)
+3. Note when the task ends (task duration = 120min → ends at ~22:00)
+4. Drying ends at ~02:00 next day (end + 4h)
 5. Now pick the Couverture Polar 137 (massicot) task from sidebar
 6. Observe the purple line on Polar 137 column
 
 **Expected Results:**
 - [ ] Polar 137 operates 07:00-14:00
-- [ ] Drying ends at ~01:00 (overnight, when Polar is closed)
+- [ ] Drying ends at ~02:00 (overnight, when Polar is closed)
 - [ ] Purple line on Polar 137 should appear at **07:00 next day** (snapped to next working slot)
 - [ ] Cannot place the Polar task before 07:00 next day
 
@@ -118,16 +122,16 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Pick the Ryobi 524 (offset) task from sidebar
-2. Place it at **13:00** on Ryobi 524 (station closes at 14:00)
-3. If the task duration > 60 min, the task will span overnight (resumes at 07:00 next day)
-4. Note the actual end time (e.g., 07:30 next day if 90min total)
+2. Place it at **13:30** on Ryobi 524 (station closes at 14:00, task duration = 60min)
+3. The task runs 30min before close (13:30-14:00), then spans overnight (resumes at 07:00 next day)
+4. Remaining 30min runs 07:00-07:30 → actual end time is **07:30 next day**
 5. Pick the Polar 137 (massicot) task from sidebar
 6. Observe the purple line on Polar 137
 
 **Expected Results:**
-- [ ] Task end time accounts for Ryobi operating hours (13:00 + duration, pausing at 14:00, resuming 07:00 next day)
-- [ ] Drying time starts from the **actual** end time (e.g., 07:30 next day), not from the naive calculation
-- [ ] Purple line on Polar = actual end time + 4h (e.g., 11:30 next day)
+- [ ] Task end time accounts for Ryobi operating hours (13:30 → pauses at 14:00, resumes 07:00 next day, ends 07:30)
+- [ ] Drying time starts from the **actual** end time (07:30 next day), not from the naive calculation
+- [ ] Purple line on Polar = actual end time + 4h (07:30 + 4h = 11:30 next day)
 - [ ] Since Polar opens 07:00-14:00, 11:30 is within working hours → purple line at 11:30
 
 ---
@@ -220,17 +224,17 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Schedule tasks with gaps, ensuring predecessors end before successor station opens:
-   - Ryobi 524: place at **07:00** today (ends ~08:30, drying ends ~12:30)
-   - Polar 137: place at **13:00** today (gap after drying end — could move to 12:30)
+   - Ryobi 524: place at **07:00** today (duration 60min → ends 08:00, drying ends 12:00)
+   - Polar 137: place at **13:00** today (gap after drying end — could move to 12:00)
    - MBO S: place at **12:00 tomorrow** (large gap — MBO opens 06:00)
    - Carton: place at **12:00 tomorrow** (after MBO S, Carton opens 07:00)
 2. Click **Compact** → 24h
 3. Observe each task's new start time
 
 **Expected Results:**
-- [ ] Polar 137 moves to 12:30 (Ryobi end + 4h drying) — within Polar hours (07:00-14:00), valid
-- [ ] MBO S moves to immediately after Polar ends — if Polar ends at, say, 13:15, MBO starts 13:15 (MBO open 06:00-19:00, valid)
-- [ ] Carton moves to immediately after MBO S ends — but if MBO S ends at e.g. 15:15 and Carton closes at 14:00 → Carton task should start at **07:00 next day** (not 15:15)
+- [ ] Polar 137 moves to 12:00 (Ryobi end + 4h drying) — within Polar hours (07:00-14:00), valid
+- [ ] MBO S moves to immediately after Polar ends — if Polar ends at 12:30, MBO starts 12:30 (MBO open 06:00-19:00, valid)
+- [ ] Carton moves to immediately after MBO S ends — but if MBO S ends at e.g. 14:30 and Carton closes at 14:00 → Carton task should start at **07:00 next day** (not 14:30)
 - [ ] No task is placed outside its station's operating hours after compaction
 
 ---
@@ -246,16 +250,16 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Schedule Couverture Komori G40 (offset) task at **03:00** today (Komori runs 00:00-23:59)
-   - Task ends around ~04:00-04:30, drying ends ~08:00-08:30
+   - Task duration = 120min → ends at 05:00, drying ends at 09:00
 2. Schedule Couverture Polar 137 task at **12:00** today (gap of ~4h after drying)
 3. Click **Compact** → 24h
 
 **Expected Results:**
 - [ ] Komori task does NOT move earlier than 03:00 (it's already the earliest in its own chain)
-- [ ] Polar task moves earlier to **drying end time** (~08:00-08:30)
-- [ ] Polar does NOT move to 04:00 (Komori end without drying), the 4h drying gap is preserved
-- [ ] Polar does NOT move before 07:00 (its opening time), even if drying ends at e.g. 06:30
-- [ ] If drying ends at 06:30 → Polar starts at **07:00** (station opening, whichever is later)
+- [ ] Polar task moves earlier to **drying end time** (09:00)
+- [ ] Polar does NOT move to 05:00 (Komori end without drying), the 4h drying gap is preserved
+- [ ] Polar does NOT move before 07:00 (its opening time), even if drying ends before 07:00
+- [ ] Since drying ends at 09:00 (after Polar opens at 07:00) → Polar starts at **09:00**
 
 ---
 
@@ -270,7 +274,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Schedule all 4 tasks far apart, each at **07:00** on consecutive days:
-   - Ryobi 524: 07:00 Monday (ends ~08:30 Mon, drying ~12:30 Mon)
+   - Ryobi 524: 07:00 Monday (ends 08:00 Mon, drying 12:00 Mon)
    - Polar 137: 07:00 Tuesday (huge gap)
    - MBO S: 07:00 Wednesday (huge gap)
    - Carton: 07:00 Thursday (huge gap)
@@ -279,7 +283,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Expected Results:**
 - [ ] Ryobi stays at 07:00 Monday (nothing before it)
-- [ ] Polar moves to ~12:30 Monday (Ryobi end + 4h drying) — within Polar hours (07:00-14:00)
+- [ ] Polar moves to 12:00 Monday (Ryobi end + 4h drying) — within Polar hours (07:00-14:00)
 - [ ] MBO S moves to immediately after Polar ends Monday — within MBO hours (06:00-19:00)
 - [ ] Carton moves to immediately after MBO S ends — if within Carton hours (07:00-14:00), same day; if not, to 07:00 next operating day
 - [ ] All 4 tasks may fit on the **same day** if durations are short enough
@@ -292,14 +296,14 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 ### CFI-C01: Full outsourced auto-assign lifecycle
 
 **Priority:** P1
-**Job:** L-00010 (Brochure piquée with DCC outsourced Finition)
+**Job:** L-00010 (Brochure piquée 16p with Clément outsourced Finition)
 
 **Preconditions:**
 - Load `?fixture=louis-phase-1`
 - Select L-00010
 
 **Steps:**
-1. Note the Finition element shows the DCC outsourced task with empty Dép/Ret dates
+1. Note the Finition element shows the Clément outsourced task with empty Dép/Ret dates
 2. Schedule **all 6 print tasks** (2 per element: Couv, Cah1, Cah2) in any order
 3. After placing the **last** (6th) print task, observe the outsourced task
 
@@ -307,7 +311,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 - [ ] Dép/Ret dates remain empty until ALL 6 tasks are scheduled
 - [ ] After the 6th task is placed, the outsourced task auto-assigns with calculated dates
 - [ ] Departure date = latest predecessor end time, snapped to latestDepartureTime (14:00)
-- [ ] Return date = departure + transitDays(3) + openDays(3) + transitDays(3) (accounting for weekends)
+- [ ] Return date = departure + transitDays (3) + production days + transitDays (3) (accounting for weekends)
 - [ ] The mini-form shows the calculated dates (non-empty)
 
 ---
@@ -433,17 +437,17 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Pick the Intérieur Ryobi 524 (offset) task
-2. Place it at **13:00** on Ryobi 524 (which closes at 14:00)
-3. The task should run ~60min at station but station closes at 14:00 → task continues next day at 07:00
-4. Calculate: actual end = 07:00 next day + (duration - 60min worked)
+2. Place it at **13:00** on Ryobi 524 (which closes at 14:00, task duration = 75min)
+3. The task runs 60min (13:00-14:00), then station closes → task continues next day at 07:00
+4. Remaining 15min runs 07:00-07:15 → actual end = 07:15 next day
 5. Now pick the Intérieur Polar 137 (massicot) task
 6. Check purple line on Polar 137
 
 **Expected Results:**
 - [ ] Ryobi tile shows correct duration accounting for overnight pause
 - [ ] Purple line on Polar = Ryobi actual end + 4h drying (NOT naive 13:00 + duration + 4h)
-- [ ] Example: if 90min total, runs 60min (13:00-14:00), resumes 07:00, ends 07:30 → drying ends 11:30
-- [ ] Purple line at 11:30 next day (Polar is open 07:00-14:00, so 11:30 is valid)
+- [ ] 75min total: runs 60min (13:00-14:00), resumes 07:00, ends 07:15 → drying ends 11:15
+- [ ] Purple line at 11:15 next day (Polar is open 07:00-14:00, so 11:15 is valid)
 
 ---
 
@@ -484,10 +488,10 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Activate Quick Placement mode (Alt+Q)
-2. Note which task is highlighted in the sidebar (should be the **bottom-most** task across all elements = Finition Filmeuse, seq 1)
+2. Note which task is highlighted in the sidebar (should be the **bottom-most** task across all elements = Finition Filmeuse, seq 2)
 3. Grid should auto-scroll to the Filmeuse column
 4. Place the task on Filmeuse
-5. Next highlighted task should be Finition Hohner (seq 0)
+5. Next highlighted task should be Finition Hohner (seq 1)
 6. Grid should auto-scroll to Hohner column
 7. Continue placing tasks in backward order through all elements
 8. Complete all 8 tasks
@@ -527,7 +531,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 ### CFI-E03: Quick Placement skips outsourced task
 
 **Priority:** P1
-**Job:** L-00010 (with DCC outsourced Finition)
+**Job:** L-00010 (with Clément outsourced Finition)
 
 **Preconditions:**
 - Load `?fixture=louis-phase-1`
@@ -536,11 +540,11 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 **Steps:**
 1. Activate Quick Placement mode (Alt+Q)
 2. Note the highlighted task — should be the **last internal task** in Cahier 2 (B26, plieuse)
-3. NOT the outsourced DCC task (outsourced tasks can't be placed via Quick Placement)
+3. NOT the outsourced Clément task (outsourced tasks can't be placed via Quick Placement)
 4. Place all 6 internal tasks using Quick Placement
 
 **Expected Results:**
-- [ ] Quick Placement never highlights the outsourced DCC task
+- [ ] Quick Placement never highlights the outsourced Clément task
 - [ ] The 6 internal tasks are placed in backward order: Cah2 B26, Cah2 Komori, Cah1 MBO M80, Cah1 SM52, Couv Polar, Couv Ryobi
 - [ ] After all 6 internal tasks placed, the outsourced task auto-assigns
 - [ ] Quick Placement shows no more tasks available (exits or shows empty state)
@@ -558,10 +562,10 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Activate Quick Placement mode (Alt+Q)
-2. Last task is Carton (seq 3) — place it
-3. Next task is MBO S (seq 2) — place it
-4. Next task is Polar 137 (seq 1) — place it
-5. Next task is Ryobi 524 (seq 0, offset printing)
+2. Last task is Carton (seq 4) — place it
+3. Next task is MBO S (seq 3) — place it
+4. Next task is Polar 137 (seq 2) — place it
+5. Next task is Ryobi 524 (seq 1, offset printing)
 6. Hover over Ryobi 524 column — observe the **orange line** (successor constraint)
 7. The orange line should account for drying time between Ryobi and Polar
 
@@ -604,9 +608,9 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 - Load `?fixture=louis-phase-1`
 
 **Steps:**
-1. Select L-00001, schedule Cahier 1 Ryobi task at 07:00 (ends ~08:30)
+1. Select L-00001, schedule Cahier 1 Ryobi task at 07:00 (duration 120min → ends 09:00)
 2. Select L-00003, pick Intérieur Ryobi task
-3. Place it right after L-00001's task ends (e.g., 08:30 or 08:45)
+3. Place it right after L-00001's task ends (e.g., 09:00 or 09:15)
 
 **Expected Results:**
 - [ ] Green ring — no conflict when tasks don't overlap
@@ -663,7 +667,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 ### CFI-G02: Recall + outsourced cascade + re-schedule full cycle
 
 **Priority:** P1
-**Job:** L-00010 (with DCC outsourced)
+**Job:** L-00010 (with Clément outsourced)
 
 **Preconditions:**
 - Load `?fixture=louis-phase-1`
@@ -671,7 +675,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 - Schedule all 6 internal tasks → outsourced auto-assigns
 
 **Steps:**
-1. Verify outsourced DCC task has calculated Dép/Ret dates
+1. Verify outsourced Clément task has calculated Dép/Ret dates
 2. Recall Cahier 1 MBO M80 task (last task of Cahier 1 element)
 3. Check outsourced task → should lose its assignment (not all predecessors scheduled)
 4. Now recall Cahier 1 SM52 task as well (first task of Cahier 1)
@@ -722,15 +726,16 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 - Navigate to a **Friday** on the grid
 
 **Steps:**
-1. Place the Ryobi 524 task on **Friday at 13:00** (station closes 14:00)
-2. If duration > 60 min, task spans to next working day
-3. Check when the task actually ends (should be **Monday morning**)
+1. Place the Ryobi 524 task on **Friday at 13:30** (station closes 14:00, task duration = 60min)
+2. 30min runs before close, remaining 30min spans to next working day (Monday)
+3. Check when the task actually ends (should be **Monday 07:30**)
 4. Pick the Polar task and check the purple line
 
 **Expected Results:**
 - [ ] Ryobi task pauses at Friday 14:00, resumes Monday 07:00
-- [ ] Drying time starts from the actual end (Monday 07:00 + remaining duration)
-- [ ] Purple line on Polar = actual end + 4h, snapped to Polar working hours (Mon 07:00-14:00)
+- [ ] Remaining 30min: ends Monday 07:30
+- [ ] Drying ends 07:30 + 4h = 11:30 Monday
+- [ ] Purple line on Polar = 11:30 Monday (within Polar hours 07:00-14:00)
 - [ ] Saturday and Sunday are correctly skipped
 
 ---
@@ -738,7 +743,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 ### CFI-H02: Quick Placement with all tasks already scheduled
 
 **Priority:** P2
-**Job:** L-00005 (Flyer, 3 tasks)
+**Job:** L-00005 (Flyer A5 promo, 3 tasks: Komori→Polar→Filmeuse)
 
 **Preconditions:**
 - Load `?fixture=louis-phase-1`
@@ -807,7 +812,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 - Schedule all 6 internal tasks → outsourced auto-assigns
 
 **Steps:**
-1. Verify DCC task has auto-assigned dates
+1. Verify Clément task has auto-assigned dates
 2. Manually clear the Dép date in the outsourced mini-form
 3. Manually clear the Ret date in the outsourced mini-form
 
@@ -877,7 +882,7 @@ These scenarios test that the 4-hour physical drying time interacts correctly wi
 
 **Steps:**
 1. Pick the Polar 137 task (successor of Ryobi, needs drying time)
-2. Place it **before** the drying time ends (e.g., at 08:00, when Ryobi ends ~08:30 + 4h = 12:30)
+2. Place it **before** the drying time ends (e.g., at 08:00, when Ryobi ends 08:00 + 4h = 12:00)
 3. Check the validation message
 
 **Expected Results:**
