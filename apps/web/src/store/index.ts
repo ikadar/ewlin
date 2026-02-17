@@ -10,6 +10,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { scheduleApi } from './api/scheduleApi';
+import { templateApi } from './api/templateApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -21,6 +22,7 @@ export const store = configureStore({
   reducer: {
     // RTK Query API reducers
     [scheduleApi.reducerPath]: scheduleApi.reducer,
+    [templateApi.reducerPath]: templateApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -30,7 +32,8 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
-      .concat(scheduleApi.middleware),
+      .concat(scheduleApi.middleware)
+      .concat(templateApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -79,6 +82,8 @@ export {
   useCompactStationMutation,
   scheduleApi,
 } from './api/scheduleApi';
+
+export { useGetTemplatesQuery, useUpdateTemplateMutation, templateApi } from './api/templateApi';
 
 // Re-export slice actions
 export {

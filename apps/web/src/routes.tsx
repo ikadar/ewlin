@@ -11,6 +11,7 @@
 
 import { Routes, Route } from 'react-router-dom';
 import App from './App';
+import { TemplatesPage } from './pages/TemplatesPage';
 
 /**
  * Application routes.
@@ -23,6 +24,7 @@ export function AppRoutes() {
       <Route path="/" element={<App />} />
       <Route path="/job/new" element={<App />} />
       <Route path="/job/:jobId" element={<App />} />
+      <Route path="/templates" element={<TemplatesPage />} />
     </Routes>
   );
 }
