@@ -285,6 +285,9 @@ importers:
       '@flux/schedule-validator':
         specifier: workspace:*
         version: link:../../packages/validator
+      '@flux/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       express:
         specifier: ^4.21.2
         version: 4.22.1
