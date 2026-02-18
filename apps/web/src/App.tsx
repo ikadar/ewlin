@@ -838,7 +838,7 @@ function AppContent() {
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // REQ-09.2: Focused date for DateStrip sync
-  const [focusedDate, setFocusedDate] = useState<Date | null>(null);
+  const [focusedDate, setFocusedDate] = useState<Date | null>(new Date());
   const scrollTimeoutRef = useRef<number | null>(null);
 
   // v0.3.47: Viewport hours for DateStrip indicator
@@ -1289,6 +1289,15 @@ function AppContent() {
       scrollTarget,
     });
   }, [pixelsPerHour, gridStartDate]);
+
+  // Scroll grid to today on initial load
+  useEffect(() => {
+    // Small delay to ensure grid is mounted and rendered
+    const timer = setTimeout(() => {
+      handleDateClick(new Date());
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle toggle completion (v0.3.33, v0.5.3: migrated to RTK Query mutation)
   const handleToggleComplete = useCallback(async (assignmentId: string) => {

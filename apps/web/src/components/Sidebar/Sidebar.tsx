@@ -1,4 +1,5 @@
 import { LayoutGrid, Calendar, Settings, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
 export interface SidebarProps {
@@ -15,6 +16,8 @@ export interface SidebarProps {
  * REQ-07: Full viewport height with User/Settings at bottom.
  */
 export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
+  const navigate = useNavigate();
+
   return (
     <nav
       className="w-14 shrink-0 bg-zinc-900/50 border-r border-white/5 h-full"
@@ -45,9 +48,8 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
         <div className="flex flex-col items-center py-3 gap-2 border-t border-white/5">
           <SidebarButton
             icon={Settings}
-            label="Settings"
-            isActive={activeView === 'settings'}
-            isDisabled
+            label="Templates"
+            onClick={() => navigate('/templates')}
             testId="sidebar-settings-button"
           />
           <SidebarButton
