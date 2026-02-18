@@ -1,6 +1,6 @@
 import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element } from '@flux/types';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
-import { isInternalTask } from '@flux/types';
+import { isInternalTask, SHIPPING_DEPARTURE_HOUR } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
@@ -364,6 +364,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   let departurePosition: number | null = null;
   if (selectedJob?.workshopExitDate) {
     const departureDate = new Date(selectedJob.workshopExitDate);
+    departureDate.setHours(SHIPPING_DEPARTURE_HOUR, 0, 0, 0);
     // In multi-day mode (when startDate provided), always show the marker
     // In single-day mode, only show if departure is today
     if (startDate) {

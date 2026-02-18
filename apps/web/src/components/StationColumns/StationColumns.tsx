@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Station, Job } from '@flux/types';
+import { SHIPPING_DEPARTURE_HOUR } from '@flux/types';
 import { PIXELS_PER_HOUR, timeToYPosition } from '../TimelineColumn';
 import { StationColumn } from './StationColumn';
 
@@ -44,6 +45,7 @@ export function StationColumns({
   let departurePosition: number | null = null;
   if (selectedJob?.workshopExitDate) {
     const departureDate = new Date(selectedJob.workshopExitDate);
+    departureDate.setHours(SHIPPING_DEPARTURE_HOUR, 0, 0, 0);
     // Only show if departure is today (simplified for MVP)
     const today = new Date();
     if (
