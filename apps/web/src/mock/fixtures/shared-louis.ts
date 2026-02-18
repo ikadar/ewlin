@@ -18,16 +18,36 @@ function day(start: string, end: string): DaySchedule {
 
 // --- Categories (9) ---------------------------------------------------------
 
+const OFFSET_CRITERIA = [
+  { id: 'crit-paper-type',   name: 'Même type de papier', fieldPath: 'paperType' },
+  { id: 'crit-paper-format', name: 'Même format',         fieldPath: 'paperFormat' },
+  { id: 'crit-inking',       name: 'Même encrage',        fieldPath: 'inking' },
+];
+
+const CUTTING_CRITERIA = [
+  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+];
+
+const FINISHING_CRITERIA = [
+  { id: 'crit-paper-weight', name: 'Même grammage', fieldPath: 'paperWeight' },
+  { id: 'crit-paper-format', name: 'Même format',   fieldPath: 'paperFormat' },
+];
+
+const PELLICULEUSE_CRITERIA = [
+  { id: 'crit-paper-type',   name: 'Même type de papier', fieldPath: 'paperType' },
+  { id: 'crit-paper-format', name: 'Même format',         fieldPath: 'paperFormat' },
+];
+
 export const louisCategories: StationCategory[] = [
-  { id: 'cat-offset',        name: 'Presses Offset',          similarityCriteria: [] },
-  { id: 'cat-cutting',       name: 'Massicots',               similarityCriteria: [] },
-  { id: 'cat-pelliculeuse',  name: 'Pelliculeuses',           similarityCriteria: [] },
+  { id: 'cat-offset',        name: 'Presses Offset',          similarityCriteria: OFFSET_CRITERIA },
+  { id: 'cat-cutting',       name: 'Massicots',               similarityCriteria: CUTTING_CRITERIA },
+  { id: 'cat-pelliculeuse',  name: 'Pelliculeuses',           similarityCriteria: PELLICULEUSE_CRITERIA },
   { id: 'cat-typo',          name: 'Typographie',             similarityCriteria: [] },
-  { id: 'cat-folding',       name: 'Plieuses',                similarityCriteria: [] },
-  { id: 'cat-booklet',       name: 'Encarteuses-Piqueuses',   similarityCriteria: [] },
-  { id: 'cat-assembly',      name: 'Assembleuses',            similarityCriteria: [] },
-  { id: 'cat-saddle-stitch', name: 'Assembleuses-Piqueuses',  similarityCriteria: [] },
-  { id: 'cat-packaging',     name: 'Conditionnement',         similarityCriteria: [] },
+  { id: 'cat-folding',       name: 'Plieuses',                similarityCriteria: FINISHING_CRITERIA },
+  { id: 'cat-booklet',       name: 'Encarteuses-Piqueuses',   similarityCriteria: FINISHING_CRITERIA },
+  { id: 'cat-assembly',      name: 'Assembleuses',            similarityCriteria: FINISHING_CRITERIA },
+  { id: 'cat-saddle-stitch', name: 'Assembleuses-Piqueuses',  similarityCriteria: FINISHING_CRITERIA },
+  { id: 'cat-packaging',     name: 'Conditionnement',         similarityCriteria: FINISHING_CRITERIA },
 ];
 
 // --- Groups (9) -------------------------------------------------------------
