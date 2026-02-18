@@ -231,8 +231,10 @@ export function TaskList({
   // Check if this is a single-element job
   const isSingleElement = !isMultiElementJob(job.elementIds);
 
-  // Get elements for this job, preserving order
-  const jobElements = elements.filter((e) => job.elementIds.includes(e.id));
+  // Get elements for this job, preserving order from job.elementIds (matches JCF order)
+  const jobElements = elements
+    .filter((e) => job.elementIds.includes(e.id))
+    .sort((a, b) => job.elementIds.indexOf(a.id) - job.elementIds.indexOf(b.id));
 
   return (
     <div className="p-3 overflow-y-auto flex-grow bg-zinc-900/30">
