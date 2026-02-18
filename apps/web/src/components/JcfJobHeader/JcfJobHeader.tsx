@@ -3,9 +3,8 @@ import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
-import { getTemplates } from '../../mock/templateApi';
 import type { JcfTemplate } from '@flux/types';
-import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery } from '../../store';
+import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery } from '../../store';
 import { useDebouncedValue } from '../../hooks';
 
 export interface JcfJobHeaderProps {
@@ -55,9 +54,13 @@ export function JcfJobHeader({
   // Session learning: new client names added on blur
   const [sessionClients, setSessionClients] = useState<string[]>([]);
 
-  // v0.4.34: Load templates from API (synchronous localStorage API)
-  // Note: setTemplates unused - templates are refreshed on component mount
-  const [templates, _setTemplates] = useState<JcfTemplate[]>(() => getTemplates());
+  // Load templates from real API via RTK Query (same source as /templates page)
+  const { data: templateData } = useGetTemplatesQuery();
+  const templates = templateData?.items ?? [];
+
+  // Keep a ref to always access latest templates in callbacks (avoids stale closure)
+  const templatesRef = useRef<JcfTemplate[]>(templates);
+  templatesRef.current = templates;
 
   // v0.5.5: Client autocomplete via RTK Query with debounce
   // Skip only for single character (too vague); empty string fetches all, 2+ chars filters
@@ -144,7 +147,7 @@ export function JcfJobHeader({
   // v0.4.34: Handle template selection - find template and call callback
   const handleTemplateSelectInternal = useCallback(
     (selectedValue: string) => {
-      const selectedTemplate = templates.find((t) => t.id === selectedValue);
+      const selectedTemplate = templatesRef.current.find((t) => t.id === selectedValue);
       if (selectedTemplate) {
         onTemplateChange(selectedTemplate.name);
         onTemplateSelect?.(selectedTemplate);
@@ -153,7 +156,7 @@ export function JcfJobHeader({
         document.getElementById('jcf-intitule')?.focus();
       }, 0);
     },
-    [templates, onTemplateChange, onTemplateSelect]
+    [onTemplateChange, onTemplateSelect]
   );
 
   // v0.4.31: Handle template clear (empty value)
