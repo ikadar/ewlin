@@ -627,7 +627,9 @@ function AppContent() {
     const providerNameMap = new Map((snapshot.providers ?? []).map((p) => [p.id, p.name]));
 
     // Map elements back to JcfElement[] format
-    const jobElements = snapshot.elements.filter((e) => selectedJob.elementIds.includes(e.id));
+    const jobElements = snapshot.elements
+      .filter((e) => selectedJob.elementIds.includes(e.id))
+      .sort((a, b) => selectedJob.elementIds.indexOf(a.id) - selectedJob.elementIds.indexOf(b.id));
     // Build elementId → name lookup for precedences
     const elementNameMap = new Map(jobElements.map((el) => [el.id, el.name]));
 
