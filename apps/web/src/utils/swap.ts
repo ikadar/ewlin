@@ -14,6 +14,12 @@ export interface SwapResult {
   swapped: boolean;
   /** ID of the other assignment that was swapped with */
   swappedWithId: string | null;
+  /** Reschedule details for each swapped tile (for API calls) */
+  reschedules: Array<{
+    taskId: string;
+    targetId: string;
+    scheduledStart: string;
+  }>;
 }
 
 /**
@@ -78,6 +84,7 @@ export function applySwap(
       assignments,
       swapped: false,
       swappedWithId: null,
+      reschedules: [],
     };
   }
 
@@ -151,5 +158,9 @@ export function applySwap(
     assignments: updatedAssignments,
     swapped: true,
     swappedWithId: adjacent.id,
+    reschedules: [
+      { taskId: target.taskId, targetId: target.targetId, scheduledStart: newTargetStart },
+      { taskId: adjacent.taskId, targetId: adjacent.targetId, scheduledStart: newAdjacentStart },
+    ],
   };
 }

@@ -1005,39 +1005,31 @@ function AppContent() {
     };
   }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, rescheduleTask]);
 
+  // Handle swap in a given direction using two rescheduleTask mutations
+  const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
+    const result = applySwap(snapshot.assignments, assignmentId, direction);
+    if (!result.swapped || result.reschedules.length < 2) return;
+
+    try {
+      await Promise.all(
+        result.reschedules.map(({ taskId, targetId, scheduledStart }) =>
+          rescheduleTask({ taskId, body: { targetId, scheduledStart } }).unwrap()
+        )
+      );
+    } catch (err) {
+      console.error(`Swap ${direction} failed:`, err);
+    }
+  }, [snapshot.assignments, rescheduleTask]);
+
   // Handle swap up - exchange position with tile above
-  // Note: Conflicts are automatically recalculated by updateSnapshot
   const handleSwapUp = useCallback((assignmentId: string) => {
-    updateSnapshot((currentSnapshot) => {
-      const result = applySwap(currentSnapshot.assignments, assignmentId, 'up');
-      if (result.swapped) {
-        console.log('Swapped up:', { assignmentId, swappedWithId: result.swappedWithId });
-        return {
-          ...currentSnapshot,
-          assignments: result.assignments,
-        };
-      }
-      return currentSnapshot;
-    });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+    handleSwap(assignmentId, 'up');
+  }, [handleSwap]);
 
   // Handle swap down - exchange position with tile below
-  // Note: Conflicts are automatically recalculated by updateSnapshot
   const handleSwapDown = useCallback((assignmentId: string) => {
-    updateSnapshot((currentSnapshot) => {
-      const result = applySwap(currentSnapshot.assignments, assignmentId, 'down');
-      if (result.swapped) {
-        console.log('Swapped down:', { assignmentId, swappedWithId: result.swappedWithId });
-        return {
-          ...currentSnapshot,
-          assignments: result.assignments,
-        };
-      }
-      return currentSnapshot;
-    });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+    handleSwap(assignmentId, 'down');
+  }, [handleSwap]);
 
   // v0.3.58: Handle context menu open
   const handleContextMenuOpen = useCallback((x: number, y: number, assignmentId: string, isCompleted: boolean) => {
