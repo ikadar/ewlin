@@ -126,13 +126,13 @@ export const scheduleApi = createApi({
      * Get client name suggestions for autocomplete.
      *
      * Mock mode: mockBaseQuery filters MOCK_CLIENTS by prefix
-     * Real mode: GET /jobs/clients?q={prefix}
+     * Real mode: GET /clients?q={prefix}
      *
      * @param prefix - Search prefix (min 2 chars recommended)
      * @see docs/releases/v0.5.5-client-autocomplete-api.md
      */
     getClientSuggestions: builder.query<ClientSuggestionsResponse, string>({
-      query: (prefix) => `/jobs/clients?q=${encodeURIComponent(prefix)}`,
+      query: (prefix) => `/clients?q=${encodeURIComponent(prefix)}`,
       providesTags: ['ClientSuggestions'],
     }),
 

@@ -1,10 +1,11 @@
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useRef, useMemo, useCallback } from 'react';
 import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
 import type { JcfTemplate } from '@flux/types';
 import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery } from '../../store';
+import { useCreateClientMutation } from '../../store';
 import { useDebouncedValue } from '../../hooks';
 
 export interface JcfJobHeaderProps {
@@ -51,8 +52,8 @@ export function JcfJobHeader({
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
 
-  // Session learning: new client names added on blur
-  const [sessionClients, setSessionClients] = useState<string[]>([]);
+  // Auto-persist new client names to the clients table
+  const [createClient] = useCreateClientMutation();
 
   // Load templates from real API via RTK Query (same source as /templates page)
   const { data: templateData } = useGetTemplatesQuery();
@@ -97,30 +98,25 @@ export function JcfJobHeader({
   // --- Client autocomplete ---
 
   const clientSuggestions: Suggestion[] = useMemo(
-    () => [
-      ...apiClients.map((name) => ({ label: name, value: name })),
-      ...sessionClients
-        .filter((s) => !apiClients.includes(s)) // Avoid duplicates
-        .map((s) => ({ label: s, value: s, category: 'nouveau' })),
-    ],
-    [apiClients, sessionClients]
+    () => apiClients.map((name) => ({ label: name, value: name })),
+    [apiClients]
   );
 
-  const handleClientBlur = () => {
+  const handleClientBlur = useCallback(() => {
     const trimmed = client.trim();
     if (!trimmed) return;
 
     const existsInApi = apiClients.some(
       (name) => name.toLowerCase() === trimmed.toLowerCase()
     );
-    const existsInSession = sessionClients.some(
-      (s) => s.toLowerCase() === trimmed.toLowerCase()
-    );
 
-    if (!existsInApi && !existsInSession) {
-      setSessionClients((prev) => [...prev, trimmed]);
+    if (!existsInApi) {
+      // Auto-persist new client name to the database
+      createClient({ name: trimmed }).catch(() => {
+        // Silently ignore errors (e.g. duplicate on race condition)
+      });
     }
-  };
+  }, [client, apiClients, createClient]);
 
   const handleClientSelect = () => {
     setTimeout(() => {

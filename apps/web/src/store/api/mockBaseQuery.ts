@@ -1151,7 +1151,13 @@ const MOCK_CLIENT_NAMES = [
 ];
 
 /**
- * GET /jobs/clients?q={prefix} - Get client suggestions
+ * Mock client store for persistent client management.
+ * Starts with MOCK_CLIENT_NAMES and grows as new clients are created.
+ */
+let mockClientStore: string[] = [...MOCK_CLIENT_NAMES];
+
+/**
+ * GET /clients?q={prefix} - Get client suggestions
  *
  * Filters mock clients by prefix (case-insensitive).
  * Returns all clients if prefix is empty.
@@ -1163,17 +1169,75 @@ const handleGetClientSuggestions = async (
 ): Promise<{ data: string[] }> => {
   // Extract query parameter from URL
   const url = new URL(args.url, 'http://localhost');
-  const prefix = url.searchParams.get('q') || '';
+  const prefix = url.searchParams.get('q');
+
+  // If no q param, return full client list (for management page)
+  if (prefix === null) {
+    return {
+      data: mockClientStore.map((name) => ({
+        id: `client-${name.toLowerCase().replace(/\s+/g, '-')}`,
+        name,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })) as unknown as string[],
+    };
+  }
+
   const normalizedPrefix = prefix.toLowerCase().trim();
 
   // Filter clients by prefix
   const suggestions = normalizedPrefix
-    ? MOCK_CLIENT_NAMES.filter((name) =>
+    ? mockClientStore.filter((name) =>
         name.toLowerCase().includes(normalizedPrefix)
       )
-    : MOCK_CLIENT_NAMES;
+    : mockClientStore;
 
   return { data: suggestions };
+};
+
+/**
+ * POST /clients - Create a new client
+ */
+const handleCreateClient = async (
+  args: FetchArgs
+): Promise<{ data: { id: string; name: string; createdAt: string; updatedAt: string } } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name: string };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Client name is required' },
+      },
+    };
+  }
+
+  // Check for duplicate
+  const exists = mockClientStore.some(
+    (n) => n.toLowerCase() === name.toLowerCase()
+  );
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Client '${name}' already exists` },
+      },
+    };
+  }
+
+  mockClientStore.push(name);
+  mockClientStore.sort();
+
+  const now = new Date().toISOString();
+  return {
+    data: {
+      id: `client-${Date.now()}`,
+      name,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
 };
 
 /**
@@ -1212,6 +1276,10 @@ const handleLookupByReference = async (
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
+
+  // Clients
+  { method: 'GET', pattern: /^\/clients/, handler: handleGetClientSuggestions },
+  { method: 'POST', pattern: /^\/clients$/, handler: handleCreateClient },
 
   // Jobs
   { method: 'GET', pattern: /^\/jobs\/clients/, handler: handleGetClientSuggestions },
