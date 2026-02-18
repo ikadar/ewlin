@@ -33,12 +33,12 @@ export function SimilarityIndicators({ results }: SimilarityIndicatorsProps) {
         >
           {result.isMatched ? (
             <Link
-              className="w-3.5 h-3.5 text-zinc-400"
+              className="w-3.5 h-3.5 text-emerald-400"
               data-testid="similarity-link-icon"
             />
           ) : (
             <Unlink
-              className="w-3.5 h-3.5 text-zinc-800"
+              className="w-3.5 h-3.5 text-orange-400"
               data-testid="similarity-unlink-icon"
             />
           )}

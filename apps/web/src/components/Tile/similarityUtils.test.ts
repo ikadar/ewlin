@@ -1,56 +1,43 @@
 import { describe, it, expect } from 'vitest';
 import { getFieldValue, valuesMatch, compareSimilarity } from './similarityUtils';
-import type { Job, SimilarityCriterion } from '@flux/types';
+import type { ElementSpec, SimilarityCriterion } from '@flux/types';
 
-// Minimal mock job for testing
-const createMockJob = (overrides: Partial<Job> = {}): Job => ({
-  id: 'job-1',
-  reference: '12345',
-  client: 'Test Client',
-  description: 'Test Job',
-  status: 'Planned',
-  workshopExitDate: new Date().toISOString(),
-  fullyScheduled: false,
-  color: '#8B5CF6',
-  comments: [],
-  taskIds: [],
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+// Minimal mock element spec for testing
+const createMockSpec = (overrides: Partial<ElementSpec> = {}): ElementSpec => ({
   ...overrides,
 });
 
 describe('getFieldValue', () => {
   it('returns direct property value', () => {
-    const job = createMockJob({ reference: 'ABC123' });
-    expect(getFieldValue(job, 'reference')).toBe('ABC123');
+    const spec = createMockSpec({ papier: 'Couché mat:135' });
+    expect(getFieldValue(spec, 'papier')).toBe('Couché mat:135');
   });
 
   it('returns undefined for non-existent property', () => {
-    const job = createMockJob();
-    expect(getFieldValue(job, 'nonExistent')).toBeUndefined();
+    const spec = createMockSpec();
+    expect(getFieldValue(spec, 'nonExistent')).toBeUndefined();
   });
 
   it('handles nested paths', () => {
-    const job = createMockJob();
-    // Add nested property for testing
-    (job as Record<string, unknown>).details = { paperType: 'CB 300g' };
-    expect(getFieldValue(job, 'details.paperType')).toBe('CB 300g');
+    const spec = createMockSpec();
+    (spec as Record<string, unknown>).nested = { value: 'test' };
+    expect(getFieldValue(spec, 'nested.value')).toBe('test');
   });
 
   it('returns undefined for deeply nested non-existent path', () => {
-    const job = createMockJob();
-    expect(getFieldValue(job, 'details.paperType')).toBeUndefined();
+    const spec = createMockSpec();
+    expect(getFieldValue(spec, 'nested.value')).toBeUndefined();
   });
 
   it('handles null intermediate values', () => {
-    const job = createMockJob();
-    (job as Record<string, unknown>).details = null;
-    expect(getFieldValue(job, 'details.paperType')).toBeUndefined();
+    const spec = createMockSpec();
+    (spec as Record<string, unknown>).nested = null;
+    expect(getFieldValue(spec, 'nested.value')).toBeUndefined();
   });
 
-  it('returns client field correctly', () => {
-    const job = createMockJob({ client: 'Autosphere' });
-    expect(getFieldValue(job, 'client')).toBe('Autosphere');
+  it('returns format field correctly', () => {
+    const spec = createMockSpec({ format: 'A4' });
+    expect(getFieldValue(spec, 'format')).toBe('A4');
   });
 });
 
@@ -78,11 +65,11 @@ describe('valuesMatch', () => {
   });
 
   it('returns true when string values are equal', () => {
-    expect(valuesMatch('CB 300g', 'CB 300g')).toBe(true);
+    expect(valuesMatch('Couché mat:135', 'Couché mat:135')).toBe(true);
   });
 
   it('returns false when string values differ', () => {
-    expect(valuesMatch('CB 300g', 'CB 135g')).toBe(false);
+    expect(valuesMatch('Couché mat:135', 'Couché mat:300')).toBe(false);
   });
 
   it('returns true when number values are equal', () => {
@@ -105,181 +92,176 @@ describe('valuesMatch', () => {
 
 describe('compareSimilarity', () => {
   const mockCriteria: SimilarityCriterion[] = [
-    { id: 'crit-1', name: 'Same paper type', fieldPath: 'paperType' },
-    { id: 'crit-2', name: 'Same client', fieldPath: 'client' },
-    { id: 'crit-3', name: 'Same color', fieldPath: 'color' },
+    { id: 'crit-1', name: 'Même type de papier', fieldPath: 'papier' },
+    { id: 'crit-2', name: 'Même format', fieldPath: 'format' },
+    { id: 'crit-3', name: 'Même encrage', fieldPath: 'impression' },
   ];
 
   it('returns empty array when no criteria provided', () => {
-    const jobA = createMockJob();
-    const jobB = createMockJob();
-    expect(compareSimilarity(jobA, jobB, [])).toEqual([]);
+    const specA = createMockSpec();
+    const specB = createMockSpec();
+    expect(compareSimilarity(specA, specB, [])).toEqual([]);
   });
 
   it('returns correct number of results', () => {
-    const jobA = createMockJob();
-    const jobB = createMockJob();
-    const results = compareSimilarity(jobA, jobB, mockCriteria);
+    const specA = createMockSpec();
+    const specB = createMockSpec();
+    const results = compareSimilarity(specA, specB, mockCriteria);
     expect(results).toHaveLength(3);
   });
 
   it('marks matching values as matched', () => {
-    const jobA = createMockJob({ client: 'Same Client' });
-    const jobB = createMockJob({ client: 'Same Client' });
-    const results = compareSimilarity(jobA, jobB, [
-      { id: 'crit-1', name: 'Same client', fieldPath: 'client' },
+    const specA = createMockSpec({ format: 'A4' });
+    const specB = createMockSpec({ format: 'A4' });
+    const results = compareSimilarity(specA, specB, [
+      { id: 'crit-1', name: 'Même format', fieldPath: 'format' },
     ]);
     expect(results[0].isMatched).toBe(true);
-    expect(results[0].criterion.name).toBe('Same client');
+    expect(results[0].criterion.name).toBe('Même format');
   });
 
   it('marks different values as not matched', () => {
-    const jobA = createMockJob({ client: 'Client A' });
-    const jobB = createMockJob({ client: 'Client B' });
-    const results = compareSimilarity(jobA, jobB, [
-      { id: 'crit-1', name: 'Same client', fieldPath: 'client' },
+    const specA = createMockSpec({ format: 'A4' });
+    const specB = createMockSpec({ format: '210x297' });
+    const results = compareSimilarity(specA, specB, [
+      { id: 'crit-1', name: 'Même format', fieldPath: 'format' },
     ]);
     expect(results[0].isMatched).toBe(false);
   });
 
   it('handles mixed matching and non-matching criteria', () => {
-    const jobA = createMockJob({ client: 'Same', color: '#8B5CF6' });
-    const jobB = createMockJob({ client: 'Same', color: '#F43F5E' });
-    (jobA as Record<string, unknown>).paperType = 'CB 300g';
-    (jobB as Record<string, unknown>).paperType = 'CB 300g';
+    const specA = createMockSpec({ papier: 'Couché mat:135', format: 'A4', impression: 'Q/Q' });
+    const specB = createMockSpec({ papier: 'Couché mat:135', format: '70x100', impression: 'Q/Q' });
 
-    const results = compareSimilarity(jobA, jobB, mockCriteria);
+    const results = compareSimilarity(specA, specB, mockCriteria);
 
-    // paperType matches
+    // papier matches
     expect(results[0].isMatched).toBe(true);
-    // client matches
-    expect(results[1].isMatched).toBe(true);
-    // color differs
-    expect(results[2].isMatched).toBe(false);
+    // format differs
+    expect(results[1].isMatched).toBe(false);
+    // impression matches
+    expect(results[2].isMatched).toBe(true);
   });
 
   it('treats both null/undefined values as matched', () => {
-    const jobA = createMockJob();
-    const jobB = createMockJob();
-    // Neither job has paperType defined
-    const results = compareSimilarity(jobA, jobB, [
-      { id: 'crit-1', name: 'Same paper type', fieldPath: 'paperType' },
+    const specA = createMockSpec();
+    const specB = createMockSpec();
+    // Neither spec has papier defined
+    const results = compareSimilarity(specA, specB, [
+      { id: 'crit-1', name: 'Même type de papier', fieldPath: 'papier' },
     ]);
     expect(results[0].isMatched).toBe(true);
   });
 
   it('treats one null one value as not matched', () => {
-    const jobA = createMockJob();
-    const jobB = createMockJob();
-    (jobA as Record<string, unknown>).paperType = 'CB 300g';
-    // jobB has no paperType
-    const results = compareSimilarity(jobA, jobB, [
-      { id: 'crit-1', name: 'Same paper type', fieldPath: 'paperType' },
+    const specA = createMockSpec({ papier: 'Couché mat:135' });
+    const specB = createMockSpec();
+    const results = compareSimilarity(specA, specB, [
+      { id: 'crit-1', name: 'Même type de papier', fieldPath: 'papier' },
     ]);
     expect(results[0].isMatched).toBe(false);
   });
 
   it('preserves criterion reference in results', () => {
-    const jobA = createMockJob();
-    const jobB = createMockJob();
+    const specA = createMockSpec();
+    const specB = createMockSpec();
     const criterion: SimilarityCriterion = {
       id: 'crit-test',
       name: 'Test Criterion',
-      fieldPath: 'reference',
+      fieldPath: 'format',
     };
-    const results = compareSimilarity(jobA, jobB, [criterion]);
+    const results = compareSimilarity(specA, specB, [criterion]);
     expect(results[0].criterion).toBe(criterion);
   });
 
-  // REQ-20: Similarities Feature Completion - paperWeight and inking tests
-  describe('paperWeight comparison', () => {
-    const paperWeightCriterion: SimilarityCriterion = {
-      id: 'crit-paper-weight',
-      name: 'Same paper weight',
-      fieldPath: 'paperWeight',
+  describe('papier comparison (paper type + weight)', () => {
+    const papierCriterion: SimilarityCriterion = {
+      id: 'crit-paper-type',
+      name: 'Même type de papier',
+      fieldPath: 'papier',
     };
 
-    it('marks matching paperWeight as matched', () => {
-      const jobA = createMockJob({ paperWeight: 300 });
-      const jobB = createMockJob({ paperWeight: 300 });
-      const results = compareSimilarity(jobA, jobB, [paperWeightCriterion]);
+    it('marks matching papier as matched', () => {
+      const specA = createMockSpec({ papier: 'Couché mat:300' });
+      const specB = createMockSpec({ papier: 'Couché mat:300' });
+      const results = compareSimilarity(specA, specB, [papierCriterion]);
       expect(results[0].isMatched).toBe(true);
     });
 
-    it('marks different paperWeight as not matched', () => {
-      const jobA = createMockJob({ paperWeight: 300 });
-      const jobB = createMockJob({ paperWeight: 170 });
-      const results = compareSimilarity(jobA, jobB, [paperWeightCriterion]);
+    it('marks different papier as not matched', () => {
+      const specA = createMockSpec({ papier: 'Couché mat:300' });
+      const specB = createMockSpec({ papier: 'Offset:170' });
+      const results = compareSimilarity(specA, specB, [papierCriterion]);
       expect(results[0].isMatched).toBe(false);
     });
 
-    it('marks one undefined paperWeight as not matched', () => {
-      const jobA = createMockJob({ paperWeight: 300 });
-      const jobB = createMockJob({ paperWeight: undefined });
-      const results = compareSimilarity(jobA, jobB, [paperWeightCriterion]);
+    it('marks one undefined papier as not matched', () => {
+      const specA = createMockSpec({ papier: 'Couché mat:300' });
+      const specB = createMockSpec();
+      const results = compareSimilarity(specA, specB, [papierCriterion]);
       expect(results[0].isMatched).toBe(false);
     });
   });
 
-  describe('inking comparison', () => {
-    const inkingCriterion: SimilarityCriterion = {
+  describe('impression comparison (inking)', () => {
+    const impressionCriterion: SimilarityCriterion = {
       id: 'crit-inking',
-      name: 'Same inking',
-      fieldPath: 'inking',
+      name: 'Même encrage',
+      fieldPath: 'impression',
     };
 
-    it('marks matching inking as matched', () => {
-      const jobA = createMockJob({ inking: 'CMYK' });
-      const jobB = createMockJob({ inking: 'CMYK' });
-      const results = compareSimilarity(jobA, jobB, [inkingCriterion]);
+    it('marks matching impression as matched', () => {
+      const specA = createMockSpec({ impression: 'Q/Q' });
+      const specB = createMockSpec({ impression: 'Q/Q' });
+      const results = compareSimilarity(specA, specB, [impressionCriterion]);
       expect(results[0].isMatched).toBe(true);
     });
 
-    it('marks different inking as not matched', () => {
-      const jobA = createMockJob({ inking: 'CMYK' });
-      const jobB = createMockJob({ inking: '4C+0' });
-      const results = compareSimilarity(jobA, jobB, [inkingCriterion]);
+    it('marks different impression as not matched', () => {
+      const specA = createMockSpec({ impression: 'Q/Q' });
+      const specB = createMockSpec({ impression: 'Q+V/' });
+      const results = compareSimilarity(specA, specB, [impressionCriterion]);
       expect(results[0].isMatched).toBe(false);
     });
 
-    it('marks one undefined inking as not matched', () => {
-      const jobA = createMockJob({ inking: 'CMYK' });
-      const jobB = createMockJob({ inking: undefined });
-      const results = compareSimilarity(jobA, jobB, [inkingCriterion]);
+    it('marks one undefined impression as not matched', () => {
+      const specA = createMockSpec({ impression: 'Q/Q' });
+      const specB = createMockSpec();
+      const results = compareSimilarity(specA, specB, [impressionCriterion]);
       expect(results[0].isMatched).toBe(false);
     });
   });
 
-  describe('offset press criteria (REQ-20)', () => {
+  describe('offset press criteria', () => {
     const offsetPressCriteria: SimilarityCriterion[] = [
-      { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'paperType' },
-      { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
-      { id: 'crit-inking', name: 'Même encrage', fieldPath: 'inking' },
+      { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'papier' },
+      { id: 'crit-paper-format', name: 'Même format', fieldPath: 'format' },
+      { id: 'crit-inking', name: 'Même encrage', fieldPath: 'impression' },
     ];
 
     it('compares all offset press criteria correctly', () => {
-      const jobA = createMockJob({
-        paperType: 'CB 300g',
-        paperFormat: '63x88',
-        inking: 'CMYK',
+      const specA = createMockSpec({
+        papier: 'Couché mat:300',
+        format: '63x88',
+        impression: 'Q/Q',
       });
-      const jobB = createMockJob({
-        paperType: 'CB 300g',
-        paperFormat: '70x100', // different
-        inking: 'CMYK',
+      const specB = createMockSpec({
+        papier: 'Couché mat:300',
+        format: '70x100', // different
+        impression: 'Q/Q',
       });
-      const results = compareSimilarity(jobA, jobB, offsetPressCriteria);
+      const results = compareSimilarity(specA, specB, offsetPressCriteria);
 
-      expect(results[0].isMatched).toBe(true);  // paperType matches
-      expect(results[1].isMatched).toBe(false); // paperFormat differs
-      expect(results[2].isMatched).toBe(true);  // inking matches
+      expect(results[0].isMatched).toBe(true);  // papier matches
+      expect(results[1].isMatched).toBe(false); // format differs
+      expect(results[2].isMatched).toBe(true);  // impression matches
     });
 
-    it('shows real differences when inking values differ', () => {
-      const jobA = createMockJob({ inking: 'CMYK' });
-      const jobB = createMockJob({ inking: 'Pantone 485+Black' });
-      const results = compareSimilarity(jobA, jobB, [
-        { id: 'crit-inking', name: 'Même encrage', fieldPath: 'inking' },
+    it('shows real differences when impression values differ', () => {
+      const specA = createMockSpec({ impression: 'Q/Q' });
+      const specB = createMockSpec({ impression: 'Q+V/' });
+      const results = compareSimilarity(specA, specB, [
+        { id: 'crit-inking', name: 'Même encrage', fieldPath: 'impression' },
       ]);
       expect(results[0].isMatched).toBe(false);
     });

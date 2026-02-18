@@ -550,14 +550,14 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     const showSwapDown = index < stationAssignments.length - 1;
 
                     // Calculate similarity results with previous tile (if any)
+                    // Compares element specs (papier, format, impression) between consecutive tasks
                     let similarityResults = undefined;
-                    if (index > 0 && criteria.length > 0) {
+                    if (index > 0 && criteria.length > 0 && element?.spec) {
                       const prevAssignment = stationAssignments[index - 1];
                       const prevTask = taskMap.get(prevAssignment.taskId);
-                      const prevJobId = prevTask ? getJobIdForTask(prevTask, elements) : null;
-                      const prevJob = prevJobId ? jobMap.get(prevJobId) : null;
-                      if (prevJob) {
-                        similarityResults = compareSimilarity(prevJob, job, criteria);
+                      const prevElement = prevTask ? elements.find((e) => e.id === prevTask.elementId) : null;
+                      if (prevElement?.spec) {
+                        similarityResults = compareSimilarity(prevElement.spec, element.spec, criteria);
                       }
                     }
 

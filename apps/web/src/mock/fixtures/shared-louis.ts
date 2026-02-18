@@ -19,23 +19,23 @@ function day(start: string, end: string): DaySchedule {
 // --- Categories (9) ---------------------------------------------------------
 
 const OFFSET_CRITERIA = [
-  { id: 'crit-paper-type',   name: 'Même type de papier', fieldPath: 'paperType' },
-  { id: 'crit-paper-format', name: 'Même format',         fieldPath: 'paperFormat' },
-  { id: 'crit-inking',       name: 'Même encrage',        fieldPath: 'inking' },
+  { id: 'crit-paper-type',   name: 'Même type de papier', fieldPath: 'papier' },
+  { id: 'crit-paper-format', name: 'Même format',         fieldPath: 'format' },
+  { id: 'crit-inking',       name: 'Même encrage',        fieldPath: 'impression' },
 ];
 
 const CUTTING_CRITERIA = [
-  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'format' },
 ];
 
 const FINISHING_CRITERIA = [
-  { id: 'crit-paper-weight', name: 'Même grammage', fieldPath: 'paperWeight' },
-  { id: 'crit-paper-format', name: 'Même format',   fieldPath: 'paperFormat' },
+  { id: 'crit-paper-weight', name: 'Même grammage', fieldPath: 'papier' },
+  { id: 'crit-paper-format', name: 'Même format',   fieldPath: 'format' },
 ];
 
 const PELLICULEUSE_CRITERIA = [
-  { id: 'crit-paper-type',   name: 'Même type de papier', fieldPath: 'paperType' },
-  { id: 'crit-paper-format', name: 'Même format',         fieldPath: 'paperFormat' },
+  { id: 'crit-paper-type',   name: 'Même type de papier', fieldPath: 'papier' },
+  { id: 'crit-paper-format', name: 'Même format',         fieldPath: 'format' },
 ];
 
 export const louisCategories: StationCategory[] = [

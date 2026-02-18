@@ -1,10 +1,10 @@
 /**
- * Similarity comparison utilities for job property matching.
+ * Similarity comparison utilities for element spec property matching.
  */
 
-import type { Job, SimilarityCriterion } from '@flux/types';
+import type { ElementSpec, SimilarityCriterion } from '@flux/types';
 
-/** Result of comparing a single criterion between two jobs */
+/** Result of comparing a single criterion between two element specs */
 export interface SimilarityResult {
   /** Criterion being compared */
   criterion: SimilarityCriterion;
@@ -13,12 +13,12 @@ export interface SimilarityResult {
 }
 
 /**
- * Get a value from a job object at a given field path.
- * Supports nested paths like "details.paperType".
+ * Get a value from an element spec at a given field path.
+ * Supports nested paths like "nested.field".
  */
-export function getFieldValue(job: Job, fieldPath: string): unknown {
+export function getFieldValue(spec: ElementSpec, fieldPath: string): unknown {
   const parts = fieldPath.split('.');
-  let value: unknown = job;
+  let value: unknown = spec;
 
   for (const part of parts) {
     if (value === null || value === undefined) {
@@ -61,17 +61,17 @@ export function valuesMatch(valueA: unknown, valueB: unknown): boolean {
 }
 
 /**
- * Compare two jobs against a list of similarity criteria.
+ * Compare two element specs against a list of similarity criteria.
  * Returns an array of results indicating which criteria are matched.
  */
 export function compareSimilarity(
-  jobA: Job,
-  jobB: Job,
+  specA: ElementSpec,
+  specB: ElementSpec,
   criteria: SimilarityCriterion[]
 ): SimilarityResult[] {
   return criteria.map((criterion) => {
-    const valueA = getFieldValue(jobA, criterion.fieldPath);
-    const valueB = getFieldValue(jobB, criterion.fieldPath);
+    const valueA = getFieldValue(specA, criterion.fieldPath);
+    const valueB = getFieldValue(specB, criterion.fieldPath);
     const isMatched = valuesMatch(valueA, valueB);
 
     return {
