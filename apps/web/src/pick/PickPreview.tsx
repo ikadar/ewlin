@@ -20,6 +20,7 @@ import type { Task, Job } from '@flux/types';
 import { hexToTailwindColor, getColorClasses } from '../components/Tile';
 import { snapToGrid, ValidationMessage } from '../components/DragPreview';
 import { usePickState } from './PickStateContext';
+import { useGetSnapshotQuery } from '../store';
 
 /**
  * Get color class for ring state display.
@@ -95,8 +96,11 @@ function PickPreviewInner({ task, job, validationMessage, debugInfo }: PickPrevi
   const tailwindColor = hexToTailwindColor(job.color);
   const colors = getColorClasses(tailwindColor);
 
-  // Get station name for internal tasks
-  const stationName = task.type === 'Internal' ? task.stationId : 'Outsourced';
+  // Resolve station name from snapshot (instead of showing UUID)
+  const { data: snapshotData } = useGetSnapshotQuery();
+  const stationName = task.type === 'Internal'
+    ? (snapshotData?.stations.find(s => s.id === task.stationId)?.name ?? task.stationId)
+    : 'Outsourced';
 
   // Format duration
   const formatDuration = (): string => {
