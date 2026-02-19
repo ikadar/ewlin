@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
-import { X, Pencil } from 'lucide-react';
+import { X, Pencil, Trash2 } from 'lucide-react';
 import { JobInfo } from './JobInfo';
 import { TaskList } from './TaskList';
 import { getTasksForJob } from '../../utils/taskHelpers';
@@ -50,6 +51,8 @@ export interface JobDetailsPanelProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** v0.5.13b: Callback when edit button is clicked */
   onEditJob?: () => void;
+  /** Callback when delete is confirmed */
+  onDeleteJob?: () => void;
 }
 
 /**
@@ -76,7 +79,10 @@ export function JobDetailsPanel({
   onDepartureChange,
   onReturnChange,
   onEditJob,
+  onDeleteJob,
 }: JobDetailsPanelProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   // Don't render if no job selected
   if (!job) {
     return null;
@@ -123,6 +129,47 @@ export function JobDetailsPanel({
       {/* Job details - simple key-value list */}
       <div className="px-3 pb-3 border-b border-white/5 space-y-2.5 text-sm">
         <JobInfo job={job} onDateClick={onDateClick} />
+
+        {/* Delete job - below départ date */}
+        {onDeleteJob && (
+          <div className="pt-1">
+            {showDeleteConfirm ? (
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-400">
+                  Supprimer <span className="font-medium text-zinc-200">{job.reference}</span> et toutes ses données ?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      onDeleteJob();
+                      setShowDeleteConfirm(false);
+                    }}
+                    className="flex-1 px-2 py-1.5 text-xs font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded transition-colors"
+                    data-testid="job-delete-confirm"
+                  >
+                    Supprimer
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
+                    data-testid="job-delete-cancel"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400 transition-colors"
+                data-testid="job-delete-button"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Supprimer ce job</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Task tiles grouped by element */}

@@ -973,6 +973,41 @@ const handleUpdateJob = async (
 };
 
 // ============================================================================
+// Delete Job Handler
+// ============================================================================
+
+/**
+ * DELETE /jobs/:jobId - Delete a job and all related data
+ */
+const handleDeleteJob = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const job = currentSnapshot.jobs.find((j) => j.id === jobId);
+  if (!job) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const jobElementIds = new Set(job.elementIds);
+  const jobTaskIds = new Set(job.taskIds);
+
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    jobs: snapshot.jobs.filter((j) => j.id !== jobId),
+    elements: snapshot.elements.filter((e) => !jobElementIds.has(e.id)),
+    tasks: snapshot.tasks.filter((t) => !jobTaskIds.has(t.id)),
+    assignments: snapshot.assignments.filter((a) => !jobTaskIds.has(a.taskId)),
+  }));
+
+  return { data: {} };
+};
+
+// ============================================================================
 // Station Compact Handler
 // ============================================================================
 
@@ -1286,6 +1321,7 @@ const routes: MockRoute[] = [
   { method: 'GET', pattern: /^\/jobs\/lookup-by-reference/, handler: handleLookupByReference },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
   { method: 'PUT', pattern: /^\/jobs\/[^/]+$/, handler: handleUpdateJob },
+  { method: 'DELETE', pattern: /^\/jobs\/[^/]+$/, handler: handleDeleteJob },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },

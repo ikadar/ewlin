@@ -190,6 +190,20 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Delete a job and all related data (elements, tasks, assignments).
+     *
+     * Mock mode: Removes job, elements, tasks, assignments from snapshot
+     * Real mode: DELETE /jobs/{id} (cascade via Doctrine ORM)
+     */
+    deleteJob: builder.mutation<void, string>({
+      query: (jobId) => ({
+        url: `/jobs/${jobId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
      * Assign a task to a station or provider.
      *
      * Mock mode: mockBaseQuery handles this
@@ -443,6 +457,7 @@ export const {
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
   useUpdateJobMutation,
+  useDeleteJobMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,

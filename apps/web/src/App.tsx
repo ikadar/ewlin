@@ -16,7 +16,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -277,6 +277,7 @@ function AppContent() {
   const [compactStation] = useCompactStationMutation();
   const [createJob] = useCreateJobMutation();
   const [updateJob] = useUpdateJobMutation();
+  const [deleteJob] = useDeleteJobMutation();
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -687,6 +688,16 @@ function AppContent() {
     // Open modal via URL navigation
     navigate('/job/new');
   }, [selectedJob, snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, navigate]);
+
+  const handleDeleteJob = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      await deleteJob(selectedJobId).unwrap();
+      setSelectedJobId(null);
+    } catch (err) {
+      showToast(`Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`, 'error');
+    }
+  }, [selectedJobId, deleteJob, setSelectedJobId, showToast]);
 
   // REQ-14: Calculate grid/DateStrip start date (6 days before today)
   const gridStartDate = useMemo(() => {
@@ -1955,6 +1966,7 @@ function AppContent() {
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}
           onEditJob={handleEditJob}
+          onDeleteJob={handleDeleteJob}
         />
         <DateStrip
           startDate={gridStartDate}

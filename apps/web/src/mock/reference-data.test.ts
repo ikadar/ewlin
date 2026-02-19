@@ -21,13 +21,18 @@ import {
 // ============================================================================
 
 describe('PAPER_TYPES', () => {
-  it('has 5 paper types', () => {
-    expect(PAPER_TYPES).toHaveLength(5);
+  it('has 9 paper types', () => {
+    expect(PAPER_TYPES).toHaveLength(9);
   });
 
-  it('each paper type has 14 grammages', () => {
-    for (const paper of PAPER_TYPES) {
-      expect(paper.grammages).toHaveLength(14);
+  it('each paper type has correct grammages count', () => {
+    const standard = PAPER_TYPES.filter((p) => !p.type.startsWith('Autocopiant'));
+    const autocopiant = PAPER_TYPES.filter((p) => p.type.startsWith('Autocopiant'));
+    for (const paper of standard) {
+      expect(paper.grammages).toHaveLength(16);
+    }
+    for (const paper of autocopiant) {
+      expect(paper.grammages).toHaveLength(4);
     }
   });
 
@@ -60,6 +65,7 @@ describe('PAPER_TYPES', () => {
     expect(types).toContain('Couché brillant');
     expect(types).toContain('Offset');
     expect(types).toContain('Laser');
+    expect(types).toContain('Autocopiant');
   });
 });
 

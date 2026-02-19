@@ -78,6 +78,7 @@ export {
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
   useUpdateJobMutation,
+  useDeleteJobMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
