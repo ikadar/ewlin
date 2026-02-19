@@ -44,11 +44,13 @@ const START_HOUR = 0;
  * Used when a test fixture is active to verify workflow-guided suggestions.
  * @see docs/releases/v0.4.22-jcf-sequence-workflow-suggestions.md
  */
-const TEST_SEQUENCE_WORKFLOW = [
-  'Presses Offset', // Step 0: Print (matches fixture category name)
-  'Massicots', // Step 1: Cutting
-  'Plieuses', // Step 2: Folding
-  'Conditionnement', // Step 3: Packaging
+const TEST_SEQUENCE_WORKFLOWS = [
+  [
+    'Presses Offset', // Step 0: Print (matches fixture category name)
+    'Massicots', // Step 1: Cutting
+    'Plieuses', // Step 2: Folding
+    'Conditionnement', // Step 3: Packaging
+  ],
 ];
 // v0.3.46: Restored to 365 days with virtual scrolling for performance
 const DAY_COUNT = 365;
@@ -375,8 +377,8 @@ function AppContent() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
 
-  // v0.4.31: Sequence workflow from selected template (template-free mode when empty)
-  const [sequenceWorkflow, setSequenceWorkflow] = useState<string[]>([]);
+  // v0.4.31: Sequence workflow from selected template (per-element, template-free mode when empty)
+  const [sequenceWorkflows, setSequenceWorkflows] = useState<string[][]>([]);
 
   // v0.4.34: Template editor modal state
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
@@ -438,7 +440,7 @@ function AppContent() {
       setJcfQuantity('');
       setJcfDeadline('');
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
-      setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
+      setSequenceWorkflows([]); // v0.4.31: Reset workflow on save
       setIsEditMode(false); // v0.5.13b: Reset edit mode
       setEditingJobId(null);
     } catch (error) {
@@ -465,7 +467,7 @@ function AppContent() {
     setJcfQuantity('');
     setJcfDeadline('');
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
-    setSequenceWorkflow([]); // v0.4.31: Reset workflow on close
+    setSequenceWorkflows([]); // v0.4.31: Reset workflow on close
     setJcfSaveError(null); // v0.4.33: Reset API error on close
     setIsEditMode(false); // v0.5.13b: Reset edit mode on close
     setEditingJobId(null);
@@ -480,12 +482,17 @@ function AppContent() {
   const handleTemplateSave = useCallback(async (data: TemplateEditorData & { id?: string }) => {
     setIsTemplateSaving(true);
     try {
+      // Derive sequenceWorkflow from each element's sequence (abstract category names)
+      const elementsWithWorkflow = data.elements.map(el => ({
+        ...el,
+        sequenceWorkflow: el.sequence.split('\n').map(s => s.trim()).filter(Boolean),
+      }));
       const templateData = {
         name: data.name,
         description: data.description,
         category: data.category,
         clientName: data.clientName,
-        elements: data.elements,
+        elements: elementsWithWorkflow,
       };
       if (data.id) {
         await updateTemplate({ id: data.id, body: templateData }).unwrap();
@@ -511,11 +518,11 @@ function AppContent() {
     if (!template) {
       // Clear template - reset to default state
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
-      setSequenceWorkflow([]);
+      setSequenceWorkflows([]);
       return;
     }
 
-    // Convert JcfTemplateElement to JcfElement
+    // Convert JcfTemplateElement to JcfElement — sequence starts empty (workflow guides the user)
     const newElements: JcfElement[] = template.elements.map(el => ({
       name: el.name,
       precedences: el.precedences,
@@ -529,15 +536,18 @@ function AppContent() {
       autres: el.autres,
       qteFeuilles: el.qteFeuilles,
       commentaires: el.commentaires,
-      sequence: el.sequence,
+      sequence: '',  // Empty — not the template's abstract workflow categories
       sequenceWorkflow: el.sequenceWorkflow,
     }));
     setJcfElements(newElements.length > 0 ? newElements : [{ ...DEFAULT_ELEMENT }]);
     setJcfTemplate(template.name);
 
-    // v0.4.31: Extract workflow from first element's sequenceWorkflow (if available)
-    const firstElementWorkflow = template.elements[0]?.sequenceWorkflow;
-    setSequenceWorkflow(firstElementWorkflow ?? []);
+    // Derive per-element workflows from each element's sequence (abstract category names)
+    setSequenceWorkflows(
+      template.elements.map(el =>
+        el.sequence.split('\n').map(s => s.trim()).filter(Boolean)
+      ),
+    );
 
     // Also set client if the template has one
     if (template.clientName && !jcfClient) {
@@ -679,7 +689,7 @@ function AppContent() {
     // Set edit mode state
     setIsEditMode(true);
     setEditingJobId(selectedJob.id);
-    setSequenceWorkflow([]);
+    setSequenceWorkflows([]);
     setJcfSaveError(null);
 
     // Open modal via URL navigation
@@ -2070,7 +2080,7 @@ function AppContent() {
             elements={jcfElements}
             onElementsChange={setJcfElements}
             postePresets={snapshotPostes}
-            sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : sequenceWorkflow}
+            sequenceWorkflows={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOWS : sequenceWorkflows}
             jobQuantity={jcfQuantity}
             onSaveAttemptRef={jcfSaveAttemptRef}
           />
@@ -2083,7 +2093,8 @@ function AppContent() {
         onSave={handleTemplateSave}
         onCancel={handleTemplateEditorCancel}
         isSaving={isTemplateSaving}
-        initialElements={jcfElements.filter(el => el.name.trim() !== '').map(el => ({
+        postePresets={snapshotPostes}
+        initialElements={jcfElements.filter(el => el.name.trim() !== '').map((el, i) => ({
           name: el.name,
           precedences: el.precedences,
           quantite: el.quantite,
@@ -2096,7 +2107,7 @@ function AppContent() {
           autres: el.autres,
           qteFeuilles: el.qteFeuilles,
           commentaires: el.commentaires,
-          sequence: el.sequence,
+          sequence: sequenceWorkflows[i]?.length > 0 ? sequenceWorkflows[i].join('\n') : '',
         }))}
         initialClientName={jcfClient}
       />

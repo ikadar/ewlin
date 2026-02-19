@@ -13,6 +13,7 @@ import { JcfTemplateList } from '../components/JcfTemplateList/JcfTemplateList';
 import { JcfTemplateEditorModal } from '../components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from '../components/JcfTemplateEditorModal';
 import { useGetTemplatesQuery, useUpdateTemplateMutation, useDeleteTemplateMutation } from '../store/api/templateApi';
+import { useGetSnapshotQuery } from '../store';
 
 export function TemplatesPage() {
   const navigate = useNavigate();
@@ -27,8 +28,19 @@ export function TemplatesPage() {
   const { data, isLoading, error } = useGetTemplatesQuery();
   const [updateTemplate, { isLoading: isUpdating }] = useUpdateTemplateMutation();
   const [deleteTemplate] = useDeleteTemplateMutation();
+  const { data: snapshotData } = useGetSnapshotQuery();
 
   const templates = data?.items ?? [];
+
+  // Derive poste presets from snapshot (for template sequence autocomplete)
+  const snapshotPostes = useMemo(() => {
+    if (!snapshotData) return [];
+    const catNameMap = new Map(snapshotData.categories.map(c => [c.id, c.name]));
+    return snapshotData.stations.map(s => ({
+      name: s.name.replace(/\s+/g, ''),
+      category: catNameMap.get(s.categoryId) ?? '',
+    }));
+  }, [snapshotData]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -83,6 +95,11 @@ export function TemplatesPage() {
   const handleEditorSave = useCallback(async (data: TemplateEditorData & { id?: string }) => {
     if (!data.id) return;
     try {
+      // Derive sequenceWorkflow from each element's sequence (abstract category names)
+      const elementsWithWorkflow = data.elements.map(el => ({
+        ...el,
+        sequenceWorkflow: el.sequence.split('\n').map(s => s.trim()).filter(Boolean),
+      }));
       await updateTemplate({
         id: data.id,
         body: {
@@ -90,7 +107,7 @@ export function TemplatesPage() {
           description: data.description,
           category: data.category,
           clientName: data.clientName,
-          elements: data.elements,
+          elements: elementsWithWorkflow,
         },
       }).unwrap();
       setEditingTemplate(null);
@@ -193,6 +210,7 @@ export function TemplatesPage() {
         onSave={handleEditorSave}
         onCancel={handleEditorCancel}
         isSaving={isUpdating}
+        postePresets={snapshotPostes}
       />
 
       {/* Delete confirmation dialog */}

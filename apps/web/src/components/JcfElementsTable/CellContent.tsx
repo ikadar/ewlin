@@ -3,13 +3,14 @@
  * Extracted from JcfElementsTable to reduce cognitive complexity
  */
 
+import { useMemo } from 'react';
 import { Calculator } from 'lucide-react';
 import type { JcfFieldKey, JcfLinkableField } from '../../types';
-import type { SequenceWorkflow } from './useSequenceWorkflow';
 import type { SessionLearning } from './useSessionLearning';
 import type { LinkPropagationState } from './useLinkPropagation';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
 import type { PostePresetLike } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
+import { WorkflowSequenceAutocomplete } from '../WorkflowSequenceAutocomplete/WorkflowSequenceAutocomplete';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete/JcfFormatAutocomplete';
 import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete/JcfImpressionAutocomplete';
 import { JcfSurfacageAutocomplete } from '../JcfSurfacageAutocomplete/JcfSurfacageAutocomplete';
@@ -26,12 +27,15 @@ import {
   SURFACAGE_PRESETS,
   PAPER_TYPES,
   FEUILLE_FORMATS,
+  POSTE_CATEGORIES,
 } from '../../mock/reference-data';
+import type { JcfMode } from './requiredFields';
 import { createTabOutHandler, createArrowNavHandler } from './navigationUtils';
 
 export interface CellContentProps {
   rowKey: JcfFieldKey;
   value: string;
+  mode?: JcfMode;
   isEmpty: boolean;
   isTextarea: boolean;
   isNumeric: boolean;
@@ -50,7 +54,7 @@ export interface CellContentProps {
   elementNames: string[];
   currentElementName: string;
   postePresets: ReadonlyArray<PostePresetLike>;
-  sequenceWorkflow: SequenceWorkflow;
+  sequenceWorkflow?: string[];
   sessionLearning: SessionLearning;
   linkPropagation: LinkPropagationState;
   focusCell: (elementIndex: number, rowIndex: number) => void;
@@ -79,6 +83,37 @@ function SequenceCell(props: CellContentProps) {
       sessionSoustraitants={sessionLearning.soustraitants}
       onLearnSoustraitant={sessionLearning.learnSoustraitant}
       sequenceWorkflow={sequenceWorkflow}
+      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
+      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
+      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
+      onBlur={() => markFieldTouched(elementIndex, 'sequence')}
+    />
+  );
+}
+
+/** Render workflow sequence autocomplete cell (template mode — categories instead of machine names) */
+function WorkflowSequenceCell(props: CellContentProps) {
+  const { cellId, value, inputFilledClass, elementIndex, rowIndex, rowCount, elementCount } = props;
+  const { postePresets, focusCell, handleCellChange, markFieldTouched } = props;
+
+  // Derive unique category names from postePresets (snapshot-based, single source of truth)
+  const categories = useMemo(() => {
+    const seen = new Set<string>();
+    return postePresets
+      .map(p => p.category)
+      .filter(c => {
+        if (!c || seen.has(c)) return false;
+        seen.add(c);
+        return true;
+      });
+  }, [postePresets]);
+
+  return (
+    <WorkflowSequenceAutocomplete
+      id={cellId}
+      value={value}
+      onChange={(v) => handleCellChange(elementIndex, 'sequence', v)}
+      categories={categories.length > 0 ? categories : POSTE_CATEGORIES}
       inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
       onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
       onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
@@ -332,10 +367,13 @@ const LINKABLE_FIELDS = ['format', 'impression', 'surfacage', 'papier', 'imposit
  * CellContent - Main component that renders the appropriate cell type
  */
 export function CellContent(props: CellContentProps) {
-  const { rowKey, isTextarea, isQteFeuilles } = props;
+  const { rowKey, mode, isTextarea, isQteFeuilles } = props;
 
-  // Sequence field
+  // Sequence field — template mode uses category autocomplete, job mode uses machine DSL
   if (rowKey === 'sequence') {
+    if (mode === 'template') {
+      return <WorkflowSequenceCell {...props} />;
+    }
     return <SequenceCell {...props} />;
   }
 

@@ -67,11 +67,11 @@ export interface JcfElementsTableProps {
   /** Poste presets for sequence autocomplete (from snapshot or reference data) */
   postePresets?: ReadonlyArray<PostePresetLike>;
   /**
-   * Workflow-guided suggestion ordering for sequence autocomplete.
-   * Array of expected production step categories in order.
+   * Per-element workflow-guided suggestion ordering for sequence autocomplete.
+   * Outer array indexed by element, inner array is expected production step categories in order.
    * @see JcfSequenceAutocompleteProps.sequenceWorkflow
    */
-  sequenceWorkflow?: string[];
+  sequenceWorkflows?: string[][];
   /** Job quantity for qteFeuilles auto-calculation */
   jobQuantity?: string;
   /** Mode: 'job' shows required indicators, 'template' does not */
@@ -93,7 +93,7 @@ export function JcfElementsTable({
   elements,
   onElementsChange,
   postePresets = [],
-  sequenceWorkflow,
+  sequenceWorkflows,
   jobQuantity = '',
   mode = 'job',
   onSaveAttemptRef,
@@ -158,7 +158,7 @@ export function JcfElementsTable({
     () =>
       hasAttemptedSubmit
         ? validateAllForSubmit(elements, mode)
-        : validateAllElements(elements, touchedFields),
+        : validateAllElements(elements, touchedFields, mode),
     [elements, touchedFields, hasAttemptedSubmit, mode],
   );
 
@@ -607,6 +607,7 @@ export function JcfElementsTable({
                   <CellContent
                     rowKey={row.key}
                     value={value}
+                    mode={mode}
                     isEmpty={isEmpty}
                     isTextarea={isTextarea}
                     isNumeric={isNumeric}
@@ -625,7 +626,7 @@ export function JcfElementsTable({
                     elementNames={elementNames}
                     currentElementName={element.name}
                     postePresets={postePresets}
-                    sequenceWorkflow={sequenceWorkflow}
+                    sequenceWorkflow={sequenceWorkflows?.[elementIndex]}
                     sessionLearning={sessionLearning}
                     linkPropagation={linkPropagation}
                     focusCell={focusCell}

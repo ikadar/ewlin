@@ -215,6 +215,8 @@ interface ValidateElementOptions {
   useStrictSequence?: boolean;
   /** Set of all valid element names for precedences validation */
   validElementNames?: Set<string>;
+  /** Mode: template mode skips sequence DSL validation (categories, not machine DSL) */
+  mode?: JcfMode;
 }
 
 /**
@@ -233,7 +235,7 @@ export function validateElementLive(
   // Backward compatibility: accept boolean for useStrictSequence
   const opts: ValidateElementOptions =
     typeof options === 'boolean' ? { useStrictSequence: options } : options;
-  const { useStrictSequence = false, validElementNames } = opts;
+  const { useStrictSequence = false, validElementNames, mode } = opts;
 
   const errors: ValidationError[] = [];
 
@@ -298,17 +300,20 @@ export function validateElementLive(
   }
 
   // Sequence validation (lenient or strict based on parameter)
-  const sequenceValid = useStrictSequence
-    ? isValidSequenceStrict(element.sequence)
-    : isValidSequenceLenient(element.sequence);
+  // Template mode: sequence contains abstract category names, skip DSL validation
+  if (mode !== 'template') {
+    const sequenceValid = useStrictSequence
+      ? isValidSequenceStrict(element.sequence)
+      : isValidSequenceLenient(element.sequence);
 
-  if (element.sequence && !sequenceValid) {
-    errors.push({
-      elementIndex: index,
-      field: 'sequence',
-      message: MESSAGES.sequence,
-      type: 'live',
-    });
+    if (element.sequence && !sequenceValid) {
+      errors.push({
+        elementIndex: index,
+        field: 'sequence',
+        message: MESSAGES.sequence,
+        type: 'live',
+      });
+    }
   }
 
   // Precedences validation (only if validElementNames is provided)
@@ -341,6 +346,7 @@ export function validateElementLive(
 export function validateAllElements(
   elements: JcfElement[],
   touchedFields: Set<string> = new Set(),
+  mode: JcfMode = 'job',
 ): Map<string, ValidationError> {
   const errorMap = new Map<string, ValidationError>();
 
@@ -352,6 +358,7 @@ export function validateAllElements(
     const errors = validateElementLive(element, index, {
       useStrictSequence: sequenceTouched,
       validElementNames,
+      mode,
     });
     errors.forEach((error) => {
       const key = `${error.elementIndex}-${error.field}`;
@@ -401,6 +408,7 @@ export function validateForSubmit(
     const dslErrors = validateElementLive(element, index, {
       useStrictSequence: true,
       validElementNames,
+      mode,
     });
     errors.push(...dslErrors);
 
