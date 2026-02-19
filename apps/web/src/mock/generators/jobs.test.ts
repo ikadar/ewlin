@@ -136,10 +136,10 @@ describe('generateJobs', () => {
     }
   });
 
-  it('workshopExitDate is valid ISO date', () => {
+  it('workshopExitDate is valid ISO datetime', () => {
     const result = generateJobs({ count: 5 });
     for (const job of result.jobs) {
-      expect(job.workshopExitDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(job.workshopExitDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
       const date = new Date(job.workshopExitDate);
       expect(date.toString()).not.toBe('Invalid Date');
     }

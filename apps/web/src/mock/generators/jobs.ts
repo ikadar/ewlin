@@ -18,7 +18,7 @@ import type {
   BatStatus,
   PlateStatus,
 } from '@flux/types';
-import { SHIPPING_DEPARTURE_HOUR } from '@flux/types';
+import { SHIPPING_DEPARTURE_HOUR, getDeadlineDate } from '@flux/types';
 import { createElement, getElementIdForJob } from './elements';
 
 // ============================================================================
@@ -284,7 +284,7 @@ function generateJob(options: GenerateJobOptions): { job: Job; element: Element;
     client,
     description: `${description} - ${quantity} ex`,
     status,
-    workshopExitDate: formatDate(workshopExitDate),
+    workshopExitDate: `${formatDate(workshopExitDate)}T${String(SHIPPING_DEPARTURE_HOUR).padStart(2, '0')}:00`,
     fullyScheduled,
     color: JOB_COLORS[index % JOB_COLORS.length],
     paperType: randomElement(PAPER_TYPES),
@@ -391,8 +391,7 @@ export function identifyLateJobs(jobs: Job[], tasks?: Task[], assignments?: Task
   }
 
   for (const job of jobs) {
-    const deadline = new Date(job.workshopExitDate);
-    deadline.setHours(SHIPPING_DEPARTURE_HOUR, 0, 0, 0);
+    const deadline = getDeadlineDate(job.workshopExitDate);
 
     let isLate = false;
     let latestEnd: Date | null = null;

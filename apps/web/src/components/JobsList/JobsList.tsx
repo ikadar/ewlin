@@ -135,12 +135,20 @@ export function JobsList({
     return { problemJobs: problems, normalJobs: normal, getProblemType: getType };
   }, [filteredJobs, lateJobIds, conflictJobIds]);
 
-  // Format date as DD/MM
+  // Format date as DD/MM HH:mm
   const formatDeadline = (dateStr: string): string => {
+    if (dateStr.includes('T')) {
+      const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+      if (match) {
+        const [, , month, day, hours, minutes] = match;
+        return `${day}/${month} ${hours}:${minutes}`;
+      }
+    }
+    // Date-only fallback
     const date = new Date(dateStr);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    return `${day}/${month}`;
+    return `${day}/${month} 14:00`;
   };
 
   const renderJobCard = (job: Job) => {

@@ -181,7 +181,12 @@ export function JcfJobHeader({
   };
 
   const deadlineDisplay = deadline.includes('-') ? formatToFrench(deadline) : deadline;
-  const deadlineNativeValue = deadline.includes('-') ? deadline : parseFrenchDate(deadline);
+  // Native datetime-local expects YYYY-MM-DDTHH:mm
+  const parsedDeadline = deadline.includes('-') ? deadline : parseFrenchDate(deadline);
+  // Ensure date-only values get a time for datetime-local
+  const deadlineNativeValue = parsedDeadline && !parsedDeadline.includes('T')
+    ? `${parsedDeadline}T14:00`
+    : parsedDeadline;
 
   return (
     <div
@@ -277,7 +282,7 @@ export function JcfJobHeader({
         </div>
 
         {/* Deadline */}
-        <div className="w-[117px]">
+        <div className="w-[156px]">
           <label htmlFor="jcf-deadline" className={labelClass}>
             Deadline
           </label>
@@ -286,7 +291,7 @@ export function JcfJobHeader({
               ref={deadlineInputRef}
               id="jcf-deadline"
               type="text"
-              placeholder="jj/mm"
+              placeholder="jj/mm 14:00"
               value={deadlineDisplay}
               onChange={(e) => onDeadlineChange(e.target.value)}
               onBlur={handleDeadlineBlur}
@@ -295,7 +300,7 @@ export function JcfJobHeader({
               data-testid="jcf-field-deadline"
             />
             <input
-              type="date"
+              type="datetime-local"
               aria-hidden="true"
               value={deadlineNativeValue}
               onChange={handleNativeDateChange}
