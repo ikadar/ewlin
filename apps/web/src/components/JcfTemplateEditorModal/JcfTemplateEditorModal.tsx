@@ -366,7 +366,7 @@ function TemplateEditorContent({
       aria-label="Close modal"
     >
       <div
-        className="w-[70vw] max-w-[1400px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
+        className="w-[95vw] max-w-[2200px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
         data-testid="template-editor-dialog"
       >
         {/* Header */}
