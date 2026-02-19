@@ -79,6 +79,7 @@ export {
   useCreateJobMutation,
   useUpdateJobMutation,
   useDeleteJobMutation,
+  useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,

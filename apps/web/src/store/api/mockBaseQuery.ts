@@ -1308,6 +1308,50 @@ const handleLookupByReference = async (
   };
 };
 
+/**
+ * PUT /elements/:elementId/prerequisites - Update element prerequisite status
+ */
+const handleUpdateElementStatus = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const elementId = extractPathParam(args.url, /\/elements\/([^/]+)\/prerequisites$/);
+  if (!elementId) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing element ID' } } } };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const element = currentSnapshot.elements.find((e) => e.id === elementId);
+  if (!element) {
+    return { error: { status: 404, data: { error: { code: 'NOT_FOUND', message: 'Element not found' } } } };
+  }
+
+  const body = args.body as Record<string, string> | undefined;
+  if (!body) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing body' } } } };
+  }
+
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    elements: snapshot.elements.map((e) =>
+      e.id === elementId
+        ? { ...e, ...body, updatedAt: new Date().toISOString() }
+        : e
+    ),
+  }));
+
+  const updated = getSnapshot().elements.find((e) => e.id === elementId)!;
+  return {
+    data: {
+      elementId: updated.id,
+      paperStatus: updated.paperStatus,
+      batStatus: updated.batStatus,
+      plateStatus: updated.plateStatus,
+      formeStatus: updated.formeStatus,
+      isBlocked: false,
+    },
+  };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
@@ -1322,6 +1366,9 @@ const routes: MockRoute[] = [
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
   { method: 'PUT', pattern: /^\/jobs\/[^/]+$/, handler: handleUpdateJob },
   { method: 'DELETE', pattern: /^\/jobs\/[^/]+$/, handler: handleDeleteJob },
+
+  // Elements
+  { method: 'PUT', pattern: /^\/elements\/[^/]+\/prerequisites$/, handler: handleUpdateElementStatus },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },

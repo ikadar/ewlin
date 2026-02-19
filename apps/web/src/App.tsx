@@ -16,7 +16,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useUpdateElementStatusMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -278,6 +278,7 @@ function AppContent() {
   const [createJob] = useCreateJobMutation();
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
+  const [updateElementStatus] = useUpdateElementStatusMutation();
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -1133,31 +1134,14 @@ function AppContent() {
   }, [snapshot.assignments, unassignTask, showToast]);
 
   // v0.4.32a: Handle element prerequisite status change
-  const handleElementStatusChange = useCallback((update: ElementStatusUpdate) => {
-    updateSnapshot((currentSnapshot) => {
-      const elementIndex = currentSnapshot.elements.findIndex((e) => e.id === update.elementId);
-      if (elementIndex === -1) {
-        console.warn('Element not found for status update:', update.elementId);
-        return currentSnapshot;
-      }
-
-      console.log('Updating element status:', update);
-
-      // Create new elements array with updated element
-      const newElements = [...currentSnapshot.elements];
-      newElements[elementIndex] = {
-        ...newElements[elementIndex],
-        [update.field]: update.value,
-        updatedAt: new Date().toISOString(),
-      };
-
-      return {
-        ...currentSnapshot,
-        elements: newElements,
-      };
-    });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+  const handleElementStatusChange = useCallback(async (update: ElementStatusUpdate) => {
+    try {
+      await updateElementStatus(update).unwrap();
+    } catch (err) {
+      console.error('Failed to update element status:', err);
+      showToast(getErrorMessage(err));
+    }
+  }, [updateElementStatus, showToast]);
 
   // v0.5.11: Handle outsourcing work days change (local state only)
   const handleOutsourcingWorkDaysChange = useCallback((taskId: string, workDays: number) => {
