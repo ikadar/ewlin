@@ -88,7 +88,7 @@ export {
   scheduleApi,
 } from './api/scheduleApi';
 
-export { useGetTemplatesQuery, useUpdateTemplateMutation, templateApi } from './api/templateApi';
+export { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation, templateApi } from './api/templateApi';
 
 export {
   useGetClientsQuery,

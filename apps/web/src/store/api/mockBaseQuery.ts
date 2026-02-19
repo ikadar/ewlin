@@ -28,9 +28,12 @@ import type {
   ElementSpec,
   Task,
   ReferenceLookupResponse,
+  JcfTemplateCreateInput,
+  JcfTemplateUpdateInput,
 } from '@flux/types';
 import { DRY_TIME_MS } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
+import { createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
 import { normalizeError, createNotFoundError } from './errorNormalization';
@@ -1352,6 +1355,60 @@ const handleUpdateElementStatus = async (
   };
 };
 
+/**
+ * POST /templates - Create a template
+ */
+const handleCreateTemplate = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const body = args.body as JcfTemplateCreateInput;
+  try {
+    const template = await mockCreateTemplate(body);
+    return { data: template };
+  } catch (e) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: String(e) } } } };
+  }
+};
+
+/**
+ * PUT /templates/:id - Update a template
+ */
+const handleUpdateTemplate = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/templates\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing template ID' } } } };
+  }
+
+  const body = args.body as JcfTemplateUpdateInput;
+  try {
+    const template = await mockUpdateTemplate(id, body);
+    return { data: template };
+  } catch {
+    return { error: { status: 404, data: { error: { code: 'NOT_FOUND', message: 'Template not found' } } } };
+  }
+};
+
+/**
+ * DELETE /templates/:id - Delete a template
+ */
+const handleDeleteTemplate = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/templates\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing template ID' } } } };
+  }
+
+  try {
+    mockDeleteTemplate(id);
+    return { data: {} };
+  } catch {
+    return { error: { status: 404, data: { error: { code: 'NOT_FOUND', message: 'Template not found' } } } };
+  }
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
@@ -1369,6 +1426,11 @@ const routes: MockRoute[] = [
 
   // Elements
   { method: 'PUT', pattern: /^\/elements\/[^/]+\/prerequisites$/, handler: handleUpdateElementStatus },
+
+  // Templates
+  { method: 'POST', pattern: /^\/templates$/, handler: handleCreateTemplate },
+  { method: 'PUT', pattern: /^\/templates\/[^/]+$/, handler: handleUpdateTemplate },
+  { method: 'DELETE', pattern: /^\/templates\/[^/]+$/, handler: handleDeleteTemplate },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },

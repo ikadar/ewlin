@@ -6,7 +6,7 @@
  */
 
 import { createApi } from '@reduxjs/toolkit/query/react';
-import type { JcfTemplate, JcfTemplateUpdateInput } from '@flux/types';
+import type { JcfTemplate, JcfTemplateCreateInput, JcfTemplateUpdateInput } from '@flux/types';
 import { baseQueryWithFixtureSupport } from './baseApi';
 
 interface TemplateListResponse {
@@ -26,6 +26,14 @@ export const templateApi = createApi({
       query: () => '/templates?limit=100',
       providesTags: ['Templates'],
     }),
+    createTemplate: builder.mutation<JcfTemplate, JcfTemplateCreateInput>({
+      query: (body) => ({
+        url: '/templates',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Templates'],
+    }),
     updateTemplate: builder.mutation<JcfTemplate, { id: string; body: JcfTemplateUpdateInput }>({
       query: ({ id, body }) => ({
         url: `/templates/${id}`,
@@ -34,7 +42,14 @@ export const templateApi = createApi({
       }),
       invalidatesTags: ['Templates'],
     }),
+    deleteTemplate: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/templates/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Templates'],
+    }),
   }),
 });
 
-export const { useGetTemplatesQuery, useUpdateTemplateMutation } = templateApi;
+export const { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation } = templateApi;

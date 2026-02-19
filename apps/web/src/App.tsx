@@ -10,13 +10,12 @@ import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
-import { createTemplate, updateTemplate } from './mock/templateApi';
 import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useUpdateElementStatusMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -279,6 +278,8 @@ function AppContent() {
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
+  const [createTemplate] = useCreateTemplateMutation();
+  const [updateTemplate] = useUpdateTemplateMutation();
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -479,30 +480,25 @@ function AppContent() {
   const handleTemplateSave = useCallback(async (data: TemplateEditorData & { id?: string }) => {
     setIsTemplateSaving(true);
     try {
+      const templateData = {
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        clientName: data.clientName,
+        elements: data.elements,
+      };
       if (data.id) {
-        await updateTemplate(data.id, {
-          name: data.name,
-          description: data.description,
-          category: data.category,
-          clientName: data.clientName,
-          elements: data.elements,
-        });
+        await updateTemplate({ id: data.id, body: templateData }).unwrap();
       } else {
-        await createTemplate({
-          name: data.name,
-          description: data.description,
-          category: data.category,
-          clientName: data.clientName,
-          elements: data.elements,
-        });
+        await createTemplate(templateData).unwrap();
       }
       setIsTemplateEditorOpen(false);
     } catch (error) {
-      console.error('Failed to save template:', error);
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setIsTemplateSaving(false);
     }
-  }, []);
+  }, [createTemplate, updateTemplate, showToast]);
 
   // v0.4.34: Handler for canceling template editor
   const handleTemplateEditorCancel = useCallback(() => {

@@ -12,7 +12,7 @@ import type { JcfTemplate } from '@flux/types';
 import { JcfTemplateList } from '../components/JcfTemplateList/JcfTemplateList';
 import { JcfTemplateEditorModal } from '../components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from '../components/JcfTemplateEditorModal';
-import { useGetTemplatesQuery, useUpdateTemplateMutation } from '../store/api/templateApi';
+import { useGetTemplatesQuery, useUpdateTemplateMutation, useDeleteTemplateMutation } from '../store/api/templateApi';
 
 export function TemplatesPage() {
   const navigate = useNavigate();
@@ -21,9 +21,12 @@ export function TemplatesPage() {
 
   // Template editor state
   const [editingTemplate, setEditingTemplate] = useState<JcfTemplate | null>(null);
+  // Delete confirmation state
+  const [deletingTemplate, setDeletingTemplate] = useState<JcfTemplate | null>(null);
 
   const { data, isLoading, error } = useGetTemplatesQuery();
   const [updateTemplate, { isLoading: isUpdating }] = useUpdateTemplateMutation();
+  const [deleteTemplate] = useDeleteTemplateMutation();
 
   const templates = data?.items ?? [];
 
@@ -100,6 +103,25 @@ export function TemplatesPage() {
     setEditingTemplate(null);
   }, []);
 
+  // Delete handlers
+  const handleDeleteClick = useCallback((template: JcfTemplate) => {
+    setDeletingTemplate(template);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deletingTemplate) return;
+    try {
+      await deleteTemplate(deletingTemplate.id).unwrap();
+    } catch (err) {
+      console.error('Failed to delete template:', err);
+    }
+    setDeletingTemplate(null);
+  }, [deletingTemplate, deleteTemplate]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeletingTemplate(null);
+  }, []);
+
   return (
     <div className="min-h-screen bg-zinc-900 flex flex-col">
       {/* Header */}
@@ -158,6 +180,7 @@ export function TemplatesPage() {
             <JcfTemplateList
               templates={filteredTemplates}
               onEditClick={handleEditClick}
+              onDeleteClick={handleDeleteClick}
             />
           </>
         )}
@@ -171,6 +194,34 @@ export function TemplatesPage() {
         onCancel={handleEditorCancel}
         isSaving={isUpdating}
       />
+
+      {/* Delete confirmation dialog */}
+      {deletingTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h2 className="text-zinc-100 font-medium mb-2">Supprimer le template</h2>
+            <p className="text-sm text-zinc-400 mb-4">
+              Supprimer <span className="font-medium text-zinc-200">{deletingTemplate.name}</span> ?
+              Cette action est irréversible.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={handleDeleteCancel}
+                className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 bg-zinc-700 hover:bg-zinc-600 rounded transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="px-3 py-1.5 text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded transition-colors"
+                data-testid="template-delete-confirm"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
