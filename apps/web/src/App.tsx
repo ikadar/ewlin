@@ -538,6 +538,7 @@ function AppContent() {
       commentaires: el.commentaires,
       sequence: '',  // Empty — not the template's abstract workflow categories
       sequenceWorkflow: el.sequenceWorkflow,
+      links: el.links,
     }));
     setJcfElements(newElements.length > 0 ? newElements : [{ ...DEFAULT_ELEMENT }]);
     setJcfTemplate(template.name);

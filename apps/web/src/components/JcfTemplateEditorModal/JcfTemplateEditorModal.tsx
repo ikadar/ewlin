@@ -85,6 +85,7 @@ function convertElement<T extends JcfElement | JcfTemplateElement>(el: T): T {
     qteFeuilles: el.qteFeuilles,
     commentaires: el.commentaires,
     sequence: el.sequence,
+    links: el.links,
   } as T;
 }
 
