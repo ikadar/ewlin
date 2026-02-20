@@ -1,4 +1,4 @@
-import { LayoutGrid, Calendar, Settings, User, Users } from 'lucide-react';
+import { LayoutGrid, Calendar, Settings, User, Users, Ruler } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
@@ -50,6 +50,11 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
             icon={Users}
             label="Clients"
             onClick={() => navigate('/clients')}
+          />
+          <SidebarButton
+            icon={Ruler}
+            label="Formats"
+            onClick={() => navigate('/formats')}
           />
           <SidebarButton
             icon={Settings}

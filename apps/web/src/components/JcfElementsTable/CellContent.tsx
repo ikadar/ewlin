@@ -29,6 +29,7 @@ import {
   FEUILLE_FORMATS,
   POSTE_CATEGORIES,
 } from '../../mock/reference-data';
+import { useGetFormatsQuery } from '../../store/api/formatApi';
 import type { JcfMode } from './requiredFields';
 import { createTabOutHandler, createArrowNavHandler } from './navigationUtils';
 
@@ -145,6 +146,9 @@ function LinkableFieldCell(props: CellContentProps) {
   const { rowKey, cellId, value, isLinked, canLinkThisCell, inputFilledClass, inputLinkedClass } = props;
   const { elementIndex, rowIndex, rowCount, elementCount, sessionLearning, linkPropagation, focusCell, handleCellChange } = props;
 
+  const { data: managedFormats } = useGetFormatsQuery();
+  const formats = managedFormats ?? PRODUCT_FORMATS;
+
   const toggleLink = () => linkPropagation.toggleLink(elementIndex, rowKey as JcfLinkableField);
   const tabOutHandler = createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
   const arrowNavHandler = createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
@@ -157,7 +161,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'format', v)}
-            formats={PRODUCT_FORMATS}
+            formats={formats}
             sessionPresets={sessionLearning.productFormats}
             onLearnPreset={sessionLearning.learnProductFormat}
             inputClassName={`${inputFilledClass} text-base`}

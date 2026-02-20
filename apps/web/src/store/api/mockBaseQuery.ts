@@ -9,6 +9,8 @@
  */
 
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
+import { PRODUCT_FORMATS } from '../../mock/reference-data';
+import type { FormatResponse } from './formatApi';
 import type {
   ScheduleSnapshot,
   AssignTaskRequest,
@@ -1601,6 +1603,168 @@ const handleDeleteStationCategory = async (
   return { data: {} };
 };
 
+// ============================================================================
+// Format Handlers
+// ============================================================================
+
+/**
+ * Mock format store — initialized from PRODUCT_FORMATS reference data.
+ * Grows / shrinks as formats are created / deleted.
+ */
+let mockFormatStore: FormatResponse[] = PRODUCT_FORMATS.map((f) => ({
+  id: `format-${f.id}`,
+  name: f.name,
+  width: f.width,
+  height: f.height,
+  createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+  updatedAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+}));
+
+/**
+ * GET /formats - List all formats
+ */
+const handleGetFormats = async (): Promise<{ data: FormatResponse[] }> => {
+  return { data: mockFormatStore };
+};
+
+/**
+ * POST /formats - Create a new format
+ */
+const handleCreateFormat = async (
+  args: FetchArgs
+): Promise<{ data: FormatResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name?: string; width?: number; height?: number };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format name is required' } },
+    };
+  }
+
+  if (!body.width || body.width <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Width must be a positive integer' } },
+    };
+  }
+
+  if (!body.height || body.height <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Height must be a positive integer' } },
+    };
+  }
+
+  const exists = mockFormatStore.some((f) => f.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Format '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newFormat: FormatResponse = {
+    id: `format-${Date.now()}`,
+    name,
+    width: body.width,
+    height: body.height,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockFormatStore = [...mockFormatStore, newFormat].sort((a, b) => a.name.localeCompare(b.name));
+
+  return { data: newFormat };
+};
+
+/**
+ * PUT /formats/:id - Update a format
+ */
+const handleUpdateFormat = async (
+  args: FetchArgs
+): Promise<{ data: FormatResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const body = args.body as { name?: string; width?: number; height?: number };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format name is required' } },
+    };
+  }
+
+  if (!body.width || body.width <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Width must be a positive integer' } },
+    };
+  }
+
+  if (!body.height || body.height <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Height must be a positive integer' } },
+    };
+  }
+
+  const existing = mockFormatStore.find((f) => f.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Format not found' } } };
+  }
+
+  const duplicate = mockFormatStore.some(
+    (f) => f.id !== id && f.name.toLowerCase() === name.toLowerCase()
+  );
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Format '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: FormatResponse = {
+    ...existing,
+    name,
+    width: body.width,
+    height: body.height,
+    updatedAt: now,
+  };
+
+  mockFormatStore = mockFormatStore
+    .map((f) => (f.id === id ? updated : f))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /formats/:id - Delete a format
+ */
+const handleDeleteFormat = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const exists = mockFormatStore.some((f) => f.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Format not found' } } };
+  }
+
+  mockFormatStore = mockFormatStore.filter((f) => f.id !== id);
+
+  return { data: {} };
+};
+
 /**
  * POST /templates - Create a template
  */
@@ -1685,6 +1849,12 @@ const routes: MockRoute[] = [
   { method: 'POST',   pattern: /^\/station-categories$/,        handler: handleCreateStationCategory },
   { method: 'PUT',    pattern: /^\/station-categories\/[^/]+$/, handler: handleUpdateStationCategory },
   { method: 'DELETE', pattern: /^\/station-categories\/[^/]+$/, handler: handleDeleteStationCategory },
+
+  // Formats
+  { method: 'GET',    pattern: /^\/formats$/,          handler: handleGetFormats },
+  { method: 'POST',   pattern: /^\/formats$/,           handler: handleCreateFormat },
+  { method: 'PUT',    pattern: /^\/formats\/[^/]+$/,    handler: handleUpdateFormat },
+  { method: 'DELETE', pattern: /^\/formats\/[^/]+$/,    handler: handleDeleteFormat },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },

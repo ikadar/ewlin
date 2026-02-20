@@ -12,6 +12,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { scheduleApi } from './api/scheduleApi';
 import { templateApi } from './api/templateApi';
 import { clientApi } from './api/clientApi';
+import { stationCategoryApi } from './api/stationCategoryApi';
+import { formatApi } from './api/formatApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -25,6 +27,8 @@ export const store = configureStore({
     [scheduleApi.reducerPath]: scheduleApi.reducer,
     [templateApi.reducerPath]: templateApi.reducer,
     [clientApi.reducerPath]: clientApi.reducer,
+    [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
+    [formatApi.reducerPath]: formatApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -36,7 +40,9 @@ export const store = configureStore({
     getDefaultMiddleware()
       .concat(scheduleApi.middleware)
       .concat(templateApi.middleware)
-      .concat(clientApi.middleware),
+      .concat(clientApi.middleware)
+      .concat(stationCategoryApi.middleware)
+      .concat(formatApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -98,6 +104,24 @@ export {
   clientApi,
 } from './api/clientApi';
 export type { ClientResponse } from './api/clientApi';
+
+export {
+  useGetStationCategoriesQuery,
+  useCreateStationCategoryMutation,
+  useUpdateStationCategoryMutation,
+  useDeleteStationCategoryMutation,
+  stationCategoryApi,
+} from './api/stationCategoryApi';
+export type { StationCategoryResponse, StationCategoryInput, SimilarityCriterionInput } from './api/stationCategoryApi';
+
+export {
+  useGetFormatsQuery,
+  useCreateFormatMutation,
+  useUpdateFormatMutation,
+  useDeleteFormatMutation,
+  formatApi,
+} from './api/formatApi';
+export type { FormatResponse, FormatInput } from './api/formatApi';
 
 // Re-export slice actions
 export {

@@ -14,6 +14,7 @@ import App from './App';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { StationCategoriesPage } from './pages/StationCategoriesPage';
 import { ClientsPage } from './pages/ClientsPage';
+import { FormatsPage } from './pages/FormatsPage';
 
 /**
  * Application routes.
@@ -29,6 +30,7 @@ export function AppRoutes() {
       <Route path="/templates" element={<TemplatesPage />} />
       <Route path="/station-categories" element={<StationCategoriesPage />} />
       <Route path="/clients" element={<ClientsPage />} />
+      <Route path="/formats" element={<FormatsPage />} />
     </Routes>
   );
 }
