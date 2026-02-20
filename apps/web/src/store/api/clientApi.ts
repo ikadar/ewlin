@@ -23,6 +23,8 @@ export const clientApi = createApi({
   endpoints: (builder) => ({
     getClients: builder.query<ClientResponse[], void>({
       query: () => '/clients',
+      transformResponse: (response: ClientResponse[] | { data: ClientResponse[] }) =>
+        Array.isArray(response) ? response : (response.data ?? []),
       providesTags: ['Clients'],
     }),
     createClient: builder.mutation<ClientResponse, { name: string }>({

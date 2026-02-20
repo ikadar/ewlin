@@ -1,4 +1,4 @@
-import { LayoutGrid, Calendar, Settings, User } from 'lucide-react';
+import { LayoutGrid, Calendar, Settings, User, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
@@ -46,6 +46,11 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
 
         {/* Bottom section: Settings/User (REQ-07.3) */}
         <div className="flex flex-col items-center py-3 gap-2 border-t border-white/5">
+          <SidebarButton
+            icon={Users}
+            label="Clients"
+            onClick={() => navigate('/clients')}
+          />
           <SidebarButton
             icon={Settings}
             label="Templates"

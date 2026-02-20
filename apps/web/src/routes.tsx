@@ -12,6 +12,8 @@
 import { Routes, Route } from 'react-router-dom';
 import App from './App';
 import { TemplatesPage } from './pages/TemplatesPage';
+import { StationCategoriesPage } from './pages/StationCategoriesPage';
+import { ClientsPage } from './pages/ClientsPage';
 
 /**
  * Application routes.
@@ -25,6 +27,8 @@ export function AppRoutes() {
       <Route path="/job/new" element={<App />} />
       <Route path="/job/:jobId" element={<App />} />
       <Route path="/templates" element={<TemplatesPage />} />
+      <Route path="/station-categories" element={<StationCategoriesPage />} />
+      <Route path="/clients" element={<ClientsPage />} />
     </Routes>
   );
 }

@@ -1273,12 +1273,95 @@ const handleCreateClient = async (
   const now = new Date().toISOString();
   return {
     data: {
-      id: `client-${Date.now()}`,
+      id: `client-${name.toLowerCase().replace(/\s+/g, '-')}`,
       name,
       createdAt: now,
       updatedAt: now,
     },
   };
+};
+
+/**
+ * PUT /clients/:id - Update a client
+ */
+const handleUpdateClient = async (
+  args: FetchArgs
+): Promise<{ data: { id: string; name: string; createdAt: string; updatedAt: string } } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/clients\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing client ID' } } };
+  }
+
+  const body = args.body as { name: string };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Client name is required' },
+      },
+    };
+  }
+
+  // Find existing client by ID
+  const existingName = mockClientStore.find(
+    (n) => `client-${n.toLowerCase().replace(/\s+/g, '-')}` === id
+  );
+  if (!existingName) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Client not found' } } };
+  }
+
+  // Check for duplicate (excluding current)
+  const duplicate = mockClientStore.some(
+    (n) => n.toLowerCase() === name.toLowerCase() && n !== existingName
+  );
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Client '${name}' already exists` },
+      },
+    };
+  }
+
+  // Replace old name with new name
+  const idx = mockClientStore.indexOf(existingName);
+  mockClientStore[idx] = name;
+  mockClientStore.sort();
+
+  const now = new Date().toISOString();
+  return {
+    data: {
+      id: `client-${name.toLowerCase().replace(/\s+/g, '-')}`,
+      name,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+};
+
+/**
+ * DELETE /clients/:id - Delete a client
+ */
+const handleDeleteClient = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/clients\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing client ID' } } };
+  }
+
+  const existingName = mockClientStore.find(
+    (n) => `client-${n.toLowerCase().replace(/\s+/g, '-')}` === id
+  );
+  if (!existingName) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Client not found' } } };
+  }
+
+  mockClientStore = mockClientStore.filter((n) => n !== existingName);
+
+  return { data: {} };
 };
 
 /**
@@ -1358,6 +1441,166 @@ const handleUpdateElementStatus = async (
   };
 };
 
+// ============================================================================
+// Station Category Handlers
+// ============================================================================
+
+/**
+ * GET /station-categories - List all station categories
+ */
+const handleGetStationCategories = async (): Promise<{ data: unknown }> => {
+  const snapshot = getSnapshot();
+  const now = new Date().toISOString();
+  const data = snapshot.categories.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    description: cat.description,
+    similarityCriteria: cat.similarityCriteria,
+    createdAt: now,
+    updatedAt: now,
+  }));
+  return { data };
+};
+
+/**
+ * POST /station-categories - Create a station category
+ */
+const handleCreateStationCategory = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name: string; description?: string; similarityCriteria: { name: string; fieldPath: string }[] };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Category name is required' },
+      },
+    };
+  }
+
+  const snapshot = getSnapshot();
+  const exists = snapshot.categories.some((c) => c.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Category '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newCategory = {
+    id: `cat-${Date.now()}`,
+    name,
+    description: body.description,
+    similarityCriteria: body.similarityCriteria ?? [],
+  };
+
+  updateSnapshot((s) => ({
+    ...s,
+    categories: [...s.categories, newCategory],
+  }));
+
+  return {
+    data: { ...newCategory, createdAt: now, updatedAt: now },
+  };
+};
+
+/**
+ * PUT /station-categories/:id - Update a station category
+ */
+const handleUpdateStationCategory = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/station-categories\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing category ID' } } };
+  }
+
+  const body = args.body as { name: string; description?: string; similarityCriteria: { name: string; fieldPath: string }[] };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Category name is required' },
+      },
+    };
+  }
+
+  const snapshot = getSnapshot();
+  const index = snapshot.categories.findIndex((c) => c.id === id);
+  if (index === -1) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Category not found' } } };
+  }
+
+  const duplicateName = snapshot.categories.some(
+    (c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase()
+  );
+  if (duplicateName) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Category '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated = {
+    ...snapshot.categories[index],
+    name,
+    description: body.description,
+    similarityCriteria: body.similarityCriteria ?? [],
+  };
+
+  updateSnapshot((s) => ({
+    ...s,
+    categories: s.categories.map((c) => (c.id === id ? updated : c)),
+  }));
+
+  return { data: { ...updated, createdAt: now, updatedAt: now } };
+};
+
+/**
+ * DELETE /station-categories/:id - Delete a station category
+ */
+const handleDeleteStationCategory = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/station-categories\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing category ID' } } };
+  }
+
+  const snapshot = getSnapshot();
+  const category = snapshot.categories.find((c) => c.id === id);
+  if (!category) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Category not found' } } };
+  }
+
+  const inUse = snapshot.stations.some((s) => s.categoryId === id);
+  if (inUse) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: 'Category is in use by one or more stations' },
+      },
+    };
+  }
+
+  updateSnapshot((s) => ({
+    ...s,
+    categories: s.categories.filter((c) => c.id !== id),
+  }));
+
+  return { data: {} };
+};
+
 /**
  * POST /templates - Create a template
  */
@@ -1419,6 +1662,8 @@ const routes: MockRoute[] = [
   // Clients
   { method: 'GET', pattern: /^\/clients/, handler: handleGetClientSuggestions },
   { method: 'POST', pattern: /^\/clients$/, handler: handleCreateClient },
+  { method: 'PUT', pattern: /^\/clients\/[^/]+$/, handler: handleUpdateClient },
+  { method: 'DELETE', pattern: /^\/clients\/[^/]+$/, handler: handleDeleteClient },
 
   // Jobs
   { method: 'GET', pattern: /^\/jobs\/clients/, handler: handleGetClientSuggestions },
@@ -1434,6 +1679,12 @@ const routes: MockRoute[] = [
   { method: 'POST', pattern: /^\/templates$/, handler: handleCreateTemplate },
   { method: 'PUT', pattern: /^\/templates\/[^/]+$/, handler: handleUpdateTemplate },
   { method: 'DELETE', pattern: /^\/templates\/[^/]+$/, handler: handleDeleteTemplate },
+
+  // Station Categories
+  { method: 'GET',    pattern: /^\/station-categories$/,        handler: handleGetStationCategories },
+  { method: 'POST',   pattern: /^\/station-categories$/,        handler: handleCreateStationCategory },
+  { method: 'PUT',    pattern: /^\/station-categories\/[^/]+$/, handler: handleUpdateStationCategory },
+  { method: 'DELETE', pattern: /^\/station-categories\/[^/]+$/, handler: handleDeleteStationCategory },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },
