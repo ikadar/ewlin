@@ -785,6 +785,16 @@ function AppContent() {
     return days;
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
+  // Conflict task IDs for sidebar highlighting + DateStrip markers
+  const conflictTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of snapshot.conflicts) {
+      ids.add(c.taskId);
+      if (c.relatedTaskId) ids.add(c.relatedTaskId);
+    }
+    return ids;
+  }, [snapshot.conflicts]);
+
   // v0.3.47: Task markers per day for DateStrip
   // Groups tasks by date and determines their status (completed, late, conflict, scheduled)
   const taskMarkersPerDay = useMemo((): Map<string, TaskMarker[]> => {
@@ -792,7 +802,6 @@ function AppContent() {
     if (!selectedJobId) return markers;
 
     const now = new Date();
-    const conflictTaskIds = new Set(snapshot.conflicts.map((c) => c.taskId));
 
     // Get all tasks for the selected job
     const jobTasks = getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements);
@@ -835,7 +844,7 @@ function AppContent() {
       });
 
     return markers;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, snapshot.conflicts]);
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
 
   // v0.3.47: Earliest task date for timeline (first scheduled task)
   const earliestTaskDate = useMemo((): Date | null => {
@@ -1947,6 +1956,7 @@ function AppContent() {
           providers={snapshot.providers}
           activeTaskId={lastUnscheduledTask?.id}
           pickedTaskId={pickedTask?.id}
+          conflictTaskIds={conflictTaskIds}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
           onPick={handlePickTask}

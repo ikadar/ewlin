@@ -16,6 +16,8 @@ export interface TaskTileProps {
   isActivePlacement?: boolean;
   /** Whether this task is currently picked (for Pick & Place) */
   isPicked?: boolean;
+  /** Whether this task is involved in a precedence conflict */
+  hasConflict?: boolean;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
@@ -52,6 +54,7 @@ export function TaskTile({
   station,
   isActivePlacement = false,
   isPicked = false,
+  hasConflict = false,
   onJumpToTask,
   onRecallTask,
   onPick,
@@ -143,6 +146,11 @@ export function TaskTile({
 
   const colorStyles = getColorStyles();
 
+  // Precedence conflict amber glow (matches grid Tile styling)
+  const conflictStyle = hasConflict
+    ? { boxShadow: '0 0 12px 4px #F59E0B99' }
+    : undefined;
+
   if (isScheduled) {
     // Scheduled (placed) task - dark placeholder (not draggable)
     const handleClick = () => {
@@ -161,6 +169,7 @@ export function TaskTile({
       <button
         type="button"
         className="h-8 pt-0.5 px-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full"
+        style={conflictStyle}
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
@@ -211,6 +220,7 @@ export function TaskTile({
     backgroundColor: colorStyles.backgroundColor,
     ...activePlacementStyle,
     ...pickedStyle,
+    ...conflictStyle,
   };
 
   const content = (

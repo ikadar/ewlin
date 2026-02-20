@@ -49,6 +49,8 @@ export interface JobDetailsPanelProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
+  conflictTaskIds?: Set<string>;
   /** v0.5.13b: Callback when edit button is clicked */
   onEditJob?: () => void;
   /** Callback when delete is confirmed */
@@ -69,6 +71,7 @@ export function JobDetailsPanel({
   providers,
   activeTaskId,
   pickedTaskId,
+  conflictTaskIds,
   onJumpToTask,
   onRecallTask,
   onPick,
@@ -183,6 +186,7 @@ export function JobDetailsPanel({
         providers={providers}
         activeTaskId={activeTaskId}
         pickedTaskId={pickedTaskId}
+        conflictTaskIds={conflictTaskIds}
         onJumpToTask={onJumpToTask}
         onRecallTask={onRecallTask}
         onPick={onPick}

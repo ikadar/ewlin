@@ -24,6 +24,8 @@ export interface TaskListProps {
   activeTaskId?: string | null;
   /** Task ID that is currently picked (v0.3.54 Pick & Place) */
   pickedTaskId?: string | null;
+  /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
+  conflictTaskIds?: Set<string>;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
@@ -53,6 +55,7 @@ export function TaskList({
   categories = [],
   activeTaskId,
   pickedTaskId,
+  conflictTaskIds,
   onJumpToTask,
   onRecallTask,
   onPick,
@@ -214,6 +217,7 @@ export function TaskList({
             station={station}
             isActivePlacement={activeTaskId === task.id}
             isPicked={pickedTaskId === task.id}
+            hasConflict={conflictTaskIds?.has(task.id)}
             onJumpToTask={onJumpToTask}
             onRecallTask={onRecallTask}
             onPick={!assignment ? onPick : undefined}
