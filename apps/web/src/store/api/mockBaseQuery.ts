@@ -36,6 +36,7 @@ import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
+import { isLastTaskOfJob } from '../../utils/taskHelpers';
 import { normalizeError, createNotFoundError } from './errorNormalization';
 
 // ============================================================================
@@ -131,11 +132,13 @@ function autoAssignOutsourcedSuccessors(
       const provider = providers.find((p) => p.id === outTask.providerId);
       if (!provider) continue;
 
+      const oneWay = isLastTaskOfJob(outTask.id, elements, snapshot.tasks);
       const dates = calculateOutsourcingDates(latestPredecessorEnd, {
         workDays: outTask.duration.openDays,
         latestDepartureTime: outTask.duration.latestDepartureTime,
         receptionTime: outTask.duration.receptionTime,
         transitDays: provider.transitDays,
+        oneWay,
       });
       if (!dates) continue;
 

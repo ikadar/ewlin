@@ -21,6 +21,8 @@ export interface OutsourcingMiniFormProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** Callback when manual return changes */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** Whether this is the last task of the job (one-way shipping, no return transit) */
+  isLastTaskOfJob?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
+  isLastTaskOfJob,
 }: OutsourcingMiniFormProps) {
   // Calculate dates from predecessor if available and no manual override
   const calculatedDates = useMemo(() => {
@@ -47,8 +50,9 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
       latestDepartureTime: provider.latestDepartureTime,
       receptionTime: provider.receptionTime,
       transitDays: provider.transitDays,
+      oneWay: isLastTaskOfJob,
     });
-  }, [predecessorEndTime, provider, task.duration.openDays]);
+  }, [predecessorEndTime, provider, task.duration.openDays, isLastTaskOfJob]);
 
   // Use manual values if set, otherwise use calculated values.
   // When predecessorEndTime is absent (predecessor unscheduled), dates are meaningless — show empty.
@@ -61,12 +65,13 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   }, [predecessorEndTime, task.manualDeparture, calculatedDates]);
 
   const returnValue = useMemo(() => {
+    if (isLastTaskOfJob) return undefined;
     if (!predecessorEndTime) return undefined;
     if (task.manualReturn) {
       return new Date(task.manualReturn);
     }
     return calculatedDates?.return;
-  }, [predecessorEndTime, task.manualReturn, calculatedDates]);
+  }, [isLastTaskOfJob, predecessorEndTime, task.manualReturn, calculatedDates]);
 
   // Validation state for inline feedback
   const validation = useMemo(() => {
@@ -95,7 +100,8 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
     }
 
     // Rule 1: return < calculated minimum → error (red)
-    if (returnValue && provider) {
+    // Skip return validation for one-way shipping (no return)
+    if (!isLastTaskOfJob && returnValue && provider) {
       const minReturn = calculateReturnDate(departureValue, {
         workDays: task.duration.openDays,
         transitDays: provider.transitDays,
@@ -108,7 +114,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
     }
 
     return result;
-  }, [departureValue, returnValue, predecessorEndTime, workshopExitDate, provider, task.duration.openDays]);
+  }, [departureValue, returnValue, predecessorEndTime, workshopExitDate, provider, task.duration.openDays, isLastTaskOfJob]);
 
   // Handlers
   const handleWorkDaysChange = useCallback(
@@ -180,16 +186,23 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
           validationMessage={validation.departureMessage}
         />
 
-        {/* Return date/time */}
-        <DateTimePicker
-          label="Ret:"
-          value={returnValue}
-          onChange={handleReturnChange}
-          disabled={!onReturnChange}
-          testId="outsourcing-return"
-          validationState={validation.return}
-          validationMessage={validation.returnMessage}
-        />
+        {/* Return date/time — hidden for one-way shipping (last task of job) */}
+        {isLastTaskOfJob ? (
+          <div className="flex items-center gap-2 text-xs text-zinc-500 py-0.5">
+            <span>Ret:</span>
+            <span className="italic text-zinc-600">Aller simple</span>
+          </div>
+        ) : (
+          <DateTimePicker
+            label="Ret:"
+            value={returnValue}
+            onChange={handleReturnChange}
+            disabled={!onReturnChange}
+            testId="outsourcing-return"
+            validationState={validation.return}
+            validationMessage={validation.returnMessage}
+          />
+        )}
       </div>
     </div>
   );

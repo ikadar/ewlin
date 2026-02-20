@@ -34,6 +34,7 @@ import {
 import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, StationCategory, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
+import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
@@ -1187,10 +1188,12 @@ function AppContent() {
           const assignment = currentSnapshot.assignments[assignmentIndex];
           const provider = currentSnapshot.providers?.find((p) => p.id === task.providerId);
           if (provider && assignment.scheduledStart) {
+            const oneWay = isLastTaskOfJob(taskId, currentSnapshot.elements, currentSnapshot.tasks);
             const newReturn = calculateReturnDate(new Date(assignment.scheduledStart), {
               workDays,
               transitDays: provider.transitDays,
               receptionTime: provider.receptionTime,
+              oneWay,
             });
             const newAssignments = [...currentSnapshot.assignments];
             newAssignments[assignmentIndex] = {

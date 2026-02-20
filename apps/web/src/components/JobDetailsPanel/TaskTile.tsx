@@ -34,6 +34,8 @@ export interface TaskTileProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** Whether this is the last task of the job (one-way shipping) */
+  isLastTaskOfJob?: boolean;
 }
 
 /**
@@ -63,6 +65,7 @@ export function TaskTile({
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
+  isLastTaskOfJob: isLastTask,
 }: TaskTileProps) {
   // v0.5.11: Outsourced tasks render as mini-form
   if (task.type === 'Outsourced') {
@@ -73,6 +76,7 @@ export function TaskTile({
         jobColor={jobColor}
         predecessorEndTime={predecessorEndTime}
         workshopExitDate={job.workshopExitDate}
+        isLastTaskOfJob={isLastTask}
         onWorkDaysChange={onWorkDaysChange}
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}

@@ -1,5 +1,6 @@
 import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
 import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
+import { isLastTaskOfJob } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
@@ -206,6 +207,9 @@ export function TaskList({
       // Check if previous task is a printing task (for dry time label)
       const showDryTimeLabel = prevTask && isPrintingTask(prevTask);
 
+      // One-way shipping: last outsourced task of a job ships directly to client
+      const isLastTask = task.type === 'Outsourced' && isLastTaskOfJob(task.id, elements, tasks);
+
       return (
         <div key={task.id}>
           {showDryTimeLabel && <DryTimeLabel />}
@@ -223,6 +227,7 @@ export function TaskList({
             onPick={!assignment ? onPick : undefined}
             provider={provider}
             predecessorEndTime={predecessorEndTime}
+            isLastTaskOfJob={isLastTask}
             onWorkDaysChange={onWorkDaysChange}
             onDepartureChange={onDepartureChange}
             onReturnChange={onReturnChange}
