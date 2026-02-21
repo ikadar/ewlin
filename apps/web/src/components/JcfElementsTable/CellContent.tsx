@@ -30,6 +30,7 @@ import {
   POSTE_CATEGORIES,
 } from '../../mock/reference-data';
 import { useGetFormatsQuery } from '../../store/api/formatApi';
+import { useGetImpressionPresetsQuery } from '../../store/api/impressionPresetApi';
 import type { JcfMode } from './requiredFields';
 import { createTabOutHandler, createArrowNavHandler } from './navigationUtils';
 
@@ -149,6 +150,9 @@ function LinkableFieldCell(props: CellContentProps) {
   const { data: managedFormats } = useGetFormatsQuery();
   const formats = managedFormats ?? PRODUCT_FORMATS;
 
+  const { data: managedImpressionPresets } = useGetImpressionPresetsQuery();
+  const impressionPresets = managedImpressionPresets ?? IMPRESSION_PRESETS;
+
   const toggleLink = () => linkPropagation.toggleLink(elementIndex, rowKey as JcfLinkableField);
   const tabOutHandler = createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
   const arrowNavHandler = createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
@@ -175,7 +179,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'impression', v)}
-            presets={IMPRESSION_PRESETS}
+            presets={impressionPresets}
             sessionPresets={sessionLearning.impressions}
             onLearnPreset={sessionLearning.learnImpression}
             inputClassName={`${inputFilledClass} text-base`}

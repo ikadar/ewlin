@@ -9,8 +9,9 @@
  */
 
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { PRODUCT_FORMATS } from '../../mock/reference-data';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS } from '../../mock/reference-data';
 import type { FormatResponse } from './formatApi';
+import type { ImpressionPresetResponse } from './impressionPresetApi';
 import type {
   ScheduleSnapshot,
   AssignTaskRequest,
@@ -1765,6 +1766,178 @@ const handleDeleteFormat = async (
   return { data: {} };
 };
 
+// ============================================================================
+// Impression Preset Handlers
+// ============================================================================
+
+const IMPRESSION_PRESET_LABELS: Record<string, string> = {
+  'Q/Q': 'quadri recto/verso',
+  'Q/': 'quadri recto',
+  'N/N': 'noir recto/verso',
+  'N/': 'noir recto',
+};
+
+/**
+ * Mock impression preset store — initialized from IMPRESSION_PRESETS reference data.
+ */
+let mockImpressionPresetStore: ImpressionPresetResponse[] = IMPRESSION_PRESETS.map((p) => ({
+  id: `impression-preset-${p.id}`,
+  value: p.value,
+  description: p.description,
+  label: IMPRESSION_PRESET_LABELS[p.value] ?? '',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+/**
+ * GET /impression-presets - List all impression presets
+ */
+const handleGetImpressionPresets = async (): Promise<{ data: ImpressionPresetResponse[] }> => {
+  return { data: mockImpressionPresetStore };
+};
+
+/**
+ * POST /impression-presets - Create a new impression preset
+ */
+const handleCreateImpressionPreset = async (
+  args: FetchArgs
+): Promise<{ data: ImpressionPresetResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const exists = mockImpressionPresetStore.some((p) => p.value === value);
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Impression preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newPreset: ImpressionPresetResponse = {
+    id: `impression-preset-${Date.now()}`,
+    value,
+    description,
+    label,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockImpressionPresetStore = [...mockImpressionPresetStore, newPreset].sort((a, b) =>
+    a.value.localeCompare(b.value)
+  );
+
+  return { data: newPreset };
+};
+
+/**
+ * PUT /impression-presets/:id - Update an impression preset
+ */
+const handleUpdateImpressionPreset = async (
+  args: FetchArgs
+): Promise<{ data: ImpressionPresetResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/impression-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const existing = mockImpressionPresetStore.find((p) => p.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Impression preset not found' } } };
+  }
+
+  const duplicate = mockImpressionPresetStore.some((p) => p.id !== id && p.value === value);
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Impression preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: ImpressionPresetResponse = {
+    ...existing,
+    value,
+    description,
+    label,
+    updatedAt: now,
+  };
+
+  mockImpressionPresetStore = mockImpressionPresetStore
+    .map((p) => (p.id === id ? updated : p))
+    .sort((a, b) => a.value.localeCompare(b.value));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /impression-presets/:id - Delete an impression preset
+ */
+const handleDeleteImpressionPreset = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/impression-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const exists = mockImpressionPresetStore.some((p) => p.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Impression preset not found' } } };
+  }
+
+  mockImpressionPresetStore = mockImpressionPresetStore.filter((p) => p.id !== id);
+
+  return { data: {} };
+};
+
 /**
  * POST /templates - Create a template
  */
@@ -1855,6 +2028,12 @@ const routes: MockRoute[] = [
   { method: 'POST',   pattern: /^\/formats$/,           handler: handleCreateFormat },
   { method: 'PUT',    pattern: /^\/formats\/[^/]+$/,    handler: handleUpdateFormat },
   { method: 'DELETE', pattern: /^\/formats\/[^/]+$/,    handler: handleDeleteFormat },
+
+  // Impression Presets
+  { method: 'GET',    pattern: /^\/impression-presets$/,          handler: handleGetImpressionPresets },
+  { method: 'POST',   pattern: /^\/impression-presets$/,           handler: handleCreateImpressionPreset },
+  { method: 'PUT',    pattern: /^\/impression-presets\/[^/]+$/,    handler: handleUpdateImpressionPreset },
+  { method: 'DELETE', pattern: /^\/impression-presets\/[^/]+$/,    handler: handleDeleteImpressionPreset },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },

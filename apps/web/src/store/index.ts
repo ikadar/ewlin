@@ -14,6 +14,7 @@ import { templateApi } from './api/templateApi';
 import { clientApi } from './api/clientApi';
 import { stationCategoryApi } from './api/stationCategoryApi';
 import { formatApi } from './api/formatApi';
+import { impressionPresetApi } from './api/impressionPresetApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -29,6 +30,7 @@ export const store = configureStore({
     [clientApi.reducerPath]: clientApi.reducer,
     [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
     [formatApi.reducerPath]: formatApi.reducer,
+    [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -42,7 +44,8 @@ export const store = configureStore({
       .concat(templateApi.middleware)
       .concat(clientApi.middleware)
       .concat(stationCategoryApi.middleware)
-      .concat(formatApi.middleware),
+      .concat(formatApi.middleware)
+      .concat(impressionPresetApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -122,6 +125,15 @@ export {
   formatApi,
 } from './api/formatApi';
 export type { FormatResponse, FormatInput } from './api/formatApi';
+
+export {
+  useGetImpressionPresetsQuery,
+  useCreateImpressionPresetMutation,
+  useUpdateImpressionPresetMutation,
+  useDeleteImpressionPresetMutation,
+  impressionPresetApi,
+} from './api/impressionPresetApi';
+export type { ImpressionPresetResponse, ImpressionPresetInput } from './api/impressionPresetApi';
 
 // Re-export slice actions
 export {
