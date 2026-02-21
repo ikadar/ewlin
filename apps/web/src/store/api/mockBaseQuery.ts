@@ -9,9 +9,10 @@
  */
 
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { PRODUCT_FORMATS, IMPRESSION_PRESETS } from '../../mock/reference-data';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS } from '../../mock/reference-data';
 import type { FormatResponse } from './formatApi';
 import type { ImpressionPresetResponse } from './impressionPresetApi';
+import type { SurfacagePresetResponse } from './surfacagePresetApi';
 import type {
   ScheduleSnapshot,
   AssignTaskRequest,
@@ -1938,6 +1939,184 @@ const handleDeleteImpressionPreset = async (
   return { data: {} };
 };
 
+// ============================================================================
+// Surfacage Preset Handlers
+// ============================================================================
+
+const SURFACAGE_PRESET_LABELS: Record<string, string> = {
+  'mat/mat': 'pelli mat recto/verso',
+  'satin/satin': 'pelli satin recto/verso',
+  'brillant/brillant': 'pelli brillant recto/verso',
+  'UV/UV': 'vernis UV recto/verso',
+  'dorure/dorure': 'dorure recto/verso',
+  'mat/': 'pelli mat recto',
+  'satin/': 'pelli satin recto',
+  'brillant/': 'pelli brillant recto',
+  'UV/': 'vernis UV recto',
+  'dorure/': 'dorure recto',
+};
+
+/**
+ * Mock surfacage preset store — initialized from SURFACAGE_PRESETS reference data.
+ */
+let mockSurfacagePresetStore: SurfacagePresetResponse[] = SURFACAGE_PRESETS.map((p) => ({
+  id: `surfacage-preset-${p.id}`,
+  value: p.value,
+  description: p.description,
+  label: SURFACAGE_PRESET_LABELS[p.value] ?? '',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+/**
+ * GET /surfacage-presets - List all surfacage presets
+ */
+const handleGetSurfacagePresets = async (): Promise<{ data: SurfacagePresetResponse[] }> => {
+  return { data: mockSurfacagePresetStore };
+};
+
+/**
+ * POST /surfacage-presets - Create a new surfacage preset
+ */
+const handleCreateSurfacagePreset = async (
+  args: FetchArgs
+): Promise<{ data: SurfacagePresetResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const exists = mockSurfacagePresetStore.some((p) => p.value === value);
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Surfacage preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newPreset: SurfacagePresetResponse = {
+    id: `surfacage-preset-${Date.now()}`,
+    value,
+    description,
+    label,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockSurfacagePresetStore = [...mockSurfacagePresetStore, newPreset].sort((a, b) =>
+    a.value.localeCompare(b.value)
+  );
+
+  return { data: newPreset };
+};
+
+/**
+ * PUT /surfacage-presets/:id - Update a surfacage preset
+ */
+const handleUpdateSurfacagePreset = async (
+  args: FetchArgs
+): Promise<{ data: SurfacagePresetResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/surfacage-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const existing = mockSurfacagePresetStore.find((p) => p.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Surfacage preset not found' } } };
+  }
+
+  const duplicate = mockSurfacagePresetStore.some((p) => p.id !== id && p.value === value);
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Surfacage preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: SurfacagePresetResponse = {
+    ...existing,
+    value,
+    description,
+    label,
+    updatedAt: now,
+  };
+
+  mockSurfacagePresetStore = mockSurfacagePresetStore
+    .map((p) => (p.id === id ? updated : p))
+    .sort((a, b) => a.value.localeCompare(b.value));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /surfacage-presets/:id - Delete a surfacage preset
+ */
+const handleDeleteSurfacagePreset = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/surfacage-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const exists = mockSurfacagePresetStore.some((p) => p.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Surfacage preset not found' } } };
+  }
+
+  mockSurfacagePresetStore = mockSurfacagePresetStore.filter((p) => p.id !== id);
+
+  return { data: {} };
+};
+
 /**
  * POST /templates - Create a template
  */
@@ -2034,6 +2213,12 @@ const routes: MockRoute[] = [
   { method: 'POST',   pattern: /^\/impression-presets$/,           handler: handleCreateImpressionPreset },
   { method: 'PUT',    pattern: /^\/impression-presets\/[^/]+$/,    handler: handleUpdateImpressionPreset },
   { method: 'DELETE', pattern: /^\/impression-presets\/[^/]+$/,    handler: handleDeleteImpressionPreset },
+
+  // Surfacage Presets
+  { method: 'GET',    pattern: /^\/surfacage-presets$/,          handler: handleGetSurfacagePresets },
+  { method: 'POST',   pattern: /^\/surfacage-presets$/,           handler: handleCreateSurfacagePreset },
+  { method: 'PUT',    pattern: /^\/surfacage-presets\/[^/]+$/,    handler: handleUpdateSurfacagePreset },
+  { method: 'DELETE', pattern: /^\/surfacage-presets\/[^/]+$/,    handler: handleDeleteSurfacagePreset },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },

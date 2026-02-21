@@ -16,6 +16,7 @@ import { StationCategoriesPage } from './pages/StationCategoriesPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { FormatsPage } from './pages/FormatsPage';
 import { ImpressionPresetsPage } from './pages/ImpressionPresetsPage';
+import { SurfacagePresetsPage } from './pages/SurfacagePresetsPage';
 
 /**
  * Application routes.
@@ -33,6 +34,7 @@ export function AppRoutes() {
       <Route path="/clients" element={<ClientsPage />} />
       <Route path="/formats" element={<FormatsPage />} />
       <Route path="/impression-presets" element={<ImpressionPresetsPage />} />
+      <Route path="/surfacage-presets" element={<SurfacagePresetsPage />} />
     </Routes>
   );
 }

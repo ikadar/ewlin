@@ -11,6 +11,12 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { render, RenderOptions } from '@testing-library/react';
 import { scheduleApi } from '../store/api/scheduleApi';
+import { templateApi } from '../store/api/templateApi';
+import { clientApi } from '../store/api/clientApi';
+import { formatApi } from '../store/api/formatApi';
+import { impressionPresetApi } from '../store/api/impressionPresetApi';
+import { surfacagePresetApi } from '../store/api/surfacagePresetApi';
+import { stationCategoryApi } from '../store/api/stationCategoryApi';
 import { uiReducer } from '../store/slices/uiSlice';
 import { jcfReducer } from '../store/slices/jcfSlice';
 import { errorReducer } from '../store/slices/errorSlice';
@@ -22,12 +28,25 @@ export function createTestStore(preloadedState?: Record<string, unknown>) {
   return configureStore({
     reducer: {
       [scheduleApi.reducerPath]: scheduleApi.reducer,
+      [templateApi.reducerPath]: templateApi.reducer,
+      [clientApi.reducerPath]: clientApi.reducer,
+      [formatApi.reducerPath]: formatApi.reducer,
+      [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
+      [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
+      [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
       ui: uiReducer,
       jcf: jcfReducer,
       error: errorReducer,
     },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(scheduleApi.middleware),
+      getDefaultMiddleware()
+        .concat(scheduleApi.middleware)
+        .concat(templateApi.middleware)
+        .concat(clientApi.middleware)
+        .concat(formatApi.middleware)
+        .concat(impressionPresetApi.middleware)
+        .concat(surfacagePresetApi.middleware)
+        .concat(stationCategoryApi.middleware),
     preloadedState,
   });
 }

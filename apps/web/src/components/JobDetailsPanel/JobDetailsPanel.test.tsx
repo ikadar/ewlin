@@ -200,7 +200,7 @@ describe('JobInfo', () => {
     expect(screen.getByText('12345')).toBeInTheDocument();
     expect(screen.getByText('Autosphere')).toBeInTheDocument();
     expect(screen.getByText('Brochures Autosphère accueil')).toBeInTheDocument();
-    expect(screen.getByText('18/12/2025')).toBeInTheDocument();
+    expect(screen.getByText('18/12/2025 14:00')).toBeInTheDocument();
   });
 });
 

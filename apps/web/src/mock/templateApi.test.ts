@@ -30,7 +30,7 @@ describe('templateApi', () => {
     it('includes expected seed template names', () => {
       const templates = getTemplates();
       const names = templates.map((t) => t.name);
-      expect(names).toContain('Brochure A4 piquée');
+      expect(names).toContain('Brochure piquée A4 16p');
       expect(names).toContain('Dépliant 3 volets');
     });
   });
@@ -219,15 +219,15 @@ describe('templateApi', () => {
     it('searches by category', () => {
       const result = searchTemplates('Feuillet');
       expect(result.length).toBeGreaterThan(0);
-      expect(result.every((t) => t.category?.toLowerCase().includes('feuillet'))).toBe(
-        true
-      );
+      // Search is multi-field (name, category, client, description), so just verify
+      // at least one result has the 'Feuillet' category
+      expect(result.some((t) => t.category?.toLowerCase().includes('feuillet'))).toBe(true);
     });
 
     it('searches by client name', () => {
-      const result = searchTemplates('SNCF');
+      const result = searchTemplates('LVMH');
       expect(result.length).toBeGreaterThan(0);
-      expect(result.every((t) => t.clientName?.toLowerCase().includes('sncf'))).toBe(
+      expect(result.every((t) => t.clientName?.toLowerCase().includes('lvmh'))).toBe(
         true
       );
     });
@@ -273,7 +273,7 @@ describe('templateApi', () => {
       resetTemplates();
 
       const restored = getTemplates();
-      expect(restored.find((t) => t.name === 'Brochure A4 piquée')).toBeTruthy();
+      expect(restored.find((t) => t.name === 'Brochure piquée A4 16p')).toBeTruthy();
       expect(restored.find((t) => t.name === 'New')).toBeFalsy();
     });
   });

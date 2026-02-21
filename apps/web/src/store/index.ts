@@ -15,6 +15,7 @@ import { clientApi } from './api/clientApi';
 import { stationCategoryApi } from './api/stationCategoryApi';
 import { formatApi } from './api/formatApi';
 import { impressionPresetApi } from './api/impressionPresetApi';
+import { surfacagePresetApi } from './api/surfacagePresetApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -31,6 +32,7 @@ export const store = configureStore({
     [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
     [formatApi.reducerPath]: formatApi.reducer,
     [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
+    [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -45,7 +47,8 @@ export const store = configureStore({
       .concat(clientApi.middleware)
       .concat(stationCategoryApi.middleware)
       .concat(formatApi.middleware)
-      .concat(impressionPresetApi.middleware),
+      .concat(impressionPresetApi.middleware)
+      .concat(surfacagePresetApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -134,6 +137,15 @@ export {
   impressionPresetApi,
 } from './api/impressionPresetApi';
 export type { ImpressionPresetResponse, ImpressionPresetInput } from './api/impressionPresetApi';
+
+export {
+  useGetSurfacagePresetsQuery,
+  useCreateSurfacagePresetMutation,
+  useUpdateSurfacagePresetMutation,
+  useDeleteSurfacagePresetMutation,
+  surfacagePresetApi,
+} from './api/surfacagePresetApi';
+export type { SurfacagePresetResponse, SurfacagePresetInput } from './api/surfacagePresetApi';
 
 // Re-export slice actions
 export {

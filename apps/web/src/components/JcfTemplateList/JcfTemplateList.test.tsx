@@ -228,7 +228,14 @@ describe('JcfTemplateList', () => {
 
     it('renders action buttons with correct aria labels', () => {
       const template = createTemplate({ id: 'tpl-test' });
-      render(<JcfTemplateList templates={[template]} />);
+      render(
+        <JcfTemplateList
+          templates={[template]}
+          onDeleteClick={vi.fn()}
+          onEditClick={vi.fn()}
+          onUseClick={vi.fn()}
+        />
+      );
 
       expect(screen.getByLabelText('Supprimer le template')).toBeInTheDocument();
       expect(screen.getByLabelText('Modifier les propriétés')).toBeInTheDocument();

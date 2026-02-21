@@ -31,6 +31,7 @@ import {
 } from '../../mock/reference-data';
 import { useGetFormatsQuery } from '../../store/api/formatApi';
 import { useGetImpressionPresetsQuery } from '../../store/api/impressionPresetApi';
+import { useGetSurfacagePresetsQuery } from '../../store/api/surfacagePresetApi';
 import type { JcfMode } from './requiredFields';
 import { createTabOutHandler, createArrowNavHandler } from './navigationUtils';
 
@@ -153,6 +154,9 @@ function LinkableFieldCell(props: CellContentProps) {
   const { data: managedImpressionPresets } = useGetImpressionPresetsQuery();
   const impressionPresets = managedImpressionPresets ?? IMPRESSION_PRESETS;
 
+  const { data: managedSurfacagePresets } = useGetSurfacagePresetsQuery();
+  const surfacagePresets = managedSurfacagePresets ?? SURFACAGE_PRESETS;
+
   const toggleLink = () => linkPropagation.toggleLink(elementIndex, rowKey as JcfLinkableField);
   const tabOutHandler = createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
   const arrowNavHandler = createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
@@ -193,7 +197,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'surfacage', v)}
-            presets={SURFACAGE_PRESETS}
+            presets={surfacagePresets}
             sessionPresets={sessionLearning.surfacages}
             onLearnPreset={sessionLearning.learnSurfacage}
             inputClassName={`${inputFilledClass} text-base`}

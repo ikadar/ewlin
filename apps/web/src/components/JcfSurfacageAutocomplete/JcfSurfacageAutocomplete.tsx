@@ -74,9 +74,16 @@ export function JcfSurfacageAutocomplete({
   }, [presets, sessionPresets]);
 
   // Display value: pretty when unfocused, editing when focused
+  // Prefer stored label over static mapping when unfocused
   const displayValue = isFocused
     ? editingValue
-    : toPrettySurfacage(value);
+    : (() => {
+        const preset = (presets as Array<{ value: string; label?: string }>).find(
+          (p) => p.value === value
+        );
+        if (preset?.label) return preset.label;
+        return toPrettySurfacage(value);
+      })();
 
   const handleFocus = useCallback(() => {
     setEditingValue(toDslSurfacage(value));

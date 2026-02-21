@@ -6,6 +6,9 @@ import { describe, it, expect } from 'vitest';
 import { recalculatePrecedenceConflicts, updateSnapshotConflicts } from './conflictRecalculation';
 import type { ScheduleSnapshot, InternalTask } from '@flux/types';
 
+const weekdaySchedule = { isOperating: true, slots: [{ start: '07:00', end: '19:00' }] };
+const weekendSchedule = { isOperating: false, slots: [] };
+
 // Helper to create a minimal test snapshot
 function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnapshot {
   return {
@@ -16,10 +19,19 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
         id: 'station-1',
         name: 'Station 1',
         categoryId: 'cat-1',
-        groupId: null,
-        operatingScheduleId: 'schedule-1',
-        status: 'Active',
-        displayOrder: 0,
+        groupId: 'group-1',
+        capacity: 1,
+        status: 'Available',
+        operatingSchedule: {
+          monday: weekdaySchedule,
+          tuesday: weekdaySchedule,
+          wednesday: weekdaySchedule,
+          thursday: weekdaySchedule,
+          friday: weekdaySchedule,
+          saturday: weekendSchedule,
+          sunday: weekendSchedule,
+        },
+        exceptions: [],
       },
     ],
     categories: [
