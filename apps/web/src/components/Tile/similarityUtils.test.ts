@@ -92,9 +92,9 @@ describe('valuesMatch', () => {
 
 describe('compareSimilarity', () => {
   const mockCriteria: SimilarityCriterion[] = [
-    { id: 'crit-1', name: 'Même type de papier', fieldPath: 'papier' },
-    { id: 'crit-2', name: 'Même format', fieldPath: 'format' },
-    { id: 'crit-3', name: 'Même encrage', fieldPath: 'impression' },
+    { name: 'Même type de papier', fieldPath: 'papier' },
+    { name: 'Même format', fieldPath: 'format' },
+    { name: 'Même encrage', fieldPath: 'impression' },
   ];
 
   it('returns empty array when no criteria provided', () => {
@@ -114,7 +114,7 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec({ format: 'A4' });
     const specB = createMockSpec({ format: 'A4' });
     const results = compareSimilarity(specA, specB, [
-      { id: 'crit-1', name: 'Même format', fieldPath: 'format' },
+      { name: 'Même format', fieldPath: 'format' },
     ]);
     expect(results[0].isMatched).toBe(true);
     expect(results[0].criterion.name).toBe('Même format');
@@ -124,7 +124,7 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec({ format: 'A4' });
     const specB = createMockSpec({ format: '210x297' });
     const results = compareSimilarity(specA, specB, [
-      { id: 'crit-1', name: 'Même format', fieldPath: 'format' },
+      { name: 'Même format', fieldPath: 'format' },
     ]);
     expect(results[0].isMatched).toBe(false);
   });
@@ -148,7 +148,7 @@ describe('compareSimilarity', () => {
     const specB = createMockSpec();
     // Neither spec has papier defined
     const results = compareSimilarity(specA, specB, [
-      { id: 'crit-1', name: 'Même type de papier', fieldPath: 'papier' },
+      { name: 'Même type de papier', fieldPath: 'papier' },
     ]);
     expect(results[0].isMatched).toBe(true);
   });
@@ -157,7 +157,7 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec({ papier: 'Couché mat:135' });
     const specB = createMockSpec();
     const results = compareSimilarity(specA, specB, [
-      { id: 'crit-1', name: 'Même type de papier', fieldPath: 'papier' },
+      { name: 'Même type de papier', fieldPath: 'papier' },
     ]);
     expect(results[0].isMatched).toBe(false);
   });
@@ -166,7 +166,6 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec();
     const specB = createMockSpec();
     const criterion: SimilarityCriterion = {
-      id: 'crit-test',
       name: 'Test Criterion',
       fieldPath: 'format',
     };
@@ -176,7 +175,6 @@ describe('compareSimilarity', () => {
 
   describe('papier comparison (paper type + weight)', () => {
     const papierCriterion: SimilarityCriterion = {
-      id: 'crit-paper-type',
       name: 'Même type de papier',
       fieldPath: 'papier',
     };
@@ -205,7 +203,6 @@ describe('compareSimilarity', () => {
 
   describe('impression comparison (inking)', () => {
     const impressionCriterion: SimilarityCriterion = {
-      id: 'crit-inking',
       name: 'Même encrage',
       fieldPath: 'impression',
     };
@@ -234,9 +231,9 @@ describe('compareSimilarity', () => {
 
   describe('offset press criteria', () => {
     const offsetPressCriteria: SimilarityCriterion[] = [
-      { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'papier' },
-      { id: 'crit-paper-format', name: 'Même format', fieldPath: 'format' },
-      { id: 'crit-inking', name: 'Même encrage', fieldPath: 'impression' },
+      { name: 'Même type de papier', fieldPath: 'papier' },
+      { name: 'Même format', fieldPath: 'format' },
+      { name: 'Même encrage', fieldPath: 'impression' },
     ];
 
     it('compares all offset press criteria correctly', () => {
@@ -261,7 +258,7 @@ describe('compareSimilarity', () => {
       const specA = createMockSpec({ impression: 'Q/Q' });
       const specB = createMockSpec({ impression: 'Q+V/' });
       const results = compareSimilarity(specA, specB, [
-        { id: 'crit-inking', name: 'Même encrage', fieldPath: 'impression' },
+        { name: 'Même encrage', fieldPath: 'impression' },
       ]);
       expect(results[0].isMatched).toBe(false);
     });

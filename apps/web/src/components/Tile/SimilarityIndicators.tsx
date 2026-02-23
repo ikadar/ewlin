@@ -27,7 +27,7 @@ export function SimilarityIndicators({ results }: SimilarityIndicatorsProps) {
     >
       {results.map((result, index) => (
         <span
-          key={result.criterion.id || index}
+          key={result.criterion.fieldPath || index}
           title={result.criterion.name}
           data-testid={`similarity-icon-${index}`}
         >
