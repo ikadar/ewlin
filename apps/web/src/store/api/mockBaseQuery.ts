@@ -9,10 +9,11 @@
  */
 
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS } from '../../mock/reference-data';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, FEUILLE_FORMATS } from '../../mock/reference-data';
 import type { FormatResponse } from './formatApi';
 import type { ImpressionPresetResponse } from './impressionPresetApi';
 import type { SurfacagePresetResponse } from './surfacagePresetApi';
+import type { FeuilleFormatResponse } from './feuilleFormatApi';
 import type {
   ScheduleSnapshot,
   AssignTaskRequest,
@@ -2117,6 +2118,164 @@ const handleDeleteSurfacagePreset = async (
   return { data: {} };
 };
 
+// ============================================================================
+// Feuille Format Handlers
+// ============================================================================
+
+/**
+ * Mock feuille format store — initialized from FEUILLE_FORMATS reference data.
+ */
+let mockFeuilleFormatStore: FeuilleFormatResponse[] = FEUILLE_FORMATS.map((f) => ({
+  id: `feuille-format-${f.format}`,
+  format: f.format,
+  poses: [...f.poses],
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+/**
+ * GET /feuille-formats - List all feuille formats
+ */
+const handleGetFeuilleFormats = async (): Promise<{ data: FeuilleFormatResponse[] }> => {
+  return { data: mockFeuilleFormatStore };
+};
+
+/**
+ * POST /feuille-formats - Create a new feuille format
+ */
+const handleCreateFeuilleFormat = async (
+  args: FetchArgs
+): Promise<{ data: FeuilleFormatResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { format?: string; poses?: number[] };
+  const format = body.format?.trim();
+
+  if (!format) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format is required' } },
+    };
+  }
+
+  if (!/^[1-9]\d*x[1-9]\d*$/i.test(format)) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format must match pattern WxH (e.g., 50x70)' } },
+    };
+  }
+
+  if (!Array.isArray(body.poses) || body.poses.length === 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'At least one poses value is required' } },
+    };
+  }
+
+  const exists = mockFeuilleFormatStore.some((f) => f.format === format);
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `FeuilleFormat '${format}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newFormat: FeuilleFormatResponse = {
+    id: `feuille-format-${Date.now()}`,
+    format,
+    poses: [...body.poses].sort((a, b) => a - b),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockFeuilleFormatStore = [...mockFeuilleFormatStore, newFormat].sort((a, b) =>
+    a.format.localeCompare(b.format)
+  );
+
+  return { data: newFormat };
+};
+
+/**
+ * PUT /feuille-formats/:id - Update a feuille format
+ */
+const handleUpdateFeuilleFormat = async (
+  args: FetchArgs
+): Promise<{ data: FeuilleFormatResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/feuille-formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const body = args.body as { format?: string; poses?: number[] };
+  const format = body.format?.trim();
+
+  if (!format) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format is required' } },
+    };
+  }
+
+  if (!/^[1-9]\d*x[1-9]\d*$/i.test(format)) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format must match pattern WxH (e.g., 50x70)' } },
+    };
+  }
+
+  if (!Array.isArray(body.poses) || body.poses.length === 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'At least one poses value is required' } },
+    };
+  }
+
+  const existing = mockFeuilleFormatStore.find((f) => f.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'FeuilleFormat not found' } } };
+  }
+
+  const duplicate = mockFeuilleFormatStore.some((f) => f.id !== id && f.format === format);
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `FeuilleFormat '${format}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: FeuilleFormatResponse = {
+    ...existing,
+    format,
+    poses: [...body.poses].sort((a, b) => a - b),
+    updatedAt: now,
+  };
+
+  mockFeuilleFormatStore = mockFeuilleFormatStore
+    .map((f) => (f.id === id ? updated : f))
+    .sort((a, b) => a.format.localeCompare(b.format));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /feuille-formats/:id - Delete a feuille format
+ */
+const handleDeleteFeuilleFormat = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/feuille-formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const exists = mockFeuilleFormatStore.some((f) => f.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'FeuilleFormat not found' } } };
+  }
+
+  mockFeuilleFormatStore = mockFeuilleFormatStore.filter((f) => f.id !== id);
+
+  return { data: {} };
+};
+
 /**
  * POST /templates - Create a template
  */
@@ -2219,6 +2378,12 @@ const routes: MockRoute[] = [
   { method: 'POST',   pattern: /^\/surfacage-presets$/,           handler: handleCreateSurfacagePreset },
   { method: 'PUT',    pattern: /^\/surfacage-presets\/[^/]+$/,    handler: handleUpdateSurfacagePreset },
   { method: 'DELETE', pattern: /^\/surfacage-presets\/[^/]+$/,    handler: handleDeleteSurfacagePreset },
+
+  // Feuille Formats
+  { method: 'GET',    pattern: /^\/feuille-formats$/,          handler: handleGetFeuilleFormats },
+  { method: 'POST',   pattern: /^\/feuille-formats$/,           handler: handleCreateFeuilleFormat },
+  { method: 'PUT',    pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleUpdateFeuilleFormat },
+  { method: 'DELETE', pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleDeleteFeuilleFormat },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },

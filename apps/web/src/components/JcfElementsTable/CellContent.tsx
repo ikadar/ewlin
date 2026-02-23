@@ -32,6 +32,7 @@ import {
 import { useGetFormatsQuery } from '../../store/api/formatApi';
 import { useGetImpressionPresetsQuery } from '../../store/api/impressionPresetApi';
 import { useGetSurfacagePresetsQuery } from '../../store/api/surfacagePresetApi';
+import { useGetFeuilleFormatsQuery } from '../../store/api/feuilleFormatApi';
 import type { JcfMode } from './requiredFields';
 import { createTabOutHandler, createArrowNavHandler } from './navigationUtils';
 
@@ -157,6 +158,9 @@ function LinkableFieldCell(props: CellContentProps) {
   const { data: managedSurfacagePresets } = useGetSurfacagePresetsQuery();
   const surfacagePresets = managedSurfacagePresets ?? SURFACAGE_PRESETS;
 
+  const { data: managedFeuilleFormats } = useGetFeuilleFormatsQuery();
+  const feuilleFormats = managedFeuilleFormats ?? FEUILLE_FORMATS;
+
   const toggleLink = () => linkPropagation.toggleLink(elementIndex, rowKey as JcfLinkableField);
   const tabOutHandler = createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
   const arrowNavHandler = createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
@@ -225,7 +229,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'imposition', v)}
-            feuilleFormats={FEUILLE_FORMATS}
+            feuilleFormats={feuilleFormats}
             sessionFormats={sessionLearning.feuilleFormats}
             onLearnFormat={sessionLearning.learnFeuilleFormat}
             inputClassName={`${inputFilledClass} text-base`}

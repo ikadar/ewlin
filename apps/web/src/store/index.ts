@@ -16,6 +16,7 @@ import { stationCategoryApi } from './api/stationCategoryApi';
 import { formatApi } from './api/formatApi';
 import { impressionPresetApi } from './api/impressionPresetApi';
 import { surfacagePresetApi } from './api/surfacagePresetApi';
+import { feuilleFormatApi } from './api/feuilleFormatApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -33,6 +34,7 @@ export const store = configureStore({
     [formatApi.reducerPath]: formatApi.reducer,
     [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
     [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
+    [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -48,7 +50,8 @@ export const store = configureStore({
       .concat(stationCategoryApi.middleware)
       .concat(formatApi.middleware)
       .concat(impressionPresetApi.middleware)
-      .concat(surfacagePresetApi.middleware),
+      .concat(surfacagePresetApi.middleware)
+      .concat(feuilleFormatApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -146,6 +149,15 @@ export {
   surfacagePresetApi,
 } from './api/surfacagePresetApi';
 export type { SurfacagePresetResponse, SurfacagePresetInput } from './api/surfacagePresetApi';
+
+export {
+  useGetFeuilleFormatsQuery,
+  useCreateFeuilleFormatMutation,
+  useUpdateFeuilleFormatMutation,
+  useDeleteFeuilleFormatMutation,
+  feuilleFormatApi,
+} from './api/feuilleFormatApi';
+export type { FeuilleFormatResponse, FeuilleFormatInput } from './api/feuilleFormatApi';
 
 // Re-export slice actions
 export {

@@ -1,4 +1,4 @@
-import { LayoutGrid, Calendar, Settings, User, Users, Ruler, Printer, Layers } from 'lucide-react';
+import { LayoutGrid, Calendar, Settings, User, Users, Ruler, Printer, Layers, Grid3x3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
@@ -65,6 +65,11 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
             icon={Layers}
             label="Surfacages"
             onClick={() => navigate('/surfacage-presets')}
+          />
+          <SidebarButton
+            icon={Grid3x3}
+            label="Impositions"
+            onClick={() => navigate('/feuille-formats')}
           />
           <SidebarButton
             icon={Settings}
