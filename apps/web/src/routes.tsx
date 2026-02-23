@@ -18,6 +18,7 @@ import { FormatsPage } from './pages/FormatsPage';
 import { ImpressionPresetsPage } from './pages/ImpressionPresetsPage';
 import { SurfacagePresetsPage } from './pages/SurfacagePresetsPage';
 import { FeuilleFormatsPage } from './pages/FeuilleFormatsPage';
+import { StationsPage } from './pages/StationsPage';
 
 /**
  * Application routes.
@@ -37,6 +38,7 @@ export function AppRoutes() {
       <Route path="/impression-presets" element={<ImpressionPresetsPage />} />
       <Route path="/surfacage-presets" element={<SurfacagePresetsPage />} />
       <Route path="/feuille-formats" element={<FeuilleFormatsPage />} />
+      <Route path="/stations" element={<StationsPage />} />
     </Routes>
   );
 }

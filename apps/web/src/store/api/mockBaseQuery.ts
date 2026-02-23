@@ -14,6 +14,7 @@ import type { FormatResponse } from './formatApi';
 import type { ImpressionPresetResponse } from './impressionPresetApi';
 import type { SurfacagePresetResponse } from './surfacagePresetApi';
 import type { FeuilleFormatResponse } from './feuilleFormatApi';
+import type { StationResponse } from './stationApi';
 import type {
   ScheduleSnapshot,
   AssignTaskRequest,
@@ -2276,6 +2277,227 @@ const handleDeleteFeuilleFormat = async (
   return { data: {} };
 };
 
+// ============================================================================
+// Station Handlers (Management CRUD)
+// ============================================================================
+
+/**
+ * Mock station store — initialized from snapshot stations.
+ */
+let mockStationStore: StationResponse[] = getSnapshot().stations.map((s, i) => ({
+  id: s.id,
+  name: s.name,
+  status: s.status as StationResponse['status'],
+  categoryId: s.categoryId,
+  groupId: s.groupId,
+  capacity: s.capacity,
+  displayOrder: i,
+  operatingSchedule: (s.operatingSchedule as Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>) ?? null,
+  scheduleExceptions: (s.exceptions ?? []).map((e) => ({
+    date: (e as { date: string }).date,
+    type: 'CLOSED',
+    schedule: (e as { schedule?: unknown }).schedule ?? null,
+    reason: (e as { reason?: string }).reason ?? null,
+  })),
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+}));
+
+/**
+ * GET /stations - List all stations
+ */
+const handleGetStations = async (): Promise<{ data: StationResponse[] }> => {
+  const sorted = [...mockStationStore].sort((a, b) => {
+    if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+    return a.name.localeCompare(b.name);
+  });
+  return { data: sorted };
+};
+
+/**
+ * POST /stations - Create a station
+ */
+const handleCreateStation = async (
+  args: FetchArgs
+): Promise<{ data: StationResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name?: string; status?: string; categoryId?: string; groupId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Station name is required' } },
+    };
+  }
+
+  const exists = mockStationStore.some((s) => s.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Station '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newStation: StationResponse = {
+    id: `sta-${Date.now()}`,
+    name,
+    status: (body.status ?? 'Available') as StationResponse['status'],
+    categoryId: body.categoryId ?? '',
+    groupId: body.groupId ?? '',
+    capacity: body.capacity ?? 1,
+    displayOrder: body.displayOrder ?? 0,
+    operatingSchedule: (body.operatingSchedule as StationResponse['operatingSchedule']) ?? null,
+    scheduleExceptions: (body.scheduleExceptions as StationResponse['scheduleExceptions']) ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockStationStore = [...mockStationStore, newStation];
+
+  // Update snapshot so scheduler sees the new station
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    stations: [
+      ...snapshot.stations,
+      {
+        id: newStation.id,
+        name: newStation.name,
+        status: newStation.status,
+        categoryId: newStation.categoryId,
+        groupId: newStation.groupId,
+        capacity: newStation.capacity,
+        operatingSchedule: newStation.operatingSchedule,
+        exceptions: (newStation.scheduleExceptions ?? []).map((e) => ({
+          date: (e as { date: string }).date,
+          schedule: (e as { schedule?: unknown }).schedule ?? null,
+          reason: (e as { reason?: string | null }).reason ?? null,
+        })),
+      },
+    ],
+  }));
+
+  return { data: newStation };
+};
+
+/**
+ * PUT /stations/:id - Update a station
+ */
+const handleUpdateStation = async (
+  args: FetchArgs
+): Promise<{ data: StationResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/stations\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing station ID' } } };
+  }
+
+  const body = args.body as { name?: string; status?: string; categoryId?: string; groupId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Station name is required' } },
+    };
+  }
+
+  const existing = mockStationStore.find((s) => s.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Station not found' } } };
+  }
+
+  const duplicate = mockStationStore.some(
+    (s) => s.id !== id && s.name.toLowerCase() === name.toLowerCase()
+  );
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Station '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: StationResponse = {
+    ...existing,
+    name,
+    status: (body.status ?? existing.status) as StationResponse['status'],
+    categoryId: body.categoryId ?? existing.categoryId,
+    groupId: body.groupId ?? existing.groupId,
+    capacity: body.capacity ?? existing.capacity,
+    displayOrder: body.displayOrder ?? existing.displayOrder,
+    operatingSchedule: body.operatingSchedule !== undefined ? (body.operatingSchedule as StationResponse['operatingSchedule']) : existing.operatingSchedule,
+    scheduleExceptions: body.scheduleExceptions !== undefined ? (body.scheduleExceptions as StationResponse['scheduleExceptions']) : existing.scheduleExceptions,
+    updatedAt: now,
+  };
+
+  mockStationStore = mockStationStore.map((s) => (s.id === id ? updated : s));
+
+  // Update snapshot
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    stations: snapshot.stations.map((s) =>
+      s.id === id
+        ? {
+            ...s,
+            name: updated.name,
+            status: updated.status,
+            categoryId: updated.categoryId,
+            groupId: updated.groupId,
+            capacity: updated.capacity,
+            operatingSchedule: updated.operatingSchedule,
+            exceptions: (updated.scheduleExceptions ?? []).map((e) => ({
+              date: (e as { date: string }).date,
+              schedule: (e as { schedule?: unknown }).schedule ?? null,
+              reason: (e as { reason?: string | null }).reason ?? null,
+            })),
+          }
+        : s
+    ),
+  }));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /stations/:id - Delete a station
+ */
+const handleDeleteStation = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/stations\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing station ID' } } };
+  }
+
+  const existing = mockStationStore.find((s) => s.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Station not found' } } };
+  }
+
+  // Check if any tasks are assigned to this station
+  const snapshot = getSnapshot();
+  const hasAssignments = snapshot.assignments.some((a) => a.targetId === id);
+  if (hasAssignments) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: 'Station has scheduled assignments and cannot be deleted' },
+      },
+    };
+  }
+
+  mockStationStore = mockStationStore.filter((s) => s.id !== id);
+
+  updateSnapshot((s) => ({
+    ...s,
+    stations: s.stations.filter((st) => st.id !== id),
+  }));
+
+  return { data: {} };
+};
+
 /**
  * POST /templates - Create a template
  */
@@ -2384,6 +2606,12 @@ const routes: MockRoute[] = [
   { method: 'POST',   pattern: /^\/feuille-formats$/,           handler: handleCreateFeuilleFormat },
   { method: 'PUT',    pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleUpdateFeuilleFormat },
   { method: 'DELETE', pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleDeleteFeuilleFormat },
+
+  // Stations (management CRUD — must come before the compact handler)
+  { method: 'GET',    pattern: /^\/stations$/,        handler: handleGetStations },
+  { method: 'POST',   pattern: /^\/stations$/,         handler: handleCreateStation },
+  { method: 'PUT',    pattern: /^\/stations\/[^/]+$/,  handler: handleUpdateStation },
+  { method: 'DELETE', pattern: /^\/stations\/[^/]+$/,  handler: handleDeleteStation },
 
   // Station operations
   { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },
