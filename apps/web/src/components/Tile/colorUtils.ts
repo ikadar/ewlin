@@ -43,8 +43,10 @@ export function hexToTailwindColor(hex: string): TailwindColor {
     '#F43F5E': 'rose',
     '#EF4444': 'red',
     '#EAB308': 'yellow',
+    '#FDD835': 'yellow',  // Material Yellow-600
     '#F59E0B': 'amber',
     '#F97316': 'orange',
+    '#FB8C00': 'orange',  // Material Orange-700
     '#14B8A6': 'teal',
     '#22C55E': 'green',
     '#10B981': 'emerald',
@@ -52,11 +54,16 @@ export function hexToTailwindColor(hex: string): TailwindColor {
     '#06B6D4': 'cyan',
     '#0EA5E9': 'sky',
     '#3B82F6': 'blue',
+    '#1E88E5': 'blue',    // Material Blue-600
     '#6366F1': 'indigo',
     '#EC4899': 'pink',
     '#D946EF': 'fuchsia',
+    '#D81B60': 'rose',    // Material Pink-700
+    '#6D4C41': 'orange',  // Material Brown-600 (closest warm color)
   };
 
+  // IMPORTANT: fallback must NOT be 'amber' — amber is reserved for conflict glow (REQ-12).
+  // An unmapped color falling back to amber would be visually indistinguishable from a conflict tile.
   return colorMap[normalizedHex] || 'purple';
 }
 
