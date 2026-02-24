@@ -1,5 +1,5 @@
 import { type ReactNode, type MouseEvent, useRef, useMemo, memo } from 'react';
-import type { Station, DaySchedule } from '@flux/types';
+import type { Station, DaySchedule, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import { PlacementIndicator } from '../PlacementIndicator';
@@ -65,6 +65,10 @@ export interface StationColumnProps {
   onPickMouseLeave?: () => void;
   /** v0.3.54: Callback for click to place during pick */
   onPickClick?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
+  /** Current display mode (for dynamic column width) */
+  displayMode?: 'produit' | 'tirage';
+  /** Station category (for columnWidth lookup) */
+  category?: StationCategory;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -120,6 +124,8 @@ export const StationColumn = memo(function StationColumn({
   onPickMouseMove,
   onPickMouseLeave,
   onPickClick,
+  displayMode,
+  category,
 }: StationColumnProps) {
   // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -205,8 +211,9 @@ export const StationColumn = memo(function StationColumn({
     return '';
   };
 
-  // Column width: full (240px / w-60) or collapsed (120px / w-30)
-  const widthClass = isCollapsed ? 'w-30' : 'w-60';
+  // Custom width when category has an explicit columnWidth set (mode-independent).
+  // Falls back to w-60 CSS class (15rem, scales with root font-size) otherwise.
+  const customWidth = category?.columnWidth ?? null;
 
   // Quick placement mode handlers
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
@@ -263,8 +270,8 @@ export const StationColumn = memo(function StationColumn({
   return (
     <div
       ref={columnRef}
-      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${getHighlightClass()} ${getCursorClass()}`}
-      style={{ height: `${totalHeight}px` }}
+      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-[#0a0a0a] relative transition-[filter,opacity,box-shadow] duration-150 ease-out ${getHighlightClass()} ${getCursorClass()}`}
+      style={{ ...(customWidth !== null ? { width: `${customWidth}px` } : {}), height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}

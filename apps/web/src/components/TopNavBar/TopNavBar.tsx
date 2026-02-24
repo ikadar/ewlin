@@ -27,6 +27,8 @@ export interface TopNavBarProps {
   onCompactTimeline?: (horizonHours: CompactHorizon) => void;
   /** Whether compaction is in progress */
   isCompacting?: boolean;
+  /** Current display mode (Produit or Tirage) */
+  displayMode?: 'produit' | 'tirage';
 }
 
 /**
@@ -41,6 +43,7 @@ export function TopNavBar({
   onZoomChange,
   onCompactTimeline,
   isCompacting = false,
+  displayMode,
 }: TopNavBarProps) {
   // Find current zoom level index
   const currentZoomIndex = ZOOM_LEVELS.findIndex((z) => z.pixelsPerHour === pixelsPerHour);
@@ -149,9 +152,22 @@ export function TopNavBar({
         </div>
       </div>
 
-      {/* Right section: Empty (REQ-07.3: User/Settings moved to Sidebar) */}
+      {/* Right section: Display mode indicator */}
       <div className="flex items-center gap-2">
-        {/* User and Settings icons moved to Sidebar bottom per REQ-07.3 */}
+        {displayMode && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-zinc-500">Affichage</span>
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${
+                displayMode === 'tirage'
+                  ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                  : 'bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              {displayMode}
+            </span>
+          </div>
+        )}
       </div>
     </nav>
   );

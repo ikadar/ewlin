@@ -1,4 +1,4 @@
-import type { Station } from '@flux/types';
+import type { Station, StationCategory } from '@flux/types';
 import { OffScreenIndicator } from './OffScreenIndicator';
 
 export interface OffScreenInfo {
@@ -37,6 +37,10 @@ export interface StationHeaderProps {
   onCompact?: (stationId: string) => void;
   /** Group capacity information (REQ-18) */
   groupCapacity?: GroupCapacityInfo;
+  /** Current display mode (for dynamic column width) */
+  displayMode?: 'produit' | 'tirage';
+  /** Station category (for columnWidth lookup) */
+  category?: StationCategory;
 }
 
 /**
@@ -108,11 +112,14 @@ export function StationHeader({
   isCompacting = false,
   onCompact,
   groupCapacity: _groupCapacity, // REQ-06: Group capacity display removed from header
+  displayMode,
+  category,
 }: StationHeaderProps) {
   const _hasIndicator = offScreen && (offScreen.above > 0 || offScreen.below > 0);
 
-  // Width: full (240px / w-60) or collapsed (120px / w-30)
-  const widthClass = isCollapsed ? 'w-30' : 'w-60';
+  // Custom width when category has an explicit columnWidth set (mode-independent).
+  // Falls back to w-60 CSS class (15rem, scales with root font-size) otherwise.
+  const customWidth = category?.columnWidth ?? null;
 
   // Compact button is disabled when no tiles or during loading
   const isCompactDisabled = !hasTiles || isCompacting;
@@ -131,7 +138,8 @@ export function StationHeader({
 
   return (
     <div
-      className={`${widthClass} shrink-0 py-2 px-3 text-sm transition-all duration-150 ease-out flex items-center justify-between`}
+      className={`${customWidth === null ? 'w-60' : ''} shrink-0 py-2 px-3 text-sm transition-[filter,opacity] duration-150 ease-out flex items-center justify-between`}
+      style={customWidth !== null ? { width: `${customWidth}px` } : {}}
       data-testid={`station-header-${station.id}`}
     >
       <span className="font-medium text-zinc-300 truncate">{station.name}</span>

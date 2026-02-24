@@ -88,6 +88,32 @@ function getLayoutDimensions(): {
 }
 
 // ============================================================================
+// v1: Tirage display mode — variable column width support
+// ============================================================================
+
+/**
+ * Calculate a station's X offset and width, accounting for variable column widths.
+ * Uses getLayoutDimensions().stationWidth as the default (w-60 = 15rem, font-size-aware).
+ * Column width is mode-independent: applies in both Produit and Tirage modes.
+ */
+function getStationXOffset(
+  stationIndex: number,
+  stations: import('@flux/types').Station[],
+  catMap: Map<string, import('@flux/types').StationCategory>,
+): { x: number; stationWidth: number } {
+  const { gap, paddingLeft, stationWidth: defaultWidth } = getLayoutDimensions();
+  let x = paddingLeft;
+  for (let i = 0; i < stationIndex; i++) {
+    const cat = catMap.get(stations[i].categoryId);
+    const w = cat?.columnWidth ?? defaultWidth;
+    x += w + gap;
+  }
+  const targetCat = catMap.get(stations[stationIndex].categoryId);
+  const stationWidth = targetCat?.columnWidth ?? defaultWidth;
+  return { x, stationWidth };
+}
+
+// ============================================================================
 // Keyboard shortcut handlers (extracted to reduce cognitive complexity S3776)
 // ============================================================================
 
@@ -209,6 +235,17 @@ function handlePageScroll(e: KeyboardEvent, ctx: KeyboardContext): boolean {
     return true;
   }
   return false;
+}
+
+function handleDisplayModeToggle(
+  e: KeyboardEvent,
+  setDisplayMode: (updater: (prev: 'produit' | 'tirage') => 'produit' | 'tirage') => void,
+): boolean {
+  if (e.key !== 'a' && e.key !== 'A') return false;
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return false;
+  setDisplayMode((prev) => (prev === 'produit' ? 'tirage' : 'produit'));
+  return true;
 }
 
 /**
@@ -334,6 +371,9 @@ function AppContent() {
     y: number;
     snappedY: number;
   }>({ stationId: null, y: 0, snappedY: 0 });
+
+  // Display mode state (Produit / Tirage)
+  const [displayMode, setDisplayMode] = useState<'produit' | 'tirage'>('produit');
 
   // v0.3.54: Pick & Place validation state
   const [pickValidation, setPickValidation] = useState<{
@@ -716,6 +756,13 @@ function AppContent() {
     return today;
   }, []);
 
+  // Category lookup map (for getStationXOffset)
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, import('@flux/types').StationCategory>();
+    snapshot.categories.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [snapshot.categories]);
+
   // v0.3.54: Calculate precedence constraints for pick
   const pickPrecedenceConstraints = useMemo(() => {
     if (!pickedTask) {
@@ -1012,6 +1059,7 @@ function AppContent() {
         }
       }, isPicking)) return;
       if (handleQuickPlacementKeyboard(e, ctx)) return;
+      if (handleDisplayModeToggle(e, setDisplayMode)) return;
       if (handleEscapeQuickPlacement(e, ctx)) return;
       if (handleJobNavigation(e, ctx)) return;
       if (handleJumpToDeparture(e, ctx)) return;
@@ -1032,7 +1080,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, rescheduleTask]);
+  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -1103,11 +1151,8 @@ function AppContent() {
     let scrollTargetX = gridRef.current.getScrollX(); // Default: keep current X
 
     if (stationIndex >= 0) {
-      // v0.4.29: Use computed dimensions based on root font-size (rem → px)
-      const { stationWidth, gap, paddingLeft, timelineWidth } = getLayoutDimensions();
-
-      // Calculate station's X position
-      const stationX = paddingLeft + stationIndex * (stationWidth + gap);
+      const { timelineWidth } = getLayoutDimensions();
+      const { x: stationX, stationWidth } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
 
       // Center the station in the viewport (accounting for timeline column width)
       const viewportWidth = gridRef.current.getViewportWidth();
@@ -1125,7 +1170,7 @@ function AppContent() {
       scrollTargetX,
       scrollTargetY,
     });
-  }, [snapshot.stations, pixelsPerHour, gridStartDate]);
+  }, [snapshot.stations, categoryMap, displayMode, pixelsPerHour, gridStartDate]);
 
   // Handle recall - remove assignment (double-click on tile)
   // v0.5.2: Now uses RTK Query mutation
@@ -1429,8 +1474,8 @@ function AppContent() {
     if (stationIndex < 0) return;
 
     // Horizontal: center the target station column in viewport
-    const { stationWidth, gap, paddingLeft, timelineWidth } = getLayoutDimensions();
-    const stationX = paddingLeft + stationIndex * (stationWidth + gap);
+    const { timelineWidth } = getLayoutDimensions();
+    const { x: stationX, stationWidth } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
     const viewportWidth = gridRef.current.getViewportWidth();
     const scrollX = Math.max(0, stationX - (viewportWidth - timelineWidth - stationWidth) / 2);
 
@@ -1446,7 +1491,7 @@ function AppContent() {
     } else {
       gridRef.current.scrollToX(scrollX, 'smooth');
     }
-  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, pixelsPerHour, gridStartDate]);
+  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, categoryMap, displayMode, pixelsPerHour, gridStartDate]);
 
   // Quick Placement: handle mouse move in station column
   // v0.3.48: Use pixelsPerHour for zoom-aware snapping
@@ -1609,14 +1654,12 @@ function AppContent() {
         const targetStationId = task.stationId;
         const stationIndex = snapshot.stations.findIndex((s) => s.id === targetStationId);
         if (stationIndex >= 0) {
-          // v0.4.29: Use computed dimensions based on root font-size (rem → px)
-          const { stationWidth, gap, paddingLeft } = getLayoutDimensions();
-          const targetX = paddingLeft + stationIndex * (stationWidth + gap);
+          const { x: targetX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
           gridRef.current.scrollToX(targetX, 'smooth');
         }
       }
     }
-  }, [pickActions, snapshot.stations]);
+  }, [pickActions, snapshot.stations, categoryMap, displayMode]);
 
   // v0.3.57: Handle pick from grid (reschedule existing task)
   // No scroll needed as user is already at tile location
@@ -1934,6 +1977,7 @@ function AppContent() {
             onZoomChange={handleZoomChange}
             onCompactTimeline={handleCompactTimeline}
             isCompacting={isCompactingTimeline}
+            displayMode={displayMode}
           />
 
           {/* Content area */}
@@ -2030,6 +2074,7 @@ function AppContent() {
           pickedAssignmentId={pickedAssignmentId}
           onPickFromGrid={handlePickFromGrid}
           onContextMenu={handleContextMenuOpen}
+          displayMode={displayMode}
         />
           </div>
         </div>

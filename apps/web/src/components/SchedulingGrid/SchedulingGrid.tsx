@@ -130,6 +130,8 @@ export interface SchedulingGridProps {
   onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
   /** v0.3.58: Callback when tile is right-clicked (context menu) */
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
+  /** Current display mode (Produit or Tirage) — affects column widths */
+  displayMode?: 'produit' | 'tirage';
 }
 
 /**
@@ -188,6 +190,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onPickFromGrid,
       // v0.3.58: Context menu props
       onContextMenu,
+      displayMode,
     },
     ref
   ) {
@@ -404,6 +407,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isCompacting = compactingStationId === station.id;
               // REQ-18: Get group capacity info for this station
               const groupCapacity = groupCapacityMap.get(station.id);
+              const headerCategory = categoryMap.get(station.categoryId);
               return (
                 <StationHeader
                   key={station.id}
@@ -413,6 +417,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   isCompacting={isCompacting}
                   onCompact={onCompact}
                   groupCapacity={groupCapacity}
+                  displayMode={displayMode}
+                  category={headerCategory}
                 />
               );
             })}
@@ -525,6 +531,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onPickMouseMove={onPickMouseMove}
                   onPickMouseLeave={onPickMouseLeave}
                   onPickClick={onPickClick}
+                  displayMode={displayMode}
+                  category={category}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
