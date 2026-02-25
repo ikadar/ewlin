@@ -192,7 +192,7 @@ describe('TileTooltip', () => {
   });
 
   describe('Element section', () => {
-    it('shows element label when present', () => {
+    it('shows element spec when element is present', () => {
       render(
         <TileTooltip
           isVisible={true}
@@ -202,11 +202,10 @@ describe('TileTooltip', () => {
           assignment={makeAssignment()}
         />
       );
-      expect(screen.getByTestId('tile-tooltip-element')).toBeInTheDocument();
-      expect(screen.getByText('Couverture')).toBeInTheDocument();
+      expect(screen.getByTestId('tile-tooltip-spec')).toBeInTheDocument();
     });
 
-    it('falls back to element name when no label', () => {
+    it('shows element spec rows when element has spec', () => {
       render(
         <TileTooltip
           isVisible={true}
@@ -216,7 +215,7 @@ describe('TileTooltip', () => {
           assignment={makeAssignment()}
         />
       );
-      expect(screen.getByText('couv')).toBeInTheDocument();
+      expect(screen.getByTestId('tile-tooltip-spec')).toBeInTheDocument();
     });
 
     it('hides element section when no element', () => {

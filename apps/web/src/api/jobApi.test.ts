@@ -32,7 +32,9 @@ describe('transformJcfElementToRequest', () => {
 
     expect(result.name).toBe('INT');
     expect(result.prerequisiteNames).toEqual([]);
-    expect(result.label).toBe('A4 | 8P | Couche 135g');
+    expect(result.format).toBe('A4');
+    expect(result.papier).toBe('Couche 135g');
+    expect(result.pagination).toBe(8);
     expect(result.sequence).toBe('M1 30+60');
   });
 
@@ -57,7 +59,9 @@ describe('transformJcfElementToRequest', () => {
 
     expect(result.name).toBe('COUV');
     expect(result.prerequisiteNames).toEqual(['INT', 'PAGE']);
-    expect(result.label).toBe('A3 | 4P | Couche 250g');
+    expect(result.format).toBe('A3');
+    expect(result.papier).toBe('Couche 250g');
+    expect(result.pagination).toBe(4);
     expect(result.sequence).toBeUndefined();
   });
 

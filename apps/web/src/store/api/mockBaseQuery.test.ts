@@ -10,7 +10,7 @@ import * as snapshotModule from '../../mock/snapshot';
 
 // Mock the snapshot module
 vi.mock('../../mock/snapshot', () => ({
-  getSnapshot: vi.fn(),
+  getSnapshot: vi.fn(() => ({ version: 1, stations: [], jobs: [], elements: [], tasks: [], assignments: [] })),
   updateSnapshot: vi.fn(),
 }));
 

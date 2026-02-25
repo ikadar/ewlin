@@ -17,6 +17,7 @@ import { formatApi } from '../store/api/formatApi';
 import { impressionPresetApi } from '../store/api/impressionPresetApi';
 import { surfacagePresetApi } from '../store/api/surfacagePresetApi';
 import { stationCategoryApi } from '../store/api/stationCategoryApi';
+import { feuilleFormatApi } from '../store/api/feuilleFormatApi';
 import { uiReducer } from '../store/slices/uiSlice';
 import { jcfReducer } from '../store/slices/jcfSlice';
 import { errorReducer } from '../store/slices/errorSlice';
@@ -34,6 +35,7 @@ export function createTestStore(preloadedState?: Record<string, unknown>) {
       [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
       [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
       [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
+      [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
       ui: uiReducer,
       jcf: jcfReducer,
       error: errorReducer,
@@ -46,7 +48,8 @@ export function createTestStore(preloadedState?: Record<string, unknown>) {
         .concat(formatApi.middleware)
         .concat(impressionPresetApi.middleware)
         .concat(surfacagePresetApi.middleware)
-        .concat(stationCategoryApi.middleware),
+        .concat(stationCategoryApi.middleware)
+        .concat(feuilleFormatApi.middleware),
     preloadedState,
   });
 }

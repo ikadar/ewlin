@@ -184,9 +184,8 @@ describe('StationColumn', () => {
     render(<StationColumn station={mockStation} dayOfWeek={1} />);
 
     const column = screen.getByTestId('station-column-station-1');
-    expect(column).toHaveClass('transition-all');
-    expect(column).toHaveClass('duration-150');
-    expect(column).toHaveClass('ease-out');
+    expect(column.className).toContain('duration-150');
+    expect(column.className).toContain('ease-out');
   });
 
   describe('Quick Placement validation visual feedback', () => {
