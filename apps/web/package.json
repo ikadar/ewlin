@@ -31,6 +31,7 @@
     "@faker-js/faker": "^10.1.0",
     "@flux/schedule-validator": "link:../../packages/validator",
     "@flux/types": "link:../../packages/types",
+    "@headlessui/react": "^2.2.9",
     "@reduxjs/toolkit": "^2.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
