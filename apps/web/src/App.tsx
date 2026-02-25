@@ -36,6 +36,7 @@ import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
+import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -105,11 +106,11 @@ function getStationXOffset(
   let x = paddingLeft;
   for (let i = 0; i < stationIndex; i++) {
     const cat = catMap.get(stations[i].categoryId);
-    const w = cat?.columnWidth ?? defaultWidth;
+    const w = cat?.columnWidth ?? (cat ? getDefaultCategoryWidth(cat.name) : null) ?? defaultWidth;
     x += w + gap;
   }
   const targetCat = catMap.get(stations[stationIndex].categoryId);
-  const stationWidth = targetCat?.columnWidth ?? defaultWidth;
+  const stationWidth = targetCat?.columnWidth ?? (targetCat ? getDefaultCategoryWidth(targetCat.name) : null) ?? defaultWidth;
   return { x, stationWidth };
 }
 
@@ -1143,20 +1144,15 @@ function AppContent() {
     const viewportHeight = gridRef.current.getViewportHeight();
     const scrollTargetY = Math.max(0, y - viewportHeight * 0.2);
 
-    // Calculate X position from station index
-    // Station layout: px-3 (12px) padding, then each station is 240px + 12px gap
+    // Calculate X position from station index (accounts for variable column widths)
     const stationId = assignment.targetId;
     const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
 
     let scrollTargetX = gridRef.current.getScrollX(); // Default: keep current X
 
     if (stationIndex >= 0) {
-      const { timelineWidth } = getLayoutDimensions();
-      const { x: stationX, stationWidth } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
-
-      // Center the station in the viewport (accounting for timeline column width)
-      const viewportWidth = gridRef.current.getViewportWidth();
-      scrollTargetX = Math.max(0, stationX - (viewportWidth - timelineWidth - stationWidth) / 2);
+      const { x: stationX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
+      scrollTargetX = Math.max(0, stationX);
     }
 
     // Scroll both X and Y at once
@@ -1473,11 +1469,9 @@ function AppContent() {
     const stationIndex = snapshot.stations.findIndex((s) => s.id === lastUnscheduledTask.stationId);
     if (stationIndex < 0) return;
 
-    // Horizontal: center the target station column in viewport
-    const { timelineWidth } = getLayoutDimensions();
-    const { x: stationX, stationWidth } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
-    const viewportWidth = gridRef.current.getViewportWidth();
-    const scrollX = Math.max(0, stationX - (viewportWidth - timelineWidth - stationWidth) / 2);
+    // Horizontal: scroll to left edge of target station column
+    const { x: stationX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
+    const scrollX = Math.max(0, stationX);
 
     // Vertical: scroll to predecessor constraint (purple line) if available, else successor (orange)
     const earliestY = getPredecessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
