@@ -41,6 +41,9 @@ export interface SessionLearningActions {
   learnSoustraitant: (st: SoustraitantPreset) => void;
 }
 
+/** Combined type for session learning state and actions */
+export type SessionLearning = SessionLearningState & SessionLearningActions;
+
 /**
  * Session learning hook for JCF autocomplete fields.
  *

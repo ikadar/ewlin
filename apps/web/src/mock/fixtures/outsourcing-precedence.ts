@@ -263,6 +263,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(8, 0, 0), // Today 8:00
       scheduledEnd: isoDate(9, 30, 0), // Today 9:30
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
     {
       id: 'assign-prec-1b',
@@ -272,6 +275,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(14, 0, 0), // Today 14:00 (departure)
       scheduledEnd: isoDate(9, 0, 5), // Day 5 at 09:00 (return after 1+2+1 transit+work days)
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
     {
       id: 'assign-prec-1c',
@@ -281,6 +287,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(10, 0, 5), // Day 5 at 10:00 (after outsourced return)
       scheduledEnd: isoDate(10, 45, 5), // Day 5 at 10:45
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
 
     // Job 2: Chain with manual return
@@ -292,6 +301,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(8, 0, 1), // Day 1 at 8:00
       scheduledEnd: isoDate(10, 0, 1), // Day 1 at 10:00
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
     {
       id: 'assign-prec-2b',
@@ -301,6 +313,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(12, 0, 1), // Day 1 at 12:00 (departure)
       scheduledEnd: isoDate(10, 0, 5), // Day 5 at 10:00 (manual return)
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
     {
       id: 'assign-prec-2c',
@@ -310,6 +325,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(11, 0, 5), // Day 5 at 11:00 (after manual return)
       scheduledEnd: isoDate(12, 0, 5), // Day 5 at 12:00
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
 
     // Job 3: Backward calculation test
@@ -321,6 +339,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(8, 0, 2), // Day 2 at 8:00
       scheduledEnd: isoDate(9, 30, 2), // Day 2 at 9:30
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
     {
       id: 'assign-prec-3b',
@@ -330,6 +351,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(14, 0, 3), // Day 3 at 14:00 (manual departure)
       scheduledEnd: isoDate(9, 0, 8), // Day 8 at 09:00 (return)
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
 
     // Job 4: Internal-only (regression)
@@ -341,6 +365,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(8, 0, 3), // Day 3 at 8:00
       scheduledEnd: isoDate(9, 30, 3), // Day 3 at 9:30
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
     {
       id: 'assign-prec-4b',
@@ -350,6 +377,9 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       scheduledStart: isoDate(10, 0, 3), // Day 3 at 10:00
       scheduledEnd: isoDate(10, 45, 3), // Day 3 at 10:45
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
   ];
 

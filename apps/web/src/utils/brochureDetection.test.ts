@@ -21,6 +21,8 @@ const makeInternalTask = (id: string, stationId: string): Task => ({
   elementId: 'elt-1',
   type: 'Internal',
   stationId,
+  sequenceOrder: 0,
+  status: 'Defined',
   duration: { setupMinutes: 0, runMinutes: 30 },
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-01T00:00:00Z',

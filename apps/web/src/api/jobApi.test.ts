@@ -84,7 +84,7 @@ describe('transformJcfElementToRequest', () => {
 
     const result = transformJcfElementToRequest(element);
 
-    expect(result.label).toBeUndefined();
+    expect(result.format).toBeUndefined();
   });
 
   it('handles whitespace in precedences', () => {

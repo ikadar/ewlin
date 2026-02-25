@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { renderWithRedux, createTestStore } from '../../test/testUtils';
 import { Provider } from 'react-redux';
 import { GlobalToast } from './GlobalToast';
@@ -38,9 +38,7 @@ describe('GlobalToast', () => {
       })
     );
 
-    renderWithRedux(<GlobalToast />, {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    });
+    render(<Provider store={store}><GlobalToast /></Provider>);
 
     // GlobalToast should render the Toast component
     expect(screen.getByTestId('toast')).toBeInTheDocument();
@@ -59,9 +57,7 @@ describe('GlobalToast', () => {
       })
     );
 
-    renderWithRedux(<GlobalToast />, {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    });
+    render(<Provider store={store}><GlobalToast /></Provider>);
 
     expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
   });
@@ -78,9 +74,7 @@ describe('GlobalToast', () => {
       })
     );
 
-    renderWithRedux(<GlobalToast />, {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    });
+    render(<Provider store={store}><GlobalToast /></Provider>);
 
     expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
   });
@@ -97,9 +91,7 @@ describe('GlobalToast', () => {
       })
     );
 
-    renderWithRedux(<GlobalToast />, {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    });
+    render(<Provider store={store}><GlobalToast /></Provider>);
 
     // Click dismiss button
     fireEvent.click(screen.getByTestId('toast-dismiss'));
@@ -120,9 +112,7 @@ describe('GlobalToast', () => {
       })
     );
 
-    renderWithRedux(<GlobalToast />, {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    });
+    render(<Provider store={store}><GlobalToast /></Provider>);
 
     expect(screen.getByTestId('toast')).toBeInTheDocument();
 

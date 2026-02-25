@@ -5,9 +5,9 @@
 
 import { useMemo } from 'react';
 import { Calculator } from 'lucide-react';
-import type { JcfFieldKey, JcfLinkableField } from '../../types';
-import type { SessionLearning } from './useSessionLearning';
-import type { LinkPropagationState } from './useLinkPropagation';
+import type { JcfFieldKey, JcfLinkableField } from './types';
+import type { SessionLearning } from '../../hooks/useSessionLearning';
+import type { LinkPropagationState } from '../../hooks/useLinkPropagation';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
 import type { PostePresetLike } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
 import { WorkflowSequenceAutocomplete } from '../WorkflowSequenceAutocomplete/WorkflowSequenceAutocomplete';
@@ -82,7 +82,7 @@ function SequenceCell(props: CellContentProps) {
       onChange={(v) => handleCellChange(elementIndex, 'sequence', v)}
       postePresets={postePresets}
       sessionPostes={sessionLearning.postes}
-      onLearnPoste={sessionLearning.learnPoste}
+      onLearnPoste={(poste: PostePresetLike) => sessionLearning.learnPoste(poste as import('@flux/types').PostePreset)}
       soustraitantPresets={SOUSTRAITANT_PRESETS}
       sessionSoustraitants={sessionLearning.soustraitants}
       onLearnSoustraitant={sessionLearning.learnSoustraitant}

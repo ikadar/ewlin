@@ -14,21 +14,28 @@ const mockJob: Job = {
   description: 'Brochures',
   status: 'Planned',
   workshopExitDate: new Date().toISOString(),
+  fullyScheduled: false,
   color: '#8B5CF6', // Purple
-  proofSentAt: null,
-  proofApprovedAt: null,
+  comments: [],
+  elementIds: [],
+  taskIds: [],
+  createdAt: '2025-12-01T00:00:00Z',
+  updatedAt: '2025-12-01T00:00:00Z',
 };
 
 const mockTask: InternalTask = {
   id: 'task-1',
-  jobId: 'job-1',
-  categoryId: 'cat-1',
-  sequence: 1,
-  status: 'Pending',
+  elementId: 'elem-1',
+  type: 'Internal',
+  stationId: 'station-1',
+  sequenceOrder: 0,
+  status: 'Defined',
   duration: {
     setupMinutes: 30,
     runMinutes: 60,
   },
+  createdAt: '2025-12-01T00:00:00Z',
+  updatedAt: '2025-12-01T00:00:00Z',
 };
 
 const mockAssignment: TaskAssignment = {

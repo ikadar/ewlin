@@ -11,6 +11,8 @@ import type {
   Job,
   Station,
   Element,
+  InternalTask,
+  OutsourcedTask,
 } from '@flux/types';
 import { isInternalTask, isOutsourcedTask } from '@flux/types';
 import { calculateEndTime } from '../../utils/timeCalculations';
@@ -66,7 +68,7 @@ interface AssignmentResult {
 }
 
 interface InternalTaskContext {
-  task: Task & { stationId: string };
+  task: InternalTask;
   stations: Station[];
   stationNextAvailable: Map<string, Date>;
   previousTaskEnd: Date | null;
@@ -75,7 +77,7 @@ interface InternalTaskContext {
 }
 
 interface OutsourcedTaskContext {
-  task: Task & { providerId: string; duration: { latestDepartureTime: string; openDays: number; receptionTime: string } };
+  task: OutsourcedTask;
   previousTaskEnd: Date | null;
   startTime: Date;
   baseDate: Date;

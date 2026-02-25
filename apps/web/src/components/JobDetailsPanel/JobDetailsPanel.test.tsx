@@ -34,6 +34,7 @@ const mockElements: Element[] = [
     paperStatus: 'in_stock',
     batStatus: 'bat_approved',
     plateStatus: 'ready',
+    formeStatus: 'none',
     createdAt: '2025-12-15T10:00:00Z',
     updatedAt: '2025-12-15T10:00:00Z',
   },

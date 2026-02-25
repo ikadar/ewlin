@@ -70,6 +70,7 @@ const SUBMIT_MESSAGES: Record<JcfFieldKey, string> = {
   surfacage: `<strong>Surfacage requis</strong>`,
   autres: `<strong>Champ requis</strong>`,
   commentaires: `<strong>Champ requis</strong>`,
+  links: `<strong>Champ requis</strong>`,
 };
 
 // ── Individual Field Validators ──────────────────────────────────────────────

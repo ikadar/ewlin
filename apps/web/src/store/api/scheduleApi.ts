@@ -250,7 +250,7 @@ export const scheduleApi = createApi({
           scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
             const element = draft.elements.find((e) => e.id === elementId);
             if (element) {
-              (element as Record<string, unknown>)[field] = value;
+              (element as unknown as Record<string, unknown>)[field] = value;
               element.updatedAt = new Date().toISOString();
             }
           })

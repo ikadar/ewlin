@@ -266,19 +266,27 @@ export function createOutsourcingMiniFormFixture(): ScheduleSnapshot {
     {
       id: 'assign-out-1a',
       taskId: 'task-out-1a',
-      stationId: 'station-offset',
+      targetId: 'station-offset',
+      isOutsourced: false,
       scheduledStart: isoDate(8, 0, 0),
       scheduledEnd: isoDate(9, 30, 0), // 1.5h
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
     // Job 3: Cut scheduled at 10:00 today
     {
       id: 'assign-out-3a',
       taskId: 'task-out-3a',
-      stationId: 'station-massicot',
+      targetId: 'station-massicot',
+      isOutsourced: false,
       scheduledStart: isoDate(10, 0, 0),
       scheduledEnd: isoDate(10, 45, 0), // 45min
       isCompleted: false,
+      completedAt: null,
+      createdAt: today.toISOString(),
+      updatedAt: today.toISOString(),
     },
   ];
 

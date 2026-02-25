@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, type MutableRefObject } from 'react';
 import { GitBranch, Minus, Plus } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
-import type { JcfElement, JcfFieldKey } from './types';
+import type { JcfElement, JcfFieldKey, JcfLinkableField } from './types';
 import { useLinkPropagation, isLinkableField } from '../../hooks/useLinkPropagation';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
@@ -22,7 +22,7 @@ import {
 // ── Row definitions ──
 
 interface RowDef {
-  key: JcfFieldKey;
+  key: Exclude<JcfFieldKey, 'links'>;
   label: string;
   icon?: 'git-branch';
 }

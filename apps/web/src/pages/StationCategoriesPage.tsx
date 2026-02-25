@@ -83,13 +83,13 @@ function CategoryFormModal({ initial, onSave, onCancel, isSaving }: CategoryForm
 
     // Drop completely empty rows silently, validate partially filled ones
     const nonEmpty = criteria.filter(
-      (c) => c.code.trim() || c.name.trim() || c.fieldPath.trim()
+      (c) => c.name.trim() || c.fieldPath.trim()
     );
     const hasIncomplete = nonEmpty.some(
-      (c) => !c.code.trim() || !c.name.trim() || !c.fieldPath.trim()
+      (c) => !c.name.trim() || !c.fieldPath.trim()
     );
     if (hasIncomplete) {
-      setCriteriaError('Chaque critère doit avoir un code, un nom et un fieldPath.');
+      setCriteriaError('Chaque critère doit avoir un nom et un fieldPath.');
       return;
     }
 

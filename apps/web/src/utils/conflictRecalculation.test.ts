@@ -38,7 +38,7 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
       {
         id: 'cat-1',
         name: 'Category 1',
-        displayOrder: 0,
+        similarityCriteria: [],
       },
     ],
     groups: [],
@@ -71,6 +71,9 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
         paperStatus: 'in_stock',
         batStatus: 'bat_approved',
         plateStatus: 'ready',
+        formeStatus: 'none',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       },
     ],
     tasks: [

@@ -6,10 +6,11 @@
 
 /* eslint-disable react-refresh/only-export-components */
 
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
-import { render, RenderOptions } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import type { RenderOptions } from '@testing-library/react';
 import { scheduleApi } from '../store/api/scheduleApi';
 import { templateApi } from '../store/api/templateApi';
 import { clientApi } from '../store/api/clientApi';
@@ -25,17 +26,17 @@ import { errorReducer } from '../store/slices/errorSlice';
 /**
  * Create a test store with optional preloaded state
  */
-export function createTestStore(preloadedState?: Record<string, unknown>) {
+export function createTestStore() {
   return configureStore({
     reducer: {
-      [scheduleApi.reducerPath]: scheduleApi.reducer,
-      [templateApi.reducerPath]: templateApi.reducer,
-      [clientApi.reducerPath]: clientApi.reducer,
-      [formatApi.reducerPath]: formatApi.reducer,
-      [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
-      [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
-      [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
-      [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
+      scheduleApi: scheduleApi.reducer,
+      templateApi: templateApi.reducer,
+      clientApi: clientApi.reducer,
+      formatApi: formatApi.reducer,
+      impressionPresetApi: impressionPresetApi.reducer,
+      surfacagePresetApi: surfacagePresetApi.reducer,
+      stationCategoryApi: stationCategoryApi.reducer,
+      feuilleFormatApi: feuilleFormatApi.reducer,
       ui: uiReducer,
       jcf: jcfReducer,
       error: errorReducer,
@@ -50,7 +51,6 @@ export function createTestStore(preloadedState?: Record<string, unknown>) {
         .concat(surfacagePresetApi.middleware)
         .concat(stationCategoryApi.middleware)
         .concat(feuilleFormatApi.middleware),
-    preloadedState,
   });
 }
 

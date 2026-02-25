@@ -74,9 +74,13 @@ const mockJob: Job = {
   description: 'Brochures',
   status: 'Planned',
   workshopExitDate: new Date().toISOString(),
+  fullyScheduled: false,
   color: '#8b5cf6',
-  proofSentAt: null,
-  proofApprovedAt: null,
+  comments: [],
+  elementIds: [],
+  taskIds: [],
+  createdAt: '2025-12-01T00:00:00Z',
+  updatedAt: '2025-12-01T00:00:00Z',
 };
 
 describe('SchedulingGrid', () => {

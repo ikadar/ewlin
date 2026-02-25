@@ -754,6 +754,9 @@ const handleCreateJob = async (
       paperStatus: 'in_stock',
       batStatus: 'bat_approved',
       plateStatus: 'ready',
+      formeStatus: 'none',
+      createdAt: now,
+      updatedAt: now,
     };
 
     newElements.push(element);
@@ -911,6 +914,9 @@ const handleUpdateJob = async (
         paperStatus: 'in_stock',
         batStatus: 'bat_approved',
         plateStatus: 'ready',
+        formeStatus: 'none',
+        createdAt: now,
+        updatedAt: now,
       });
     }
 
@@ -1087,7 +1093,7 @@ const handleCompactStation = async (
     }
 
     // Calculate new end time
-    const newEnd = task?.type === 'Internal'
+    const newEnd: string = task?.type === 'Internal'
       ? calculateEndTime(task as InternalTask, earliestStart.toISOString(), station)
       : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
 
@@ -2292,7 +2298,7 @@ let mockStationStore: StationResponse[] = getSnapshot().stations.map((s, i) => (
   groupId: s.groupId,
   capacity: s.capacity,
   displayOrder: i,
-  operatingSchedule: (s.operatingSchedule as Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>) ?? null,
+  operatingSchedule: (s.operatingSchedule as unknown as Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>) ?? null,
   scheduleExceptions: (s.exceptions ?? []).map((e) => ({
     date: (e as { date: string }).date,
     type: 'CLOSED',
@@ -2368,11 +2374,12 @@ const handleCreateStation = async (
         categoryId: newStation.categoryId,
         groupId: newStation.groupId,
         capacity: newStation.capacity,
-        operatingSchedule: newStation.operatingSchedule,
-        exceptions: (newStation.scheduleExceptions ?? []).map((e) => ({
+        operatingSchedule: (newStation.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
+        exceptions: (newStation.scheduleExceptions ?? []).map((e, i) => ({
+          id: `exc-${newStation.id}-${i}`,
           date: (e as { date: string }).date,
-          schedule: (e as { schedule?: unknown }).schedule ?? null,
-          reason: (e as { reason?: string | null }).reason ?? null,
+          schedule: ((e as { schedule?: unknown }).schedule ?? { isOperating: false, slots: [] }) as import('@flux/types').DaySchedule,
+          reason: (e as { reason?: string | null }).reason ?? undefined,
         })),
       },
     ],
@@ -2446,11 +2453,12 @@ const handleUpdateStation = async (
             categoryId: updated.categoryId,
             groupId: updated.groupId,
             capacity: updated.capacity,
-            operatingSchedule: updated.operatingSchedule,
-            exceptions: (updated.scheduleExceptions ?? []).map((e) => ({
+            operatingSchedule: (updated.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
+            exceptions: (updated.scheduleExceptions ?? []).map((e, i) => ({
+              id: `exc-${updated.id}-${i}`,
               date: (e as { date: string }).date,
-              schedule: (e as { schedule?: unknown }).schedule ?? null,
-              reason: (e as { reason?: string | null }).reason ?? null,
+              schedule: ((e as { schedule?: unknown }).schedule ?? { isOperating: false, slots: [] }) as import('@flux/types').DaySchedule,
+              reason: (e as { reason?: string | null }).reason ?? undefined,
             })),
           }
         : s

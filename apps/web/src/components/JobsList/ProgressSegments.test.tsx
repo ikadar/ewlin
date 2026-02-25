@@ -11,14 +11,14 @@ import {
 // Helper to create internal task
 function createInternalTask(
   id: string,
-  jobId: string,
+  elementId: string,
   setupMinutes: number,
   runMinutes: number,
   sequenceOrder: number = 0
 ): InternalTask {
   return {
     id,
-    jobId,
+    elementId,
     type: 'Internal',
     stationId: 'station-1',
     sequenceOrder,
@@ -32,13 +32,13 @@ function createInternalTask(
 // Helper to create outsourced task
 function createOutsourcedTask(
   id: string,
-  jobId: string,
+  elementId: string,
   openDays: number,
   sequenceOrder: number = 0
 ): OutsourcedTask {
   return {
     id,
-    jobId,
+    elementId,
     type: 'Outsourced',
     providerId: 'provider-1',
     actionType: 'Pelliculage',
