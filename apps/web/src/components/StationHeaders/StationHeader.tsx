@@ -1,4 +1,5 @@
 import type { Station, StationCategory } from '@flux/types';
+import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 import { OffScreenIndicator } from './OffScreenIndicator';
 
 export interface OffScreenInfo {
@@ -117,9 +118,8 @@ export function StationHeader({
 }: StationHeaderProps) {
   const _hasIndicator = offScreen && (offScreen.above > 0 || offScreen.below > 0);
 
-  // Custom width when category has an explicit columnWidth set (mode-independent).
-  // Falls back to w-60 CSS class (15rem, scales with root font-size) otherwise.
-  const customWidth = category?.columnWidth ?? null;
+  // Custom width: explicit DB value takes priority, then category-based default, then CSS w-60.
+  const customWidth = category?.columnWidth ?? (category ? getDefaultCategoryWidth(category.name) : null);
 
   // Compact button is disabled when no tiles or during loading
   const isCompactDisabled = !hasTiles || isCompacting;

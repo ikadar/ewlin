@@ -16,5 +16,5 @@ export type { TailwindColor } from './colorUtils';
 export { getFieldValue, valuesMatch, compareSimilarity } from './similarityUtils';
 export type { SimilarityResult } from './similarityUtils';
 
-export { PrerequisiteTooltip } from './PrerequisiteTooltip';
-export type { PrerequisiteTooltipProps } from './PrerequisiteTooltip';
+export { TileTooltip } from './TileTooltip';
+export type { TileTooltipProps } from './TileTooltip';

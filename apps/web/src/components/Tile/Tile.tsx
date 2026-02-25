@@ -1,10 +1,10 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import { Circle, CircleCheck } from 'lucide-react';
-import type { TaskAssignment, Job, InternalTask } from '@flux/types';
+import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
-import { PrerequisiteTooltip } from './PrerequisiteTooltip';
+import { TileTooltip } from './TileTooltip';
 import { getJobColorClasses } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
@@ -54,6 +54,12 @@ export interface TileProps {
   isBlocked?: boolean;
   /** v0.4.32b: Prerequisite blocking info for tooltip display */
   blockingInfo?: PrerequisiteBlockingInfo;
+  /** Fázis D: Element data for rich tooltip */
+  element?: Element;
+  /** Current display mode ('produit' or 'tirage') */
+  displayMode?: 'produit' | 'tirage';
+  /** Pre-computed Tirage label string (full label including prefix). Empty → Produit fallback. */
+  tirageLabel?: string;
 }
 
 /**
@@ -92,6 +98,9 @@ export const Tile = memo(function Tile({
   onContextMenu,
   isBlocked = false,
   blockingInfo,
+  element,
+  displayMode,
+  tirageLabel,
 }: TileProps) {
   // v0.4.32b: Tooltip visibility state with 2-second hover delay
   const [showTooltip, setShowTooltip] = useState(false);
@@ -106,14 +115,12 @@ export const Tile = memo(function Tile({
     };
   }, []);
 
-  // v0.4.32b: Handle mouse enter - start 2s timer for tooltip
+  // Fázis D: Handle mouse enter - start 500ms timer for tooltip (all tiles)
   const handleMouseEnter = useCallback(() => {
-    if (isBlocked && blockingInfo) {
-      hoverTimeoutRef.current = setTimeout(() => {
-        setShowTooltip(true);
-      }, 2000);
-    }
-  }, [isBlocked, blockingInfo]);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowTooltip(true);
+    }, 500);
+  }, []);
 
   // v0.4.32b: Handle mouse leave - cancel timer and hide tooltip
   const handleMouseLeave = useCallback(() => {
@@ -312,7 +319,7 @@ export const Tile = memo(function Tile({
               className={`${colorClasses.text} font-medium truncate min-w-0`}
               data-testid="tile-content"
             >
-              {job.reference} · {job.client}
+              {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
             </span>
           </div>
         </div>
@@ -348,7 +355,7 @@ export const Tile = memo(function Tile({
               className={`${colorClasses.text} font-medium truncate min-w-0`}
               data-testid="tile-content"
             >
-              {job.reference} · {job.client}
+              {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
             </span>
           </div>
         )}
@@ -362,13 +369,16 @@ export const Tile = memo(function Tile({
         showDown={showSwapDown}
       />
 
-      {/* v0.4.32b: Prerequisite tooltip (shown after 2s hover on blocked tiles) */}
-      {isBlocked && blockingInfo && (
-        <PrerequisiteTooltip
-          blockingInfo={blockingInfo}
-          isVisible={showTooltip}
-        />
-      )}
+      {/* Fázis D: Rich tooltip (shown after 500ms hover on all tiles) */}
+      <TileTooltip
+        isVisible={showTooltip}
+        job={job}
+        element={element}
+        task={task}
+        assignment={assignment}
+        blockingInfo={blockingInfo}
+        isBlocked={isBlocked}
+      />
     </div>
   );
 }, arePropsEqual);
@@ -382,6 +392,7 @@ function haveDataPropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.assignment !== next.assignment ||
     prev.task !== next.task ||
     prev.job !== next.job ||
+    prev.element !== next.element ||
     prev.top !== next.top ||
     prev.pixelsPerHour !== next.pixelsPerHour ||
     prev.similarityResults !== next.similarityResults
@@ -401,7 +412,9 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.isPicked !== next.isPicked ||
     prev.isPickingActive !== next.isPickingActive ||
     prev.isBlocked !== next.isBlocked ||
-    prev.blockingInfo !== next.blockingInfo
+    prev.blockingInfo !== next.blockingInfo ||
+    prev.displayMode !== next.displayMode ||
+    prev.tirageLabel !== next.tirageLabel
   );
 }
 

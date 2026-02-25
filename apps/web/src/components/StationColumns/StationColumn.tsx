@@ -7,6 +7,7 @@ import { PrecedenceLines } from '../PrecedenceLines';
 import { DryingTimeIndicator } from '../DryingTimeIndicator';
 import { OutsourcingTimeIndicator } from '../OutsourcingTimeIndicator';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
+import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 
 export interface StationColumnProps {
   /** Station to display */
@@ -211,9 +212,8 @@ export const StationColumn = memo(function StationColumn({
     return '';
   };
 
-  // Custom width when category has an explicit columnWidth set (mode-independent).
-  // Falls back to w-60 CSS class (15rem, scales with root font-size) otherwise.
-  const customWidth = category?.columnWidth ?? null;
+  // Custom width: explicit DB value takes priority, then category-based default, then CSS w-60.
+  const customWidth = category?.columnWidth ?? (category ? getDefaultCategoryWidth(category.name) : null);
 
   // Quick placement mode handlers
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {

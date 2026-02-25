@@ -56,7 +56,7 @@ export {
   DIE_CUTTING_CATEGORY_ID,
 } from './prerequisites';
 export type { PrerequisiteBlockingInfo } from './prerequisites';
-export { formatDateDDMMYYYY } from './dateFormat';
+export { formatDateDDMMYYYY, formatScheduleDateTime } from './dateFormat';
 export {
   isBusinessDay,
   addBusinessDays,

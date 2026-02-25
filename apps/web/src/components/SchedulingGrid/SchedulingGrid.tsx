@@ -11,6 +11,7 @@ import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { getJobIdForTask } from '../../utils/taskHelpers';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
+import { getTirageLabel } from '../../utils/tileLabelResolver';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -301,6 +302,21 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return map;
   }, [categories]);
 
+  // Station IDs for assembly categories (Encarteuses-Piqueuses / Assembleuses-Piqueuses).
+  // Used by getTirageLabel → detectBrochureOrLeaflet to distinguish brochure from leaflet.
+  const assemblyStationIds = useMemo(() => {
+    return new Set(
+      stations
+        .filter((s) => {
+          const cat = categoryMap.get(s.categoryId);
+          if (!cat) return false;
+          const n = cat.name.toLowerCase();
+          return n.includes('encarteuse') || (n.includes('assembleuse') && n.includes('piqueuse'));
+        })
+        .map((s) => s.id),
+    );
+  }, [stations, categoryMap]);
+
   // REQ-18: Calculate group capacity info for each station
   const groupCapacityMap = useMemo((): Map<string, GroupCapacityInfo> => {
     if (groups.length === 0) return new Map();
@@ -568,12 +584,28 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                       }
                     }
 
+                    // Compute Tirage label for this tile
+                    const jobElements = elements.filter((e) => e.jobId === job.id);
+                    const rawTirageLabel =
+                      category && element
+                        ? getTirageLabel(
+                            category.name,
+                            element,
+                            job,
+                            jobElements,
+                            taskMap,
+                            assemblyStationIds,
+                          )
+                        : '';
+                    const tileLabel = rawTirageLabel || undefined;
+
                     return (
                       <Tile
                         key={assignment.id}
                         assignment={assignment}
                         task={task}
                         job={job}
+                        element={element}
                         top={top}
                         isSelected={selectedJobId === job.id}
                         showSwapUp={showSwapUp}
@@ -593,6 +625,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onContextMenu={onContextMenu}
                         isBlocked={blocked}
                         blockingInfo={blockingInfo}
+                        displayMode={displayMode}
+                        tirageLabel={tileLabel}
                       />
                     );
                   })}
