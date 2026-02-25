@@ -209,8 +209,6 @@ export const TileTooltip = memo(function TileTooltip({
     ? formatDateDDMMYYYY(job.workshopExitDate)
     : undefined;
 
-  const elementLabel = element?.label ?? element?.name;
-
   return (
     <div
       className="absolute left-0 bottom-full mb-2 z-50 pointer-events-none w-72"
@@ -235,13 +233,6 @@ export const TileTooltip = memo(function TileTooltip({
         {deadlineFormatted && (
           <div className="text-zinc-400" data-testid="tile-tooltip-deadline">
             Sortie atelier: <span className="text-zinc-200">{deadlineFormatted}</span>
-          </div>
-        )}
-
-        {/* Element label */}
-        {elementLabel && (
-          <div className="text-zinc-300" data-testid="tile-tooltip-element">
-            {elementLabel}
           </div>
         )}
 
