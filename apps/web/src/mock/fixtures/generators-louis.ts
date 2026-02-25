@@ -237,7 +237,12 @@ function monoRoute(
   const tasks = taskFactory(ctx, offsetDur);
 
   const elem = makeElement(
-    { id: elemId, name: 'ELT', isPrint: true, spec },
+    {
+      id: elemId,
+      name: 'ELT',
+      isPrint: true,
+      spec: spec ? { ...spec, ...(quantity !== undefined && { quantite: quantity }) } : spec,
+    },
     jobId,
     tasks.map(t => t.id),
     [],
@@ -318,9 +323,9 @@ function generateBrochurePiquee(jobNum: number): RouteResult {
   const allTasks: Task[] = [...couvTasks, ...cah1Tasks, ...cah2Tasks, ...finTasks];
 
   const elements: Element[] = [
-    makeElement({ id: couvId, name: 'Couverture', isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, couvTasks.map(t => t.id), []),
-    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah1Tasks.map(t => t.id), []),
-    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah2Tasks.map(t => t.id), []),
+    makeElement({ id: couvId, name: 'Couverture', isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } }, jobId, couvTasks.map(t => t.id), []),
+    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } }, jobId, cah1Tasks.map(t => t.id), []),
+    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } }, jobId, cah2Tasks.map(t => t.id), []),
     makeElement({ id: finId,  name: 'Finition',    isPrint: false }, jobId, finTasks.map(t => t.id), [couvId, cah1Id, cah2Id]),
   ];
 
@@ -381,9 +386,9 @@ function generateBrochurePiqueePelli(jobNum: number): RouteResult {
   const allTasks: Task[] = [...couvTasks, ...cah1Tasks, ...cah2Tasks, ...finTasks];
 
   const elements: Element[] = [
-    makeElement({ id: couvId, name: 'Couverture', isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, couvTasks.map(t => t.id), []),
-    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah1Tasks.map(t => t.id), []),
-    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } }, jobId, cah2Tasks.map(t => t.id), []),
+    makeElement({ id: couvId, name: 'Couverture', isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } }, jobId, couvTasks.map(t => t.id), []),
+    makeElement({ id: cah1Id, name: 'Cahier 1',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } }, jobId, cah1Tasks.map(t => t.id), []),
+    makeElement({ id: cah2Id, name: 'Cahier 2',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 16, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } }, jobId, cah2Tasks.map(t => t.id), []),
     makeElement({ id: finId,  name: 'Finition',    isPrint: false }, jobId, finTasks.map(t => t.id), [couvId, cah1Id, cah2Id]),
   ];
 
@@ -455,9 +460,9 @@ function generateLiasse(jobNum: number): RouteResult {
   const allTasks: Task[] = [...f1Tasks, ...f2Tasks, ...f3Tasks, ...assTasks];
 
   const elements: Element[] = [
-    makeElement({ id: f1Id,  name: 'Feuillet 1',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 1, imposition: '50x70(4)' } },  jobId, f1Tasks.map(t => t.id), []),
-    makeElement({ id: f2Id,  name: 'Feuillet 2',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 1, imposition: '50x70(4)' } },  jobId, f2Tasks.map(t => t.id), []),
-    makeElement({ id: f3Id,  name: 'Feuillet 3',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 1, imposition: '50x70(4)' } },  jobId, f3Tasks.map(t => t.id), []),
+    makeElement({ id: f1Id,  name: 'Feuillet 1',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 500, imposition: '50x70(4)' } },  jobId, f1Tasks.map(t => t.id), []),
+    makeElement({ id: f2Id,  name: 'Feuillet 2',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 500, imposition: '50x70(4)' } },  jobId, f2Tasks.map(t => t.id), []),
+    makeElement({ id: f3Id,  name: 'Feuillet 3',  isPrint: true, spec: { format: 'A4', papier: 'Autocopiant:60', pagination: 2, impression: 'Q/', quantite: 500, imposition: '50x70(4)' } },  jobId, f3Tasks.map(t => t.id), []),
     makeElement({ id: assId, name: 'Assemblage',   isPrint: false }, jobId, assTasks.map(t => t.id), [f1Id, f2Id, f3Id]),
   ];
 
@@ -511,8 +516,8 @@ function generateBrochureAssembleePiquee(jobNum: number): RouteResult {
   const allTasks: Task[] = [...intTasks, ...couvTasks, ...assTasks];
 
   const elements: Element[] = [
-    makeElement({ id: intId,  name: 'Intérieur',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 48, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } },  jobId, intTasks.map(t => t.id), []),
-    makeElement({ id: couvId, name: 'Couverture',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1, imposition: '65x90(16)' } },  jobId, couvTasks.map(t => t.id), []),
+    makeElement({ id: intId,  name: 'Intérieur',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:115', pagination: 48, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } },  jobId, intTasks.map(t => t.id), []),
+    makeElement({ id: couvId, name: 'Couverture',   isPrint: true, spec: { format: 'A4', papier: 'Couché mat:250', pagination: 4, impression: 'Q/Q', quantite: 1000, imposition: '65x90(16)' } },  jobId, couvTasks.map(t => t.id), []),
     makeElement({ id: assId,  name: 'Assemblage',   isPrint: false }, jobId, assTasks.map(t => t.id), [intId, couvId]),
   ];
 
