@@ -171,10 +171,13 @@ export function WorkflowSequenceAutocomplete({
     return { filtered: suggestions, searchText: search };
   }, [value, cursorPosition, categories]);
 
-  // Reset highlight when suggestions change
-  useEffect(() => {
+  // Reset highlight when suggestions change (store-previous-render pattern per React docs)
+  const [prevSuggestionsKey, setPrevSuggestionsKey] = useState('');
+  const suggestionsKey = `${filtered.length}:${searchText}`;
+  if (suggestionsKey !== prevSuggestionsKey) {
+    setPrevSuggestionsKey(suggestionsKey);
     setHighlightedIndex(0);
-  }, [filtered.length, searchText]);
+  }
 
   // Auto-scroll highlighted item into view (keyboard nav only)
   useEffect(() => {

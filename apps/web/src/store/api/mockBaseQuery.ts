@@ -24,7 +24,6 @@ import type {
   CompactStationResponse,
   InternalTask,
   OutsourcedTask,
-  OutsourcedProvider,
   Station,
   TaskAssignment,
   CreateJobRequest,
@@ -310,7 +309,6 @@ const handleAssignTask = async (
     autoAssignOutsourcedSuccessors(currentSnapshot, taskId, allAssignments);
 
   // Apply outsourced updates to existing assignments
-  const updatedIds = new Set(outsourcedUpdated.map((a) => a.taskId));
   const finalAssignments = allAssignments
     .map((a) => {
       const updated = outsourcedUpdated.find((u) => u.taskId === a.taskId);

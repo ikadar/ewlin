@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback } from 'react';
+import { useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
@@ -61,7 +61,9 @@ export function JcfJobHeader({
 
   // Keep a ref to always access latest templates in callbacks (avoids stale closure)
   const templatesRef = useRef<JcfTemplate[]>(templates);
-  templatesRef.current = templates;
+  useLayoutEffect(() => {
+    templatesRef.current = templates;
+  }, [templates]);
 
   // v0.5.5: Client autocomplete via RTK Query with debounce
   // Skip only for single character (too vague); empty string fetches all, 2+ chars filters

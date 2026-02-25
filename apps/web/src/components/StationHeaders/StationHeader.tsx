@@ -113,7 +113,7 @@ export function StationHeader({
   isCompacting = false,
   onCompact,
   groupCapacity: _groupCapacity, // REQ-06: Group capacity display removed from header
-  displayMode,
+  displayMode: _displayMode,
   category,
 }: StationHeaderProps) {
   const _hasIndicator = offScreen && (offScreen.above > 0 || offScreen.below > 0);

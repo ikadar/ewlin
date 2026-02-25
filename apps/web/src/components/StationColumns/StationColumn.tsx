@@ -103,7 +103,7 @@ export const StationColumn = memo(function StationColumn({
   dayOfWeek,
   gridStartDate,
   children,
-  isCollapsed = false,
+  isCollapsed: _isCollapsed = false,
   isValidDrop = false,
   isInvalidDrop = false,
   isQuickPlacementBypass = false,
@@ -125,7 +125,7 @@ export const StationColumn = memo(function StationColumn({
   onPickMouseMove,
   onPickMouseLeave,
   onPickClick,
-  displayMode,
+  displayMode: _displayMode,
   category,
 }: StationColumnProps) {
   // Ref for the column element
