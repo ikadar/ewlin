@@ -103,14 +103,14 @@ describe('getTirageLabel — Presses Offset', () => {
   it('builds full label', () => {
     expect(
       getTirageLabel('Presses Offset', element, job, [element], emptyTaskMap, noAssemblyStations),
-    ).toBe('REF-001 · int • Couché mat 135g 50x70 Q/Q 5000ex');
+    ).toBe('REF-001 • Couché mat 135g 50x70 Q/Q 5000ex');
   });
 
   it('skips missing fields', () => {
     const el = makeElement('e1', 'int', { papier: 'Offset' });
     expect(
       getTirageLabel('Presses Offset', el, job, [el], emptyTaskMap, noAssemblyStations),
-    ).toBe('REF-001 · int • Offset');
+    ).toBe('REF-001 • Offset');
   });
 });
 
@@ -121,7 +121,7 @@ describe('getTirageLabel — Massicots', () => {
     const el = makeElement('e1', 'int', { format: 'A4', quantite: 1000 });
     expect(
       getTirageLabel('Massicots', el, job, [el], emptyTaskMap, noAssemblyStations),
-    ).toBe('REF-001 · int • A4 1000ex');
+    ).toBe('REF-001 • A4 1000ex');
   });
 
   it('returns empty string when no spec fields', () => {
@@ -141,7 +141,7 @@ describe('getTirageLabel — Plieuses', () => {
     const taskMap = new Map<string, Task>([['t1', makeInternalTask('t1', 'plieuse-1')]]);
     expect(
       getTirageLabel('Plieuses', el, job, [el], taskMap, assemblyStations),
-    ).toBe('REF-001 · int • A5 Offset 80g 5000ex');
+    ).toBe('REF-001 • A5 Offset 80g 5000ex');
   });
 
   it('brochure format (has assembly sibling)', () => {
@@ -198,14 +198,14 @@ describe('getTirageLabel — Assembleuses (not piqueuse)', () => {
     const el = makeElement('e1', 'int', { pagination: 16, quantite: 2000 });
     expect(
       getTirageLabel('Assembleuses', el, job, [el], emptyTaskMap, noAssemblyStations),
-    ).toBe('REF-001 · int • 4 feuillets 2000ex');
+    ).toBe('REF-001 • 4 feuillets 2000ex');
   });
 
   it('ceils feuillets correctly (e.g. 18/4 = 4.5 → 5)', () => {
     const el = makeElement('e1', 'int', { pagination: 18, quantite: 500 });
     expect(
       getTirageLabel('Assembleuses', el, job, [el], emptyTaskMap, noAssemblyStations),
-    ).toBe('REF-001 · int • 5 feuillets 500ex');
+    ).toBe('REF-001 • 5 feuillets 500ex');
   });
 });
 
@@ -216,7 +216,7 @@ describe('getTirageLabel — Typographie', () => {
     const el = makeElement('e1', 'int', { imposition: '50x70(4)', qteFeuilles: 250, papier: 'Offset:80' });
     expect(
       getTirageLabel('Typographie', el, job, [el], emptyTaskMap, noAssemblyStations),
-    ).toBe('REF-001 · int • 50x70(4) 250F Offset 80g');
+    ).toBe('REF-001 • 50x70(4) 250F Offset 80g');
   });
 });
 
@@ -227,7 +227,7 @@ describe('getTirageLabel — Pelliculeuses', () => {
     const el = makeElement('e1', 'couv', { surfacage: 'mat/mat', imposition: '50x70(8)', qteFeuilles: 125, papier: 'Couché mat:135' });
     expect(
       getTirageLabel('Pelliculeuses', el, job, [el], emptyTaskMap, noAssemblyStations),
-    ).toBe('REF-001 · couv • mat/mat 50x70(8) 125F Couché mat 135g');
+    ).toBe('REF-001 • mat/mat 50x70(8) 125F Couché mat 135g');
   });
 });
 
@@ -246,6 +246,23 @@ describe('getTirageLabel — Conditionnement and unknown categories', () => {
     expect(
       getTirageLabel('Inconnu', el, job, [el], emptyTaskMap, noAssemblyStations),
     ).toBe('');
+  });
+});
+
+describe('getTirageLabel — single vs multi element prefix', () => {
+  it('omits element name for single-element job', () => {
+    const el = makeElement('e1', 'ELT', { papier: 'Offset:80', imposition: '50x70', impression: 'R°', quantite: 1000 });
+    expect(
+      getTirageLabel('Presses Offset', el, makeJob(), [el], emptyTaskMap, noAssemblyStations),
+    ).toBe('REF-001 • Offset 80g 50x70 R° 1000ex');
+  });
+
+  it('shows element name for multi-element job', () => {
+    const el = makeElement('e1', 'int', { papier: 'Offset:80', imposition: '50x70', impression: 'R°', quantite: 1000 });
+    const el2 = makeElement('e2', 'couv');
+    expect(
+      getTirageLabel('Presses Offset', el, makeJob(), [el, el2], emptyTaskMap, noAssemblyStations),
+    ).toBe('REF-001 · int • Offset 80g 50x70 R° 1000ex');
   });
 });
 

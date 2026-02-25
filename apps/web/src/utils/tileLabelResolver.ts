@@ -40,7 +40,8 @@ export function getDefaultCategoryWidth(categoryName: string): number | null {
 /**
  * Compute the Tirage-mode tile label for a given element.
  *
- * Returns a string of the form `"{reference} · {element.name} • {content}"`.
+ * Returns a string like `"{reference} • {content}"` for single-element jobs,
+ * or `"{reference} · {element.name} • {content}"` for multi-element jobs.
  * Returns an empty string when the category has no Tirage format defined
  * (e.g. Conditionnement) — the caller should fall back to the Produit label.
  *
@@ -64,7 +65,9 @@ export function getTirageLabel(
 ): string {
   const s = element.spec;
   const name = categoryName.toLowerCase();
-  const prefix = `${job.reference} · ${element.name} •`;
+  const prefix = jobElements.length === 1
+    ? `${job.reference} •`
+    : `${job.reference} · ${element.name} •`;
 
   let content = '';
 
