@@ -38,7 +38,7 @@ import type {
 } from '@flux/types';
 import { DRY_TIME_MS } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
-import { createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
+import { getTemplates as mockGetTemplates, createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
 import { isLastTaskOfJob } from '../../utils/taskHelpers';
@@ -2505,6 +2505,16 @@ const handleDeleteStation = async (
 };
 
 /**
+ * GET /templates - List templates
+ */
+const handleGetTemplates = async (
+  _args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const items = mockGetTemplates();
+  return { data: { items, total: items.length, page: 1, limit: 100, pages: 1 } };
+};
+
+/**
  * POST /templates - Create a template
  */
 const handleCreateTemplate = async (
@@ -2579,6 +2589,7 @@ const routes: MockRoute[] = [
   { method: 'PUT', pattern: /^\/elements\/[^/]+\/prerequisites$/, handler: handleUpdateElementStatus },
 
   // Templates
+  { method: 'GET',  pattern: /^\/templates(\?.*)?$/, handler: handleGetTemplates },
   { method: 'POST', pattern: /^\/templates$/, handler: handleCreateTemplate },
   { method: 'PUT', pattern: /^\/templates\/[^/]+$/, handler: handleUpdateTemplate },
   { method: 'DELETE', pattern: /^\/templates\/[^/]+$/, handler: handleDeleteTemplate },
