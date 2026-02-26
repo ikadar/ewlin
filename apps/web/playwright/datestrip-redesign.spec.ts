@@ -101,10 +101,15 @@ test.describe('DateStrip Redesign (REQ-09)', () => {
     // Get initial scroll position
     const initialScrollTop = await grid.evaluate((el) => el.scrollTop);
 
-    // Calculate a date 7 days from now
+    // Calculate a date 7 days from now using local time components,
+    // matching DateStrip's formatDateKey() which uses getFullYear/getMonth/getDate.
+    // toISOString() would give UTC date which can differ by ±1 day in non-UTC timezones.
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + 7);
-    const targetDateKey = targetDate.toISOString().split('T')[0];
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(targetDate.getDate()).padStart(2, '0');
+    const targetDateKey = `${yyyy}-${mm}-${dd}`;
 
     // Find and click the target date cell
     const targetCell = datestripContainer.locator(`[data-testid="date-cell-${targetDateKey}"]`);

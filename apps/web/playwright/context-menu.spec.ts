@@ -12,10 +12,18 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Context Menu', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to app with context-menu fixture
     await page.goto('/?fixture=context-menu');
-    // Wait for the app to load
     await page.waitForSelector('[data-testid="scheduling-grid"]');
+    // Wait for tiles to render (mock API has ~200ms latency).
+    // Tiles are on today = day 6 from gridStartDate. Virtual scroll only renders
+    // tiles within the visible day range. The app auto-scrolls to today, but the
+    // scrollTop can still be unstable immediately after mount.
+    await page.waitForSelector('[data-testid="tile-assign-menu-1a"]');
+    // Explicitly scroll the tile into the actual viewport and wait for React to
+    // settle. Without this, the grid scrollTop may reset to 0 before the first
+    // right-click, removing day 6 tiles from the virtual scroll range.
+    await page.locator('[data-testid="tile-assign-menu-1a"]').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
   });
 
   test('should open context menu on right-click', async ({ page }) => {
@@ -44,6 +52,8 @@ test.describe('Context Menu', () => {
 
     const contextMenu = page.locator('[data-testid="tile-context-menu"]');
     await expect(contextMenu).toBeVisible();
+    // Wait for the setTimeout(0) mousedown listener to be registered
+    await page.waitForTimeout(50);
 
     // Click outside the menu
     await page.mouse.click(10, 10);
@@ -74,10 +84,13 @@ test.describe('Context Menu', () => {
 
     const contextMenu = page.locator('[data-testid="tile-context-menu"]');
     await expect(contextMenu).toBeVisible();
+    // Wait for scroll listener to be fully registered
+    await page.waitForTimeout(50);
 
-    // Scroll the grid
+    // Scroll the grid using mouse wheel (fires native scroll event)
     const grid = page.locator('[data-testid="scheduling-grid"]');
-    await grid.evaluate((el) => el.scrollTop += 100);
+    await grid.hover();
+    await page.mouse.wheel(0, 100);
 
     // Menu should close
     await expect(contextMenu).not.toBeVisible();
@@ -88,11 +101,14 @@ test.describe('Context Menu', () => {
     const tile = page.locator('[data-testid="tile-assign-menu-1b"]');
     await tile.click({ button: 'right' });
 
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
+
     // Click "Voir détails"
     await page.locator('[data-testid="context-menu-view-details"]').click();
 
     // Menu should close
-    await expect(page.locator('[data-testid="tile-context-menu"]')).not.toBeVisible();
+    await expect(contextMenu).not.toBeVisible();
 
     // Job should be selected (job details panel should show job info)
     // The tile's job is MENU-001
@@ -120,19 +136,21 @@ test.describe('Context Menu', () => {
     const tileA = page.locator('[data-testid="tile-assign-menu-1a"]');
     const tileB = page.locator('[data-testid="tile-assign-menu-1b"]');
 
-    const initialTopA = await tileA.evaluate((el) => el.style.top);
-    const initialTopB = await tileB.evaluate((el) => el.style.top);
+    const initialTopA = await tileA.evaluate((el) => (el as HTMLElement).style.top);
+    const initialTopB = await tileB.evaluate((el) => (el as HTMLElement).style.top);
 
     // Open context menu on middle tile (1b) and move up
     await tileB.click({ button: 'right' });
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
     await page.locator('[data-testid="context-menu-move-up"]').click();
 
-    // Wait for the swap to complete
-    await page.waitForTimeout(100);
+    // Wait for the swap to complete (mock API ~200ms latency)
+    await page.waitForTimeout(600);
 
     // Positions should be swapped
-    const newTopA = await tileA.evaluate((el) => el.style.top);
-    const newTopB = await tileB.evaluate((el) => el.style.top);
+    const newTopA = await tileA.evaluate((el) => (el as HTMLElement).style.top);
+    const newTopB = await tileB.evaluate((el) => (el as HTMLElement).style.top);
 
     expect(newTopB).toBe(initialTopA);
     expect(newTopA).toBe(initialTopB);
@@ -143,19 +161,21 @@ test.describe('Context Menu', () => {
     const tileB = page.locator('[data-testid="tile-assign-menu-1b"]');
     const tileC = page.locator('[data-testid="tile-assign-menu-1c"]');
 
-    const initialTopB = await tileB.evaluate((el) => el.style.top);
-    const initialTopC = await tileC.evaluate((el) => el.style.top);
+    const initialTopB = await tileB.evaluate((el) => (el as HTMLElement).style.top);
+    const initialTopC = await tileC.evaluate((el) => (el as HTMLElement).style.top);
 
     // Open context menu on middle tile (1b) and move down
     await tileB.click({ button: 'right' });
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
     await page.locator('[data-testid="context-menu-move-down"]').click();
 
-    // Wait for the swap to complete
-    await page.waitForTimeout(100);
+    // Wait for the swap to complete (mock API ~200ms latency)
+    await page.waitForTimeout(600);
 
     // Positions should be swapped
-    const newTopB = await tileB.evaluate((el) => el.style.top);
-    const newTopC = await tileC.evaluate((el) => el.style.top);
+    const newTopB = await tileB.evaluate((el) => (el as HTMLElement).style.top);
+    const newTopC = await tileC.evaluate((el) => (el as HTMLElement).style.top);
 
     expect(newTopB).toBe(initialTopC);
     expect(newTopC).toBe(initialTopB);
@@ -166,6 +186,9 @@ test.describe('Context Menu', () => {
     const tile = page.locator('[data-testid="tile-assign-menu-1a"]');
     await tile.click({ button: 'right' });
 
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
+
     // "Move up" should be disabled
     const moveUpButton = page.locator('[data-testid="context-menu-move-up"]');
     await expect(moveUpButton).toBeDisabled();
@@ -174,7 +197,16 @@ test.describe('Context Menu', () => {
   test('should disable "Move down" for bottom tile', async ({ page }) => {
     // Open context menu on bottom tile (1c - has no tile below)
     const tile = page.locator('[data-testid="tile-assign-menu-1c"]');
+    // Explicit scroll before click: tile 1c may be below the viewport after
+    // beforeEach (which only scrolls to 1a). Without this, Playwright's internal
+    // scroll-before-click causes a React re-render race that prevents the
+    // contextmenu event from reaching the tile.
+    await tile.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(100);
     await tile.click({ button: 'right' });
+
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
 
     // "Move down" should be disabled
     const moveDownButton = page.locator('[data-testid="context-menu-move-down"]');
@@ -185,6 +217,9 @@ test.describe('Context Menu', () => {
     // Open context menu on middle tile (1b - has tiles above and below)
     const tile = page.locator('[data-testid="tile-assign-menu-1b"]');
     await tile.click({ button: 'right' });
+
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
 
     // Both move options should be enabled
     const moveUpButton = page.locator('[data-testid="context-menu-move-up"]');
@@ -199,6 +234,9 @@ test.describe('Context Menu', () => {
     const tile = page.locator('[data-testid="tile-assign-menu-1b"]');
     await tile.click({ button: 'right' });
 
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
+
     // Verify French labels
     await expect(page.locator('[data-testid="context-menu-view-details"]')).toContainText('Voir détails');
     await expect(page.locator('[data-testid="context-menu-toggle-complete"]')).toContainText('Marquer terminé');
@@ -211,12 +249,24 @@ test.describe('Context Menu - Isolated Tile', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/?fixture=context-menu');
     await page.waitForSelector('[data-testid="scheduling-grid"]');
+    // Wait for tiles to render. Same virtual scroll stabilization as above.
+    await page.waitForSelector('[data-testid="tile-assign-menu-1a"]');
+    await page.locator('[data-testid="tile-assign-menu-1a"]').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
   });
 
   test('should disable both move options for isolated tile', async ({ page }) => {
-    // Open context menu on isolated tile (2a - only tile on Heidelberg)
+    // Open context menu on isolated tile (2a - only tile on Plieuse station)
     const tile = page.locator('[data-testid="tile-assign-menu-2a"]');
+    // Tile 2a is on a different station (Plieuse) and at hour 14:00 — farther from
+    // tile 1a (hour 8:00) both vertically and horizontally. Explicit scroll before
+    // click prevents the React re-render race from Playwright's internal scroll.
+    await tile.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(100);
     await tile.click({ button: 'right' });
+
+    const contextMenu = page.locator('[data-testid="tile-context-menu"]');
+    await expect(contextMenu).toBeVisible();
 
     // Both move options should be disabled
     const moveUpButton = page.locator('[data-testid="context-menu-move-up"]');
