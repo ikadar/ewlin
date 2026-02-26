@@ -70,12 +70,13 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       const taskTile = page.locator('[data-testid="task-tile-task-sidebar-1"]');
       await expect(taskTile).toBeVisible();
 
-      // ACT: Pick & place to exact grid line (Y=160 = 8:00)
-      await pickAndPlace(
+      // ACT: Pick & place to exact grid line at 8:00
+      // Using pickAndPlaceAtTime to avoid scroll-position timing issues
+      await pickAndPlaceAtTime(
         page,
         '[data-testid="task-tile-task-sidebar-1"]',
         'station-komori',
-        160
+        8, 0 // 8:00 AM - exact grid line
       );
 
       // ASSERT: Tile should be at a 15-minute boundary
@@ -85,7 +86,7 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
 
       expect(scheduledStart).toBeTruthy();
       const time = parseTime(scheduledStart!);
-      console.log(`Placed at Y=160, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
+      console.log(`Placed at 8:00, scheduled at: ${time.hours}:${time.minutes.toString().padStart(2, '0')}`);
 
       // Should be on a 15-minute boundary
       expect(isOnSnapBoundary(time)).toBe(true);
@@ -135,11 +136,12 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       await expect(taskTile).toBeVisible();
 
       // ACT: Place the task on its designated station
-      await pickAndPlace(
+      // Using pickAndPlaceAtTime to avoid scroll-position timing issues
+      await pickAndPlaceAtTime(
         page,
         '[data-testid="task-tile-task-sidebar-1"]',
         'station-komori',
-        160
+        8, 0 // 8:00 AM
       );
 
       // ASSERT: Tile should be placed successfully
@@ -153,11 +155,12 @@ test.describe('v0.3.31: Pick & Place Snapping (REQ-08/09)', () => {
       await jobCard.click();
       await page.waitForTimeout(200);
 
-      await pickAndPlace(
+      // Using pickAndPlaceAtTime to avoid scroll-position timing issues
+      await pickAndPlaceAtTime(
         page,
         '[data-testid="task-tile-task-sidebar-1"]',
         'station-komori',
-        160
+        8, 0 // 8:00 AM
       );
 
       // Get the placed tile
