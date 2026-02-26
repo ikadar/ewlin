@@ -147,16 +147,18 @@ test.describe('Forme Status & Date Tracking', () => {
       await blockedTile.hover();
       await page.waitForTimeout(2500);
 
-      // Check tooltip appears with Forme status
-      const tooltip = page.locator('[data-testid="prerequisite-tooltip"]');
+      // Check tooltip appears
+      const tooltip = page.locator('[data-testid="tile-tooltip"]');
       await expect(tooltip).toBeVisible();
 
-      // Tooltip should show Forme with warning icon (blocking)
-      await expect(tooltip).toContainText('Forme');
-      await expect(tooltip).toContainText('Commandée');
+      // Tooltip prerequisites section should show Forme with warning icon (blocking)
+      const prerequisites = tooltip.locator('[data-testid="tile-tooltip-prerequisites"]');
+      await expect(prerequisites).toBeVisible();
+      await expect(prerequisites).toContainText('Forme');
+      await expect(prerequisites).toContainText('Commandée');
 
       // Should have warning icon for Forme (blocking)
-      const warningIcons = tooltip.locator('text=⚠');
+      const warningIcons = prerequisites.locator('text=⚠');
       await expect(warningIcons.first()).toBeVisible();
     });
   });
