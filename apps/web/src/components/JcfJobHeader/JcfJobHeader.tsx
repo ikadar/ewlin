@@ -57,7 +57,7 @@ export function JcfJobHeader({
 
   // Load templates from real API via RTK Query (same source as /templates page)
   const { data: templateData } = useGetTemplatesQuery();
-  const templates = templateData?.items ?? [];
+  const templates = useMemo(() => templateData?.items ?? [], [templateData]);
 
   // Keep a ref to always access latest templates in callbacks (avoids stale closure)
   const templatesRef = useRef<JcfTemplate[]>(templates);

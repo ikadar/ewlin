@@ -30,7 +30,7 @@ export function TemplatesPage() {
   const [deleteTemplate] = useDeleteTemplateMutation();
   const { data: snapshotData } = useGetSnapshotQuery();
 
-  const templates = data?.items ?? [];
+  const templates = useMemo(() => data?.items ?? [], [data]);
 
   // Derive poste presets from snapshot (for template sequence autocomplete)
   const snapshotPostes = useMemo(() => {

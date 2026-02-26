@@ -288,20 +288,24 @@ function AppContent() {
 
   // Memoized snapshot with loading guard
   // snapshotData may be undefined during loading or error states
-  const snapshot = snapshotData ?? {
-    version: 0,
-    generatedAt: new Date().toISOString(),
-    stations: [],
-    categories: [],
-    groups: [],
-    providers: [],
-    jobs: [],
-    elements: [],
-    tasks: [],
-    assignments: [],
-    conflicts: [],
-    lateJobs: [],
-  };
+  const snapshot = useMemo(
+    () =>
+      snapshotData ?? {
+        version: 0,
+        generatedAt: new Date().toISOString(),
+        stations: [],
+        categories: [],
+        groups: [],
+        providers: [],
+        jobs: [],
+        elements: [],
+        tasks: [],
+        assignments: [],
+        conflicts: [],
+        lateJobs: [],
+      },
+    [snapshotData],
+  );
 
   // Derive poste presets from snapshot stations (single source of truth)
   const snapshotPostes = useMemo(
@@ -492,7 +496,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, navigate, createJob, updateJob, showToast, isEditMode, editingJobId]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, navigate, createJob, updateJob, showToast, isEditMode, editingJobId]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -1166,7 +1170,7 @@ function AppContent() {
       scrollTargetX,
       scrollTargetY,
     });
-  }, [snapshot.stations, categoryMap, displayMode, pixelsPerHour, gridStartDate]);
+  }, [snapshot.stations, categoryMap, pixelsPerHour, gridStartDate]);
 
   // Handle recall - remove assignment (double-click on tile)
   // v0.5.2: Now uses RTK Query mutation
@@ -1626,7 +1630,7 @@ function AppContent() {
       });
       setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
     }
-  }, [selectedJobId]);
+  }, [selectedJobId, setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
 
   // v0.3.54: Handle pick from sidebar (unscheduled task)
   // v0.3.55: Added scroll to target column and save scroll position
@@ -1653,7 +1657,7 @@ function AppContent() {
         }
       }
     }
-  }, [pickActions, snapshot.stations, categoryMap, displayMode]);
+  }, [pickActions, snapshot.stations, categoryMap]);
 
   // v0.3.57: Handle pick from grid (reschedule existing task)
   // No scroll needed as user is already at tile location
