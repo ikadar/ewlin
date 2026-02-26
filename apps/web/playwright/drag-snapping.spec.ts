@@ -14,7 +14,6 @@ import {
   waitForAppReady,
   countTilesOnStation,
   isOnSnapBoundary,
-  pickAndPlace,
   pickAndPlaceAtTime,
 } from './helpers/drag';
 
