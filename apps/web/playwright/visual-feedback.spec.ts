@@ -122,14 +122,14 @@ test.describe('v0.3.29: Visual Feedback (REQ-01, REQ-12)', () => {
       await dragFromSidebarToStationWithAlt(
         page,
         '[data-testid="task-tile-task-bypass-2"]',
-        'station-polar',
+        'station-massicot',
         240 // ~09:00
       );
 
       await page.waitForTimeout(500);
 
       // ASSERT: Check for conflict styling on the tile
-      const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+      const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
       const placedTile = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
 
       if (await placedTile.isVisible()) {
@@ -163,14 +163,14 @@ test.describe('v0.3.29: Visual Feedback (REQ-01, REQ-12)', () => {
       await dragFromSidebarToStationWithAlt(
         page,
         '[data-testid="task-tile-task-bypass-2"]',
-        'station-polar',
+        'station-massicot',
         240 // ~09:00 (conflict)
       );
 
       await page.waitForTimeout(500);
 
       // Verify conflict was created
-      const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+      const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
       const conflictTile = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
 
       if (await conflictTile.isVisible()) {
@@ -208,14 +208,14 @@ test.describe('v0.3.29: Visual Feedback (REQ-01, REQ-12)', () => {
       await dragFromSidebarToStationWithAlt(
         page,
         '[data-testid="task-tile-task-bypass-2"]',
-        'station-polar',
+        'station-massicot',
         240 // ~09:00 (conflict)
       );
 
       await page.waitForTimeout(500);
 
       // ASSERT: The tile should have amber glow, not job color glow
-      const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+      const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
       const conflictTile = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
 
       if (await conflictTile.isVisible()) {
@@ -246,14 +246,14 @@ test.describe('v0.3.29: Visual Feedback (REQ-01, REQ-12)', () => {
       await dragFromSidebarToStation(
         page,
         '[data-testid="task-tile-task-bypass-2"]',
-        'station-polar',
+        'station-massicot',
         384 // ~12:00 (valid)
       );
 
       await page.waitForTimeout(500);
 
       // ASSERT: Tile should NOT have conflict styling
-      const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+      const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
       const placedTile = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
 
       if (await placedTile.isVisible()) {
