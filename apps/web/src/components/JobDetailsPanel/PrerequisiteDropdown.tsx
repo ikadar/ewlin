@@ -67,17 +67,23 @@ export function PrerequisiteDropdown<T extends string>({
   const colorClass = getStatusColor(type, value);
   const formattedDate = formatDateDDMMYYYY(dateValue);
 
+  // BAT: date shown only in tooltip, not next to pill
+  const tooltipText =
+    type === 'bat' && formattedDate
+      ? `${currentOption?.label ?? value} — ${formattedDate}`
+      : (currentOption?.label ?? value);
+
   return (
     <div className="flex items-center gap-1.5">
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
           <Listbox.Button
-            className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 ${getPillBgColor(value)}`}
+            title={tooltipText}
+            className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 cursor-pointer ${getPillBgColor(value)}`}
             data-testid={`${testIdPrefix}-${type}-dropdown`}
           >
-            <span className="text-zinc-400 font-normal">{label}:</span>
-            <span className={colorClass}>{currentOption?.label ?? value}</span>
-            <ChevronDown className="w-3 h-3 text-zinc-500 transition-transform ui-open:rotate-180" />
+            <span className={colorClass}>{label}</span>
+            <ChevronDown className="w-3 h-3 opacity-50 transition-transform ui-open:rotate-180" />
           </Listbox.Button>
           <Listbox.Options
             className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg z-50 min-w-[130px] focus:outline-none"
@@ -98,7 +104,7 @@ export function PrerequisiteDropdown<T extends string>({
           </Listbox.Options>
         </div>
       </Listbox>
-      {formattedDate && (
+      {formattedDate && type !== 'bat' && (
         <span className="text-zinc-500 text-xs" data-testid={`${testIdPrefix}-${type}-date`}>
           {formattedDate}
         </span>
