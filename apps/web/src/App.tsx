@@ -837,11 +837,15 @@ function AppContent() {
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // Conflict task IDs for sidebar highlighting + DateStrip markers
+  // Only PrecedenceConflict and GroupCapacityConflict trigger amber glow —
+  // other types (ApprovalGateConflict, DeadlineConflict, etc.) have their own indicators.
   const conflictTaskIds = useMemo(() => {
     const ids = new Set<string>();
     for (const c of snapshot.conflicts) {
-      ids.add(c.taskId);
-      if (c.relatedTaskId) ids.add(c.relatedTaskId);
+      if (c.type === 'PrecedenceConflict' || c.type === 'GroupCapacityConflict') {
+        ids.add(c.taskId);
+        if (c.relatedTaskId) ids.add(c.relatedTaskId);
+      }
     }
     return ids;
   }, [snapshot.conflicts]);
