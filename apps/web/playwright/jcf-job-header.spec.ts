@@ -87,7 +87,8 @@ test.describe('v0.4.7: JCF Job Header Basic Fields', () => {
       const input = page.locator('[data-testid="jcf-field-deadline"]');
       await input.fill('25/12/2026');
       await input.blur();
-      await expect(input).toHaveValue('25/12/2026');
+      // Formatter always converts to DD/MM HH:mm (no year in display)
+      await expect(input).toHaveValue('25/12 14:00');
     });
   });
 
