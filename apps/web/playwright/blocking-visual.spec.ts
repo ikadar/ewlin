@@ -45,43 +45,44 @@ test.describe('Blocking Visual', () => {
     expect(borderStyle).toBe('solid');
   });
 
-  test('tooltip appears after 2s hover on blocked tile', async ({ page }) => {
+  test('tooltip appears after 500ms hover on blocked tile', async ({ page }) => {
     // Find blocked tile
     const blockedTile = page.locator('[data-testid="tile-assign-blocked-paper"]');
     await expect(blockedTile).toBeVisible();
 
     // Tooltip should not be visible initially
-    const tooltip = page.locator('[data-testid="prerequisite-tooltip"]');
+    const tooltip = page.locator('[data-testid="tile-tooltip"]');
     await expect(tooltip).not.toBeVisible();
 
     // Hover over the tile
     await blockedTile.hover();
 
-    // Tooltip should still not be visible after 1s
-    await page.waitForTimeout(1000);
+    // Tooltip should still not be visible after 200ms (before 500ms delay)
+    await page.waitForTimeout(200);
     await expect(tooltip).not.toBeVisible();
 
-    // Wait for the remaining 1.5s (total 2.5s to be safe)
-    await page.waitForTimeout(1500);
+    // Wait for the remaining time (total 800ms to be safe)
+    await page.waitForTimeout(600);
 
     // Now tooltip should be visible
     await expect(tooltip).toBeVisible();
   });
 
-  test('no tooltip on ready tile regardless of hover duration', async ({ page }) => {
+  test('ready tile tooltip has no warning indicators', async ({ page }) => {
     // Find ready tile
     const readyTile = page.locator('[data-testid="tile-assign-ready"]');
     await expect(readyTile).toBeVisible();
 
-    // Hover over the tile
+    // Hover over the tile and wait for tooltip
     await readyTile.hover();
+    await page.waitForTimeout(800);
 
-    // Wait 3s (more than the 2s delay)
-    await page.waitForTimeout(3000);
+    // Tooltip appears on all tiles
+    const tooltip = page.locator('[data-testid="tile-tooltip"]');
+    await expect(tooltip).toBeVisible();
 
-    // Tooltip should NOT appear
-    const tooltip = page.locator('[data-testid="prerequisite-tooltip"]');
-    await expect(tooltip).not.toBeVisible();
+    // No warning indicators (all prerequisites are ready)
+    await expect(tooltip).not.toContainText('⚠');
   });
 
   test('tooltip shows warning indicator for blocking items', async ({ page }) => {
@@ -91,15 +92,15 @@ test.describe('Blocking Visual', () => {
 
     // Hover and wait for tooltip
     await blockedTile.hover();
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(800);
 
     // Check tooltip content
-    const tooltip = page.locator('[data-testid="prerequisite-tooltip"]');
+    const tooltip = page.locator('[data-testid="tile-tooltip"]');
     await expect(tooltip).toBeVisible();
 
     // Should show warning icon for paper (blocking)
-    await expect(tooltip.locator('text=⚠')).toBeVisible();
-    await expect(tooltip.locator('text=Papier')).toBeVisible();
+    await expect(tooltip).toContainText('⚠');
+    await expect(tooltip).toContainText('Papier');
   });
 
   test('tooltip shows check indicator for ready items', async ({ page }) => {
@@ -109,17 +110,14 @@ test.describe('Blocking Visual', () => {
 
     // Hover and wait for tooltip
     await blockedTile.hover();
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(800);
 
     // Check tooltip content
-    const tooltip = page.locator('[data-testid="prerequisite-tooltip"]');
+    const tooltip = page.locator('[data-testid="tile-tooltip"]');
     await expect(tooltip).toBeVisible();
 
-    // Should show check icon for ready items (there may be multiple)
-    const checkIcons = tooltip.locator('text=✓');
-    await expect(checkIcons.first()).toBeVisible();
-    // Verify there's at least one check icon
-    expect(await checkIcons.count()).toBeGreaterThanOrEqual(1);
+    // Should show check icon for ready items
+    await expect(tooltip).toContainText('✓');
   });
 
   test('tooltip disappears when mouse leaves tile', async ({ page }) => {
@@ -129,9 +127,9 @@ test.describe('Blocking Visual', () => {
 
     // Hover and wait for tooltip to appear
     await blockedTile.hover();
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(800);
 
-    const tooltip = page.locator('[data-testid="prerequisite-tooltip"]');
+    const tooltip = page.locator('[data-testid="tile-tooltip"]');
     await expect(tooltip).toBeVisible();
 
     // Move mouse away from the tile
@@ -144,21 +142,21 @@ test.describe('Blocking Visual', () => {
     await expect(tooltip).not.toBeVisible();
   });
 
-  test('hover less than 2s does not show tooltip', async ({ page }) => {
+  test('hover less than 500ms does not show tooltip', async ({ page }) => {
     // Find blocked tile
     const blockedTile = page.locator('[data-testid="tile-assign-blocked-paper"]');
     await expect(blockedTile).toBeVisible();
 
-    // Hover for only 1s, then move away
+    // Hover for only 200ms (less than 500ms delay), then move away
     await blockedTile.hover();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(200);
     await page.mouse.move(0, 0);
 
     // Wait a bit
     await page.waitForTimeout(100);
 
     // Tooltip should NOT be visible
-    const tooltip = page.locator('[data-testid="prerequisite-tooltip"]');
+    const tooltip = page.locator('[data-testid="tile-tooltip"]');
     await expect(tooltip).not.toBeVisible();
   });
 
