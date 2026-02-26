@@ -589,11 +589,9 @@ function AppContent() {
     setJcfElements(newElements.length > 0 ? newElements : [{ ...DEFAULT_ELEMENT }]);
     setJcfTemplate(template.name);
 
-    // Derive per-element workflows from each element's sequence (abstract category names)
+    // Derive per-element workflows from each element's sequenceWorkflow (abstract category names)
     setSequenceWorkflows(
-      template.elements.map(el =>
-        el.sequence.split('\n').map(s => s.trim()).filter(Boolean)
-      ),
+      template.elements.map(el => el.sequenceWorkflow ?? []),
     );
 
     // Also set client if the template has one

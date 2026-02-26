@@ -40,10 +40,11 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       await sequenceTextarea.click();
 
       // Dropdown should appear with poste names (portal-based)
+      // Station names from test fixture: "Presse Offset" → "PresseOffset", "Massicot" → "Massicot"
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
-      await expect(dropdown).toContainText('G37');
-      await expect(dropdown).toContainText('Stahl');
+      await expect(dropdown).toContainText('PresseOffset');
+      await expect(dropdown).toContainText('Massicot');
     });
 
     test('shows category descriptions in dropdown', async ({ page }) => {
@@ -52,7 +53,8 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
 
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
-      await expect(dropdown).toContainText('Presse offset');
+      // Category descriptions from test fixture (plural forms)
+      await expect(dropdown).toContainText('Presses Offset');
       await expect(dropdown).toContainText('Plieuse');
     });
 
@@ -97,12 +99,12 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
 
       // Press Enter to add new line, then type filter text
       await page.keyboard.press('Enter');
-      // Type "ahl" which only matches "Stahl" (not "ST:")
-      await page.keyboard.type('ahl');
+      // Type "ass" which only matches "Massicot" (not ST: or other stations)
+      await page.keyboard.type('ass');
 
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
-      await expect(dropdown).toContainText('Stahl');
+      await expect(dropdown).toContainText('Massicot');
     });
   });
 
@@ -146,15 +148,14 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
     test('typing filters poste suggestions', async ({ page }) => {
       const sequenceTextarea = page.locator('#cell-0-11');
       await sequenceTextarea.click();
-      await sequenceTextarea.fill('G');
+      await sequenceTextarea.fill('Plie');
 
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
-      await expect(dropdown).toContainText('G37');
-      await expect(dropdown).toContainText('GTO');
+      await expect(dropdown).toContainText('Plieuse');
       // Non-matching should not appear
       const text = await dropdown.textContent();
-      expect(text).not.toContain('Stahl');
+      expect(text).not.toContain('Massicot');
     });
   });
 
@@ -227,7 +228,7 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
    *
    * These tests require a template with workflow to be selected.
    * The workflow defines expected production step categories:
-   * ['Presse offset', 'Massicot', 'Plieuse', 'Conditionnement']
+   * ['Presses Offset', 'Massicots', 'Plieuses', 'Conditionnement']
    *
    * These tests verify:
    * - Priority postes (matching expected category) appear first
@@ -239,12 +240,12 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
     test.beforeEach(async ({ page }) => {
       const templateInput = page.locator('#jcf-template');
       await templateInput.click();
-      await templateInput.fill('Brochure A4');
+      await templateInput.fill('Dépliant 3');
 
       const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
       await expect(templateDropdown).toBeVisible();
-      // Select "Brochure A4" (not "Brochure A4 piquée")
-      await templateDropdown.locator('button').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+      // Select "Dépliant 3 volets" (workflow: Presses Offset → Massicots → Plieuses → Conditionnement)
+      await templateDropdown.locator('button').filter({ hasText: 'Dépliant 3 volets' }).first().click();
       await page.waitForTimeout(300);
     });
 
@@ -255,9 +256,9 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
 
-      // At step 0, workflow expects "Presse offset, Presse numérique"
-      // Postes in these categories should have star marker
-      await expect(dropdown).toContainText('★ Presse offset');
+      // At step 0, workflow expects "Presses Offset"
+      // Postes in this category should have star marker
+      await expect(dropdown).toContainText('★ Presses Offset');
     });
 
     test('priority postes appear first in dropdown', async ({ page }) => {
@@ -271,9 +272,9 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       const items = dropdown.locator('> button');
       const firstItemText = await items.first().textContent();
 
-      // First item should be a priority poste (Presse offset or Presse numérique machine)
-      // These are G37, 754, GTO, C9500 in test data
-      expect(firstItemText).toMatch(/G37|754|GTO|C9500/);
+      // First item should be a priority poste (Presses Offset category)
+      // In the test fixture, PresseOffset is the only machine in that category
+      expect(firstItemText).toContain('PresseOffset');
     });
 
     test('non-priority postes do not have star marker', async ({ page }) => {
@@ -286,8 +287,8 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       // Massicot, Plieuse, etc. should not have star at step 0
       // They should have plain category (no star)
       const text = await dropdown.textContent();
-      expect(text).not.toContain('★ Massicot');
-      expect(text).not.toContain('★ Plieuse');
+      expect(text).not.toContain('★ Massicots');
+      expect(text).not.toContain('★ Plieuses');
     });
 
     test('step advances after completing first line', async ({ page }) => {
@@ -295,19 +296,19 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
       await sequenceTextarea.click();
 
       // Complete first line (step 0 → step 1)
-      await sequenceTextarea.fill('G37(20)');
+      await sequenceTextarea.fill('PresseOffset(20)');
       await page.keyboard.press('Enter');
 
-      // Now on step 1, workflow expects "Massicot"
+      // Now on step 1, workflow expects "Massicots"
       const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
       await expect(dropdown).toBeVisible();
 
       // Massicot should now have star marker
-      await expect(dropdown).toContainText('★ Massicot');
+      await expect(dropdown).toContainText('★ Massicots');
 
-      // Presse offset should NOT have star anymore
+      // Presses Offset should NOT have star anymore
       const text = await dropdown.textContent();
-      expect(text).not.toContain('★ Presse offset');
+      expect(text).not.toContain('★ Presses Offset');
     });
 
     test('workflow does not affect ST mode suggestions', async ({ page }) => {
@@ -340,6 +341,11 @@ test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
  */
 test.describe('v0.4.31: Template-Free Mode', () => {
   test.beforeEach(async ({ page }) => {
+    // Clear stale template cache so mock API re-seeds from SEED_TEMPLATES (with sequenceWorkflow)
+    await page.addInitScript(() => {
+      localStorage.removeItem('flux-jcf-templates');
+    });
+
     // NO fixture - this is template-free mode
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -377,9 +383,9 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     await expect(dropdown).toBeVisible();
 
     // Should show postes from different categories (no filtering)
-    await expect(dropdown).toContainText('G37'); // Presse offset
-    await expect(dropdown).toContainText('P137'); // Massicot
-    await expect(dropdown).toContainText('Stahl'); // Plieuse
+    await expect(dropdown).toContainText('KomoriG40'); // Presses Offset
+    await expect(dropdown).toContainText('Polar137'); // Massicots
+    await expect(dropdown).toContainText('B26'); // Plieuses
   });
 
   test('selecting template activates workflow with star markers', async ({
@@ -388,15 +394,14 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     // Select a template with workflow
     const templateInput = page.locator('#jcf-template');
     await templateInput.click();
-    await templateInput.fill('Brochure A4');
+    await templateInput.fill('Dépliant 3');
 
     // Select from dropdown
     const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
     await expect(templateDropdown).toBeVisible();
 
-    // Click the exact "Brochure A4" option (not "Brochure A4 piquée")
-    // Each dropdown item is a button, find the one where first span contains exactly "Brochure A4"
-    await templateDropdown.locator('button').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+    // Click "Dépliant 3 volets" (workflow: Presses Offset → Massicots → Plieuses → Conditionnement)
+    await templateDropdown.locator('button').filter({ hasText: 'Dépliant 3 volets' }).first().click();
 
     // Wait for template to be applied (elements table updates)
     await page.waitForTimeout(300);
@@ -409,21 +414,21 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
     await expect(dropdown).toBeVisible();
 
-    // With Brochure A4 template (workflow: ['Presse offset', 'Massicot', 'Plieuse', 'Conditionnement'])
-    // Presse offset should have star marker at step 0
-    await expect(dropdown).toContainText('★ Presse offset');
+    // With Dépliant 3 volets template (workflow: ['Presses Offset', 'Massicots', 'Plieuses', 'Conditionnement'])
+    // Presses Offset should have star marker at step 0
+    await expect(dropdown).toContainText('★ Presses Offset');
   });
 
   test('clearing template removes star markers', async ({ page }) => {
     // First select a template
     const templateInput = page.locator('#jcf-template');
     await templateInput.click();
-    await templateInput.fill('Brochure A4');
+    await templateInput.fill('Dépliant 3');
 
-    // Select from dropdown - exact match to avoid "Brochure A4 piquée"
+    // Select from dropdown
     const templateDropdown = page.locator('[data-testid="jcf-template-dropdown"]');
     await expect(templateDropdown).toBeVisible();
-    await templateDropdown.locator('button').filter({ hasText: /^Brochure A4/ }).filter({ hasNotText: 'piquée' }).first().click();
+    await templateDropdown.locator('button').filter({ hasText: 'Dépliant 3 volets' }).first().click();
     await page.waitForTimeout(300);
 
     // Clear template
