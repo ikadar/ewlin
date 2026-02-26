@@ -27,6 +27,22 @@ import { realBaseQuery } from './realBaseQuery';
  *
  * @returns true if mock mode should be used
  */
+const FIXTURE_SESSION_KEY = 'flux_fixture';
+
+// Persist fixture name to sessionStorage so it survives React Router navigations
+// that strip the ?fixture= query param.
+// This module-level code runs only on actual page loads (not on SPA navigations),
+// so clearing on non-fixture loads is safe.
+if (typeof window !== 'undefined') {
+  const params = new URLSearchParams(window.location.search);
+  const fixture = params.get('fixture');
+  if (fixture) {
+    sessionStorage.setItem(FIXTURE_SESSION_KEY, fixture);
+  } else {
+    sessionStorage.removeItem(FIXTURE_SESSION_KEY);
+  }
+}
+
 export function shouldUseMockMode(): boolean {
   // Server-side rendering guard
   if (typeof window === 'undefined') {
@@ -35,17 +51,17 @@ export function shouldUseMockMode(): boolean {
 
   // Check URL for fixture parameter
   const params = new URLSearchParams(window.location.search);
-  const fixture = params.get('fixture');
-  if (fixture) {
-    return true;
-  }
+  if (params.get('fixture')) return true;
+
+  // Check sessionStorage (persists across React Router navigations)
+  if (sessionStorage.getItem(FIXTURE_SESSION_KEY)) return true;
 
   // Check environment variable
   return import.meta.env.VITE_USE_MOCK === 'true';
 }
 
 /**
- * Get the current fixture name from URL, if any.
+ * Get the current fixture name from URL or sessionStorage, if any.
  *
  * @returns Fixture name or null if not in fixture mode
  */
@@ -55,7 +71,7 @@ export function getFixtureName(): string | null {
   }
 
   const params = new URLSearchParams(window.location.search);
-  return params.get('fixture');
+  return params.get('fixture') ?? sessionStorage.getItem(FIXTURE_SESSION_KEY);
 }
 
 // ============================================================================
