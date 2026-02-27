@@ -70,7 +70,7 @@ describe('PrerequisiteStatus', () => {
       />
     );
     expect(screen.getByTestId('prerequisite-forme-dropdown')).toBeInTheDocument();
-    expect(screen.getByText('Sur stock')).toBeInTheDocument();
+    expect(screen.getByTitle('Sur stock')).toBeInTheDocument();
   });
 
   it('hides forme dropdown when hasDieCutting is false', () => {
@@ -86,7 +86,7 @@ describe('PrerequisiteStatus', () => {
     expect(screen.queryByTestId('prerequisite-forme-dropdown')).not.toBeInTheDocument();
   });
 
-  it('displays current status labels', () => {
+  it('displays current status labels in pill tooltips', () => {
     render(
       <PrerequisiteStatus
         paperStatus="in_stock"
@@ -95,9 +95,9 @@ describe('PrerequisiteStatus', () => {
         formeStatus="none"
       />
     );
-    expect(screen.getByText('En stock')).toBeInTheDocument();
-    expect(screen.getByText('BAT OK')).toBeInTheDocument();
-    expect(screen.getByText('Prêtes')).toBeInTheDocument();
+    expect(screen.getByTitle('En stock')).toBeInTheDocument();
+    expect(screen.getByTitle('BAT OK')).toBeInTheDocument();
+    expect(screen.getByTitle('Prêtes')).toBeInTheDocument();
   });
 
   it('opens dropdown on click', () => {
@@ -171,8 +171,8 @@ describe('PrerequisiteStatus', () => {
       />
     );
 
-    expect(screen.getByText('À commander')).toHaveClass('text-red-500');
-    expect(screen.getByText('Attente fichiers')).toHaveClass('text-red-500');
+    expect(screen.getByText('Papier')).toHaveClass('text-red-500');
+    expect(screen.getByText('BAT')).toHaveClass('text-red-500');
   });
 
   it('shows correct colors for ready status', () => {
@@ -185,9 +185,9 @@ describe('PrerequisiteStatus', () => {
       />
     );
 
-    expect(screen.getByText('En stock')).toHaveClass('text-emerald-500');
-    expect(screen.getByText('BAT OK')).toHaveClass('text-emerald-500');
-    expect(screen.getByText('Prêtes')).toHaveClass('text-emerald-500');
+    expect(screen.getByText('Papier')).toHaveClass('text-emerald-500');
+    expect(screen.getByText('BAT')).toHaveClass('text-emerald-500');
+    expect(screen.getByText('Plaques')).toHaveClass('text-emerald-500');
   });
 
   it('shows correct colors for pending status', () => {
@@ -200,8 +200,8 @@ describe('PrerequisiteStatus', () => {
       />
     );
 
-    expect(screen.getByText('Commandé')).toHaveClass('text-amber-500');
-    expect(screen.getByText('BAT envoyé')).toHaveClass('text-amber-500');
-    expect(screen.getByText('À faire')).toHaveClass('text-amber-500');
+    expect(screen.getByText('Papier')).toHaveClass('text-amber-500');
+    expect(screen.getByText('BAT')).toHaveClass('text-amber-500');
+    expect(screen.getByText('Plaques')).toHaveClass('text-amber-500');
   });
 });
