@@ -23,19 +23,34 @@ describe('Sidebar', () => {
     render(<MemoryRouter><Sidebar /></MemoryRouter>);
     expect(screen.getByLabelText('Scheduling view')).toBeInTheDocument();
     expect(screen.getByLabelText('Calendar view')).toBeInTheDocument();
+    expect(screen.getByLabelText('Settings')).toBeInTheDocument();
     expect(screen.getByLabelText('User')).toBeInTheDocument();
   });
 
-  it('shows schedule view as active by default', () => {
-    render(<MemoryRouter><Sidebar /></MemoryRouter>);
+  it('shows schedule view as active on root route', () => {
+    render(<MemoryRouter initialEntries={['/']}><Sidebar /></MemoryRouter>);
     const scheduleButton = screen.getByLabelText('Scheduling view');
     expect(scheduleButton).toHaveAttribute('aria-current', 'page');
   });
 
-  it('shows calendar view as inactive by default', () => {
-    render(<MemoryRouter><Sidebar /></MemoryRouter>);
-    const calendarButton = screen.getByLabelText('Calendar view');
-    expect(calendarButton).not.toHaveAttribute('aria-current');
+  it('shows settings as active on settings routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/stations']}>
+        <Sidebar />
+      </MemoryRouter>
+    );
+    const settingsButton = screen.getByLabelText('Settings');
+    expect(settingsButton).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('shows schedule view as inactive on settings routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/clients']}>
+        <Sidebar />
+      </MemoryRouter>
+    );
+    const scheduleButton = screen.getByLabelText('Scheduling view');
+    expect(scheduleButton).not.toHaveAttribute('aria-current');
   });
 
   it('shows user button as disabled', () => {
@@ -44,33 +59,9 @@ describe('Sidebar', () => {
     expect(userButton).toBeDisabled();
   });
 
-  it('calls onNavigate when clicking schedule button', () => {
-    const onNavigate = vi.fn();
-    render(<MemoryRouter><Sidebar onNavigate={onNavigate} /></MemoryRouter>);
-    fireEvent.click(screen.getByLabelText('Scheduling view'));
-    expect(onNavigate).toHaveBeenCalledWith('schedule');
-  });
-
-  it('calls onNavigate when clicking calendar button', () => {
-    const onNavigate = vi.fn();
-    render(<MemoryRouter><Sidebar onNavigate={onNavigate} /></MemoryRouter>);
-    fireEvent.click(screen.getByLabelText('Calendar view'));
-    expect(onNavigate).toHaveBeenCalledWith('calendar');
-  });
-
-  it('does not call onNavigate when clicking disabled user button', () => {
-    const onNavigate = vi.fn();
-    render(<MemoryRouter><Sidebar onNavigate={onNavigate} /></MemoryRouter>);
-    fireEvent.click(screen.getByLabelText('User'));
-    expect(onNavigate).not.toHaveBeenCalled();
-  });
-
-  it('respects activeView prop', () => {
-    render(<MemoryRouter><Sidebar activeView="calendar" /></MemoryRouter>);
-    const scheduleButton = screen.getByLabelText('Scheduling view');
-    const calendarButton = screen.getByLabelText('Calendar view');
-    expect(scheduleButton).not.toHaveAttribute('aria-current');
-    expect(calendarButton).toHaveAttribute('aria-current', 'page');
+  it('accepts lastSchedulingUrl prop', () => {
+    render(<MemoryRouter><Sidebar lastSchedulingUrl="/job/abc" /></MemoryRouter>);
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
   });
 });
 

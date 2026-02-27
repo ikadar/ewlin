@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -1961,13 +1961,7 @@ function AppContent() {
 
   return (
     <>
-      {/* REQ-07: Layout restructure - sidebar full height */}
-      <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
-        {/* Sidebar - full viewport height (REQ-07.1) */}
-        <Sidebar />
-
-        {/* Main area - right of sidebar */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Navigation Bar - now only spans width after sidebar (REQ-07.2/07.3) */}
           <TopNavBar
             isQuickPlacementMode={isQuickPlacementMode}
@@ -2078,7 +2072,6 @@ function AppContent() {
         />
           </div>
         </div>
-      </div>
 
       {/* v0.3.54: Pick preview - ghost tile during pick */}
       <PickPreview

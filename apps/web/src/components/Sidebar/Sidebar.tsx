@@ -1,12 +1,10 @@
-import { LayoutGrid, Calendar, Settings, User, Users, Ruler, Printer, Layers, Grid3x3, Monitor, Tag } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { LayoutGrid, Calendar, Settings, User } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
 export interface SidebarProps {
-  /** Currently active view */
-  activeView?: 'schedule' | 'calendar' | 'settings';
-  /** Callback when a navigation item is clicked */
-  onNavigate?: (view: 'schedule' | 'calendar' | 'settings') => void;
+  /** Last visited scheduling URL, used for the LayoutGrid back-navigation */
+  lastSchedulingUrl?: string;
 }
 
 /**
@@ -15,8 +13,10 @@ export interface SidebarProps {
  * Always visible on the left side of the screen.
  * REQ-07: Full viewport height with User/Settings at bottom.
  */
-export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
+export function Sidebar({ lastSchedulingUrl = '/' }: SidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSettings = location.pathname.startsWith('/settings');
 
   return (
     <nav
@@ -30,14 +30,13 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
           <SidebarButton
             icon={LayoutGrid}
             label="Scheduling view"
-            isActive={activeView === 'schedule'}
-            onClick={() => onNavigate?.('schedule')}
+            isActive={!isSettings}
+            onClick={() => navigate(lastSchedulingUrl)}
           />
           <SidebarButton
             icon={Calendar}
             label="Calendar view"
-            isActive={activeView === 'calendar'}
-            onClick={() => onNavigate?.('calendar')}
+            isActive={false}
           />
         </div>
 
@@ -47,44 +46,10 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
         {/* Bottom section: Settings/User (REQ-07.3) */}
         <div className="flex flex-col items-center py-3 gap-2 border-t border-white/5">
           <SidebarButton
-            icon={Monitor}
-            label="Stations"
-            onClick={() => navigate('/stations')}
-          />
-          <SidebarButton
-            icon={Tag}
-            label="Station categories"
-            onClick={() => navigate('/station-categories')}
-          />
-          <SidebarButton
-            icon={Users}
-            label="Clients"
-            onClick={() => navigate('/clients')}
-          />
-          <SidebarButton
-            icon={Ruler}
-            label="Formats"
-            onClick={() => navigate('/formats')}
-          />
-          <SidebarButton
-            icon={Printer}
-            label="Impressions"
-            onClick={() => navigate('/impression-presets')}
-          />
-          <SidebarButton
-            icon={Layers}
-            label="Surfacages"
-            onClick={() => navigate('/surfacage-presets')}
-          />
-          <SidebarButton
-            icon={Grid3x3}
-            label="Impositions"
-            onClick={() => navigate('/feuille-formats')}
-          />
-          <SidebarButton
             icon={Settings}
-            label="Templates"
-            onClick={() => navigate('/templates')}
+            label="Settings"
+            isActive={isSettings}
+            onClick={() => navigate('/settings/stations')}
             testId="sidebar-settings-button"
           />
           <SidebarButton
