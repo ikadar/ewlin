@@ -1,0 +1,127 @@
+/**
+ * Filtering logic for the Production Flow Dashboard.
+ * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, sections 3.3, 6.4, 6.5
+ * Q&A: docs/production-flow-dashboard-spec/qa.md, K4.1 (search filters counts too)
+ */
+
+import type { FluxJob } from './fluxTypes';
+import { worstPrerequisiteStatus } from './fluxAggregation';
+
+/** Route segment → tab identifier mapping (qa.md K11.1). */
+export type TabId = 'all' | 'prepresse' | 'papier' | 'formes' | 'plaques';
+
+/** The ordered list of tabs (left to right). Used for keyboard cycling. */
+export const TAB_IDS: TabId[] = ['all', 'prepresse', 'papier', 'formes', 'plaques'];
+
+/** Maps tab ID to its display label. */
+export const TAB_LABELS: Record<TabId, string> = {
+  all:       'Tous',
+  prepresse: 'A faire prepresse',
+  papier:    'Cdes papier',
+  formes:    'Cdes formes',
+  plaques:   'Plaques a produire',
+};
+
+/** Maps URL pathname to tab ID. Unknown paths default to 'all'. */
+export function pathnameToTab(pathname: string): TabId {
+  if (pathname === '/flux/prepresse') return 'prepresse';
+  if (pathname === '/flux/papier')    return 'papier';
+  if (pathname === '/flux/formes')    return 'formes';
+  if (pathname === '/flux/plaques')   return 'plaques';
+  return 'all';
+}
+
+/** Maps tab ID to its route pathname. */
+export function tabToPathname(tab: TabId): string {
+  if (tab === 'all') return '/flux';
+  return `/flux/${tab}`;
+}
+
+/**
+ * Returns true if the job matches the given tab filter (spec 6.4).
+ * For multi-element jobs, evaluates the aggregated worst status of the parent row.
+ * The FluxJob already stores the worst-aggregated values in its elements[0] for
+ * single-element jobs; for multi-element, we compute worst across all elements.
+ */
+export function filterByTab(job: FluxJob, tab: TabId): boolean {
+  if (tab === 'all') return true;
+
+  const bat    = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.bat))
+    : job.elements[0]!.bat;
+  const papier = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.papier))
+    : job.elements[0]!.papier;
+  const formes = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.formes))
+    : job.elements[0]!.formes;
+  const plaques = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.plaques))
+    : job.elements[0]!.plaques;
+
+  switch (tab) {
+    case 'prepresse': return bat !== 'OK' && bat !== 'n.a.';
+    case 'papier':    return papier === 'A cder';
+    case 'formes':    return formes === 'A cder';
+    case 'plaques':   return plaques === 'A faire';
+    default:          return true;
+  }
+}
+
+/**
+ * Returns true if the job matches the search query.
+ * Case-insensitive substring search across: id, client, designation,
+ * transporteur, and prerequisite badge labels (spec 3.2).
+ * Sub-row labels are NOT searched — visibility follows parent (spec 6.6).
+ */
+export function filterBySearch(job: FluxJob, search: string): boolean {
+  if (!search.trim()) return true;
+
+  const q = search.toLowerCase();
+
+  // Text columns
+  const textFields = [
+    job.id,
+    job.client,
+    job.designation,
+    job.transporteur ?? '',
+  ];
+  if (textFields.some(f => f.toLowerCase().includes(q))) return true;
+
+  // Prerequisite badge labels (displayed values on parent row — worst for multi-element)
+  const bat    = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.bat))
+    : job.elements[0]!.bat;
+  const papier = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.papier))
+    : job.elements[0]!.papier;
+  const formes = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.formes))
+    : job.elements[0]!.formes;
+  const plaques = job.elements.length > 1
+    ? worstPrerequisiteStatus(job.elements.map(e => e.plaques))
+    : job.elements[0]!.plaques;
+
+  return [bat, papier, formes, plaques].some(s => s.toLowerCase().includes(q));
+}
+
+/**
+ * Computes count badges for all 5 tabs simultaneously.
+ * Count = number of parent rows matching BOTH that tab's filter AND the search
+ * (qa.md K4.1: search also filters counts).
+ */
+export function computeTabCounts(
+  jobs: FluxJob[],
+  search: string,
+): Record<TabId, number> {
+  const counts: Record<TabId, number> = { all: 0, prepresse: 0, papier: 0, formes: 0, plaques: 0 };
+  for (const job of jobs) {
+    if (!filterBySearch(job, search)) continue;
+    for (const tab of TAB_IDS) {
+      if (filterByTab(job, tab)) {
+        counts[tab]++;
+      }
+    }
+  }
+  return counts;
+}

@@ -1,0 +1,1 @@
+export { FluxTabBar } from './FluxTabBar';

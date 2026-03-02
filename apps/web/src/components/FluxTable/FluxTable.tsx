@@ -17,6 +17,8 @@ import { FluxStackedDots } from './FluxStackedDots';
 
 interface FluxTableProps {
   jobs: FluxJob[];
+  /** Job ID of the keyboard-focused parent row (Alt+↑/↓ navigation). */
+  focusedJobId?: string;
 }
 
 // Frozen zone shadow styles (spec 3.6)
@@ -119,7 +121,13 @@ function FluxTableHeader() {
  * A single parent job row. Multi-element rows show aggregated worst values
  * and stacked dots in station cells (collapsed state, spec 3.11).
  */
-const FluxTableRow = memo(function FluxTableRow({ job }: { job: FluxJob }) {
+const FluxTableRow = memo(function FluxTableRow({
+  job,
+  isFocused,
+}: {
+  job: FluxJob;
+  isFocused: boolean;
+}) {
   const isMulti = job.elements.length > 1;
   const el0 = job.elements[0] as FluxElement;
 
@@ -134,10 +142,14 @@ const FluxTableRow = memo(function FluxTableRow({ job }: { job: FluxJob }) {
 
   return (
     <tr
-      className={`border-b border-flux-border ${isMulti ? 'row-multi' : ''}`}
-      style={{ height: '36px' }}
+      className={`border-b border-flux-border ${isMulti ? 'row-multi' : ''} ${isFocused ? 'ring-1 ring-inset ring-indigo-500/40' : ''}`}
+      style={{
+        height: '36px',
+        backgroundColor: isFocused ? 'rgba(99,102,241,0.08)' : undefined,
+      }}
       data-testid="flux-table-row"
       data-job-id={job.id}
+      data-flux-focused={isFocused ? 'true' : undefined}
     >
       {/* Expand toggle — frozen left */}
       <td
@@ -284,7 +296,7 @@ const FluxTableRow = memo(function FluxTableRow({ job }: { job: FluxJob }) {
  * Horizontally scrollable with frozen left and right column zones.
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, sections 3.6–3.14
  */
-export const FluxTable = memo(function FluxTable({ jobs }: FluxTableProps) {
+export const FluxTable = memo(function FluxTable({ jobs, focusedJobId }: FluxTableProps) {
   // Default sort: ID ascending (spec, qa.md K9.1)
   const sorted = useMemo(
     () => [...jobs].sort((a, b) => a.id.localeCompare(b.id)),
@@ -326,7 +338,11 @@ export const FluxTable = memo(function FluxTable({ jobs }: FluxTableProps) {
 
         <tbody className="divide-y divide-flux-border">
           {sorted.map(job => (
-            <FluxTableRow key={job.id} job={job} />
+            <FluxTableRow
+              key={job.id}
+              job={job}
+              isFocused={focusedJobId === job.id}
+            />
           ))}
         </tbody>
       </table>

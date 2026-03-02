@@ -2,9 +2,14 @@
  * Route configuration for React Router integration.
  *
  * @see v0.4.38 - React Router Integration
+ * @see v0.5.16 - Flux tab nested routes
  *
  * Route structure:
- * /flux                      → Production Flow Dashboard (v0.5.15)
+ * /flux                      → Production Flow Dashboard — Tous tab (v0.5.15)
+ * /flux/prepresse            → Production Flow Dashboard — A faire prepresse tab
+ * /flux/papier               → Production Flow Dashboard — Cdes papier tab
+ * /flux/formes               → Production Flow Dashboard — Cdes formes tab
+ * /flux/plaques              → Production Flow Dashboard — Plaques a produire tab
  * /                          → Main scheduler view (no job selected)
  * /job/:jobId                → Main scheduler with job selected
  * /job/new                   → Main scheduler with JCF modal open
@@ -41,8 +46,14 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route element={<RootLayout />}>
-        {/* Production Flow Dashboard */}
-        <Route path="/flux" element={<FluxPage />} />
+        {/* Production Flow Dashboard — tab nested routes (v0.5.16) */}
+        <Route path="/flux" element={<FluxPage />}>
+          <Route index element={null} />
+          <Route path="prepresse" element={null} />
+          <Route path="papier" element={null} />
+          <Route path="formes" element={null} />
+          <Route path="plaques" element={null} />
+        </Route>
 
         {/* Scheduling routes */}
         <Route path="/" element={<App />} />
