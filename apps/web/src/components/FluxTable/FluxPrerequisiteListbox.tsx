@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   COLUMN_STATUS_OPTIONS,
   PREREQUISITE_STATUS_COLOR,
@@ -165,16 +166,18 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
         </svg>
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
           ref={dropdownRef}
           role="listbox"
           aria-label={column}
-          className="fixed z-50 py-1 shadow-xl overflow-hidden"
+          className="py-1 shadow-xl overflow-hidden"
           style={{
+            position: 'fixed',
             top: dropdownStyle.top,
             left: dropdownStyle.left,
             minWidth: Math.max(dropdownStyle.minWidth, 80),
+            zIndex: 9999,
             backgroundColor: 'rgb(26,26,26)',
             border: '1px solid rgb(42,42,42)',
             borderRadius: '6px',
@@ -214,7 +217,8 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
