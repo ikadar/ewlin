@@ -17,7 +17,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
 import { scheduleApi } from './scheduleApi';
-import type { FluxJob, FluxStationData, PrerequisiteColumn, PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
+import type { FluxJob, FluxSTStatus, FluxOutsourcingTask, FluxStationData, PrerequisiteColumn, PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
 
 // ============================================================================
 // API Response Shape (from PHP backend)
@@ -36,6 +36,13 @@ interface FluxElementApiResponse {
   plaques: PrerequisiteStatus;
   /** Station state per category. Key = stationCategoryId, value.state = 'done'|'late'|'in-progress'|'planned'|'empty' */
   stations: Record<string, { state: string }>;
+  /** Outsourced tasks for this element. Always present, empty array if none (v0.5.22+). */
+  outsourcing?: Array<{
+    taskId: string;
+    actionType: string;
+    providerName: string;
+    status: FluxSTStatus;
+  }>;
 }
 
 /**
@@ -91,7 +98,8 @@ function transformFluxJobsResponse(
         papier: el.papier,
         formes: el.formes,
         plaques: el.plaques,
-          stations: el.stations as Record<string, FluxStationData>,
+        stations: el.stations as Record<string, FluxStationData>,
+        outsourcing: (el.outsourcing ?? []) as FluxOutsourcingTask[],
       })),
       transporteur: job.shipper,
       parti: {
@@ -108,6 +116,12 @@ function transformFluxJobsResponse(
 // ============================================================================
 // Mutation argument type
 // ============================================================================
+
+export interface UpdateSTStatusArg {
+  /** Task GUID (used in the PATCH URL) */
+  taskId: string;
+  status: FluxSTStatus;
+}
 
 export interface UpdatePrerequisiteArg {
   /** Element GUID (used in the PATCH URL) */
@@ -132,6 +146,22 @@ export const fluxApi = createApi({
       transformResponse: (response: FluxJob[] | FluxJobApiResponse[]) =>
         transformFluxJobsResponse(response),
       providesTags: ['FluxJobs'],
+    }),
+
+    /**
+     * Update an outsourced task's status (ST column 3-state checkbox).
+     *
+     * Uses invalidatesTags to refetch jobs after status update.
+     *
+     * @see docs/releases/v0.5.23-st-column-frontend.md
+     */
+    updateSTStatus: builder.mutation<void, UpdateSTStatusArg>({
+      query: ({ taskId, status }) => ({
+        url: `/flux/tasks/${taskId}/status`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      invalidatesTags: ['FluxJobs'],
     }),
 
     /**
@@ -171,4 +201,4 @@ export const fluxApi = createApi({
   }),
 });
 
-export const { useGetFluxJobsQuery, useUpdateElementPrerequisiteMutation } = fluxApi;
+export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation } = fluxApi;

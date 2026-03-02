@@ -4,9 +4,9 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
-import { useGetFluxJobsQuery, useUpdateElementPrerequisiteMutation, useAppDispatch, fluxApi } from '@/store';
+import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useAppDispatch, fluxApi } from '@/store';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
-import type { PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
+import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
   computeTabCounts,
   filterBySearch,
@@ -45,6 +45,7 @@ export function FluxPage() {
     ),
     [categories],
   );
+  const [updateSTStatus] = useUpdateSTStatusMutation();
   const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
 
   // ── Local UI state (not tied to server data) ──────────────────────────────
@@ -105,6 +106,14 @@ export function FluxPage() {
   const handleNewJob = useCallback(() => {
     navigate('/job/new');
   }, [navigate]);
+
+  /**
+   * Update an outsourced task's ST status and persist to the backend (v0.5.23).
+   * Uses RTK Query mutation with invalidatesTags: refetches jobs on success.
+   */
+  const handleUpdateSTStatus = useCallback((taskId: string, status: FluxSTStatus) => {
+    void updateSTStatus({ taskId, status });
+  }, [updateSTStatus]);
 
   /**
    * Update a single element's prerequisite status and persist to the backend.
@@ -266,6 +275,7 @@ export function FluxPage() {
               sortDirection={sortDirection}
               onSortChange={handleSortChange}
               onUpdatePrerequisite={handleUpdatePrerequisite}
+              onUpdateSTStatus={handleUpdateSTStatus}
               onToggleExpand={handleToggleExpand}
               onDeleteJob={handleDeleteJob}
               onEditJob={handleEditJob}

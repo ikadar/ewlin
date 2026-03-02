@@ -121,6 +121,22 @@ export interface FluxStationData {
   progress?: number;
 }
 
+// ── ST (Sous-traitance) types ──────────────────────────────────────────────
+
+/**
+ * 3-state dashboard status for outsourced tasks (spec §5, API contract §2).
+ * Maps to TaskStatus enum: pending=defined/ready, progress=assigned, done=completed.
+ */
+export type FluxSTStatus = 'pending' | 'progress' | 'done';
+
+/** An outsourced (sous-traitance) task on an element. */
+export interface FluxOutsourcingTask {
+  taskId: string;
+  actionType: string;
+  providerName: string;
+  status: FluxSTStatus;
+}
+
 // ── Job / Element data ─────────────────────────────────────────────────────
 
 /** A single print element within a multi-element job (spec 3.11, 5.3). */
@@ -132,6 +148,8 @@ export interface FluxElement {
   formes: PrerequisiteStatus;
   plaques: PrerequisiteStatus;
   stations: Partial<Record<string, FluxStationData>>;
+  /** Outsourced tasks for this element. Empty array if none (v0.5.23). */
+  outsourcing: FluxOutsourcingTask[];
 }
 
 /** A print job row in the Flux dashboard (spec 5.1). */

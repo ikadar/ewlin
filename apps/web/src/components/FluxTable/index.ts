@@ -1,4 +1,5 @@
 export { FluxTable } from './FluxTable';
+export { STCell } from './STCell';
 export { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
 export { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
 export { FluxDeleteConfirmDialog } from './FluxDeleteConfirmDialog';

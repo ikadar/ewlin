@@ -234,3 +234,77 @@ describe('computeTabCounts', () => {
     expect(counts.prepresse).toBe(2);
   });
 });
+
+// ── soustraitance tab (v0.5.23) ──────────────────────────────────────────────
+
+describe('filterByTab — soustraitance (ST column spec §7)', () => {
+  const jobs = FLUX_STATIC_JOBS;
+  const ids = (tab: TabId) =>
+    jobs.filter(j => filterByTab(j, tab)).map(j => j.id);
+
+  it('shows 3 jobs with non-done ST tasks (spec §7.5 verification matrix)', () => {
+    const result = ids('soustraitance');
+    expect(result).toContain('00078'); // pending + progress tasks
+    expect(result).toContain('00091'); // progress task
+    expect(result).toContain('00103'); // pending task
+    expect(result).not.toContain('00042'); // all tasks done
+    expect(result).not.toContain('00117'); // no tasks
+    expect(result).toHaveLength(3);
+  });
+
+  it('excludes 00042: all outsourced tasks are done', () => {
+    const job = jobs.find(j => j.id === '00042')!;
+    expect(filterByTab(job, 'soustraitance')).toBe(false);
+  });
+
+  it('excludes 00117: no outsourced tasks at all', () => {
+    const job = jobs.find(j => j.id === '00117')!;
+    expect(filterByTab(job, 'soustraitance')).toBe(false);
+  });
+
+  it('includes 00078: has pending and progress tasks across elements', () => {
+    const job = jobs.find(j => j.id === '00078')!;
+    expect(filterByTab(job, 'soustraitance')).toBe(true);
+  });
+
+  it('includes 00091: has progress task (done + progress mix)', () => {
+    const job = jobs.find(j => j.id === '00091')!;
+    expect(filterByTab(job, 'soustraitance')).toBe(true);
+  });
+
+  it('includes 00103: has pending task (done + pending mix)', () => {
+    const job = jobs.find(j => j.id === '00103')!;
+    expect(filterByTab(job, 'soustraitance')).toBe(true);
+  });
+});
+
+describe('pathnameToTab — soustraitance URL', () => {
+  it('maps /flux/soustraitance to soustraitance', () => {
+    expect(pathnameToTab('/flux/soustraitance')).toBe('soustraitance');
+  });
+});
+
+describe('tabToPathname — soustraitance URL', () => {
+  it('maps soustraitance to /flux/soustraitance', () => {
+    expect(tabToPathname('soustraitance')).toBe('/flux/soustraitance');
+  });
+});
+
+describe('computeTabCounts — soustraitance', () => {
+  const jobs = FLUX_STATIC_JOBS;
+
+  it('no search: soustraitance count = 3', () => {
+    const counts = computeTabCounts(jobs, '');
+    expect(counts.soustraitance).toBe(3);
+  });
+
+  it('search "Ducros": soustraitance = 0 (00042 all done)', () => {
+    const counts = computeTabCounts(jobs, 'Ducros');
+    expect(counts.soustraitance).toBe(0);
+  });
+
+  it('search "Müller": soustraitance = 1 (00078 matches search and has non-done tasks)', () => {
+    const counts = computeTabCounts(jobs, 'Müller');
+    expect(counts.soustraitance).toBe(1);
+  });
+});

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { PrerequisiteColumn, PrerequisiteStatus } from './fluxTypes';
+import type { PrerequisiteColumn, PrerequisiteStatus, FluxSTStatus } from './fluxTypes';
 import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
 import type { SortColumn, SortDirection } from './fluxSort';
 
@@ -16,6 +16,8 @@ export interface FluxTableContextValue {
     column: PrerequisiteColumn,
     status: PrerequisiteStatus,
   ) => void;
+  /** Update an outsourced task's ST status (v0.5.23). */
+  onUpdateSTStatus: (taskId: string, status: FluxSTStatus) => void;
   onToggleExpand: (jobId: string) => void;
   onDeleteJob: (jobId: string) => void;
   onEditJob: (jobId: string) => void;

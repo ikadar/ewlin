@@ -91,6 +91,55 @@ body {
 .flux-scrollable::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
 .flux-scrollable::-webkit-scrollbar-thumb:hover { background: rgb(110 110 110); }
 
+/* ── ST (Sous-traitance) column (v0.5.23, spec §4–5) ── */
+
+/* ST cell container — vertical flex, compact */
+.st-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11px;
+}
+
+/* ST line — icon + label */
+.st-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: default;
+  min-width: 0;
+}
+
+/* ST label — overflow ellipsis */
+.st-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(161 161 161);
+}
+
+/* 3-state colors */
+.st-pending  { color: rgb(128 128 128); }
+.st-progress { color: rgb(251 146 60); }
+.st-done     { color: rgb(74 222 128); }
+
+/* Custom tooltip — position: fixed, follows cursor */
+.st-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: rgb(36 36 36);
+  border: 1px solid rgb(58 58 58);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: rgb(209 209 209);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
 /* Striped pattern for unavailability overlay (v0.3.60: CSS gradient → SVG for performance) */
 .bg-stripes-dark {
   background-image: url('/stripes.svg');

@@ -33,6 +33,7 @@ const singleJob: FluxJob = {
         'cat-offset': { state: 'done' },
         'cat-cutting': { state: 'done' },
       },
+      outsourcing: [],
     },
   ],
   transporteur: 'Chronopost',
@@ -48,14 +49,17 @@ const multiJob: FluxJob = {
     {
       id: 'e1', label: 'Ronde', bat: 'bat_approved', papier: 'in_stock', formes: 'in_stock', plaques: 'ready',
       stations: { 'cat-offset': { state: 'late', progress: 60 } },
+      outsourcing: [],
     },
     {
       id: 'e2', label: 'Carree', bat: 'bat_sent', papier: 'ordered', formes: 'none', plaques: 'to_make',
       stations: { 'cat-offset': { state: 'in-progress', progress: 40 } },
+      outsourcing: [],
     },
     {
       id: 'e3', label: 'Ovale', bat: 'waiting_files', papier: 'to_order', formes: 'to_order', plaques: 'to_make',
       stations: { 'cat-offset': { state: 'planned' } },
+      outsourcing: [],
     },
   ],
   transporteur: null,

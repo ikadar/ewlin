@@ -2,6 +2,8 @@
  * Static mock data for the Production Flow Dashboard (v0.5.15).
  * Based on spec section 5.1 and 5.3 reference data.
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md
+ *
+ * v0.5.23: outsourcing[] added per ST column spec §3.3 reference data.
  */
 
 import type { FluxJob } from '../components/FluxTable/fluxTypes';
@@ -39,6 +41,9 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           // cat-assembly: empty
           'cat-packaging':    { state: 'done' },
         },
+        outsourcing: [
+          { taskId: '00042-t1', actionType: 'Vernis UV sélectif', providerName: 'Faco 37', status: 'done' },
+        ],
       },
     ],
     transporteur: 'Chronopost',
@@ -65,6 +70,9 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           'cat-typo':    { state: 'planned' },
           'cat-packaging':{ state: 'planned' },
         },
+        outsourcing: [
+          { taskId: '00078-t1', actionType: 'Découpe mi-chair', providerName: 'Clement', status: 'pending' },
+        ],
       },
       {
         id: '00078-e2',
@@ -78,6 +86,9 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           'cat-cutting':  { state: 'planned' },
           'cat-packaging':{ state: 'planned' },
         },
+        outsourcing: [
+          { taskId: '00078-t2', actionType: 'Gaufrage logo', providerName: 'JF', status: 'progress' },
+        ],
       },
       {
         id: '00078-e3',
@@ -91,6 +102,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           'cat-typo':     { state: 'planned' },
           'cat-packaging':{ state: 'planned' },
         },
+        outsourcing: [],
       },
     ],
     transporteur: null,
@@ -116,6 +128,9 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           'cat-cutting':  { state: 'planned' },
           'cat-packaging':{ state: 'planned' },
         },
+        outsourcing: [
+          { taskId: '00091-t1', actionType: 'Pelliculage mat', providerName: 'SIPAP', status: 'done' },
+        ],
       },
       {
         id: '00091-e2',
@@ -129,6 +144,9 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           'cat-folding': { state: 'planned' },
           'cat-packaging':{ state: 'planned' },
         },
+        outsourcing: [
+          { taskId: '00091-t2', actionType: 'Vernis UV', providerName: 'Faco 37', status: 'progress' },
+        ],
       },
     ],
     transporteur: 'DHL',
@@ -160,6 +178,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           // cat-assembly: empty
           'cat-packaging':{ state: 'planned' },
         },
+        outsourcing: [
+          { taskId: '00103-t1', actionType: 'Vernis UV', providerName: 'SIPAP', status: 'done' },
+          { taskId: '00103-t2', actionType: 'Reliure Singer', providerName: 'Clement', status: 'pending' },
+        ],
       },
     ],
     transporteur: 'TNT',
@@ -191,6 +213,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
           // cat-assembly: empty
           'cat-packaging':    { state: 'planned' },
         },
+        outsourcing: [],
       },
     ],
     transporteur: 'GLS',

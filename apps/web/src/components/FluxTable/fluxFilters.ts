@@ -2,6 +2,8 @@
  * Filtering logic for the Production Flow Dashboard.
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, sections 3.3, 6.4, 6.5
  * Q&A: docs/production-flow-dashboard-spec/qa.md, K4.1 (search filters counts too)
+ *
+ * v0.5.23: Added 'soustraitance' tab (ST column spec §7).
  */
 
 import type { FluxJob } from './fluxTypes';
@@ -9,26 +11,28 @@ import { PREREQUISITE_BADGE_LABEL } from './fluxTypes';
 import { worstPrerequisiteStatus } from './fluxAggregation';
 
 /** Route segment → tab identifier mapping (qa.md K11.1). */
-export type TabId = 'all' | 'prepresse' | 'papier' | 'formes' | 'plaques';
+export type TabId = 'all' | 'prepresse' | 'papier' | 'formes' | 'plaques' | 'soustraitance';
 
 /** The ordered list of tabs (left to right). Used for keyboard cycling. */
-export const TAB_IDS: TabId[] = ['all', 'prepresse', 'papier', 'formes', 'plaques'];
+export const TAB_IDS: TabId[] = ['all', 'prepresse', 'papier', 'formes', 'plaques', 'soustraitance'];
 
 /** Maps tab ID to its display label. */
 export const TAB_LABELS: Record<TabId, string> = {
-  all:       'Tous',
-  prepresse: 'A faire prepresse',
-  papier:    'Cdes papier',
-  formes:    'Cdes formes',
-  plaques:   'Plaques a produire',
+  all:            'Tous',
+  prepresse:      'A faire prepresse',
+  papier:         'Cdes papier',
+  formes:         'Cdes formes',
+  plaques:        'Plaques a produire',
+  soustraitance:  'S-T à faire',
 };
 
 /** Maps URL pathname to tab ID. Unknown paths default to 'all'. */
 export function pathnameToTab(pathname: string): TabId {
-  if (pathname === '/flux/prepresse') return 'prepresse';
-  if (pathname === '/flux/papier')    return 'papier';
-  if (pathname === '/flux/formes')    return 'formes';
-  if (pathname === '/flux/plaques')   return 'plaques';
+  if (pathname === '/flux/prepresse')     return 'prepresse';
+  if (pathname === '/flux/papier')        return 'papier';
+  if (pathname === '/flux/formes')        return 'formes';
+  if (pathname === '/flux/plaques')       return 'plaques';
+  if (pathname === '/flux/soustraitance') return 'soustraitance';
   return 'all';
 }
 
@@ -46,6 +50,13 @@ export function tabToPathname(tab: TabId): string {
  */
 export function filterByTab(job: FluxJob, tab: TabId): boolean {
   if (tab === 'all') return true;
+
+  if (tab === 'soustraitance') {
+    // Job visible if at least one element has at least one non-done outsourced task.
+    return job.elements.some(el =>
+      el.outsourcing.some(t => t.status !== 'done'),
+    );
+  }
 
   const bat    = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.bat))
@@ -109,7 +120,7 @@ export function filterBySearch(job: FluxJob, search: string): boolean {
 }
 
 /**
- * Computes count badges for all 5 tabs simultaneously.
+ * Computes count badges for all tabs simultaneously.
  * Count = number of parent rows matching BOTH that tab's filter AND the search
  * (qa.md K4.1: search also filters counts).
  */
@@ -117,7 +128,9 @@ export function computeTabCounts(
   jobs: FluxJob[],
   search: string,
 ): Record<TabId, number> {
-  const counts: Record<TabId, number> = { all: 0, prepresse: 0, papier: 0, formes: 0, plaques: 0 };
+  const counts: Record<TabId, number> = {
+    all: 0, prepresse: 0, papier: 0, formes: 0, plaques: 0, soustraitance: 0,
+  };
   for (const job of jobs) {
     if (!filterBySearch(job, search)) continue;
     for (const tab of TAB_IDS) {

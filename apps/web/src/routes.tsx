@@ -53,6 +53,7 @@ export function AppRoutes() {
           <Route path="papier" element={null} />
           <Route path="formes" element={null} />
           <Route path="plaques" element={null} />
+          <Route path="soustraitance" element={null} />
         </Route>
 
         {/* Scheduling routes */}

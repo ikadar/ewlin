@@ -3,9 +3,11 @@ import { CircleCheck, Circle, Trash2, FolderOpen, ChevronUp, ChevronDown, Chevro
 import {
   type FluxJob,
   type FluxElement,
+  type FluxSTStatus,
   type PrerequisiteColumn,
   type PrerequisiteStatus,
 } from './fluxTypes';
+import { STCell } from './STCell';
 import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
 import {
   worstPrerequisiteStatus,
@@ -39,6 +41,8 @@ interface FluxTableProps {
     column: PrerequisiteColumn,
     status: PrerequisiteStatus,
   ) => void;
+  /** Update an outsourced task's ST status (v0.5.23). */
+  onUpdateSTStatus?: (taskId: string, status: FluxSTStatus) => void;
   onToggleExpand?: (jobId: string) => void;
   onDeleteJob?: (jobId: string) => void;
   onEditJob?: (jobId: string) => void;
@@ -172,6 +176,13 @@ function FluxTableHeader() {
             {cat.abbreviation || cat.name.substring(0, 5)}
           </th>
         ))}
+        {/* ST (Sous-traitance) — not sortable, between last station col and Transporteur */}
+        <th
+          className={headerCell}
+          title="Sous-traitance"
+        >
+          ST
+        </th>
         {/* Transporteur */}
         <th
           className={sortableHeader}
@@ -335,6 +346,16 @@ const FluxTableRow = memo(function FluxTableRow({
         </td>
       ))}
 
+      {/* ST (Sous-traitance) — flattened tasks for collapsed multi, single element tasks otherwise */}
+      <td className="px-1 py-1" style={{ maxWidth: '160px', verticalAlign: 'middle' }} data-testid="flux-st-cell">
+        <STCell
+          tasks={isMulti && !isExpanded
+            ? job.elements.flatMap(e => e.outsourcing)
+            : el0.outsourcing}
+          onUpdateSTStatus={ctx.onUpdateSTStatus}
+        />
+      </td>
+
       {/* Transporteur */}
       <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
         {job.transporteur ?? '—'}
@@ -463,6 +484,14 @@ function FluxSubRow({
         </td>
       ))}
 
+      {/* ST — per-element tasks */}
+      <td className="px-1 py-1" style={{ maxWidth: '160px', verticalAlign: 'middle' }}>
+        <STCell
+          tasks={element.outsourcing}
+          onUpdateSTStatus={ctx.onUpdateSTStatus}
+        />
+      </td>
+
       {/* Transporteur — empty */}
       <td />
 
@@ -494,6 +523,7 @@ export const FluxTable = memo(function FluxTable({
   sortDirection = 'asc',
   onSortChange = () => {},
   onUpdatePrerequisite = () => {},
+  onUpdateSTStatus = () => {},
   onToggleExpand = () => {},
   onDeleteJob = () => {},
   onEditJob = () => {},
@@ -506,6 +536,7 @@ export const FluxTable = memo(function FluxTable({
     openListboxId,
     setOpenListboxId,
     onUpdatePrerequisite,
+    onUpdateSTStatus,
     onToggleExpand,
     onDeleteJob,
     onEditJob,
@@ -542,6 +573,7 @@ export const FluxTable = memo(function FluxTable({
             {categories.map(cat => (
               <col key={cat.id} style={{ width: '3.5rem' }} />
             ))}
+            <col style={{ width: '10rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '7rem' }} />
             <col style={{ width: '4rem' }} />
