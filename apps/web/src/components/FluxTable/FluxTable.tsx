@@ -91,16 +91,16 @@ function FluxTableHeader() {
           Sortie {sortIcon}
         </th>
         {/* Prerequisite columns */}
-        <th className={`${headerCell} text-center group cursor-pointer`} title="Bon à tirer">
+        <th className={`${headerCell} group cursor-pointer`} title="Bon à tirer">
           BAT {sortIcon}
         </th>
-        <th className={`${headerCell} text-center group cursor-pointer`} title="Papier">
+        <th className={`${headerCell} group cursor-pointer`} title="Papier">
           Papier {sortIcon}
         </th>
-        <th className={`${headerCell} text-center group cursor-pointer`} title="Formes">
+        <th className={`${headerCell} group cursor-pointer`} title="Formes">
           Formes {sortIcon}
         </th>
-        <th className={`${headerCell} text-center group cursor-pointer`} title="Plaques">
+        <th className={`${headerCell} group cursor-pointer`} title="Plaques">
           Plaques {sortIcon}
         </th>
         {/* Station columns — dynamic from API */}
@@ -234,7 +234,7 @@ const FluxTableRow = memo(function FluxTableRow({
       {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map((col, i) => {
         const status = [bat, papier, formes, plaques][i]!;
         return isMulti ? (
-          <td key={col} className="px-1 py-0 text-center">
+          <td key={col} className="px-1 py-0">
             <FluxPrerequisiteBadge status={status} plusCount={plusCount} />
           </td>
         ) : (
