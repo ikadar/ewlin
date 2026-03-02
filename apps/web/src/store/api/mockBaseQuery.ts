@@ -38,6 +38,7 @@ import type {
 } from '@flux/types';
 import { DRY_TIME_MS } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
+import { FLUX_STATIC_JOBS } from '../../mock/fluxStaticData';
 import { getTemplates as mockGetTemplates, createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
@@ -2568,6 +2569,20 @@ const handleDeleteTemplate = async (
   }
 };
 
+// ============================================================================
+// Flux (Production Flow Dashboard) Handlers
+// ============================================================================
+
+/**
+ * GET /flux/jobs — Return mock flux jobs for fixture/development mode.
+ *
+ * Returns FLUX_STATIC_JOBS directly (FluxJob[] shape).
+ * The fluxApi transformResponse handles this format transparently.
+ */
+const handleGetFluxJobs = async (): Promise<{ data: unknown }> => {
+  return { data: FLUX_STATIC_JOBS };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
@@ -2587,6 +2602,9 @@ const routes: MockRoute[] = [
 
   // Elements
   { method: 'PUT', pattern: /^\/elements\/[^/]+\/prerequisites$/, handler: handleUpdateElementStatus },
+
+  // Flux — Production Flow Dashboard
+  { method: 'GET', pattern: /^\/flux\/jobs$/, handler: handleGetFluxJobs },
 
   // Templates
   { method: 'GET',  pattern: /^\/templates(\?.*)?$/, handler: handleGetTemplates },

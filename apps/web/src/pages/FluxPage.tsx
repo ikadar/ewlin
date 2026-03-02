@@ -4,8 +4,7 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
-import { FLUX_STATIC_JOBS } from '@/mock/fluxStaticData';
-import type { FluxJob } from '@/components/FluxTable/fluxTypes';
+import { useGetFluxJobsQuery, useAppDispatch, fluxApi } from '@/store';
 import type { PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
   computeTabCounts,
@@ -27,9 +26,12 @@ export function FluxPage() {
   const navigate = useNavigate();
 
   const activeTab = pathnameToTab(location.pathname);
+  const dispatch = useAppDispatch();
 
-  // ── Mutable job state ────────────────────────────────────────────────────
-  const [jobs, setJobs] = useState<FluxJob[]>(FLUX_STATIC_JOBS);
+  // ── API data (RTK Query cache as source of truth) ─────────────────────────
+  const { data: jobs = [], isLoading, isError } = useGetFluxJobsQuery();
+
+  // ── Local UI state (not tied to server data) ──────────────────────────────
   const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
   const [deleteConfirmJobId, setDeleteConfirmJobId] = useState<string | null>(null);
 
@@ -80,17 +82,16 @@ export function FluxPage() {
     column: PrerequisiteColumn,
     status: PrerequisiteStatus,
   ) => {
-    setJobs(prev => prev.map(job => {
-      if (job.id !== jobId) return job;
-      return {
-        ...job,
-        elements: job.elements.map(el => {
-          if (el.id !== elementId) return el;
-          return { ...el, [column]: status };
-        }),
-      };
-    }));
-  }, []);
+    dispatch(
+      fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
+        const job = draft.find((j) => j.id === jobId);
+        if (job) {
+          const el = job.elements.find((e) => e.id === elementId);
+          if (el) el[column] = status;
+        }
+      }),
+    );
+  }, [dispatch]);
 
   /** Toggle expanded state for a multi-element job. */
   const handleToggleExpand = useCallback((jobId: string) => {
@@ -110,11 +111,16 @@ export function FluxPage() {
     setDeleteConfirmJobId(jobId);
   }, []);
 
-  /** Confirm deletion: remove job, clear expanded state. */
+  /** Confirm deletion: remove job from RTK Query cache, clear expanded state. */
   const handleConfirmDelete = useCallback(() => {
     if (deleteConfirmJobId) {
-      setJobs(prev => prev.filter(job => job.id !== deleteConfirmJobId));
-      setExpandedJobIds(prev => {
+      dispatch(
+        fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
+          const idx = draft.findIndex((j) => j.id === deleteConfirmJobId);
+          if (idx !== -1) draft.splice(idx, 1);
+        }),
+      );
+      setExpandedJobIds((prev) => {
         const next = new Set(prev);
         next.delete(deleteConfirmJobId);
         return next;
@@ -122,7 +128,7 @@ export function FluxPage() {
       setFocusedRowIndex(-1);
     }
     setDeleteConfirmJobId(null);
-  }, [deleteConfirmJobId]);
+  }, [deleteConfirmJobId, dispatch]);
 
   /** Navigate to the job edit page (qa.md K6.2). */
   const handleEditJob = useCallback((jobId: string) => {
@@ -183,6 +189,23 @@ export function FluxPage() {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [activeTab, navigate, filteredJobs.length]);
+
+  // ── Loading / error states ────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-flux-base" data-testid="flux-loading">
+        <p className="text-flux-text-muted text-sm">Chargement…</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-flux-base" data-testid="flux-error">
+        <p className="text-red-400 text-sm">Erreur de chargement des jobs.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-flux-base" data-testid="flux-page">

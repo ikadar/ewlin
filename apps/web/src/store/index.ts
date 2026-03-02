@@ -18,6 +18,7 @@ import { impressionPresetApi } from './api/impressionPresetApi';
 import { surfacagePresetApi } from './api/surfacagePresetApi';
 import { feuilleFormatApi } from './api/feuilleFormatApi';
 import { stationApi } from './api/stationApi';
+import { fluxApi } from './api/fluxApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -37,6 +38,7 @@ export const store = configureStore({
     [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
     [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
     [stationApi.reducerPath]: stationApi.reducer,
+    [fluxApi.reducerPath]: fluxApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -54,7 +56,8 @@ export const store = configureStore({
       .concat(impressionPresetApi.middleware)
       .concat(surfacagePresetApi.middleware)
       .concat(feuilleFormatApi.middleware)
-      .concat(stationApi.middleware),
+      .concat(stationApi.middleware)
+      .concat(fluxApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -170,6 +173,8 @@ export {
   stationApi,
 } from './api/stationApi';
 export type { StationResponse, StationInput } from './api/stationApi';
+
+export { useGetFluxJobsQuery, fluxApi } from './api/fluxApi';
 
 // Re-export slice actions
 export {

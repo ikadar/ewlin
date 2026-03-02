@@ -124,6 +124,8 @@ export interface FluxElement {
 export interface FluxJob {
   /** 5-digit zero-padded job number, e.g. "00042". */
   id: string;
+  /** Internal GUID from the PHP API. Used for backend mutations (update, delete). */
+  internalId?: string;
   client: string;
   designation: string;
   /** Workshop exit date in JJ/MM format, e.g. "28/02". */
