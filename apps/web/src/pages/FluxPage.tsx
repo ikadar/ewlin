@@ -4,7 +4,7 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
-import { useGetFluxJobsQuery, useAppDispatch, fluxApi } from '@/store';
+import { useGetFluxJobsQuery, useUpdateElementPrerequisiteMutation, useAppDispatch, fluxApi } from '@/store';
 import type { PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
   computeTabCounts,
@@ -30,6 +30,7 @@ export function FluxPage() {
 
   // ── API data (RTK Query cache as source of truth) ─────────────────────────
   const { data: jobs = [], isLoading, isError } = useGetFluxJobsQuery();
+  const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
 
   // ── Local UI state (not tied to server data) ──────────────────────────────
   const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
@@ -75,23 +76,21 @@ export function FluxPage() {
     navigate('/job/new');
   }, [navigate]);
 
-  /** Immutable update of a single element's prerequisite status (qa.md K8.1). */
+  /**
+   * Update a single element's prerequisite status and persist to the backend.
+   *
+   * Uses RTK Query mutation with optimistic update: the cache is updated
+   * immediately via onQueryStarted, and reverted automatically on API error.
+   * (qa.md K8.1, v0.5.19)
+   */
   const handleUpdatePrerequisite = useCallback((
     jobId: string,
     elementId: string,
     column: PrerequisiteColumn,
     status: PrerequisiteStatus,
   ) => {
-    dispatch(
-      fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
-        const job = draft.find((j) => j.id === jobId);
-        if (job) {
-          const el = job.elements.find((e) => e.id === elementId);
-          if (el) el[column] = status;
-        }
-      }),
-    );
-  }, [dispatch]);
+    void updateElementPrerequisite({ jobId, elementId, column, value: status });
+  }, [updateElementPrerequisite]);
 
   /** Toggle expanded state for a multi-element job. */
   const handleToggleExpand = useCallback((jobId: string) => {

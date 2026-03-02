@@ -3,6 +3,7 @@
  *
  * Provides:
  *   - getFluxJobs: GET /api/v1/flux/jobs — list active jobs
+ *   - updateElementPrerequisite: PATCH /api/v1/flux/elements/{id} — update one prerequisite field
  *
  * In fixture/mock mode: the mock handler returns FLUX_STATIC_JOBS directly
  * (FluxJob[] shape, preserving station data for UI development).
@@ -10,12 +11,13 @@
  * transformed to FluxJob[] via transformResponse.
  *
  * @see docs/releases/v0.5.18-production-flow-dashboard-api-integration.md
+ * @see docs/releases/v0.5.19-prerequisite-persistence.md
  */
 
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
-import type { FluxJob } from '../../components/FluxTable/fluxTypes';
-import type { PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
+import { scheduleApi } from './scheduleApi';
+import type { FluxJob, PrerequisiteColumn, PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
 
 // ============================================================================
 // API Response Shape (from PHP backend)
@@ -103,6 +105,19 @@ function transformFluxJobsResponse(
 }
 
 // ============================================================================
+// Mutation argument type
+// ============================================================================
+
+export interface UpdatePrerequisiteArg {
+  /** Element GUID (used in the PATCH URL) */
+  elementId: string;
+  /** Parent job reference ID (used for optimistic cache update lookup) */
+  jobId: string;
+  column: PrerequisiteColumn;
+  value: PrerequisiteStatus;
+}
+
+// ============================================================================
 // API Slice
 // ============================================================================
 
@@ -117,7 +132,42 @@ export const fluxApi = createApi({
         transformFluxJobsResponse(response),
       providesTags: ['FluxJobs'],
     }),
+
+    /**
+     * Update a single prerequisite field of an element.
+     *
+     * Uses optimistic update: the cache is updated immediately, and reverted
+     * automatically if the API call fails (undo pattern).
+     *
+     * @see docs/releases/v0.5.19-prerequisite-persistence.md
+     */
+    updateElementPrerequisite: builder.mutation<void, UpdatePrerequisiteArg>({
+      query: ({ elementId, column, value }) => ({
+        url: `/flux/elements/${elementId}`,
+        method: 'PATCH',
+        body: { column, value },
+      }),
+      async onQueryStarted({ jobId, elementId, column, value }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
+            const job = draft.find((j) => j.id === jobId);
+            if (job) {
+              const el = job.elements.find((e) => e.id === elementId);
+              if (el) el[column] = value;
+            }
+          }),
+        );
+        try {
+          await queryFulfilled;
+          // Invalidate the scheduling snapshot so the scheduling view
+          // reflects the updated prerequisite status on next render.
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
   }),
 });
 
-export const { useGetFluxJobsQuery } = fluxApi;
+export const { useGetFluxJobsQuery, useUpdateElementPrerequisiteMutation } = fluxApi;

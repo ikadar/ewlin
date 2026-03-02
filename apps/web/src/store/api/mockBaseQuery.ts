@@ -2583,6 +2583,40 @@ const handleGetFluxJobs = async (): Promise<{ data: unknown }> => {
   return { data: FLUX_STATIC_JOBS };
 };
 
+/**
+ * PATCH /flux/elements/{id} — Mock prerequisite update.
+ *
+ * Updates FLUX_STATIC_JOBS in-memory so subsequent GET /flux/jobs returns
+ * the updated value. The optimistic update already applied the change to
+ * the RTK Query cache via onQueryStarted; this ensures consistency if the
+ * cache is invalidated and refetched during the same session.
+ *
+ * Returns { data: {} } — the response body is not used by the mutation
+ * (onQueryStarted handles the cache update).
+ */
+const handlePatchFluxElement = async (
+  args: FetchArgs,
+): Promise<{ data: unknown }> => {
+  const urlMatch = args.url.match(/^\/flux\/elements\/(.+)$/);
+  const elementId = urlMatch?.[1];
+  const body = args.body as { column?: string; value?: string } | undefined;
+
+  if (elementId && body?.column && body?.value) {
+    const column = body.column as 'bat' | 'papier' | 'formes' | 'plaques';
+    const value = body.value;
+    for (const job of FLUX_STATIC_JOBS) {
+      const el = job.elements.find((e) => e.id === elementId);
+      if (el && column in el) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (el as any)[column] = value;
+        break;
+      }
+    }
+  }
+
+  return { data: {} };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
@@ -2604,7 +2638,8 @@ const routes: MockRoute[] = [
   { method: 'PUT', pattern: /^\/elements\/[^/]+\/prerequisites$/, handler: handleUpdateElementStatus },
 
   // Flux — Production Flow Dashboard
-  { method: 'GET', pattern: /^\/flux\/jobs$/, handler: handleGetFluxJobs },
+  { method: 'GET',   pattern: /^\/flux\/jobs$/,           handler: handleGetFluxJobs },
+  { method: 'PATCH', pattern: /^\/flux\/elements\/[^/]+$/, handler: handlePatchFluxElement },
 
   // Templates
   { method: 'GET',  pattern: /^\/templates(\?.*)?$/, handler: handleGetTemplates },

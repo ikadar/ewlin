@@ -174,7 +174,7 @@ export {
 } from './api/stationApi';
 export type { StationResponse, StationInput } from './api/stationApi';
 
-export { useGetFluxJobsQuery, fluxApi } from './api/fluxApi';
+export { useGetFluxJobsQuery, useUpdateElementPrerequisiteMutation, fluxApi } from './api/fluxApi';
 
 // Re-export slice actions
 export {

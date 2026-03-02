@@ -76,7 +76,7 @@ body {
 @keyframes flux-listbox-in {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(-4px);
+    transform: translateY(-3px) scale(0.97);
   }
   to {
     opacity: 1;
