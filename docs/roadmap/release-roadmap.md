@@ -1996,17 +1996,18 @@ Two-part release following reference/jcf pattern.
 - [x] Delete action: megerősítő dialog
 - [x] Edit action: navigáció `/job/:jobId` URL-re
 
-#### v0.5.18 - Production Flow Dashboard — API Integration
+#### v0.5.18 - Production Flow Dashboard — API Integration ✅
 
 > **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
 > **Goal:** A statikus mock adatok helyett valós API adatok megjelenítése. A dashboard a PHP API-tól kéri le az aktív jobokat és azok állapotát.
 
-- [ ] API endpoint(ok) definiálása a Flux dashboard adataihoz
-- [ ] RTK Query integráció: `FluxPage` valós adatokat kér le
-- [ ] Loading és error állapotok kezelése
-- [ ] Station progress % forrásának tisztázása (qa.md K3.1)
-- [ ] "Late" állapot definíciójának implementálása (qa.md K3.2)
-- [ ] "Parti" toggle interaktivitás (qa.md K5.1)
+- [x] PHP API: `GET /api/v1/flux/jobs` endpoint (FluxJobResponse, FluxElementResponse, FluxController)
+- [x] RTK Query integráció: `FluxPage` valós adatokat kér le (`fluxApi.ts`)
+- [x] Loading és error állapotok kezelése
+- [x] Prerequisite dropdown portal fix (`createPortal`)
+- [ ] Station progress % forrásának tisztázása (qa.md K3.1) — **halasztva**
+- [ ] "Late" állapot definíciójának implementálása (qa.md K3.2) — **halasztva**
+- [ ] "Parti" toggle interaktivitás (qa.md K5.1) — **halasztva**
 
 ---
 
