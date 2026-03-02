@@ -1,10 +1,12 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { CircleCheck, Circle, Trash2, Folder } from 'lucide-react';
 import {
   STATION_CATEGORIES,
   type FluxJob,
   type FluxElement,
   type StationCategoryId,
+  type PrerequisiteColumn,
+  type PrerequisiteStatus,
 } from './fluxTypes';
 import {
   worstPrerequisiteStatus,
@@ -12,13 +14,26 @@ import {
   sortStationDataBySeverity,
 } from './fluxAggregation';
 import { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
+import { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
 import { FluxStationIndicator } from './FluxStationIndicator';
 import { FluxStackedDots } from './FluxStackedDots';
+import { FluxTableContext, useFluxTableContext } from './FluxTableContext';
 
 interface FluxTableProps {
   jobs: FluxJob[];
   /** Job ID of the keyboard-focused parent row (Alt+↑/↓ navigation). */
   focusedJobId?: string;
+  /** Set of job IDs that are currently expanded (multi-element only). */
+  expandedJobIds?: Set<string>;
+  onUpdatePrerequisite?: (
+    jobId: string,
+    elementId: string,
+    column: PrerequisiteColumn,
+    status: PrerequisiteStatus,
+  ) => void;
+  onToggleExpand?: (jobId: string) => void;
+  onDeleteJob?: (jobId: string) => void;
+  onEditJob?: (jobId: string) => void;
 }
 
 // Frozen zone shadow styles (spec 3.6)
@@ -120,6 +135,7 @@ function FluxTableHeader() {
 /**
  * A single parent job row. Multi-element rows show aggregated worst values
  * and stacked dots in station cells (collapsed state, spec 3.11).
+ * v0.5.17: expand toggle, listbox for single-element, action callbacks.
  */
 const FluxTableRow = memo(function FluxTableRow({
   job,
@@ -128,7 +144,9 @@ const FluxTableRow = memo(function FluxTableRow({
   job: FluxJob;
   isFocused: boolean;
 }) {
+  const ctx = useFluxTableContext();
   const isMulti = job.elements.length > 1;
+  const isExpanded = isMulti && ctx.expandedJobIds.has(job.id);
   const el0 = job.elements[0] as FluxElement;
 
   // Prerequisite values — aggregated for multi-element, direct for single
@@ -136,9 +154,16 @@ const FluxTableRow = memo(function FluxTableRow({
   const papier = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.papier)) : el0.papier;
   const formes = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.formes)) : el0.formes;
   const plaques= isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.plaques)): el0.plaques;
-  const plusCount = isMulti ? job.elements.length - 1 : undefined;
+
+  // +N count only when collapsed (sub-rows show individual elements when expanded)
+  const plusCount = isMulti && !isExpanded ? job.elements.length - 1 : undefined;
 
   const cellBase = `${stickyCell} px-4 py-0 text-sm text-flux-text-secondary`;
+
+  // Left border style reflects expanded state
+  const expandCellStyle = isMulti
+    ? { borderLeft: isExpanded ? '3px solid rgba(99,102,241,1)' : '3px solid rgba(99,102,241,0.25)' }
+    : undefined;
 
   return (
     <tr
@@ -154,18 +179,22 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Expand toggle — frozen left */}
       <td
         className={`${stickyCell} left-0 text-center`}
-        style={isMulti ? { borderLeft: '3px solid rgba(99,102,241,0.25)' } : undefined}
+        style={expandCellStyle}
       >
         {isMulti && (
           <button
-            className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm border border-flux-border-light bg-transparent text-flux-text-muted font-mono font-semibold leading-none cursor-default"
+            className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm border font-mono font-semibold leading-none transition-colors ${
+              isExpanded
+                ? 'border-indigo-500/60 bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50'
+                : 'border-flux-border-light bg-transparent text-flux-text-muted hover:border-flux-text-muted hover:text-flux-text-secondary'
+            }`}
             style={{ fontSize: '11px' }}
-            disabled
-            tabIndex={-1}
-            aria-label="Expand/collapse elements"
+            onClick={() => ctx.onToggleExpand(job.id)}
+            aria-label={isExpanded ? 'Réduire les éléments' : 'Développer les éléments'}
+            aria-expanded={isExpanded}
             data-testid="flux-expand-toggle"
           >
-            +
+            {isExpanded ? '−' : '+'}
           </button>
         )}
       </td>
@@ -199,46 +228,48 @@ const FluxTableRow = memo(function FluxTableRow({
         {job.sortie}
       </td>
 
-      {/* Prerequisite badge cells */}
-      <td className="px-1 py-0 text-center">
-        <FluxPrerequisiteBadge status={bat} plusCount={plusCount} />
-      </td>
-      <td className="px-1 py-0 text-center">
-        <FluxPrerequisiteBadge status={papier} plusCount={plusCount} />
-      </td>
-      <td className="px-1 py-0 text-center">
-        <FluxPrerequisiteBadge status={formes} plusCount={plusCount} />
-      </td>
-      <td className="px-1 py-0 text-center">
-        <FluxPrerequisiteBadge status={plaques} plusCount={plusCount} />
-      </td>
-
-      {/* Station cells */}
-      {STATION_CATEGORIES.map(cat => {
-        const stationCell = (
-          <td
-            key={cat.id}
-            className="p-0 text-center border-l border-flux-border"
-            style={{ lineHeight: 0 }}
-            data-testid={`flux-station-${cat.id}`}
-          >
+      {/* Prerequisite badge/listbox cells */}
+      {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map((col, i) => {
+        const status = [bat, papier, formes, plaques][i]!;
+        return (
+          <td key={col} className="px-1 py-0 text-center">
             {isMulti ? (
-              <FluxStackedDots
-                data={sortStationDataBySeverity(
-                  getMultiElementStationData(job.elements, cat.id as StationCategoryId)
-                )}
-                stationName={cat.full}
-              />
+              <FluxPrerequisiteBadge status={status} plusCount={plusCount} />
             ) : (
-              <FluxStationIndicator
-                data={el0.stations[cat.id as StationCategoryId]}
-                stationName={cat.full}
+              <FluxPrerequisiteListbox
+                jobId={job.id}
+                elementId={el0.id}
+                column={col}
+                status={status}
               />
             )}
           </td>
         );
-        return stationCell;
       })}
+
+      {/* Station cells */}
+      {STATION_CATEGORIES.map(cat => (
+        <td
+          key={cat.id}
+          className="p-0 text-center border-l border-flux-border"
+          style={{ lineHeight: 0 }}
+          data-testid={`flux-station-${cat.id}`}
+        >
+          {isMulti ? (
+            <FluxStackedDots
+              data={sortStationDataBySeverity(
+                getMultiElementStationData(job.elements, cat.id as StationCategoryId)
+              )}
+              stationName={cat.full}
+            />
+          ) : (
+            <FluxStationIndicator
+              data={el0.stations[cat.id as StationCategoryId]}
+              stationName={cat.full}
+            />
+          )}
+        </td>
+      ))}
 
       {/* Transporteur */}
       <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
@@ -271,7 +302,7 @@ const FluxTableRow = memo(function FluxTableRow({
         <div className="flex items-center gap-2">
           <button
             className="text-red-400 hover:text-red-300 transition-colors"
-            tabIndex={-1}
+            onClick={() => ctx.onDeleteJob(job.id)}
             title="Supprimer"
             data-testid="flux-action-delete"
           >
@@ -279,7 +310,7 @@ const FluxTableRow = memo(function FluxTableRow({
           </button>
           <button
             className="text-blue-400 hover:text-blue-300 transition-colors"
-            tabIndex={-1}
+            onClick={() => ctx.onEditJob(job.id)}
             title="Éditer"
             data-testid="flux-action-edit"
           >
@@ -292,60 +323,191 @@ const FluxTableRow = memo(function FluxTableRow({
 });
 
 /**
+ * Sub-row for one element of a multi-element job (shown when expanded, spec 3.11).
+ * v0.5.17: animated entry, interactive prerequisite listboxes (qa.md K8.1).
+ */
+function FluxSubRow({
+  job,
+  element,
+  index,
+}: {
+  job: FluxJob;
+  element: FluxElement;
+  index: number;
+}) {
+  return (
+    <tr
+      className="border-b border-flux-border"
+      style={{
+        height: '32px',
+        animation: `flux-subrow-in 400ms cubic-bezier(0.25, 1, 0.5, 1) both`,
+        animationDelay: `${index * 30}ms`,
+      }}
+      data-testid="flux-sub-row"
+      data-job-id={job.id}
+      data-element-id={element.id}
+    >
+      {/* Expand — indigo border (visual continuation) */}
+      <td
+        className={`${stickyCell} left-0`}
+        style={{ borderLeft: '3px solid rgb(99,102,241)' }}
+      />
+
+      {/* ID — empty */}
+      <td className={`${stickyCell} left-6`} />
+
+      {/* Client — empty */}
+      <td className={`${stickyCell} left-[5.5rem]`} />
+
+      {/* Designation — label with arrow prefix */}
+      <td
+        className={`${stickyCell} left-[14.5rem] px-4 py-0 text-sm text-flux-text-tertiary`}
+        style={LEFT_SHADOW}
+        data-testid="flux-sub-designation"
+      >
+        <span className="text-flux-text-muted mr-1" aria-hidden="true">↳</span>
+        {element.label}
+      </td>
+
+      {/* Sortie — empty */}
+      <td />
+
+      {/* Prerequisite listbox cells */}
+      {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map(col => (
+        <td key={col} className="px-1 py-0 text-center">
+          <FluxPrerequisiteListbox
+            jobId={job.id}
+            elementId={element.id}
+            column={col}
+            status={element[col]}
+          />
+        </td>
+      ))}
+
+      {/* Station cells */}
+      {STATION_CATEGORIES.map(cat => (
+        <td
+          key={cat.id}
+          className="p-0 text-center border-l border-flux-border"
+          style={{ lineHeight: 0 }}
+        >
+          <FluxStationIndicator
+            data={element.stations[cat.id as StationCategoryId]}
+            stationName={cat.full}
+          />
+        </td>
+      ))}
+
+      {/* Transporteur — empty */}
+      <td />
+
+      {/* Parti — empty */}
+      <td />
+
+      {/* Actions — empty (frozen right placeholder) */}
+      <td
+        className={`${stickyCell} right-0`}
+        style={RIGHT_SHADOW}
+      />
+    </tr>
+  );
+}
+
+/**
  * Production Flow Dashboard table.
  * Horizontally scrollable with frozen left and right column zones.
+ * v0.5.17: interactive prerequisite listboxes, expand/collapse, action callbacks.
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, sections 3.6–3.14
  */
-export const FluxTable = memo(function FluxTable({ jobs, focusedJobId }: FluxTableProps) {
+export const FluxTable = memo(function FluxTable({
+  jobs,
+  focusedJobId,
+  expandedJobIds = new Set<string>(),
+  onUpdatePrerequisite = () => {},
+  onToggleExpand = () => {},
+  onDeleteJob = () => {},
+  onEditJob = () => {},
+}: FluxTableProps) {
+  // openListboxId is managed here to coordinate "only one listbox open at a time"
+  const [openListboxId, setOpenListboxId] = useState<string | null>(null);
+
   // Default sort: ID ascending (spec, qa.md K9.1)
   const sorted = useMemo(
     () => [...jobs].sort((a, b) => a.id.localeCompare(b.id)),
     [jobs],
   );
 
+  const ctxValue = {
+    openListboxId,
+    setOpenListboxId,
+    onUpdatePrerequisite,
+    onToggleExpand,
+    onDeleteJob,
+    onEditJob,
+    expandedJobIds,
+  };
+
   return (
-    <div
-      className="overflow-x-auto"
-      style={{
-        scrollbarWidth: 'thin',
-        scrollbarColor: 'rgb(80 80 80) transparent',
-      }}
-    >
-      <table
-        className="w-full table-fixed"
-        style={{ minWidth: '1440px', fontSize: '13px' }}
-        data-testid="flux-table"
+    <FluxTableContext.Provider value={ctxValue}>
+      <div
+        className="overflow-x-auto"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgb(80 80 80) transparent',
+        }}
       >
-        <colgroup>
-          <col style={{ width: '1.5rem' }} />
-          <col style={{ width: '4rem' }} />
-          <col style={{ width: '9rem' }} />
-          <col style={{ width: '20%' }} />
-          <col style={{ width: '6rem' }} />
-          <col style={{ width: '6rem' }} />
-          <col style={{ width: '6rem' }} />
-          <col style={{ width: '6rem' }} />
-          <col style={{ width: '6rem' }} />
-          {STATION_CATEGORIES.map(cat => (
-            <col key={cat.id} style={{ width: '3.5rem' }} />
-          ))}
-          <col style={{ width: '6rem' }} />
-          <col style={{ width: '7rem' }} />
-          <col style={{ width: '4rem' }} />
-        </colgroup>
+        <table
+          className="w-full table-fixed"
+          style={{ minWidth: '1440px', fontSize: '13px' }}
+          data-testid="flux-table"
+        >
+          <colgroup>
+            <col style={{ width: '1.5rem' }} />
+            <col style={{ width: '4rem' }} />
+            <col style={{ width: '9rem' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '6rem' }} />
+            <col style={{ width: '6rem' }} />
+            <col style={{ width: '6rem' }} />
+            <col style={{ width: '6rem' }} />
+            <col style={{ width: '6rem' }} />
+            {STATION_CATEGORIES.map(cat => (
+              <col key={cat.id} style={{ width: '3.5rem' }} />
+            ))}
+            <col style={{ width: '6rem' }} />
+            <col style={{ width: '7rem' }} />
+            <col style={{ width: '4rem' }} />
+          </colgroup>
 
-        <FluxTableHeader />
+          <FluxTableHeader />
 
-        <tbody className="divide-y divide-flux-border">
-          {sorted.map(job => (
-            <FluxTableRow
-              key={job.id}
-              job={job}
-              isFocused={focusedJobId === job.id}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+          <tbody className="divide-y divide-flux-border">
+            {sorted.flatMap(job => {
+              const isExpanded = expandedJobIds.has(job.id);
+              const rows: React.ReactNode[] = [
+                <FluxTableRow
+                  key={job.id}
+                  job={job}
+                  isFocused={focusedJobId === job.id}
+                />,
+              ];
+              if (isExpanded && job.elements.length > 1) {
+                job.elements.forEach((el, idx) => {
+                  rows.push(
+                    <FluxSubRow
+                      key={`${job.id}-${el.id}`}
+                      job={job}
+                      element={el}
+                      index={idx}
+                    />,
+                  );
+                });
+              }
+              return rows;
+            })}
+          </tbody>
+        </table>
+      </div>
+    </FluxTableContext.Provider>
   );
 });

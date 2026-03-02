@@ -1,6 +1,9 @@
 export { FluxTable } from './FluxTable';
 export { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
+export { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
+export { FluxDeleteConfirmDialog } from './FluxDeleteConfirmDialog';
 export { FluxStationIndicator } from './FluxStationIndicator';
 export { FluxStackedDots } from './FluxStackedDots';
+export { FluxTableContext, useFluxTableContext } from './FluxTableContext';
 export * from './fluxTypes';
 export * from './fluxAggregation';

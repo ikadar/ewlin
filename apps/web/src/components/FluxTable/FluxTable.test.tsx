@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { FluxTable } from './FluxTable';
 import type { FluxJob } from './fluxTypes';
 
@@ -134,7 +134,7 @@ describe('FluxTable', () => {
     expect(texts.some(t => t?.includes('A cder'))).toBe(true);
   });
 
-  it('renders +N count on badges for multi-element job', () => {
+  it('renders +N count on badges for multi-element job (collapsed)', () => {
     render(<FluxTable jobs={[multiJob]} />);
     const plusCounts = screen.getAllByTestId('flux-prereq-plus-count');
     // 4 prerequisite columns, each with +2 for 3-element job
@@ -146,5 +146,74 @@ describe('FluxTable', () => {
     render(<FluxTable jobs={[]} />);
     expect(screen.getByTestId('flux-table')).toBeInTheDocument();
     expect(screen.queryByTestId('flux-table-row')).not.toBeInTheDocument();
+  });
+
+  it('renders listbox trigger for single-element job prerequisite cells', () => {
+    render(<FluxTable jobs={[singleJob]} />);
+    const triggers = screen.getAllByTestId('flux-prereq-listbox-trigger');
+    // 4 prerequisite columns for single-element job
+    expect(triggers).toHaveLength(4);
+  });
+
+  it('does not render listbox triggers for collapsed multi-element prerequisite cells', () => {
+    render(<FluxTable jobs={[multiJob]} />);
+    // Multi-element collapsed: no listbox triggers (read-only badges)
+    expect(screen.queryByTestId('flux-prereq-listbox-trigger')).not.toBeInTheDocument();
+  });
+
+  // ── Expand / Collapse ───────────────────────────────────────────────────
+
+  it('clicking expand toggle calls onToggleExpand with job id', () => {
+    const onToggleExpand = vi.fn();
+    render(<FluxTable jobs={[multiJob]} onToggleExpand={onToggleExpand} />);
+    fireEvent.click(screen.getByTestId('flux-expand-toggle'));
+    expect(onToggleExpand).toHaveBeenCalledWith('00078');
+  });
+
+  it('does not show sub-rows when job is not in expandedJobIds', () => {
+    render(<FluxTable jobs={[multiJob]} expandedJobIds={new Set()} />);
+    expect(screen.queryByTestId('flux-sub-row')).not.toBeInTheDocument();
+  });
+
+  it('shows sub-rows when job is in expandedJobIds', () => {
+    render(<FluxTable jobs={[multiJob]} expandedJobIds={new Set(['00078'])} />);
+    const subRows = screen.getAllByTestId('flux-sub-row');
+    expect(subRows).toHaveLength(3); // 3 elements
+  });
+
+  it('sub-row shows element label with arrow prefix', () => {
+    render(<FluxTable jobs={[multiJob]} expandedJobIds={new Set(['00078'])} />);
+    expect(screen.getByText('Ronde')).toBeInTheDocument();
+    expect(screen.getByText('Carree')).toBeInTheDocument();
+    expect(screen.getByText('Ovale')).toBeInTheDocument();
+  });
+
+  it('sub-rows have listbox triggers for prerequisite columns', () => {
+    render(<FluxTable jobs={[multiJob]} expandedJobIds={new Set(['00078'])} />);
+    // 3 sub-rows × 4 columns = 12 listbox triggers
+    const triggers = screen.getAllByTestId('flux-prereq-listbox-trigger');
+    expect(triggers).toHaveLength(12);
+  });
+
+  it('parent row has no +N count when expanded', () => {
+    render(<FluxTable jobs={[multiJob]} expandedJobIds={new Set(['00078'])} />);
+    // When expanded, plusCount is undefined so no +N badges on parent
+    expect(screen.queryByTestId('flux-prereq-plus-count')).not.toBeInTheDocument();
+  });
+
+  // ── Action callbacks ─────────────────────────────────────────────────────
+
+  it('clicking delete button calls onDeleteJob with job id', () => {
+    const onDeleteJob = vi.fn();
+    render(<FluxTable jobs={[singleJob]} onDeleteJob={onDeleteJob} />);
+    fireEvent.click(screen.getByTestId('flux-action-delete'));
+    expect(onDeleteJob).toHaveBeenCalledWith('00042');
+  });
+
+  it('clicking edit button calls onEditJob with job id', () => {
+    const onEditJob = vi.fn();
+    render(<FluxTable jobs={[singleJob]} onEditJob={onEditJob} />);
+    fireEvent.click(screen.getByTestId('flux-action-edit'));
+    expect(onEditJob).toHaveBeenCalledWith('00042');
   });
 });

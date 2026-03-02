@@ -1985,16 +1985,16 @@ Two-part release following reference/jcf pattern.
 - [x] Keyboard shortcuts: `Alt+←/→` (tab váltás), `Alt+↑/↓` (sor navigáció), `Alt+F` (keresőmező), `Alt+N` (new job → `/job/new`)
 - [x] Keyboard hint bar megjelenítése a tab bar mellett
 
-#### v0.5.17 - Production Flow Dashboard — Interaction
+#### v0.5.17 - Production Flow Dashboard — Interaction ✅
 
 > **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
 > **Goal:** Interaktív elemek: prerequisite státusz módosítás, multi-element expand/collapse, delete/edit akciók.
 
-- [ ] Prerequisite listbox dropdown-ok (BAT, Papier, Formes, Plaques) — animált, billentyűzettel is kezelhető
-- [ ] Sub-sor prerequisite módosítás → parent aggregált worst automatikus újraszámolása
-- [ ] Multi-element expand/collapse animációval (staggered slide+fade, 400ms)
-- [ ] Delete action: megerősítő dialog
-- [ ] Edit action: JCF megnyitása az adott job adataival
+- [x] Prerequisite listbox dropdown-ok (BAT, Papier, Formes, Plaques) — animált, billentyűzettel is kezelhető
+- [x] Sub-sor prerequisite módosítás → parent aggregált worst automatikus újraszámolása
+- [x] Multi-element expand/collapse animációval (staggered slide+fade, 400ms)
+- [x] Delete action: megerősítő dialog
+- [x] Edit action: navigáció `/job/:jobId` URL-re
 
 #### v0.5.18 - Production Flow Dashboard — API Integration
 

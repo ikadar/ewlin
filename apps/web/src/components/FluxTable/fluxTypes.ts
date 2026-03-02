@@ -3,6 +3,11 @@
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md
  */
 
+// ── Prerequisite columns ───────────────────────────────────────────────────
+
+/** The four editable prerequisite columns. */
+export type PrerequisiteColumn = 'bat' | 'papier' | 'formes' | 'plaques';
+
 // ── Prerequisite statuses ──────────────────────────────────────────────────
 
 /** All prerequisite status values used across BAT, Papier, Formes, Plaques columns. */
@@ -23,6 +28,17 @@ export type PrerequisiteStatus =
 
 /** Semantic color for a prerequisite status (spec 3.8). */
 export type PrerequisiteColor = 'green' | 'yellow' | 'red' | 'gray';
+
+/**
+ * Available status options per column (spec 3.8).
+ * These are the only values that can be set via the listbox UI.
+ */
+export const COLUMN_STATUS_OPTIONS: Record<PrerequisiteColumn, PrerequisiteStatus[]> = {
+  bat:    ['n.a.', 'Att.fich', 'Recus', 'Envoye', 'OK'],
+  papier: ['Stock', 'A cder', 'Cde', 'Livre'],
+  formes: ['n.a.', 'Stock', 'A cder', 'Cdee', 'Livree'],
+  plaques:['n.a.', 'A faire', 'Pretes'],
+};
 
 /** Maps each status to its display color. Severity: red=0 > yellow=1 > gray=2 > green=3 */
 export const PREREQUISITE_STATUS_COLOR: Record<PrerequisiteStatus, PrerequisiteColor> = {

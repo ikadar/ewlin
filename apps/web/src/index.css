@@ -60,6 +60,30 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Flux Dashboard animations (v0.5.17) ── */
+
+@keyframes flux-subrow-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes flux-listbox-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Striped pattern for unavailability overlay (v0.3.60: CSS gradient → SVG for performance) */
 .bg-stripes-dark {
   background-image: url('/stripes.svg');

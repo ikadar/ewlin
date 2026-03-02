@@ -3,7 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
+import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
 import { FLUX_STATIC_JOBS } from '@/mock/fluxStaticData';
+import type { FluxJob } from '@/components/FluxTable/fluxTypes';
+import type { PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
   computeTabCounts,
   filterBySearch,
@@ -17,6 +20,7 @@ import {
  * Production Flow Dashboard page (/flux, /flux/prepresse, etc.).
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md
  * v0.5.16: Tab filtering, full-text search, URL persistence, keyboard shortcuts.
+ * v0.5.17: Prerequisite listbox, expand/collapse, delete confirmation, edit navigation.
  */
 export function FluxPage() {
   const location = useLocation();
@@ -24,28 +28,36 @@ export function FluxPage() {
 
   const activeTab = pathnameToTab(location.pathname);
 
+  // ── Mutable job state ────────────────────────────────────────────────────
+  const [jobs, setJobs] = useState<FluxJob[]>(FLUX_STATIC_JOBS);
+  const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmJobId, setDeleteConfirmJobId] = useState<string | null>(null);
+
+  // ── Search / keyboard state ──────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [focusedRowIndex, setFocusedRowIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Filtered jobs: tab filter + search, ID ascending
   const filteredJobs = useMemo(
-    () => FLUX_STATIC_JOBS
+    () => jobs
       .filter(job => filterByTab(job, activeTab) && filterBySearch(job, search))
       .sort((a, b) => a.id.localeCompare(b.id)),
-    [activeTab, search],
+    [jobs, activeTab, search],
   );
 
-  // Tab counts: all 5 tabs recalculated based on current search (qa.md K4.1)
+  // Tab counts: all 5 tabs recalculated based on current search and job state
   const tabCounts = useMemo(
-    () => computeTabCounts(FLUX_STATIC_JOBS, search),
-    [search],
+    () => computeTabCounts(jobs, search),
+    [jobs, search],
   );
 
   // Focused job ID for visual highlight (Alt+↑/↓)
   const focusedJobId = focusedRowIndex >= 0 && focusedRowIndex < filteredJobs.length
     ? filteredJobs[focusedRowIndex]!.id
     : undefined;
+
+  // ── Callbacks ─────────────────────────────────────────────────────────────
 
   const handleTabChange = useCallback((tab: typeof activeTab) => {
     setFocusedRowIndex(-1);
@@ -61,7 +73,63 @@ export function FluxPage() {
     navigate('/job/new');
   }, [navigate]);
 
-  // Keyboard shortcuts (spec 3.4)
+  /** Immutable update of a single element's prerequisite status (qa.md K8.1). */
+  const handleUpdatePrerequisite = useCallback((
+    jobId: string,
+    elementId: string,
+    column: PrerequisiteColumn,
+    status: PrerequisiteStatus,
+  ) => {
+    setJobs(prev => prev.map(job => {
+      if (job.id !== jobId) return job;
+      return {
+        ...job,
+        elements: job.elements.map(el => {
+          if (el.id !== elementId) return el;
+          return { ...el, [column]: status };
+        }),
+      };
+    }));
+  }, []);
+
+  /** Toggle expanded state for a multi-element job. */
+  const handleToggleExpand = useCallback((jobId: string) => {
+    setExpandedJobIds(prev => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  }, []);
+
+  /** Open the delete confirmation dialog for a job. */
+  const handleDeleteJob = useCallback((jobId: string) => {
+    setDeleteConfirmJobId(jobId);
+  }, []);
+
+  /** Confirm deletion: remove job, clear expanded state. */
+  const handleConfirmDelete = useCallback(() => {
+    if (deleteConfirmJobId) {
+      setJobs(prev => prev.filter(job => job.id !== deleteConfirmJobId));
+      setExpandedJobIds(prev => {
+        const next = new Set(prev);
+        next.delete(deleteConfirmJobId);
+        return next;
+      });
+      setFocusedRowIndex(-1);
+    }
+    setDeleteConfirmJobId(null);
+  }, [deleteConfirmJobId]);
+
+  /** Navigate to the job edit page (qa.md K6.2). */
+  const handleEditJob = useCallback((jobId: string) => {
+    navigate(`/job/${jobId}`);
+  }, [navigate]);
+
+  // ── Keyboard shortcuts (spec 3.4) ────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.altKey) return;
@@ -137,10 +205,26 @@ export function FluxPage() {
       <div className="flex-1 overflow-hidden">
         <div className="p-4 h-full">
           <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden">
-            <FluxTable jobs={filteredJobs} focusedJobId={focusedJobId} />
+            <FluxTable
+              jobs={filteredJobs}
+              focusedJobId={focusedJobId}
+              expandedJobIds={expandedJobIds}
+              onUpdatePrerequisite={handleUpdatePrerequisite}
+              onToggleExpand={handleToggleExpand}
+              onDeleteJob={handleDeleteJob}
+              onEditJob={handleEditJob}
+            />
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation dialog */}
+      {deleteConfirmJobId && (
+        <FluxDeleteConfirmDialog
+          onCancel={() => setDeleteConfirmJobId(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </div>
   );
 }
