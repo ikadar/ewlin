@@ -17,7 +17,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
 import { scheduleApi } from './scheduleApi';
-import type { FluxJob, PrerequisiteColumn, PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
+import type { FluxJob, FluxStationData, PrerequisiteColumn, PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
 
 // ============================================================================
 // API Response Shape (from PHP backend)
@@ -34,6 +34,8 @@ interface FluxElementApiResponse {
   papier: PrerequisiteStatus;
   formes: PrerequisiteStatus;
   plaques: PrerequisiteStatus;
+  /** Station state per category. Key = stationCategoryId, value.state = 'done'|'late'|'in-progress'|'planned'|'empty' */
+  stations: Record<string, { state: string }>;
 }
 
 /**
@@ -89,8 +91,7 @@ function transformFluxJobsResponse(
         papier: el.papier,
         formes: el.formes,
         plaques: el.plaques,
-        // stationData is empty (K3.1 postponed)
-        stations: {},
+          stations: el.stations as Record<string, FluxStationData>,
       })),
       transporteur: job.shipper,
       parti: {
