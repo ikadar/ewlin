@@ -1929,20 +1929,32 @@ Two-part release following reference/jcf pattern.
 - [x] Test fixture: outsourcing-drag
 - [ ] E2E tests for drag behavior
 
-#### v0.5.13b - Job Edit via JCF Modal
+#### ✅ v0.5.13b - Job Edit via JCF Modal
 > **Goal:** Allow editing existing jobs through the Job Creation Form
 
-- [ ] "Modifier" button on Job Details Panel header (next to close button)
-- [ ] `updateJob` RTK Query mutation + mock implementation
-- [ ] JCF modal edit mode: pre-fill form with selected job data (client, intitulé, deadline, elements)
-- [ ] Modal title: "Modifier {jobId}" instead of "Nouveau Job"
-- [ ] Save button calls updateJob (PUT) instead of createJob (POST)
-- [ ] Job ID field read-only in edit mode
-- [ ] App.tsx: `onEditJob` callback wiring (load job data → open modal in edit mode)
+- [x] "Modifier" button on Job Details Panel header (next to close button)
+- [x] `updateJob` RTK Query mutation + mock implementation
+- [x] JCF modal edit mode: pre-fill form with selected job data (client, intitulé, deadline, elements)
+- [x] Modal title: "Modifier {jobId}" instead of "Nouveau Job"
+- [x] Save button calls updateJob (PUT) instead of createJob (POST)
+- [x] Job ID field read-only in edit mode
+- [x] App.tsx: `onEditJob` callback wiring (load job data → open modal in edit mode)
+
+#### ✅ v0.5.14 - Settings Submenu Navigation + UI Redesign
+> **Goal:** Replace 8 individual config icons with a single gear icon and submenu; redesign prerequisite status pills
+
+- [x] `RootLayout.tsx` — shared h-screen wrapper + Sidebar + Outlet for all routes
+- [x] `SettingsLayout/` — w-72 submenu panel + Outlet for `/settings/*` routes
+- [x] `routes.tsx` — nested route structure: RootLayout > SettingsLayout > config pages
+- [x] `Sidebar.tsx` — single gear icon, `useLocation`-based active state, `lastSchedulingUrl` prop
+- [x] URL routing: `/settings/stations`, `/settings/clients`, etc.
+- [x] Last scheduling URL persisted in sessionStorage (LayoutGrid restores it)
+- [x] PrerequisiteDropdown pill redesign — category label colored by status, status text in tooltip
+- [x] ESLint v7 compliant (react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/globals)
 
 ### Phase 5E: Testing & Verification
 
-#### v0.5.14 - E2E Tests with Real Backend
+#### v0.5.15 - E2E Tests with Real Backend
 > **Goal:** E2E tests run against actual PHP API
 
 - [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
@@ -1951,7 +1963,7 @@ Two-part release following reference/jcf pattern.
 - [ ] Key E2E tests with real backend
 - [ ] CI pipeline integration
 
-#### v0.5.15 - Performance Verification
+#### v0.5.16 - Performance Verification
 > **Goal:** Verify acceptable performance with real API
 
 - [ ] Snapshot load time < 2s
