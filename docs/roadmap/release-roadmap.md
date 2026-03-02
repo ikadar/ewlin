@@ -2080,21 +2080,22 @@ Two-part release following reference/jcf pattern.
 ]
 ```
 
-#### v0.5.23 - ST Column: Frontend UI + Integration
+#### v0.5.23 - ST Column: Frontend UI + Integration ✅
 
 > **Goal:** ST column rendered in Flux table with interactive 3-state checkboxes, tooltip, "S-T à faire" tab.
+> **Released:** 2026-03-02
 
 **Frontend:**
-- [ ] `fluxTypes.ts`: `FluxSTStatus` type, `FluxOutsourcingTask` interface, extend `FluxElement` with `outsourcing: FluxOutsourcingTask[]`
-- [ ] `fluxApi.ts`: extend `transformFluxJobsResponse` to map `outsourcing[]`; add `updateSTStatus` RTK mutation (`PATCH /flux/tasks/{taskId}/status`) with optimistic cache update
-- [ ] `fluxFilters.ts`: add `'soustraitance'` to `TAB_IDS`; filter: job visible if any element has any task with `status !== 'done'`; add `/flux/soustraitance` URL path
-- [ ] `fluxStaticData.ts`: add `outsourcing[]` data to fixture elements (ref data from spec §3.3)
-- [ ] New `STCell.tsx`: 3-state icon (pending=gray circle, progress=orange dot-circle, done=green checkmark); click cycles `pending→progress→done→pending`; label "ProviderName · ActionType" with `text-overflow: ellipsis`; custom fixed-position tooltip on hover
-- [ ] `FluxTable.tsx`: ST column header (`<th>` "ST", `title="Sous-traitance"`, not sortable); `<STCell>` in parent rows (collapsed multi: flattened tasks); `<STCell>` in sub-rows (per-element tasks)
-- [ ] `FluxPage.tsx`: `handleUpdateSTStatus` callback → `updateSTStatus` mutation
-- [ ] `index.css`: `.st-pending` (gray), `.st-progress` (orange `rgb(251 146 60)`), `.st-done` (green), `.st-tooltip` (fixed, dark bg, 120ms fade)
-- [ ] Unit tests: `fluxFilters.test.ts` — soustraitance tab filter (verification matrix: 3/5 jobs)
-- [ ] Unit tests: `STCell.test.tsx` — 3-state render, click cycle
+- [x] `fluxTypes.ts`: `FluxSTStatus` type, `FluxOutsourcingTask` interface, extend `FluxElement` with `outsourcing: FluxOutsourcingTask[]`
+- [x] `fluxApi.ts`: extend `transformFluxJobsResponse` to map `outsourcing[]`; add `updateSTStatus` RTK mutation (`PATCH /flux/tasks/{taskId}/status`) with optimistic cache update
+- [x] `fluxFilters.ts`: add `'soustraitance'` to `TAB_IDS`; filter: job visible if any element has any task with `status !== 'done'`; add `/flux/soustraitance` URL path
+- [x] `fluxStaticData.ts`: add `outsourcing[]` data to fixture elements (ref data from spec §3.3)
+- [x] New `STCell.tsx`: 3-state icon (pending=gray circle, progress=orange dot-circle, done=green checkmark); click cycles `pending→progress→done→pending`; label "ProviderName · ActionType" with `text-overflow: ellipsis`; custom fixed-position tooltip on hover
+- [x] `FluxTable.tsx`: ST column header (`<th>` "ST", `title="Sous-traitance"`, not sortable); `<STCell>` in parent rows (collapsed multi: flattened tasks); `<STCell>` in sub-rows (per-element tasks)
+- [x] `FluxPage.tsx`: `handleUpdateSTStatus` callback → `updateSTStatus` mutation
+- [x] `index.css`: `.st-pending` (gray), `.st-progress` (orange `rgb(251 146 60)`), `.st-done` (green), `.st-tooltip` (fixed, dark bg, 120ms fade)
+- [x] Unit tests: `fluxFilters.test.ts` — soustraitance tab filter (verification matrix: 3/5 jobs)
+- [x] Unit tests: `STCell.test.tsx` — 3-state render, click cycle
 
 ---
 
