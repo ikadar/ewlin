@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { PrerequisiteColumn, PrerequisiteStatus } from './fluxTypes';
 import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
+import type { SortColumn, SortDirection } from './fluxSort';
 
 export interface FluxTableContextValue {
   /** Ordered station categories for dynamic column rendering. */
@@ -19,6 +20,12 @@ export interface FluxTableContextValue {
   onDeleteJob: (jobId: string) => void;
   onEditJob: (jobId: string) => void;
   expandedJobIds: Set<string>;
+  /** Active sort column (v0.5.21). */
+  sortColumn: SortColumn;
+  /** Active sort direction (v0.5.21). */
+  sortDirection: SortDirection;
+  /** Callback to change the sort column (v0.5.21). */
+  onSortChange: (column: SortColumn) => void;
 }
 
 export const FluxTableContext = createContext<FluxTableContextValue | null>(null);

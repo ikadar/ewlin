@@ -74,9 +74,10 @@ describe('FluxTable', () => {
     expect(rows).toHaveLength(2);
   });
 
-  it('sorts rows by ID ascending', () => {
+  it('renders rows in the order provided (sorting is done by FluxPage)', () => {
     const job2: FluxJob = { ...singleJob, id: '00010', client: 'AAAA' };
-    render(<FluxTable categories={dummyCategories} jobs={[singleJob, job2]} />);
+    // FluxTable is a presentational component — it renders jobs in the order given
+    render(<FluxTable categories={dummyCategories} jobs={[job2, singleJob]} />);
     const rows = screen.getAllByTestId('flux-table-row');
     expect(rows[0]).toHaveAttribute('data-job-id', '00010');
     expect(rows[1]).toHaveAttribute('data-job-id', '00042');
@@ -228,5 +229,81 @@ describe('FluxTable', () => {
     render(<FluxTable categories={dummyCategories} jobs={[singleJob]} onEditJob={onEditJob} />);
     fireEvent.click(screen.getByTestId('flux-action-edit'));
     expect(onEditJob).toHaveBeenCalledWith('00042');
+  });
+
+  // ── Sort header clicks (v0.5.21) ─────────────────────────────────────────
+
+  it('clicking ID header calls onSortChange with "id"', () => {
+    const onSortChange = vi.fn();
+    render(<FluxTable categories={dummyCategories} jobs={[singleJob]} onSortChange={onSortChange} />);
+    fireEvent.click(screen.getByTitle('Identifiant'));
+    expect(onSortChange).toHaveBeenCalledWith('id');
+  });
+
+  it('clicking Client header calls onSortChange with "client"', () => {
+    const onSortChange = vi.fn();
+    render(<FluxTable categories={dummyCategories} jobs={[singleJob]} onSortChange={onSortChange} />);
+    fireEvent.click(screen.getByTitle('Client'));
+    expect(onSortChange).toHaveBeenCalledWith('client');
+  });
+
+  it('clicking Désignation header calls onSortChange with "designation"', () => {
+    const onSortChange = vi.fn();
+    render(<FluxTable categories={dummyCategories} jobs={[singleJob]} onSortChange={onSortChange} />);
+    fireEvent.click(screen.getByTitle('Désignation'));
+    expect(onSortChange).toHaveBeenCalledWith('designation');
+  });
+
+  it('clicking Sortie header calls onSortChange with "sortie"', () => {
+    const onSortChange = vi.fn();
+    render(<FluxTable categories={dummyCategories} jobs={[singleJob]} onSortChange={onSortChange} />);
+    fireEvent.click(screen.getByTitle('Date de sortie atelier'));
+    expect(onSortChange).toHaveBeenCalledWith('sortie');
+  });
+
+  it('clicking BAT header calls onSortChange with "bat"', () => {
+    const onSortChange = vi.fn();
+    render(<FluxTable categories={dummyCategories} jobs={[singleJob]} onSortChange={onSortChange} />);
+    fireEvent.click(screen.getByTitle('Bon à tirer'));
+    expect(onSortChange).toHaveBeenCalledWith('bat');
+  });
+
+  it('clicking Transporteur header calls onSortChange with "transporteur"', () => {
+    const onSortChange = vi.fn();
+    render(<FluxTable categories={dummyCategories} jobs={[singleJob]} onSortChange={onSortChange} />);
+    fireEvent.click(screen.getByTitle('Transporteur'));
+    expect(onSortChange).toHaveBeenCalledWith('transporteur');
+  });
+
+  it('active sort column shows up-arrow chevron when ascending', () => {
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[singleJob]}
+        sortColumn="id"
+        sortDirection="asc"
+      />,
+    );
+    // The ID header should have an up chevron (active ascending)
+    const idHeader = screen.getByTitle('Identifiant');
+    // The active column chevron has no opacity-0 class (it's always visible)
+    const chevron = idHeader.querySelector('svg');
+    expect(chevron).not.toBeNull();
+    expect(chevron?.classList.contains('opacity-0')).toBe(false);
+  });
+
+  it('inactive sortable column chevron has opacity-0 class (hidden until hover)', () => {
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[singleJob]}
+        sortColumn="id"
+        sortDirection="asc"
+      />,
+    );
+    // Client header (inactive) should have opacity-0 chevron
+    const clientHeader = screen.getByTitle('Client');
+    const chevron = clientHeader.querySelector('svg');
+    expect(chevron?.classList.contains('opacity-0')).toBe(true);
   });
 });

@@ -84,6 +84,13 @@ body {
   }
 }
 
+/* ── Flux Dashboard webkit scrollbar (v0.5.21, spec 3.6) ── */
+/* Complements Firefox scrollbarWidth/scrollbarColor (set inline on the scroll container). */
+.flux-scrollable::-webkit-scrollbar { width: 6px; height: 6px; }
+.flux-scrollable::-webkit-scrollbar-track { background: transparent; }
+.flux-scrollable::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
+.flux-scrollable::-webkit-scrollbar-thumb:hover { background: rgb(110 110 110); }
+
 /* Striped pattern for unavailability overlay (v0.3.60: CSS gradient → SVG for performance) */
 .bg-stripes-dark {
   background-image: url('/stripes.svg');

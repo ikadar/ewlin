@@ -1,5 +1,5 @@
-import { memo, useMemo, useState } from 'react';
-import { CircleCheck, Circle, Trash2, Folder } from 'lucide-react';
+import { memo, useState } from 'react';
+import { CircleCheck, Circle, Trash2, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   type FluxJob,
   type FluxElement,
@@ -17,6 +17,7 @@ import { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
 import { FluxStationIndicator } from './FluxStationIndicator';
 import { FluxStackedDots } from './FluxStackedDots';
 import { FluxTableContext, useFluxTableContext } from './FluxTableContext';
+import { type SortColumn, type SortDirection } from './fluxSort';
 
 interface FluxTableProps {
   jobs: FluxJob[];
@@ -26,6 +27,12 @@ interface FluxTableProps {
   focusedJobId?: string;
   /** Set of job IDs that are currently expanded (multi-element only). */
   expandedJobIds?: Set<string>;
+  /** Active sort column (v0.5.21). Defaults to 'id'. */
+  sortColumn?: SortColumn;
+  /** Active sort direction (v0.5.21). Defaults to 'asc'. */
+  sortDirection?: SortDirection;
+  /** Called when the user clicks a sortable column header (v0.5.21). */
+  onSortChange?: (column: SortColumn) => void;
   onUpdatePrerequisite?: (
     jobId: string,
     elementId: string,
@@ -45,22 +52,47 @@ const RIGHT_SHADOW = { boxShadow: '-4px 0 8px -2px rgba(0,0,0,0.3)' } as const;
 const stickyCell = 'sticky z-20 bg-flux-elevated';
 
 /**
+ * Sort indicator chevron for a column header (v0.5.21).
+ * - Active ascending: single up arrow, blue, always visible.
+ * - Active descending: single down arrow, blue, always visible.
+ * - Inactive sortable: double chevron, opacity-0, appears on group-hover.
+ */
+function SortChevron({ col, active, dir }: { col: SortColumn; active: SortColumn; dir: SortDirection }) {
+  const isActive = col === active;
+  if (!isActive) {
+    return (
+      <ChevronsUpDown
+        className="w-3 h-3 text-flux-text-muted opacity-0 group-hover:opacity-100 transition-opacity inline ml-0.5"
+        strokeWidth={2}
+      />
+    );
+  }
+  if (dir === 'asc') {
+    return (
+      <ChevronUp
+        className="w-3 h-3 text-blue-400 inline ml-0.5"
+        strokeWidth={2.5}
+      />
+    );
+  }
+  return (
+    <ChevronDown
+      className="w-3 h-3 text-blue-400 inline ml-0.5"
+      strokeWidth={2.5}
+    />
+  );
+}
+
+/**
  * Header row for the Flux table.
- * All column headers show full name as title tooltip.
- * Sort chevron appears on hover (non-functional in v0.5.15).
+ * Sortable columns show a chevron indicator; clicking triggers onSortChange.
+ * Station columns, Parti, and Actions are not sortable (spec 3.6).
  */
 function FluxTableHeader() {
   const ctx = useFluxTableContext();
+  const { sortColumn, sortDirection, onSortChange } = ctx;
   const headerCell = 'px-2 py-3 text-left font-medium whitespace-nowrap text-flux-text-secondary';
-  const sortIcon = (
-    <svg
-      className="w-3 h-3 text-flux-text-muted opacity-0 group-hover:opacity-100 transition-opacity inline ml-0.5"
-      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8v12m0 0l4-4m-4 4l-4-4" />
-    </svg>
-  );
+  const sortableHeader = `${headerCell} group cursor-pointer select-none`;
 
   return (
     <thead>
@@ -68,42 +100,68 @@ function FluxTableHeader() {
         {/* Expand — frozen left, no header */}
         <th className={`${stickyCell} left-0 w-6 py-3`} />
         {/* ID — frozen left */}
-        <th className={`${stickyCell} left-6 ${headerCell} group cursor-pointer`} title="Identifiant">
-          ID {sortIcon}
+        <th
+          className={`${stickyCell} left-6 ${sortableHeader}`}
+          title="Identifiant"
+          onClick={() => onSortChange('id')}
+        >
+          ID <SortChevron col="id" active={sortColumn} dir={sortDirection} />
         </th>
         {/* Client — frozen left */}
         <th
-          className={`${stickyCell} left-[5.5rem] ${headerCell} group cursor-pointer`}
+          className={`${stickyCell} left-[5.5rem] ${sortableHeader}`}
           title="Client"
+          onClick={() => onSortChange('client')}
         >
-          Client {sortIcon}
+          Client <SortChevron col="client" active={sortColumn} dir={sortDirection} />
         </th>
         {/* Designation — frozen left + right shadow */}
         <th
-          className={`${stickyCell} left-[14.5rem] ${headerCell} group cursor-pointer`}
+          className={`${stickyCell} left-[14.5rem] ${sortableHeader}`}
           style={LEFT_SHADOW}
           title="Désignation"
+          onClick={() => onSortChange('designation')}
         >
-          Désignation {sortIcon}
+          Désignation <SortChevron col="designation" active={sortColumn} dir={sortDirection} />
         </th>
         {/* Sortie */}
-        <th className={`${headerCell} group cursor-pointer`} title="Date de sortie atelier">
-          Sortie {sortIcon}
+        <th
+          className={sortableHeader}
+          title="Date de sortie atelier"
+          onClick={() => onSortChange('sortie')}
+        >
+          Sortie <SortChevron col="sortie" active={sortColumn} dir={sortDirection} />
         </th>
         {/* Prerequisite columns */}
-        <th className={`${headerCell} group cursor-pointer`} title="Bon à tirer">
-          BAT {sortIcon}
+        <th
+          className={sortableHeader}
+          title="Bon à tirer"
+          onClick={() => onSortChange('bat')}
+        >
+          BAT <SortChevron col="bat" active={sortColumn} dir={sortDirection} />
         </th>
-        <th className={`${headerCell} group cursor-pointer`} title="Papier">
-          Papier {sortIcon}
+        <th
+          className={sortableHeader}
+          title="Papier"
+          onClick={() => onSortChange('papier')}
+        >
+          Papier <SortChevron col="papier" active={sortColumn} dir={sortDirection} />
         </th>
-        <th className={`${headerCell} group cursor-pointer`} title="Formes">
-          Formes {sortIcon}
+        <th
+          className={sortableHeader}
+          title="Formes"
+          onClick={() => onSortChange('formes')}
+        >
+          Formes <SortChevron col="formes" active={sortColumn} dir={sortDirection} />
         </th>
-        <th className={`${headerCell} group cursor-pointer`} title="Plaques">
-          Plaques {sortIcon}
+        <th
+          className={sortableHeader}
+          title="Plaques"
+          onClick={() => onSortChange('plaques')}
+        >
+          Plaques <SortChevron col="plaques" active={sortColumn} dir={sortDirection} />
         </th>
-        {/* Station columns — dynamic from API */}
+        {/* Station columns — dynamic from API, not sortable */}
         {ctx.categories.map(cat => (
           <th
             key={cat.id}
@@ -115,12 +173,16 @@ function FluxTableHeader() {
           </th>
         ))}
         {/* Transporteur */}
-        <th className={`${headerCell} group cursor-pointer`} title="Transporteur">
-          Transp. {sortIcon}
+        <th
+          className={sortableHeader}
+          title="Transporteur"
+          onClick={() => onSortChange('transporteur')}
+        >
+          Transp. <SortChevron col="transporteur" active={sortColumn} dir={sortDirection} />
         </th>
-        {/* Parti */}
-        <th className={`${headerCell} group cursor-pointer`} title="Statut d'expédition">
-          Parti {sortIcon}
+        {/* Parti — not sortable (K5.1 deferred) */}
+        <th className={headerCell} title="Statut d'expédition">
+          Parti
         </th>
         {/* Actions — frozen right + left shadow */}
         <th
@@ -316,7 +378,7 @@ const FluxTableRow = memo(function FluxTableRow({
             title="Éditer"
             data-testid="flux-action-edit"
           >
-            <Folder className="w-4 h-4" strokeWidth={2} />
+            <FolderOpen className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
       </td>
@@ -420,6 +482,7 @@ function FluxSubRow({
  * Production Flow Dashboard table.
  * Horizontally scrollable with frozen left and right column zones.
  * v0.5.17: interactive prerequisite listboxes, expand/collapse, action callbacks.
+ * v0.5.21: sortable column headers, webkit scrollbar.
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, sections 3.6–3.14
  */
 export const FluxTable = memo(function FluxTable({
@@ -427,6 +490,9 @@ export const FluxTable = memo(function FluxTable({
   categories = [],
   focusedJobId,
   expandedJobIds = new Set<string>(),
+  sortColumn = 'id',
+  sortDirection = 'asc',
+  onSortChange = () => {},
   onUpdatePrerequisite = () => {},
   onToggleExpand = () => {},
   onDeleteJob = () => {},
@@ -434,12 +500,6 @@ export const FluxTable = memo(function FluxTable({
 }: FluxTableProps) {
   // openListboxId is managed here to coordinate "only one listbox open at a time"
   const [openListboxId, setOpenListboxId] = useState<string | null>(null);
-
-  // Default sort: ID ascending (spec, qa.md K9.1)
-  const sorted = useMemo(
-    () => [...jobs].sort((a, b) => a.id.localeCompare(b.id)),
-    [jobs],
-  );
 
   const ctxValue = {
     categories,
@@ -450,12 +510,15 @@ export const FluxTable = memo(function FluxTable({
     onDeleteJob,
     onEditJob,
     expandedJobIds,
+    sortColumn,
+    sortDirection,
+    onSortChange,
   };
 
   return (
     <FluxTableContext.Provider value={ctxValue}>
       <div
-        className="overflow-x-auto"
+        className="overflow-x-auto flux-scrollable"
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: 'rgb(80 80 80) transparent',
@@ -487,7 +550,7 @@ export const FluxTable = memo(function FluxTable({
           <FluxTableHeader />
 
           <tbody className="divide-y divide-flux-border">
-            {sorted.flatMap(job => {
+            {jobs.flatMap(job => {
               const isExpanded = expandedJobIds.has(job.id);
               const rows: React.ReactNode[] = [
                 <FluxTableRow

@@ -15,6 +15,7 @@ import {
   tabToPathname,
   TAB_IDS,
 } from '@/components/FluxTable/fluxFilters';
+import { sortFluxJobs, type SortColumn, type SortDirection } from '@/components/FluxTable/fluxSort';
 
 /**
  * Production Flow Dashboard page (/flux, /flux/prepresse, etc.).
@@ -55,12 +56,27 @@ export function FluxPage() {
   const [focusedRowIndex, setFocusedRowIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Filtered jobs: tab filter + search, ID ascending
+  // ── Sort state (v0.5.21) ─────────────────────────────────────────────────
+  const [sortColumn, setSortColumn] = useState<SortColumn>('id');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSortChange = useCallback((column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
+
+  // Filtered + sorted jobs: tab filter → search → sort
   const filteredJobs = useMemo(
-    () => jobs
-      .filter(job => filterByTab(job, activeTab) && filterBySearch(job, search))
-      .sort((a, b) => a.id.localeCompare(b.id)),
-    [jobs, activeTab, search],
+    () => sortFluxJobs(
+      jobs.filter(job => filterByTab(job, activeTab) && filterBySearch(job, search)),
+      sortColumn,
+      sortDirection,
+    ),
+    [jobs, activeTab, search, sortColumn, sortDirection],
   );
 
   // Tab counts: all 5 tabs recalculated based on current search and job state
@@ -246,6 +262,9 @@ export function FluxPage() {
               categories={sortedCategories}
               focusedJobId={focusedJobId}
               expandedJobIds={expandedJobIds}
+              sortColumn={sortColumn}
+              sortDirection={sortDirection}
+              onSortChange={handleSortChange}
               onUpdatePrerequisite={handleUpdatePrerequisite}
               onToggleExpand={handleToggleExpand}
               onDeleteJob={handleDeleteJob}
