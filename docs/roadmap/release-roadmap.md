@@ -1963,15 +1963,15 @@ Two-part release following reference/jcf pattern.
 > **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
 > **Goal:** Teljes táblázat layout és adatmegjelenítés, minden interakció nélkül. Frozen oszlopok, prerequisite badge-ek (read-only), station ring+dot SVG indikátorok, multi-element aggregált megjelenítés (összecsukott állapot), Transporteur, Parti, Actions gombok (nem funkcionálisak).
 
-- [ ] Route `/flux` hozzáadása a Sidebar LayoutGrid ikonjához
-- [ ] Frozen-column table layout (expand + ID + Client + Designation frozen left, Actions frozen right)
-- [ ] Prerequisite badge oszlopok (BAT, Papier, Formes, Plaques) — read-only, színkódolt
-- [ ] Station ring+dot SVG indikátorok (9 station kategória, 5 állapot)
-- [ ] Multi-element sorok: összecsukott állapot, stacked dots, +N count badge-ek, worst-value aggregáció
-- [ ] Transporteur és Parti oszlopok (display-only)
-- [ ] Actions oszlop (ikonok megjelennek, de nem funkcionálisak)
-- [ ] Default sort: ID ascending
-- [ ] Test fixture a manuális QA-hoz (spec 5. fejezet referencia adatai)
+- [x] Route `/flux` hozzáadása a Sidebar LayoutGrid ikonjához
+- [x] Frozen-column table layout (expand + ID + Client + Designation frozen left, Actions frozen right)
+- [x] Prerequisite badge oszlopok (BAT, Papier, Formes, Plaques) — read-only, színkódolt
+- [x] Station ring+dot SVG indikátorok (9 station kategória, 5 állapot)
+- [x] Multi-element sorok: összecsukott állapot, stacked dots, +N count badge-ek, worst-value aggregáció
+- [x] Transporteur és Parti oszlopok (display-only)
+- [x] Actions oszlop (ikonok megjelennek, de nem funkcionálisak)
+- [x] Default sort: ID ascending
+- [x] Test fixture a manuális QA-hoz (spec 5. fejezet referencia adatai)
 
 #### v0.5.16 - Production Flow Dashboard — Filtering & Navigation
 
