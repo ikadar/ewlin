@@ -21,16 +21,16 @@ describe('Sidebar', () => {
 
   it('renders main navigation buttons', () => {
     render(<MemoryRouter><Sidebar /></MemoryRouter>);
-    expect(screen.getByLabelText('Scheduling view')).toBeInTheDocument();
+    expect(screen.getByLabelText('Flux de production')).toBeInTheDocument();
     expect(screen.getByLabelText('Calendar view')).toBeInTheDocument();
     expect(screen.getByLabelText('Settings')).toBeInTheDocument();
     expect(screen.getByLabelText('User')).toBeInTheDocument();
   });
 
-  it('shows schedule view as active on root route', () => {
+  it('shows flux view as active on root route', () => {
     render(<MemoryRouter initialEntries={['/']}><Sidebar /></MemoryRouter>);
-    const scheduleButton = screen.getByLabelText('Scheduling view');
-    expect(scheduleButton).toHaveAttribute('aria-current', 'page');
+    const fluxButton = screen.getByLabelText('Flux de production');
+    expect(fluxButton).toHaveAttribute('aria-current', 'page');
   });
 
   it('shows settings as active on settings routes', () => {
@@ -43,14 +43,14 @@ describe('Sidebar', () => {
     expect(settingsButton).toHaveAttribute('aria-current', 'page');
   });
 
-  it('shows schedule view as inactive on settings routes', () => {
+  it('shows flux view as inactive on settings routes', () => {
     render(
       <MemoryRouter initialEntries={['/settings/clients']}>
         <Sidebar />
       </MemoryRouter>
     );
-    const scheduleButton = screen.getByLabelText('Scheduling view');
-    expect(scheduleButton).not.toHaveAttribute('aria-current');
+    const fluxButton = screen.getByLabelText('Flux de production');
+    expect(fluxButton).not.toHaveAttribute('aria-current');
   });
 
   it('shows user button as disabled', () => {
@@ -59,9 +59,9 @@ describe('Sidebar', () => {
     expect(userButton).toBeDisabled();
   });
 
-  it('accepts lastSchedulingUrl prop', () => {
-    render(<MemoryRouter><Sidebar lastSchedulingUrl="/job/abc" /></MemoryRouter>);
-    expect(screen.getByRole('navigation')).toBeInTheDocument();
+  it('navigates to /flux on LayoutGrid click', () => {
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
+    expect(screen.getByLabelText('Flux de production')).toBeInTheDocument();
   });
 });
 

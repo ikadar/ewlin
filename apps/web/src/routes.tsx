@@ -4,6 +4,7 @@
  * @see v0.4.38 - React Router Integration
  *
  * Route structure:
+ * /flux                      → Production Flow Dashboard (v0.5.15)
  * /                          → Main scheduler view (no job selected)
  * /job/:jobId                → Main scheduler with job selected
  * /job/new                   → Main scheduler with JCF modal open
@@ -29,6 +30,7 @@ import { ImpressionPresetsPage } from './pages/ImpressionPresetsPage';
 import { SurfacagePresetsPage } from './pages/SurfacagePresetsPage';
 import { FeuilleFormatsPage } from './pages/FeuilleFormatsPage';
 import { StationsPage } from './pages/StationsPage';
+import { FluxPage } from './pages/FluxPage';
 
 /**
  * Application routes.
@@ -39,6 +41,9 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route element={<RootLayout />}>
+        {/* Production Flow Dashboard */}
+        <Route path="/flux" element={<FluxPage />} />
+
         {/* Scheduling routes */}
         <Route path="/" element={<App />} />
         <Route path="/job/new" element={<App />} />

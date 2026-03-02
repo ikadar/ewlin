@@ -1792,7 +1792,8 @@ Two-part release following reference/jcf pattern.
 > - Phase 5B: JCF API Integration (v0.5.5–v0.5.6)
 > - Phase 5C: Error Handling & UX (v0.5.7–v0.5.8)
 > - Phase 5D: Outsourcing Refactor (v0.5.9–v0.5.13)
-> - Phase 5E: Testing & Verification (v0.5.14–v0.5.15)
+> - Phase 5E: Production Flow Dashboard (v0.5.15–v0.5.18)
+> - Phase 5F: Testing & Verification (v0.5.19–v0.5.20)
 
 ### Phase 5A: Core API Integration
 
@@ -1952,9 +1953,66 @@ Two-part release following reference/jcf pattern.
 - [x] PrerequisiteDropdown pill redesign — category label colored by status, status text in tooltip
 - [x] ESLint v7 compliant (react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/globals)
 
-### Phase 5E: Testing & Verification
+### Phase 5E: Production Flow Dashboard
 
-#### v0.5.15 - E2E Tests with Real Backend
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md)
+> **Q&A:** [production-flow-dashboard-spec/qa.md](../production-flow-dashboard-spec/qa.md)
+
+#### v0.5.15 - Production Flow Dashboard — Static Table
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** Teljes táblázat layout és adatmegjelenítés, minden interakció nélkül. Frozen oszlopok, prerequisite badge-ek (read-only), station ring+dot SVG indikátorok, multi-element aggregált megjelenítés (összecsukott állapot), Transporteur, Parti, Actions gombok (nem funkcionálisak).
+
+- [ ] Route `/flux` hozzáadása a Sidebar LayoutGrid ikonjához
+- [ ] Frozen-column table layout (expand + ID + Client + Designation frozen left, Actions frozen right)
+- [ ] Prerequisite badge oszlopok (BAT, Papier, Formes, Plaques) — read-only, színkódolt
+- [ ] Station ring+dot SVG indikátorok (9 station kategória, 5 állapot)
+- [ ] Multi-element sorok: összecsukott állapot, stacked dots, +N count badge-ek, worst-value aggregáció
+- [ ] Transporteur és Parti oszlopok (display-only)
+- [ ] Actions oszlop (ikonok megjelennek, de nem funkcionálisak)
+- [ ] Default sort: ID ascending
+- [ ] Test fixture a manuális QA-hoz (spec 5. fejezet referencia adatai)
+
+#### v0.5.16 - Production Flow Dashboard — Filtering & Navigation
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** Tab szűrés, keresés, URL routing és keyboard shortcuts. Minden interakció, ami az adatok megjelenítési szűrésére vonatkozik.
+
+- [ ] Nested routes: `/flux` (Tous), `/flux/prepresse`, `/flux/papier`, `/flux/formes`, `/flux/plaques`
+- [ ] Tab bar 5 tabbal, aktív/inaktív vizuális állapot
+- [ ] Dinamikus count badge-ek (tab szűrő + keresés kombinációja)
+- [ ] Full-text keresés (real-time, case-insensitive, összes szöveges oszlopra)
+- [ ] Keyboard shortcuts: `Alt+←/→` (tab váltás), `Alt+↑/↓` (sor navigáció), `Alt+F` (keresőmező), `Alt+N` (new job → `/job/new`)
+- [ ] Keyboard hint bar megjelenítése a tab bar mellett
+
+#### v0.5.17 - Production Flow Dashboard — Interaction
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** Interaktív elemek: prerequisite státusz módosítás, multi-element expand/collapse, delete/edit akciók.
+
+- [ ] Prerequisite listbox dropdown-ok (BAT, Papier, Formes, Plaques) — animált, billentyűzettel is kezelhető
+- [ ] Sub-sor prerequisite módosítás → parent aggregált worst automatikus újraszámolása
+- [ ] Multi-element expand/collapse animációval (staggered slide+fade, 400ms)
+- [ ] Delete action: megerősítő dialog
+- [ ] Edit action: JCF megnyitása az adott job adataival
+
+#### v0.5.18 - Production Flow Dashboard — API Integration
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** A statikus mock adatok helyett valós API adatok megjelenítése. A dashboard a PHP API-tól kéri le az aktív jobokat és azok állapotát.
+
+- [ ] API endpoint(ok) definiálása a Flux dashboard adataihoz
+- [ ] RTK Query integráció: `FluxPage` valós adatokat kér le
+- [ ] Loading és error állapotok kezelése
+- [ ] Station progress % forrásának tisztázása (qa.md K3.1)
+- [ ] "Late" állapot definíciójának implementálása (qa.md K3.2)
+- [ ] "Parti" toggle interaktivitás (qa.md K5.1)
+
+---
+
+### Phase 5F: Testing & Verification
+
+#### v0.5.19 - E2E Tests with Real Backend
 > **Goal:** E2E tests run against actual PHP API
 
 - [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
@@ -1963,7 +2021,7 @@ Two-part release following reference/jcf pattern.
 - [ ] Key E2E tests with real backend
 - [ ] CI pipeline integration
 
-#### v0.5.16 - Performance Verification
+#### v0.5.20 - Performance Verification
 > **Goal:** Verify acceptable performance with real API
 
 - [ ] Snapshot load time < 2s

@@ -2,18 +2,13 @@ import { LayoutGrid, Calendar, Settings, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
-export interface SidebarProps {
-  /** Last visited scheduling URL, used for the LayoutGrid back-navigation */
-  lastSchedulingUrl?: string;
-}
-
 /**
  * Sidebar navigation component.
  * Provides top-level navigation between main application views.
  * Always visible on the left side of the screen.
  * REQ-07: Full viewport height with User/Settings at bottom.
  */
-export function Sidebar({ lastSchedulingUrl = '/' }: SidebarProps) {
+export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSettings = location.pathname.startsWith('/settings');
@@ -29,9 +24,9 @@ export function Sidebar({ lastSchedulingUrl = '/' }: SidebarProps) {
         <div className="flex flex-col items-center py-3 gap-2">
           <SidebarButton
             icon={LayoutGrid}
-            label="Scheduling view"
+            label="Flux de production"
             isActive={!isSettings}
-            onClick={() => navigate(lastSchedulingUrl)}
+            onClick={() => navigate('/flux')}
           />
           <SidebarButton
             icon={Calendar}

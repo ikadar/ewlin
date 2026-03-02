@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de Flux — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      colors: {
+        dark: {
+          base: 'rgb(15 15 15)',
+          surface: 'rgb(26 26 26)',
+          elevated: 'rgb(36 36 36)',
+          hover: 'rgb(44 44 44)',
+          active: 'rgb(52 52 52)',
+          border: 'rgb(42 42 42)',
+          'border-light': 'rgb(58 58 58)',
+          'text-primary': 'rgb(245 245 245)',
+          'text-secondary': 'rgb(209 209 209)',
+          'text-tertiary': 'rgb(161 161 161)',
+          'text-muted': 'rgb(128 128 128)',
+        },
+      },
+    },
+  },
+}
+</script>
+<style>
+  html { font-size: 13px; }
+  td { vertical-align: middle; padding-top: 0; padding-bottom: 0; }
+  td:has(> .inline-flex) { line-height: 0; }
+  tbody tr { height: 2.25rem; }
+  tbody tr.sub-row { height: 2rem; }
+
+  /* Thin overlay-style scrollbars (Firefox + Chrome 121+) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(80 80 80) transparent;
+  }
+  /* WebKit scrollbars (Chrome, Edge, Safari) */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(120 120 120); }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* Station headers */
+  th.th-station {
+    padding: 0 !important;
+    text-align: center;
+    white-space: nowrap;
+  }
+  /* Station cells — ring+dot */
+  td.td-station {
+    padding: 0 !important;
+    border-left: 1px solid rgb(42 42 42);
+    background: transparent !important;
+    text-align: center;
+    line-height: 0;
+  }
+  td.td-station svg { display: inline-block; vertical-align: middle; }
+  body {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ── Listbox trigger ── */
+  .listbox-trigger {
+    display: flex; align-items: center; justify-content: space-between; gap: 4px;
+    width: 100%; height: 100%;
+    padding: 0 5px;
+    background: transparent; border: none;
+    cursor: pointer; font-family: inherit;
+    min-height: 2.25rem;
+    transition: background 0.15s;
+  }
+  .sub-row .listbox-trigger { min-height: 2rem; }
+  .listbox-trigger:hover { background: rgba(255,255,255,0.04); }
+  .listbox-trigger:focus-visible { outline: 1.5px solid rgba(99,102,241,0.5); outline-offset: -1.5px; border-radius: 2px; }
+
+  .lb-badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 6px; border-radius: 4px; border: 1px solid transparent;
+    font-size: 11px; font-weight: 500; white-space: nowrap; line-height: 1.4;
+  }
+  .lb-badge-green  { background: rgba(22,101,52,0.20); color: rgb(74 222 128); }
+  .lb-badge-yellow { background: rgba(133,77,14,0.20); color: rgb(250 204 21); }
+  .lb-badge-red    { background: rgba(153,27,27,0.20); color: rgb(248 113 113); }
+  .lb-badge-gray   { background: rgba(75,85,99,0.25); color: rgb(128 128 128); }
+
+  .listbox-trigger .lb-caret {
+    flex-shrink: 0; opacity: 0.35;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+  .listbox-trigger[aria-expanded="true"] .lb-caret { transform: rotate(180deg); opacity: 0.6; }
+
+  /* ── Listbox options panel ── */
+  .listbox-options {
+    position: absolute; top: calc(100% + 2px); left: 0; min-width: 100%;
+    background: rgb(26 26 26); border: 1px solid rgb(42 42 42); border-radius: 6px;
+    padding: 3px; z-index: 200;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3);
+    opacity: 0; transform: translateY(-3px) scale(0.97);
+    animation: lbIn 150ms ease forwards;
+  }
+  @keyframes lbIn { to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  .listbox-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 5px;
+    cursor: pointer; font-family: inherit; font-size: 12px;
+    color: rgb(209 209 209); white-space: nowrap;
+    transition: background 0.1s; position: relative;
+  }
+  .listbox-option:hover, .listbox-option.lb-focused { background: rgb(44 44 44); }
+  .listbox-option.lb-selected { color: rgb(245 245 245); }
+
+  .listbox-option .opt-bar {
+    width: 3px; height: 14px; border-radius: 1.5px; flex-shrink: 0;
+  }
+  .opt-bar-green  { background: rgb(74 222 128); }
+  .opt-bar-yellow { background: rgb(250 204 21); }
+  .opt-bar-red    { background: rgb(248 113 113); }
+  .opt-bar-gray   { background: rgb(128 128 128); }
+
+  .listbox-option .sel-bar {
+    position: absolute; left: 3px; top: 4px; bottom: 4px;
+    width: 2px; border-radius: 1px;
+    background: rgb(99 102 241); opacity: 0;
+    transition: opacity 0.1s;
+  }
+  .listbox-option.lb-selected .sel-bar { opacity: 1; }
+
+  /* Override badge cell styling for listbox cells */
+  td.td-listbox {
+    padding: 0 !important; position: relative; text-align: left; line-height: 0;
+  }
+
+  /* ── Multi-row indicator ── */
+  tr.row-multi { cursor: pointer; }
+  tr.row-multi > td:first-child { border-left: 3px solid rgba(99,102,241,0.25); }
+  tr.row-multi.expanded > td:first-child { border-left-color: rgb(129 140 248); }
+
+  /* ── Sub-row blue bar ── */
+  tbody tr.sub-row > td:first-child { border-left: 3px solid rgb(129 140 248); border-top-style: hidden; }
+
+  /* ── Expand toggle ── */
+  .expand-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 1px solid rgb(58 58 58);
+    background: transparent; color: rgb(128 128 128);
+    cursor: pointer; font-size: 11px; font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1; padding: 0;
+    transition: all 0.12s;
+    vertical-align: middle;
+  }
+  .expand-toggle:hover {
+    background: rgb(52 52 52); color: rgb(209 209 209);
+    border-color: rgb(129 140 248);
+  }
+  .row-multi.expanded .expand-toggle {
+    background: rgba(99,102,241,0.25); border-color: rgb(129 140 248);
+    color: rgb(129 140 248);
+  }
+
+  /* ── Badge + count (collapsed multi) ── */
+  .badge-plus-wrap {
+    display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;
+    padding: 0 4px;
+  }
+  .badge-plus-n {
+    font-size: 9px; font-weight: 600; color: rgb(128 128 128);
+    white-space: nowrap; line-height: 1;
+  }
+
+  /* ── Element count ── */
+  .el-count {
+    font-size: 10px; color: rgb(128 128 128);
+    margin-left: 4px;
+  }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="h-screen flex bg-gray-100 dark:bg-dark-base">
+
+    <!-- ═══ Sidebar ═══ -->
+    <div class="w-16 bg-gray-800 dark:bg-dark-surface border-r border-gray-700 dark:border-dark-border flex flex-col items-center py-4">
+      <div class="text-sm font-bold text-gray-100 dark:text-dark-text-primary mb-4">ERP</div>
+      <div class="flex-1 w-full flex flex-col items-center space-y-2">
+        <button class="w-12 h-12 flex items-center justify-center rounded transition-colors bg-gray-700 dark:bg-dark-hover text-gray-100 dark:text-blue-500" title="Flux" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <path d="m9 15 2 2 4-4"></path>
+          </svg>
+        </button>
+        <button class="w-12 h-12 flex items-center justify-center rounded transition-colors text-gray-400 dark:text-dark-text-tertiary hover:text-gray-100 dark:hover:text-dark-text-primary hover:bg-gray-700 dark:hover:bg-dark-hover" title="Demandes" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+      </div>
+      <button class="mt-4 w-12 h-12 flex items-center justify-center rounded text-gray-400 dark:text-dark-text-tertiary hover:text-gray-100 dark:hover:text-dark-text-primary hover:bg-gray-700 dark:hover:bg-dark-hover transition-colors" title="Toggle dark mode" type="button">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- ═══ Main area ═══ -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex-1 overflow-y-auto overflow-x-hidden">
+        <div class="p-6">
+          <div class="bg-white dark:bg-dark-elevated rounded-lg border border-gray-200 dark:border-dark-border">
+
+            <!-- Header: titre + bouton -->
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-dark-border">
+              <div class="flex items-center justify-between mb-4">
+                <h1 class="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">Flux de production</h1>
+                <button type="button" class="flex items-center gap-2 px-4 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 border border-blue-600 rounded transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14"></path>
+                    <path d="M12 5v14"></path>
+                  </svg>
+                  Nouveau job
+                  <kbd class="ml-1 px-1.5 py-0.5 bg-blue-700 dark:bg-blue-700 border border-blue-800 dark:border-blue-600 rounded text-sm font-mono text-white">Alt+N</kbd>
+                </button>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="relative flex-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-dark-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.3-4.3"></path>
+                  </svg>
+                  <input type="text" placeholder="Rechercher..." class="w-full pl-10 pr-4 py-2 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-hover text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted" value="" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabs + raccourcis clavier -->
+            <div class="sticky top-0 z-20 bg-white dark:bg-dark-elevated">
+              <div class="border-b border-gray-300 dark:border-dark-border bg-gray-50 dark:bg-dark-surface">
+                <div class="flex items-center justify-between px-4">
+                  <div class="flex items-center space-x-1">
+                    <button type="button" data-filter="all" class="px-3 py-2 text-sm font-medium border-b-2 flex items-center space-x-1.5 transition-colors border-blue-600 dark:border-blue-500 text-gray-900 dark:text-dark-text-primary bg-white dark:bg-dark-elevated">
+                      <span>Tous</span>
+                      <span class="tab-count text-sm text-gray-500 dark:text-dark-text-muted">(5)</span>
+                    </button>
+                    <button type="button" data-filter="prepresse" class="px-3 py-2 text-sm font-medium border-b-2 flex items-center space-x-1.5 transition-colors border-transparent text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary">
+                      <span>À faire prépresse</span>
+                      <span class="tab-count text-sm text-gray-500 dark:text-dark-text-muted">(3)</span>
+                    </button>
+                    <button type="button" data-filter="papier" class="px-3 py-2 text-sm font-medium border-b-2 flex items-center space-x-1.5 transition-colors border-transparent text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary">
+                      <span>Cdes papier</span>
+                      <span class="tab-count text-sm text-gray-500 dark:text-dark-text-muted">(2)</span>
+                    </button>
+                    <button type="button" data-filter="formes" class="px-3 py-2 text-sm font-medium border-b-2 flex items-center space-x-1.5 transition-colors border-transparent text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary">
+                      <span>Cdes formes</span>
+                      <span class="tab-count text-sm text-gray-500 dark:text-dark-text-muted">(1)</span>
+                    </button>
+                    <button type="button" data-filter="plaques" class="px-3 py-2 text-sm font-medium border-b-2 flex items-center space-x-1.5 transition-colors border-transparent text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary">
+                      <span>Plaques à produire</span>
+                      <span class="tab-count text-sm text-gray-500 dark:text-dark-text-muted">(2)</span>
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-500">
+                    <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-400 dark:border-gray-600 rounded text-sm font-mono">Alt</kbd>
+                    <span>+</span>
+                    <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-400 dark:border-gray-600 rounded text-sm font-mono">↕</kbd>
+                    <span>naviguer</span>
+                    <span class="mx-1 text-gray-300 dark:text-dark-border">|</span>
+                    <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-400 dark:border-gray-600 rounded text-sm font-mono">Alt</kbd>
+                    <span>+</span>
+                    <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-400 dark:border-gray-600 rounded text-sm font-mono">↔</kbd>
+                    <span>onglets</span>
+                    <span class="mx-1 text-gray-300 dark:text-dark-border">|</span>
+                    <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-400 dark:border-gray-600 rounded text-sm font-mono">Alt</kbd>
+                    <span>+</span>
+                    <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-400 dark:border-gray-600 rounded text-sm font-mono">F</kbd>
+                    <span>rechercher</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tableau — colonnes gelées avec position:sticky -->
+            <div class="overflow-x-auto">
+              <table class="w-full table-fixed min-w-[1440px]">
+                <colgroup>
+                  <col class="w-6" />        <!-- Expand/collapse -->
+                  <col class="w-16" />       <!-- ID -->
+                  <col class="w-36" />       <!-- Client -->
+                  <col style="width: 20%" /> <!-- Désignation -->
+                  <col class="w-24" />       <!-- Date sortie atelier -->
+                  <col class="w-24" />       <!-- BAT -->
+                  <col class="w-24" />       <!-- Papier -->
+                  <col class="w-24" />       <!-- Formes -->
+                  <col class="w-24" />       <!-- Plaques -->
+                  <col class="w-14" />        <!-- Offset -->
+                  <col class="w-14" />        <!-- Massicot -->
+                  <col class="w-14" />        <!-- Pelliculeuse -->
+                  <col class="w-14" />        <!-- Typo -->
+                  <col class="w-14" />        <!-- Plieuse -->
+                  <col class="w-14" />        <!-- Enc.-Piq. -->
+                  <col class="w-14" />        <!-- Ass.-Piq. -->
+                  <col class="w-14" />        <!-- Assembl. -->
+                  <col class="w-14" />        <!-- Condit. -->
+                  <col class="w-24" />       <!-- Transporteur -->
+                  <col class="w-28" />       <!-- Parti -->
+                  <col class="w-16" />       <!-- Actions -->
+                </colgroup>
+                <thead class="bg-gray-50 dark:bg-dark-hover border-b border-gray-200 dark:border-dark-border shadow-sm">
+                  <tr>
+                    <!-- Expand/collapse — frozen left, no header -->
+                    <th class="sticky left-0 z-30 bg-gray-50 dark:bg-dark-hover py-3"></th>
+                    <!-- ID — frozen left -->
+                    <th class="sticky left-6 z-30 bg-gray-50 dark:bg-dark-hover px-4 py-3 text-left text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center gap-1 whitespace-nowrap">ID<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Client — frozen left -->
+                    <th class="sticky left-[5.5rem] z-30 bg-gray-50 dark:bg-dark-hover px-4 py-3 text-left text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center gap-1 whitespace-nowrap">Client<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Désignation — frozen left + shadow -->
+                    <th class="sticky left-[14.5rem] z-30 bg-gray-50 dark:bg-dark-hover px-4 py-3 text-left text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <div class="flex items-center gap-1 whitespace-nowrap">Désignation<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Date sortie atelier -->
+                    <th class="px-2 py-3 text-left text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center gap-1 whitespace-nowrap">Sortie<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- BAT -->
+                    <th class="px-1 py-3 text-center text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center justify-center gap-1 whitespace-nowrap">BAT<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Papier -->
+                    <th class="px-1 py-3 text-center text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center justify-center gap-1 whitespace-nowrap">Papier<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Formes -->
+                    <th class="px-1 py-3 text-center text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center justify-center gap-1 whitespace-nowrap">Formes<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Plaques -->
+                    <th class="px-1 py-3 text-center text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center justify-center gap-1 whitespace-nowrap">Plaques<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Offset">Off.</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Massicot">Mass.</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Pelliculeuse">Pell.</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Typo">Typo</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Plieuse">Pli.</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Encarteuse-Piqueuse">Enc.</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Assembleuse-Piqueuse">Ass.</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Assembleuse">Assem.</th>
+                    <th class="th-station py-3 text-sm font-medium text-gray-600 dark:text-dark-text-secondary" title="Conditionnement">Cond.</th>
+                    <!-- Transporteur -->
+                    <th class="px-2 py-3 text-left text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center gap-1 whitespace-nowrap">Transp.<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Parti -->
+                    <th class="px-2 py-3 text-left text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-active group font-medium text-gray-600 dark:text-dark-text-secondary">
+                      <div class="flex items-center gap-1 whitespace-nowrap">Parti<svg class="w-3 h-3 text-gray-400 dark:text-dark-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7"></path></svg></div>
+                    </th>
+                    <!-- Actions — frozen right + shadow -->
+                    <th class="sticky right-0 z-30 bg-gray-50 dark:bg-dark-hover px-4 py-3 text-left text-sm font-medium text-gray-600 dark:text-dark-text-secondary" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-dark-border">
+
+                  <!-- Row 1 : tout OK / ready -->
+                  <tr class="group hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors cursor-pointer" data-bat="OK" data-papier="Stock" data-formes="n.a." data-plaques="Prêtes">
+                    <td class="sticky left-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover text-center"></td>
+                    <td class="sticky left-6 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-900 dark:text-dark-text-primary font-medium whitespace-nowrap font-mono">00042</td>
+                    <td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">Ducros</td>
+                    <td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">Brochure A4 16p Couché Satin</td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">28/02</td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">OK</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">Stock</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-dark-text-muted border-gray-200 dark:border-gray-700">n.a.</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">Prêtes</span></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Offset — Terminé"></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Massicot — Terminé"></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Pelliculeuse — Terminé"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Plieuse — Terminé"></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Enc.-Piqueuse — Terminé"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Conditionnement — Terminé"></td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">Chronopost</td>
+                    <td class="px-2 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-500 cursor-pointer hover:text-emerald-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><path d="m9 11 3 3L22 4"></path></svg>
+                        <span class="text-xs text-gray-500 dark:text-dark-text-muted">25/02</span>
+                      </div>
+                    </td>
+                    <td class="sticky right-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <div class="flex items-center gap-2">
+                        <button class="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors" tabindex="-1" title="Supprimer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></button>
+                        <button class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors" tabindex="-1" title="Éditer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path></svg></button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Row 2 : MULTI-ELEMENT (3 éléments) — état FERMÉ (+) -->
+                  <tr class="row-multi group hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors" data-job="00078" data-bat="Att.fich" data-papier="À cder" data-formes="À cder" data-plaques="À faire">
+                    <td class="sticky left-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover text-center">
+                      <button class="expand-toggle" title="Déplier">+</button>
+                    </td>
+                    <td class="sticky left-6 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-900 dark:text-dark-text-primary font-medium whitespace-nowrap font-mono">00078</td>
+                    <td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">Müller AG</td>
+                    <td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">Étiquettes adhésives 500ex <span class="el-count">(3)</span></td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">05/03</td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">Att.fich</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">À cder</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">À cder</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">À faire</span></td>
+                    <td class="td-station bg-red-400 dark:bg-red-600" title="Offset — En retard"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Massicot — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Typo — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Conditionnement — Planifié"></td>
+                    <td class="px-2 text-sm text-gray-500 dark:text-dark-text-muted whitespace-nowrap">—</td>
+                    <td class="px-2 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+                      </div>
+                    </td>
+                    <td class="sticky right-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <div class="flex items-center gap-2">
+                        <button class="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors" tabindex="-1" title="Supprimer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></button>
+                        <button class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors" tabindex="-1" title="Éditer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path></svg></button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Row 3 : MULTI-ELEMENT (2 éléments) — ligne parent agrégée, état déplié -->
+                  <tr class="row-multi expanded group hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors" data-job="00091" data-bat="Att.fich" data-papier="À cder" data-formes="Cdée" data-plaques="À faire">
+                    <td class="sticky left-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover text-center">
+                      <button class="expand-toggle" title="Replier">−</button>
+                    </td>
+                    <td class="sticky left-6 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-900 dark:text-dark-text-primary font-medium whitespace-nowrap font-mono">00091</td>
+                    <td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">Lefèvre &amp; Fils</td>
+                    <td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">Boîtes carton 350g recto-verso <span class="el-count">(2)</span></td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">03/03</td>
+                    <!-- Agrégé : pire de chaque colonne -->
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">Att.fich</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">À cder</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">Cdée</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">À faire</span></td>
+                    <td class="td-station bg-orange-400 dark:bg-orange-500" title="Offset — pire: En cours"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Massicot — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Plieuse — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Conditionnement — Planifié"></td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">DHL</td>
+                    <td class="px-2 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+                      </div>
+                    </td>
+                    <td class="sticky right-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <div class="flex items-center gap-2">
+                        <button class="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors" tabindex="-1" title="Supprimer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></button>
+                        <button class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors" tabindex="-1" title="Éditer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path></svg></button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Sub-row 3a : Couverture -->
+                  <tr class="sub-row hover:bg-gray-50/50 dark:hover:bg-dark-hover/50 transition-colors" data-parent-job="00091">
+                    <td class="sticky left-0 z-20 bg-white dark:bg-dark-surface"></td>
+                    <td class="sticky left-6 z-20 bg-white dark:bg-dark-surface px-4 text-sm whitespace-nowrap font-mono"></td>
+                    <td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-surface px-4 text-sm whitespace-nowrap"></td>
+                    <td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-surface px-4 text-sm text-gray-500 dark:text-dark-text-muted" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <span class="pl-4 text-xs">↳ Couverture</span>
+                    </td>
+                    <td class="px-2"></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">Reçus</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">Cdé</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-dark-text-muted border-gray-200 dark:border-gray-700">n.a.</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-dark-text-muted border-gray-200 dark:border-gray-700">n.a.</span></td>
+                    <td class="td-station bg-orange-400 dark:bg-orange-500" title="Offset — En cours"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Massicot — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Conditionnement — Planifié"></td>
+                    <td class="px-2"></td>
+                    <td class="px-2"></td>
+                    <td class="sticky right-0 z-20 bg-white dark:bg-dark-surface px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);"></td>
+                  </tr>
+
+                  <!-- Sub-row 3b : Intérieur -->
+                  <tr class="sub-row hover:bg-gray-50/50 dark:hover:bg-dark-hover/50 transition-colors" data-parent-job="00091">
+                    <td class="sticky left-0 z-20 bg-white dark:bg-dark-surface"></td>
+                    <td class="sticky left-6 z-20 bg-white dark:bg-dark-surface px-4 text-sm whitespace-nowrap font-mono"></td>
+                    <td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-surface px-4 text-sm whitespace-nowrap"></td>
+                    <td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-surface px-4 text-sm text-gray-500 dark:text-dark-text-muted" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <span class="pl-4 text-xs">↳ Intérieur</span>
+                    </td>
+                    <td class="px-2"></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">Att.fich</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">À cder</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">Cdée</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">À faire</span></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Offset — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Plieuse — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Conditionnement — Planifié"></td>
+                    <td class="px-2"></td>
+                    <td class="px-2"></td>
+                    <td class="sticky right-0 z-20 bg-white dark:bg-dark-surface px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);"></td>
+                  </tr>
+
+                  <!-- Row 4 : BAT envoyé, livraisons OK -->
+                  <tr class="group hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors cursor-pointer" data-bat="Envoyé" data-papier="Livré" data-formes="Livrée" data-plaques="Prêtes">
+                    <td class="sticky left-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover text-center"></td>
+                    <td class="sticky left-6 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-900 dark:text-dark-text-primary font-medium whitespace-nowrap font-mono">00103</td>
+                    <td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">Pharma Plus</td>
+                    <td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">Notice pliée 6 volets 90g</td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">01/03</td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">Envoyé</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">Livré</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">Livrée</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">Prêtes</span></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Offset — Terminé"></td>
+                    <td class="td-station bg-orange-400 dark:bg-orange-500" title="Massicot — En cours"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Plieuse — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Conditionnement — Planifié"></td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">TNT</td>
+                    <td class="px-2 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+                      </div>
+                    </td>
+                    <td class="sticky right-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <div class="flex items-center gap-2">
+                        <button class="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors" tabindex="-1" title="Supprimer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></button>
+                        <button class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors" tabindex="-1" title="Éditer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path></svg></button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Row 5 : rien requis partout (tirets gris) -->
+                  <tr class="group hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors cursor-pointer" data-bat="n.a." data-papier="Stock" data-formes="Stock" data-plaques="n.a.">
+                    <td class="sticky left-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover text-center"></td>
+                    <td class="sticky left-6 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-900 dark:text-dark-text-primary font-medium whitespace-nowrap font-mono">00117</td>
+                    <td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">Éditions Vega</td>
+                    <td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4 text-sm text-gray-700 dark:text-dark-text-secondary" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);">Réimpression catalogue 2025</td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">27/02</td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-dark-text-muted border-gray-200 dark:border-gray-700">n.a.</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">Stock</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">Stock</span></td>
+                    <td class="px-1 text-center whitespace-nowrap"><span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-dark-text-muted border-gray-200 dark:border-gray-700">n.a.</span></td>
+                    <td class="td-station bg-red-400 dark:bg-red-600" title="Offset — En retard"></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Massicot — Terminé"></td>
+                    <td class="td-station bg-green-400 dark:bg-green-600" title="Pelliculeuse — Terminé"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Enc.-Piqueuse — Planifié"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station"></td>
+                    <td class="td-station bg-gray-300 dark:bg-gray-600" title="Conditionnement — Planifié"></td>
+                    <td class="px-2 text-sm text-gray-700 dark:text-dark-text-secondary whitespace-nowrap">GLS</td>
+                    <td class="px-2 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-500 cursor-pointer hover:text-emerald-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><path d="m9 11 3 3L22 4"></path></svg>
+                        <span class="text-xs text-gray-500 dark:text-dark-text-muted">26/02</span>
+                      </div>
+                    </td>
+                    <td class="sticky right-0 z-20 bg-white dark:bg-dark-elevated group-hover:bg-gray-50 dark:group-hover:bg-dark-hover px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);">
+                      <div class="flex items-center gap-2">
+                        <button class="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors" tabindex="-1" title="Supprimer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></button>
+                        <button class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors" tabindex="-1" title="Éditer"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path></svg></button>
+                      </div>
+                    </td>
+                  </tr>
+
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+(function() {
+  const COLORS = {
+    done:    [74,222,128],
+    progress:[251,146,60],
+    late:    [248,113,113],
+    planned: [156,163,175],
+  };
+  // Mockup progress values per state
+  const PROGRESS = { done: 100, planned: 0 };
+  // Varied progress for "en cours" and "en retard" — seeded by cell index
+  let cellIdx = 0;
+  const VARIED = [65, 45, 75, 55, 70, 40, 60, 50, 80, 35];
+
+  function parseState(title) {
+    if (!title) return null;
+    if (title.includes('Terminé')) return 'done';
+    if (title.includes('En cours')) return 'progress';
+    if (title.includes('En retard')) return 'late';
+    if (title.includes('Planifié')) return 'planned';
+    return null;
+  }
+
+  function ringSVG(state, pct) {
+    const c = COLORS[state];
+    const rgba = (a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+    const rgbStr = `rgb(${c[0]} ${c[1]} ${c[2]})`;
+
+    const sz = 24, cx = 12, cy = 12, r = 8, sw = 1.5;
+    const isDone = pct >= 100;
+    const dotR = isDone ? 5 : 3.5;
+
+    // Dot focus: ring hidden at 0% and 100%, only dot visible
+    if (pct <= 0 || pct >= 100) {
+      const dotOp = pct <= 0 ? 0.25 : 0.7;
+      return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}"><circle cx="${cx}" cy="${cy}" r="${dotR}" fill="${rgbStr}" opacity="${dotOp}"/></svg>`;
+    }
+
+    // Intermediate: dot + ring
+    const circ = 2 * Math.PI * r;
+    const dashoffset = circ * (1 - pct / 100);
+    let inner = '';
+    inner += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${rgba(0.12)}" stroke-width="${sw}"/>`;
+    inner += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${rgbStr}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${dashoffset.toFixed(2)}" opacity="0.75"/>`;
+    inner += `<circle cx="${cx}" cy="${cy}" r="${dotR}" fill="${rgbStr}" opacity="0.7"/>`;
+
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="transform:rotate(-90deg)">${inner}</svg>`;
+  }
+
+  document.querySelectorAll('td.td-station').forEach(td => {
+    const state = parseState(td.getAttribute('title'));
+    if (!state) return; // empty cell — no SVG
+
+    // Remove Tailwind bg-* classes
+    td.className = td.className.replace(/\b(bg-\S+|dark:bg-\S+)\b/g, '').replace(/\s+/g, ' ').trim();
+
+    const pct = PROGRESS[state] ?? VARIED[cellIdx++ % VARIED.length];
+    td.innerHTML = ringSVG(state, pct);
+  });
+
+  // Expose helper for dynamic sub-row creation
+  window.makeStationSVG = function(state) {
+    if (!state) return '';
+    var pct = PROGRESS[state] ?? VARIED[cellIdx++ % VARIED.length];
+    return ringSVG(state, pct);
+  };
+})();
+</script>
+
+<script>
+// ── Multi-Element Support ──
+(function() {
+  const PRIORITY = { red: 0, yellow: 1, gray: 2, green: 3 };
+  const BADGE_COLS = ['bat', 'papier', 'formes', 'plaques'];
+  const COL_INDICES = [5, 6, 7, 8];
+  const STATION_KEYS = ['off', 'mass', 'pell', 'typo', 'pli', 'enc', 'ass', 'assem', 'cond'];
+  const STATION_INDICES = [9, 10, 11, 12, 13, 14, 15, 16, 17];
+  const STATION_PRIORITY = { late: 0, progress: 1, planned: 2, done: 3 };
+  const STATION_COLORS = {
+    done:     'rgb(74,222,128)',
+    progress: 'rgb(251,146,60)',
+    late:     'rgb(248,113,113)',
+    planned:  'rgb(156,163,175)',
+  };
+
+  const MULTI_ELEMENTS = {
+    '00078': [
+      { name: 'Étiquette Ronde', initial: 'R',
+        bat: { label: 'OK', color: 'green' }, papier: { label: 'Stock', color: 'green' },
+        formes: { label: 'Stock', color: 'green' }, plaques: { label: 'Prêtes', color: 'green' },
+        stations: { off: 'late', mass: 'planned', pell: null, typo: 'planned', pli: null, enc: null, ass: null, assem: null, cond: 'planned' } },
+      { name: 'Étiquette Carrée', initial: 'C',
+        bat: { label: 'Envoyé', color: 'yellow' }, papier: { label: 'Cdé', color: 'yellow' },
+        formes: { label: 'n.a.', color: 'gray' }, plaques: { label: 'À faire', color: 'red' },
+        stations: { off: 'progress', mass: 'planned', pell: null, typo: null, pli: null, enc: null, ass: null, assem: null, cond: 'planned' } },
+      { name: 'Étiquette Ovale', initial: 'O',
+        bat: { label: 'Att.fich', color: 'red' }, papier: { label: 'À cder', color: 'red' },
+        formes: { label: 'À cder', color: 'red' }, plaques: { label: 'À faire', color: 'red' },
+        stations: { off: 'planned', mass: null, pell: null, typo: 'planned', pli: null, enc: null, ass: null, assem: null, cond: 'planned' } },
+    ],
+    '00091': [
+      { name: 'Couverture', initial: 'C',
+        bat: { label: 'Envoyé', color: 'yellow' }, papier: { label: 'Reçus', color: 'yellow' },
+        formes: { label: 'n.a.', color: 'gray' }, plaques: { label: 'n.a.', color: 'gray' },
+        stations: { off: 'progress', mass: 'planned', pell: null, typo: null, pli: null, enc: null, ass: null, assem: null, cond: 'planned' } },
+      { name: 'Intérieur', initial: 'I',
+        bat: { label: 'Att.fich', color: 'red' }, papier: { label: 'À cder', color: 'red' },
+        formes: { label: 'Cdée', color: 'yellow' }, plaques: { label: 'À faire', color: 'red' },
+        stations: { off: 'planned', mass: null, pell: null, typo: null, pli: 'planned', enc: null, ass: null, assem: null, cond: 'planned' } },
+    ],
+  };
+
+  const expanded = {};
+
+  function getWorst(elements, col) {
+    let worst = null, worstP = 999;
+    elements.forEach(el => {
+      const p = PRIORITY[el[col].color];
+      if (p < worstP) { worstP = p; worst = el[col]; }
+    });
+    return worst;
+  }
+
+  function makeBadge(label, color) {
+    return '<span class="lb-badge lb-badge-' + color + '">' + label + '</span>';
+  }
+
+  function makeBadgeDots(elements, col) {
+    let worstIdx = 0, worstP = 999;
+    elements.forEach(function(el, i) {
+      var p = PRIORITY[el[col].color];
+      if (p < worstP) { worstP = p; worstIdx = i; }
+    });
+
+    var others = elements.length - 1;
+    var html = '<span class="badge-plus-wrap">';
+    html += makeBadge(elements[worstIdx][col].label, elements[worstIdx][col].color);
+    if (others > 0) {
+      html += '<span class="badge-plus-n">+' + others + '</span>';
+    }
+    html += '</span>';
+    return html;
+  }
+
+  function makeBadgeSpan(label, color) {
+    var colorMap = {
+      green:  'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800',
+      yellow: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+      red:    'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800',
+      gray:   'bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-dark-text-muted border-gray-200 dark:border-gray-700',
+    };
+    return '<span class="inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium ' + colorMap[color] + '">' + label + '</span>';
+  }
+
+  function makeStackedDots(elements, stationKey) {
+    // Collect non-null states for this station
+    var dots = [];
+    elements.forEach(function(el) {
+      var s = el.stations[stationKey];
+      if (s) dots.push(s);
+    });
+    if (dots.length === 0) return '';
+
+    // Sort by severity (worst first = leftmost = rendered last in SVG = on top)
+    dots.sort(function(a, b) { return STATION_PRIORITY[a] - STATION_PRIORITY[b]; });
+
+    var r = 5, gap = 6, n = dots.length;
+    var w = r * 2 + (n - 1) * gap;
+    var h = r * 2 + 2;
+    var cy = h / 2;
+
+    var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+    // Render reverse so worst (index 0) paints last (on top)
+    for (var i = n - 1; i >= 0; i--) {
+      var cx = r + i * gap;
+      svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + STATION_COLORS[dots[i]] + '" stroke="rgb(36,36,36)" stroke-width="1.5" opacity="0.7"/>';
+    }
+    svg += '</svg>';
+    return svg;
+  }
+
+  function createSubRow(jobId, element) {
+    var tr = document.createElement('tr');
+    tr.className = 'sub-row hover:bg-gray-50/50 dark:hover:bg-dark-hover/50 transition-colors';
+    tr.dataset.parentJob = jobId;
+
+    var html = '';
+    // Col 0: Expand (sticky)
+    html += '<td class="sticky left-0 z-20 bg-white dark:bg-dark-surface"></td>';
+    // Col 1: ID (sticky)
+    html += '<td class="sticky left-6 z-20 bg-white dark:bg-dark-surface px-4 text-sm whitespace-nowrap font-mono"></td>';
+    // Col 2: Client (sticky)
+    html += '<td class="sticky left-[5.5rem] z-20 bg-white dark:bg-dark-surface px-4 text-sm whitespace-nowrap"></td>';
+    // Col 3: Désignation (sticky + shadow)
+    html += '<td class="sticky left-[14.5rem] z-20 bg-white dark:bg-dark-surface px-4 text-sm text-gray-500 dark:text-dark-text-muted" style="box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15);"><span class="pl-4 text-xs">\u21B3 ' + element.name + '</span></td>';
+    // Col 4: Date sortie (empty)
+    html += '<td class="px-2"></td>';
+    // Cols 5-8: Badge cells
+    BADGE_COLS.forEach(function(col) {
+      html += '<td class="px-1 text-center whitespace-nowrap">' + makeBadgeSpan(element[col].label, element[col].color) + '</td>';
+    });
+    // Cols 9-17: Station cells with ring+dot SVGs
+    STATION_KEYS.forEach(function(key) {
+      var state = element.stations[key];
+      if (state && window.makeStationSVG) {
+        html += '<td class="td-station">' + window.makeStationSVG(state) + '</td>';
+      } else {
+        html += '<td class="td-station"></td>';
+      }
+    });
+    // Col 18: Transporteur (empty)
+    html += '<td class="px-2"></td>';
+    // Col 19: Parti (empty)
+    html += '<td class="px-2"></td>';
+    // Col 20: Actions (sticky + shadow)
+    html += '<td class="sticky right-0 z-20 bg-white dark:bg-dark-surface px-4" style="box-shadow: -4px 0 8px -2px rgba(0,0,0,0.15);"></td>';
+
+    tr.innerHTML = html;
+    return tr;
+  }
+
+  function setBadgeDots(parentRow, jobId) {
+    var elements = MULTI_ELEMENTS[jobId];
+    var cells = parentRow.children;
+    // Badge columns: worst + N
+    COL_INDICES.forEach(function(colIdx, ci) {
+      var td = cells[colIdx];
+      if (!td) return;
+      td.innerHTML = makeBadgeDots(elements, BADGE_COLS[ci]);
+      td.className = 'px-0 whitespace-nowrap';
+    });
+    // Station columns: stacked dots
+    STATION_INDICES.forEach(function(colIdx, si) {
+      var td = cells[colIdx];
+      if (!td) return;
+      td.innerHTML = makeStackedDots(elements, STATION_KEYS[si]);
+    });
+  }
+
+  function clearBadgeCells(parentRow) {
+    var cells = parentRow.children;
+    // Clear badge columns
+    COL_INDICES.forEach(function(colIdx) {
+      var td = cells[colIdx];
+      if (td) { td.innerHTML = ''; td.className = 'px-1 text-center whitespace-nowrap'; }
+    });
+    // Clear station columns
+    STATION_INDICES.forEach(function(colIdx) {
+      var td = cells[colIdx];
+      if (td) { td.innerHTML = ''; }
+    });
+  }
+
+  function toggleJob(jobId) {
+    var elements = MULTI_ELEMENTS[jobId];
+    if (!elements) return;
+
+    var parentRow = document.querySelector('tr.row-multi[data-job="' + jobId + '"]');
+    if (!parentRow) return;
+    var tbody = parentRow.closest('tbody');
+
+    var wasExpanded = !!expanded[jobId];
+
+    if (!wasExpanded) {
+      // ── EXPAND ──
+      expanded[jobId] = true;
+      parentRow.classList.add('expanded');
+
+      var btn = parentRow.querySelector('.expand-toggle');
+      if (btn) btn.textContent = '\u2212';
+
+      clearBadgeCells(parentRow);
+
+      var insertAfter = parentRow;
+      var newSubRows = [];
+
+      elements.forEach(function(el, idx) {
+        var sub = createSubRow(jobId, el);
+        insertAfter.after(sub);
+        insertAfter = sub;
+        newSubRows.push(sub);
+
+        // Animation: slide + fade
+        var delay = idx * 30;
+        sub.style.opacity = '0';
+        sub.style.transform = 'translateY(-8px)';
+        sub.style.transition = 'all 400ms cubic-bezier(0.25,1,0.5,1) ' + delay + 'ms';
+        requestAnimationFrame(function() { requestAnimationFrame(function() {
+          sub.style.opacity = '1';
+          sub.style.transform = 'none';
+        }); });
+      });
+
+      // Init listbox on new sub-rows
+      if (window.initListboxCells) {
+        window.initListboxCells(newSubRows);
+      }
+
+    } else {
+      // ── COLLAPSE ──
+      expanded[jobId] = false;
+      parentRow.classList.remove('expanded');
+
+      var btn = parentRow.querySelector('.expand-toggle');
+      if (btn) btn.textContent = '+';
+
+      // Remove sub-rows
+      tbody.querySelectorAll('tr[data-parent-job="' + jobId + '"]').forEach(function(r) { r.remove(); });
+
+      // Restore badge-dots
+      setBadgeDots(parentRow, jobId);
+    }
+  }
+
+  // Click handler for row-multi rows
+  document.querySelectorAll('tr.row-multi').forEach(function(tr) {
+    tr.addEventListener('click', function(e) {
+      // Ignore clicks inside listbox triggers/options
+      if (e.target.closest('.listbox-trigger') || e.target.closest('.listbox-options')) return;
+      toggleJob(tr.dataset.job);
+    });
+  });
+
+  // ── Initial state ──
+  // 00078: collapsed → show badge-dots
+  var row00078 = document.querySelector('tr.row-multi[data-job="00078"]');
+  if (row00078 && !row00078.classList.contains('expanded')) {
+    setBadgeDots(row00078, '00078');
+  }
+
+  // 00091: expanded → clear badge cells (sub-rows already in HTML)
+  var row00091 = document.querySelector('tr.row-multi[data-job="00091"]');
+  if (row00091 && row00091.classList.contains('expanded')) {
+    clearBadgeCells(row00091);
+    expanded['00091'] = true;
+  }
+
+})();
+</script>
+
+<script>
+// ── Badge Listbox (Headless UI pattern) ──
+(function() {
+  const COLS = {
+    5: { name: 'BAT', states: [
+      { label: 'OK',       color: 'green' },
+      { label: 'Envoyé',   color: 'yellow' },
+      { label: 'Att.fich', color: 'red' },
+      { label: 'n.a.',     color: 'gray' },
+    ]},
+    6: { name: 'Papier', states: [
+      { label: 'Stock',  color: 'green' },
+      { label: 'Livré',  color: 'green' },
+      { label: 'Reçus',  color: 'yellow' },
+      { label: 'Cdé',    color: 'yellow' },
+      { label: 'À cder', color: 'red' },
+    ]},
+    7: { name: 'Formes', states: [
+      { label: 'Livrée', color: 'green' },
+      { label: 'Cdée',   color: 'yellow' },
+      { label: 'À cder', color: 'red' },
+      { label: 'n.a.',   color: 'gray' },
+    ]},
+    8: { name: 'Plaques', states: [
+      { label: 'Prêtes',  color: 'green' },
+      { label: 'À faire', color: 'red' },
+      { label: 'n.a.',    color: 'gray' },
+    ]},
+  };
+
+  // Build a label→color lookup across all columns
+  const LABEL_COLOR = {};
+  Object.values(COLS).forEach(col => col.states.forEach(s => { LABEL_COLOR[s.label] = s.color; }));
+
+  const CARET = '<svg class="lb-caret" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 3.75L5 6.25L7.5 3.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  let openPanel = null;
+  let focusedIdx = -1;
+
+  function closePanel() {
+    if (!openPanel) return;
+    if (openPanel._keyHandler) document.removeEventListener('keydown', openPanel._keyHandler);
+    const trigger = openPanel._trigger;
+    openPanel.remove();
+    openPanel = null;
+    focusedIdx = -1;
+    if (trigger) trigger.removeAttribute('aria-expanded');
+  }
+
+  function renderTrigger(btn, label, color) {
+    btn.innerHTML = `<span class="lb-badge lb-badge-${color}">${label}</span>${CARET}`;
+  }
+
+  function openOptions(btn, td, states, ref) {
+    btn.setAttribute('aria-expanded', 'true');
+    focusedIdx = ref.idx;
+
+    const panel = document.createElement('div');
+    panel.className = 'listbox-options';
+    panel.setAttribute('role', 'listbox');
+    panel._trigger = btn;
+
+    function render() {
+      panel.innerHTML = '';
+      states.forEach((s, i) => {
+        const opt = document.createElement('div');
+        opt.className = 'listbox-option' + (i === ref.idx ? ' lb-selected' : '') + (i === focusedIdx ? ' lb-focused' : '');
+        opt.setAttribute('role', 'option');
+        opt.setAttribute('aria-selected', i === ref.idx);
+
+        // Selection bar
+        const sb = document.createElement('span');
+        sb.className = 'sel-bar';
+        opt.appendChild(sb);
+
+        // Color bar
+        const bar = document.createElement('span');
+        bar.className = 'opt-bar opt-bar-' + s.color;
+        opt.appendChild(bar);
+
+        // Label text
+        const lbl = document.createElement('span');
+        lbl.textContent = s.label;
+        opt.appendChild(lbl);
+
+        opt.onmouseenter = () => { focusedIdx = i; render(); };
+        opt.onclick = (e) => {
+          e.stopPropagation();
+          ref.idx = i;
+          renderTrigger(btn, s.label, s.color);
+          closePanel();
+          btn.focus();
+          if (window.onBadgeChange) window.onBadgeChange(td);
+        };
+
+        panel.appendChild(opt);
+      });
+    }
+
+    render();
+
+    const keyHandler = (e) => {
+      if (!openPanel) { document.removeEventListener('keydown', keyHandler); return; }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        focusedIdx = (focusedIdx + 1) % states.length;
+        render();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        focusedIdx = (focusedIdx - 1 + states.length) % states.length;
+        render();
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (focusedIdx >= 0) {
+          ref.idx = focusedIdx;
+          renderTrigger(btn, states[ref.idx].label, states[ref.idx].color);
+          closePanel();
+          btn.focus();
+          if (window.onBadgeChange) window.onBadgeChange(td);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closePanel();
+        btn.focus();
+      }
+    };
+    document.addEventListener('keydown', keyHandler);
+    panel._keyHandler = keyHandler;
+
+    td.appendChild(panel);
+    openPanel = panel;
+  }
+
+  // Reusable function to init listbox triggers on specific rows
+  window.initListboxCells = function(rows) {
+    rows.forEach(tr => {
+      const cells = tr.children;
+      [5, 6, 7, 8].forEach(colIdx => {
+        const td = cells[colIdx];
+        if (!td) return;
+        const span = td.querySelector('.inline-flex');
+        if (!span) return; // empty cell or badge-dots
+
+        const label = span.textContent.trim();
+        const colDef = COLS[colIdx];
+        const states = colDef.states;
+
+        let curIdx = states.findIndex(s => s.label === label);
+        const color = curIdx >= 0 ? states[curIdx].color : (LABEL_COLOR[label] || 'gray');
+        if (curIdx < 0) curIdx = 0;
+
+        const ref = { idx: curIdx };
+
+        td.className = 'td-listbox';
+
+        const btn = document.createElement('button');
+        btn.className = 'listbox-trigger';
+        btn.setAttribute('role', 'combobox');
+        btn.setAttribute('aria-haspopup', 'listbox');
+        btn.setAttribute('aria-label', colDef.name);
+        renderTrigger(btn, label, color);
+
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          if (openPanel && openPanel._trigger === btn) { closePanel(); return; }
+          closePanel();
+          openOptions(btn, td, states, ref);
+        };
+
+        btn.onkeydown = (e) => {
+          if (openPanel && openPanel._trigger === btn) return;
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            closePanel();
+            openOptions(btn, td, states, ref);
+          }
+        };
+
+        td.innerHTML = '';
+        td.appendChild(btn);
+      });
+    });
+  };
+
+  // Initial initialization (multi-element script already set badge-dots / cleared cells)
+  window.initListboxCells(document.querySelectorAll('tbody tr'));
+
+  document.addEventListener('click', closePanel);
+})();
+</script>
+
+<script>
+// ── Tab Filtering + Search + Shortcuts + URL Persistence ──
+(function() {
+  var tabs = document.querySelectorAll('[data-filter]');
+  var tbody = document.querySelector('tbody');
+  var searchInput = document.querySelector('input[placeholder="Rechercher..."]');
+
+  var ACTIVE_CLS = 'border-blue-600 dark:border-blue-500 text-gray-900 dark:text-dark-text-primary bg-white dark:bg-dark-elevated';
+  var INACTIVE_CLS = 'border-transparent text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary';
+  var BASE_CLS = 'px-3 py-2 text-sm font-medium border-b-2 flex items-center space-x-1.5 transition-colors';
+
+  var COL_DATA_ATTR = { 5: 'bat', 6: 'papier', 7: 'formes', 8: 'plaques' };
+  var LABEL_TO_COLOR = {
+    'OK': 'green', 'Envoyé': 'yellow', 'Att.fich': 'red',
+    'Stock': 'green', 'Livré': 'green', 'Reçus': 'yellow', 'Cdé': 'yellow', 'À cder': 'red',
+    'Livrée': 'green', 'Cdée': 'yellow',
+    'Prêtes': 'green', 'À faire': 'red',
+    'n.a.': 'gray'
+  };
+  var PRIORITY = { red: 0, yellow: 1, gray: 2, green: 3 };
+  var tabOrder = ['all', 'prepresse', 'papier', 'formes', 'plaques'];
+  var currentFilter = 'all';
+
+  var filters = {
+    all:       function() { return true; },
+    prepresse: function(r) { var b = r.dataset.bat; return b && b !== 'OK' && b !== 'n.a.'; },
+    papier:    function(r) { return r.dataset.papier === 'À cder'; },
+    formes:    function(r) { return r.dataset.formes === 'À cder'; },
+    plaques:   function(r) { return r.dataset.plaques === 'À faire'; },
+  };
+
+  function getParentRows() {
+    return Array.from(tbody.querySelectorAll('tr:not(.sub-row)'));
+  }
+
+  function matchesSearch(row, query) {
+    if (!query) return true;
+    return row.textContent.toLowerCase().indexOf(query) !== -1;
+  }
+
+  function applyFilter() {
+    var fn = filters[currentFilter];
+    var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    var rows = getParentRows();
+
+    rows.forEach(function(row) {
+      var passesTab = fn(row);
+      var passesSearch = matchesSearch(row, query);
+      var show = passesTab && passesSearch;
+      row.style.display = show ? '' : 'none';
+
+      // Sub-rows follow parent visibility
+      var jobId = row.dataset.job;
+      if (jobId) {
+        tbody.querySelectorAll('tr[data-parent-job="' + jobId + '"]').forEach(function(sub) {
+          sub.style.display = show ? '' : 'none';
+        });
+      }
+    });
+
+    updateTabStyles();
+    updateCounts();
+  }
+
+  function updateTabStyles() {
+    tabs.forEach(function(tab) {
+      var isActive = tab.dataset.filter === currentFilter;
+      tab.className = BASE_CLS + ' ' + (isActive ? ACTIVE_CLS : INACTIVE_CLS);
+    });
+  }
+
+  function updateCounts() {
+    var rows = getParentRows();
+    tabs.forEach(function(tab) {
+      var fn = filters[tab.dataset.filter];
+      var count = 0;
+      rows.forEach(function(row) { if (fn(row)) count++; });
+      var countSpan = tab.querySelector('.tab-count');
+      if (countSpan) countSpan.textContent = '(' + count + ')';
+    });
+  }
+
+  function setFilter(filterName) {
+    currentFilter = filterName;
+    applyFilter();
+    // URL persistence
+    if (filterName === 'all') {
+      history.replaceState(null, '', location.pathname + location.search);
+    } else {
+      history.replaceState(null, '', '#tab=' + filterName);
+    }
+  }
+
+  // ── Tab click handlers ──
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      setFilter(tab.dataset.filter);
+    });
+  });
+
+  // ── Search bar ──
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      applyFilter();
+    });
+  }
+
+  // ── Keyboard shortcuts ──
+  document.addEventListener('keydown', function(e) {
+    if (!e.altKey) return;
+
+    // Alt + ← / → : switch tabs
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      var idx = tabOrder.indexOf(currentFilter);
+      if (e.key === 'ArrowRight') {
+        idx = (idx + 1) % tabOrder.length;
+      } else {
+        idx = (idx - 1 + tabOrder.length) % tabOrder.length;
+      }
+      setFilter(tabOrder[idx]);
+    }
+
+    // Alt + ↑ / ↓ : navigate visible rows
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      var visibleRows = getParentRows().filter(function(r) { return r.style.display !== 'none'; });
+      if (visibleRows.length === 0) return;
+      // Make rows focusable
+      visibleRows.forEach(function(r) { if (!r.hasAttribute('tabindex')) r.setAttribute('tabindex', '-1'); });
+      var focused = document.activeElement ? document.activeElement.closest('tr:not(.sub-row)') : null;
+      var currentIdx = focused ? visibleRows.indexOf(focused) : -1;
+      var nextIdx;
+      if (e.key === 'ArrowDown') {
+        nextIdx = currentIdx < visibleRows.length - 1 ? currentIdx + 1 : 0;
+      } else {
+        nextIdx = currentIdx > 0 ? currentIdx - 1 : visibleRows.length - 1;
+      }
+      visibleRows[nextIdx].focus();
+      visibleRows[nextIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    // Alt + F : focus search
+    if (e.key === 'f' || e.key === 'F') {
+      e.preventDefault();
+      if (searchInput) {
+        if (document.activeElement === searchInput) {
+          searchInput.select();
+        } else {
+          searchInput.focus();
+        }
+      }
+    }
+  });
+
+  // ── Badge change callback (called by listbox after selection) ──
+  window.onBadgeChange = function(td) {
+    var tr = td.closest('tr');
+    if (!tr) return;
+
+    // Determine column index
+    var colIdx = Array.from(tr.children).indexOf(td);
+    var attrName = COL_DATA_ATTR[colIdx];
+    if (!attrName) return;
+
+    // Get new label from the trigger button badge
+    var badge = td.querySelector('.lb-badge');
+    var newLabel = badge ? badge.textContent.trim() : '';
+
+    if (tr.classList.contains('sub-row')) {
+      // Sub-row changed — re-aggregate worst value to parent
+      var parentJobId = tr.dataset.parentJob;
+      var parentRow = tbody.querySelector('tr[data-job="' + parentJobId + '"]');
+      if (parentRow) {
+        var subs = tbody.querySelectorAll('tr[data-parent-job="' + parentJobId + '"]');
+        var worstLabel = '';
+        var worstPriority = 999;
+        subs.forEach(function(sub) {
+          var subBadge = sub.children[colIdx] && sub.children[colIdx].querySelector('.lb-badge');
+          if (subBadge) {
+            var lbl = subBadge.textContent.trim();
+            var color = LABEL_TO_COLOR[lbl] || 'gray';
+            var p = PRIORITY[color] !== undefined ? PRIORITY[color] : 999;
+            if (p < worstPriority) { worstPriority = p; worstLabel = lbl; }
+          }
+        });
+        if (worstLabel) parentRow.dataset[attrName] = worstLabel;
+      }
+    } else if (!tr.dataset.job) {
+      // Single-element parent row — direct update
+      tr.dataset[attrName] = newLabel;
+    }
+
+    updateCounts();
+    // Re-apply filter in case visibility changed
+    applyFilter();
+  };
+
+  // ── URL persistence — read initial hash ──
+  var hash = location.hash.replace('#tab=', '');
+  if (hash && filters[hash]) {
+    currentFilter = hash;
+  }
+
+  // Expose for external callers
+  window.updateTabCounts = updateCounts;
+
+  // Initial apply
+  applyFilter();
+})();
+</script>
+</body>
+</html>

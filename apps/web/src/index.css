@@ -34,6 +34,19 @@ html {
   --color-input: hsl(214.3 31.8% 91.4%);
   --color-ring: hsl(222.2 84% 4.9%);
   --radius: 0.5rem;
+
+  /* ── Flux Dashboard dark palette (spec 3.15) ── */
+  --color-flux-base:         rgb(15 15 15);
+  --color-flux-surface:      rgb(26 26 26);
+  --color-flux-elevated:     rgb(36 36 36);
+  --color-flux-hover:        rgb(44 44 44);
+  --color-flux-active:       rgb(52 52 52);
+  --color-flux-border:       rgb(42 42 42);
+  --color-flux-border-light: rgb(58 58 58);
+  --color-flux-text-primary:   rgb(245 245 245);
+  --color-flux-text-secondary: rgb(209 209 209);
+  --color-flux-text-tertiary:  rgb(161 161 161);
+  --color-flux-text-muted:     rgb(128 128 128);
 }
 
 body {
