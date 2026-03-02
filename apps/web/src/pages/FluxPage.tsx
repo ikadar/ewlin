@@ -5,6 +5,7 @@ import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
 import { useGetFluxJobsQuery, useUpdateElementPrerequisiteMutation, useAppDispatch, fluxApi } from '@/store';
+import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
   computeTabCounts,
@@ -29,7 +30,20 @@ export function FluxPage() {
   const dispatch = useAppDispatch();
 
   // ── API data (RTK Query cache as source of truth) ─────────────────────────
-  const { data: jobs = [], isLoading, isError } = useGetFluxJobsQuery();
+  const { data: jobs = [], isLoading: isJobsLoading, isError } = useGetFluxJobsQuery();
+  const { data: categories = [], isLoading: isCategoriesLoading } = useGetStationCategoriesQuery();
+
+  const isLoading = isJobsLoading || isCategoriesLoading;
+
+  // Categories sorted by displayOrder, then name for stable ordering
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) =>
+      a.displayOrder !== b.displayOrder
+        ? a.displayOrder - b.displayOrder
+        : a.name.localeCompare(b.name)
+    ),
+    [categories],
+  );
   const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
 
   // ── Local UI state (not tied to server data) ──────────────────────────────
@@ -229,6 +243,7 @@ export function FluxPage() {
           <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden">
             <FluxTable
               jobs={filteredJobs}
+              categories={sortedCategories}
               focusedJobId={focusedJobId}
               expandedJobIds={expandedJobIds}
               onUpdatePrerequisite={handleUpdatePrerequisite}

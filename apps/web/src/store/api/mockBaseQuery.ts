@@ -1462,11 +1462,13 @@ const handleUpdateElementStatus = async (
 const handleGetStationCategories = async (): Promise<{ data: unknown }> => {
   const snapshot = getSnapshot();
   const now = new Date().toISOString();
-  const data = snapshot.categories.map((cat) => ({
+  const data = snapshot.categories.map((cat, index) => ({
     id: cat.id,
     name: cat.name,
     description: cat.description,
     similarityCriteria: cat.similarityCriteria,
+    abbreviation: (cat as { abbreviation?: string }).abbreviation ?? cat.name.substring(0, 5),
+    displayOrder: (cat as { displayOrder?: number }).displayOrder ?? index,
     createdAt: now,
     updatedAt: now,
   }));

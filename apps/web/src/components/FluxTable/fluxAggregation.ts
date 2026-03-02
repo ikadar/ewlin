@@ -9,7 +9,6 @@ import {
   type FluxStationData,
   type PrerequisiteColor,
   type PrerequisiteStatus,
-  type StationCategoryId,
   type StationState,
 } from './fluxTypes';
 
@@ -66,7 +65,7 @@ export function worstPrerequisiteStatus(statuses: PrerequisiteStatus[]): Prerequ
  */
 export function getMultiElementStationData(
   elements: FluxElement[],
-  categoryId: StationCategoryId,
+  categoryId: string,
 ): FluxStationData[] {
   return elements
     .map(el => el.stations[categoryId])

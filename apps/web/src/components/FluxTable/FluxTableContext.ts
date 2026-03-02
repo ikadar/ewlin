@@ -1,7 +1,10 @@
 import { createContext, useContext } from 'react';
 import type { PrerequisiteColumn, PrerequisiteStatus } from './fluxTypes';
+import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
 
 export interface FluxTableContextValue {
+  /** Ordered station categories for dynamic column rendering. */
+  categories: StationCategoryResponse[];
   /** ID of the currently open listbox, or null. Format: `${jobId}-${elementId}-${column}`. */
   openListboxId: string | null;
   setOpenListboxId: (id: string | null) => void;

@@ -24,6 +24,7 @@ import type { StationCategoryResponse, SimilarityCriterionInput } from '../store
 interface CategoryFormData {
   name: string;
   description: string;
+  abbreviation: string;
   similarityCriteria: SimilarityCriterionInput[];
 }
 
@@ -42,6 +43,7 @@ interface CriterionDraft extends SimilarityCriterionInput {
 function CategoryFormModal({ initial, onSave, onCancel, isSaving }: CategoryFormModalProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
+  const [abbreviation, setAbbreviation] = useState(initial?.abbreviation ?? '');
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -95,7 +97,7 @@ function CategoryFormModal({ initial, onSave, onCancel, isSaving }: CategoryForm
 
     // Strip _key before sending to API
     const payload = nonEmpty.map(({ _key: _, ...rest }) => rest);
-    await onSave({ name, description, similarityCriteria: payload });
+    await onSave({ name, description, abbreviation, similarityCriteria: payload });
   };
 
   return (
@@ -119,6 +121,23 @@ function CategoryFormModal({ initial, onSave, onCancel, isSaving }: CategoryForm
               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
               placeholder="Ex : Presses Offset"
             />
+          </div>
+
+          {/* Abbreviation */}
+          <div>
+            <label className="block text-sm text-zinc-400 mb-1">
+              Abréviation <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              required={!initial}
+              maxLength={20}
+              value={abbreviation}
+              onChange={(e) => setAbbreviation(e.target.value)}
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
+              placeholder="Ex : Off."
+            />
+            <p className="mt-1 text-xs text-zinc-500">Max 20 caractères</p>
           </div>
 
           {/* Description */}
@@ -274,22 +293,24 @@ export function StationCategoriesPage() {
   }, [categories, searchQuery]);
 
   // Handlers
-  const handleSaveCreate = async (data: { name: string; description: string; similarityCriteria: SimilarityCriterionInput[] }) => {
+  const handleSaveCreate = async (data: CategoryFormData) => {
     await createCategory({
       name: data.name,
       description: data.description || undefined,
+      abbreviation: data.abbreviation || undefined,
       similarityCriteria: data.similarityCriteria,
     }).unwrap();
     setIsCreating(false);
   };
 
-  const handleSaveEdit = async (data: { name: string; description: string; similarityCriteria: SimilarityCriterionInput[] }) => {
+  const handleSaveEdit = async (data: CategoryFormData) => {
     if (!editingCategory) return;
     await updateCategory({
       id: editingCategory.id,
       body: {
         name: data.name,
         description: data.description || undefined,
+        abbreviation: data.abbreviation,
         similarityCriteria: data.similarityCriteria,
       },
     }).unwrap();

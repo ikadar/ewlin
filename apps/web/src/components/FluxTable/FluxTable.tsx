@@ -1,13 +1,12 @@
 import { memo, useMemo, useState } from 'react';
 import { CircleCheck, Circle, Trash2, Folder } from 'lucide-react';
 import {
-  STATION_CATEGORIES,
   type FluxJob,
   type FluxElement,
-  type StationCategoryId,
   type PrerequisiteColumn,
   type PrerequisiteStatus,
 } from './fluxTypes';
+import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
 import {
   worstPrerequisiteStatus,
   getMultiElementStationData,
@@ -21,6 +20,8 @@ import { FluxTableContext, useFluxTableContext } from './FluxTableContext';
 
 interface FluxTableProps {
   jobs: FluxJob[];
+  /** Station categories for dynamic column headers (ordered by displayOrder). */
+  categories?: StationCategoryResponse[];
   /** Job ID of the keyboard-focused parent row (Alt+↑/↓ navigation). */
   focusedJobId?: string;
   /** Set of job IDs that are currently expanded (multi-element only). */
@@ -49,6 +50,7 @@ const stickyCell = 'sticky z-20 bg-flux-elevated';
  * Sort chevron appears on hover (non-functional in v0.5.15).
  */
 function FluxTableHeader() {
+  const ctx = useFluxTableContext();
   const headerCell = 'px-2 py-3 text-left font-medium whitespace-nowrap text-flux-text-secondary';
   const sortIcon = (
     <svg
@@ -101,15 +103,15 @@ function FluxTableHeader() {
         <th className={`${headerCell} text-center group cursor-pointer`} title="Plaques">
           Plaques {sortIcon}
         </th>
-        {/* Station columns */}
-        {STATION_CATEGORIES.map(cat => (
+        {/* Station columns — dynamic from API */}
+        {ctx.categories.map(cat => (
           <th
             key={cat.id}
             className="px-0 py-3 text-center font-medium whitespace-nowrap text-flux-text-secondary border-l border-flux-border"
             style={{ fontSize: '11px' }}
-            title={cat.full}
+            title={cat.name}
           >
-            {cat.abbr}
+            {cat.abbreviation || cat.name.substring(0, 5)}
           </th>
         ))}
         {/* Transporteur */}
@@ -247,8 +249,8 @@ const FluxTableRow = memo(function FluxTableRow({
         );
       })}
 
-      {/* Station cells */}
-      {STATION_CATEGORIES.map(cat => (
+      {/* Station cells — dynamic from API */}
+      {ctx.categories.map(cat => (
         <td
           key={cat.id}
           className="p-0 text-center border-l border-flux-border"
@@ -258,14 +260,14 @@ const FluxTableRow = memo(function FluxTableRow({
           {isMulti ? (
             <FluxStackedDots
               data={sortStationDataBySeverity(
-                getMultiElementStationData(job.elements, cat.id as StationCategoryId)
+                getMultiElementStationData(job.elements, cat.id)
               )}
-              stationName={cat.full}
+              stationName={cat.name}
             />
           ) : (
             <FluxStationIndicator
-              data={el0.stations[cat.id as StationCategoryId]}
-              stationName={cat.full}
+              data={el0.stations[cat.id]}
+              stationName={cat.name}
             />
           )}
         </td>
@@ -335,6 +337,7 @@ function FluxSubRow({
   element: FluxElement;
   index: number;
 }) {
+  const ctx = useFluxTableContext();
   return (
     <tr
       className="border-b border-flux-border"
@@ -384,16 +387,16 @@ function FluxSubRow({
         </td>
       ))}
 
-      {/* Station cells */}
-      {STATION_CATEGORIES.map(cat => (
+      {/* Station cells — dynamic from API */}
+      {ctx.categories.map(cat => (
         <td
           key={cat.id}
           className="p-0 text-center border-l border-flux-border"
           style={{ lineHeight: 0 }}
         >
           <FluxStationIndicator
-            data={element.stations[cat.id as StationCategoryId]}
-            stationName={cat.full}
+            data={element.stations[cat.id]}
+            stationName={cat.name}
           />
         </td>
       ))}
@@ -421,6 +424,7 @@ function FluxSubRow({
  */
 export const FluxTable = memo(function FluxTable({
   jobs,
+  categories = [],
   focusedJobId,
   expandedJobIds = new Set<string>(),
   onUpdatePrerequisite = () => {},
@@ -438,6 +442,7 @@ export const FluxTable = memo(function FluxTable({
   );
 
   const ctxValue = {
+    categories,
     openListboxId,
     setOpenListboxId,
     onUpdatePrerequisite,
@@ -471,7 +476,7 @@ export const FluxTable = memo(function FluxTable({
             <col style={{ width: '6rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '6rem' }} />
-            {STATION_CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <col key={cat.id} style={{ width: '3.5rem' }} />
             ))}
             <col style={{ width: '6rem' }} />

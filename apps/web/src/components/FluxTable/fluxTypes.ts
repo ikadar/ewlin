@@ -102,35 +102,6 @@ export const COLUMN_OPTIONS: Record<PrerequisiteColumn, PrerequisiteOption[]> = 
 
 // ── Station types ──────────────────────────────────────────────────────────
 
-/** Station category IDs matching the 9 production stations (spec 3.10). */
-export type StationCategoryId =
-  | 'cat-offset'
-  | 'cat-cutting'
-  | 'cat-pelliculeuse'
-  | 'cat-typo'
-  | 'cat-folding'
-  | 'cat-booklet'
-  | 'cat-saddle-stitch'
-  | 'cat-assembly'
-  | 'cat-packaging';
-
-/** Ordered list of all station categories with display labels (spec 3.10). */
-export const STATION_CATEGORIES: Array<{
-  id: StationCategoryId;
-  abbr: string;
-  full: string;
-}> = [
-  { id: 'cat-offset',       abbr: 'Off.',   full: 'Offset' },
-  { id: 'cat-cutting',      abbr: 'Mass.',  full: 'Massicot' },
-  { id: 'cat-pelliculeuse', abbr: 'Pell.',  full: 'Pelliculeuse' },
-  { id: 'cat-typo',         abbr: 'Typo',   full: 'Typo' },
-  { id: 'cat-folding',      abbr: 'Pli.',   full: 'Plieuse' },
-  { id: 'cat-booklet',      abbr: 'Enc.',   full: 'Enc.-Piqueuse' },
-  { id: 'cat-saddle-stitch',abbr: 'Ass.',   full: 'Ass.-Piqueuse' },
-  { id: 'cat-assembly',     abbr: 'Assem.', full: 'Assembleuse' },
-  { id: 'cat-packaging',    abbr: 'Cond.',  full: 'Conditionnement' },
-];
-
 /** Visual state of a station for a given job/element (spec 3.10). */
 export type StationState = 'empty' | 'planned' | 'in-progress' | 'late' | 'done';
 
@@ -160,7 +131,7 @@ export interface FluxElement {
   papier: PrerequisiteStatus;
   formes: PrerequisiteStatus;
   plaques: PrerequisiteStatus;
-  stations: Partial<Record<StationCategoryId, FluxStationData>>;
+  stations: Partial<Record<string, FluxStationData>>;
 }
 
 /** A print job row in the Flux dashboard (spec 5.1). */

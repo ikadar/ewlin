@@ -18,6 +18,8 @@ export interface StationCategoryResponse {
   name: string;
   description?: string;
   similarityCriteria: SimilarityCriterionInput[];
+  abbreviation: string;
+  displayOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +28,8 @@ export interface StationCategoryInput {
   name: string;
   description?: string;
   similarityCriteria: SimilarityCriterionInput[];
+  abbreviation?: string;
+  displayOrder?: number;
 }
 
 export const stationCategoryApi = createApi({
