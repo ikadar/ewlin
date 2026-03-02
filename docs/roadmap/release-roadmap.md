@@ -1978,12 +1978,12 @@ Two-part release following reference/jcf pattern.
 > **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
 > **Goal:** Tab szűrés, keresés, URL routing és keyboard shortcuts. Minden interakció, ami az adatok megjelenítési szűrésére vonatkozik.
 
-- [ ] Nested routes: `/flux` (Tous), `/flux/prepresse`, `/flux/papier`, `/flux/formes`, `/flux/plaques`
-- [ ] Tab bar 5 tabbal, aktív/inaktív vizuális állapot
-- [ ] Dinamikus count badge-ek (tab szűrő + keresés kombinációja)
-- [ ] Full-text keresés (real-time, case-insensitive, összes szöveges oszlopra)
-- [ ] Keyboard shortcuts: `Alt+←/→` (tab váltás), `Alt+↑/↓` (sor navigáció), `Alt+F` (keresőmező), `Alt+N` (new job → `/job/new`)
-- [ ] Keyboard hint bar megjelenítése a tab bar mellett
+- [x] Nested routes: `/flux` (Tous), `/flux/prepresse`, `/flux/papier`, `/flux/formes`, `/flux/plaques`
+- [x] Tab bar 5 tabbal, aktív/inaktív vizuális állapot
+- [x] Dinamikus count badge-ek (tab szűrő + keresés kombinációja)
+- [x] Full-text keresés (real-time, case-insensitive, összes szöveges oszlopra)
+- [x] Keyboard shortcuts: `Alt+←/→` (tab váltás), `Alt+↑/↓` (sor navigáció), `Alt+F` (keresőmező), `Alt+N` (new job → `/job/new`)
+- [x] Keyboard hint bar megjelenítése a tab bar mellett
 
 #### v0.5.17 - Production Flow Dashboard — Interaction
 
