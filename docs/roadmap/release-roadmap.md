@@ -1792,8 +1792,8 @@ Two-part release following reference/jcf pattern.
 > - Phase 5B: JCF API Integration (v0.5.5–v0.5.6)
 > - Phase 5C: Error Handling & UX (v0.5.7–v0.5.8)
 > - Phase 5D: Outsourcing Refactor (v0.5.9–v0.5.13)
-> - Phase 5E: Production Flow Dashboard (v0.5.15–v0.5.18)
-> - Phase 5F: Testing & Verification (v0.5.19–v0.5.20)
+> - Phase 5E: Production Flow Dashboard (v0.5.15–v0.5.20)
+> - Phase 5F: Testing & Verification (v0.5.21+)
 
 ### Phase 5A: Core API Integration
 
@@ -2006,14 +2006,39 @@ Two-part release following reference/jcf pattern.
 - [x] Loading és error állapotok kezelése
 - [x] Prerequisite dropdown portal fix (`createPortal`)
 - [ ] Station progress % forrásának tisztázása (qa.md K3.1) — **halasztva**
-- [ ] "Late" állapot definíciójának implementálása (qa.md K3.2) — **halasztva**
 - [ ] "Parti" toggle interaktivitás (qa.md K5.1) — **halasztva**
+
+#### v0.5.19 - Production Flow Dashboard — Prerequisite Persistence ✅
+
+> **Goal:** Prerequisite értékek módosítása perzisztál az adatbázisba (`PATCH /api/v1/flux/elements/{id}`)
+
+- [x] PHP API: `PATCH /api/v1/flux/elements/{id}` — prerequisite mező frissítése (bat/papier/formes/plaques)
+- [x] RTK Query mutation optimistic update + undo on error
+- [x] Mock handler: in-memory frissítés mock módban
+- [x] Unit tesztek: `FluxUpdateElementPrerequisiteTest.php`
+
+#### v0.5.20 - Production Flow Dashboard — Dynamic Station Category Columns ✅
+
+> **Goal:** Dinamikus station category oszlopok API-ból, valós station state adatok a schedule alapján
+
+- [x] PHP API: `abbreviation` + `display_order` mezők a `station_categories` táblán (3 migration)
+- [x] Exact abbreviation-ök: Off. | Mass. | Pell. | Typo | Pli. | Enc. | Ass. | Assem. | Cond.
+- [x] PHP API: `StationRepository::findCategoryIdMap()` — stationId→categoryId map
+- [x] PHP API: `FluxElementResponse::fromEntityWithContext()` — station state számítás (done/late/in-progress/planned/empty)
+- [x] PHP API: `FluxController::jobs()` — schedule + station map injection
+- [x] Frontend: `StationCategoryId` union type + `STATION_CATEGORIES` konstans eltávolítva
+- [x] Frontend: `FluxTable` dinamikus `categories` prop (API-ból)
+- [x] Frontend: `FluxPage` `useGetStationCategoriesQuery()` + displayOrder rendezés
+- [x] Frontend: Settings → Station Categories form: abbreviation mező
+- [x] Frontend: valós station state adatok a transform-ban (`fluxApi.ts`)
+- [ ] Station progress % (in-progress, late állapotnál) — K3.1, halasztva
+- [ ] "Parti" toggle interaktivitás — K5.1, halasztva
 
 ---
 
 ### Phase 5F: Testing & Verification
 
-#### v0.5.19 - E2E Tests with Real Backend
+#### v0.5.21 - E2E Tests with Real Backend
 > **Goal:** E2E tests run against actual PHP API
 
 - [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
@@ -2022,7 +2047,7 @@ Two-part release following reference/jcf pattern.
 - [ ] Key E2E tests with real backend
 - [ ] CI pipeline integration
 
-#### v0.5.20 - Performance Verification
+#### v0.5.22 - Performance Verification
 > **Goal:** Verify acceptable performance with real API
 
 - [ ] Snapshot load time < 2s
