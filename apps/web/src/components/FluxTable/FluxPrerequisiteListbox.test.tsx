@@ -27,7 +27,7 @@ function renderListbox(
   } = {},
   ctxOverrides?: Partial<FluxTableContextValue>,
 ) {
-  const { jobId = 'j1', elementId = 'e1', column = 'bat', status = 'OK' } = props;
+  const { jobId = 'j1', elementId = 'e1', column = 'bat', status = 'bat_approved' } = props;
   const ctx = makeCtx(ctxOverrides);
 
   render(
@@ -46,9 +46,10 @@ function renderListbox(
 
 describe('FluxPrerequisiteListbox', () => {
   it('renders the trigger with the current status badge', () => {
-    renderListbox({ status: 'OK' });
+    renderListbox({ status: 'bat_approved' });
     expect(screen.getByTestId('flux-prereq-listbox-trigger')).toBeInTheDocument();
-    expect(screen.getByText('OK')).toBeInTheDocument();
+    // badge label for bat_approved is 'BAT OK'
+    expect(screen.getByText('BAT OK')).toBeInTheDocument();
   });
 
   it('does not show dropdown when closed', () => {
@@ -64,7 +65,7 @@ describe('FluxPrerequisiteListbox', () => {
 
   it('shows dropdown when openListboxId matches', () => {
     renderListbox(
-      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'OK' },
+      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
     expect(screen.getByTestId('flux-prereq-dropdown')).toBeInTheDocument();
@@ -72,67 +73,70 @@ describe('FluxPrerequisiteListbox', () => {
 
   it('renders all BAT options in the dropdown', () => {
     renderListbox(
-      { column: 'bat', status: 'OK' },
+      { column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
-    expect(screen.getByText('n.a.')).toBeInTheDocument();
-    expect(screen.getByText('Att.fich')).toBeInTheDocument();
-    expect(screen.getByText('Recus')).toBeInTheDocument();
-    expect(screen.getByText('Envoye')).toBeInTheDocument();
-    // 'OK' appears in both badge and option
-    const okElements = screen.getAllByText('OK');
-    expect(okElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Pas de BAT')).toBeInTheDocument();
+    expect(screen.getByText('Attente fichiers')).toBeInTheDocument();
+    expect(screen.getByText('Fichiers reçus')).toBeInTheDocument();
+    expect(screen.getByText('BAT envoyé')).toBeInTheDocument();
+    // 'BAT OK' appears in both trigger badge and dropdown option
+    const batOkElements = screen.getAllByText('BAT OK');
+    expect(batOkElements.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders all Papier options', () => {
     renderListbox(
-      { column: 'papier', status: 'Stock' },
+      { column: 'papier', status: 'in_stock' },
       { openListboxId: 'j1-e1-papier' },
     );
-    // 'Stock' appears in both trigger badge and dropdown option
-    expect(screen.getAllByText('Stock').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('A cder')).toBeInTheDocument();
-    expect(screen.getByText('Cde')).toBeInTheDocument();
-    expect(screen.getByText('Livre')).toBeInTheDocument();
+    expect(screen.getByText('Pas de papier')).toBeInTheDocument();
+    expect(screen.getByText('En stock')).toBeInTheDocument();
+    expect(screen.getByText('À commander')).toBeInTheDocument();
+    expect(screen.getByText('Commandé')).toBeInTheDocument();
+    expect(screen.getByText('Livré')).toBeInTheDocument();
   });
 
   it('renders all Formes options', () => {
     renderListbox(
-      { column: 'formes', status: 'n.a.' },
+      { column: 'formes', status: 'none' },
       { openListboxId: 'j1-e1-formes' },
     );
-    expect(screen.getByText('Stock')).toBeInTheDocument();
-    expect(screen.getByText('A cder')).toBeInTheDocument();
-    expect(screen.getByText('Cdee')).toBeInTheDocument();
-    expect(screen.getByText('Livree')).toBeInTheDocument();
+    expect(screen.getByText('Pas de forme')).toBeInTheDocument();
+    expect(screen.getByText('Sur stock')).toBeInTheDocument();
+    // 'À commander' appears in both papier and formes; at least one instance
+    expect(screen.getAllByText('À commander').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Commandée')).toBeInTheDocument();
+    expect(screen.getByText('Livrée')).toBeInTheDocument();
   });
 
   it('renders all Plaques options', () => {
     renderListbox(
-      { column: 'plaques', status: 'A faire' },
+      { column: 'plaques', status: 'to_make' },
       { openListboxId: 'j1-e1-plaques' },
     );
-    // 'A faire' appears in both trigger badge and dropdown option — use getAllByText
-    expect(screen.getAllByText('A faire').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Pretes')).toBeInTheDocument();
+    expect(screen.getByText('Pas de plaques')).toBeInTheDocument();
+    // dropdown option label 'À faire' (with accent)
+    expect(screen.getByText('À faire')).toBeInTheDocument();
+    expect(screen.getByText('Prêtes')).toBeInTheDocument();
   });
 
   it('clicking an option calls onUpdatePrerequisite with correct args', () => {
     const ctx = renderListbox(
-      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'OK' },
+      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
-    // Click the 'Envoye' option
+    // Click the 'bat_sent' option (data-option="bat_sent")
     const options = screen.getAllByTestId('flux-prereq-option');
-    const envoyeOption = options.find(o => o.getAttribute('data-option') === 'Envoye');
-    expect(envoyeOption).toBeDefined();
-    fireEvent.click(envoyeOption!);
-    expect(ctx.onUpdatePrerequisite).toHaveBeenCalledWith('j1', 'e1', 'bat', 'Envoye');
+    const batSentOption = options.find(o => o.getAttribute('data-option') === 'bat_sent');
+    expect(batSentOption).toBeDefined();
+    fireEvent.click(batSentOption!);
+    expect(ctx.onUpdatePrerequisite).toHaveBeenCalledWith('j1', 'e1', 'bat', 'bat_sent');
   });
 
   it('clicking an option calls setOpenListboxId(null) to close', () => {
     const ctx = renderListbox(
-      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'OK' },
+      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
     const options = screen.getAllByTestId('flux-prereq-option');
@@ -142,22 +146,22 @@ describe('FluxPrerequisiteListbox', () => {
 
   it('selected option has aria-selected=true', () => {
     renderListbox(
-      { column: 'bat', status: 'Recus' },
+      { column: 'bat', status: 'files_received' },
       { openListboxId: 'j1-e1-bat' },
     );
     const options = screen.getAllByTestId('flux-prereq-option');
-    const recusOption = options.find(o => o.getAttribute('data-option') === 'Recus');
-    expect(recusOption).toHaveAttribute('aria-selected', 'true');
+    const selectedOption = options.find(o => o.getAttribute('data-option') === 'files_received');
+    expect(selectedOption).toHaveAttribute('aria-selected', 'true');
   });
 
   it('non-selected options have aria-selected=false', () => {
     renderListbox(
-      { column: 'bat', status: 'OK' },
+      { column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
     const options = screen.getAllByTestId('flux-prereq-option');
-    const envoyeOption = options.find(o => o.getAttribute('data-option') === 'Envoye');
-    expect(envoyeOption).toHaveAttribute('aria-selected', 'false');
+    const batSentOption = options.find(o => o.getAttribute('data-option') === 'bat_sent');
+    expect(batSentOption).toHaveAttribute('aria-selected', 'false');
   });
 
   it('trigger has aria-haspopup=listbox', () => {
@@ -166,13 +170,13 @@ describe('FluxPrerequisiteListbox', () => {
   });
 
   it('trigger has aria-expanded=false when closed', () => {
-    renderListbox({ status: 'OK' }, { openListboxId: null });
+    renderListbox({ status: 'bat_approved' }, { openListboxId: null });
     expect(screen.getByTestId('flux-prereq-listbox-trigger')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('trigger has aria-expanded=true when open', () => {
     renderListbox(
-      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'OK' },
+      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
     expect(screen.getByTestId('flux-prereq-listbox-trigger')).toHaveAttribute('aria-expanded', 'true');
@@ -180,7 +184,7 @@ describe('FluxPrerequisiteListbox', () => {
 
   it('dropdown has role=listbox', () => {
     renderListbox(
-      { column: 'bat', status: 'OK' },
+      { column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -188,7 +192,7 @@ describe('FluxPrerequisiteListbox', () => {
 
   it('Escape key on open trigger calls setOpenListboxId(null)', () => {
     const ctx = renderListbox(
-      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'OK' },
+      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
     const dropdown = screen.getByTestId('flux-prereq-dropdown');
@@ -198,7 +202,7 @@ describe('FluxPrerequisiteListbox', () => {
 
   it('clicking trigger when open calls setOpenListboxId(null)', () => {
     const ctx = renderListbox(
-      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'OK' },
+      { jobId: 'j1', elementId: 'e1', column: 'bat', status: 'bat_approved' },
       { openListboxId: 'j1-e1-bat' },
     );
     fireEvent.click(screen.getByTestId('flux-prereq-listbox-trigger'));

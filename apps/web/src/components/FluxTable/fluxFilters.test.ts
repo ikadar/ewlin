@@ -64,8 +64,8 @@ describe('filterByTab — spec 6.5 verification matrix', () => {
     expect(result).toContain('00078');
     expect(result).toContain('00091');
     expect(result).toContain('00103');
-    expect(result).not.toContain('00042'); // BAT = OK → excluded
-    expect(result).not.toContain('00117'); // BAT = n.a. → excluded
+    expect(result).not.toContain('00042'); // BAT = bat_approved → excluded
+    expect(result).not.toContain('00117'); // BAT = none → excluded
     expect(result).toHaveLength(3);
   });
 
@@ -93,43 +93,43 @@ describe('filterByTab — spec 6.5 verification matrix', () => {
 // ── filterByTab — specific exclusion rules ──────────────────────────────────
 
 describe('filterByTab — prepresse exclusion rules', () => {
-  const okJob = FLUX_STATIC_JOBS.find(j => j.id === '00042')!; // BAT=OK
-  const naJob = FLUX_STATIC_JOBS.find(j => j.id === '00117')!; // BAT=n.a.
-  const redJob = FLUX_STATIC_JOBS.find(j => j.id === '00078')!; // BAT=Att.fich (red)
+  const okJob = FLUX_STATIC_JOBS.find(j => j.id === '00042')!; // BAT = bat_approved
+  const naJob = FLUX_STATIC_JOBS.find(j => j.id === '00117')!; // BAT = none
+  const redJob = FLUX_STATIC_JOBS.find(j => j.id === '00078')!; // BAT = waiting_files (red)
 
-  it('excludes BAT=OK from prepresse tab', () => {
+  it('excludes BAT=bat_approved from prepresse tab', () => {
     expect(filterByTab(okJob, 'prepresse')).toBe(false);
   });
-  it('excludes BAT=n.a. from prepresse tab', () => {
+  it('excludes BAT=none from prepresse tab', () => {
     expect(filterByTab(naJob, 'prepresse')).toBe(false);
   });
-  it('includes BAT=Att.fich (red) in prepresse tab', () => {
+  it('includes BAT=waiting_files (red) in prepresse tab', () => {
     expect(filterByTab(redJob, 'prepresse')).toBe(true);
   });
-  it('includes BAT=Envoye (yellow) in prepresse tab', () => {
-    const envoye = FLUX_STATIC_JOBS.find(j => j.id === '00103')!; // BAT=Envoye
-    expect(filterByTab(envoye, 'prepresse')).toBe(true);
+  it('includes BAT=bat_sent (yellow) in prepresse tab', () => {
+    const batSentJob = FLUX_STATIC_JOBS.find(j => j.id === '00103')!; // BAT = bat_sent
+    expect(filterByTab(batSentJob, 'prepresse')).toBe(true);
   });
 });
 
 // ── filterByTab — multi-element aggregation ─────────────────────────────────
 
 describe('filterByTab — multi-element worst-value aggregation', () => {
-  // Job 00078: 3 elements. Worst BAT = Att.fich (red), Worst Papier = A cder (red)
-  // Job 00091: 2 elements. Worst BAT = Att.fich (red), Worst Formes = Cdee (yellow — NOT A cder)
+  // Job 00078: 3 elements. Worst BAT = waiting_files (red), Worst Papier = to_order (red)
+  // Job 00091: 2 elements. Worst BAT = waiting_files (red), Worst Formes = ordered (yellow — NOT to_order)
   const job78 = FLUX_STATIC_JOBS.find(j => j.id === '00078')!;
   const job91 = FLUX_STATIC_JOBS.find(j => j.id === '00091')!;
 
-  it('00078: matches formes filter (Formes worst = A cder)', () => {
+  it('00078: matches formes filter (Formes worst = to_order)', () => {
     expect(filterByTab(job78, 'formes')).toBe(true);
   });
-  it('00091: does not match formes filter (Formes worst = Cdee, not A cder)', () => {
+  it('00091: does not match formes filter (Formes worst = ordered, not to_order)', () => {
     expect(filterByTab(job91, 'formes')).toBe(false);
   });
-  it('00078: matches plaques filter (Plaques worst = A faire)', () => {
+  it('00078: matches plaques filter (Plaques worst = to_make)', () => {
     expect(filterByTab(job78, 'plaques')).toBe(true);
   });
-  it('00091: matches plaques filter (Plaques worst = A faire)', () => {
+  it('00091: matches plaques filter (Plaques worst = to_make)', () => {
     expect(filterByTab(job91, 'plaques')).toBe(true);
   });
 });
@@ -167,14 +167,14 @@ describe('filterBySearch', () => {
     expect(filterBySearch(jobs[0]!, 'XXXNONEXISTENT')).toBe(false);
   });
   it('matches by prerequisite badge label (case-insensitive)', () => {
-    // 00078 parent has BAT=Att.fich
+    // 00078 parent has BAT=waiting_files → badge label "Att.fich"
     const job78 = jobs.find(j => j.id === '00078')!;
     expect(filterBySearch(job78, 'att.fich')).toBe(true);
     expect(filterBySearch(job78, 'ATT.FICH')).toBe(true);
     expect(filterBySearch(job78, 'att')).toBe(true);
   });
   it('matches by papier badge label', () => {
-    // 00078 has Papier=A cder
+    // 00078 has Papier=to_order → badge label "A cder"
     const job78 = jobs.find(j => j.id === '00078')!;
     expect(filterBySearch(job78, 'a cder')).toBe(true);
     expect(filterBySearch(job78, 'A CDER')).toBe(true);
@@ -204,7 +204,7 @@ describe('computeTabCounts', () => {
   it('search "Ducros": counts reflect only matching jobs', () => {
     const counts = computeTabCounts(jobs, 'Ducros');
     expect(counts.all).toBe(1);       // only 00042
-    expect(counts.prepresse).toBe(0); // 00042 has BAT=OK → excluded from prepresse
+    expect(counts.prepresse).toBe(0); // 00042 has BAT=bat_approved → excluded from prepresse
     expect(counts.papier).toBe(0);
     expect(counts.formes).toBe(0);
     expect(counts.plaques).toBe(0);
@@ -228,7 +228,7 @@ describe('computeTabCounts', () => {
     expect(counts.plaques).toBe(0);
   });
 
-  it('search "att.fich" matches 00078 and 00091 (worst BAT = Att.fich)', () => {
+  it('search "att.fich" matches 00078 and 00091 (worst BAT badge = Att.fich)', () => {
     const counts = computeTabCounts(jobs, 'att.fich');
     expect(counts.all).toBe(2);
     expect(counts.prepresse).toBe(2);

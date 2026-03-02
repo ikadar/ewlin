@@ -5,6 +5,7 @@
  */
 
 import type { FluxJob } from './fluxTypes';
+import { PREREQUISITE_BADGE_LABEL } from './fluxTypes';
 import { worstPrerequisiteStatus } from './fluxAggregation';
 
 /** Route segment → tab identifier mapping (qa.md K11.1). */
@@ -60,10 +61,10 @@ export function filterByTab(job: FluxJob, tab: TabId): boolean {
     : job.elements[0]!.plaques;
 
   switch (tab) {
-    case 'prepresse': return bat !== 'OK' && bat !== 'n.a.';
-    case 'papier':    return papier === 'A cder';
-    case 'formes':    return formes === 'A cder';
-    case 'plaques':   return plaques === 'A faire';
+    case 'prepresse': return bat !== 'bat_approved' && bat !== 'none';
+    case 'papier':    return papier === 'to_order';
+    case 'formes':    return formes === 'to_order';
+    case 'plaques':   return plaques === 'to_make';
     default:          return true;
   }
 }
@@ -102,7 +103,9 @@ export function filterBySearch(job: FluxJob, search: string): boolean {
     ? worstPrerequisiteStatus(job.elements.map(e => e.plaques))
     : job.elements[0]!.plaques;
 
-  return [bat, papier, formes, plaques].some(s => s.toLowerCase().includes(q));
+  // Search by badge labels (abbreviated display text visible in the table)
+  const badgeLabels = [bat, papier, formes, plaques].map(s => PREREQUISITE_BADGE_LABEL[s] ?? s);
+  return badgeLabels.some(label => label.toLowerCase().includes(q));
 }
 
 /**

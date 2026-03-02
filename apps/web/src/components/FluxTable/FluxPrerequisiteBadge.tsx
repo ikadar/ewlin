@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { PREREQUISITE_STATUS_COLOR, type PrerequisiteStatus } from './fluxTypes';
+import { PREREQUISITE_BADGE_LABEL, PREREQUISITE_STATUS_COLOR, type PrerequisiteStatus } from './fluxTypes';
 
 interface FluxPrerequisiteBadgeProps {
   status: PrerequisiteStatus;
@@ -36,7 +36,7 @@ export const FluxPrerequisiteBadge = memo(function FluxPrerequisiteBadge({
         style={{ fontSize: '11px' }}
         data-color={color}
       >
-        {status}
+        {PREREQUISITE_BADGE_LABEL[status] ?? status}
       </span>
       {plusCount != null && plusCount > 0 && (
         <span

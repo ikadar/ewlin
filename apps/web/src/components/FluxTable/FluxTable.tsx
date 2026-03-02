@@ -231,18 +231,18 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Prerequisite badge/listbox cells */}
       {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map((col, i) => {
         const status = [bat, papier, formes, plaques][i]!;
-        return (
+        return isMulti ? (
           <td key={col} className="px-1 py-0 text-center">
-            {isMulti ? (
-              <FluxPrerequisiteBadge status={status} plusCount={plusCount} />
-            ) : (
-              <FluxPrerequisiteListbox
-                jobId={job.id}
-                elementId={el0.id}
-                column={col}
-                status={status}
-              />
-            )}
+            <FluxPrerequisiteBadge status={status} plusCount={plusCount} />
+          </td>
+        ) : (
+          <td key={col} className="p-0">
+            <FluxPrerequisiteListbox
+              jobId={job.id}
+              elementId={el0.id}
+              column={col}
+              status={status}
+            />
           </td>
         );
       })}
@@ -374,7 +374,7 @@ function FluxSubRow({
 
       {/* Prerequisite listbox cells */}
       {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map(col => (
-        <td key={col} className="px-1 py-0 text-center">
+        <td key={col} className="p-0">
           <FluxPrerequisiteListbox
             jobId={job.id}
             elementId={element.id}

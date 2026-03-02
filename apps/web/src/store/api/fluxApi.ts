@@ -23,7 +23,7 @@ import type { PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
 
 /**
  * Element shape as returned by GET /api/v1/flux/jobs.
- * Status values are already French UI display strings (mapped server-side).
+ * Status values are API enum strings (e.g. 'bat_approved', 'in_stock') matching @flux/types.
  */
 interface FluxElementApiResponse {
   id: string;

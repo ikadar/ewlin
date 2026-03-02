@@ -24,10 +24,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00042-e1',
         label: 'Main',
-        bat: 'OK',
-        papier: 'Stock',
-        formes: 'n.a.',
-        plaques: 'Pretes',
+        bat: 'bat_approved',
+        papier: 'in_stock',
+        formes: 'none',
+        plaques: 'ready',
         stations: {
           'cat-offset':       { state: 'done' },
           'cat-cutting':      { state: 'done' },
@@ -55,10 +55,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00078-e1',
         label: 'Étiquette Ronde',
-        bat: 'OK',
-        papier: 'Stock',
-        formes: 'Stock',
-        plaques: 'Pretes',
+        bat: 'bat_approved',
+        papier: 'in_stock',
+        formes: 'in_stock',
+        plaques: 'ready',
         stations: {
           'cat-offset':  { state: 'late', progress: 60 },
           'cat-cutting': { state: 'planned' },
@@ -69,10 +69,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00078-e2',
         label: 'Étiquette Carrée',
-        bat: 'Envoye',
-        papier: 'Cde',
-        formes: 'n.a.',
-        plaques: 'A faire',
+        bat: 'bat_sent',
+        papier: 'ordered',
+        formes: 'none',
+        plaques: 'to_make',
         stations: {
           'cat-offset':   { state: 'in-progress', progress: 40 },
           'cat-cutting':  { state: 'planned' },
@@ -82,10 +82,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00078-e3',
         label: 'Étiquette Ovale',
-        bat: 'Att.fich',
-        papier: 'A cder',
-        formes: 'A cder',
-        plaques: 'A faire',
+        bat: 'waiting_files',
+        papier: 'to_order',
+        formes: 'to_order',
+        plaques: 'to_make',
         stations: {
           'cat-offset':   { state: 'planned' },
           'cat-typo':     { state: 'planned' },
@@ -107,10 +107,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00091-e1',
         label: 'Couverture',
-        bat: 'Envoye',
-        papier: 'Recus',
-        formes: 'n.a.',
-        plaques: 'n.a.',
+        bat: 'bat_sent',
+        papier: 'files_received',
+        formes: 'none',
+        plaques: 'none',
         stations: {
           'cat-offset':   { state: 'in-progress', progress: 40 },
           'cat-cutting':  { state: 'planned' },
@@ -120,10 +120,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00091-e2',
         label: 'Intérieur',
-        bat: 'Att.fich',
-        papier: 'A cder',
-        formes: 'Cdee',
-        plaques: 'A faire',
+        bat: 'waiting_files',
+        papier: 'to_order',
+        formes: 'ordered',
+        plaques: 'to_make',
         stations: {
           'cat-offset':  { state: 'planned' },
           'cat-folding': { state: 'planned' },
@@ -145,10 +145,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00103-e1',
         label: 'Main',
-        bat: 'Envoye',
-        papier: 'Livre',
-        formes: 'Livree',
-        plaques: 'Pretes',
+        bat: 'bat_sent',
+        papier: 'delivered',
+        formes: 'delivered',
+        plaques: 'ready',
         stations: {
           'cat-offset':   { state: 'done' },
           'cat-cutting':  { state: 'in-progress', progress: 40 },
@@ -176,10 +176,10 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00117-e1',
         label: 'Main',
-        bat: 'n.a.',
-        papier: 'Stock',
-        formes: 'Stock',
-        plaques: 'n.a.',
+        bat: 'none',
+        papier: 'in_stock',
+        formes: 'in_stock',
+        plaques: 'none',
         stations: {
           'cat-offset':       { state: 'late', progress: 60 },
           'cat-cutting':      { state: 'done' },

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  COLUMN_STATUS_OPTIONS,
+  COLUMN_OPTIONS,
   PREREQUISITE_STATUS_COLOR,
   type PrerequisiteColumn,
   type PrerequisiteStatus,
@@ -16,12 +16,12 @@ interface FluxPrerequisiteListboxProps {
   status: PrerequisiteStatus;
 }
 
-/** Bar color CSS class per prerequisite color (spec 3.9). */
-const BAR_COLOR_CLASS: Record<string, string> = {
-  green:  'bg-green-500',
-  yellow: 'bg-yellow-500',
-  red:    'bg-red-500',
-  gray:   'bg-zinc-500',
+/** Color bar inline style per prerequisite color (spec 3.9). */
+const BAR_COLOR: Record<string, string> = {
+  green:  'rgb(74 222 128)',
+  yellow: 'rgb(250 204 21)',
+  red:    'rgb(248 113 113)',
+  gray:   'rgb(128 128 128)',
 };
 
 /**
@@ -43,8 +43,9 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
 
   const [dropdownStyle, setDropdownStyle] = useState({ top: 0, left: 0, minWidth: 0 });
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
 
-  const options = COLUMN_STATUS_OPTIONS[column];
+  const options = COLUMN_OPTIONS[column];
 
   // ── Open / Close ────────────────────────────────────────────────────────
 
@@ -56,12 +57,12 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
       setDropdownStyle({
-        top: rect.bottom + 4,
+        top: rect.bottom + 2,
         left: rect.left,
         minWidth: rect.width,
       });
     }
-    const currentIdx = options.indexOf(status);
+    const currentIdx = options.findIndex(o => o.value === status);
     setFocusedIndex(currentIdx >= 0 ? currentIdx : 0);
     ctx.setOpenListboxId(myId);
   }, [isOpen, ctx, myId, options, status]);
@@ -125,7 +126,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
       case 'Enter':
       case ' ':
         e.preventDefault();
-        handleSelect(options[focusedIndex]!);
+        handleSelect(options[focusedIndex]!.value);
         break;
       case 'Escape':
         e.preventDefault();
@@ -138,10 +139,29 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="inline-block w-full">
+    <div style={{ display: 'inline-block', width: '100%' }}>
       <button
         ref={triggerRef}
-        className="w-full flex items-center justify-between gap-1 px-1.5 py-0.5 rounded hover:bg-flux-hover transition-colors focus:outline-none focus:ring-1 focus:ring-inset focus:ring-indigo-500"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '4px',
+          width: '100%',
+          height: '100%',
+          padding: '0 5px',
+          minHeight: '2.25rem',
+          background: isHovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          transition: 'background 0.15s',
+          borderRadius: '2px',
+          outline: isOpen ? '1.5px solid rgba(99,102,241,0.5)' : 'none',
+          outlineOffset: '-1.5px',
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         onClick={handleOpen}
         onKeyDown={handleTriggerKeyDown}
         aria-haspopup="listbox"
@@ -151,10 +171,13 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
         <FluxPrerequisiteBadge status={status} />
         {/* Caret icon */}
         <svg
-          className="w-3 h-3 flex-shrink-0 transition-transform duration-150"
           style={{
-            opacity: 0.35,
+            width: '10px',
+            height: '10px',
+            flexShrink: 0,
+            opacity: isOpen ? 0.6 : 0.35,
             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.15s, opacity 0.15s',
             color: 'currentColor',
           }}
           fill="none"
@@ -171,49 +194,82 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
           ref={dropdownRef}
           role="listbox"
           aria-label={column}
-          className="py-1 shadow-xl overflow-hidden"
           style={{
             position: 'fixed',
             top: dropdownStyle.top,
             left: dropdownStyle.left,
             minWidth: Math.max(dropdownStyle.minWidth, 80),
             zIndex: 9999,
-            backgroundColor: 'rgb(26,26,26)',
-            border: '1px solid rgb(42,42,42)',
+            padding: '3px',
+            backgroundColor: 'rgb(26 26 26)',
+            border: '1px solid rgb(42 42 42)',
             borderRadius: '6px',
-            animation: 'flux-listbox-in 150ms ease-out both',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3)',
+            animation: 'flux-listbox-in 150ms ease both',
           }}
           onKeyDown={handleDropdownKeyDown}
           data-testid="flux-prereq-dropdown"
         >
           {options.map((opt, idx) => {
-            const color = PREREQUISITE_STATUS_COLOR[opt];
-            const barClass = BAR_COLOR_CLASS[color ?? 'gray'] ?? 'bg-zinc-500';
-            const isSelected = opt === status;
+            const color = PREREQUISITE_STATUS_COLOR[opt.value];
+            const barColor = BAR_COLOR[color ?? 'gray'] ?? 'rgb(128 128 128)';
+            const isSelected = opt.value === status;
 
             return (
               <button
-                key={opt}
+                key={opt.value}
                 role="option"
                 aria-selected={isSelected}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-flux-hover transition-colors focus:outline-none focus:bg-flux-hover"
+                className="hover:bg-flux-hover focus:bg-flux-hover focus:outline-none"
                 style={{
-                  borderLeft: isSelected
-                    ? '2px solid rgb(99,102,241)'
-                    : '2px solid transparent',
-                  fontSize: '11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: '5px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '12px',
+                  color: isSelected ? 'rgb(245 245 245)' : 'rgb(209 209 209)',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'left',
+                  position: 'relative',
+                  transition: 'background 0.1s',
                 }}
-                onClick={() => handleSelect(opt)}
+                onClick={() => handleSelect(opt.value)}
                 tabIndex={idx === focusedIndex ? 0 : -1}
                 data-testid="flux-prereq-option"
-                data-option={opt}
+                data-option={opt.value}
               >
+                {/* Selected indicator bar — absolutely positioned on left edge */}
                 <span
-                  className={`flex-shrink-0 rounded-sm ${barClass}`}
-                  style={{ width: '3px', height: '14px' }}
+                  style={{
+                    position: 'absolute',
+                    left: '3px',
+                    top: '4px',
+                    bottom: '4px',
+                    width: '2px',
+                    borderRadius: '1px',
+                    background: 'rgb(99 102 241)',
+                    opacity: isSelected ? 1 : 0,
+                    transition: 'opacity 0.1s',
+                  }}
                   aria-hidden="true"
                 />
-                <span className="text-flux-text-secondary">{opt}</span>
+                {/* Color status bar */}
+                <span
+                  style={{
+                    flexShrink: 0,
+                    width: '3px',
+                    height: '14px',
+                    borderRadius: '1.5px',
+                    background: barColor,
+                  }}
+                  aria-hidden="true"
+                />
+                <span>{opt.label}</span>
               </button>
             );
           })}

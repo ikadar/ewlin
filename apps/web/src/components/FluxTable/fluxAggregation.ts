@@ -47,7 +47,7 @@ export const STATION_STATE_SEVERITY: Record<StationState, number> = {
  * Example: ['Stock', 'Cde', 'A cder'] → 'A cder' (red wins)
  */
 export function worstPrerequisiteStatus(statuses: PrerequisiteStatus[]): PrerequisiteStatus {
-  if (statuses.length === 0) return 'n.a.';
+  if (statuses.length === 0) return 'none';
 
   return statuses.reduce((worst, current) => {
     const worstColor = PREREQUISITE_STATUS_COLOR[worst];

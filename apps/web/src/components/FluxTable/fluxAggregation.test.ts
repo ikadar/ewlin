@@ -24,42 +24,42 @@ describe('PREREQUISITE_COLOR_SEVERITY', () => {
 });
 
 describe('worstPrerequisiteStatus', () => {
-  it('returns n.a. for empty array', () => {
-    expect(worstPrerequisiteStatus([])).toBe('n.a.');
+  it('returns none for empty array', () => {
+    expect(worstPrerequisiteStatus([])).toBe('none');
   });
 
   it('returns single status unchanged', () => {
-    expect(worstPrerequisiteStatus(['OK'])).toBe('OK');
-    expect(worstPrerequisiteStatus(['A cder'])).toBe('A cder');
+    expect(worstPrerequisiteStatus(['bat_approved'])).toBe('bat_approved');
+    expect(worstPrerequisiteStatus(['to_order'])).toBe('to_order');
   });
 
   it('returns red over yellow and green (spec 6.2 example: job 00078 Papier)', () => {
-    // Ronde: Stock (green), Carree: Cde (yellow), Ovale: A cder (red)
-    expect(worstPrerequisiteStatus(['Stock', 'Cde', 'A cder'])).toBe('A cder');
+    // Ronde: in_stock (green), Carree: ordered (yellow), Ovale: to_order (red)
+    expect(worstPrerequisiteStatus(['in_stock', 'ordered', 'to_order'])).toBe('to_order');
   });
 
   it('returns yellow over gray and green (spec 6.2 example: job 00091 Formes)', () => {
-    // Couverture: n.a. (gray), Interieur: Cdee (yellow)
-    expect(worstPrerequisiteStatus(['n.a.', 'Cdee'])).toBe('Cdee');
+    // Couverture: none (gray), Interieur: ordered (yellow)
+    expect(worstPrerequisiteStatus(['none', 'ordered'])).toBe('ordered');
   });
 
   it('returns worst when all same color', () => {
     // All red: returns first red encountered
-    const result = worstPrerequisiteStatus(['Att.fich', 'A cder', 'A faire']);
-    expect(['Att.fich', 'A cder', 'A faire']).toContain(result);
+    const result = worstPrerequisiteStatus(['waiting_files', 'to_order', 'to_make']);
+    expect(['waiting_files', 'to_order', 'to_make']).toContain(result);
   });
 
   it('returns green when all green', () => {
-    const result = worstPrerequisiteStatus(['OK', 'Stock', 'Pretes']);
-    expect(['OK', 'Stock', 'Pretes']).toContain(result);
+    const result = worstPrerequisiteStatus(['bat_approved', 'in_stock', 'ready']);
+    expect(['bat_approved', 'in_stock', 'ready']).toContain(result);
   });
 
   it('red over gray', () => {
-    expect(worstPrerequisiteStatus(['n.a.', 'Att.fich'])).toBe('Att.fich');
+    expect(worstPrerequisiteStatus(['none', 'waiting_files'])).toBe('waiting_files');
   });
 
   it('gray over green', () => {
-    expect(worstPrerequisiteStatus(['OK', 'n.a.'])).toBe('n.a.');
+    expect(worstPrerequisiteStatus(['bat_approved', 'none'])).toBe('none');
   });
 });
 
@@ -111,15 +111,18 @@ describe('sortStationDataBySeverity', () => {
 describe('getMultiElementStationData', () => {
   const elements: FluxElement[] = [
     {
-      id: 'e1', label: 'Ronde', bat: 'OK', papier: 'Stock', formes: 'Stock', plaques: 'Pretes',
+      id: 'e1', label: 'Ronde',
+      bat: 'bat_approved', papier: 'in_stock', formes: 'in_stock', plaques: 'ready',
       stations: { 'cat-offset': { state: 'late', progress: 60 }, 'cat-cutting': { state: 'planned' } },
     },
     {
-      id: 'e2', label: 'Carree', bat: 'Envoye', papier: 'Cde', formes: 'n.a.', plaques: 'A faire',
+      id: 'e2', label: 'Carree',
+      bat: 'bat_sent', papier: 'ordered', formes: 'none', plaques: 'to_make',
       stations: { 'cat-offset': { state: 'in-progress', progress: 40 } },
     },
     {
-      id: 'e3', label: 'Ovale', bat: 'Att.fich', papier: 'A cder', formes: 'A cder', plaques: 'A faire',
+      id: 'e3', label: 'Ovale',
+      bat: 'waiting_files', papier: 'to_order', formes: 'to_order', plaques: 'to_make',
       stations: { 'cat-offset': { state: 'planned' } },
     },
   ];

@@ -12,10 +12,10 @@ const singleJob: FluxJob = {
     {
       id: 'e1',
       label: 'Main',
-      bat: 'OK',
-      papier: 'Stock',
-      formes: 'n.a.',
-      plaques: 'Pretes',
+      bat: 'bat_approved',
+      papier: 'in_stock',
+      formes: 'none',
+      plaques: 'ready',
       stations: {
         'cat-offset': { state: 'done' },
         'cat-cutting': { state: 'done' },
@@ -33,15 +33,15 @@ const multiJob: FluxJob = {
   sortie: '05/03',
   elements: [
     {
-      id: 'e1', label: 'Ronde', bat: 'OK', papier: 'Stock', formes: 'Stock', plaques: 'Pretes',
+      id: 'e1', label: 'Ronde', bat: 'bat_approved', papier: 'in_stock', formes: 'in_stock', plaques: 'ready',
       stations: { 'cat-offset': { state: 'late', progress: 60 } },
     },
     {
-      id: 'e2', label: 'Carree', bat: 'Envoye', papier: 'Cde', formes: 'n.a.', plaques: 'A faire',
+      id: 'e2', label: 'Carree', bat: 'bat_sent', papier: 'ordered', formes: 'none', plaques: 'to_make',
       stations: { 'cat-offset': { state: 'in-progress', progress: 40 } },
     },
     {
-      id: 'e3', label: 'Ovale', bat: 'Att.fich', papier: 'A cder', formes: 'A cder', plaques: 'A faire',
+      id: 'e3', label: 'Ovale', bat: 'waiting_files', papier: 'to_order', formes: 'to_order', plaques: 'to_make',
       stations: { 'cat-offset': { state: 'planned' } },
     },
   ],
@@ -127,7 +127,7 @@ describe('FluxTable', () => {
 
   it('renders worst-value prerequisites for multi-element job', () => {
     render(<FluxTable jobs={[multiJob]} />);
-    // BAT worst: Att.fich (red), Papier worst: A cder (red)
+    // BAT worst: waiting_files → badge "Att.fich", Papier worst: to_order → badge "A cder"
     const badges = screen.getAllByTestId('flux-prereq-badge');
     const texts = badges.map(b => b.textContent);
     expect(texts.some(t => t?.includes('Att.fich'))).toBe(true);
