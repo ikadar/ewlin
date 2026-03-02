@@ -1792,8 +1792,9 @@ Two-part release following reference/jcf pattern.
 > - Phase 5B: JCF API Integration (v0.5.5–v0.5.6)
 > - Phase 5C: Error Handling & UX (v0.5.7–v0.5.8)
 > - Phase 5D: Outsourcing Refactor (v0.5.9–v0.5.13)
-> - Phase 5E: Production Flow Dashboard (v0.5.15–v0.5.20)
-> - Phase 5F: Testing & Verification (v0.5.21+)
+> - Phase 5E: Production Flow Dashboard (v0.5.15–v0.5.21)
+> - Phase 5F: ST Column — Sous-traitance (v0.5.22–v0.5.23)
+> - Phase 5G: Testing & Verification (v0.5.24–v0.5.25)
 
 ### Phase 5A: Core API Integration
 
@@ -2034,20 +2035,81 @@ Two-part release following reference/jcf pattern.
 - [ ] Station progress % (in-progress, late állapotnál) — K3.1, halasztva
 - [ ] "Parti" toggle interaktivitás — K5.1, halasztva
 
+#### v0.5.21 - Production Flow Dashboard — Sortable Column Headers & Webkit Scrollbar ✅
+
+> **Goal:** Spec 3.6 compliance: sortable column headers + webkit scrollbar fix
+> **Spec:** `docs/production-flow-dashboard-spec/tableau-de-flux.md` §3.6
+> **Release doc:** `docs/releases/v0.5.21-sortable-headers-webkit-scrollbar.md`
+
+- [x] Frontend: `fluxSort.ts` — `SortColumn`, `SortDirection` types + `sortFluxJobs()` utility
+- [x] Frontend: Sort state in `FluxPage` (`sortColumn`, `sortDirection` useState + `handleSortChange`)
+- [x] Frontend: `FluxTable` sort props (`sortColumn`, `sortDirection`, `onSortChange`), `SortChevron` component
+- [x] Frontend: `FluxTableContext` extended with sort state
+- [x] Frontend: Active column: blue up/down arrow; inactive: double chevron on hover
+- [x] Frontend: Prerequisite sort uses `worstPrerequisiteStatus()`, ascending = green (best) first
+- [x] Frontend: `sortie` sorted by MMDD key (month-correct); `transporteur` null → always last
+- [x] Frontend: `.flux-scrollable` webkit scrollbar CSS (6px, dark gray thumb)
+- [x] Frontend: `FolderOpen` icon (corrected from `Folder` per mockup)
+- [x] Tests: `fluxSort.test.ts` (27 unit tests), `FluxTable.test.tsx` (8 new sort tests), `sort-headers.spec.ts` (E2E)
+
 ---
 
-### Phase 5F: Testing & Verification
+### Phase 5F: ST Column — Sous-traitance
 
-#### v0.5.21 - E2E Tests with Real Backend
+> **Goal:** Add the ST (Sous-traitance) column to the Flux dashboard with a 3-state checkbox system and a new "S-T à faire" filter tab.
+>
+> **Spec:** `docs/production-flow-dashboard-spec/upgrade-colonne-st-en.md`
+> **API contract:** `docs/production-flow-dashboard-spec/st-column-api-contract.md`
+> **Visual reference:** `docs/production-flow-dashboard-spec/mockup2.html`
+
+#### ✅ v0.5.22 - ST Column: Backend API
+
+> **Goal:** Expose outsourced task data in the Flux jobs response; add status update endpoint.
+
+**PHP API:**
+- [x] `FluxElementResponse.php`: add `outsourcing[]` array — include outsourced tasks (currently filtered out), resolve `providerName` via `OutsourcedProvider`, map `TaskStatus` → `FluxSTStatus` (`defined`/`ready` → `pending`, `assigned` → `progress`, `completed` → `done`; skip `cancelled`)
+- [x] New DTO `FluxTaskStatusRequest`: validates `status` ∈ {`pending`, `progress`, `done`}
+- [x] New action `FluxController::patchTaskStatus()`: `PATCH /api/v1/flux/tasks/{taskId}/status` — validates task is `Outsourced` type, maps dashboard status → `TaskStatus`, persists
+- [x] PHPStan level 8 clean
+- [x] PHPUnit unit tests for new endpoint (204, 400 wrong type, 404 not found, 422 invalid status)
+
+**Response shape added to each element:**
+```json
+"outsourcing": [
+  { "taskId": "uuid", "actionType": "Vernis UV sélectif", "providerName": "Faco 37", "status": "done" }
+]
+```
+
+#### v0.5.23 - ST Column: Frontend UI + Integration
+
+> **Goal:** ST column rendered in Flux table with interactive 3-state checkboxes, tooltip, "S-T à faire" tab.
+
+**Frontend:**
+- [ ] `fluxTypes.ts`: `FluxSTStatus` type, `FluxOutsourcingTask` interface, extend `FluxElement` with `outsourcing: FluxOutsourcingTask[]`
+- [ ] `fluxApi.ts`: extend `transformFluxJobsResponse` to map `outsourcing[]`; add `updateSTStatus` RTK mutation (`PATCH /flux/tasks/{taskId}/status`) with optimistic cache update
+- [ ] `fluxFilters.ts`: add `'soustraitance'` to `TAB_IDS`; filter: job visible if any element has any task with `status !== 'done'`; add `/flux/soustraitance` URL path
+- [ ] `fluxStaticData.ts`: add `outsourcing[]` data to fixture elements (ref data from spec §3.3)
+- [ ] New `STCell.tsx`: 3-state icon (pending=gray circle, progress=orange dot-circle, done=green checkmark); click cycles `pending→progress→done→pending`; label "ProviderName · ActionType" with `text-overflow: ellipsis`; custom fixed-position tooltip on hover
+- [ ] `FluxTable.tsx`: ST column header (`<th>` "ST", `title="Sous-traitance"`, not sortable); `<STCell>` in parent rows (collapsed multi: flattened tasks); `<STCell>` in sub-rows (per-element tasks)
+- [ ] `FluxPage.tsx`: `handleUpdateSTStatus` callback → `updateSTStatus` mutation
+- [ ] `index.css`: `.st-pending` (gray), `.st-progress` (orange `rgb(251 146 60)`), `.st-done` (green), `.st-tooltip` (fixed, dark bg, 120ms fade)
+- [ ] Unit tests: `fluxFilters.test.ts` — soustraitance tab filter (verification matrix: 3/5 jobs)
+- [ ] Unit tests: `STCell.test.tsx` — 3-state render, click cycle
+
+---
+
+### Phase 5G: Testing & Verification
+
+#### v0.5.24 - E2E Tests with Real Backend
 > **Goal:** E2E tests run against actual PHP API
 
-- [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
+- [ ] Docker Compose setup (PHP + MariaDB + Frontend)
 - [ ] Test database seeding
 - [ ] Playwright configuration for API mode
 - [ ] Key E2E tests with real backend
 - [ ] CI pipeline integration
 
-#### v0.5.22 - Performance Verification
+#### v0.5.25 - Performance Verification
 > **Goal:** Verify acceptable performance with real API
 
 - [ ] Snapshot load time < 2s
