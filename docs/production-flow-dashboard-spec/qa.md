@@ -114,7 +114,11 @@ Kérdések és válaszok a specifikáció értelmezéséhez, az implementáció 
 
 **K9.2** A station oszlopok (Off., Mass., stb.) is rendezhetők? Ha igen, mi alapján?
 
-> **V:** Halasztva — later discussion.
+> **V:** Igen, rendezhetők. A spec 3.6 általánosan kimondja: "Clicking a column header sorts the table by that column." Az algoritmus:
+> 1. Minden jobhoz az adott kategória state-jét összegyűjtjük az összes elemből.
+> 2. A legrosszabb (worst) state alapján rendezünk: `late(0) > in-progress(1) > planned(2) > done(3) > empty(4)`.
+> 3. Multi-element jobokra ugyanez a worst-aggregation, mint a prerequisite oszlopoknál.
+> - **Implementálva:** v0.5.24 (tervezett).
 
 ---
 
@@ -160,4 +164,4 @@ A következő kérdések válasza még nyitott, implementáció közben vagy el�
 | K3.1 | Station progress % forrása (API mező?) |
 | ~~K3.2~~ | ~~"Late" állapot definíciója~~ — **Lezárva**: backend kalkuláció (`scheduledEnd < now`), már implementálva |
 | K5.1 | Parti toggle interaktivitás + dátumkezelés |
-| K9.2 | Station oszlopok rendezhetősége |
+| ~~K9.2~~ | ~~Station oszlopok rendezhetősége~~ — **Lezárva**: worst-state severity ranking, implementálva v0.5.24-ben |
