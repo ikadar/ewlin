@@ -99,7 +99,7 @@ function FluxTableHeader() {
   const sortableHeader = `${headerCell} group cursor-pointer select-none`;
 
   return (
-    <thead>
+    <thead className="sticky top-0 z-30 bg-flux-hover">
       <tr className="bg-flux-hover border-b border-flux-border">
         {/* Expand — frozen left, no header */}
         <th className={`${stickyCell} left-0 w-6 py-3`} />
@@ -557,7 +557,7 @@ export const FluxTable = memo(function FluxTable({
   return (
     <FluxTableContext.Provider value={ctxValue}>
       <div
-        className="overflow-x-auto flux-scrollable"
+        className="h-full overflow-auto flux-scrollable"
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: 'rgb(80 80 80) transparent',
