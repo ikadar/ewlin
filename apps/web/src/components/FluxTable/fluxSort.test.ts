@@ -175,6 +175,89 @@ describe('sortFluxJobs — transporteur', () => {
   });
 });
 
+// ── Station column sort ───────────────────────────────────────────────────────
+
+describe('sortFluxJobs — station column', () => {
+  const cat = 'cat-offset';
+
+  const lateJob = makeJob({
+    id: '00001',
+    elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: { [cat]: { state: 'late', progress: 0 } } }],
+  });
+  const inProgressJob = makeJob({
+    id: '00002',
+    elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: { [cat]: { state: 'in-progress', progress: 50 } } }],
+  });
+  const plannedJob = makeJob({
+    id: '00003',
+    elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: { [cat]: { state: 'planned', progress: 0 } } }],
+  });
+  const doneJob = makeJob({
+    id: '00004',
+    elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: { [cat]: { state: 'done', progress: 100 } } }],
+  });
+  const emptyJob = makeJob({
+    id: '00005',
+    elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: {} }],
+  });
+
+  it('ascending: done before late', () => {
+    const result = sortFluxJobs([lateJob, doneJob], `station:${cat}`, 'asc');
+    expect(result[0]!.id).toBe('00004'); // done first
+    expect(result[1]!.id).toBe('00001'); // late last
+  });
+
+  it('descending: late before done', () => {
+    const result = sortFluxJobs([doneJob, lateJob], `station:${cat}`, 'desc');
+    expect(result[0]!.id).toBe('00001'); // late first
+    expect(result[1]!.id).toBe('00004'); // done last
+  });
+
+  it('in-progress sorts between late and planned', () => {
+    // ascending = best (highest severity) first: planned(2) > in-progress(1) > late(0)
+    const result = sortFluxJobs([plannedJob, lateJob, inProgressJob], `station:${cat}`, 'asc');
+    expect(result[0]!.id).toBe('00003'); // planned (severity=2) first in asc
+    expect(result[1]!.id).toBe('00002'); // in-progress (severity=1)
+    expect(result[2]!.id).toBe('00001'); // late (severity=0) last
+  });
+
+  it('empty (severity=4) sorts before done (severity=3) in ascending', () => {
+    // ascending = best (highest severity) first: empty(4) > done(3) > late(0)
+    const result = sortFluxJobs([emptyJob, doneJob, lateJob], `station:${cat}`, 'asc');
+    expect(result[0]!.id).toBe('00005'); // empty first (severity=4, no station data)
+    expect(result[1]!.id).toBe('00004'); // done second (severity=3)
+    expect(result[result.length - 1]!.id).toBe('00001'); // late last
+  });
+
+  it('multi-element: uses worst state across all elements', () => {
+    const multiJob = makeJob({
+      id: '00001',
+      elements: [
+        { id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: { [cat]: { state: 'done', progress: 100 } } },
+        { id: 'e2', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: { [cat]: { state: 'late', progress: 0 } } },
+      ],
+    });
+    const singleDoneJob = makeJob({
+      id: '00002',
+      elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: { [cat]: { state: 'done', progress: 100 } } }],
+    });
+    // multiJob worst = late → sorts last in asc
+    const result = sortFluxJobs([multiJob, singleDoneJob], `station:${cat}`, 'asc');
+    expect(result[0]!.id).toBe('00002'); // done-only job first
+    expect(result[1]!.id).toBe('00001'); // multi with late worst, last
+  });
+
+  it('both jobs empty at category: stable order preserved', () => {
+    const empty1 = makeJob({ id: '00001', elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: {} }] });
+    const empty2 = makeJob({ id: '00002', elements: [{ id: 'e1', label: '', bat: 'none', papier: 'none', formes: 'none', plaques: 'none', stations: {} }] });
+    const result = sortFluxJobs([empty1, empty2], `station:${cat}`, 'asc');
+    expect(result).toHaveLength(2);
+    // Both have severity 4 (empty), diff = 0, stable relative order
+    expect(result[0]!.id).toBe('00001');
+    expect(result[1]!.id).toBe('00002');
+  });
+});
+
 // ── Empty array ───────────────────────────────────────────────────────────────
 
 describe('sortFluxJobs — edge cases', () => {

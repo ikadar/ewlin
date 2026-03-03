@@ -90,7 +90,7 @@ function SortChevron({ col, active, dir }: { col: SortColumn; active: SortColumn
 /**
  * Header row for the Flux table.
  * Sortable columns show a chevron indicator; clicking triggers onSortChange.
- * Station columns, Parti, and Actions are not sortable (spec 3.6).
+ * Parti and Actions are not sortable (spec 3.6).
  */
 function FluxTableHeader() {
   const ctx = useFluxTableContext();
@@ -165,15 +165,23 @@ function FluxTableHeader() {
         >
           Plaques <SortChevron col="plaques" active={sortColumn} dir={sortDirection} />
         </th>
-        {/* Station columns — dynamic from API, not sortable */}
+        {/* Station columns — dynamic from API, sortable (v0.5.24) */}
         {ctx.categories.map(cat => (
           <th
             key={cat.id}
-            className="px-0 py-3 text-center font-medium whitespace-nowrap text-flux-text-secondary border-l border-flux-border"
+            className="px-0 py-3 text-center font-medium whitespace-nowrap text-flux-text-secondary border-l border-flux-border group cursor-pointer select-none"
             style={{ fontSize: '11px' }}
             title={cat.name}
+            onClick={() => onSortChange(`station:${cat.id}`)}
           >
-            {cat.abbreviation || cat.name.substring(0, 5)}
+            <span className="flex items-center justify-center gap-0.5">
+              {cat.abbreviation || cat.name.substring(0, 5)}
+              <SortChevron
+                col={`station:${cat.id}`}
+                active={sortColumn}
+                dir={sortDirection}
+              />
+            </span>
           </th>
         ))}
         {/* ST (Sous-traitance) — not sortable, between last station col and Transporteur */}

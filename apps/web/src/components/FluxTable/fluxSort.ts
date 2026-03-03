@@ -1,13 +1,14 @@
 /**
- * Sort logic for the Flux Dashboard table (v0.5.21).
+ * Sort logic for the Flux Dashboard table (v0.5.21, v0.5.24).
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, section 3.6
  */
 
 import type { FluxJob } from './fluxTypes';
 import { PREREQUISITE_STATUS_COLOR } from './fluxTypes';
-import { worstPrerequisiteStatus, PREREQUISITE_COLOR_SEVERITY } from './fluxAggregation';
+import type { StationState } from './fluxTypes';
+import { worstPrerequisiteStatus, PREREQUISITE_COLOR_SEVERITY, STATION_STATE_SEVERITY } from './fluxAggregation';
 
-/** Columns that support sorting (spec 3.6). Station columns, Parti, and Actions are not sortable. */
+/** Columns that support sorting (spec 3.6). Parti and Actions are not sortable. */
 export type SortColumn =
   | 'id'
   | 'client'
@@ -17,7 +18,8 @@ export type SortColumn =
   | 'papier'
   | 'formes'
   | 'plaques'
-  | 'transporteur';
+  | 'transporteur'
+  | `station:${string}`;
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -39,6 +41,19 @@ function prereqSeverity(job: FluxJob, col: 'bat' | 'papier' | 'formes' | 'plaque
   const statuses = job.elements.map(e => e[col]);
   const worst = worstPrerequisiteStatus(statuses);
   return PREREQUISITE_COLOR_SEVERITY[PREREQUISITE_STATUS_COLOR[worst]];
+}
+
+/**
+ * Returns the worst (lowest) severity number for a job at a given station category.
+ * Multi-element jobs: uses the worst state across all elements.
+ * late=0 > in-progress=1 > planned=2 > done=3 > empty=4 (lower = worse)
+ */
+function worstStationSeverity(job: FluxJob, categoryId: string): number {
+  const states = job.elements
+    .map(e => e.stations[categoryId]?.state)
+    .filter((s): s is StationState => s !== undefined);
+  if (states.length === 0) return STATION_STATE_SEVERITY.empty; // 4
+  return Math.min(...states.map(s => STATION_STATE_SEVERITY[s]));
 }
 
 /**
@@ -71,6 +86,14 @@ export function sortFluxJobs(
       const sa = prereqSeverity(a, column);
       const sb = prereqSeverity(b, column);
       return (sb - sa) * mul; // sb-sa: higher severity (green=3) first for asc
+    }
+
+    // Station columns: ascending = best (done/empty) first → sort by severity DESC (same pattern as prereqs)
+    if (column.startsWith('station:')) {
+      const categoryId = column.slice('station:'.length);
+      const sa = worstStationSeverity(a, categoryId);
+      const sb = worstStationSeverity(b, categoryId);
+      return (sb - sa) * mul; // sb-sa: higher severity (done=3, empty=4) first for asc
     }
 
     // String / date columns
