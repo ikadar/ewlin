@@ -247,25 +247,27 @@ export function FluxPage() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-flux-base" data-testid="flux-page">
-      {/* Toolbar: title + search bar */}
-      <FluxToolbar
-        searchValue={search}
-        onSearchChange={handleSearchChange}
-        onNewJob={handleNewJob}
-        searchInputRef={searchInputRef}
-      />
-
-      {/* Tab bar */}
-      <FluxTabBar
-        activeTab={activeTab}
-        counts={tabCounts}
-        onTabChange={handleTabChange}
-      />
-
-      {/* Table area */}
+      {/* Table area — toolbar + tabs + table inside the card */}
       <div className="flex-1 overflow-hidden">
         <div className="p-4 h-full">
-          <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden">
+          <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden flex flex-col">
+            {/* Toolbar: title + search bar */}
+            <FluxToolbar
+              searchValue={search}
+              onSearchChange={handleSearchChange}
+              onNewJob={handleNewJob}
+              searchInputRef={searchInputRef}
+            />
+
+            {/* Tab bar */}
+            <FluxTabBar
+              activeTab={activeTab}
+              counts={tabCounts}
+              onTabChange={handleTabChange}
+            />
+
+            {/* Table — fills remaining height */}
+            <div className="flex-1 overflow-hidden">
             <FluxTable
               jobs={filteredJobs}
               categories={sortedCategories}
@@ -280,6 +282,7 @@ export function FluxPage() {
               onDeleteJob={handleDeleteJob}
               onEditJob={handleEditJob}
             />
+            </div>
           </div>
         </div>
       </div>

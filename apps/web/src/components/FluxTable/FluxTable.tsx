@@ -54,6 +54,10 @@ const RIGHT_SHADOW = { boxShadow: '-4px 0 8px -2px rgba(0,0,0,0.3)' } as const;
 
 // Shared sticky cell classes for left-frozen columns
 const stickyCell = 'sticky z-20 bg-flux-elevated';
+// Sub-row sticky cells use a slightly lighter background (spec: dark-surface)
+const subRowStickyCell = 'sticky z-20 bg-flux-surface';
+// Header sticky cells match the header background (bg-flux-hover)
+const stickyHeaderCell = 'sticky z-30 bg-flux-hover';
 
 /**
  * Sort indicator chevron for a column header (v0.5.21).
@@ -95,17 +99,17 @@ function SortChevron({ col, active, dir }: { col: SortColumn; active: SortColumn
 function FluxTableHeader() {
   const ctx = useFluxTableContext();
   const { sortColumn, sortDirection, onSortChange } = ctx;
-  const headerCell = 'px-2 py-3 text-left font-medium whitespace-nowrap text-flux-text-secondary';
+  const headerCell = 'px-2 py-3 text-left text-sm font-medium whitespace-nowrap text-flux-text-secondary';
   const sortableHeader = `${headerCell} group cursor-pointer select-none`;
 
   return (
     <thead className="sticky top-0 z-30 bg-flux-hover">
       <tr className="bg-flux-hover border-b border-flux-border">
         {/* Expand — frozen left, no header */}
-        <th className={`${stickyCell} left-0 w-6 py-3`} />
+        <th className={`${stickyHeaderCell} left-0 w-6 py-3`} />
         {/* ID — frozen left */}
         <th
-          className={`${stickyCell} left-6 ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-6 ${sortableHeader}`}
           title="Identifiant"
           onClick={() => onSortChange('id')}
         >
@@ -113,7 +117,7 @@ function FluxTableHeader() {
         </th>
         {/* Client — frozen left */}
         <th
-          className={`${stickyCell} left-[5.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[6.5rem] ${sortableHeader}`}
           title="Client"
           onClick={() => onSortChange('client')}
         >
@@ -121,7 +125,7 @@ function FluxTableHeader() {
         </th>
         {/* Designation — frozen left + right shadow */}
         <th
-          className={`${stickyCell} left-[14.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[15.5rem] ${sortableHeader}`}
           style={LEFT_SHADOW}
           title="Désignation"
           onClick={() => onSortChange('designation')}
@@ -205,7 +209,7 @@ function FluxTableHeader() {
         </th>
         {/* Actions — frozen right + left shadow */}
         <th
-          className={`${stickyCell} right-0 px-4 py-3 font-medium text-flux-text-secondary`}
+          className={`${stickyHeaderCell} right-0 px-4 py-3 text-left text-sm font-medium text-flux-text-secondary`}
           style={RIGHT_SHADOW}
         >
           Actions
@@ -252,7 +256,7 @@ const FluxTableRow = memo(function FluxTableRow({
     <tr
       className={`border-b border-flux-border ${isMulti ? 'row-multi' : ''} ${isFocused ? 'ring-1 ring-inset ring-indigo-500/40' : ''}`}
       style={{
-        height: '36px',
+        height: '2.25rem',
         backgroundColor: isFocused ? 'rgba(99,102,241,0.08)' : undefined,
       }}
       data-testid="flux-table-row"
@@ -266,7 +270,7 @@ const FluxTableRow = memo(function FluxTableRow({
       >
         {isMulti && (
           <button
-            className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm border font-mono font-semibold leading-none transition-colors ${
+            className={`inline-flex items-center justify-center w-[14px] h-[14px] rounded-[3px] border font-mono font-semibold leading-none transition-colors ${
               isExpanded
                 ? 'border-indigo-500/60 bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50'
                 : 'border-flux-border-light bg-transparent text-flux-text-muted hover:border-flux-text-muted hover:text-flux-text-secondary'
@@ -288,13 +292,13 @@ const FluxTableRow = memo(function FluxTableRow({
       </td>
 
       {/* Client — frozen left */}
-      <td className={`${cellBase} left-[5.5rem] whitespace-nowrap`}>
+      <td className={`${cellBase} left-[6.5rem] whitespace-nowrap`}>
         {job.client}
       </td>
 
       {/* Designation — frozen left + right shadow */}
       <td
-        className={`${cellBase} left-[14.5rem]`}
+        className={`${cellBase} left-[15.5rem]`}
         style={LEFT_SHADOW}
         data-testid="flux-designation"
       >
@@ -314,6 +318,9 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Prerequisite badge/listbox cells */}
       {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map((col, i) => {
         const status = [bat, papier, formes, plaques][i]!;
+        if (isMulti && isExpanded) {
+          return <td key={col} className="px-1 py-0" />;
+        }
         return isMulti ? (
           <td key={col} className="px-1 py-0">
             <FluxPrerequisiteBadge status={status} plusCount={plusCount} />
@@ -335,33 +342,35 @@ const FluxTableRow = memo(function FluxTableRow({
         <td
           key={cat.id}
           className="p-0 text-center border-l border-flux-border"
-          style={{ lineHeight: 0 }}
+          style={{ lineHeight: 0, verticalAlign: 'middle' }}
           data-testid={`flux-station-${cat.id}`}
         >
-          {isMulti ? (
+          {isMulti && !isExpanded ? (
             <FluxStackedDots
               data={sortStationDataBySeverity(
                 getMultiElementStationData(job.elements, cat.id)
               )}
               stationName={cat.name}
             />
-          ) : (
+          ) : !isMulti ? (
             <FluxStationIndicator
               data={el0.stations[cat.id]}
               stationName={cat.name}
             />
-          )}
+          ) : null}
         </td>
       ))}
 
-      {/* ST (Sous-traitance) — flattened tasks for collapsed multi, single element tasks otherwise */}
-      <td className="px-1 py-1" style={{ maxWidth: '160px', verticalAlign: 'middle' }} data-testid="flux-st-cell">
-        <STCell
-          tasks={isMulti && !isExpanded
-            ? job.elements.flatMap(e => e.outsourcing)
-            : el0.outsourcing}
-          onUpdateSTStatus={ctx.onUpdateSTStatus}
-        />
+      {/* ST (Sous-traitance) — empty when expanded, flattened for collapsed multi, single element otherwise */}
+      <td className="px-1 py-0" style={{ maxWidth: '14rem', verticalAlign: 'middle' }} data-testid="flux-st-cell">
+        {!isExpanded && (
+          <STCell
+            tasks={isMulti
+              ? job.elements.flatMap(e => e.outsourcing)
+              : el0.outsourcing}
+            onUpdateSTStatus={ctx.onUpdateSTStatus}
+          />
+        )}
       </td>
 
       {/* Transporteur */}
@@ -433,7 +442,7 @@ function FluxSubRow({
     <tr
       className="border-b border-flux-border"
       style={{
-        height: '32px',
+        height: '2rem',
         animation: `flux-subrow-in 400ms cubic-bezier(0.25, 1, 0.5, 1) both`,
         animationDelay: `${index * 30}ms`,
       }}
@@ -443,24 +452,23 @@ function FluxSubRow({
     >
       {/* Expand — indigo border (visual continuation) */}
       <td
-        className={`${stickyCell} left-0`}
+        className={`${subRowStickyCell} left-0`}
         style={{ borderLeft: '3px solid rgb(99,102,241)' }}
       />
 
       {/* ID — empty */}
-      <td className={`${stickyCell} left-6`} />
+      <td className={`${subRowStickyCell} left-6`} />
 
       {/* Client — empty */}
-      <td className={`${stickyCell} left-[5.5rem]`} />
+      <td className={`${subRowStickyCell} left-[6.5rem]`} />
 
       {/* Designation — label with arrow prefix */}
       <td
-        className={`${stickyCell} left-[14.5rem] px-4 py-0 text-sm text-flux-text-tertiary`}
+        className={`${subRowStickyCell} left-[15.5rem] px-4 py-0 text-flux-text-tertiary`}
         style={LEFT_SHADOW}
         data-testid="flux-sub-designation"
       >
-        <span className="text-flux-text-muted mr-1" aria-hidden="true">↳</span>
-        {element.label}
+        <span className="text-xs pl-4 text-flux-text-muted">↳ {element.label}</span>
       </td>
 
       {/* Sortie — empty */}
@@ -474,6 +482,7 @@ function FluxSubRow({
             elementId={element.id}
             column={col}
             status={element[col]}
+            compact
           />
         </td>
       ))}
@@ -483,7 +492,7 @@ function FluxSubRow({
         <td
           key={cat.id}
           className="p-0 text-center border-l border-flux-border"
-          style={{ lineHeight: 0 }}
+          style={{ lineHeight: 0, verticalAlign: 'middle' }}
         >
           <FluxStationIndicator
             data={element.stations[cat.id]}
@@ -493,7 +502,7 @@ function FluxSubRow({
       ))}
 
       {/* ST — per-element tasks */}
-      <td className="px-1 py-1" style={{ maxWidth: '160px', verticalAlign: 'middle' }}>
+      <td className="px-1 py-0" style={{ maxWidth: '14rem', verticalAlign: 'middle' }}>
         <STCell
           tasks={element.outsourcing}
           onUpdateSTStatus={ctx.onUpdateSTStatus}
@@ -508,7 +517,7 @@ function FluxSubRow({
 
       {/* Actions — empty (frozen right placeholder) */}
       <td
-        className={`${stickyCell} right-0`}
+        className={`${subRowStickyCell} right-0`}
         style={RIGHT_SHADOW}
       />
     </tr>
@@ -570,9 +579,9 @@ export const FluxTable = memo(function FluxTable({
         >
           <colgroup>
             <col style={{ width: '1.5rem' }} />
-            <col style={{ width: '4rem' }} />
+            <col style={{ width: '5rem' }} />
             <col style={{ width: '9rem' }} />
-            <col style={{ width: '20%' }} />
+            <col style={{ width: '16rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '6rem' }} />
@@ -581,7 +590,7 @@ export const FluxTable = memo(function FluxTable({
             {categories.map(cat => (
               <col key={cat.id} style={{ width: '3.5rem' }} />
             ))}
-            <col style={{ width: '10rem' }} />
+            <col style={{ width: '14rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '7rem' }} />
             <col style={{ width: '4rem' }} />

@@ -14,6 +14,8 @@ interface FluxPrerequisiteListboxProps {
   elementId: string;
   column: PrerequisiteColumn;
   status: PrerequisiteStatus;
+  /** Sub-row variant: smaller min-height (2rem vs 2.25rem). */
+  compact?: boolean;
 }
 
 /** Color bar inline style per prerequisite color (spec 3.9). */
@@ -33,6 +35,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
   elementId,
   column,
   status,
+  compact = false,
 }: FluxPrerequisiteListboxProps) {
   const ctx = useFluxTableContext();
   const myId = `${jobId}-${elementId}-${column}`;
@@ -139,7 +142,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: 'inline-block', width: '100%' }}>
+    <div style={{ display: 'block', width: '100%' }}>
       <button
         ref={triggerRef}
         style={{
@@ -150,7 +153,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
           width: '100%',
           height: '100%',
           padding: '0 5px',
-          minHeight: '2.25rem',
+          minHeight: compact ? '2rem' : '2.25rem',
           background: isHovered ? 'rgba(255,255,255,0.04)' : 'transparent',
           border: 'none',
           cursor: 'pointer',

@@ -20,11 +20,11 @@ export const FluxTabBar = memo(function FluxTabBar({
 }: FluxTabBarProps) {
   return (
     <div
-      className="flex items-end justify-between border-b border-flux-border bg-flux-elevated px-4"
+      className="flex items-end justify-between border-b border-flux-border bg-flux-surface px-4"
       data-testid="flux-tab-bar"
     >
       {/* Tabs */}
-      <div className="flex items-end gap-0" role="tablist" aria-label="Filtres du tableau de flux">
+      <div className="flex items-end gap-0 overflow-x-auto" role="tablist" aria-label="Filtres du tableau de flux">
         {TAB_IDS.map(tab => {
           const isActive = tab === activeTab;
           return (
@@ -35,9 +35,9 @@ export const FluxTabBar = memo(function FluxTabBar({
               onClick={() => onTabChange(tab)}
               data-testid={`flux-tab-${tab}`}
               className={[
-                'px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px',
+                'px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px',
                 isActive
-                  ? 'border-blue-500 text-white bg-flux-hover'
+                  ? 'border-blue-500 text-white bg-flux-elevated'
                   : 'border-transparent text-flux-text-secondary hover:text-white hover:bg-flux-hover/50',
               ].join(' ')}
             >
@@ -60,42 +60,25 @@ export const FluxTabBar = memo(function FluxTabBar({
 
       {/* Keyboard hint bar */}
       <div
-        className="flex items-center gap-2 pb-2 shrink-0"
-        style={{ fontSize: '10px', fontFamily: 'JetBrains Mono, monospace' }}
+        className="flex items-center gap-1 text-sm text-gray-500 shrink-0 pb-2"
         aria-hidden="true"
         data-testid="flux-keyboard-hints"
       >
-        <ShortcutHint keys={['Alt+←', 'Alt+→']} label="Tab" />
-        <Divider />
-        <ShortcutHint keys={['Alt+↑', 'Alt+↓']} label="Ligne" />
-        <Divider />
-        <ShortcutHint keys={['Alt+F']} label="Rech." />
-        <Divider />
-        <ShortcutHint keys={['Alt+N']} label="Nouveau" />
+        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">Alt</kbd>
+        <span>+</span>
+        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">↕</kbd>
+        <span>naviguer</span>
+        <span className="mx-1 text-gray-600">|</span>
+        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">Alt</kbd>
+        <span>+</span>
+        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">↔</kbd>
+        <span>onglets</span>
+        <span className="mx-1 text-gray-600">|</span>
+        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">Alt</kbd>
+        <span>+</span>
+        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">F</kbd>
+        <span>rechercher</span>
       </div>
     </div>
   );
 });
-
-function ShortcutHint({ keys, label }: { keys: string[]; label: string }) {
-  return (
-    <div className="flex items-center gap-1 text-flux-text-muted">
-      {keys.map((k, i) => (
-        <span key={k}>
-          {i > 0 && <span className="mr-1">/</span>}
-          <kbd
-            className="px-1 py-0.5 rounded border border-flux-border-light bg-flux-surface text-flux-text-tertiary"
-            style={{ fontSize: '10px', fontFamily: 'inherit' }}
-          >
-            {k}
-          </kbd>
-        </span>
-      ))}
-      <span className="ml-1 text-flux-text-muted">{label}</span>
-    </div>
-  );
-}
-
-function Divider() {
-  return <span className="text-flux-border-light">|</span>;
-}

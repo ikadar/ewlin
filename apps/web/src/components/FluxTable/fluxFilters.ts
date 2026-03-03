@@ -19,10 +19,10 @@ export const TAB_IDS: TabId[] = ['all', 'prepresse', 'papier', 'formes', 'plaque
 /** Maps tab ID to its display label. */
 export const TAB_LABELS: Record<TabId, string> = {
   all:            'Tous',
-  prepresse:      'A faire prepresse',
+  prepresse:      'À faire prépresse',
   papier:         'Cdes papier',
   formes:         'Cdes formes',
-  plaques:        'Plaques a produire',
+  plaques:        'Plaques à produire',
   soustraitance:  'S-T à faire',
 };
 
