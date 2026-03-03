@@ -50,7 +50,11 @@ Kérdések és válaszok a specifikáció értelmezéséhez, az implementáció 
 
 **K3.2** Mikor "late" egy station? A spec felsorolja mint állapotot, de nem definiálja a feltételt.
 
-> **V:** Halasztva — later discussion.
+> **V:** A `late` állapot nem station-szintű, hanem **task-assignment szintű kalkuláció** a backend oldalon (`FluxElementResponse::computeTaskState()`):
+> - `TaskAssignment.scheduledEnd < now` ÉS `isCompleted = false` → `'late'`
+> - A backend kiszámolja és `state: 'late'`-ként küldi a `/flux/jobs` válaszban.
+> - A frontend (`FluxStationIndicator`) már kezeli: piros ring+dot indikátor.
+> - **Implementálva:** v0.5.20 (backend), v0.5.18 (frontend indicator).
 
 ---
 
@@ -154,6 +158,6 @@ A következő kérdések válasza még nyitott, implementáció közben vagy el�
 | Kérdés | Téma |
 |--------|------|
 | K3.1 | Station progress % forrása (API mező?) |
-| K3.2 | "Late" állapot definíciója |
+| ~~K3.2~~ | ~~"Late" állapot definíciója~~ — **Lezárva**: backend kalkuláció (`scheduledEnd < now`), már implementálva |
 | K5.1 | Parti toggle interaktivitás + dátumkezelés |
 | K9.2 | Station oszlopok rendezhetősége |
