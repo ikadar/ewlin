@@ -17,6 +17,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
 import { scheduleApi } from './scheduleApi';
+import { shipperApi } from './shipperApi';
 import type { FluxJob, FluxSTStatus, FluxOutsourcingTask, FluxStationData, PrerequisiteColumn, PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
 
 // ============================================================================
@@ -123,6 +124,13 @@ export interface UpdateSTStatusArg {
   status: FluxSTStatus;
 }
 
+export interface UpdateJobShipperArg {
+  /** Job GUID (used in the PUT URL) */
+  jobInternalId: string;
+  /** Shipper UUID or null to clear */
+  shipperId: string | null;
+}
+
 export interface UpdatePrerequisiteArg {
   /** Element GUID (used in the PATCH URL) */
   elementId: string;
@@ -198,7 +206,48 @@ export const fluxApi = createApi({
         }
       },
     }),
+
+    /**
+     * Update a job's shipper (transporteur) via PUT /api/v1/jobs/{id}.
+     *
+     * Uses optimistic update: the cache is updated immediately with the new
+     * shipper name, and reverted automatically if the API call fails.
+     */
+    updateJobShipper: builder.mutation<void, UpdateJobShipperArg>({
+      query: ({ jobInternalId, shipperId }) => ({
+        url: `/jobs/${jobInternalId}`,
+        method: 'PUT',
+        body: { shipperId },
+      }),
+      async onQueryStarted({ jobInternalId, shipperId }, { dispatch, queryFulfilled, getState }) {
+        // Look up shipper name from the shipperApi cache for optimistic display
+        let shipperName: string | null = null;
+        if (shipperId) {
+          const state = getState() as Record<string, unknown>;
+          const shippersResult = shipperApi.endpoints.getShippers.select()(state as never);
+          const shippers = shippersResult?.data;
+          if (shippers) {
+            const shipper = shippers.find((s) => s.id === shipperId);
+            if (shipper) shipperName = shipper.name;
+          }
+        }
+
+        const patchResult = dispatch(
+          fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
+            const job = draft.find((j) => j.internalId === jobInternalId);
+            if (job) job.transporteur = shipperName;
+          }),
+        );
+        try {
+          await queryFulfilled;
+          // Invalidate scheduler snapshot so JCF edit mode sees updated shipperId
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
   }),
 });
 
-export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation } = fluxApi;
+export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation } = fluxApi;

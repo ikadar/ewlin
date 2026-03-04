@@ -4,7 +4,7 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
-import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useAppDispatch, fluxApi } from '@/store';
+import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useGetShippersQuery, useAppDispatch, fluxApi } from '@/store';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
@@ -47,6 +47,8 @@ export function FluxPage() {
   );
   const [updateSTStatus] = useUpdateSTStatusMutation();
   const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
+  const [updateJobShipper] = useUpdateJobShipperMutation();
+  const { data: shippers = [] } = useGetShippersQuery();
 
   // ── Local UI state (not tied to server data) ──────────────────────────────
   const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
@@ -130,6 +132,14 @@ export function FluxPage() {
   ) => {
     void updateElementPrerequisite({ jobId, elementId, column, value: status });
   }, [updateElementPrerequisite]);
+
+  /**
+   * Update a job's shipper (transporteur) and persist to the backend.
+   * Uses RTK Query mutation with optimistic update.
+   */
+  const handleUpdateShipper = useCallback((jobInternalId: string, shipperId: string | null) => {
+    void updateJobShipper({ jobInternalId, shipperId });
+  }, [updateJobShipper]);
 
   /** Toggle expanded state for a multi-element job. */
   const handleToggleExpand = useCallback((jobId: string) => {
@@ -277,6 +287,8 @@ export function FluxPage() {
               onToggleExpand={handleToggleExpand}
               onDeleteJob={handleDeleteJob}
               onEditJob={handleEditJob}
+              onUpdateShipper={handleUpdateShipper}
+              shippers={shippers}
               onStationClick={handleStationClick}
             />
             </div>

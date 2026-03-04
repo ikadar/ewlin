@@ -19,6 +19,7 @@ import { surfacagePresetApi } from './api/surfacagePresetApi';
 import { feuilleFormatApi } from './api/feuilleFormatApi';
 import { stationApi } from './api/stationApi';
 import { providerApi } from './api/providerApi';
+import { shipperApi } from './api/shipperApi';
 import { fluxApi } from './api/fluxApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
@@ -40,6 +41,7 @@ export const store = configureStore({
     [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
     [stationApi.reducerPath]: stationApi.reducer,
     [providerApi.reducerPath]: providerApi.reducer,
+    [shipperApi.reducerPath]: shipperApi.reducer,
     [fluxApi.reducerPath]: fluxApi.reducer,
     // UI state slice
     ui: uiReducer,
@@ -60,6 +62,7 @@ export const store = configureStore({
       .concat(feuilleFormatApi.middleware)
       .concat(stationApi.middleware)
       .concat(providerApi.middleware)
+      .concat(shipperApi.middleware)
       .concat(fluxApi.middleware),
   devTools: import.meta.env.DEV,
 });
@@ -186,7 +189,16 @@ export {
 } from './api/providerApi';
 export type { ProviderResponse, ProviderInput } from './api/providerApi';
 
-export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, fluxApi } from './api/fluxApi';
+export {
+  useGetShippersQuery,
+  useCreateShipperMutation,
+  useUpdateShipperMutation,
+  useDeleteShipperMutation,
+  shipperApi,
+} from './api/shipperApi';
+export type { ShipperResponse, ShipperInput } from './api/shipperApi';
+
+export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, fluxApi } from './api/fluxApi';
 
 // Re-export slice actions
 export {
@@ -214,6 +226,7 @@ export {
   setJcfIntitule,
   setJcfQuantity,
   setJcfDeadline,
+  setJcfShipperId,
   setJcfElements,
   setSequenceWorkflow,
   setIsTemplateEditorOpen,

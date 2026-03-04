@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { PrerequisiteColumn, PrerequisiteStatus, FluxSTStatus } from './fluxTypes';
 import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
+import type { ShipperResponse } from '@/store/api/shipperApi';
 import type { SortColumn, SortDirection } from './fluxSort';
 
 export interface FluxTableContextValue {
@@ -28,6 +29,10 @@ export interface FluxTableContextValue {
   sortDirection: SortDirection;
   /** Callback to change the sort column (v0.5.21). */
   onSortChange: (column: SortColumn) => void;
+  /** Update a job's shipper (transporteur). */
+  onUpdateShipper?: (jobInternalId: string, shipperId: string | null) => void;
+  /** Available shippers for the inline dropdown. */
+  shippers?: ShipperResponse[];
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
 }

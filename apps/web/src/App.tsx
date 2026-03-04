@@ -424,6 +424,7 @@ function AppContent() {
   const [jcfJobId, setJcfJobId] = useState('');
   const [jcfIntitule, setJcfIntitule] = useState('');
   const [jcfQuantity, setJcfQuantity] = useState('');
+  const [jcfShipperId, setJcfShipperId] = useState('');
   const [jcfDeadline, setJcfDeadline] = useState('');
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
@@ -473,6 +474,7 @@ function AppContent() {
             workshopExitDate: jcfDeadline,
             elements: jcfElements.map(transformJcfElementToRequest),
             ...(jcfQuantity ? { quantity: parseInt(jcfQuantity, 10) } : {}),
+            shipperId: jcfShipperId || null,
           },
         }).unwrap();
       } else {
@@ -483,7 +485,8 @@ function AppContent() {
           jcfIntitule,
           jcfDeadline,
           jcfElements,
-          jcfQuantity
+          jcfQuantity,
+          jcfShipperId || undefined,
         );
         await createJob(request).unwrap();
       }
@@ -499,6 +502,7 @@ function AppContent() {
       setJcfTemplate('');
       setJcfIntitule('');
       setJcfQuantity('');
+      setJcfShipperId('');
       setJcfDeadline('');
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
       setSequenceWorkflows([]); // v0.4.31: Reset workflow on save
@@ -511,7 +515,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, jcfShipperId, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -699,6 +703,7 @@ function AppContent() {
     setJcfIntitule(job.description);
     setJcfDeadline(job.workshopExitDate);
     setJcfQuantity(job.quantity?.toString() ?? '');
+    setJcfShipperId(job.shipperId ?? '');
     setJcfTemplate('');
 
     // Build stationId → station name lookup for sequence DSL reconstruction
@@ -2204,6 +2209,8 @@ function AppContent() {
           onIntituleChange={setJcfIntitule}
           quantity={jcfQuantity}
           onQuantityChange={setJcfQuantity}
+          shipperId={jcfShipperId}
+          onShipperIdChange={setJcfShipperId}
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
         />

@@ -18,8 +18,10 @@ import { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
 import { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
 import { FluxStationIndicator } from './FluxStationIndicator';
 import { FluxStackedDots } from './FluxStackedDots';
+import { TransporteurCell } from './TransporteurCell';
 import { FluxTableContext, useFluxTableContext } from './FluxTableContext';
 import { type SortColumn, type SortDirection } from './fluxSort';
+import type { ShipperResponse } from '@/store/api/shipperApi';
 
 interface FluxTableProps {
   jobs: FluxJob[];
@@ -46,6 +48,10 @@ interface FluxTableProps {
   onToggleExpand?: (jobId: string) => void;
   onDeleteJob?: (jobId: string) => void;
   onEditJob?: (jobId: string) => void;
+  /** Update a job's shipper (transporteur). */
+  onUpdateShipper?: (jobInternalId: string, shipperId: string | null) => void;
+  /** Available shippers for the inline dropdown. */
+  shippers?: ShipperResponse[];
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
 }
@@ -392,7 +398,17 @@ const FluxTableRow = memo(function FluxTableRow({
 
       {/* Transporteur */}
       <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
-        {job.transporteur ?? '—'}
+        {ctx.onUpdateShipper && ctx.shippers ? (
+          <TransporteurCell
+            jobInternalId={job.internalId}
+            jobId={job.id}
+            currentValue={job.transporteur}
+            shippers={ctx.shippers}
+            onUpdateShipper={ctx.onUpdateShipper}
+          />
+        ) : (
+          job.transporteur ?? '—'
+        )}
       </td>
 
       {/* Parti */}
@@ -566,6 +582,8 @@ export const FluxTable = memo(function FluxTable({
   onToggleExpand = () => {},
   onDeleteJob = () => {},
   onEditJob = () => {},
+  onUpdateShipper,
+  shippers = [],
   onStationClick,
 }: FluxTableProps) {
   // openListboxId is managed here to coordinate "only one listbox open at a time"
@@ -580,6 +598,8 @@ export const FluxTable = memo(function FluxTable({
     onToggleExpand,
     onDeleteJob,
     onEditJob,
+    onUpdateShipper,
+    shippers,
     expandedJobIds,
     sortColumn,
     sortDirection,

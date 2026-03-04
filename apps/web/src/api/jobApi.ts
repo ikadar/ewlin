@@ -39,6 +39,7 @@ export interface CreateJobRequest {
   description: string;
   workshopExitDate: string;
   quantity?: number;
+  shipperId?: string;
   status: 'draft' | 'planned' | 'in_progress' | 'delayed' | 'completed' | 'cancelled';
   elements: CreateJobElementRequest[];
 }
@@ -151,6 +152,7 @@ export function transformJcfToRequest(
   deadline: string,
   elements: JcfElement[],
   quantity?: string,
+  shipperId?: string,
 ): CreateJobRequest {
   return {
     reference: jobId,
@@ -160,6 +162,7 @@ export function transformJcfToRequest(
     status: 'planned',
     elements: elements.map(transformJcfElementToRequest),
     ...(quantity ? { quantity: parseInt(quantity, 10) } : {}),
+    ...(shipperId ? { shipperId } : {}),
   };
 }
 

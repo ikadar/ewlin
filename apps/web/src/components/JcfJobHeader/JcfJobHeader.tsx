@@ -4,7 +4,7 @@ import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
 import type { JcfTemplate } from '@flux/types';
-import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery } from '../../store';
+import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery, useGetShippersQuery } from '../../store';
 import { useCreateClientMutation } from '../../store';
 import { useDebouncedValue } from '../../hooks';
 
@@ -22,6 +22,8 @@ export interface JcfJobHeaderProps {
   onIntituleChange: (value: string) => void;
   quantity: string;
   onQuantityChange: (value: string) => void;
+  shipperId?: string;
+  onShipperIdChange?: (value: string) => void;
   deadline: string;
   onDeadlineChange: (value: string) => void;
 }
@@ -47,6 +49,8 @@ export function JcfJobHeader({
   onIntituleChange,
   quantity,
   onQuantityChange,
+  shipperId,
+  onShipperIdChange,
   deadline,
   onDeadlineChange,
 }: JcfJobHeaderProps) {
@@ -59,6 +63,9 @@ export function JcfJobHeader({
 
   // Auto-persist new client names to the clients table
   const [createClient] = useCreateClientMutation();
+
+  // Load shippers for transporteur dropdown
+  const { data: shippers = [] } = useGetShippersQuery();
 
   // Load templates from real API via RTK Query (same source as /templates page)
   const { data: templateData } = useGetTemplatesQuery();
@@ -287,6 +294,29 @@ export function JcfJobHeader({
             data-testid="jcf-field-quantite"
           />
         </div>
+
+        {/* Transporteur */}
+        {onShipperIdChange && (
+          <div className="w-[156px]">
+            <label htmlFor="jcf-transporteur" className={labelClass}>
+              Transporteur
+            </label>
+            <select
+              id="jcf-transporteur"
+              value={shipperId ?? ''}
+              onChange={(e) => onShipperIdChange(e.target.value)}
+              className={inputBaseClass}
+              data-testid="jcf-field-transporteur"
+            >
+              <option value="">Aucun</option>
+              {shippers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Deadline */}
         <div className="w-[156px]">
