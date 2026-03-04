@@ -21,6 +21,7 @@
  * /settings/surfacage-presets  → Surfacage preset config
  * /settings/feuille-formats    → Feuille format (imposition) config
  * /settings/templates          → Template config
+ * /settings/providers           → Outsourced provider config
  */
 
 import { Routes, Route, Navigate } from 'react-router-dom';
@@ -36,6 +37,7 @@ import { SurfacagePresetsPage } from './pages/SurfacagePresetsPage';
 import { FeuilleFormatsPage } from './pages/FeuilleFormatsPage';
 import { StationsPage } from './pages/StationsPage';
 import { FluxPage } from './pages/FluxPage';
+import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 
 /**
  * Application routes.
@@ -72,6 +74,7 @@ export function AppRoutes() {
           <Route path="surfacage-presets" element={<SurfacagePresetsPage />} />
           <Route path="feuille-formats" element={<FeuilleFormatsPage />} />
           <Route path="templates" element={<TemplatesPage />} />
+          <Route path="providers" element={<OutsourcedProvidersPage />} />
         </Route>
       </Route>
     </Routes>

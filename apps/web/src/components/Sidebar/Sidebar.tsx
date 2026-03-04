@@ -1,4 +1,4 @@
-import { LayoutGrid, Calendar, Settings, User } from 'lucide-react';
+import { LayoutGrid, Gauge, Settings, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
@@ -12,6 +12,8 @@ export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSettings = location.pathname.startsWith('/settings');
+  const isFlux = location.pathname.startsWith('/flux');
+  const isScheduler = !isSettings && !isFlux;
 
   return (
     <nav
@@ -24,14 +26,15 @@ export function Sidebar() {
         <div className="flex flex-col items-center py-3 gap-2">
           <SidebarButton
             icon={LayoutGrid}
-            label="Flux de production"
-            isActive={!isSettings}
-            onClick={() => navigate('/flux')}
+            label="Planificateur"
+            isActive={isScheduler}
+            onClick={() => navigate('/')}
           />
           <SidebarButton
-            icon={Calendar}
-            label="Calendar view"
-            isActive={false}
+            icon={Gauge}
+            label="Flux de production"
+            isActive={isFlux}
+            onClick={() => navigate('/flux')}
           />
         </div>
 

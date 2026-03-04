@@ -18,6 +18,7 @@ import { impressionPresetApi } from './api/impressionPresetApi';
 import { surfacagePresetApi } from './api/surfacagePresetApi';
 import { feuilleFormatApi } from './api/feuilleFormatApi';
 import { stationApi } from './api/stationApi';
+import { providerApi } from './api/providerApi';
 import { fluxApi } from './api/fluxApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
@@ -38,6 +39,7 @@ export const store = configureStore({
     [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
     [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
     [stationApi.reducerPath]: stationApi.reducer,
+    [providerApi.reducerPath]: providerApi.reducer,
     [fluxApi.reducerPath]: fluxApi.reducer,
     // UI state slice
     ui: uiReducer,
@@ -57,6 +59,7 @@ export const store = configureStore({
       .concat(surfacagePresetApi.middleware)
       .concat(feuilleFormatApi.middleware)
       .concat(stationApi.middleware)
+      .concat(providerApi.middleware)
       .concat(fluxApi.middleware),
   devTools: import.meta.env.DEV,
 });
@@ -173,6 +176,15 @@ export {
   stationApi,
 } from './api/stationApi';
 export type { StationResponse, StationInput } from './api/stationApi';
+
+export {
+  useGetProvidersQuery,
+  useCreateProviderMutation,
+  useUpdateProviderMutation,
+  useDeleteProviderMutation,
+  providerApi,
+} from './api/providerApi';
+export type { ProviderResponse, ProviderInput } from './api/providerApi';
 
 export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, fluxApi } from './api/fluxApi';
 

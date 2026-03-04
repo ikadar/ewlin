@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const SETTINGS_ITEMS = [
   { label: 'Stations',                    path: '/settings/stations' },
   { label: 'Catégories de stations',      path: '/settings/station-categories' },
+  { label: 'Sous-traitants',              path: '/settings/providers' },
   { label: 'Clients',                     path: '/settings/clients' },
   { label: 'Formats',                     path: '/settings/formats' },
   { label: 'Impressions',                 path: '/settings/impression-presets' },
