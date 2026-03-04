@@ -53,9 +53,9 @@ const LEFT_SHADOW = { boxShadow: '4px 0 8px -2px rgba(0,0,0,0.3)' } as const;
 const RIGHT_SHADOW = { boxShadow: '-4px 0 8px -2px rgba(0,0,0,0.3)' } as const;
 
 // Shared sticky cell classes for left-frozen columns
-const stickyCell = 'sticky z-20 bg-flux-elevated';
+const stickyCell = 'sticky z-20 bg-flux-elevated group-hover:bg-flux-hover';
 // Sub-row sticky cells use a slightly lighter background (spec: dark-surface)
-const subRowStickyCell = 'sticky z-20 bg-flux-surface';
+const subRowStickyCell = 'sticky z-20 bg-flux-surface group-hover:bg-flux-hover/50';
 // Header sticky cells match the header background (bg-flux-hover)
 const stickyHeaderCell = 'sticky z-30 bg-flux-hover';
 
@@ -101,6 +101,8 @@ function FluxTableHeader() {
   const { sortColumn, sortDirection, onSortChange } = ctx;
   const headerCell = 'px-2 py-3 text-left text-sm font-medium whitespace-nowrap text-flux-text-secondary';
   const sortableHeader = `${headerCell} group cursor-pointer select-none`;
+  // Prerequisite column headers: centered, tighter padding (mockup2 spec)
+  const prereqHeader = 'px-1 py-3 text-center text-sm font-medium whitespace-nowrap text-flux-text-secondary group cursor-pointer select-none';
 
   return (
     <thead className="sticky top-0 z-30 bg-flux-hover">
@@ -140,60 +142,60 @@ function FluxTableHeader() {
         >
           Sortie <SortChevron col="sortie" active={sortColumn} dir={sortDirection} />
         </th>
-        {/* Prerequisite columns */}
+        {/* Prerequisite columns — centered, px-1 (mockup2 spec) */}
         <th
-          className={sortableHeader}
+          className={prereqHeader}
           title="Bon à tirer"
           onClick={() => onSortChange('bat')}
         >
-          BAT <SortChevron col="bat" active={sortColumn} dir={sortDirection} />
+          <div className="flex items-center justify-center gap-1">
+            BAT <SortChevron col="bat" active={sortColumn} dir={sortDirection} />
+          </div>
         </th>
         <th
-          className={sortableHeader}
+          className={prereqHeader}
           title="Papier"
           onClick={() => onSortChange('papier')}
         >
-          Papier <SortChevron col="papier" active={sortColumn} dir={sortDirection} />
+          <div className="flex items-center justify-center gap-1">
+            Papier <SortChevron col="papier" active={sortColumn} dir={sortDirection} />
+          </div>
         </th>
         <th
-          className={sortableHeader}
+          className={prereqHeader}
           title="Formes"
           onClick={() => onSortChange('formes')}
         >
-          Formes <SortChevron col="formes" active={sortColumn} dir={sortDirection} />
+          <div className="flex items-center justify-center gap-1">
+            Formes <SortChevron col="formes" active={sortColumn} dir={sortDirection} />
+          </div>
         </th>
         <th
-          className={sortableHeader}
+          className={prereqHeader}
           title="Plaques"
           onClick={() => onSortChange('plaques')}
         >
-          Plaques <SortChevron col="plaques" active={sortColumn} dir={sortDirection} />
+          <div className="flex items-center justify-center gap-1">
+            Plaques <SortChevron col="plaques" active={sortColumn} dir={sortDirection} />
+          </div>
         </th>
-        {/* Station columns — dynamic from API, sortable (v0.5.24) */}
+        {/* Station columns — dynamic from API, not sortable (mockup2 spec) */}
         {ctx.categories.map(cat => (
           <th
             key={cat.id}
-            className="px-0 py-3 text-center font-medium whitespace-nowrap text-flux-text-secondary border-l border-flux-border group cursor-pointer select-none"
+            className="px-0 py-3 text-center font-medium whitespace-nowrap text-flux-text-secondary border-l border-flux-border"
             style={{ fontSize: '11px' }}
             title={cat.name}
-            onClick={() => onSortChange(`station:${cat.id}`)}
           >
-            <span className="flex items-center justify-center gap-0.5">
-              {cat.abbreviation || cat.name.substring(0, 5)}
-              <SortChevron
-                col={`station:${cat.id}`}
-                active={sortColumn}
-                dir={sortDirection}
-              />
-            </span>
+            {cat.abbreviation || cat.name.substring(0, 5)}
           </th>
         ))}
-        {/* ST (Sous-traitance) — not sortable, between last station col and Transporteur */}
+        {/* ST (Sous-traitance) — not sortable, hover for visual consistency (mockup2 spec) */}
         <th
-          className={headerCell}
+          className={`${headerCell} group cursor-pointer select-none hover:bg-flux-active`}
           title="Sous-traitance"
         >
-          ST
+          <div className="flex items-center gap-1 whitespace-nowrap">ST</div>
         </th>
         {/* Transporteur */}
         <th
@@ -203,9 +205,12 @@ function FluxTableHeader() {
         >
           Transp. <SortChevron col="transporteur" active={sortColumn} dir={sortDirection} />
         </th>
-        {/* Parti — not sortable (K5.1 deferred) */}
-        <th className={headerCell} title="Statut d'expédition">
-          Parti
+        {/* Parti — not sortable (K5.1 deferred), hover for visual consistency (mockup2 spec) */}
+        <th
+          className={`${headerCell} group cursor-pointer select-none hover:bg-flux-active`}
+          title="Statut d'expédition"
+        >
+          <div className="flex items-center gap-1 whitespace-nowrap">Parti</div>
         </th>
         {/* Actions — frozen right + left shadow */}
         <th
@@ -254,7 +259,7 @@ const FluxTableRow = memo(function FluxTableRow({
 
   return (
     <tr
-      className={`border-b border-flux-border ${isMulti ? 'row-multi' : ''} ${isFocused ? 'ring-1 ring-inset ring-indigo-500/40' : ''}`}
+      className={`border-b border-flux-border group transition-colors cursor-pointer hover:bg-flux-hover ${isMulti ? 'row-multi' : ''} ${isFocused ? 'ring-1 ring-inset ring-indigo-500/40' : ''}`}
       style={{
         height: '2.25rem',
         backgroundColor: isFocused ? 'rgba(99,102,241,0.08)' : undefined,
@@ -273,7 +278,7 @@ const FluxTableRow = memo(function FluxTableRow({
             className={`inline-flex items-center justify-center w-[14px] h-[14px] rounded-[3px] border font-mono font-semibold leading-none transition-colors ${
               isExpanded
                 ? 'border-indigo-500/60 bg-indigo-900/30 text-indigo-400 hover:bg-indigo-900/50'
-                : 'border-flux-border-light bg-transparent text-flux-text-muted hover:border-flux-text-muted hover:text-flux-text-secondary'
+                : 'border-flux-border-light bg-transparent text-flux-text-muted hover:bg-flux-active hover:border-flux-text-muted hover:text-flux-text-secondary'
             }`}
             style={{ fontSize: '11px' }}
             onClick={() => ctx.onToggleExpand(job.id)}
@@ -362,7 +367,7 @@ const FluxTableRow = memo(function FluxTableRow({
       ))}
 
       {/* ST (Sous-traitance) — empty when expanded, flattened for collapsed multi, single element otherwise */}
-      <td className="px-1 py-0" style={{ maxWidth: '14rem', verticalAlign: 'middle' }} data-testid="flux-st-cell">
+      <td className="px-1.5 py-0" style={{ maxWidth: '160px', verticalAlign: 'middle' }} data-testid="flux-st-cell">
         {!isExpanded && (
           <STCell
             tasks={isMulti
@@ -440,7 +445,7 @@ function FluxSubRow({
   const ctx = useFluxTableContext();
   return (
     <tr
-      className="border-b border-flux-border"
+      className="border-b border-flux-border group transition-colors hover:bg-flux-hover/50"
       style={{
         height: '2rem',
         animation: `flux-subrow-in 400ms cubic-bezier(0.25, 1, 0.5, 1) both`,
@@ -502,7 +507,7 @@ function FluxSubRow({
       ))}
 
       {/* ST — per-element tasks */}
-      <td className="px-1 py-0" style={{ maxWidth: '14rem', verticalAlign: 'middle' }}>
+      <td className="px-1.5 py-0" style={{ maxWidth: '160px', verticalAlign: 'middle' }}>
         <STCell
           tasks={element.outsourcing}
           onUpdateSTStatus={ctx.onUpdateSTStatus}

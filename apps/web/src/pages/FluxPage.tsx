@@ -178,9 +178,10 @@ export function FluxPage() {
     const handler = (e: KeyboardEvent) => {
       if (!e.altKey) return;
 
-      switch (e.key) {
-        case 'f':
-        case 'F': {
+      // Use e.code (physical key) instead of e.key to avoid macOS Option key
+      // remapping (e.g. Alt+F → e.key='ƒ' on macOS, but e.code='KeyF' always).
+      switch (e.code) {
+        case 'KeyF': {
           e.preventDefault();
           if (document.activeElement === searchInputRef.current) {
             searchInputRef.current?.select();
@@ -189,8 +190,7 @@ export function FluxPage() {
           }
           break;
         }
-        case 'n':
-        case 'N': {
+        case 'KeyN': {
           e.preventDefault();
           navigate('/job/new');
           break;

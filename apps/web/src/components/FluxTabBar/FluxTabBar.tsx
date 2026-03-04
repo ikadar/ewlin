@@ -20,7 +20,7 @@ export const FluxTabBar = memo(function FluxTabBar({
 }: FluxTabBarProps) {
   return (
     <div
-      className="flex items-end justify-between border-b border-flux-border bg-flux-surface px-4"
+      className="flex items-end justify-between border-b border-flux-border bg-flux-elevated px-4"
       data-testid="flux-tab-bar"
     >
       {/* Tabs */}
@@ -35,23 +35,18 @@ export const FluxTabBar = memo(function FluxTabBar({
               onClick={() => onTabChange(tab)}
               data-testid={`flux-tab-${tab}`}
               className={[
-                'px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px',
+                'px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-1.5',
                 isActive
                   ? 'border-blue-500 text-white bg-flux-elevated'
                   : 'border-transparent text-flux-text-secondary hover:text-white hover:bg-flux-hover/50',
               ].join(' ')}
             >
-              {TAB_LABELS[tab]}
+              <span>{TAB_LABELS[tab]}</span>
               <span
-                className={[
-                  'ml-1.5 px-1 py-0.5 rounded text-[10px] font-semibold',
-                  isActive
-                    ? 'bg-blue-500/20 text-blue-300'
-                    : 'bg-flux-surface text-flux-text-muted',
-                ].join(' ')}
+                className="text-sm text-flux-text-muted"
                 data-testid={`flux-tab-count-${tab}`}
               >
-                {counts[tab]}
+                ({counts[tab]})
               </span>
             </button>
           );

@@ -32,7 +32,7 @@ export const FluxPrerequisiteBadge = memo(function FluxPrerequisiteBadge({
   return (
     <span className="inline-flex items-center gap-1" data-testid="flux-prereq-badge">
       <span
-        className={`inline-flex items-center px-1.5 py-0.5 rounded border font-medium whitespace-nowrap leading-snug ${colorClass}`}
+        className={`inline-flex items-center px-1.5 py-0.5 rounded-[0.25rem] border font-medium whitespace-nowrap leading-snug ${colorClass}`}
         style={{ fontSize: '11px' }}
         data-color={color}
       >
