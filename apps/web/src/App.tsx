@@ -121,6 +121,7 @@ function getStationXOffset(
 interface KeyboardContext {
   selectedJobId: string | null;
   isQuickPlacementMode: boolean;
+  isJcfOpen: boolean;
   orderedJobIds: string[];
   selectedJob: Job | null;
   gridRef: React.RefObject<SchedulingGridHandle | null>;
@@ -177,7 +178,7 @@ function handleEscapePick(e: KeyboardEvent, cancelPick: () => void, isPicking: b
 }
 
 function handleEscapeCloseJob(e: KeyboardEvent, ctx: KeyboardContext): boolean {
-  if (e.key === 'Escape' && ctx.selectedJobId) {
+  if (e.key === 'Escape' && ctx.selectedJobId && !ctx.isJcfOpen) {
     ctx.setSelectedJobId(null);
     return true;
   }
@@ -416,6 +417,8 @@ function AppContent() {
   // v0.4.38: JCF modal state derived from URL
   // Modal opens when URL is /job/new
   const isJcfModalOpen = location.pathname === '/job/new';
+  // Remember which job was selected before JCF opened, so we can restore on close
+  const preJcfSelectedJobIdRef = useRef<string | null>(null);
   // v0.4.7: JCF form state (lifted from JcfJobHeader)
   const [jcfJobId, setJcfJobId] = useState('');
   const [jcfIntitule, setJcfIntitule] = useState('');
@@ -508,13 +511,18 @@ function AppContent() {
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
+    preJcfSelectedJobIdRef.current = selectedJobId;
     setJcfJobId(generateJobId());
     navigate('/job/new');
-  }, [navigate]);
+  }, [navigate, selectedJobId]);
 
   // v0.4.38: Navigate away from /job/new to close modal
+  // Restore URL to previously selected job (if any) instead of always to /
   const handleCloseJcf = useCallback(() => {
-    navigate('/');
+    const savedJobId = preJcfSelectedJobIdRef.current;
+    const restoreUrl = savedJobId ? `/job/${savedJobId}` : '/';
+    navigate(restoreUrl, { replace: true });
+    preJcfSelectedJobIdRef.current = null;
     setJcfClient('');
     setJcfTemplate('');
     setJcfIntitule('');
@@ -746,8 +754,9 @@ function AppContent() {
     setJcfSaveError(null);
 
     // Open modal via URL navigation
+    preJcfSelectedJobIdRef.current = selectedJobId;
     navigate('/job/new');
-  }, [selectedJob, snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, navigate]);
+  }, [selectedJob, selectedJobId, snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, navigate]);
 
   const handleDeleteJob = useCallback(async () => {
     if (!selectedJobId) return;
@@ -1029,6 +1038,7 @@ function AppContent() {
     const ctx: KeyboardContext = {
       selectedJobId,
       isQuickPlacementMode,
+      isJcfOpen: isJcfModalOpen,
       orderedJobIds,
       selectedJob,
       gridRef,
@@ -1097,7 +1107,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {

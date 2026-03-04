@@ -51,6 +51,11 @@ export function JcfJobHeader({
   onDeadlineChange,
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
+  const nativeDateRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenPicker = () => {
+    nativeDateRef.current?.showPicker();
+  };
 
   // Auto-persist new client names to the clients table
   const [createClient] = useCreateClientMutation();
@@ -300,13 +305,15 @@ export function JcfJobHeader({
               className={`${inputBaseClass} font-mono pr-[26px]`}
               autoComplete="off"
               data-testid="jcf-field-deadline"
+              onClick={handleOpenPicker}
             />
             <input
+              ref={nativeDateRef}
               type="datetime-local"
               aria-hidden="true"
               value={deadlineNativeValue}
               onChange={handleNativeDateChange}
-              className="absolute inset-0 opacity-0 cursor-pointer"
+              className="absolute inset-0 opacity-0 pointer-events-none"
               tabIndex={-1}
             />
             <Calendar
