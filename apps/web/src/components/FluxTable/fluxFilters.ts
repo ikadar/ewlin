@@ -89,7 +89,7 @@ export function filterByTab(job: FluxJob, tab: TabId): boolean {
 export function filterBySearch(job: FluxJob, search: string): boolean {
   if (!search.trim()) return true;
 
-  const q = search.toLowerCase();
+  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
 
   // Text columns
   const textFields = [
@@ -98,7 +98,6 @@ export function filterBySearch(job: FluxJob, search: string): boolean {
     job.designation,
     job.transporteur ?? '',
   ];
-  if (textFields.some(f => f.toLowerCase().includes(q))) return true;
 
   // Prerequisite badge labels (displayed values on parent row — worst for multi-element)
   const bat    = job.elements.length > 1
@@ -114,9 +113,11 @@ export function filterBySearch(job: FluxJob, search: string): boolean {
     ? worstPrerequisiteStatus(job.elements.map(e => e.plaques))
     : job.elements[0]!.plaques;
 
-  // Search by badge labels (abbreviated display text visible in the table)
   const badgeLabels = [bat, papier, formes, plaques].map(s => PREREQUISITE_BADGE_LABEL[s] ?? s);
-  return badgeLabels.some(label => label.toLowerCase().includes(q));
+  const allFields = [...textFields, ...badgeLabels].map(f => f.toLowerCase());
+
+  // Every search term must match at least one field (AND logic)
+  return terms.every(term => allFields.some(field => field.includes(term)));
 }
 
 /**

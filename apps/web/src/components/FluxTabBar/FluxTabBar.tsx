@@ -24,7 +24,7 @@ export const FluxTabBar = memo(function FluxTabBar({
       data-testid="flux-tab-bar"
     >
       {/* Tabs */}
-      <div className="flex items-end gap-0 overflow-x-auto" role="tablist" aria-label="Filtres du tableau de flux">
+      <div className="flex items-end gap-0" role="tablist" aria-label="Filtres du tableau de flux">
         {TAB_IDS.map(tab => {
           const isActive = tab === activeTab;
           return (
@@ -59,11 +59,6 @@ export const FluxTabBar = memo(function FluxTabBar({
         aria-hidden="true"
         data-testid="flux-keyboard-hints"
       >
-        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">Alt</kbd>
-        <span>+</span>
-        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">↕</kbd>
-        <span>naviguer</span>
-        <span className="mx-1 text-gray-600">|</span>
         <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">Alt</kbd>
         <span>+</span>
         <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">↔</kbd>

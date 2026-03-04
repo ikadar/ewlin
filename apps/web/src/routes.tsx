@@ -38,6 +38,7 @@ import { FeuilleFormatsPage } from './pages/FeuilleFormatsPage';
 import { StationsPage } from './pages/StationsPage';
 import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
+import { ShippersPage } from './pages/ShippersPage';
 
 /**
  * Application routes.
@@ -75,6 +76,7 @@ export function AppRoutes() {
           <Route path="feuille-formats" element={<FeuilleFormatsPage />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="providers" element={<OutsourcedProvidersPage />} />
+          <Route path="shippers" element={<ShippersPage />} />
         </Route>
       </Route>
     </Routes>

@@ -23,30 +23,30 @@
 
 ## JCF (Job Creation Form)
 
-| # | Feladat | Leírás                                                   | Státusz |
-|---|---------|----------------------------------------------------------|---------|
+| # | Feladat                             | Leírás                                                   | Státusz |
+|---|-------------------------------------|----------------------------------------------------------|---------|
 | J1 | Naptár kattintható terület növelése | JCF dátumválasztón túl kicsi a kattintható area          | |
-| J2 | JCF bezárás → job deselect | Modal bezárásakor a kijelölt job NE legyen deselect-álva | |
-| J3 | JCF ST: dinamikus adatok | Sous-traitance szekció API-ból jövő adatokkal            | |
+| J2 | JCF bezárás → job deselect          | Modal bezárásakor a kijelölt job NE legyen deselect-álva | |
+| J3 | *JCF ST: dinamikus adatok           | Sous-traitance szekció API-ból jövő adatokkal            | |
 
 ## Flux dashboard
 
-| # | Feladat | Leírás | Státusz |
-|---|---------|--------|---------|
-| F1 | Flux ikon: `TowerControl` | Sidebar navigáció ikon csere (Lucide) | |
-| F2 | Sor kattintás → elemek kinyitása | Job row click: expand elements | |
-| F3 | JCF ne navigáljon scheduler-re | JCF megnyitása Flux-ból: maradjon Flux-ban | |
-| F4 | Modify job → open JCF | "Módosít" akció nyissa a JCF-et | |
-| F5 | Alt+←/→ eltávolítása | Billentyűparancs eltávolítás | |
-| F6 | Keresés: space, töredék szó, AND | Szóköz-szeparált részleges szavak AND logikával | |
-| F7 | Tab bar scroll eltávolítása | Tab bar ne scrollozzon | |
-| F8 | CSS: Tailwind preflight elég | Nincs extra CSS reset szükség | |
+| # | Feladat                                  | Leírás | Státusz |
+|---|------------------------------------------|--------|---------|
+| F1 | Flux ikon: `TowerControl`                | Sidebar navigáció ikon csere (Lucide) | |
+| F2 | Sor kattintás → elemek kinyitása         | Job row click: expand elements | |
+| F3 | JCF ne navigáljon scheduler-re           | JCF megnyitása Flux-ból: maradjon Flux-ban | |
+| F4 | Modify job → open JCF                    | "Módosít" akció nyissa a JCF-et | |
+| F5 | Alt+←/→ eltávolítása                     | Billentyűparancs eltávolítás | |
+| F6 | Keresés: space, töredék szó, AND         | Szóköz-szeparált részleges szavak AND logikával | |
+| F7 | Tab bar scroll eltávolítása              | Tab bar ne scrollozzon | |
+| F8 | -CSS: Tailwind preflight elég            | Nincs extra CSS reset szükség | |
 | F9 | Station kör kattintás → scheduler új tab | Új böngésző tab nyílik, scheduler scroll a task-hoz | |
 
 ## Egyéb
 
-| # | Feladat | Leírás | Státusz |
-|---|---------|--------|---------|
-| E1 | Teszt fixture: sok nem-késő job | Demo/play adathalmaz | |
-| E2 | Transporteur lista | Új entitás: szállítók (csak név) | |
+| # | Feladat                                 | Leírás | Státusz |
+|---|-----------------------------------------|--------|---------|
+| E1 | - Teszt fixture: sok nem-késő job       | Demo/play adathalmaz | |
+| E2 | Transporteur lista                      | Új entitás: szállítók (csak név) | |
 | E3 | Parti kattintás → departure date toggle | Job "elküldve" státusz, departure date beállítása (mai nap) toggle-ként | |

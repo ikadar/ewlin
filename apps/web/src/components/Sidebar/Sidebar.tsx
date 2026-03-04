@@ -1,4 +1,4 @@
-import { CalendarDays, Gauge, Settings, User } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
@@ -31,7 +31,7 @@ export function Sidebar() {
             onClick={() => navigate('/')}
           />
           <SidebarButton
-            icon={Gauge}
+            icon={TowerControl}
             label="Flux de production"
             isActive={isFlux}
             onClick={() => navigate('/flux')}
