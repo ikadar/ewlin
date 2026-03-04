@@ -751,13 +751,14 @@ function AppContent() {
     }
   }, [selectedJobId, deleteJob, setSelectedJobId, showToast]);
 
-  // REQ-14: Calculate grid/DateStrip start date (6 days before today)
+  // REQ-14: Calculate grid/DateStrip start date (lookbackDays before today)
+  const lookbackDays = snapshotData?.lookbackDays ?? 6;
   const gridStartDate = useMemo(() => {
     const today = new Date();
-    today.setDate(today.getDate() - 6);
+    today.setDate(today.getDate() - lookbackDays);
     today.setHours(START_HOUR, 0, 0, 0);
     return today;
-  }, []);
+  }, [lookbackDays]);
 
   // Category lookup map (for getStationXOffset)
   const categoryMap = useMemo(() => {
@@ -1091,6 +1092,10 @@ function AppContent() {
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
+    // Guard: don't swap completed tiles
+    const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    if (assignment?.isCompleted) return;
+
     const result = applySwap(snapshot.assignments, assignmentId, direction);
     if (!result.swapped || result.reschedules.length < 2) return;
 
@@ -1403,6 +1408,9 @@ function AppContent() {
     const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
     if (!assignment) return { canSwapUp: false, canSwapDown: false };
 
+    // Completed tiles cannot be swapped
+    if (assignment.isCompleted) return { canSwapUp: false, canSwapDown: false };
+
     // Find adjacent tiles on the same station
     const stationAssignments = snapshot.assignments
       .filter((a) => a.targetId === assignment.targetId)
@@ -1410,9 +1418,13 @@ function AppContent() {
 
     const currentIndex = stationAssignments.findIndex((a) => a.id === contextMenu.assignmentId);
 
+    // Also check if adjacent tiles are completed
+    const adjacentUp = currentIndex > 0 ? stationAssignments[currentIndex - 1] : null;
+    const adjacentDown = currentIndex < stationAssignments.length - 1 ? stationAssignments[currentIndex + 1] : null;
+
     return {
-      canSwapUp: currentIndex > 0,
-      canSwapDown: currentIndex < stationAssignments.length - 1,
+      canSwapUp: currentIndex > 0 && !adjacentUp?.isCompleted,
+      canSwapDown: currentIndex < stationAssignments.length - 1 && !adjacentDown?.isCompleted,
     };
   }, [contextMenu, snapshot.assignments]);
 
@@ -1541,8 +1553,9 @@ function AppContent() {
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
     // Check for blocking conflicts (same logic as drag & drop)
+    // StationConflict is non-blocking (push-down) UNLESS the existing tile is completed
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => c.type !== 'StationConflict' &&
+      (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
@@ -1805,11 +1818,11 @@ function AppContent() {
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
     // Check for blocking conflicts
-    // StationConflict is NOT blocking - push-down will handle overlapping tiles
+    // StationConflict is NOT blocking (push-down) UNLESS the existing tile is completed
     // PrecedenceConflict with suggestedStart is NOT blocking (can be placed at suggested time)
     // ApprovalGateConflict for Plates is NOT blocking
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => c.type !== 'StationConflict' &&
+      (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&

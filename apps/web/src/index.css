@@ -95,12 +95,18 @@ body {
   }
 }
 
-/* ── Flux Dashboard webkit scrollbar (v0.5.21, spec 3.6) ── */
-/* Complements Firefox scrollbarWidth/scrollbarColor (set inline on the scroll container). */
-.flux-scrollable::-webkit-scrollbar { width: 6px; height: 6px; }
-.flux-scrollable::-webkit-scrollbar-track { background: transparent; }
-.flux-scrollable::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
-.flux-scrollable::-webkit-scrollbar-thumb:hover { background: rgb(110 110 110); }
+/* ── Global dark scrollbar ── */
+/* Thin dark scrollbar for all scrollable elements (Chromium + Firefox). */
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: rgb(110 110 110); }
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(80 80 80) transparent;
+}
 
 /* ── ST (Sous-traitance) column (v0.5.23, spec §4–5) ── */
 

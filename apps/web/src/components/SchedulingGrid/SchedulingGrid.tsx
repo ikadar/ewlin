@@ -568,9 +568,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     const startTime = new Date(assignment.scheduledStart);
                     const top = timeToYPosition(startTime, startHour, pixelsPerHour, startDate);
 
-                    // Determine swap button visibility
-                    const showSwapUp = index > 0;
-                    const showSwapDown = index < stationAssignments.length - 1;
+                    // Determine swap button visibility (completed tiles cannot be swapped)
+                    const isCurrentCompleted = assignment.isCompleted;
+                    const adjacentUp = index > 0 ? stationAssignments[index - 1] : null;
+                    const adjacentDown = index < stationAssignments.length - 1 ? stationAssignments[index + 1] : null;
+                    const showSwapUp = !isCurrentCompleted && index > 0 && !adjacentUp?.isCompleted;
+                    const showSwapDown = !isCurrentCompleted && index < stationAssignments.length - 1 && !adjacentDown?.isCompleted;
 
                     // Calculate similarity results with previous tile (if any)
                     // Compares element specs (papier, format, impression) between consecutive tasks

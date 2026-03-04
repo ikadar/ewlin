@@ -571,11 +571,7 @@ export const FluxTable = memo(function FluxTable({
   return (
     <FluxTableContext.Provider value={ctxValue}>
       <div
-        className="h-full overflow-auto flux-scrollable"
-        style={{
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'rgb(80 80 80) transparent',
-        }}
+        className="h-full overflow-auto"
       >
         <table
           className="w-full table-fixed"

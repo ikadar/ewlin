@@ -89,6 +89,14 @@ interface UpdateElementStatusResponse {
 
 import { baseQueryWithFixtureSupport } from './baseApi';
 
+/**
+ * Extended snapshot type that includes server-side config values.
+ * lookbackDays is served by the PHP API but not yet in @flux/types.
+ */
+interface SnapshotWithConfig extends ScheduleSnapshot {
+  lookbackDays?: number;
+}
+
 // ============================================================================
 // Optimistic Update Helpers
 // ============================================================================
@@ -143,7 +151,7 @@ export const scheduleApi = createApi({
      *
      * @see docs/architecture/rtk-query-design.md#getSnapshot
      */
-    getSnapshot: builder.query<ScheduleSnapshot, void>({
+    getSnapshot: builder.query<SnapshotWithConfig, void>({
       query: () => '/schedule/snapshot',
       providesTags: ['Snapshot'],
     }),
