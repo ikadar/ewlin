@@ -198,7 +198,7 @@ export {
 } from './api/shipperApi';
 export type { ShipperResponse, ShipperInput } from './api/shipperApi';
 
-export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, fluxApi } from './api/fluxApi';
+export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, fluxApi } from './api/fluxApi';
 
 // Re-export slice actions
 export {

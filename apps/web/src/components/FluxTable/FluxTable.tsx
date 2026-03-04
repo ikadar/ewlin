@@ -52,6 +52,8 @@ interface FluxTableProps {
   onUpdateShipper?: (jobInternalId: string, shipperId: string | null) => void;
   /** Available shippers for the inline dropdown. */
   shippers?: ShipperResponse[];
+  /** Toggle a job's shipped (Parti) status. */
+  onToggleShipped?: (jobInternalId: string, shipped: boolean) => void;
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
 }
@@ -411,9 +413,14 @@ const FluxTableRow = memo(function FluxTableRow({
         )}
       </td>
 
-      {/* Parti */}
+      {/* Parti — clickable toggle */}
       <td className="px-2 py-0 whitespace-nowrap">
-        <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          className="flex items-center gap-1.5 cursor-pointer hover:opacity-80"
+          onClick={() => ctx.onToggleShipped?.(job.internalId, !job.parti.shipped)}
+          title={job.parti.shipped ? 'Marquer comme non expédié' : 'Marquer comme expédié'}
+        >
           {job.parti.shipped ? (
             <>
               <CircleCheck className="w-4 h-4 text-emerald-500" strokeWidth={2} />
@@ -426,7 +433,7 @@ const FluxTableRow = memo(function FluxTableRow({
           ) : (
             <Circle className="w-4 h-4 text-zinc-600" strokeWidth={2} />
           )}
-        </div>
+        </button>
       </td>
 
       {/* Actions — frozen right */}
@@ -584,6 +591,7 @@ export const FluxTable = memo(function FluxTable({
   onEditJob = () => {},
   onUpdateShipper,
   shippers = [],
+  onToggleShipped,
   onStationClick,
 }: FluxTableProps) {
   // openListboxId is managed here to coordinate "only one listbox open at a time"
@@ -600,6 +608,7 @@ export const FluxTable = memo(function FluxTable({
     onEditJob,
     onUpdateShipper,
     shippers,
+    onToggleShipped,
     expandedJobIds,
     sortColumn,
     sortDirection,

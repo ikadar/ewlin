@@ -4,7 +4,7 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
-import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useGetShippersQuery, useAppDispatch, fluxApi } from '@/store';
+import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useGetShippersQuery, useAppDispatch, fluxApi } from '@/store';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
@@ -48,6 +48,7 @@ export function FluxPage() {
   const [updateSTStatus] = useUpdateSTStatusMutation();
   const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
   const [updateJobShipper] = useUpdateJobShipperMutation();
+  const [toggleJobShipped] = useToggleJobShippedMutation();
   const { data: shippers = [] } = useGetShippersQuery();
 
   // ── Local UI state (not tied to server data) ──────────────────────────────
@@ -140,6 +141,11 @@ export function FluxPage() {
   const handleUpdateShipper = useCallback((jobInternalId: string, shipperId: string | null) => {
     void updateJobShipper({ jobInternalId, shipperId });
   }, [updateJobShipper]);
+
+  /** Toggle a job's shipped (Parti) status. */
+  const handleToggleShipped = useCallback((jobInternalId: string, shipped: boolean) => {
+    void toggleJobShipped({ jobInternalId, shipped });
+  }, [toggleJobShipped]);
 
   /** Toggle expanded state for a multi-element job. */
   const handleToggleExpand = useCallback((jobId: string) => {
@@ -289,6 +295,7 @@ export function FluxPage() {
               onEditJob={handleEditJob}
               onUpdateShipper={handleUpdateShipper}
               shippers={shippers}
+              onToggleShipped={handleToggleShipped}
               onStationClick={handleStationClick}
             />
             </div>

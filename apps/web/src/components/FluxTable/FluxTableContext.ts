@@ -33,6 +33,8 @@ export interface FluxTableContextValue {
   onUpdateShipper?: (jobInternalId: string, shipperId: string | null) => void;
   /** Available shippers for the inline dropdown. */
   shippers?: ShipperResponse[];
+  /** Toggle a job's shipped (Parti) status. */
+  onToggleShipped?: (jobInternalId: string, shipped: boolean) => void;
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
 }

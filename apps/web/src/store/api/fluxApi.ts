@@ -105,7 +105,7 @@ function transformFluxJobsResponse(
       transporteur: job.shipper,
       parti: {
         shipped: job.shipped,
-        date: null, // shippedAt display not yet implemented (K5.1)
+        date: job.shippedAt ?? null,
       },
     }));
   }
@@ -138,6 +138,13 @@ export interface UpdatePrerequisiteArg {
   jobId: string;
   column: PrerequisiteColumn;
   value: PrerequisiteStatus;
+}
+
+export interface ToggleJobShippedArg {
+  /** Job GUID (used in the PUT URL) */
+  jobInternalId: string;
+  /** New shipped state */
+  shipped: boolean;
 }
 
 // ============================================================================
@@ -247,7 +254,39 @@ export const fluxApi = createApi({
         }
       },
     }),
+
+    /**
+     * Toggle a job's shipped (Parti) status.
+     * Optimistic update: immediately shows CircleCheck + today's date or reverts to Circle.
+     */
+    toggleJobShipped: builder.mutation<void, ToggleJobShippedArg>({
+      query: ({ jobInternalId, shipped }) => ({
+        url: `/jobs/${jobInternalId}`,
+        method: 'PUT',
+        body: { shipped },
+      }),
+      async onQueryStarted({ jobInternalId, shipped }, { dispatch, queryFulfilled }) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+
+        const patchResult = dispatch(
+          fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
+            const job = draft.find((j) => j.internalId === jobInternalId);
+            if (job) {
+              job.parti = { shipped, date: shipped ? `${dd}/${mm}` : null };
+            }
+          }),
+        );
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
   }),
 });
 
-export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation } = fluxApi;
+export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation } = fluxApi;
