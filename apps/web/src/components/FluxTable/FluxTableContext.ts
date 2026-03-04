@@ -28,6 +28,8 @@ export interface FluxTableContextValue {
   sortDirection: SortDirection;
   /** Callback to change the sort column (v0.5.21). */
   onSortChange: (column: SortColumn) => void;
+  /** Open scheduler in new tab scrolled to the given task (F9). */
+  onStationClick?: (taskId: string) => void;
 }
 
 export const FluxTableContext = createContext<FluxTableContextValue | null>(null);

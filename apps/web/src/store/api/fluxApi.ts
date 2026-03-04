@@ -35,7 +35,7 @@ interface FluxElementApiResponse {
   formes: PrerequisiteStatus;
   plaques: PrerequisiteStatus;
   /** Station state per category. Key = stationCategoryId, value.state = 'done'|'late'|'in-progress'|'planned'|'empty' */
-  stations: Record<string, { state: string }>;
+  stations: Record<string, { state: string; taskId?: string }>;
   /** Outsourced tasks for this element. Always present, empty array if none (v0.5.22+). */
   outsourcing?: Array<{
     taskId: string;

@@ -119,6 +119,8 @@ export interface FluxStationData {
   state: StationState;
   /** Progress percentage 0–100. Used for in-progress and late states. */
   progress?: number;
+  /** Task ID for deep-linking to the scheduler (F9). */
+  taskId?: string;
 }
 
 // ── ST (Sous-traitance) types ──────────────────────────────────────────────

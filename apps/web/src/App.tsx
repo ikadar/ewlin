@@ -21,6 +21,7 @@ import { Toast } from './components/Toast';
 import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
+import { fluxApi } from './store/api/fluxApi';
 import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
@@ -488,9 +489,12 @@ function AppContent() {
       }
 
       // Success: close modal and reset form
-      // Cache invalidation is automatic via invalidatesTags: ['Snapshot']
+      // Cache invalidation: Snapshot is automatic via invalidatesTags, Flux needs explicit invalidation
       setIsJcfSaving(false);
-      navigate('/'); // v0.4.38: Navigate away to close modal
+      dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+      // Navigate back: Flux route if opened from Flux, otherwise scheduler root
+      const fromRoute = (location.state as { from?: string } | null)?.from;
+      navigate(fromRoute?.startsWith('/flux') ? fromRoute : '/', { replace: true });
       setJcfClient('');
       setJcfTemplate('');
       setJcfIntitule('');
@@ -507,7 +511,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, navigate, createJob, updateJob, showToast, isEditMode, editingJobId]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -519,8 +523,18 @@ function AppContent() {
   // v0.4.38: Navigate away from /job/new to close modal
   // Restore URL to previously selected job (if any) instead of always to /
   const handleCloseJcf = useCallback(() => {
+    const fromRoute = (location.state as { from?: string } | null)?.from;
     const savedJobId = preJcfSelectedJobIdRef.current;
-    const restoreUrl = savedJobId ? `/job/${savedJobId}` : '/';
+
+    let restoreUrl: string;
+    if (fromRoute?.startsWith('/flux')) {
+      restoreUrl = fromRoute;
+    } else if (savedJobId) {
+      restoreUrl = `/job/${savedJobId}`;
+    } else {
+      restoreUrl = '/';
+    }
+
     navigate(restoreUrl, { replace: true });
     preJcfSelectedJobIdRef.current = null;
     setJcfClient('');
@@ -533,7 +547,7 @@ function AppContent() {
     setJcfSaveError(null); // v0.4.33: Reset API error on close
     setIsEditMode(false); // v0.5.13b: Reset edit mode on close
     setEditingJobId(null);
-  }, [navigate]);
+  }, [navigate, location.state]);
 
   // v0.4.34: Handler for "Save as Template" button in JcfModal
   const handleSaveAsTemplate = useCallback(() => {
@@ -678,16 +692,13 @@ function AppContent() {
   // Find selected job
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
 
-  // v0.5.13b: Handler for "Modifier" button in Job Details Panel
-  const handleEditJob = useCallback(() => {
-    if (!selectedJob) return;
-
-    // Map job data back to JCF form fields
-    setJcfJobId(selectedJob.reference);
-    setJcfClient(selectedJob.client);
-    setJcfIntitule(selectedJob.description);
-    setJcfDeadline(selectedJob.workshopExitDate);
-    setJcfQuantity(selectedJob.quantity?.toString() ?? '');
+  // Populate JCF form fields from a Job object (shared by scheduler edit + Flux edit)
+  const populateJcfFromJob = useCallback((job: Job) => {
+    setJcfJobId(job.reference);
+    setJcfClient(job.client);
+    setJcfIntitule(job.description);
+    setJcfDeadline(job.workshopExitDate);
+    setJcfQuantity(job.quantity?.toString() ?? '');
     setJcfTemplate('');
 
     // Build stationId → station name lookup for sequence DSL reconstruction
@@ -697,8 +708,8 @@ function AppContent() {
 
     // Map elements back to JcfElement[] format
     const jobElements = snapshot.elements
-      .filter((e) => selectedJob.elementIds.includes(e.id))
-      .sort((a, b) => selectedJob.elementIds.indexOf(a.id) - selectedJob.elementIds.indexOf(b.id));
+      .filter((e) => job.elementIds.includes(e.id))
+      .sort((a, b) => job.elementIds.indexOf(a.id) - job.elementIds.indexOf(b.id));
     // Build elementId → name lookup for precedences
     const elementNameMap = new Map(jobElements.map((el) => [el.id, el.name]));
 
@@ -747,16 +758,30 @@ function AppContent() {
       setJcfElements(mappedElements);
     }
 
-    // Set edit mode state
     setIsEditMode(true);
-    setEditingJobId(selectedJob.id);
+    setEditingJobId(job.id);
     setSequenceWorkflows([]);
     setJcfSaveError(null);
+  }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers]);
 
-    // Open modal via URL navigation
+  // v0.5.13b: Handler for "Modifier" button in Job Details Panel (scheduler view)
+  const handleEditJob = useCallback(() => {
+    if (!selectedJob) return;
+    populateJcfFromJob(selectedJob);
     preJcfSelectedJobIdRef.current = selectedJobId;
     navigate('/job/new');
-  }, [selectedJob, selectedJobId, snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, navigate]);
+  }, [selectedJob, selectedJobId, populateJcfFromJob, navigate]);
+
+  // Auto-populate JCF when arriving at /job/new with editJobId in state (from Flux)
+  useEffect(() => {
+    const state = location.state as { editJobId?: string } | null;
+    if (state?.editJobId && isJcfModalOpen) {
+      const job = jobMap.get(state.editJobId);
+      if (job) {
+        populateJcfFromJob(job);
+      }
+    }
+  }, [location.state, isJcfModalOpen, jobMap, populateJcfFromJob]);
 
   const handleDeleteJob = useCallback(async () => {
     if (!selectedJobId) return;
@@ -1197,6 +1222,20 @@ function AppContent() {
       scrollTargetY,
     });
   }, [snapshot.stations, categoryMap, pixelsPerHour, gridStartDate]);
+
+  // F9: Deep-link from Flux dashboard — ?task= URL param → scroll to task
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const taskId = params.get('task');
+    if (!taskId || !gridRef.current || snapshot.assignments.length === 0) return;
+
+    const assignment = snapshot.assignments.find(a => a.taskId === taskId);
+    if (assignment) {
+      handleJumpToTask(assignment);
+      // Clean up URL param
+      window.history.replaceState(null, '', location.pathname);
+    }
+  }, [location.search, snapshot.assignments, handleJumpToTask, location.pathname]);
 
   // Handle recall - remove assignment (double-click on tile)
   // v0.5.2: Now uses RTK Query mutation

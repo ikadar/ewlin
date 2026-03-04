@@ -104,8 +104,8 @@ export function FluxPage() {
   }, []);
 
   const handleNewJob = useCallback(() => {
-    navigate('/job/new');
-  }, [navigate]);
+    navigate('/job/new', { state: { from: location.pathname } });
+  }, [navigate, location.pathname]);
 
   /**
    * Update an outsourced task's ST status and persist to the backend (v0.5.23).
@@ -168,10 +168,18 @@ export function FluxPage() {
     setDeleteConfirmJobId(null);
   }, [deleteConfirmJobId, dispatch]);
 
-  /** Navigate to the job edit page (qa.md K6.2). */
+  /** Open the scheduler in a new tab scrolled to the clicked task (F9). */
+  const handleStationClick = useCallback((taskId: string) => {
+    window.open(`/?task=${encodeURIComponent(taskId)}`, '_blank');
+  }, []);
+
+  /** Open JCF in edit mode for a job, then return to Flux on close (qa.md K6.2). */
   const handleEditJob = useCallback((jobId: string) => {
-    navigate(`/job/${jobId}`);
-  }, [navigate]);
+    // FluxJob.internalId is the scheduler Job UUID; FluxJob.id is the display reference.
+    const fluxJob = jobs.find(j => j.id === jobId);
+    const editId = fluxJob?.internalId ?? jobId;
+    navigate('/job/new', { state: { editJobId: editId, from: location.pathname } });
+  }, [navigate, location.pathname, jobs]);
 
   // ── Keyboard shortcuts (spec 3.4) ────────────────────────────────────────
   useEffect(() => {
@@ -192,7 +200,7 @@ export function FluxPage() {
         }
         case 'KeyN': {
           e.preventDefault();
-          navigate('/job/new');
+          navigate('/job/new', { state: { from: location.pathname } });
           break;
         }
         case 'ArrowRight': {
@@ -209,24 +217,12 @@ export function FluxPage() {
           navigate(tabToPathname(prevTab));
           break;
         }
-        case 'ArrowDown': {
-          e.preventDefault();
-          setFocusedRowIndex(prev =>
-            prev < filteredJobs.length - 1 ? prev + 1 : prev,
-          );
-          break;
-        }
-        case 'ArrowUp': {
-          e.preventDefault();
-          setFocusedRowIndex(prev => (prev > 0 ? prev - 1 : 0));
-          break;
-        }
       }
     };
 
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [activeTab, navigate, filteredJobs.length]);
+  }, [activeTab, navigate, location.pathname]);
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (isLoading) {
@@ -281,6 +277,7 @@ export function FluxPage() {
               onToggleExpand={handleToggleExpand}
               onDeleteJob={handleDeleteJob}
               onEditJob={handleEditJob}
+              onStationClick={handleStationClick}
             />
             </div>
           </div>

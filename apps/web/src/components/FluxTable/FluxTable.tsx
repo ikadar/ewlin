@@ -46,6 +46,8 @@ interface FluxTableProps {
   onToggleExpand?: (jobId: string) => void;
   onDeleteJob?: (jobId: string) => void;
   onEditJob?: (jobId: string) => void;
+  /** Open scheduler in new tab scrolled to the given task (F9). */
+  onStationClick?: (taskId: string) => void;
 }
 
 // Frozen zone shadow styles (spec 3.6)
@@ -267,6 +269,11 @@ const FluxTableRow = memo(function FluxTableRow({
       data-testid="flux-table-row"
       data-job-id={job.id}
       data-flux-focused={isFocused ? 'true' : undefined}
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, select, [role="listbox"], [role="option"], a')) return;
+        if (isMulti) ctx.onToggleExpand(job.id);
+      }}
     >
       {/* Expand toggle — frozen left */}
       <td
@@ -343,28 +350,33 @@ const FluxTableRow = memo(function FluxTableRow({
       })}
 
       {/* Station cells — dynamic from API */}
-      {ctx.categories.map(cat => (
-        <td
-          key={cat.id}
-          className="p-0 text-center border-l border-flux-border"
-          style={{ lineHeight: 0, verticalAlign: 'middle' }}
-          data-testid={`flux-station-${cat.id}`}
-        >
-          {isMulti && !isExpanded ? (
-            <FluxStackedDots
-              data={sortStationDataBySeverity(
-                getMultiElementStationData(job.elements, cat.id)
-              )}
-              stationName={cat.name}
-            />
-          ) : !isMulti ? (
-            <FluxStationIndicator
-              data={el0.stations[cat.id]}
-              stationName={cat.name}
-            />
-          ) : null}
-        </td>
-      ))}
+      {ctx.categories.map(cat => {
+        const singleTaskId = !isMulti ? el0.stations[cat.id]?.taskId : undefined;
+        const clickable = singleTaskId && ctx.onStationClick;
+        return (
+          <td
+            key={cat.id}
+            className={`p-0 text-center border-l border-flux-border${clickable ? ' cursor-pointer' : ''}`}
+            style={{ lineHeight: 0, verticalAlign: 'middle' }}
+            data-testid={`flux-station-${cat.id}`}
+            onClick={clickable ? () => ctx.onStationClick!(singleTaskId) : undefined}
+          >
+            {isMulti && !isExpanded ? (
+              <FluxStackedDots
+                data={sortStationDataBySeverity(
+                  getMultiElementStationData(job.elements, cat.id)
+                )}
+                stationName={cat.name}
+              />
+            ) : !isMulti ? (
+              <FluxStationIndicator
+                data={el0.stations[cat.id]}
+                stationName={cat.name}
+              />
+            ) : null}
+          </td>
+        );
+      })}
 
       {/* ST (Sous-traitance) — empty when expanded, flattened for collapsed multi, single element otherwise */}
       <td className="px-1.5 py-0" style={{ maxWidth: '160px', verticalAlign: 'middle' }} data-testid="flux-st-cell">
@@ -493,18 +505,23 @@ function FluxSubRow({
       ))}
 
       {/* Station cells — dynamic from API */}
-      {ctx.categories.map(cat => (
-        <td
-          key={cat.id}
-          className="p-0 text-center border-l border-flux-border"
-          style={{ lineHeight: 0, verticalAlign: 'middle' }}
-        >
-          <FluxStationIndicator
-            data={element.stations[cat.id]}
-            stationName={cat.name}
-          />
-        </td>
-      ))}
+      {ctx.categories.map(cat => {
+        const taskId = element.stations[cat.id]?.taskId;
+        const clickable = taskId && ctx.onStationClick;
+        return (
+          <td
+            key={cat.id}
+            className={`p-0 text-center border-l border-flux-border${clickable ? ' cursor-pointer' : ''}`}
+            style={{ lineHeight: 0, verticalAlign: 'middle' }}
+            onClick={clickable ? () => ctx.onStationClick!(taskId) : undefined}
+          >
+            <FluxStationIndicator
+              data={element.stations[cat.id]}
+              stationName={cat.name}
+            />
+          </td>
+        );
+      })}
 
       {/* ST — per-element tasks */}
       <td className="px-1.5 py-0" style={{ maxWidth: '160px', verticalAlign: 'middle' }}>
@@ -549,6 +566,7 @@ export const FluxTable = memo(function FluxTable({
   onToggleExpand = () => {},
   onDeleteJob = () => {},
   onEditJob = () => {},
+  onStationClick,
 }: FluxTableProps) {
   // openListboxId is managed here to coordinate "only one listbox open at a time"
   const [openListboxId, setOpenListboxId] = useState<string | null>(null);
@@ -566,6 +584,7 @@ export const FluxTable = memo(function FluxTable({
     sortColumn,
     sortDirection,
     onSortChange,
+    onStationClick,
   };
 
   return (
