@@ -2,17 +2,17 @@
 
 ## Scheduler nézet
 
-| # | Feladat | Leírás | Státusz |
-|---|---------|--------|---------|
-| S1 | Scrollbar-ok teljes elrejtése | Scheduler view-ban minden scrollbar rejtett (scroll működik, de vizuálisan láthatatlan) | |
-| S2 | ESC → close job details | Job kijelölve + ESC: job details panel bezárása (nem area select) | |
-| S3 | Scheduler ikon: `CalendarDays` | Sidebar navigáció ikon csere (Lucide) | |
-| S4 | Area selection eltávolítása | Teljes feature eltávolítás | |
-| S5 | Tile fejléc: job, element, client | Grid tile-on megjelenik: job reference, element name, client | |
-| S6 | Task list: completed látható + toggleable | Completed task-ok láthatók és toggle-ölhetők a task listában | |
-| S7 | Bug: L-00003 filmeuse element name hiányzik | Tirage módban nincs element name | |
-| S8 | Compact: 4, 8, 24, 48, 72 órás időtartamok | Compact funkció különböző időtávokra (48h, 72h hozzáadása) | |
-| S9 | Bug: prereq dropdown eltolja a task bar-t | Layout issue prereq dropdown kinyitásakor | |
+| # | Feladat                                      | Leírás | Státusz |
+|---|----------------------------------------------|--------|---------|
+| S1 | *Scrollbar-ok teljes elrejtése               | Scheduler view-ban minden scrollbar rejtett (scroll működik, de vizuálisan láthatatlan) | |
+| S2 | ESC → close job details                      | Job kijelölve + ESC: job details panel bezárása (nem area select) | |
+| S3 | Scheduler ikon: `CalendarDays`               | Sidebar navigáció ikon csere (Lucide) | |
+| S4 | *Area selection eltávolítása                 | Teljes feature eltávolítás | |
+| S5 | -Tile fejléc: job, element, client           | Grid tile-on megjelenik: job reference, element name, client | |
+| S6 | Task list: completed látható + toggleable    | Completed task-ok láthatók és toggle-ölhetők a task listában | |
+| S7 | -Bug: L-00003 filmeuse element name hiányzik | Tirage módban nincs element name | |
+| S8 | Compact: 4, 8, 24, 48, 72 órás időtartamok   | Compact funkció különböző időtávokra (48h, 72h hozzáadása) | |
+| S9 | Bug: prereq dropdown eltolja a task bar-t    | Layout issue prereq dropdown kinyitásakor | |
 
 ## Placement / Quick Place
 
@@ -23,11 +23,11 @@
 
 ## JCF (Job Creation Form)
 
-| # | Feladat | Leírás | Státusz |
-|---|---------|--------|---------|
-| J1 | Naptár kattintható terület növelése | JCF dátumválasztón túl kicsi a kattintható area | |
-| J2 | JCF bezárás → job deselect | Modal bezárásakor a kijelölt job legyen deselect-álva | |
-| J3 | JCF ST: dinamikus adatok | Sous-traitance szekció API-ból jövő adatokkal | |
+| # | Feladat | Leírás                                                   | Státusz |
+|---|---------|----------------------------------------------------------|---------|
+| J1 | Naptár kattintható terület növelése | JCF dátumválasztón túl kicsi a kattintható area          | |
+| J2 | JCF bezárás → job deselect | Modal bezárásakor a kijelölt job NE legyen deselect-álva | |
+| J3 | JCF ST: dinamikus adatok | Sous-traitance szekció API-ból jövő adatokkal            | |
 
 ## Flux dashboard
 

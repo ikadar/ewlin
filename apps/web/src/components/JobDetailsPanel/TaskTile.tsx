@@ -1,4 +1,5 @@
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask } from '@flux/types';
+import { Circle, CircleCheck } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 
 export interface TaskTileProps {
@@ -36,6 +37,10 @@ export interface TaskTileProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Whether this is the last task of the job (one-way shipping) */
   isLastTaskOfJob?: boolean;
+  /** Whether the task assignment is completed */
+  isCompleted?: boolean;
+  /** Callback to toggle completion state */
+  onToggleComplete?: (assignmentId: string) => void;
 }
 
 /**
@@ -66,6 +71,8 @@ export function TaskTile({
   onDepartureChange,
   onReturnChange,
   isLastTaskOfJob: isLastTask,
+  isCompleted = false,
+  onToggleComplete,
 }: TaskTileProps) {
   // v0.5.11: Outsourced tasks render as mini-form
   if (task.type === 'Outsourced') {
@@ -155,6 +162,14 @@ export function TaskTile({
     ? { boxShadow: '0 0 12px 4px #F59E0B99' }
     : undefined;
 
+  // Completion icon click handler
+  const handleToggleComplete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleComplete && assignment) {
+      onToggleComplete(assignment.id);
+    }
+  };
+
   if (isScheduled) {
     // Scheduled (placed) task - dark placeholder (not draggable)
     const handleClick = () => {
@@ -172,14 +187,27 @@ export function TaskTile({
     return (
       <button
         type="button"
-        className="h-8 pt-0.5 px-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full"
+        className={`h-8 pt-0.5 px-2 text-sm border-l-4 border-slate-700 bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-colors text-left w-full ${isCompleted ? 'opacity-50' : ''}`}
         style={conflictStyle}
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-zinc-400 font-medium truncate min-w-0">{displayName}</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {isCompleted ? (
+              <CircleCheck
+                className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={handleToggleComplete}
+              />
+            ) : (
+              <Circle
+                className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
+                onClick={handleToggleComplete}
+              />
+            )}
+            <span className={`font-medium truncate min-w-0 ${isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-400'}`}>{displayName}</span>
+          </div>
           <span className="text-zinc-500 shrink-0">
             {formatScheduledTime(assignment.scheduledStart)}
           </span>

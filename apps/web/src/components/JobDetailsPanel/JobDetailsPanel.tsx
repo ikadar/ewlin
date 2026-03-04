@@ -49,6 +49,8 @@ export interface JobDetailsPanelProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** Callback when completion icon is clicked (assignmentId) */
+  onToggleComplete?: (assignmentId: string) => void;
   /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
   conflictTaskIds?: Set<string>;
   /** v0.5.13b: Callback when edit button is clicked */
@@ -78,6 +80,7 @@ export function JobDetailsPanel({
   onClose,
   onDateClick,
   onElementStatusChange,
+  onToggleComplete,
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
@@ -194,6 +197,7 @@ export function JobDetailsPanel({
         onWorkDaysChange={onWorkDaysChange}
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
+        onToggleComplete={onToggleComplete}
       />
     </div>
   );

@@ -176,6 +176,14 @@ function handleEscapePick(e: KeyboardEvent, cancelPick: () => void, isPicking: b
   return false;
 }
 
+function handleEscapeCloseJob(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (e.key === 'Escape' && ctx.selectedJobId) {
+    ctx.setSelectedJobId(null);
+    return true;
+  }
+  return false;
+}
+
 function handleJobNavigation(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) {
     return false;
@@ -1069,6 +1077,7 @@ function AppContent() {
       if (handleQuickPlacementKeyboard(e, ctx)) return;
       if (handleDisplayModeToggle(e, setDisplayMode)) return;
       if (handleEscapeQuickPlacement(e, ctx)) return;
+      if (handleEscapeCloseJob(e, ctx)) return;
       if (handleJobNavigation(e, ctx)) return;
       if (handleJumpToDeparture(e, ctx)) return;
       if (handleJumpToToday(e, ctx)) return;
@@ -1496,14 +1505,23 @@ function AppContent() {
     const latestY = getSuccessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
     const targetY = earliestY ?? latestY;
 
-    if (targetY !== null) {
+    // Fallback: workshopExitDate (blue deadline line) when no precedence constraints
+    const deadlineY = selectedJob?.workshopExitDate
+      ? timeToYPosition(new Date(selectedJob.workshopExitDate), START_HOUR, pixelsPerHour, gridStartDate)
+      : null;
+
+    const scrollTargetY = targetY ?? deadlineY;
+
+    if (scrollTargetY !== null) {
       const viewportHeight = gridRef.current.getViewportHeight();
-      const scrollY = Math.max(0, targetY - viewportHeight * 0.3);
+      // Constraint: viewport 30% | Deadline fallback: viewport 70% (bottom, since we place bottom-up)
+      const offset = targetY !== null ? 0.3 : 0.7;
+      const scrollY = Math.max(0, scrollTargetY - viewportHeight * offset);
       gridRef.current.scrollTo(scrollX, scrollY, 'smooth');
     } else {
       gridRef.current.scrollToX(scrollX, 'smooth');
     }
-  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, categoryMap, displayMode, pixelsPerHour, gridStartDate]);
+  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, categoryMap, displayMode, pixelsPerHour, gridStartDate, selectedJob]);
 
   // Quick Placement: handle mouse move in station column
   // v0.3.48: Use pixelsPerHour for zoom-aware snapping
@@ -2017,6 +2035,7 @@ function AppContent() {
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
           onElementStatusChange={handleElementStatusChange}
+          onToggleComplete={handleToggleComplete}
           onWorkDaysChange={handleOutsourcingWorkDaysChange}
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}

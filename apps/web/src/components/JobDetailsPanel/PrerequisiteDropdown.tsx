@@ -1,5 +1,5 @@
-import { Fragment } from 'react';
-import { Listbox } from '@headlessui/react';
+import { Fragment, useRef, useState } from 'react';
+import { Listbox, Portal } from '@headlessui/react';
 import { ChevronDown } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../../utils';
 
@@ -73,35 +73,49 @@ export function PrerequisiteDropdown<T extends string>({
       ? `${currentOption?.label ?? value} — ${formattedDate}`
       : (currentOption?.label ?? value);
 
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [buttonRect, setButtonRect] = useState<DOMRect | null>(null);
+
+  const handleButtonClick = () => {
+    if (buttonRef.current) {
+      setButtonRect(buttonRef.current.getBoundingClientRect());
+    }
+  };
+
   return (
     <div className="flex items-center gap-1.5">
       <Listbox value={value} onChange={onChange}>
-        <div className="relative">
+        <div>
           <Listbox.Button
+            ref={buttonRef}
             title={tooltipText}
             className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 cursor-pointer ${getPillBgColor(value)}`}
             data-testid={`${testIdPrefix}-${type}-dropdown`}
+            onClick={handleButtonClick}
           >
             <span className={colorClass}>{label}</span>
             <ChevronDown className="w-3 h-3 opacity-50 transition-transform ui-open:rotate-180" />
           </Listbox.Button>
-          <Listbox.Options
-            className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg z-50 min-w-[130px] focus:outline-none"
-            data-testid={`${testIdPrefix}-${type}-options`}
-          >
-            {options.map((option) => (
-              <Listbox.Option key={option.value} value={option.value} as={Fragment}>
-                {({ active, selected }: { active: boolean; selected: boolean }) => (
-                  <button
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${active ? 'bg-white/10' : ''} ${selected ? 'bg-white/5' : ''} ${getStatusColor(type, option.value)}`}
-                    data-testid={`${testIdPrefix}-${type}-option-${option.value}`}
-                  >
-                    {option.label}
-                  </button>
-                )}
-              </Listbox.Option>
-            ))}
-          </Listbox.Options>
+          <Portal>
+            <Listbox.Options
+              className="fixed bg-zinc-800 border border-zinc-700 rounded shadow-lg z-[9999] min-w-[130px] focus:outline-none"
+              style={buttonRect ? { top: buttonRect.bottom + 4, left: buttonRect.left } : undefined}
+              data-testid={`${testIdPrefix}-${type}-options`}
+            >
+              {options.map((option) => (
+                <Listbox.Option key={option.value} value={option.value} as={Fragment}>
+                  {({ active, selected }: { active: boolean; selected: boolean }) => (
+                    <button
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${active ? 'bg-white/10' : ''} ${selected ? 'bg-white/5' : ''} ${getStatusColor(type, option.value)}`}
+                      data-testid={`${testIdPrefix}-${type}-option-${option.value}`}
+                    >
+                      {option.label}
+                    </button>
+                  )}
+                </Listbox.Option>
+              ))}
+            </Listbox.Options>
+          </Portal>
         </div>
       </Listbox>
       {formattedDate && type !== 'bat' && (

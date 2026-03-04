@@ -41,6 +41,8 @@ export interface TaskListProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** Callback when completion icon is clicked (assignmentId) */
+  onToggleComplete?: (assignmentId: string) => void;
 }
 
 /**
@@ -64,6 +66,7 @@ export function TaskList({
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
+  onToggleComplete,
 }: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
@@ -231,6 +234,8 @@ export function TaskList({
             onWorkDaysChange={onWorkDaysChange}
             onDepartureChange={onDepartureChange}
             onReturnChange={onReturnChange}
+            isCompleted={assignment?.isCompleted ?? false}
+            onToggleComplete={onToggleComplete}
           />
         </div>
       );
@@ -246,7 +251,7 @@ export function TaskList({
     .sort((a, b) => job.elementIds.indexOf(a.id) - job.elementIds.indexOf(b.id));
 
   return (
-    <div className="p-3 overflow-y-auto flex-grow bg-zinc-900/30">
+    <div className="p-3 overflow-y-auto flex-grow bg-zinc-900/30 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
       {jobElements.map((element) => {
         // Get tasks for this element
         const elementTasks = element.taskIds

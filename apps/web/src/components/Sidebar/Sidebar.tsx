@@ -1,4 +1,4 @@
-import { LayoutGrid, Gauge, Settings, User } from 'lucide-react';
+import { CalendarDays, Gauge, Settings, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 
@@ -25,7 +25,7 @@ export function Sidebar() {
         {/* Top navigation section */}
         <div className="flex flex-col items-center py-3 gap-2">
           <SidebarButton
-            icon={LayoutGrid}
+            icon={CalendarDays}
             label="Planificateur"
             isActive={isScheduler}
             onClick={() => navigate('/')}

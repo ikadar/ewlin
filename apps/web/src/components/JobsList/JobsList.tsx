@@ -180,7 +180,7 @@ export function JobsList({
         onAddJob={onAddJob}
       />
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {/* Problems section */}
         <ProblemsSection count={problemJobs.length}>
           {problemJobs.map(renderJobCard)}
