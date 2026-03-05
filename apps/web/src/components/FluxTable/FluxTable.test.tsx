@@ -201,9 +201,9 @@ describe('FluxTable', () => {
 
   it('sub-row shows element label with arrow prefix', () => {
     render(<FluxTable categories={dummyCategories} jobs={[multiJob]} expandedJobIds={new Set(['00078'])} />);
-    expect(screen.getByText('Ronde')).toBeInTheDocument();
-    expect(screen.getByText('Carree')).toBeInTheDocument();
-    expect(screen.getByText('Ovale')).toBeInTheDocument();
+    expect(screen.getByText(/Ronde/)).toBeInTheDocument();
+    expect(screen.getByText(/Carree/)).toBeInTheDocument();
+    expect(screen.getByText(/Ovale/)).toBeInTheDocument();
   });
 
   it('sub-rows have listbox triggers for prerequisite columns', () => {

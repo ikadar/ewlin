@@ -19,6 +19,8 @@ import { impressionPresetApi } from '../store/api/impressionPresetApi';
 import { surfacagePresetApi } from '../store/api/surfacagePresetApi';
 import { stationCategoryApi } from '../store/api/stationCategoryApi';
 import { feuilleFormatApi } from '../store/api/feuilleFormatApi';
+import { providerApi } from '../store/api/providerApi';
+import { shipperApi } from '../store/api/shipperApi';
 import { uiReducer } from '../store/slices/uiSlice';
 import { jcfReducer } from '../store/slices/jcfSlice';
 import { errorReducer } from '../store/slices/errorSlice';
@@ -37,6 +39,8 @@ export function createTestStore() {
       surfacagePresetApi: surfacagePresetApi.reducer,
       stationCategoryApi: stationCategoryApi.reducer,
       feuilleFormatApi: feuilleFormatApi.reducer,
+      providerApi: providerApi.reducer,
+      shipperApi: shipperApi.reducer,
       ui: uiReducer,
       jcf: jcfReducer,
       error: errorReducer,
@@ -50,7 +54,9 @@ export function createTestStore() {
         .concat(impressionPresetApi.middleware)
         .concat(surfacagePresetApi.middleware)
         .concat(stationCategoryApi.middleware)
-        .concat(feuilleFormatApi.middleware),
+        .concat(feuilleFormatApi.middleware)
+        .concat(providerApi.middleware)
+        .concat(shipperApi.middleware),
   });
 }
 

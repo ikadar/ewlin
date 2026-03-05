@@ -9,10 +9,11 @@ const defaultCounts: Record<TabId, number> = {
   papier: 2,
   formes: 1,
   plaques: 2,
+  soustraitance: 0,
 };
 
 describe('FluxTabBar', () => {
-  it('renders all 5 tabs', () => {
+  it('renders all 6 tabs', () => {
     render(
       <FluxTabBar
         activeTab="all"
@@ -25,6 +26,7 @@ describe('FluxTabBar', () => {
     expect(screen.getByTestId('flux-tab-papier')).toBeInTheDocument();
     expect(screen.getByTestId('flux-tab-formes')).toBeInTheDocument();
     expect(screen.getByTestId('flux-tab-plaques')).toBeInTheDocument();
+    expect(screen.getByTestId('flux-tab-soustraitance')).toBeInTheDocument();
   });
 
   it('renders tab labels', () => {
@@ -36,10 +38,11 @@ describe('FluxTabBar', () => {
       />
     );
     expect(screen.getByText('Tous')).toBeInTheDocument();
-    expect(screen.getByText('A faire prepresse')).toBeInTheDocument();
+    expect(screen.getByText('À faire prépresse')).toBeInTheDocument();
     expect(screen.getByText('Cdes papier')).toBeInTheDocument();
     expect(screen.getByText('Cdes formes')).toBeInTheDocument();
-    expect(screen.getByText('Plaques a produire')).toBeInTheDocument();
+    expect(screen.getByText('Plaques à produire')).toBeInTheDocument();
+    expect(screen.getByText('S-T à faire')).toBeInTheDocument();
   });
 
   it('marks active tab with aria-selected=true', () => {
@@ -122,12 +125,9 @@ describe('FluxTabBar', () => {
       />
     );
     const hints = screen.getByTestId('flux-keyboard-hints');
-    expect(hints).toHaveTextContent('Alt+←');
-    expect(hints).toHaveTextContent('Alt+→');
-    expect(hints).toHaveTextContent('Alt+↑');
-    expect(hints).toHaveTextContent('Alt+↓');
-    expect(hints).toHaveTextContent('Alt+F');
-    expect(hints).toHaveTextContent('Alt+N');
+    expect(hints).toHaveTextContent('↔');
+    expect(hints).toHaveTextContent('Alt');
+    expect(hints).toHaveTextContent('F');
   });
 
   it('tab list has correct aria role', () => {

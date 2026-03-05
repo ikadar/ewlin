@@ -22,13 +22,19 @@ describe('Sidebar', () => {
   it('renders main navigation buttons', () => {
     render(<MemoryRouter><Sidebar /></MemoryRouter>);
     expect(screen.getByLabelText('Flux de production')).toBeInTheDocument();
-    expect(screen.getByLabelText('Calendar view')).toBeInTheDocument();
+    expect(screen.getByLabelText('Planificateur')).toBeInTheDocument();
     expect(screen.getByLabelText('Settings')).toBeInTheDocument();
     expect(screen.getByLabelText('User')).toBeInTheDocument();
   });
 
-  it('shows flux view as active on root route', () => {
+  it('shows scheduler as active on root route', () => {
     render(<MemoryRouter initialEntries={['/']}><Sidebar /></MemoryRouter>);
+    const schedulerButton = screen.getByLabelText('Planificateur');
+    expect(schedulerButton).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('shows flux view as active on flux route', () => {
+    render(<MemoryRouter initialEntries={['/flux']}><Sidebar /></MemoryRouter>);
     const fluxButton = screen.getByLabelText('Flux de production');
     expect(fluxButton).toHaveAttribute('aria-current', 'page');
   });
