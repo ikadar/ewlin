@@ -63,6 +63,21 @@ sudo a2enmod proxy proxy_fcgi headers deflate rewrite
 sudo systemctl restart apache2
 ```
 
+### Apache reload jogosultság az `ordo` usernek
+
+A deploy script (`deploy-server.sh`) az `ordo` userrel fut, de az Apache reload-hoz `sudo` kell. Mivel az `ordo` user nem sudoer, adjunk neki jogot **kizárólag ehhez az egy parancshoz** (a `debian` userrel):
+
+```bash
+sudo visudo -f /etc/sudoers.d/ordo-apache
+```
+
+Tartalma:
+```
+ordo ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload apache2
+```
+
+Ez után az `ordo` user futtathatja a `sudo systemctl reload apache2` parancsot, de semmi mást.
+
 ## Telepítés
 
 ### 1. Mappa létrehozása
