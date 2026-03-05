@@ -82,6 +82,43 @@ export function getElementTasks(
 }
 
 /**
+ * Check if a task is the last task of its job.
+ *
+ * "Last task" = the highest sequenceOrder task of a terminal element
+ * (an element that no other element in the same job depends on).
+ *
+ * Used for one-way shipping: when the last task of a job is outsourced,
+ * the product ships directly from the provider to the client (no return transit).
+ */
+export function isLastTaskOfJob(
+  taskId: string,
+  elements: Element[],
+  tasks: Task[]
+): boolean {
+  // Find the task and its element
+  const task = tasks.find((t) => t.id === taskId);
+  if (!task) return false;
+  const element = elements.find((e) => e.id === task.elementId);
+  if (!element) return false;
+
+  // Get all elements in the same job
+  const jobElements = elements.filter((e) => e.jobId === element.jobId);
+
+  // Check: is this element terminal? (no other element depends on it)
+  const isTerminal = !jobElements.some((e) =>
+    e.prerequisiteElementIds.includes(element.id)
+  );
+  if (!isTerminal) return false;
+
+  // Check: is this task the last in the element?
+  const elementTasks = tasks
+    .filter((t) => t.elementId === element.id)
+    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+  const lastTask = elementTasks[elementTasks.length - 1];
+  return lastTask?.id === taskId;
+}
+
+/**
  * Group tasks by their job ID.
  *
  * @param tasks - Array of all tasks

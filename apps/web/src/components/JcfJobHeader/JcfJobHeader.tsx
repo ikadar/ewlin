@@ -1,11 +1,11 @@
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
-import { getTemplates } from '../../mock/templateApi';
 import type { JcfTemplate } from '@flux/types';
-import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery } from '../../store';
+import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery, useGetShippersQuery } from '../../store';
+import { useCreateClientMutation } from '../../store';
 import { useDebouncedValue } from '../../hooks';
 
 export interface JcfJobHeaderProps {
@@ -22,6 +22,8 @@ export interface JcfJobHeaderProps {
   onIntituleChange: (value: string) => void;
   quantity: string;
   onQuantityChange: (value: string) => void;
+  shipperId?: string;
+  onShipperIdChange?: (value: string) => void;
   deadline: string;
   onDeadlineChange: (value: string) => void;
 }
@@ -47,17 +49,33 @@ export function JcfJobHeader({
   onIntituleChange,
   quantity,
   onQuantityChange,
+  shipperId,
+  onShipperIdChange,
   deadline,
   onDeadlineChange,
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
+  const nativeDateRef = useRef<HTMLInputElement>(null);
 
-  // Session learning: new client names added on blur
-  const [sessionClients, setSessionClients] = useState<string[]>([]);
+  const handleOpenPicker = () => {
+    nativeDateRef.current?.showPicker();
+  };
 
-  // v0.4.34: Load templates from API (synchronous localStorage API)
-  // Note: setTemplates unused - templates are refreshed on component mount
-  const [templates, _setTemplates] = useState<JcfTemplate[]>(() => getTemplates());
+  // Auto-persist new client names to the clients table
+  const [createClient] = useCreateClientMutation();
+
+  // Load shippers for transporteur dropdown
+  const { data: shippers = [] } = useGetShippersQuery();
+
+  // Load templates from real API via RTK Query (same source as /templates page)
+  const { data: templateData } = useGetTemplatesQuery();
+  const templates = useMemo(() => templateData?.items ?? [], [templateData]);
+
+  // Keep a ref to always access latest templates in callbacks (avoids stale closure)
+  const templatesRef = useRef<JcfTemplate[]>(templates);
+  useLayoutEffect(() => {
+    templatesRef.current = templates;
+  }, [templates]);
 
   // v0.5.5: Client autocomplete via RTK Query with debounce
   // Skip only for single character (too vague); empty string fetches all, 2+ chars filters
@@ -94,30 +112,25 @@ export function JcfJobHeader({
   // --- Client autocomplete ---
 
   const clientSuggestions: Suggestion[] = useMemo(
-    () => [
-      ...apiClients.map((name) => ({ label: name, value: name })),
-      ...sessionClients
-        .filter((s) => !apiClients.includes(s)) // Avoid duplicates
-        .map((s) => ({ label: s, value: s, category: 'nouveau' })),
-    ],
-    [apiClients, sessionClients]
+    () => apiClients.map((name) => ({ label: name, value: name })),
+    [apiClients]
   );
 
-  const handleClientBlur = () => {
+  const handleClientBlur = useCallback(() => {
     const trimmed = client.trim();
     if (!trimmed) return;
 
     const existsInApi = apiClients.some(
       (name) => name.toLowerCase() === trimmed.toLowerCase()
     );
-    const existsInSession = sessionClients.some(
-      (s) => s.toLowerCase() === trimmed.toLowerCase()
-    );
 
-    if (!existsInApi && !existsInSession) {
-      setSessionClients((prev) => [...prev, trimmed]);
+    if (!existsInApi) {
+      // Auto-persist new client name to the database
+      createClient({ name: trimmed }).catch(() => {
+        // Silently ignore errors (e.g. duplicate on race condition)
+      });
     }
-  };
+  }, [client, apiClients, createClient]);
 
   const handleClientSelect = () => {
     setTimeout(() => {
@@ -144,7 +157,7 @@ export function JcfJobHeader({
   // v0.4.34: Handle template selection - find template and call callback
   const handleTemplateSelectInternal = useCallback(
     (selectedValue: string) => {
-      const selectedTemplate = templates.find((t) => t.id === selectedValue);
+      const selectedTemplate = templatesRef.current.find((t) => t.id === selectedValue);
       if (selectedTemplate) {
         onTemplateChange(selectedTemplate.name);
         onTemplateSelect?.(selectedTemplate);
@@ -153,7 +166,7 @@ export function JcfJobHeader({
         document.getElementById('jcf-intitule')?.focus();
       }, 0);
     },
-    [templates, onTemplateChange, onTemplateSelect]
+    [onTemplateChange, onTemplateSelect]
   );
 
   // v0.4.31: Handle template clear (empty value)
@@ -182,7 +195,12 @@ export function JcfJobHeader({
   };
 
   const deadlineDisplay = deadline.includes('-') ? formatToFrench(deadline) : deadline;
-  const deadlineNativeValue = deadline.includes('-') ? deadline : parseFrenchDate(deadline);
+  // Native datetime-local expects YYYY-MM-DDTHH:mm
+  const parsedDeadline = deadline.includes('-') ? deadline : parseFrenchDate(deadline);
+  // Ensure date-only values get a time for datetime-local
+  const deadlineNativeValue = parsedDeadline && !parsedDeadline.includes('T')
+    ? `${parsedDeadline}T14:00`
+    : parsedDeadline;
 
   return (
     <div
@@ -208,6 +226,7 @@ export function JcfJobHeader({
                 : 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
             }`}
             tabIndex={onJobIdChange ? 0 : -1}
+            autoComplete="off"
             data-testid="jcf-field-id"
           />
         </div>
@@ -255,6 +274,7 @@ export function JcfJobHeader({
             value={intitule}
             onChange={(e) => onIntituleChange(e.target.value)}
             className={inputBaseClass}
+            autoComplete="off"
             data-testid="jcf-field-intitule"
           />
         </div>
@@ -270,12 +290,36 @@ export function JcfJobHeader({
             value={quantity}
             onChange={(e) => onQuantityChange(e.target.value)}
             className={`${inputBaseClass} text-right font-mono`}
+            autoComplete="off"
             data-testid="jcf-field-quantite"
           />
         </div>
 
+        {/* Transporteur */}
+        {onShipperIdChange && (
+          <div className="w-[156px]">
+            <label htmlFor="jcf-transporteur" className={labelClass}>
+              Transporteur
+            </label>
+            <select
+              id="jcf-transporteur"
+              value={shipperId ?? ''}
+              onChange={(e) => onShipperIdChange(e.target.value)}
+              className={inputBaseClass}
+              data-testid="jcf-field-transporteur"
+            >
+              <option value="">Aucun</option>
+              {shippers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Deadline */}
-        <div className="w-[117px]">
+        <div className="w-[156px]">
           <label htmlFor="jcf-deadline" className={labelClass}>
             Deadline
           </label>
@@ -284,19 +328,22 @@ export function JcfJobHeader({
               ref={deadlineInputRef}
               id="jcf-deadline"
               type="text"
-              placeholder="jj/mm"
+              placeholder="jj/mm 14:00"
               value={deadlineDisplay}
               onChange={(e) => onDeadlineChange(e.target.value)}
               onBlur={handleDeadlineBlur}
               className={`${inputBaseClass} font-mono pr-[26px]`}
+              autoComplete="off"
               data-testid="jcf-field-deadline"
+              onClick={handleOpenPicker}
             />
             <input
-              type="date"
+              ref={nativeDateRef}
+              type="datetime-local"
               aria-hidden="true"
               value={deadlineNativeValue}
               onChange={handleNativeDateChange}
-              className="absolute inset-0 opacity-0 cursor-pointer"
+              className="absolute inset-0 opacity-0 pointer-events-none"
               tabIndex={-1}
             />
             <Calendar

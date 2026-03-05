@@ -12,6 +12,7 @@ import {
 } from './generators';
 import { getFixtureFromUrl, shouldUseFixture } from './testFixtures';
 import { getTasksForJob as getTasksForJobHelper } from '../utils/taskHelpers';
+import { updateSnapshotConflicts } from '../utils/conflictRecalculation';
 
 // ============================================================================
 // Snapshot Creation
@@ -44,8 +45,8 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
     stationData.stations
   );
 
-  // Identify late jobs
-  const lateJobs = identifyLateJobs(jobData.jobs, jobData.tasks);
+  // Identify late jobs (including tasks scheduled past deadline)
+  const lateJobs = identifyLateJobs(jobData.jobs, jobData.tasks, assignmentData.assignments);
 
   // Create the snapshot
   const snapshot: ScheduleSnapshot = {
@@ -113,15 +114,22 @@ export function invalidateSnapshot(): void {
 /**
  * Update the cached snapshot with new data.
  * Useful for optimistic updates.
+ * Automatically recalculates all precedence conflicts after the update.
  * @param updater - Function that receives the current snapshot and returns updated snapshot
  */
 export function updateSnapshot(
   updater: (snapshot: ScheduleSnapshot) => ScheduleSnapshot
 ): ScheduleSnapshot {
   const current = getSnapshot();
-  cachedSnapshot = updater(current);
-  cachedSnapshot.version += 1;
-  cachedSnapshot.generatedAt = new Date().toISOString();
+  let updated = updater(current);
+  updated.version += 1;
+  updated.generatedAt = new Date().toISOString();
+
+  // Automatically recalculate conflicts and late jobs after every update
+  updated = updateSnapshotConflicts(updated);
+  updated = { ...updated, lateJobs: identifyLateJobs(updated.jobs, updated.tasks, updated.assignments) };
+
+  cachedSnapshot = updated;
   return cachedSnapshot;
 }
 

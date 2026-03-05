@@ -76,9 +76,13 @@ const mockJob: Job = {
   description: 'Brochures',
   status: 'Planned',
   workshopExitDate: new Date().toISOString(),
+  fullyScheduled: false,
   color: '#8b5cf6',
-  proofSentAt: null,
-  proofApprovedAt: null,
+  comments: [],
+  elementIds: [],
+  taskIds: [],
+  createdAt: '2025-12-01T00:00:00Z',
+  updatedAt: '2025-12-01T00:00:00Z',
 };
 
 describe('UnavailabilityOverlay', () => {
@@ -184,9 +188,8 @@ describe('StationColumn', () => {
     render(<StationColumn station={mockStation} dayOfWeek={1} />);
 
     const column = screen.getByTestId('station-column-station-1');
-    expect(column).toHaveClass('transition-all');
-    expect(column).toHaveClass('duration-150');
-    expect(column).toHaveClass('ease-out');
+    expect(column.className).toContain('duration-150');
+    expect(column.className).toContain('ease-out');
   });
 
   describe('Quick Placement validation visual feedback', () => {

@@ -1,194 +1,388 @@
-# Station Management API - Manual QA Plan
+# Manual QA Plan: Station Management API
 
-> **Last Updated:** 2026-02-03
+> **QA Group:** station-management
 >
-> **Related Features:** API-001 through API-021
+> **Feature Catalog Batch:** B1
 >
-> **Test Environment:** PHP API at `http://localhost:8080`
+> **Features Covered:** API-001 to API-020
+>
+> **Created:** 2026-02-03
+>
+> **Status:** Draft
 
 ---
 
 ## Overview
 
-Ez a QA dokumentum a Station Management API végpontok manuális tesztelését fedi le. A B1 batch 21 feature-je 4 fő entitás köré szerveződik: Station, StationCategory, StationGroup és OutsourcedProvider.
-
-A tesztelés Postman collection-nel és/vagy curl parancsokkal végezhető.
+This QA plan covers the Station Management API endpoints and domain model, including:
+- Station entity CRUD operations
+- Operating Schedules (TimeSlot, DaySchedule)
+- Schedule Exceptions (CLOSED, MODIFIED)
+- Station Categories with Similarity Criteria
+- Station Groups with concurrency limits
+- Outsourced Providers
+- Domain Events
 
 ---
 
-## Test Prerequisites
+## Prerequisites
 
-| Követelmény | Leírás |
-|-------------|--------|
-| Docker | Futó konténerek (MariaDB, PHP-FPM, Nginx) |
-| Migrations | `php bin/console doctrine:migrations:migrate` lefuttatva |
-| Swagger UI | Elérhető: `http://localhost:8080/api/doc` |
+- PHP API running locally (`services/php-api`)
+- Database seeded with test data
+- Swagger UI available at `/api/doc`
+- Tools: curl, Postman, or Swagger UI
 
-### Test Data Setup
+---
 
-A teszteléshez szükséges alapadatok:
+## Features Covered
 
-```bash
-# 1. Create a test category
-curl -X POST http://localhost:8080/api/v1/station-categories \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Test Category", "similarityCriteria": []}'
-
-# 2. Create a test group
-curl -X POST http://localhost:8080/api/v1/station-groups \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Test Group", "maxConcurrent": 5}'
-```
+| ID | Feature Name | Release | Status |
+|----|--------------|---------|--------|
+| API-001 | Station Entity (Aggregate Root) | v0.1.0 | Active |
+| API-002 | StationStatus Enum | v0.1.0 | Active |
+| API-003 | Station CRUD - Create | v0.1.1 | Active |
+| API-004 | Station CRUD - Read (Single) | v0.1.1 | Active |
+| API-005 | Station CRUD - Read (List) | v0.1.1 | Active |
+| API-006 | Station CRUD - Update | v0.1.1 | Active |
+| API-007 | Station CRUD - Delete | v0.1.1 | Active |
+| API-008 | TimeSlot Value Object | v0.1.2 | Active |
+| API-009 | DaySchedule Value Object | v0.1.2 | Active |
+| API-010 | Operating Schedule API | v0.1.2 | Active |
+| API-011 | ExceptionType Enum | v0.1.3 | Active |
+| API-012 | Schedule Exception - CLOSED | v0.1.3 | Active |
+| API-013 | Schedule Exception - MODIFIED | v0.1.3 | Active |
+| API-014 | Station Category Entity | v0.1.4 | Active |
+| API-015 | SimilarityCriterion Value Object | v0.1.4 | Active |
+| API-016 | Station Group Entity | v0.1.5 | Active |
+| API-017 | Concurrency Limit (Group) | v0.1.5 | Active |
+| API-018 | Outsourced Provider Entity | v0.1.6 | Active |
+| API-019 | Auto-create StationGroup for Provider | v0.1.6 | Active |
+| API-020 | Domain Events (Station lifecycle) | v0.1.7 | Active |
 
 ---
 
 ## Test Scenarios
 
-### API-001, API-002 - Station Entity & Status
+### 1. Station Entity & Status (v0.1.0)
 
-#### Scenario: Verify station status values
+#### API-001 - Station Entity (Aggregate Root)
 
-**Preconditions:**
-- Station exists
+##### Scenario: Station entity contains all required fields
 
 **Steps:**
-1. PUT `/api/v1/stations/{id}` with each status value
+1. Create a station via POST `/api/v1/stations`:
+
+```json
+{
+  "name": "Test Station",
+  "categoryId": "550e8400-e29b-41d4-a716-446655440001",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002",
+  "capacity": 1,
+  "status": "active"
+}
+```
+
+2. GET `/api/v1/stations/{id}` to retrieve the created station
 
 **Expected Results:**
-- [ ] `active` - Accepted
-- [ ] `inactive` - Accepted
-- [ ] `maintenance` - Accepted
-- [ ] `out_of_service` - Accepted
-- [ ] Invalid status - 400 Bad Request
+- [ ] Response contains `id` (UUID v4 format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+- [ ] Response contains `name` (string, matches input)
+- [ ] Response contains `categoryId` (UUID, matches input)
+- [ ] Response contains `groupId` (UUID, matches input)
+- [ ] Response contains `capacity` (integer, default 1 if not provided)
+- [ ] Response contains `status` (string enum value)
+- [ ] Response contains `operatingSchedule` (object or null)
+- [ ] Response contains `createdAt` (ISO 8601 timestamp)
+- [ ] Response contains `updatedAt` (ISO 8601 timestamp)
 
 ---
 
-### API-003 - Station CRUD API
-
-#### Scenario: Create Station
-
-**Preconditions:**
-- StationCategory létezik (ID ismert)
-- StationGroup létezik (ID ismert)
+##### Scenario: Station entity persists correctly after update
 
 **Steps:**
-1. POST `/api/v1/stations`
-```bash
-curl -X POST http://localhost:8080/api/v1/stations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Komori G37",
-    "categoryId": "{category-uuid}",
-    "groupId": "{group-uuid}",
-    "capacity": 1,
-    "status": "active"
-  }'
+1. Create a station
+2. PUT `/api/v1/stations/{id}` with updated fields:
+
+```json
+{
+  "name": "Updated Station Name",
+  "capacity": 2
+}
+```
+
+3. GET `/api/v1/stations/{id}` to verify
+
+**Expected Results:**
+- [ ] `id` unchanged
+- [ ] `name` updated to "Updated Station Name"
+- [ ] `capacity` updated to 2
+- [ ] `categoryId` unchanged
+- [ ] `groupId` unchanged
+- [ ] `createdAt` unchanged
+- [ ] `updatedAt` changed (newer than createdAt)
+
+---
+
+#### API-002 - StationStatus Enum
+
+##### Scenario: All valid status values accepted on create
+
+**Steps:**
+1. POST `/api/v1/stations` with `"status": "active"`:
+
+```json
+{
+  "name": "Station Active",
+  "categoryId": "...",
+  "groupId": "...",
+  "status": "active"
+}
+```
+
+2. POST `/api/v1/stations` with `"status": "inactive"`:
+
+```json
+{
+  "name": "Station Inactive",
+  "categoryId": "...",
+  "groupId": "...",
+  "status": "inactive"
+}
+```
+
+3. POST `/api/v1/stations` with `"status": "maintenance"`:
+
+```json
+{
+  "name": "Station Maintenance",
+  "categoryId": "...",
+  "groupId": "...",
+  "status": "maintenance"
+}
+```
+
+4. POST `/api/v1/stations` with `"status": "out_of_service"`:
+
+```json
+{
+  "name": "Station Out of Service",
+  "categoryId": "...",
+  "groupId": "...",
+  "status": "out_of_service"
+}
+```
+
+**Expected Results:**
+- [ ] All 4 requests return HTTP 201 Created
+- [ ] Each response contains the exact status value provided
+- [ ] Status values are: `active`, `inactive`, `maintenance`, `out_of_service`
+
+---
+
+##### Scenario: Invalid status value rejected
+
+**Steps:**
+1. POST `/api/v1/stations` with invalid status:
+
+```json
+{
+  "name": "Invalid Station",
+  "categoryId": "550e8400-e29b-41d4-a716-446655440001",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002",
+  "status": "INVALID"
+}
+```
+
+**Expected Results:**
+- [ ] HTTP 400 Bad Request
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message lists valid values: active, inactive, maintenance, out_of_service
+
+---
+
+##### Scenario: Status transition via update
+
+**Steps:**
+1. Create station with `"status": "active"`
+2. PUT `/api/v1/stations/{id}` with `"status": "maintenance"`:
+
+```json
+{
+  "status": "maintenance"
+}
+```
+
+3. GET `/api/v1/stations/{id}` to verify
+
+**Expected Results:**
+- [ ] HTTP 200 OK on update
+- [ ] `status` changed from "active" to "maintenance"
+- [ ] `updatedAt` timestamp changed
+- [ ] All other fields unchanged
+
+---
+
+##### Scenario: Default status is "active" when not provided
+
+**Steps:**
+1. POST `/api/v1/stations` without status field:
+
+```json
+{
+  "name": "Station Without Status",
+  "categoryId": "550e8400-e29b-41d4-a716-446655440001",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002"
+}
+```
+
+**Expected Results:**
+- [ ] HTTP 201 Created
+- [ ] Response contains `status`: "active" (default value)
+
+---
+
+### 2. Station CRUD Operations (v0.1.1)
+
+#### API-003 - Create Station
+
+##### Scenario: Create station with valid data
+
+**Steps:**
+1. POST `/api/v1/stations` with valid payload:
+
+```json
+{
+  "name": "Komori G37",
+  "categoryId": "550e8400-e29b-41d4-a716-446655440001",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002",
+  "capacity": 1,
+  "status": "active"
+}
 ```
 
 **Expected Results:**
 - [ ] HTTP 201 Created
 - [ ] Response contains `id` (UUID format)
-- [ ] Response contains `createdAt` and `updatedAt` timestamps
-- [ ] `operatingSchedule` is null
+- [ ] Response contains `name`: "Komori G37"
+- [ ] Response contains `status`: "active"
+- [ ] Response contains `createdAt` timestamp
+- [ ] Response contains `updatedAt` timestamp
+- [ ] Response contains `operatingSchedule`: null
 
 ---
 
-#### Scenario: Create Station with duplicate name
-
-**Preconditions:**
-- Station "Komori G37" already exists
+##### Scenario: Create station with duplicate name
 
 **Steps:**
-1. POST `/api/v1/stations` with same name
+1. Create a station named "Komori G37"
+2. POST `/api/v1/stations` with same name:
 
-**Expected Results:**
-- [ ] HTTP 409 Conflict
-- [ ] Error code: `CONFLICT`
-- [ ] Error message mentions duplicate name
-
----
-
-#### Scenario: Create Station with invalid categoryId
-
-**Steps:**
-1. POST `/api/v1/stations` with non-existent categoryId
-
-**Expected Results:**
-- [ ] HTTP 404 Not Found
-- [ ] Error: "Station category not found"
-
----
-
-#### Scenario: Create Station with invalid groupId
-
-**Steps:**
-1. POST `/api/v1/stations` with non-existent groupId
-
-**Expected Results:**
-- [ ] HTTP 404 Not Found
-- [ ] Error: "Station group not found"
-
----
-
-#### Scenario: Get Station by ID
-
-**Steps:**
-1. GET `/api/v1/stations/{id}`
-
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] All station fields returned
-- [ ] Category and group IDs present
-
----
-
-#### Scenario: Get non-existent Station
-
-**Steps:**
-1. GET `/api/v1/stations/{random-uuid}`
-
-**Expected Results:**
-- [ ] HTTP 404 Not Found
-- [ ] Error code: `NOT_FOUND`
-
----
-
-#### Scenario: Update Station
-
-**Steps:**
-1. PUT `/api/v1/stations/{id}`
 ```json
 {
-  "name": "Komori G37 XL",
-  "status": "maintenance"
+  "name": "Komori G37",
+  "categoryId": "550e8400-e29b-41d4-a716-446655440001",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002"
 }
 ```
 
 **Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] Name updated to "Komori G37 XL"
-- [ ] Status updated to "maintenance"
-- [ ] `updatedAt` timestamp changed
+- [ ] HTTP 409 Conflict
+- [ ] Error code: "CONFLICT"
+- [ ] Error message mentions "already exists"
+- [ ] Error details include field "name"
 
 ---
 
-#### Scenario: Delete Station
-
-**Preconditions:**
-- Station exists with no assigned tasks
+##### Scenario: Create station with invalid category ID
 
 **Steps:**
-1. DELETE `/api/v1/stations/{id}`
+1. POST `/api/v1/stations` with non-existent categoryId:
+
+```json
+{
+  "name": "New Station",
+  "categoryId": "00000000-0000-0000-0000-000000000000",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002"
+}
+```
 
 **Expected Results:**
-- [ ] HTTP 204 No Content
-- [ ] Subsequent GET returns 404
+- [ ] HTTP 404 Not Found
+- [ ] Error message: "Station category not found"
 
 ---
 
-### API-004 - Station List Filtering
+##### Scenario: Create station with empty name
 
-#### Scenario: List all stations
+**Steps:**
+1. POST `/api/v1/stations` with empty name:
+
+```json
+{
+  "name": "",
+  "categoryId": "550e8400-e29b-41d4-a716-446655440001",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002"
+}
+```
+
+**Expected Results:**
+- [ ] HTTP 400 Bad Request
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message mentions "required" or "cannot be empty"
+
+---
+
+##### Scenario: Create station with invalid status value
+
+**Steps:**
+1. POST `/api/v1/stations` with invalid status:
+
+```json
+{
+  "name": "Test Station",
+  "categoryId": "550e8400-e29b-41d4-a716-446655440001",
+  "groupId": "550e8400-e29b-41d4-a716-446655440002",
+  "status": "INVALID_STATUS"
+}
+```
+
+**Expected Results:**
+- [ ] HTTP 400 Bad Request
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error mentions valid status values: active, inactive, out_of_service, maintenance
+
+---
+
+#### API-004 - Read Station (Single)
+
+##### Scenario: Get existing station by ID
+
+**Steps:**
+1. GET `/api/v1/stations/{id}` with valid station ID
+
+**Expected Results:**
+- [ ] HTTP 200 OK
+- [ ] Response contains all station fields
+- [ ] `id` matches requested ID
+- [ ] `operatingSchedule` is object or null
+
+---
+
+##### Scenario: Get non-existent station
+
+**Steps:**
+1. GET `/api/v1/stations/00000000-0000-0000-0000-000000000000`
+
+**Expected Results:**
+- [ ] HTTP 404 Not Found
+- [ ] Error code: "NOT_FOUND"
+- [ ] Error message: "Station not found"
+
+---
+
+#### API-005 - Read Station (List)
+
+##### Scenario: List all stations
 
 **Steps:**
 1. GET `/api/v1/stations`
@@ -196,122 +390,167 @@ curl -X POST http://localhost:8080/api/v1/stations \
 **Expected Results:**
 - [ ] HTTP 200 OK
 - [ ] Response contains `items` array
-- [ ] Response contains pagination: `total`, `page`, `limit`, `pages`
+- [ ] Response contains `total` count
+- [ ] Response contains `page` number
+- [ ] Response contains `limit` value
+- [ ] Response contains `pages` count
 
 ---
 
-#### Scenario: List stations with status filter
-
-**Preconditions:**
-- Multiple stations exist with different statuses
+##### Scenario: List stations with status filter
 
 **Steps:**
 1. GET `/api/v1/stations?status=active`
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] All returned stations have `status: "active"`
+- [ ] All items have `status`: "active"
+- [ ] `total` reflects filtered count
 
 ---
 
-#### Scenario: List stations with category filter
+##### Scenario: List stations with pagination
 
 **Steps:**
-1. GET `/api/v1/stations?categoryId={uuid}`
+1. GET `/api/v1/stations?page=1&limit=5`
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] All returned stations have matching `categoryId`
+- [ ] `items` array has max 5 elements
+- [ ] `page` is 1
+- [ ] `limit` is 5
+- [ ] `pages` calculated correctly
 
 ---
 
-#### Scenario: List stations with group filter
+#### API-006 - Update Station
+
+##### Scenario: Update station name
 
 **Steps:**
-1. GET `/api/v1/stations?groupId={uuid}`
+1. PUT `/api/v1/stations/{id}`:
+
+```json
+{
+  "name": "Komori G37 XL"
+}
+```
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] All returned stations have matching `groupId`
+- [ ] `name` updated to "Komori G37 XL"
+- [ ] `updatedAt` changed
+- [ ] Other fields unchanged
 
 ---
 
-#### Scenario: List stations with search
+##### Scenario: Update station status
 
 **Steps:**
-1. GET `/api/v1/stations?search=Komori`
+1. PUT `/api/v1/stations/{id}`:
+
+```json
+{
+  "status": "maintenance"
+}
+```
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] Only stations with "Komori" in name returned
+- [ ] `status` is "maintenance"
+- [ ] `updatedAt` changed
 
 ---
 
-#### Scenario: List stations with pagination
+##### Scenario: Update non-existent station
 
 **Steps:**
-1. GET `/api/v1/stations?page=2&limit=5`
+1. PUT `/api/v1/stations/00000000-0000-0000-0000-000000000000`:
+
+```json
+{
+  "name": "New Name"
+}
+```
 
 **Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] `page` = 2
-- [ ] `limit` = 5
-- [ ] `items` contains at most 5 stations
+- [ ] HTTP 404 Not Found
+- [ ] Error code: "NOT_FOUND"
 
 ---
 
-### API-005 - OpenAPI Documentation
+#### API-007 - Delete Station
 
-#### Scenario: Access Swagger UI
+##### Scenario: Delete existing station
 
 **Steps:**
-1. Navigate to `http://localhost:8080/api/doc`
+1. DELETE `/api/v1/stations/{id}`
 
 **Expected Results:**
-- [ ] Swagger UI loads
-- [ ] All Station endpoints documented
-- [ ] All StationCategory endpoints documented
-- [ ] All StationGroup endpoints documented
-- [ ] All Provider endpoints documented
-- [ ] Request/response schemas visible
+- [ ] HTTP 204 No Content
+- [ ] Response body is empty
+- [ ] Subsequent GET returns 404
 
 ---
 
-### API-006, API-007 - TimeSlot & OperatingSchedule Value Objects
-
-#### Scenario: Valid time slot formats
+##### Scenario: Delete non-existent station
 
 **Steps:**
-1. PUT `/api/v1/stations/{id}/schedule` with various time formats
+1. DELETE `/api/v1/stations/00000000-0000-0000-0000-000000000000`
 
 **Expected Results:**
-- [ ] "06:00" - Accepted
-- [ ] "17:30" - Accepted
-- [ ] "00:00" - Accepted
-- [ ] "24:00" as end time - Accepted
-- [ ] "6:00" (missing leading zero) - Rejected (400)
-- [ ] "25:00" - Rejected (400)
-- [ ] "17:60" - Rejected (400)
+- [ ] HTTP 404 Not Found
+- [ ] Error code: "NOT_FOUND"
 
 ---
 
-### API-008 - Operating Schedule API
+### 3. Operating Schedules (v0.1.2)
 
-#### Scenario: Update station operating schedule
+#### API-008/009/010 - TimeSlot, DaySchedule, Operating Schedule
 
-**Preconditions:**
-- Station exists
+##### Scenario: Set valid operating schedule
 
 **Steps:**
-1. PUT `/api/v1/stations/{id}/schedule`
+1. PUT `/api/v1/stations/{id}/schedule`:
+
 ```json
 {
   "operatingSchedule": {
-    "monday": {"isOperating": true, "slots": [{"start": "06:00", "end": "12:00"}, {"start": "13:00", "end": "17:00"}]},
-    "tuesday": {"isOperating": true, "slots": [{"start": "06:00", "end": "12:00"}, {"start": "13:00", "end": "17:00"}]},
-    "wednesday": {"isOperating": true, "slots": [{"start": "06:00", "end": "12:00"}, {"start": "13:00", "end": "17:00"}]},
-    "thursday": {"isOperating": true, "slots": [{"start": "06:00", "end": "12:00"}, {"start": "13:00", "end": "17:00"}]},
-    "friday": {"isOperating": true, "slots": [{"start": "06:00", "end": "12:00"}, {"start": "13:00", "end": "17:00"}]},
+    "monday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "12:00"},
+        {"start": "13:00", "end": "17:00"}
+      ]
+    },
+    "tuesday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "12:00"},
+        {"start": "13:00", "end": "17:00"}
+      ]
+    },
+    "wednesday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "12:00"},
+        {"start": "13:00", "end": "17:00"}
+      ]
+    },
+    "thursday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "12:00"},
+        {"start": "13:00", "end": "17:00"}
+      ]
+    },
+    "friday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "12:00"},
+        {"start": "13:00", "end": "17:00"}
+      ]
+    },
     "saturday": {"isOperating": false, "slots": []},
     "sunday": {"isOperating": false, "slots": []}
   }
@@ -320,30 +559,18 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] Station returned with updated `operatingSchedule`
-- [ ] All 7 days present in response
-- [ ] `updatedAt` changed
+- [ ] Response contains full station with `operatingSchedule`
+- [ ] All 7 days present in schedule
+- [ ] Monday-Friday have 2 slots each
+- [ ] Saturday-Sunday have `isOperating`: false
 
 ---
 
-#### Scenario: Set 24/7 schedule
-
-**Steps:**
-1. PUT `/api/v1/stations/{id}/schedule` with all days operating 00:00-24:00
-
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] Each day has `isOperating: true`
-- [ ] Each day has single slot "00:00"-"24:00"
-
----
-
-### API-009 - Schedule Slot Validation
-
-#### Scenario: Overlapping time slots rejected
+##### Scenario: Overlapping time slots rejected
 
 **Steps:**
 1. PUT `/api/v1/stations/{id}/schedule` with overlapping slots:
+
 ```json
 {
   "operatingSchedule": {
@@ -366,61 +593,141 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error mentions "overlap"
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message mentions "overlap"
 - [ ] Error details include day name ("monday")
 
 ---
 
-#### Scenario: Contiguous slots accepted
+##### Scenario: Contiguous slots accepted (not overlapping)
 
 **Steps:**
-1. PUT `/api/v1/stations/{id}/schedule` with contiguous slots (end = next start)
+1. PUT `/api/v1/stations/{id}/schedule` with contiguous slots:
 
 ```json
-"slots": [{"start": "06:00", "end": "12:00"}, {"start": "12:00", "end": "17:00"}]
+{
+  "operatingSchedule": {
+    "monday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "12:00"},
+        {"start": "12:00", "end": "17:00"}
+      ]
+    },
+    "tuesday": {"isOperating": false, "slots": []},
+    "wednesday": {"isOperating": false, "slots": []},
+    "thursday": {"isOperating": false, "slots": []},
+    "friday": {"isOperating": false, "slots": []},
+    "saturday": {"isOperating": false, "slots": []},
+    "sunday": {"isOperating": false, "slots": []}
+  }
+}
 ```
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] Slots are NOT considered overlapping
+- [ ] Slots are NOT considered overlapping (end = next start is allowed)
+- [ ] Schedule saved successfully
 
 ---
 
-#### Scenario: Start time must be before end time
+##### Scenario: Start time must be before end time
 
 **Steps:**
-1. PUT `/api/v1/stations/{id}/schedule` with start > end
+1. PUT `/api/v1/stations/{id}/schedule` with invalid time order:
 
 ```json
-"slots": [{"start": "17:00", "end": "06:00"}]
+{
+  "operatingSchedule": {
+    "monday": {
+      "isOperating": true,
+      "slots": [{"start": "17:00", "end": "06:00"}]
+    },
+    "tuesday": {"isOperating": false, "slots": []},
+    "wednesday": {"isOperating": false, "slots": []},
+    "thursday": {"isOperating": false, "slots": []},
+    "friday": {"isOperating": false, "slots": []},
+    "saturday": {"isOperating": false, "slots": []},
+    "sunday": {"isOperating": false, "slots": []}
+  }
+}
 ```
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error: "Start time must be before end time"
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message: "Start time must be before end time"
 
 ---
 
-### API-010 - ScheduleException Value Object
-
-#### Scenario: Valid exception types
+##### Scenario: Invalid time format rejected
 
 **Steps:**
-1. POST `/api/v1/stations/{id}/exceptions` with type "CLOSED"
-2. POST `/api/v1/stations/{id}/exceptions` with type "MODIFIED"
+1. PUT `/api/v1/stations/{id}/schedule` with invalid time format:
+
+```json
+{
+  "operatingSchedule": {
+    "monday": {
+      "isOperating": true,
+      "slots": [{"start": "6:00", "end": "12:00"}]
+    },
+    "tuesday": {"isOperating": false, "slots": []},
+    "wednesday": {"isOperating": false, "slots": []},
+    "thursday": {"isOperating": false, "slots": []},
+    "friday": {"isOperating": false, "slots": []},
+    "saturday": {"isOperating": false, "slots": []},
+    "sunday": {"isOperating": false, "slots": []}
+  }
+}
+```
 
 **Expected Results:**
-- [ ] Both types accepted
-- [ ] Invalid type rejected (400)
+- [ ] HTTP 400 Bad Request
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message mentions "HH:MM format"
+- [ ] Error details specify invalid field
 
 ---
 
-### API-011 - Schedule Exception API
-
-#### Scenario: Add CLOSED exception
+##### Scenario: 24-hour operation (00:00-24:00)
 
 **Steps:**
-1. POST `/api/v1/stations/{id}/exceptions`
+1. PUT `/api/v1/stations/{id}/schedule`:
+
+```json
+{
+  "operatingSchedule": {
+    "monday": {
+      "isOperating": true,
+      "slots": [{"start": "00:00", "end": "24:00"}]
+    },
+    "tuesday": {"isOperating": false, "slots": []},
+    "wednesday": {"isOperating": false, "slots": []},
+    "thursday": {"isOperating": false, "slots": []},
+    "friday": {"isOperating": false, "slots": []},
+    "saturday": {"isOperating": false, "slots": []},
+    "sunday": {"isOperating": false, "slots": []}
+  }
+}
+```
+
+**Expected Results:**
+- [ ] HTTP 200 OK
+- [ ] "24:00" is valid as end time
+- [ ] Full day coverage saved
+
+---
+
+### 4. Schedule Exceptions (v0.1.3)
+
+#### API-011/012 - CLOSED Exception
+
+##### Scenario: Add CLOSED exception
+
+**Steps:**
+1. POST `/api/v1/stations/{id}/exceptions`:
+
 ```json
 {
   "date": "2026-12-25",
@@ -431,15 +738,42 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 201 Created
-- [ ] Response contains `date`, `type`, `reason`
-- [ ] `schedule` is null
+- [ ] Response contains `date`: "2026-12-25"
+- [ ] Response contains `type`: "CLOSED"
+- [ ] Response contains `schedule`: null
+- [ ] Response contains `reason`: "Christmas Day"
 
 ---
 
-#### Scenario: Add MODIFIED exception
+##### Scenario: Add duplicate exception rejected
 
 **Steps:**
-1. POST `/api/v1/stations/{id}/exceptions`
+1. Add CLOSED exception for "2026-12-25"
+2. POST `/api/v1/stations/{id}/exceptions` again:
+
+```json
+{
+  "date": "2026-12-25",
+  "type": "CLOSED",
+  "reason": "Another reason"
+}
+```
+
+**Expected Results:**
+- [ ] HTTP 400 Bad Request
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message: "Exception already exists for date"
+- [ ] Error details include the date
+
+---
+
+#### API-013 - MODIFIED Exception
+
+##### Scenario: Add MODIFIED exception with schedule
+
+**Steps:**
+1. POST `/api/v1/stations/{id}/exceptions`:
+
 ```json
 {
   "date": "2026-12-24",
@@ -454,57 +788,47 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 201 Created
-- [ ] Response contains `schedule` with the provided slots
+- [ ] Response contains `type`: "MODIFIED"
+- [ ] Response contains `schedule` object with slots
+- [ ] Schedule has one slot "06:00-12:00"
 
 ---
 
-#### Scenario: MODIFIED without schedule rejected
+##### Scenario: MODIFIED exception without schedule rejected
 
 **Steps:**
-1. POST `/api/v1/stations/{id}/exceptions`
+1. POST `/api/v1/stations/{id}/exceptions`:
+
 ```json
 {
   "date": "2026-12-24",
-  "type": "MODIFIED"
+  "type": "MODIFIED",
+  "reason": "Missing schedule"
 }
 ```
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error: "Schedule is required for MODIFIED exception type"
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message: "Schedule is required for MODIFIED exception type"
 
 ---
 
-#### Scenario: Duplicate exception date rejected
-
-**Preconditions:**
-- Exception for 2026-12-25 already exists
+##### Scenario: List exceptions for station
 
 **Steps:**
-1. POST `/api/v1/stations/{id}/exceptions` with same date
-
-**Expected Results:**
-- [ ] HTTP 400 Bad Request
-- [ ] Error: "Exception already exists for date"
-
----
-
-#### Scenario: List exceptions
-
-**Preconditions:**
-- Multiple exceptions exist
-
-**Steps:**
-1. GET `/api/v1/stations/{id}/exceptions`
+1. Add 2-3 exceptions to a station
+2. GET `/api/v1/stations/{id}/exceptions`
 
 **Expected Results:**
 - [ ] HTTP 200 OK
 - [ ] Response contains `data` array
 - [ ] Response contains `total` count
+- [ ] Exceptions sorted by date
 
 ---
 
-#### Scenario: List exceptions with date filter
+##### Scenario: List exceptions with date filter
 
 **Steps:**
 1. GET `/api/v1/stations/{id}/exceptions?from=2026-12-01&to=2026-12-31`
@@ -512,121 +836,117 @@ curl -X POST http://localhost:8080/api/v1/stations \
 **Expected Results:**
 - [ ] HTTP 200 OK
 - [ ] Only exceptions within date range returned
+- [ ] `total` reflects filtered count
 
 ---
 
-#### Scenario: Delete exception
+##### Scenario: Delete exception
 
 **Steps:**
-1. DELETE `/api/v1/stations/{id}/exceptions/2026-12-25`
+1. Add exception for "2026-12-25"
+2. DELETE `/api/v1/stations/{id}/exceptions/2026-12-25`
 
 **Expected Results:**
 - [ ] HTTP 204 No Content
-- [ ] Subsequent GET does not include this date
+- [ ] Subsequent GET for exceptions doesn't include "2026-12-25"
 
 ---
 
-#### Scenario: Delete non-existent exception
+##### Scenario: Invalid date format rejected
 
 **Steps:**
-1. DELETE `/api/v1/stations/{id}/exceptions/2099-01-01`
+1. POST `/api/v1/stations/{id}/exceptions`:
 
-**Expected Results:**
-- [ ] HTTP 404 Not Found
-- [ ] Error: "Exception not found for date"
-
----
-
-### API-012, API-013 - StationCategory & SimilarityCriterion
-
-#### Scenario: Verify similarity criterion structure
-
-**Steps:**
-1. GET `/api/v1/station-categories/{id}`
-
-**Expected Results:**
-- [ ] Each criterion has `code` (lowercase, underscores)
-- [ ] Each criterion has `name` (display name)
-- [ ] Each criterion has `fieldPath` (job field reference)
-
----
-
-### API-014 - Station Category CRUD API
-
-#### Scenario: Create category
-
-**Steps:**
-1. POST `/api/v1/station-categories`
 ```json
 {
-  "name": "Offset Press",
-  "description": "Large format offset presses"
+  "date": "25/12/2026",
+  "type": "CLOSED"
 }
 ```
 
 **Expected Results:**
-- [ ] HTTP 201 Created
-- [ ] `similarityCriteria` defaults to empty array
+- [ ] HTTP 400 Bad Request
+- [ ] Error message mentions "YYYY-MM-DD format"
 
 ---
 
-#### Scenario: Create category with similarity criteria
+### 5. Station Categories (v0.1.4)
+
+#### API-014/015 - Station Category with Similarity Criteria
+
+##### Scenario: Create category with similarity criteria
 
 **Steps:**
-1. POST `/api/v1/station-categories`
+1. POST `/api/v1/station-categories`:
+
 ```json
 {
-  "name": "Offset Press",
-  "description": "Large format offset presses",
+  "name": "Offset Printing Press",
+  "description": "Large format offset presses for high-volume printing",
   "similarityCriteria": [
     {"code": "paper_type", "name": "Same paper type", "fieldPath": "paperType"},
-    {"code": "paper_size", "name": "Same paper size", "fieldPath": "paperSize"}
+    {"code": "paper_size", "name": "Same paper size", "fieldPath": "paperSize"},
+    {"code": "paper_weight", "name": "Same paper weight", "fieldPath": "paperWeight"},
+    {"code": "inking", "name": "Same inking", "fieldPath": "inkingType"}
   ]
 }
 ```
 
 **Expected Results:**
 - [ ] HTTP 201 Created
-- [ ] Response contains `similarityCriteria` array with 2 items
+- [ ] Response contains `id` (UUID)
+- [ ] Response contains `name`: "Offset Printing Press"
+- [ ] Response contains `description`
+- [ ] Response contains `similarityCriteria` array with 4 items
 - [ ] Each criterion has `code`, `name`, `fieldPath`
+- [ ] Response contains `createdAt` and `updatedAt`
 
 ---
 
-#### Scenario: Duplicate criterion code rejected
+##### Scenario: Duplicate criterion code rejected
 
 **Steps:**
-1. POST `/api/v1/station-categories` with duplicate codes:
+1. POST `/api/v1/station-categories`:
+
 ```json
 {
-  "name": "Test",
+  "name": "Test Category",
   "similarityCriteria": [
-    {"code": "paper_type", "name": "Type 1", "fieldPath": "field1"},
-    {"code": "paper_type", "name": "Type 2", "fieldPath": "field2"}
+    {"code": "paper_type", "name": "Paper type 1", "fieldPath": "field1"},
+    {"code": "paper_type", "name": "Paper type 2", "fieldPath": "field2"}
   ]
 }
 ```
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error mentions duplicate code "paper_type"
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message: "Duplicate similarity criterion code"
+- [ ] Error details include the duplicate code
 
 ---
 
-#### Scenario: Invalid criterion code format rejected
+##### Scenario: Invalid criterion code format rejected
 
 **Steps:**
-1. POST `/api/v1/station-categories` with invalid code format:
+1. POST `/api/v1/station-categories`:
+
 ```json
-{"code": "Paper-Type", "name": "Test", "fieldPath": "field"}
+{
+  "name": "Test Category",
+  "similarityCriteria": [
+    {"code": "PaperType", "name": "Paper type", "fieldPath": "paperType"}
+  ]
+}
 ```
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error: "Must be lowercase with underscores"
+- [ ] Error mentions "lowercase with underscores"
 
 ---
 
-#### Scenario: List categories
+##### Scenario: List categories
 
 **Steps:**
 1. GET `/api/v1/station-categories`
@@ -634,91 +954,37 @@ curl -X POST http://localhost:8080/api/v1/stations \
 **Expected Results:**
 - [ ] HTTP 200 OK
 - [ ] Response contains `data` array
-- [ ] Response contains `total`
+- [ ] Response contains `total` count
+- [ ] Each category includes `similarityCriteria`
 
 ---
 
-#### Scenario: List categories with search
+##### Scenario: Delete category in use rejected
 
 **Steps:**
-1. GET `/api/v1/station-categories?search=Offset`
-
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] Only categories with "Offset" in name returned
-
----
-
-#### Scenario: Update category
-
-**Steps:**
-1. PUT `/api/v1/station-categories/{id}`
-```json
-{
-  "name": "Updated Name",
-  "description": "Updated description"
-}
-```
-
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] Name and description updated
-- [ ] `updatedAt` changed
-
----
-
-#### Scenario: Delete category
-
-**Preconditions:**
-- Category not used by any station
-
-**Steps:**
-1. DELETE `/api/v1/station-categories/{id}`
-
-**Expected Results:**
-- [ ] HTTP 204 No Content
-
----
-
-#### Scenario: Delete category in use
-
-**Preconditions:**
-- Station references this category
-
-**Steps:**
-1. DELETE `/api/v1/station-categories/{id}`
+1. Create category
+2. Create station using that category
+3. DELETE `/api/v1/station-categories/{id}`
 
 **Expected Results:**
 - [ ] HTTP 409 Conflict
-- [ ] Error: Category in use
+- [ ] Error message indicates category is in use by stations
 
 ---
 
-### API-015 - StationGroup Entity
+### 6. Station Groups (v0.1.5)
 
-#### Scenario: Verify maxConcurrent values
+#### API-016/017 - Station Group with Concurrency Limit
 
-**Steps:**
-1. Create groups with various maxConcurrent values
-
-**Expected Results:**
-- [ ] Positive integer (e.g., 5) - Accepted
-- [ ] null (unlimited) - Accepted
-- [ ] 0 - Rejected (400)
-- [ ] Negative number - Rejected (400)
-
----
-
-### API-016 - Station Group CRUD API
-
-#### Scenario: Create group with concurrency limit
+##### Scenario: Create group with concurrency limit
 
 **Steps:**
-1. POST `/api/v1/station-groups`
+1. POST `/api/v1/station-groups`:
+
 ```json
 {
   "name": "Offset Press Operators",
-  "description": "Limited by operator availability",
+  "description": "Limited by operator availability - max 2 presses at once",
   "maxConcurrent": 2,
   "isOutsourcedProviderGroup": false
 }
@@ -726,32 +992,35 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 201 Created
-- [ ] `maxConcurrent` = 2
-- [ ] `isOutsourcedProviderGroup` = false
+- [ ] Response contains `maxConcurrent`: 2
+- [ ] Response contains `isOutsourcedProviderGroup`: false
 
 ---
 
-#### Scenario: Create group with unlimited capacity
+##### Scenario: Create group with unlimited capacity
 
 **Steps:**
-1. POST `/api/v1/station-groups`
+1. POST `/api/v1/station-groups`:
+
 ```json
 {
-  "name": "Digital Printers",
-  "maxConcurrent": null
+  "name": "Unlimited Group",
+  "maxConcurrent": null,
+  "isOutsourcedProviderGroup": false
 }
 ```
 
 **Expected Results:**
 - [ ] HTTP 201 Created
-- [ ] `maxConcurrent` = null
+- [ ] Response contains `maxConcurrent`: null
 
 ---
 
-#### Scenario: Provider group must have unlimited capacity
+##### Scenario: Provider group must have unlimited capacity
 
 **Steps:**
-1. POST `/api/v1/station-groups`
+1. POST `/api/v1/station-groups`:
+
 ```json
 {
   "name": "Provider Group",
@@ -762,88 +1031,69 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error: "Outsourced provider groups must have unlimited capacity (maxConcurrent = null)"
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message: "Outsourced provider groups must have unlimited capacity"
 
 ---
 
-#### Scenario: Create provider group correctly
+##### Scenario: maxConcurrent must be positive
 
 **Steps:**
-1. POST `/api/v1/station-groups`
+1. POST `/api/v1/station-groups`:
+
 ```json
 {
-  "name": "Provider Group",
-  "maxConcurrent": null,
-  "isOutsourcedProviderGroup": true
+  "name": "Invalid Group",
+  "maxConcurrent": 0,
+  "isOutsourcedProviderGroup": false
 }
 ```
 
 **Expected Results:**
-- [ ] HTTP 201 Created
-- [ ] `isOutsourcedProviderGroup` = true
-- [ ] `maxConcurrent` = null
+- [ ] HTTP 400 Bad Request
+- [ ] Error message: "maxConcurrent must be a positive integer or null"
 
 ---
 
-#### Scenario: List groups
+##### Scenario: maxConcurrent negative rejected
 
 **Steps:**
-1. GET `/api/v1/station-groups`
+1. POST `/api/v1/station-groups`:
+
+```json
+{
+  "name": "Invalid Group",
+  "maxConcurrent": -1,
+  "isOutsourcedProviderGroup": false
+}
+```
+
+**Expected Results:**
+- [ ] HTTP 400 Bad Request
+- [ ] Error message indicates positive integer required
+
+---
+
+##### Scenario: List groups with filter
+
+**Steps:**
+1. GET `/api/v1/station-groups?isOutsourcedProviderGroup=false`
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] Response contains `data` array
+- [ ] All returned groups have `isOutsourcedProviderGroup`: false
 
 ---
 
-#### Scenario: List groups with provider filter
+### 7. Outsourced Providers (v0.1.6)
+
+#### API-018/019 - Provider with Auto-created Group
+
+##### Scenario: Create provider (auto-creates station group)
 
 **Steps:**
-1. GET `/api/v1/station-groups?isOutsourcedProviderGroup=true`
+1. POST `/api/v1/providers`:
 
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] All returned groups have `isOutsourcedProviderGroup: true`
-
----
-
-#### Scenario: Delete group in use
-
-**Preconditions:**
-- Station references this group
-
-**Steps:**
-1. DELETE `/api/v1/station-groups/{id}`
-
-**Expected Results:**
-- [ ] HTTP 409 Conflict
-- [ ] Error: Group in use by stations
-
----
-
-### API-017 - OutsourcedProvider Entity
-
-#### Scenario: Verify provider fields
-
-**Steps:**
-1. GET `/api/v1/providers/{id}`
-
-**Expected Results:**
-- [ ] `name` - Provider name
-- [ ] `status` - Active or Inactive
-- [ ] `supportedActionTypes` - Array of strings
-- [ ] `latestDepartureTime` - HH:MM format
-- [ ] `receptionTime` - HH:MM format
-- [ ] `groupId` - Reference to auto-created group
-
----
-
-### API-018 - Provider CRUD API
-
-#### Scenario: Create provider (auto-creates group)
-
-**Steps:**
-1. POST `/api/v1/providers`
 ```json
 {
   "name": "Pelliculage Express",
@@ -855,111 +1105,73 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 201 Created
-- [ ] Response contains `groupId`
-- [ ] `status` defaults to "Active"
-- [ ] Default times applied if not provided
-
-2. GET `/api/v1/station-groups/{groupId}`
-
-**Expected Results:**
-- [ ] Group exists
-- [ ] `isOutsourcedProviderGroup` = true
-- [ ] `maxConcurrent` = null (unlimited)
-- [ ] Group name derived from provider name
+- [ ] Response contains `id` (UUID)
+- [ ] Response contains `name`: "Pelliculage Express"
+- [ ] Response contains `status`: "Active"
+- [ ] Response contains `groupId` (UUID)
+- [ ] Response contains `supportedActionTypes` array
+- [ ] Response contains `latestDepartureTime`: "14:00"
+- [ ] Response contains `receptionTime`: "09:00"
 
 ---
 
-#### Scenario: Create provider with defaults
+##### Scenario: Verify auto-created group properties
 
 **Steps:**
-1. POST `/api/v1/providers`
-```json
-{
-  "name": "Test Provider",
-  "supportedActionTypes": ["Test"]
-}
-```
+1. Create provider "Pelliculage Express"
+2. GET `/api/v1/station-groups/{groupId}` using groupId from response
 
 **Expected Results:**
-- [ ] HTTP 201 Created
-- [ ] `latestDepartureTime` = "14:00" (default)
-- [ ] `receptionTime` = "09:00" (default)
+- [ ] HTTP 200 OK
+- [ ] Group `maxConcurrent`: null (unlimited)
+- [ ] Group `isOutsourcedProviderGroup`: true
+- [ ] Group name contains provider name
 
 ---
 
-#### Scenario: Provider without action types rejected
+##### Scenario: Create provider without action types rejected
 
 **Steps:**
-1. POST `/api/v1/providers`
+1. POST `/api/v1/providers`:
+
 ```json
 {
-  "name": "Test Provider",
+  "name": "Invalid Provider",
   "supportedActionTypes": []
 }
 ```
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error: "At least one supported action type is required"
+- [ ] Error message: "At least one supported action type is required"
 
 ---
 
-#### Scenario: Invalid time format rejected
+##### Scenario: Create provider with invalid time format
 
 **Steps:**
-1. POST `/api/v1/providers`
+1. POST `/api/v1/providers`:
+
 ```json
 {
-  "name": "Test",
-  "supportedActionTypes": ["Test"],
+  "name": "Invalid Provider",
+  "supportedActionTypes": ["Pelliculage"],
   "latestDepartureTime": "2:00 PM"
 }
 ```
 
 **Expected Results:**
 - [ ] HTTP 400 Bad Request
-- [ ] Error mentions "HH:MM format"
+- [ ] Error message: "Invalid time format. Expected HH:MM"
 
 ---
 
-#### Scenario: List providers
+##### Scenario: Update provider status to Inactive
 
 **Steps:**
-1. GET `/api/v1/providers`
+1. Create provider
+2. PUT `/api/v1/providers/{id}`:
 
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] Response contains `data` array
-- [ ] Response contains `total`
-
----
-
-#### Scenario: List providers with status filter
-
-**Steps:**
-1. GET `/api/v1/providers?status=Active`
-
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] All returned providers have `status: "Active"`
-
----
-
-#### Scenario: List providers with action type filter
-
-**Steps:**
-1. GET `/api/v1/providers?actionType=Pelliculage`
-
-**Expected Results:**
-- [ ] HTTP 200 OK
-- [ ] All returned providers have "Pelliculage" in `supportedActionTypes`
-
----
-
-#### Scenario: Update provider status
-
-**Steps:**
-1. PUT `/api/v1/providers/{id}`
 ```json
 {
   "status": "Inactive"
@@ -968,94 +1180,222 @@ curl -X POST http://localhost:8080/api/v1/stations \
 
 **Expected Results:**
 - [ ] HTTP 200 OK
-- [ ] `status` = "Inactive"
-- [ ] `groupId` unchanged (cannot be modified)
+- [ ] Response contains `status`: "Inactive"
+- [ ] `groupId` unchanged
 
 ---
 
-### API-019 - Auto-create Provider Group
-
-#### Scenario: Verify auto-created group properties
-
-**Preconditions:**
-- Create a new provider
+##### Scenario: List providers with action type filter
 
 **Steps:**
-1. POST `/api/v1/providers` (create provider)
-2. GET `/api/v1/station-groups/{groupId}` (get auto-created group)
+1. Create providers with different action types
+2. GET `/api/v1/providers?actionType=Pelliculage`
 
 **Expected Results:**
-- [ ] Group `name` contains provider name
-- [ ] `isOutsourcedProviderGroup` = true
-- [ ] `maxConcurrent` = null
-- [ ] Group `description` references provider
+- [ ] HTTP 200 OK
+- [ ] All returned providers support "Pelliculage" action type
 
 ---
 
-### API-020, API-021 - Domain Events
+### 8. Domain Events (v0.1.7)
 
-#### Scenario: Verify domain events are recorded (Developer verification)
+#### API-020 - Domain Events
 
-**Note:** Domain events are internal and not exposed via API. Verification requires log inspection or debugger.
+##### Scenario: StationRegistered event on creation
 
-**Events to verify:**
-- [ ] `StationRegistered` - On station creation
-- [ ] `OperatingScheduleUpdated` - On schedule update
-- [ ] `ScheduleExceptionAdded` - On exception creation
-- [ ] `StationStatusChanged` - On status change
+**Steps:**
+1. POST `/api/v1/stations` to create new station
+2. Check event log/queue (implementation-specific)
+
+**Expected Results:**
+- [ ] StationRegistered event dispatched
+- [ ] Event contains `stationId`
+- [ ] Event contains `name`
+- [ ] Event contains `categoryId`
+- [ ] Event contains `groupId`
+- [ ] Event contains `registeredAt` timestamp
+
+---
+
+##### Scenario: OperatingScheduleUpdated event
+
+**Steps:**
+1. PUT `/api/v1/stations/{id}/schedule` with new schedule
+2. Check event log/queue
+
+**Expected Results:**
+- [ ] OperatingScheduleUpdated event dispatched
+- [ ] Event contains `stationId`
+- [ ] Event contains `weeklyPattern` with all 7 days
+- [ ] Event contains `updatedAt` timestamp
+
+---
+
+##### Scenario: ScheduleExceptionAdded event
+
+**Steps:**
+1. POST `/api/v1/stations/{id}/exceptions` to add exception
+2. Check event log/queue
+
+**Expected Results:**
+- [ ] ScheduleExceptionAdded event dispatched
+- [ ] Event contains `stationId`
+- [ ] Event contains `exceptionDate`
+- [ ] Event contains `type` (CLOSED or MODIFIED)
+- [ ] Event contains `addedAt` timestamp
+
+---
+
+##### Scenario: StationStatusChanged event
+
+**Steps:**
+1. PUT `/api/v1/stations/{id}` with status change (active → maintenance)
+2. Check event log/queue
+
+**Expected Results:**
+- [ ] StationStatusChanged event dispatched
+- [ ] Event contains `stationId`
+- [ ] Event contains `previousStatus`: "active"
+- [ ] Event contains `newStatus`: "maintenance"
+- [ ] Event contains `changedAt` timestamp
 
 ---
 
 ## Edge Cases
 
-| Eset | Elvárt viselkedés |
-|------|-------------------|
-| Invalid UUID format in path | 400 Bad Request |
-| Empty request body | 400 Validation Error |
-| Extra unknown fields in request | Ignored (no error) |
-| Very long name (>100 chars) | 400 Validation Error |
-| Time "24:00" as end time | Accepted (end of day) |
-| Time "00:00" as start time | Accepted (midnight) |
-| Past date for exception | Accepted (MVP relaxed) |
-| Future date for exception | Accepted |
-| Delete category in use | 409 Conflict |
-| Delete group in use | 409 Conflict |
-| Delete station with tasks | 409 Conflict (future) |
-| Concurrent requests (same name) | One succeeds, other gets 409 |
+### Station Name Edge Cases
+
+| # | Scenario | Request | Expected |
+|---|----------|---------|----------|
+| E1 | Name exactly 100 chars | POST with 100-char name | 201 Created |
+| E2 | Name 101 chars | POST with 101-char name | 400 Bad Request |
+| E3 | Name with special chars | POST with name "Station @#$%" | Depends on validation rules |
+| E4 | Name with Unicode | POST with name "Machine été" | 201 Created (if supported) |
+
+### Schedule Edge Cases
+
+| # | Scenario | Request | Expected |
+|---|----------|---------|----------|
+| E5 | Schedule with 10 slots per day | PUT with many slots | 200 OK or validation limit |
+| E6 | Schedule spanning midnight | slot end "24:00" | 200 OK |
+| E7 | All days non-operating | All isOperating: false | 200 OK (valid schedule) |
+
+### Exception Edge Cases
+
+| # | Scenario | Request | Expected |
+|---|----------|---------|----------|
+| E8 | Exception in the past | POST with past date | Depends on validation rules |
+| E9 | Exception far in future | POST with date 10 years away | 201 Created |
+| E10 | MODIFIED with overlapping slots | POST MODIFIED with overlapping | 400 Bad Request |
+
+### Group/Provider Edge Cases
+
+| # | Scenario | Request | Expected |
+|---|----------|---------|----------|
+| E11 | Group with maxConcurrent 999 | POST with very high value | 201 Created |
+| E12 | Provider with 20 action types | POST with many action types | 201 Created or limit error |
+| E13 | Delete provider, check group | DELETE provider | Group may or may not be deleted |
 
 ---
 
-## Cross-feature Interactions
+## Cross-Feature Interactions
 
-| Kapcsolódó feature | Interakció típusa |
-|--------------------|-------------------|
-| Station + Category | Station requires valid categoryId (FK) |
-| Station + Group | Station requires valid groupId (FK) |
-| Provider + Group | Provider auto-creates StationGroup |
-| Station + Schedule | Schedule nullable until task assignment |
-| Schedule + Exception | Exception overrides weekly pattern for date |
-| Group + Provider | Provider groups must have unlimited capacity |
-| Category + Station | Cannot delete category with assigned stations |
-| Group + Station | Cannot delete group with assigned stations |
+| Features | Interaction | Test |
+|----------|-------------|------|
+| Station + Category | Station must reference valid category | Create station with valid/invalid categoryId |
+| Station + Group | Station must reference valid group | Create station with valid/invalid groupId |
+| Schedule + Exceptions | Exception overrides regular schedule | Set regular + exception, verify effective schedule |
+| Provider + Group | Provider auto-creates group | Create provider, verify group properties |
+| Status + Events | Status change triggers event | Change status, verify StationStatusChanged event |
+| Group + Provider | Provider groups must be unlimited | Create provider group with maxConcurrent |
 
 ---
 
-## Visual Checklist (Swagger UI)
+## Test Data Requirements
 
-- [ ] All endpoints visible in Swagger UI
-- [ ] Request schemas show required fields
-- [ ] Response schemas show field types
-- [ ] Error responses documented (400, 404, 409)
-- [ ] Try-it-out functionality works
-- [ ] Authentication not required (MVP)
+### Minimum Test Fixtures
+
+Before running tests, ensure:
+
+- [ ] At least 2 station categories exist
+- [ ] At least 2 station groups exist (1 regular, 1 provider-type)
+- [ ] At least 3 stations exist (various statuses)
+- [ ] At least 1 station has operating schedule set
+- [ ] At least 1 station has schedule exceptions
+- [ ] At least 1 outsourced provider exists
+
+### Sample Test Data
+
+**Station Category:**
+```json
+{
+  "id": "cat-offset",
+  "name": "Offset Press",
+  "similarityCriteria": [
+    {"code": "paper_type", "name": "Same paper", "fieldPath": "paperType"}
+  ]
+}
+```
+
+**Station Group:**
+```json
+{
+  "id": "grp-offset",
+  "name": "Offset Operators",
+  "maxConcurrent": 2,
+  "isOutsourcedProviderGroup": false
+}
+```
+
+**Station:**
+```json
+{
+  "id": "station-komori",
+  "name": "Komori G37",
+  "categoryId": "cat-offset",
+  "groupId": "grp-offset",
+  "status": "active",
+  "capacity": 1
+}
+```
 
 ---
 
-## Summary
+## Verification Checklist
 
-| Metrika | Érték |
-|---------|-------|
-| Feldolgozott feature-ök | 21 |
-| Generált teszt szcenáriók | 52 |
-| Edge case-ek | 12 |
-| Cross-feature interactions | 8 |
+### API Contract
+
+- [ ] All endpoints return correct HTTP status codes
+- [ ] All endpoints return `application/json` content type
+- [ ] Error responses follow standard format: `{ "error": { "code", "message", "details" } }`
+- [ ] UUIDs are properly generated and formatted
+- [ ] Timestamps use ISO 8601 format
+- [ ] Pagination works correctly on list endpoints
+
+### Business Rules
+
+- [ ] BR-STATION-001: Unique station identifiers
+- [ ] BR-STATION-002: Station must belong to category
+- [ ] BR-STATION-003: Station must belong to group
+- [ ] BR-STATION-005: Schedule slots cannot overlap
+- [ ] BR-STATION-008: Exceptions override regular schedule
+- [ ] BR-CATEGORY-002: Unique criterion codes within category
+- [ ] BR-GROUP-003: Provider groups must be unlimited
+- [ ] BR-PROVIDER-002: Provider creates own station group
+
+### Documentation
+
+- [ ] OpenAPI documentation accessible at /api/doc
+- [ ] All endpoints documented with request/response examples
+- [ ] Error codes documented
+
+---
+
+## Notes
+
+- Test with both Swagger UI and curl for consistency
+- Verify JSON response structure matches OpenAPI spec
+- Check for proper CORS headers if testing from browser
+- Domain events may be async - allow time for propagation
+- Times are in 24-hour HH:MM format
+- Dates are in ISO 8601 YYYY-MM-DD format

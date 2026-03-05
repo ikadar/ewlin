@@ -32,7 +32,9 @@ describe('transformJcfElementToRequest', () => {
 
     expect(result.name).toBe('INT');
     expect(result.prerequisiteNames).toEqual([]);
-    expect(result.label).toBe('A4 | 8P | Couche 135g');
+    expect(result.format).toBe('A4');
+    expect(result.papier).toBe('Couche 135g');
+    expect(result.pagination).toBe(8);
     expect(result.sequence).toBe('M1 30+60');
   });
 
@@ -57,7 +59,9 @@ describe('transformJcfElementToRequest', () => {
 
     expect(result.name).toBe('COUV');
     expect(result.prerequisiteNames).toEqual(['INT', 'PAGE']);
-    expect(result.label).toBe('A3 | 4P | Couche 250g');
+    expect(result.format).toBe('A3');
+    expect(result.papier).toBe('Couche 250g');
+    expect(result.pagination).toBe(4);
     expect(result.sequence).toBeUndefined();
   });
 
@@ -80,7 +84,7 @@ describe('transformJcfElementToRequest', () => {
 
     const result = transformJcfElementToRequest(element);
 
-    expect(result.label).toBeUndefined();
+    expect(result.format).toBeUndefined();
   });
 
   it('handles whitespace in precedences', () => {
@@ -153,7 +157,7 @@ describe('transformJcfToRequest', () => {
     expect(result.client).toBe('ACME Corp');
     expect(result.description).toBe('Brochure A4');
     expect(result.workshopExitDate).toBe('2025-02-15');
-    expect(result.status).toBe('draft');
+    expect(result.status).toBe('planned');
     expect(result.elements).toHaveLength(2);
     expect(result.elements[0].name).toBe('INT');
     expect(result.elements[0].prerequisiteNames).toEqual([]);

@@ -20,6 +20,7 @@ import type { Task, Job } from '@flux/types';
 import { hexToTailwindColor, getColorClasses } from '../components/Tile';
 import { snapToGrid, ValidationMessage } from '../components/DragPreview';
 import { usePickState } from './PickStateContext';
+import { useGetSnapshotQuery } from '../store';
 
 /**
  * Get color class for ring state display.
@@ -95,8 +96,11 @@ function PickPreviewInner({ task, job, validationMessage, debugInfo }: PickPrevi
   const tailwindColor = hexToTailwindColor(job.color);
   const colors = getColorClasses(tailwindColor);
 
-  // Get station name for internal tasks
-  const stationName = task.type === 'Internal' ? task.stationId : 'Outsourced';
+  // Resolve station name from snapshot (instead of showing UUID)
+  const { data: snapshotData } = useGetSnapshotQuery();
+  const stationName = task.type === 'Internal'
+    ? (snapshotData?.stations.find(s => s.id === task.stationId)?.name ?? task.stationId)
+    : 'Outsourced';
 
   // Format duration
   const formatDuration = (): string => {
@@ -217,12 +221,12 @@ function PickPreviewInner({ task, job, validationMessage, debugInfo }: PickPrevi
       )}
       {/* Debug overlay */}
       {debugInfo && (
-        <div className="mt-2 px-2 py-1 bg-black/90 text-xs text-white font-mono rounded max-w-72">
+        <div className="mt-2 px-2 py-1 bg-black/90 text-xs text-white font-mono rounded max-w-[32rem]">
           <div>ring: <span className={getRingStateColorClass(debugInfo.ringState)}>{debugInfo.ringState}</span></div>
           <div>start: {debugInfo.scheduledStart ? new Date(debugInfo.scheduledStart).toLocaleTimeString() : 'null'}</div>
           <div>conflicts: {debugInfo.conflicts.length === 0 ? 'none' : debugInfo.conflicts.map(c => c.type).join(', ')}</div>
           {debugInfo.conflicts.map((c) => (
-            <div key={`${c.type}-${c.message}`} className="text-zinc-400 truncate">{c.type}: {c.message}</div>
+            <div key={`${c.type}-${c.message}`} className="text-zinc-400 break-words">{c.type}: {c.message}</div>
           ))}
         </div>
       )}

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./",
+    "noEmit": true
+  },
+  "include": ["helpers/**/*.ts", "scenarios/**/*.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

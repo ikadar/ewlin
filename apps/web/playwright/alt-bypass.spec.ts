@@ -20,8 +20,8 @@ test.describe('v0.3.28: Alt+Drag Bypass Bug Fix (REQ-13)', () => {
   test.beforeEach(async ({ page }) => {
     // Use alt-bypass fixture:
     // - Job with 2 sequential tasks
-    // - Task 1 scheduled at 10:00-11:00 on Komori
-    // - Task 2 unscheduled, sequenceOrder: 1, on Polar
+    // - Task 1 scheduled at 10:00-11:00 on Offset
+    // - Task 2 unscheduled, sequenceOrder: 1, on Massicot
     // - Valid placement for Task 2 is >= 11:00
     await page.goto('/?fixture=alt-bypass');
     await waitForAppReady(page);
@@ -38,24 +38,24 @@ test.describe('v0.3.28: Alt+Drag Bypass Bug Fix (REQ-13)', () => {
     await expect(taskTile).toBeVisible();
 
     // Count tiles before
-    const tilesBefore = await countTilesOnStation(page, 'station-polar');
+    const tilesBefore = await countTilesOnStation(page, 'station-massicot');
     console.log(`Tiles on Polar before: ${tilesBefore}`);
 
-    // ACT: Drag Task 2 to Polar station at 09:00 (BEFORE Task 1 ends at 11:00)
+    // ACT: Drag Task 2 to Massicot station at 09:00 (BEFORE Task 1 ends at 11:00)
     // With Alt pressed to bypass precedence
-    // v0.4.29: 09:00 is 3 hours after 06:00 start = 3 * 64px = 192px from column top
+    // 09:00 is 3 hours after 06:00 start = 3 * 80px = 240px from column top
     await dragFromSidebarToStationWithAlt(
       page,
       '[data-testid="task-tile-task-bypass-2"]',
-      'station-polar',
-      192 // ~09:00
+      'station-massicot',
+      240 // ~09:00
     );
 
     // Wait for state update
     await page.waitForTimeout(500);
 
     // ASSERT: Check that the tile was placed
-    const tilesAfter = await countTilesOnStation(page, 'station-polar');
+    const tilesAfter = await countTilesOnStation(page, 'station-massicot');
     console.log(`Tiles on Polar after: ${tilesAfter}`);
 
     if (tilesAfter > tilesBefore) {
@@ -98,14 +98,14 @@ test.describe('v0.3.28: Alt+Drag Bypass Bug Fix (REQ-13)', () => {
     await dragFromSidebarToStation(
       page,
       '[data-testid="task-tile-task-bypass-2"]',
-      'station-polar',
-      240 // ~09:00
+      'station-massicot',
+      240 // ~09:00 = 3h * 80px
     );
 
     await page.waitForTimeout(500);
 
     // ASSERT: Check tile was placed (auto-snapped)
-    const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+    const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
     const polarTiles = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]');
     const count = await polarTiles.count();
 
@@ -138,18 +138,18 @@ test.describe('v0.3.28: Alt+Drag Bypass Bug Fix (REQ-13)', () => {
     await expect(taskTile).toBeVisible();
 
     // ACT: Drag Task 2 to 12:00 (AFTER Task 1 ends at 11:00) with Alt
-    // v0.4.29: 12:00 is 6 hours after 06:00 start = 6 * 64px = 384px from column top
+    // 12:00 is 6 hours after 06:00 start = 6 * 80px = 480px from column top
     await dragFromSidebarToStationWithAlt(
       page,
       '[data-testid="task-tile-task-bypass-2"]',
-      'station-polar',
-      384 // ~12:00
+      'station-massicot',
+      480 // ~12:00
     );
 
     await page.waitForTimeout(500);
 
     // ASSERT: Tile should be placed at valid position
-    const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+    const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
     const polarTiles = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]');
     const count = await polarTiles.count();
 
@@ -165,7 +165,7 @@ test.describe('v0.3.28: Alt+Drag Bypass Bug Fix (REQ-13)', () => {
 
   test('Predecessor task (Task 1) is visible at 10:00', async ({ page }) => {
     // ARRANGE & ASSERT: Verify Task 1 is scheduled at 10:00
-    const komoriColumn = page.locator('[data-testid="station-column-station-komori"]');
+    const komoriColumn = page.locator('[data-testid="station-column-station-offset"]');
     const task1Tile = komoriColumn.locator('[data-testid="tile-assign-bypass-1"]');
 
     await expect(task1Tile).toBeVisible();

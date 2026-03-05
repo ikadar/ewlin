@@ -14,6 +14,10 @@ export interface DateTimePickerProps {
   disabled?: boolean;
   /** Test ID for the input */
   testId?: string;
+  /** Validation state for visual feedback */
+  validationState?: 'valid' | 'warning' | 'error';
+  /** Validation message (shown as title tooltip) */
+  validationMessage?: string;
 }
 
 /**
@@ -28,6 +32,8 @@ export const DateTimePicker = memo(function DateTimePicker({
   placeholder = '--/-- --:--',
   disabled = false,
   testId,
+  validationState = 'valid',
+  validationMessage,
 }: DateTimePickerProps) {
   // Track if user is actively editing
   const [isEditing, setIsEditing] = useState(false);
@@ -80,6 +86,12 @@ export const DateTimePicker = memo(function DateTimePicker({
     []
   );
 
+  const borderClass = validationState === 'error'
+    ? 'border-red-500'
+    : validationState === 'warning'
+      ? 'border-amber-500'
+      : 'border-zinc-700';
+
   return (
     <div className="flex items-center gap-2">
       <label className="text-zinc-500 text-xs shrink-0 w-8">{label}</label>
@@ -92,7 +104,8 @@ export const DateTimePicker = memo(function DateTimePicker({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
-        className="flex-1 px-1.5 py-0.5 text-xs bg-zinc-800 border border-zinc-700 rounded text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+        title={validationMessage}
+        className={`flex-1 px-1.5 py-0.5 text-xs bg-zinc-800 border ${borderClass} rounded text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed font-mono`}
         data-testid={testId}
       />
     </div>

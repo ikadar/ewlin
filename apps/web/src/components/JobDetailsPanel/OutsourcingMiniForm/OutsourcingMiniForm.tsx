@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo } from 'react';
 import type { OutsourcedTask, OutsourcedProvider } from '@flux/types';
 import { WorkDaysInput } from './WorkDaysInput';
 import { DateTimePicker } from './DateTimePicker';
-import { calculateOutsourcingDates } from '../../../utils/outsourcingCalculation';
+import { calculateOutsourcingDates, calculateReturnDate } from '../../../utils/outsourcingCalculation';
 
 export interface OutsourcingMiniFormProps {
   /** The outsourced task */
@@ -13,12 +13,16 @@ export interface OutsourcingMiniFormProps {
   jobColor: string;
   /** End time of predecessor task (if scheduled) - ISO string */
   predecessorEndTime?: string;
+  /** Job workshop exit date (deadline) - ISO date string */
+  workshopExitDate?: string;
   /** Callback when work days changes */
   onWorkDaysChange?: (taskId: string, workDays: number) => void;
   /** Callback when manual departure changes */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** Callback when manual return changes */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** Whether this is the last task of the job (one-way shipping, no return transit) */
+  isLastTaskOfJob?: boolean;
 }
 
 /**
@@ -31,9 +35,11 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   provider,
   jobColor,
   predecessorEndTime,
+  workshopExitDate,
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
+  isLastTaskOfJob,
 }: OutsourcingMiniFormProps) {
   // Calculate dates from predecessor if available and no manual override
   const calculatedDates = useMemo(() => {
@@ -44,23 +50,71 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
       latestDepartureTime: provider.latestDepartureTime,
       receptionTime: provider.receptionTime,
       transitDays: provider.transitDays,
+      oneWay: isLastTaskOfJob,
     });
-  }, [predecessorEndTime, provider, task.duration.openDays]);
+  }, [predecessorEndTime, provider, task.duration.openDays, isLastTaskOfJob]);
 
-  // Use manual values if set, otherwise use calculated values
+  // Use manual values if set, otherwise use calculated values.
+  // When predecessorEndTime is absent (predecessor unscheduled), dates are meaningless — show empty.
   const departureValue = useMemo(() => {
+    if (!predecessorEndTime) return undefined;
     if (task.manualDeparture) {
       return new Date(task.manualDeparture);
     }
     return calculatedDates?.departure;
-  }, [task.manualDeparture, calculatedDates]);
+  }, [predecessorEndTime, task.manualDeparture, calculatedDates]);
 
   const returnValue = useMemo(() => {
+    if (isLastTaskOfJob) return undefined;
+    if (!predecessorEndTime) return undefined;
     if (task.manualReturn) {
       return new Date(task.manualReturn);
     }
     return calculatedDates?.return;
-  }, [task.manualReturn, calculatedDates]);
+  }, [isLastTaskOfJob, predecessorEndTime, task.manualReturn, calculatedDates]);
+
+  // Validation state for inline feedback
+  const validation = useMemo(() => {
+    const result: {
+      departure: 'valid' | 'warning' | 'error';
+      return: 'valid' | 'warning' | 'error';
+      departureMessage?: string;
+      returnMessage?: string;
+    } = { departure: 'valid', return: 'valid' };
+
+    if (!departureValue) return result;
+
+    // Rule 2: departure < predecessor end → precedence warning (amber)
+    if (predecessorEndTime && departureValue < new Date(predecessorEndTime)) {
+      result.departure = 'warning';
+      result.departureMessage = 'Avant fin prédécesseur';
+    }
+
+    // Rule 3: departure > deadline → error (red), overrides warning
+    if (workshopExitDate) {
+      const deadline = new Date(workshopExitDate);
+      if (departureValue > deadline) {
+        result.departure = 'error';
+        result.departureMessage = 'Après échéance';
+      }
+    }
+
+    // Rule 1: return < calculated minimum → error (red)
+    // Skip return validation for one-way shipping (no return)
+    if (!isLastTaskOfJob && returnValue && provider) {
+      const minReturn = calculateReturnDate(departureValue, {
+        workDays: task.duration.openDays,
+        transitDays: provider.transitDays,
+        receptionTime: provider.receptionTime,
+      });
+      if (returnValue < minReturn) {
+        result.return = 'error';
+        result.returnMessage = 'Avant dép + JO';
+      }
+    }
+
+    return result;
+  }, [departureValue, returnValue, predecessorEndTime, workshopExitDate, provider, task.duration.openDays, isLastTaskOfJob]);
 
   // Handlers
   const handleWorkDaysChange = useCallback(
@@ -128,16 +182,27 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
           onChange={handleDepartureChange}
           disabled={!onDepartureChange}
           testId="outsourcing-departure"
+          validationState={validation.departure}
+          validationMessage={validation.departureMessage}
         />
 
-        {/* Return date/time */}
-        <DateTimePicker
-          label="Ret:"
-          value={returnValue}
-          onChange={handleReturnChange}
-          disabled={!onReturnChange}
-          testId="outsourcing-return"
-        />
+        {/* Return date/time — hidden for one-way shipping (last task of job) */}
+        {isLastTaskOfJob ? (
+          <div className="flex items-center gap-2 text-xs text-zinc-500 py-0.5">
+            <span>Ret:</span>
+            <span className="italic text-zinc-600">Aller simple</span>
+          </div>
+        ) : (
+          <DateTimePicker
+            label="Ret:"
+            value={returnValue}
+            onChange={handleReturnChange}
+            disabled={!onReturnChange}
+            testId="outsourcing-return"
+            validationState={validation.return}
+            validationMessage={validation.returnMessage}
+          />
+        )}
       </div>
     </div>
   );

@@ -15,7 +15,6 @@ import {
   waitForAppReady,
   countTilesOnStation,
   isOnSnapBoundary,
-  pickAndPlace,
   pickAndPlaceAtTime,
 } from './helpers/drag';
 
@@ -60,9 +59,10 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
     const tilesBefore = await countTilesOnStation(page, 'station-komori');
     expect(tilesBefore).toBe(0); // No tiles initially
 
-    // ACT: Pick task and place on Komori station
-    // v0.4.29: 200 → 160 (scaled to 64px/hour)
-    await pickAndPlace(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 160);
+    // ACT: Pick task and place on Komori station at 10:00 AM
+    // Use pickAndPlaceAtTime to avoid flakiness from scroll-position timing issues
+    // (Y-offset based placement can land outside operating hours depending on when test runs)
+    await pickAndPlaceAtTime(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 10, 0);
 
     // ASSERT: New tile should be created
     const tilesAfter = await countTilesOnStation(page, 'station-komori');
@@ -132,8 +132,9 @@ test.describe('UC-01: New Task Placement (Sidebar → Grid)', () => {
     const countBefore = await tilesBeforeSelector.count();
     expect(countBefore).toBe(0);
 
-    // ACT: Pick task and place on station
-    await pickAndPlace(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 150);
+    // ACT: Pick task and place on station at 10:00 AM
+    // Use pickAndPlaceAtTime to avoid flakiness from scroll-position timing issues
+    await pickAndPlaceAtTime(page, '[data-testid="task-tile-task-sidebar-1"]', 'station-komori', 10, 0);
 
     // ASSERT: Tile should appear on grid
     const tilesAfterSelector = stationColumn.locator(tileSelector);

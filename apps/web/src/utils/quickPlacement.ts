@@ -8,8 +8,9 @@ import { isInternalTask } from '@flux/types';
 import { getTasksForJob } from './taskHelpers';
 
 /**
- * Get the last (highest sequenceOrder) unscheduled internal task for a job.
- * This is the task that should be placed next in backward scheduling.
+ * Get the last (bottom-most in task list) unscheduled internal task for a job.
+ * Iterates through all elements in display order, then tasks by sequenceOrder,
+ * and returns the last unscheduled internal task across all elements.
  *
  * @param job - The job to get the task for
  * @param tasks - All tasks in the snapshot
@@ -23,18 +24,29 @@ export function getLastUnscheduledTask(
   elements: Element[],
   assignments: TaskAssignment[]
 ): InternalTask | null {
-  // Get all internal tasks for this job that are unscheduled
-  const unscheduledTasks = getTasksForJob(job.id, tasks, elements)
-    .filter((t): t is InternalTask => isInternalTask(t))
-    .filter((t) => !assignments.some((a) => a.taskId === t.id));
+  const taskById = new Map(tasks.map((t) => [t.id, t]));
+  const assignedTaskIds = new Set(assignments.map((a) => a.taskId));
 
-  if (unscheduledTasks.length === 0) {
-    return null;
+  // Iterate elements in display order (same as sidebar: elements array filtered by job)
+  const jobElements = elements.filter((e) => job.elementIds.includes(e.id));
+
+  let lastUnscheduled: InternalTask | null = null;
+
+  for (const element of jobElements) {
+    // Tasks within element in sequenceOrder
+    const elementTasks = element.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is Task => t !== undefined)
+      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+
+    for (const task of elementTasks) {
+      if (isInternalTask(task) && !assignedTaskIds.has(task.id)) {
+        lastUnscheduled = task;
+      }
+    }
   }
 
-  // Sort by sequenceOrder descending and return the highest
-  unscheduledTasks.sort((a, b) => b.sequenceOrder - a.sequenceOrder);
-  return unscheduledTasks[0];
+  return lastUnscheduled;
 }
 
 /**

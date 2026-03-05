@@ -91,10 +91,10 @@ describe('canActivateQuickPlacement', () => {
 
 describe('getLastUnscheduledTask', () => {
   const job = createJob('job-1');
-  const elements = [createElement('job-1')];
 
   it('returns the only unscheduled task', () => {
     const tasks: Task[] = [createInternalTask('task-1', 'element-job-1', 'station-a', 1)];
+    const elements = [createElement('job-1', ['task-1'])];
     const assignments: TaskAssignment[] = [];
 
     const result = getLastUnscheduledTask(job, tasks, elements, assignments);
@@ -108,6 +108,7 @@ describe('getLastUnscheduledTask', () => {
       createInternalTask('task-2', 'element-job-1', 'station-b', 2),
       createInternalTask('task-3', 'element-job-1', 'station-c', 3),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2', 'task-3'])];
     const assignments: TaskAssignment[] = [];
 
     const result = getLastUnscheduledTask(job, tasks, elements, assignments);
@@ -122,6 +123,7 @@ describe('getLastUnscheduledTask', () => {
       createInternalTask('task-2', 'element-job-1', 'station-b', 2),
       createInternalTask('task-3', 'element-job-1', 'station-c', 3),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2', 'task-3'])];
     // Task 3 is scheduled
     const assignments: TaskAssignment[] = [createAssignment('task-3', 'station-c')];
 
@@ -132,6 +134,7 @@ describe('getLastUnscheduledTask', () => {
 
   it('returns null when all tasks are scheduled', () => {
     const tasks: Task[] = [createInternalTask('task-1', 'element-job-1', 'station-a', 1)];
+    const elements = [createElement('job-1', ['task-1'])];
     const assignments: TaskAssignment[] = [createAssignment('task-1', 'station-a')];
 
     const result = getLastUnscheduledTask(job, tasks, elements, assignments);
@@ -140,6 +143,7 @@ describe('getLastUnscheduledTask', () => {
 
   it('returns null when job has no tasks', () => {
     const tasks: Task[] = [];
+    const elements = [createElement('job-1')];
     const assignments: TaskAssignment[] = [];
 
     const result = getLastUnscheduledTask(job, tasks, elements, assignments);
@@ -149,7 +153,6 @@ describe('getLastUnscheduledTask', () => {
 
 describe('getAvailableTaskForStation', () => {
   const job = createJob('job-1');
-  const elements = [createElement('job-1')];
   const stationA = 'station-a';
   const stationB = 'station-b';
   const stationC = 'station-c';
@@ -157,6 +160,7 @@ describe('getAvailableTaskForStation', () => {
   it('returns the task when it is the last unscheduled and matches station', () => {
     // Only one task, it's the last and matches station
     const tasks: Task[] = [createInternalTask('task-1', 'element-job-1', stationA, 1)];
+    const elements = [createElement('job-1', ['task-1'])];
     const assignments: TaskAssignment[] = [];
 
     const result = getAvailableTaskForStation(job, tasks, elements, assignments, stationA);
@@ -171,6 +175,7 @@ describe('getAvailableTaskForStation', () => {
       createInternalTask('task-1', 'element-job-1', stationA, 1),
       createInternalTask('task-2', 'element-job-1', stationB, 2),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2'])];
     const assignments: TaskAssignment[] = [];
 
     // StationA should return null because task-2 (last) is not on stationA
@@ -185,6 +190,7 @@ describe('getAvailableTaskForStation', () => {
 
   it('returns null when all tasks are scheduled', () => {
     const tasks: Task[] = [createInternalTask('task-1', 'element-job-1', stationA, 1)];
+    const elements = [createElement('job-1', ['task-1'])];
     const assignments: TaskAssignment[] = [createAssignment('task-1', stationA)];
 
     const result = getAvailableTaskForStation(job, tasks, elements, assignments, stationA);
@@ -193,6 +199,7 @@ describe('getAvailableTaskForStation', () => {
 
   it('returns null when no tasks exist for the station', () => {
     const tasks: Task[] = [createInternalTask('task-1', 'element-job-1', stationB, 1)];
+    const elements = [createElement('job-1', ['task-1'])];
     const assignments: TaskAssignment[] = [];
 
     const result = getAvailableTaskForStation(job, tasks, elements, assignments, stationA);
@@ -207,6 +214,7 @@ describe('getAvailableTaskForStation', () => {
       createInternalTask('task-2', 'element-job-1', stationB, 2),
       createInternalTask('task-3', 'element-job-1', stationC, 3),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2', 'task-3'])];
     const assignments: TaskAssignment[] = [];
 
     // Only stationC should have available task
@@ -222,6 +230,7 @@ describe('getAvailableTaskForStation', () => {
       createInternalTask('task-2', 'element-job-1', stationB, 2),
       createInternalTask('task-3', 'element-job-1', stationC, 3),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2', 'task-3'])];
     const assignments: TaskAssignment[] = [createAssignment('task-3', stationC)];
 
     // Now stationB should have task-2 available
@@ -236,6 +245,7 @@ describe('getAvailableTaskForStation', () => {
       createInternalTask('task-2', 'element-job-1', stationB, 2),
       createInternalTask('task-3', 'element-job-1', stationC, 3),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2', 'task-3'])];
 
     // Step 1: None scheduled → only task-3 available
     let assignments: TaskAssignment[] = [];
@@ -266,7 +276,6 @@ describe('getAvailableTaskForStation', () => {
 
 describe('getStationsWithAvailableTasks', () => {
   const job = createJob('job-1');
-  const elements = [createElement('job-1')];
   const stationA = 'station-a';
   const stationB = 'station-b';
   const stationC = 'station-c';
@@ -278,6 +287,7 @@ describe('getStationsWithAvailableTasks', () => {
       createInternalTask('task-1', 'element-job-1', stationA, 1),
       createInternalTask('task-2', 'element-job-1', stationB, 2),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2'])];
     const assignments: TaskAssignment[] = [];
 
     const result = getStationsWithAvailableTasks(job, tasks, elements, assignments);
@@ -288,6 +298,7 @@ describe('getStationsWithAvailableTasks', () => {
 
   it('returns empty array when all tasks are scheduled', () => {
     const tasks: Task[] = [createInternalTask('task-1', 'element-job-1', stationA, 1)];
+    const elements = [createElement('job-1', ['task-1'])];
     const assignments: TaskAssignment[] = [createAssignment('task-1', stationA)];
 
     const result = getStationsWithAvailableTasks(job, tasks, elements, assignments);
@@ -296,6 +307,7 @@ describe('getStationsWithAvailableTasks', () => {
 
   it('returns empty array when job has no tasks', () => {
     const tasks: Task[] = [];
+    const elements = [createElement('job-1')];
     const assignments: TaskAssignment[] = [];
 
     const result = getStationsWithAvailableTasks(job, tasks, elements, assignments);
@@ -308,6 +320,7 @@ describe('getStationsWithAvailableTasks', () => {
       createInternalTask('task-2', 'element-job-1', stationB, 2),
       createInternalTask('task-3', 'element-job-1', stationC, 3),
     ];
+    const elements = [createElement('job-1', ['task-1', 'task-2', 'task-3'])];
 
     // None scheduled → only stationC
     let result = getStationsWithAvailableTasks(job, tasks, elements, []);

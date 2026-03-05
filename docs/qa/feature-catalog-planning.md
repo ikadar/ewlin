@@ -4,61 +4,61 @@
 >
 > **Created:** 2026-02-03
 >
-> **Purpose:** Ez a dokumentum rögzíti a Feature Katalógus elkészítésének tervezési döntéseit és megközelítését.
+> **Purpose:** This document records the planning decisions and approach for creating the Feature Catalog.
 
 ---
 
-## 1. Célkitűzés
+## 1. Objective
 
-A Manual QA Plan elkészítése előtt szükség van egy **Feature Katalógusra**, amely az alkalmazás összes aktív feature-jét tartalmazza. A katalógus a "Single Source of Truth" a feature-ökről, és a Manual QA Plan ebből származik.
+Before creating the Manual QA Plan, a **Feature Catalog** is needed, which contains all active features of the application. The catalog is the "Single Source of Truth" for features, and the Manual QA Plan is derived from it.
 
-A Feature Katalógus más célokra is használható:
-- Onboarding dokumentáció
+The Feature Catalog can also be used for other purposes:
+- Onboarding documentation
 - Product overview
-- Release notes generálás
+- Release notes generation
 
 ---
 
-## 2. Feature Katalógus struktúra
+## 2. Feature Catalog Structure
 
-**Hely:** `docs/features/feature-catalog.md`
+**Location:** `docs/features/feature-catalog.md`
 
-| Mező | Leírás |
-|------|--------|
-| Feature ID | Egyedi azonosító (pl. `SCHED-001`, `JCF-015`, `API-003`) |
-| Feature név | Rövid, leíró név |
-| Leírás | Capability formátum (lásd alább) |
-| Státusz | `Active` / `Suspicious` / `Deprecated` |
-| Release verzió | Melyik verzióban került be |
-| QA dokumentum | Link a kapcsolódó QA dokumentumra |
+| Field | Description |
+|-------|-------------|
+| Feature ID | Unique identifier (e.g., `SCHED-001`, `JCF-015`, `API-003`) |
+| Feature Name | Short, descriptive name |
+| Description | Capability format (see below) |
+| Status | `Active` / `Suspicious` / `Deprecated` |
+| Release Version | Which version it was introduced in |
+| QA Document | Link to the related QA document |
 
 ---
 
-## 3. Feature leírás formátum
+## 3. Feature Description Format
 
-A feature-ök leírására **kétszintű megközelítést** alkalmazunk.
+We use a **two-level approach** for describing features.
 
-### Katalógus szint (gyors áttekintés)
+### Catalog Level (quick overview)
 
-**Formátum:** Capability – 1 rövid mondat, max 10-15 szó
+**Format:** Capability – 1 short sentence, max 10-15 words
 
-**Cél:** Gyorsan átlátható lista, scannable
+**Goal:** Quickly scannable list
 
-**Példa:**
+**Example:**
 ```markdown
-| ID | Feature | Leírás |
-|----|---------|--------|
+| ID | Feature | Description |
+|----|---------|-------------|
 | SCHED-012 | Context Menu | Right-click context menu on tiles (view details, toggle completion, swap position) |
 | JCF-008 | Papier Autocomplete | Two-step paper selection: type first, then grammage |
 ```
 
-### QA dokumentum szint (részletes)
+### QA Document Level (detailed)
 
-**Formátum:** User Story + Acceptance Criteria
+**Format:** User Story + Acceptance Criteria
 
-**Cél:** Tesztelő pontosan értse, mit és miért tesztel
+**Goal:** Tester clearly understands what and why they are testing
 
-**Példa:**
+**Example:**
 ```markdown
 ## Feature: Context Menu
 
@@ -78,114 +78,116 @@ without using drag & drop.
 
 ---
 
-## 4. Input források
+## 4. Input Sources
 
-A Feature Katalógus elkészítéséhez az alábbi forrásokat használjuk:
+The following sources are used to create the Feature Catalog:
 
-### 4.1 Release dokumentumok
+### 4.1 Release Documents
 
-- **Hely:** `docs/releases/v*.md`
-- **Tartalom:** Feature leírások, Manual QA tervek, scope definíciók
-- **Megjegyzés:** 91 release dokumentum tartalmaz Manual QA szekciót
+- **Location:** `docs/releases/v*.md`
+- **Content:** Feature descriptions, Manual QA plans, scope definitions
+- **Note:** 91 release documents contain Manual QA sections
 
-### 4.2 Playwright E2E tesztek
+### 4.2 Playwright E2E Tests
 
-- **Hely:** `apps/web/playwright/*.spec.ts`
-- **Tartalom:** Automatizált teszt szcenáriók
-- **Felhasználás:** Feature létezésének ellenőrzése, teszt szcenáriók azonosítása
+- **Location:** `apps/web/playwright/*.spec.ts`
+- **Content:** Automated test scenarios
+- **Usage:** Feature existence verification, test scenario identification
 
 ---
 
-## 5. Deprecated feature-ök kezelése
+## 5. Deprecated Feature Handling
 
-Későbbi release-ek felülírhatják a korábbi feature-öket. A deprecated feature-öket a katalógusban `Deprecated` státusszal jelöljük, és **nem** kerülnek be a Manual QA Plan-be.
+Later releases may override earlier features. Deprecated features are marked with `Deprecated` status in the catalog and are **not** included in the Manual QA Plan.
 
-### Azonosítási módszerek
+### Identification Methods
 
-| Módszer | Leírás | Megbízhatóság |
-|---------|--------|---------------|
-| **Kód ellenőrzés** | A komponens/fájl létezik-e még a kódbázisban? | Magas |
-| **Playwright teszt** | Van-e aktív E2E teszt a feature-re? | Közepes |
-| **Későbbi release doc** | Említi-e egy későbbi release, hogy felülírta/törölte? | Közepes |
-| **"Out of Scope" szekciók** | Későbbi release explicit kizárja? | Alacsony |
-| **User review** | Felhasználó jelzi a review során | Magas |
+| Method | Description | Reliability |
+|--------|-------------|-------------|
+| **Code check** | Does the component/file still exist in the codebase? | High |
+| **Playwright test** | Is there an active E2E test for the feature? | Medium |
+| **Later release doc** | Does a later release mention that it was overridden/deleted? | Medium |
+| **"Out of Scope" sections** | Does a later release explicitly exclude it? | Low |
+| **User review** | User indicates during review | High |
 
-### Ellenőrzési workflow (minden feature-nél)
+### Verification Workflow (for each feature)
 
 ```
-Feature azonosítva (release doc-ból)
+Feature identified (from release doc)
          │
          ▼
 ┌────────────────────────────────┐
-│ 1. Létezik a komponens/fájl?   │ ──No──→ DEPRECATED
+│ 1. Does the component/file    │ ──No──→ DEPRECATED
+│    exist?                      │
 └────────────────────────────────┘
          │ Yes
          ▼
 ┌────────────────────────────────┐
-│ 2. Van aktív Playwright teszt? │ ──No──→ ⚠️ SUSPICIOUS
+│ 2. Is there an active         │ ──No──→ ⚠️ SUSPICIOUS
+│    Playwright test?           │
 └────────────────────────────────┘
          │ Yes
          ▼
 ┌────────────────────────────────┐
-│ 3. Későbbi release felülírta?  │ ──Yes─→ DEPRECATED
+│ 3. Did a later release        │ ──Yes─→ DEPRECATED
+│    override it?               │
 └────────────────────────────────┘
          │ No
          ▼
       ✅ ACTIVE
 ```
 
-### Státuszok
+### Statuses
 
-| Státusz | Jelentés | Bekerül a QA Plan-be? |
-|---------|----------|----------------------|
-| `Active` | Működő, tesztelt feature | ✅ Igen |
-| `Suspicious` | Gyanús (nincs teszt, de kód létezik) | ⚠️ Review után döntés |
-| `Deprecated` | Felülírt vagy eltávolított | ❌ Nem |
+| Status | Meaning | Included in QA Plan? |
+|--------|---------|---------------------|
+| `Active` | Working, tested feature | ✅ Yes |
+| `Suspicious` | Suspicious (no test, but code exists) | ⚠️ Decision after review |
+| `Deprecated` | Overridden or removed | ❌ No |
 
 ---
 
-## 6. Munkafolyamat
+## 6. Workflow
 
-### Granularitás: Hibrid megközelítés
+### Granularity: Hybrid Approach
 
-A Feature Katalógus elkészítése **Phase-alapú**, de a nagy phase-eket **tovább bontjuk** (~10-15 release / batch).
+The Feature Catalog is created **Phase-based**, but large phases are **further divided** (~10-15 releases / batch).
 
-### Batch-ek
+### Batches
 
-| Batch | Phase | Fókusz | Release-ek | Méret |
-|-------|-------|--------|------------|-------|
+| Batch | Phase | Focus | Releases | Size |
+|-------|-------|-------|----------|------|
 | **B1** | 1A | Station Management API | v0.1.0 - v0.1.7 | 8 |
 | **B2** | 1B | Job Management API | v0.1.9 - v0.1.19 | 11 |
 | **B3** | 2B + 2C | Validation & Assignment API | v0.2.7 - v0.2.18 | 12 |
 | **B4** | 3A + 3B + 3C | Mock Data, Layout, Grid | v0.3.0 - v0.3.10 | 11 |
-| **B5** | 3D-3F | Drag & Drop alapok | v0.3.11 - v0.3.20 | 10 |
+| **B5** | 3D-3F | Drag & Drop basics | v0.3.11 - v0.3.20 | 10 |
 | **B6** | 3G-3H | Station compact, Fixes | v0.3.21 - v0.3.33 | 13 |
 | **B7** | 3I-3J | Navigation, Layout, UX | v0.3.34 - v0.3.46 | 13 |
 | **B8** | 3K-3L | DateStrip, Validation, Pick&Place | v0.3.47 - v0.3.60 | 14 |
-| **B9** | 4A-4C | Element layer, JCF alapok | v0.4.0 - v0.4.12 | ~12 |
+| **B9** | 4A-4C | Element layer, JCF basics | v0.4.0 - v0.4.12 | ~12 |
 | **B10** | 4D-4F | JCF Autocomplete fields | v0.4.13 - v0.4.24 | ~12 |
 | **B11** | 4G-4H | JCF Validation, Templates, API | v0.4.25 - v0.4.40 | ~12 |
 
-> **Megjegyzés:** A batch határok finomíthatók a tényleges review során.
+> **Note:** Batch boundaries can be refined during actual review.
 
-### Workflow (batch-enként)
+### Workflow (per batch)
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  Batch N feldolgozása                                          │
+│  Processing Batch N                                             │
 ├────────────────────────────────────────────────────────────────┤
-│  1. Release dokumentumok átnézése (adott batch)                │
-│  2. Playwright tesztek átnézése (kapcsolódó)                   │
-│  3. Feature lista draft elkészítése                            │
-│  4. Deprecated feature-ök azonosítása                          │
+│  1. Review release documents (given batch)                      │
+│  2. Review Playwright tests (related)                           │
+│  3. Create feature list draft                                   │
+│  4. Identify deprecated features                                │
 ├────────────────────────────────────────────────────────────────┤
-│  → USER REVIEW                                                 │
-│    - Hiányzik valami?                                          │
-│    - Helyesek a feature leírások?                              │
-│    - Van deprecated amit nem vettem észre?                     │
+│  → USER REVIEW                                                  │
+│    - Is anything missing?                                       │
+│    - Are the feature descriptions correct?                      │
+│    - Is there a deprecated feature I missed?                    │
 ├────────────────────────────────────────────────────────────────┤
-│  5. Batch véglegesítés → Feature Katalógusba                   │
-│  → Következő batch                                             │
+│  5. Batch finalization → Into Feature Catalog                   │
+│  → Next batch                                                   │
 └────────────────────────────────────────────────────────────────┘
 ```
-

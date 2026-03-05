@@ -127,3 +127,16 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 - **PHPUnit** tesztek kötelezőek
 - Symfony 7 + Doctrine ORM
 - OpenAPI dokumentáció (Swagger UI: /api/doc)
+
+## Playwright tesztek — SZIGORÚ SZABÁLYOK
+
+### 1. SOHA ne futtass Playwright tesztet engedély nélkül
+- Playwright tesztet (`npx playwright test`, `npx playwright show-trace`, stb.) **CSAK akkor futtathatsz, ha a user EXPLICIT, egyértelmű engedélyt ad.**
+- "Javítsd meg a teszteket" — ez NEM engedély a futtatásra.
+- Ha teszteredményre van szükséged, **kérdezd meg a usert**, hogy futtassa és adja át az outputot.
+
+### 2. MINDIG olvasd el az actual error output-ot ELŐSZÖR
+- Mielőtt bármilyen változtatást csinálsz failing teszteknél, **olvasd el a tényleges hibaüzenetet**.
+- A `test-results/` könyvtárban minden failing teszthez van `error-context.md` — olvasd el.
+- A user által átadott test output-ot (terminál, fájl) olvasd el, mielőtt diagnózist állítasz fel.
+- **Feltevések alapján dolgozni tilos.** Minden változtatásnak konkrét, olvasott hibaüzeneten kell alapulnia.

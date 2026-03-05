@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
+import { renderWithRedux } from '../../test/testUtils';
 import { JcfElementsTable } from './JcfElementsTable';
 import { generateElementName, DEFAULT_ELEMENT } from './types';
 import type { JcfElement } from './types';
@@ -11,7 +12,7 @@ const defaultProps = {
 
 function renderTable(overrides: Partial<typeof defaultProps> = {}) {
   const props = { ...defaultProps, onElementsChange: vi.fn(), ...overrides };
-  const result = render(<JcfElementsTable {...props} />);
+  const result = renderWithRedux(<JcfElementsTable {...props} />);
   return { ...result, onElementsChange: props.onElementsChange };
 }
 

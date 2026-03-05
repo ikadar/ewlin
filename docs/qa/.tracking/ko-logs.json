@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "bc4b9583-004e-4aba-b44f-98709d58b66f",
+      "testId": "scheduler/datestrip-pickplace.md::DS-002",
+      "description": "test",
+      "severity": "major",
+      "createdAt": "2026-02-05T23:42:24.674Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "e85c37f1-aead-410f-be19-1a03d9c2b1b1",
+      "testId": "jcf/autocomplete.md::AUTO-004",
+      "description": "Validation is missing, I can enter anything into the input, it won't show that the value is invalid.",
+      "severity": "major",
+      "createdAt": "2026-02-06T10:22:13.324Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "5f77671b-e923-45b6-89cd-f0a5ae55f762",
+      "testId": "jcf/autocomplete.md::AUTO-021",
+      "description": "If I use down arrow to select option, when the selected item is the bottom visible option, then after pressing down arrow, the selected item will be the top visible option instead of the next (invisible) option, below the actual option.",
+      "severity": "major",
+      "createdAt": "2026-02-06T10:44:43.361Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "3678b1d3-87de-4c29-958f-d57d4ac7608a",
+      "testId": "jcf/autocomplete.md::AUTO-003",
+      "description": "Invalid formats are accepted (e.g: A3/A2)",
+      "severity": "major",
+      "createdAt": "2026-02-06T11:02:58.841Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "8540b510-e53c-408a-8c3d-d65b7696d4bd",
+      "testId": "jcf/autocomplete.md::AUTO-016",
+      "description": "I don't understand this: Poses-merge strategy: new poses merge with existing format",
+      "severity": "major",
+      "createdAt": "2026-02-06T16:59:47.920Z",
+      "resolvedAt": "2026-02-09T13:59:44.169Z"
+    },
+    {
+      "id": "49ee3d3a-7837-4c68-bffa-211a819b941e",
+      "testId": "jcf/autocomplete.md::AUTO-018",
+      "description": "There is no circular reference check",
+      "severity": "major",
+      "createdAt": "2026-02-06T17:00:36.923Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "7dc58937-791b-42bd-bebe-bef222112136",
+      "testId": "jcf/elements-table.md::JCF-005",
+      "description": "Accepts letters",
+      "severity": "major",
+      "createdAt": "2026-02-06T17:25:19.189Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "b55b54f7-1ef9-4b6c-a9eb-383fd2d02f30",
+      "testId": "jcf/elements-table.md::JCF-015",
+      "description": "I don't understand this",
+      "severity": "major",
+      "createdAt": "2026-02-06T17:32:26.279Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "64d6b710-f861-4aee-a522-27dbe046e0c1",
+      "testId": "jcf/validation-templates.md::VAL-003",
+      "description": "I don't know what it is",
+      "severity": "major",
+      "createdAt": "2026-02-06T18:17:36.023Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "2e96455c-9f0c-4e44-956e-f9bcca9e9d36",
+      "testId": "jcf/validation-templates.md::TMPL-004",
+      "description": "I'm not sure what does this mean: Elements table in template mode",
+      "severity": "major",
+      "createdAt": "2026-02-06T18:58:17.430Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "137456ce-63f5-4d6e-84a5-40b0de0830fc",
+      "testId": "jcf/autocomplete.md::AUTO-014",
+      "description": "Learned weights should be ordered",
+      "severity": "major",
+      "createdAt": "2026-02-09T13:57:28.912Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "3741cc0a-ed69-48cc-a591-4374b8429122",
+      "testId": "jcf/autocomplete.md::AUTO-030",
+      "description": "The template sequence should offer station grous instead of stations.",
+      "severity": "blocker",
+      "createdAt": "2026-02-09T14:06:56.266Z",
+      "resolvedAt": null
+    }
+  ]
+}

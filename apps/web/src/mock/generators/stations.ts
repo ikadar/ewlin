@@ -22,18 +22,18 @@ import type {
 // ============================================================================
 
 const OFFSET_PRESS_CRITERIA: SimilarityCriterion[] = [
-  { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'paperType' },
-  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
-  { id: 'crit-inking', name: 'Même encrage', fieldPath: 'inking' },
+  { name: 'Même type de papier', fieldPath: 'papier' },
+  { name: 'Même format', fieldPath: 'format' },
+  { name: 'Même encrage', fieldPath: 'impression' },
 ];
 
 const FINISHING_CRITERIA: SimilarityCriterion[] = [
-  { id: 'crit-paper-weight', name: 'Même grammage', fieldPath: 'paperWeight' },
-  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+  { name: 'Même grammage', fieldPath: 'papier' },
+  { name: 'Même format', fieldPath: 'format' },
 ];
 
 const CUTTING_CRITERIA: SimilarityCriterion[] = [
-  { id: 'crit-paper-format', name: 'Même format', fieldPath: 'paperFormat' },
+  { name: 'Même format', fieldPath: 'format' },
 ];
 
 // ============================================================================
@@ -53,7 +53,7 @@ export function generateStationCategories(): StationCategory[] {
       name: 'Impression Numérique',
       description: 'Machines d\'impression numérique',
       similarityCriteria: [
-        { id: 'crit-paper-type', name: 'Même type de papier', fieldPath: 'paperType' },
+        { name: 'Même type de papier', fieldPath: 'papier' },
       ],
     },
     {
@@ -73,7 +73,7 @@ export function generateStationCategories(): StationCategory[] {
       name: 'Découpe',
       description: 'Machines de découpe à forme (die-cutting)',
       similarityCriteria: [
-        { id: 'crit-forme-size', name: 'Même taille de forme', fieldPath: 'formeSize' },
+        { name: 'Même taille de forme', fieldPath: 'formeSize' },
       ],
     },
     {

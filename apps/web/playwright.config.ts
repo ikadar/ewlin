@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1, // Use single worker for dnd-kit stability
   reporter: [['html'], ['list']],
   use: {
-    baseURL: 'http://localhost:5174',
+    baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
   },
   projects: [
@@ -19,7 +19,10 @@ export default defineConfig({
   ],
   webServer: {
     command: 'pnpm dev',
-    url: 'http://localhost:5174',
+    url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
+    env: {
+      VITE_USE_MOCK: 'true',
+    },
   },
 });

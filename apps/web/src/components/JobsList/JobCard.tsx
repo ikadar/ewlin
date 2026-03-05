@@ -46,7 +46,7 @@ export const JobCard = memo(function JobCard({
   onClick,
 }: JobCardProps) {
   // REQ-05: block display respects margins (w-full + margins caused overflow)
-  const baseClasses = 'mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors';
+  const baseClasses = 'mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors focus-visible:ring-1 focus-visible:ring-white/30';
 
   const stateClasses = (() => {
     if (problemType === 'late') {

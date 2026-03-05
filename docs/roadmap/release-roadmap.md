@@ -1792,7 +1792,9 @@ Two-part release following reference/jcf pattern.
 > - Phase 5B: JCF API Integration (v0.5.5–v0.5.6)
 > - Phase 5C: Error Handling & UX (v0.5.7–v0.5.8)
 > - Phase 5D: Outsourcing Refactor (v0.5.9–v0.5.13)
-> - Phase 5E: Testing & Verification (v0.5.14–v0.5.15)
+> - Phase 5E: Production Flow Dashboard (v0.5.15–v0.5.21)
+> - Phase 5F: ST Column — Sous-traitance (v0.5.22–v0.5.23)
+> - Phase 5G: Testing & Verification (v0.5.24–v0.5.25)
 
 ### Phase 5A: Core API Integration
 
@@ -1899,46 +1901,216 @@ Two-part release following reference/jcf pattern.
 - [x] Update mock data and fixtures
 - [x] Remove obsolete tests
 
-#### v0.5.11 - Outsourcing Mini-Form
+#### v0.5.11 - Outsourcing Mini-Form ✅
 > **Goal:** Editable outsourcing parameters in Job Details Panel
 
-- [ ] Create `OutsourcingMiniForm` component
-- [ ] Integrate into `TaskTile` for outsourced tasks
-- [ ] Work days (JO) number input
-- [ ] Departure date/time picker
-- [ ] Return date/time picker (hidden for final outsourcing)
-- [ ] Auto-calculate from predecessor when scheduled
+- [x] Create `OutsourcingMiniForm` component
+- [x] Integrate into `TaskTile` for outsourced tasks
+- [x] Work days (JO) number input
+- [x] Departure date/time picker
+- [x] Return date/time picker (hidden for final outsourcing)
+- [x] Auto-calculate from predecessor when scheduled
 
-#### v0.5.12 - Outsourcing Precedence Calculation
+#### v0.5.12 - Outsourcing Precedence Calculation ✅
 > **Goal:** New duration calculation with transit days
 
-- [ ] Forward calculation: `earliestStart(successor)` from predecessor end
-- [ ] Backward calculation: `latestEnd(predecessor)` from successor start
-- [ ] Business day utilities (add/subtract, skip weekends)
-- [ ] Manual override support (`manualDeparture`, `manualReturn`)
-- [ ] Update `precedenceConstraints.ts`
-- [ ] Comprehensive unit tests
+- [x] Forward calculation: `earliestStart(successor)` from predecessor end
+- [x] Backward calculation: `latestEnd(predecessor)` from successor start
+- [x] Business day utilities (add/subtract, skip weekends)
+- [x] Manual override support (`manualDeparture`, `manualReturn`)
+- [x] Update `precedenceConstraints.ts`
+- [x] Comprehensive unit tests
 
-#### v0.5.13 - Outsourcing Drag Visualization
+#### ✅ v0.5.13 - Outsourcing Drag Visualization
 > **Goal:** Show outsourcing constraints during drag operations
 
-- [ ] Display outsourcing constraint duration during drag (like drying time)
-- [ ] Show earliest valid drop position accounting for outsourcing timeline
-- [ ] Alt+drag bypass with warning
+- [x] Display outsourcing constraint duration during drag (like drying time)
+- [x] Show earliest valid drop position accounting for outsourcing timeline
+- [x] OutsourcingTimeIndicator component (cyan/teal color)
+- [x] getOutsourcingTimeInfo utility function
+- [x] Test fixture: outsourcing-drag
 - [ ] E2E tests for drag behavior
 
-### Phase 5E: Testing & Verification
+#### ✅ v0.5.13b - Job Edit via JCF Modal
+> **Goal:** Allow editing existing jobs through the Job Creation Form
 
-#### v0.5.14 - E2E Tests with Real Backend
+- [x] "Modifier" button on Job Details Panel header (next to close button)
+- [x] `updateJob` RTK Query mutation + mock implementation
+- [x] JCF modal edit mode: pre-fill form with selected job data (client, intitulé, deadline, elements)
+- [x] Modal title: "Modifier {jobId}" instead of "Nouveau Job"
+- [x] Save button calls updateJob (PUT) instead of createJob (POST)
+- [x] Job ID field read-only in edit mode
+- [x] App.tsx: `onEditJob` callback wiring (load job data → open modal in edit mode)
+
+#### ✅ v0.5.14 - Settings Submenu Navigation + UI Redesign
+> **Goal:** Replace 8 individual config icons with a single gear icon and submenu; redesign prerequisite status pills
+
+- [x] `RootLayout.tsx` — shared h-screen wrapper + Sidebar + Outlet for all routes
+- [x] `SettingsLayout/` — w-72 submenu panel + Outlet for `/settings/*` routes
+- [x] `routes.tsx` — nested route structure: RootLayout > SettingsLayout > config pages
+- [x] `Sidebar.tsx` — single gear icon, `useLocation`-based active state, `lastSchedulingUrl` prop
+- [x] URL routing: `/settings/stations`, `/settings/clients`, etc.
+- [x] Last scheduling URL persisted in sessionStorage (LayoutGrid restores it)
+- [x] PrerequisiteDropdown pill redesign — category label colored by status, status text in tooltip
+- [x] ESLint v7 compliant (react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/globals)
+
+### Phase 5E: Production Flow Dashboard
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md)
+> **Q&A:** [production-flow-dashboard-spec/qa.md](../production-flow-dashboard-spec/qa.md)
+
+#### v0.5.15 - Production Flow Dashboard — Static Table
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** Teljes táblázat layout és adatmegjelenítés, minden interakció nélkül. Frozen oszlopok, prerequisite badge-ek (read-only), station ring+dot SVG indikátorok, multi-element aggregált megjelenítés (összecsukott állapot), Transporteur, Parti, Actions gombok (nem funkcionálisak).
+
+- [x] Route `/flux` hozzáadása a Sidebar LayoutGrid ikonjához
+- [x] Frozen-column table layout (expand + ID + Client + Designation frozen left, Actions frozen right)
+- [x] Prerequisite badge oszlopok (BAT, Papier, Formes, Plaques) — read-only, színkódolt
+- [x] Station ring+dot SVG indikátorok (9 station kategória, 5 állapot)
+- [x] Multi-element sorok: összecsukott állapot, stacked dots, +N count badge-ek, worst-value aggregáció
+- [x] Transporteur és Parti oszlopok (display-only)
+- [x] Actions oszlop (ikonok megjelennek, de nem funkcionálisak)
+- [x] Default sort: ID ascending
+- [x] Test fixture a manuális QA-hoz (spec 5. fejezet referencia adatai)
+
+#### v0.5.16 - Production Flow Dashboard — Filtering & Navigation
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** Tab szűrés, keresés, URL routing és keyboard shortcuts. Minden interakció, ami az adatok megjelenítési szűrésére vonatkozik.
+
+- [x] Nested routes: `/flux` (Tous), `/flux/prepresse`, `/flux/papier`, `/flux/formes`, `/flux/plaques`
+- [x] Tab bar 5 tabbal, aktív/inaktív vizuális állapot
+- [x] Dinamikus count badge-ek (tab szűrő + keresés kombinációja)
+- [x] Full-text keresés (real-time, case-insensitive, összes szöveges oszlopra)
+- [x] Keyboard shortcuts: `Alt+←/→` (tab váltás), `Alt+↑/↓` (sor navigáció), `Alt+F` (keresőmező), `Alt+N` (new job → `/job/new`)
+- [x] Keyboard hint bar megjelenítése a tab bar mellett
+
+#### v0.5.17 - Production Flow Dashboard — Interaction ✅
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** Interaktív elemek: prerequisite státusz módosítás, multi-element expand/collapse, delete/edit akciók.
+
+- [x] Prerequisite listbox dropdown-ok (BAT, Papier, Formes, Plaques) — animált, billentyűzettel is kezelhető
+- [x] Sub-sor prerequisite módosítás → parent aggregált worst automatikus újraszámolása
+- [x] Multi-element expand/collapse animációval (staggered slide+fade, 400ms)
+- [x] Delete action: megerősítő dialog
+- [x] Edit action: navigáció `/job/:jobId` URL-re
+
+#### v0.5.18 - Production Flow Dashboard — API Integration ✅
+
+> **Specification:** [production-flow-dashboard-spec/tableau-de-flux.md](../production-flow-dashboard-spec/tableau-de-flux.md) | [qa.md](../production-flow-dashboard-spec/qa.md)
+> **Goal:** A statikus mock adatok helyett valós API adatok megjelenítése. A dashboard a PHP API-tól kéri le az aktív jobokat és azok állapotát.
+
+- [x] PHP API: `GET /api/v1/flux/jobs` endpoint (FluxJobResponse, FluxElementResponse, FluxController)
+- [x] RTK Query integráció: `FluxPage` valós adatokat kér le (`fluxApi.ts`)
+- [x] Loading és error állapotok kezelése
+- [x] Prerequisite dropdown portal fix (`createPortal`)
+- [ ] Station progress % forrásának tisztázása (qa.md K3.1) — **halasztva**
+- [ ] "Parti" toggle interaktivitás (qa.md K5.1) — **halasztva**
+
+#### v0.5.19 - Production Flow Dashboard — Prerequisite Persistence ✅
+
+> **Goal:** Prerequisite értékek módosítása perzisztál az adatbázisba (`PATCH /api/v1/flux/elements/{id}`)
+
+- [x] PHP API: `PATCH /api/v1/flux/elements/{id}` — prerequisite mező frissítése (bat/papier/formes/plaques)
+- [x] RTK Query mutation optimistic update + undo on error
+- [x] Mock handler: in-memory frissítés mock módban
+- [x] Unit tesztek: `FluxUpdateElementPrerequisiteTest.php`
+
+#### v0.5.20 - Production Flow Dashboard — Dynamic Station Category Columns ✅
+
+> **Goal:** Dinamikus station category oszlopok API-ból, valós station state adatok a schedule alapján
+
+- [x] PHP API: `abbreviation` + `display_order` mezők a `station_categories` táblán (3 migration)
+- [x] Exact abbreviation-ök: Off. | Mass. | Pell. | Typo | Pli. | Enc. | Ass. | Assem. | Cond.
+- [x] PHP API: `StationRepository::findCategoryIdMap()` — stationId→categoryId map
+- [x] PHP API: `FluxElementResponse::fromEntityWithContext()` — station state számítás (done/late/in-progress/planned/empty)
+- [x] PHP API: `FluxController::jobs()` — schedule + station map injection
+- [x] Frontend: `StationCategoryId` union type + `STATION_CATEGORIES` konstans eltávolítva
+- [x] Frontend: `FluxTable` dinamikus `categories` prop (API-ból)
+- [x] Frontend: `FluxPage` `useGetStationCategoriesQuery()` + displayOrder rendezés
+- [x] Frontend: Settings → Station Categories form: abbreviation mező
+- [x] Frontend: valós station state adatok a transform-ban (`fluxApi.ts`)
+- [ ] Station progress % (in-progress, late állapotnál) — K3.1, halasztva
+- [ ] "Parti" toggle interaktivitás — K5.1, halasztva
+
+#### v0.5.21 - Production Flow Dashboard — Sortable Column Headers & Webkit Scrollbar ✅
+
+> **Goal:** Spec 3.6 compliance: sortable column headers + webkit scrollbar fix
+> **Spec:** `docs/production-flow-dashboard-spec/tableau-de-flux.md` §3.6
+> **Release doc:** `docs/releases/v0.5.21-sortable-headers-webkit-scrollbar.md`
+
+- [x] Frontend: `fluxSort.ts` — `SortColumn`, `SortDirection` types + `sortFluxJobs()` utility
+- [x] Frontend: Sort state in `FluxPage` (`sortColumn`, `sortDirection` useState + `handleSortChange`)
+- [x] Frontend: `FluxTable` sort props (`sortColumn`, `sortDirection`, `onSortChange`), `SortChevron` component
+- [x] Frontend: `FluxTableContext` extended with sort state
+- [x] Frontend: Active column: blue up/down arrow; inactive: double chevron on hover
+- [x] Frontend: Prerequisite sort uses `worstPrerequisiteStatus()`, ascending = green (best) first
+- [x] Frontend: `sortie` sorted by MMDD key (month-correct); `transporteur` null → always last
+- [x] Frontend: `.flux-scrollable` webkit scrollbar CSS (6px, dark gray thumb)
+- [x] Frontend: `FolderOpen` icon (corrected from `Folder` per mockup)
+- [x] Tests: `fluxSort.test.ts` (27 unit tests), `FluxTable.test.tsx` (8 new sort tests), `sort-headers.spec.ts` (E2E)
+
+---
+
+### Phase 5F: ST Column — Sous-traitance
+
+> **Goal:** Add the ST (Sous-traitance) column to the Flux dashboard with a 3-state checkbox system and a new "S-T à faire" filter tab.
+>
+> **Spec:** `docs/production-flow-dashboard-spec/upgrade-colonne-st-en.md`
+> **API contract:** `docs/production-flow-dashboard-spec/st-column-api-contract.md`
+> **Visual reference:** `docs/production-flow-dashboard-spec/mockup2.html`
+
+#### ✅ v0.5.22 - ST Column: Backend API
+
+> **Goal:** Expose outsourced task data in the Flux jobs response; add status update endpoint.
+
+**PHP API:**
+- [x] `FluxElementResponse.php`: add `outsourcing[]` array — include outsourced tasks (currently filtered out), resolve `providerName` via `OutsourcedProvider`, map `TaskStatus` → `FluxSTStatus` (`defined`/`ready` → `pending`, `assigned` → `progress`, `completed` → `done`; skip `cancelled`)
+- [x] New DTO `FluxTaskStatusRequest`: validates `status` ∈ {`pending`, `progress`, `done`}
+- [x] New action `FluxController::patchTaskStatus()`: `PATCH /api/v1/flux/tasks/{taskId}/status` — validates task is `Outsourced` type, maps dashboard status → `TaskStatus`, persists
+- [x] PHPStan level 8 clean
+- [x] PHPUnit unit tests for new endpoint (204, 400 wrong type, 404 not found, 422 invalid status)
+
+**Response shape added to each element:**
+```json
+"outsourcing": [
+  { "taskId": "uuid", "actionType": "Vernis UV sélectif", "providerName": "Faco 37", "status": "done" }
+]
+```
+
+#### v0.5.23 - ST Column: Frontend UI + Integration ✅
+
+> **Goal:** ST column rendered in Flux table with interactive 3-state checkboxes, tooltip, "S-T à faire" tab.
+> **Released:** 2026-03-02
+
+**Frontend:**
+- [x] `fluxTypes.ts`: `FluxSTStatus` type, `FluxOutsourcingTask` interface, extend `FluxElement` with `outsourcing: FluxOutsourcingTask[]`
+- [x] `fluxApi.ts`: extend `transformFluxJobsResponse` to map `outsourcing[]`; add `updateSTStatus` RTK mutation (`PATCH /flux/tasks/{taskId}/status`) with optimistic cache update
+- [x] `fluxFilters.ts`: add `'soustraitance'` to `TAB_IDS`; filter: job visible if any element has any task with `status !== 'done'`; add `/flux/soustraitance` URL path
+- [x] `fluxStaticData.ts`: add `outsourcing[]` data to fixture elements (ref data from spec §3.3)
+- [x] New `STCell.tsx`: 3-state icon (pending=gray circle, progress=orange dot-circle, done=green checkmark); click cycles `pending→progress→done→pending`; label "ProviderName · ActionType" with `text-overflow: ellipsis`; custom fixed-position tooltip on hover
+- [x] `FluxTable.tsx`: ST column header (`<th>` "ST", `title="Sous-traitance"`, not sortable); `<STCell>` in parent rows (collapsed multi: flattened tasks); `<STCell>` in sub-rows (per-element tasks)
+- [x] `FluxPage.tsx`: `handleUpdateSTStatus` callback → `updateSTStatus` mutation
+- [x] `index.css`: `.st-pending` (gray), `.st-progress` (orange `rgb(251 146 60)`), `.st-done` (green), `.st-tooltip` (fixed, dark bg, 120ms fade)
+- [x] Unit tests: `fluxFilters.test.ts` — soustraitance tab filter (verification matrix: 3/5 jobs)
+- [x] Unit tests: `STCell.test.tsx` — 3-state render, click cycle
+
+---
+
+### Phase 5G: Testing & Verification
+
+#### v0.5.24 - E2E Tests with Real Backend
 > **Goal:** E2E tests run against actual PHP API
 
-- [ ] Docker Compose setup (PHP + PostgreSQL + Frontend)
+- [ ] Docker Compose setup (PHP + MariaDB + Frontend)
 - [ ] Test database seeding
 - [ ] Playwright configuration for API mode
 - [ ] Key E2E tests with real backend
 - [ ] CI pipeline integration
 
-#### v0.5.15 - Performance Verification
+#### v0.5.25 - Performance Verification
 > **Goal:** Verify acceptable performance with real API
 
 - [ ] Snapshot load time < 2s

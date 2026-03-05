@@ -91,7 +91,7 @@ test.describe('v0.3.42 - UI Bug Fixes', () => {
 
     test('unavailability overlays appear at correct positions', async ({ page }) => {
       // Get the first station column
-      const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+      const stationColumn = page.locator('[data-testid="station-column-station-offset"]');
       await expect(stationColumn).toBeVisible();
 
       // Get all overlays within the station column

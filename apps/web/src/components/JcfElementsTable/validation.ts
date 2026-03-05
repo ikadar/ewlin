@@ -44,7 +44,16 @@ const MESSAGES = {
   surfacage: `<strong>Format Surfacage invalide</strong><br>Syntaxe attendue : <code>recto/verso</code><br>Exemples : <code>mat/mat</code>, <code>brillant/</code>, <code>vernis/</code>`,
   format: `<strong>Format produit invalide</strong><br>Formats acceptés :<br>• ISO : <code>A4</code>, <code>A3</code><br>• Dimensions : <code>210x297</code><br>• Fini : <code>A4f</code>, <code>A4fi</code><br>• Composite : <code>A3/A6</code>`,
   sequence: `<strong>Format Séquence invalide</strong><br>Une ligne par opération :<br>• Poste : <code>Komori(20+40)</code><br>• Sous-traitant : <code>ST:Reliure(3j):desc</code>`,
+  precedences: `<strong>Prédécesseur inconnu</strong><br>Un ou plusieurs éléments référencés n'existent pas.`,
 };
+
+/**
+ * Build dynamic precedences message with invalid names highlighted
+ */
+function buildPrecedencesMessage(invalidNames: string[]): string {
+  const invalidList = invalidNames.map((n) => `<code>${n}</code>`).join(', ');
+  return `<strong>Prédécesseur(s) inconnu(s)</strong><br>Élément(s) non trouvé(s) : ${invalidList}`;
+}
 
 // Level 3: Submit validation messages for required fields
 const SUBMIT_MESSAGES: Record<JcfFieldKey, string> = {
@@ -61,6 +70,7 @@ const SUBMIT_MESSAGES: Record<JcfFieldKey, string> = {
   surfacage: `<strong>Surfacage requis</strong>`,
   autres: `<strong>Champ requis</strong>`,
   commentaires: `<strong>Champ requis</strong>`,
+  links: `<strong>Champ requis</strong>`,
 };
 
 // ── Individual Field Validators ──────────────────────────────────────────────
@@ -151,21 +161,83 @@ export function isValidSequenceStrict(value: string): boolean {
   return !lines.some((line) => line.trim() && !isValidSequenceLine(line));
 }
 
+/**
+ * Parse precedences string into array of element names
+ */
+function parsePrecedences(value: string): string[] {
+  if (!value || value === '-') return [];
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Get invalid precedences (element names that don't exist)
+ * @param precedences - comma-separated element names
+ * @param validElementNames - set of valid element names
+ * @param currentElementName - current element name (for self-reference detection)
+ * @returns array of invalid element names
+ */
+export function getInvalidPrecedences(
+  precedences: string,
+  validElementNames: Set<string>,
+  currentElementName: string,
+): string[] {
+  const referenced = parsePrecedences(precedences);
+  return referenced.filter((name) => {
+    if (name === currentElementName) return false; // Self-reference is shown via autocomplete hint, not error
+    return !validElementNames.has(name);
+  });
+}
+
+/**
+ * Validate precedences: all referenced elements must exist
+ * @param precedences - comma-separated element names
+ * @param validElementNames - set of valid element names
+ * @param currentElementName - current element name
+ * @returns true if all precedences are valid
+ */
+export function isValidPrecedences(
+  precedences: string,
+  validElementNames: Set<string>,
+  currentElementName: string,
+): boolean {
+  return getInvalidPrecedences(precedences, validElementNames, currentElementName).length === 0;
+}
+
 // ── Main Validation Function ─────────────────────────────────────────────────
+
+/**
+ * Options for element validation
+ */
+interface ValidateElementOptions {
+  /** If true, use strict sequence validation (after blur) */
+  useStrictSequence?: boolean;
+  /** Set of all valid element names for precedences validation */
+  validElementNames?: Set<string>;
+  /** Mode: template mode skips sequence DSL validation (categories, not machine DSL) */
+  mode?: JcfMode;
+}
 
 /**
  * Validate all fields of an element (Level 1 - Live Format)
  *
  * @param element - The element to validate
  * @param index - Element index for error tracking
- * @param useStrictSequence - If true, use strict sequence validation (after blur)
+ * @param options - Validation options
  * @returns Array of validation errors
  */
 export function validateElementLive(
   element: JcfElement,
   index: number,
-  useStrictSequence = false,
+  options: ValidateElementOptions | boolean = false,
 ): ValidationError[] {
+  // Backward compatibility: accept boolean for useStrictSequence
+  const opts: ValidateElementOptions =
+    typeof options === 'boolean' ? { useStrictSequence: options } : options;
+  const { useStrictSequence = false, validElementNames, mode } = opts;
+
   const errors: ValidationError[] = [];
 
   // Pagination validation
@@ -229,17 +301,37 @@ export function validateElementLive(
   }
 
   // Sequence validation (lenient or strict based on parameter)
-  const sequenceValid = useStrictSequence
-    ? isValidSequenceStrict(element.sequence)
-    : isValidSequenceLenient(element.sequence);
+  // Template mode: sequence contains abstract category names, skip DSL validation
+  if (mode !== 'template') {
+    const sequenceValid = useStrictSequence
+      ? isValidSequenceStrict(element.sequence)
+      : isValidSequenceLenient(element.sequence);
 
-  if (element.sequence && !sequenceValid) {
-    errors.push({
-      elementIndex: index,
-      field: 'sequence',
-      message: MESSAGES.sequence,
-      type: 'live',
-    });
+    if (element.sequence && !sequenceValid) {
+      errors.push({
+        elementIndex: index,
+        field: 'sequence',
+        message: MESSAGES.sequence,
+        type: 'live',
+      });
+    }
+  }
+
+  // Precedences validation (only if validElementNames is provided)
+  if (validElementNames && element.precedences) {
+    const invalidNames = getInvalidPrecedences(
+      element.precedences,
+      validElementNames,
+      element.name,
+    );
+    if (invalidNames.length > 0) {
+      errors.push({
+        elementIndex: index,
+        field: 'precedences',
+        message: buildPrecedencesMessage(invalidNames),
+        type: 'live',
+      });
+    }
   }
 
   return errors;
@@ -255,12 +347,20 @@ export function validateElementLive(
 export function validateAllElements(
   elements: JcfElement[],
   touchedFields: Set<string> = new Set(),
+  mode: JcfMode = 'job',
 ): Map<string, ValidationError> {
   const errorMap = new Map<string, ValidationError>();
 
+  // Build set of valid element names for precedences validation
+  const validElementNames = new Set(elements.map((el) => el.name));
+
   elements.forEach((element, index) => {
     const sequenceTouched = touchedFields.has(`${index}-sequence`);
-    const errors = validateElementLive(element, index, sequenceTouched);
+    const errors = validateElementLive(element, index, {
+      useStrictSequence: sequenceTouched,
+      validElementNames,
+      mode,
+    });
     errors.forEach((error) => {
       const key = `${error.elementIndex}-${error.field}`;
       errorMap.set(key, error);
@@ -289,6 +389,7 @@ export function getCellError(
  * Combines:
  * - Strict DSL format validation (no leniency for incomplete input)
  * - Required field validation (converts amber indicators to red errors)
+ * - Precedences validation (all referenced elements must exist)
  *
  * @param elements - Array of elements to validate
  * @param mode - 'job' or 'template' mode (template skips required validation)
@@ -300,9 +401,16 @@ export function validateForSubmit(
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
+  // Build set of valid element names for precedences validation
+  const validElementNames = new Set(elements.map((el) => el.name));
+
   elements.forEach((element, index) => {
     // Level 1 STRICT: DSL format validation (always strict on submit)
-    const dslErrors = validateElementLive(element, index, true);
+    const dslErrors = validateElementLive(element, index, {
+      useStrictSequence: true,
+      validElementNames,
+      mode,
+    });
     errors.push(...dslErrors);
 
     // Level 3: Convert required fields to submit errors

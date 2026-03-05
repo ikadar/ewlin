@@ -1,6 +1,15 @@
-import type { Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
+import type { Element, ElementSpec, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
 import { Workflow } from 'lucide-react';
 import { PrerequisiteStatus } from './PrerequisiteStatus';
+
+function deriveSpecLabel(spec: ElementSpec | undefined): string | undefined {
+  const parts = [
+    spec?.format,
+    spec?.pagination != null ? String(spec.pagination) : undefined,
+    spec?.papier,
+  ].filter((p): p is string => p != null && p.trim().length > 0);
+  return parts.length > 0 ? parts.join(' | ') : undefined;
+}
 
 export interface ElementSectionProps {
   /** The element to display */
@@ -92,9 +101,9 @@ export function ElementSection({
           <span className="text-xs font-semibold text-zinc-400 tracking-wide">
             {element.name.toUpperCase()}
           </span>
-          {element.label && (
+          {(deriveSpecLabel(element.spec) ?? element.label) && (
             <span className="text-xs text-zinc-500">
-              {element.label}
+              {deriveSpecLabel(element.spec) ?? element.label}
             </span>
           )}
         </div>

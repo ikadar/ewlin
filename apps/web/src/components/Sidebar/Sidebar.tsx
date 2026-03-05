@@ -1,12 +1,6 @@
-import { LayoutGrid, Calendar, Settings, User } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
-
-export interface SidebarProps {
-  /** Currently active view */
-  activeView?: 'schedule' | 'calendar' | 'settings';
-  /** Callback when a navigation item is clicked */
-  onNavigate?: (view: 'schedule' | 'calendar' | 'settings') => void;
-}
 
 /**
  * Sidebar navigation component.
@@ -14,7 +8,13 @@ export interface SidebarProps {
  * Always visible on the left side of the screen.
  * REQ-07: Full viewport height with User/Settings at bottom.
  */
-export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
+export function Sidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isSettings = location.pathname.startsWith('/settings');
+  const isFlux = location.pathname.startsWith('/flux');
+  const isScheduler = !isSettings && !isFlux;
+
   return (
     <nav
       className="w-14 shrink-0 bg-zinc-900/50 border-r border-white/5 h-full"
@@ -25,16 +25,16 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
         {/* Top navigation section */}
         <div className="flex flex-col items-center py-3 gap-2">
           <SidebarButton
-            icon={LayoutGrid}
-            label="Scheduling view"
-            isActive={activeView === 'schedule'}
-            onClick={() => onNavigate?.('schedule')}
+            icon={CalendarDays}
+            label="Planificateur"
+            isActive={isScheduler}
+            onClick={() => navigate('/')}
           />
           <SidebarButton
-            icon={Calendar}
-            label="Calendar view"
-            isActive={activeView === 'calendar'}
-            onClick={() => onNavigate?.('calendar')}
+            icon={TowerControl}
+            label="Flux de production"
+            isActive={isFlux}
+            onClick={() => navigate('/flux')}
           />
         </div>
 
@@ -46,8 +46,8 @@ export function Sidebar({ activeView = 'schedule', onNavigate }: SidebarProps) {
           <SidebarButton
             icon={Settings}
             label="Settings"
-            isActive={activeView === 'settings'}
-            isDisabled
+            isActive={isSettings}
+            onClick={() => navigate('/settings/stations')}
             testId="sidebar-settings-button"
           />
           <SidebarButton

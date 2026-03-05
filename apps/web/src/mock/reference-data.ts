@@ -21,7 +21,9 @@ import type {
 // Paper Types (§9.5)
 // ============================================================================
 
-const GRAMMAGES: number[] = [70, 80, 90, 100, 115, 130, 135, 150, 170, 200, 250, 300, 320, 400];
+const GRAMMAGES: number[] = [60, 70, 80, 90, 100, 115, 130, 135, 150, 170, 200, 250, 300, 320, 350, 400];
+
+const AUTOCOPIANT_GRAMMAGES: number[] = [50, 55, 60, 80];
 
 export const PAPER_TYPES: PaperType[] = [
   { id: 'couche-mat', type: 'Couché mat', grammages: GRAMMAGES },
@@ -29,6 +31,10 @@ export const PAPER_TYPES: PaperType[] = [
   { id: 'couche-brillant', type: 'Couché brillant', grammages: GRAMMAGES },
   { id: 'offset', type: 'Offset', grammages: GRAMMAGES },
   { id: 'laser', type: 'Laser', grammages: GRAMMAGES },
+  { id: 'autocopiant', type: 'Autocopiant', grammages: AUTOCOPIANT_GRAMMAGES },
+  { id: 'autocopiant-cb-blanc', type: 'Autocopiant CB blanc', grammages: AUTOCOPIANT_GRAMMAGES },
+  { id: 'autocopiant-cfb-rose', type: 'Autocopiant CFB rose', grammages: AUTOCOPIANT_GRAMMAGES },
+  { id: 'autocopiant-cf-jaune', type: 'Autocopiant CF jaune', grammages: AUTOCOPIANT_GRAMMAGES },
 ];
 
 // ============================================================================

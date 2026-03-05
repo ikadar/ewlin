@@ -3,12 +3,14 @@
  * Extracted from JcfElementsTable to reduce cognitive complexity
  */
 
+import { useMemo } from 'react';
 import { Calculator } from 'lucide-react';
-import type { JcfFieldKey, JcfLinkableField } from '../../types';
-import type { SequenceWorkflow } from './useSequenceWorkflow';
-import type { SessionLearning } from './useSessionLearning';
-import type { LinkPropagationState } from './useLinkPropagation';
+import type { JcfFieldKey, JcfLinkableField } from './types';
+import type { SessionLearning } from '../../hooks/useSessionLearning';
+import type { LinkPropagationState } from '../../hooks/useLinkPropagation';
 import { JcfSequenceAutocomplete } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
+import type { PostePresetLike } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
+import { WorkflowSequenceAutocomplete } from '../WorkflowSequenceAutocomplete/WorkflowSequenceAutocomplete';
 import { JcfFormatAutocomplete } from '../JcfFormatAutocomplete/JcfFormatAutocomplete';
 import { JcfImpressionAutocomplete } from '../JcfImpressionAutocomplete/JcfImpressionAutocomplete';
 import { JcfSurfacageAutocomplete } from '../JcfSurfacageAutocomplete/JcfSurfacageAutocomplete';
@@ -19,19 +21,26 @@ import { JcfQuantiteInput } from '../JcfQuantiteInput/JcfQuantiteInput';
 import { JcfPaginationInput } from '../JcfPaginationInput/JcfPaginationInput';
 import { JcfLinkToggle } from '../JcfLinkToggle/JcfLinkToggle';
 import {
-  POSTE_PRESETS,
   SOUSTRAITANT_PRESETS,
   PRODUCT_FORMATS,
   IMPRESSION_PRESETS,
   SURFACAGE_PRESETS,
   PAPER_TYPES,
   FEUILLE_FORMATS,
+  POSTE_CATEGORIES,
 } from '../../mock/reference-data';
+import { useGetFormatsQuery } from '../../store/api/formatApi';
+import { useGetImpressionPresetsQuery } from '../../store/api/impressionPresetApi';
+import { useGetSurfacagePresetsQuery } from '../../store/api/surfacagePresetApi';
+import { useGetFeuilleFormatsQuery } from '../../store/api/feuilleFormatApi';
+import { useGetProvidersQuery } from '../../store/api/providerApi';
+import type { JcfMode } from './requiredFields';
 import { createTabOutHandler, createArrowNavHandler } from './navigationUtils';
 
 export interface CellContentProps {
   rowKey: JcfFieldKey;
   value: string;
+  mode?: JcfMode;
   isEmpty: boolean;
   isTextarea: boolean;
   isNumeric: boolean;
@@ -49,7 +58,8 @@ export interface CellContentProps {
   inputLinkedClass: string;
   elementNames: string[];
   currentElementName: string;
-  sequenceWorkflow: SequenceWorkflow;
+  postePresets: ReadonlyArray<PostePresetLike>;
+  sequenceWorkflow?: string[];
   sessionLearning: SessionLearning;
   linkPropagation: LinkPropagationState;
   focusCell: (elementIndex: number, rowIndex: number) => void;
@@ -64,20 +74,60 @@ export interface CellContentProps {
 /** Render sequence autocomplete cell */
 function SequenceCell(props: CellContentProps) {
   const { cellId, value, inputFilledClass, elementIndex, rowIndex, rowCount, elementCount } = props;
-  const { sequenceWorkflow, sessionLearning, focusCell, handleCellChange, markFieldTouched } = props;
+  const { postePresets, sequenceWorkflow, sessionLearning, focusCell, handleCellChange, markFieldTouched } = props;
+
+  const { data: providers } = useGetProvidersQuery();
+
+  const dynamicSoustraitantPresets = useMemo(() => {
+    if (!providers) return SOUSTRAITANT_PRESETS;
+    return providers
+      .filter(p => p.status === 'Active')
+      .map(p => ({ name: p.name }));
+  }, [providers]);
 
   return (
     <JcfSequenceAutocomplete
       id={cellId}
       value={value}
       onChange={(v) => handleCellChange(elementIndex, 'sequence', v)}
-      postePresets={POSTE_PRESETS}
+      postePresets={postePresets}
       sessionPostes={sessionLearning.postes}
-      onLearnPoste={sessionLearning.learnPoste}
-      soustraitantPresets={SOUSTRAITANT_PRESETS}
+      onLearnPoste={(poste: PostePresetLike) => sessionLearning.learnPoste(poste as import('@flux/types').PostePreset)}
+      soustraitantPresets={dynamicSoustraitantPresets}
       sessionSoustraitants={sessionLearning.soustraitants}
       onLearnSoustraitant={sessionLearning.learnSoustraitant}
       sequenceWorkflow={sequenceWorkflow}
+      inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
+      onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
+      onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
+      onBlur={() => markFieldTouched(elementIndex, 'sequence')}
+    />
+  );
+}
+
+/** Render workflow sequence autocomplete cell (template mode — categories instead of machine names) */
+function WorkflowSequenceCell(props: CellContentProps) {
+  const { cellId, value, inputFilledClass, elementIndex, rowIndex, rowCount, elementCount } = props;
+  const { postePresets, focusCell, handleCellChange, markFieldTouched } = props;
+
+  // Derive unique category names from postePresets (snapshot-based, single source of truth)
+  const categories = useMemo(() => {
+    const seen = new Set<string>();
+    return postePresets
+      .map(p => p.category)
+      .filter(c => {
+        if (!c || seen.has(c)) return false;
+        seen.add(c);
+        return true;
+      });
+  }, [postePresets]);
+
+  return (
+    <WorkflowSequenceAutocomplete
+      id={cellId}
+      value={value}
+      onChange={(v) => handleCellChange(elementIndex, 'sequence', v)}
+      categories={categories.length > 0 ? categories : POSTE_CATEGORIES}
       inputClassName={`${inputFilledClass} resize-none min-h-[28px] overflow-hidden text-base`}
       onTabOut={createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
       onArrowNav={createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount)}
@@ -109,6 +159,18 @@ function LinkableFieldCell(props: CellContentProps) {
   const { rowKey, cellId, value, isLinked, canLinkThisCell, inputFilledClass, inputLinkedClass } = props;
   const { elementIndex, rowIndex, rowCount, elementCount, sessionLearning, linkPropagation, focusCell, handleCellChange } = props;
 
+  const { data: managedFormats } = useGetFormatsQuery();
+  const formats = managedFormats ?? PRODUCT_FORMATS;
+
+  const { data: managedImpressionPresets } = useGetImpressionPresetsQuery();
+  const impressionPresets = managedImpressionPresets ?? IMPRESSION_PRESETS;
+
+  const { data: managedSurfacagePresets } = useGetSurfacagePresetsQuery();
+  const surfacagePresets = managedSurfacagePresets ?? SURFACAGE_PRESETS;
+
+  const { data: managedFeuilleFormats } = useGetFeuilleFormatsQuery();
+  const feuilleFormats = managedFeuilleFormats ?? FEUILLE_FORMATS;
+
   const toggleLink = () => linkPropagation.toggleLink(elementIndex, rowKey as JcfLinkableField);
   const tabOutHandler = createTabOutHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
   const arrowNavHandler = createArrowNavHandler(focusCell, elementIndex, rowIndex, rowCount, elementCount);
@@ -121,7 +183,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'format', v)}
-            formats={PRODUCT_FORMATS}
+            formats={formats}
             sessionPresets={sessionLearning.productFormats}
             onLearnPreset={sessionLearning.learnProductFormat}
             inputClassName={`${inputFilledClass} text-base`}
@@ -135,7 +197,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'impression', v)}
-            presets={IMPRESSION_PRESETS}
+            presets={impressionPresets}
             sessionPresets={sessionLearning.impressions}
             onLearnPreset={sessionLearning.learnImpression}
             inputClassName={`${inputFilledClass} text-base`}
@@ -149,7 +211,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'surfacage', v)}
-            presets={SURFACAGE_PRESETS}
+            presets={surfacagePresets}
             sessionPresets={sessionLearning.surfacages}
             onLearnPreset={sessionLearning.learnSurfacage}
             inputClassName={`${inputFilledClass} text-base`}
@@ -177,7 +239,7 @@ function LinkableFieldCell(props: CellContentProps) {
             id={cellId}
             value={value}
             onChange={(v) => handleCellChange(elementIndex, 'imposition', v)}
-            feuilleFormats={FEUILLE_FORMATS}
+            feuilleFormats={feuilleFormats}
             sessionFormats={sessionLearning.feuilleFormats}
             onLearnFormat={sessionLearning.learnFeuilleFormat}
             inputClassName={`${inputFilledClass} text-base`}
@@ -299,6 +361,7 @@ function QteFeuillesCell(props: CellContentProps) {
         onChange={(e) => handleQteFeuillesChange(elementIndex, e.target.value)}
         onKeyDown={(e) => handleCellKeyDown(e, elementIndex, rowIndex)}
         className={`${isEmpty ? inputEmptyClass : inputFilledClass} text-right ${isAutoMode ? 'text-emerald-500' : 'text-zinc-100'} text-base flex-1`}
+        autoComplete="off"
         data-testid={`jcf-input-${elementIndex}-${rowKey}`}
       />
     </div>
@@ -318,6 +381,7 @@ function DefaultCell(props: CellContentProps) {
       onChange={(e) => handleCellChange(elementIndex, rowKey, e.target.value)}
       onKeyDown={(e) => handleCellKeyDown(e, elementIndex, rowIndex)}
       className={`${isEmpty ? inputEmptyClass : inputFilledClass}${isNumeric ? ' text-right' : ''} text-base`}
+      autoComplete="off"
       data-testid={`jcf-input-${elementIndex}-${rowKey}`}
     />
   );
@@ -329,10 +393,13 @@ const LINKABLE_FIELDS = ['format', 'impression', 'surfacage', 'papier', 'imposit
  * CellContent - Main component that renders the appropriate cell type
  */
 export function CellContent(props: CellContentProps) {
-  const { rowKey, isTextarea, isQteFeuilles } = props;
+  const { rowKey, mode, isTextarea, isQteFeuilles } = props;
 
-  // Sequence field
+  // Sequence field — template mode uses category autocomplete, job mode uses machine DSL
   if (rowKey === 'sequence') {
+    if (mode === 'template') {
+      return <WorkflowSequenceCell {...props} />;
+    }
     return <SequenceCell {...props} />;
   }
 

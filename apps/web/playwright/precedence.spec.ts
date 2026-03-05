@@ -19,8 +19,8 @@ test.describe('UC-06: Precedence Validation', () => {
   test.beforeEach(async ({ page }) => {
     // Use precedence fixture:
     // - Job with 2 sequential tasks
-    // - Task 1 scheduled at 7:00-8:30 on Komori
-    // - Task 2 unscheduled, must wait for Task 1 (after 8:30), on Polar
+    // - Task 1 scheduled at 7:00-8:30 on Offset
+    // - Task 2 unscheduled, must wait for Task 1 (after 8:30), on Massicot
     await page.goto('/?fixture=precedence');
     await waitForAppReady(page);
   });
@@ -35,23 +35,23 @@ test.describe('UC-06: Precedence Validation', () => {
     const taskTile = page.locator('[data-testid="task-tile-task-prec-2"]');
     await expect(taskTile).toBeVisible();
 
-    // Get the station column for Polar (where task 2 should go)
-    const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+    // Get the station column for Massicot (where task 2 should go)
+    const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
     const polarRect = await polarColumn.boundingBox();
     expect(polarRect).toBeTruthy();
 
     // Count tiles before drag
-    const tilesBefore = await countTilesOnStation(page, 'station-polar');
+    const tilesBefore = await countTilesOnStation(page, 'station-massicot');
 
     // ACT: Try to drag task 2 to 7:00 (before task 1 ends at 8:30)
     // targetY = 100 corresponds to around 7:00 (100px from column top)
-    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-polar', 100);
+    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-massicot', 100);
 
     // ASSERT: Check what happened
     // Due to precedence auto-snap, the task should either:
     // 1. Be placed at 8:30 or later (auto-snapped)
     // 2. Not be placed at all (blocked)
-    const tilesAfter = await countTilesOnStation(page, 'station-polar');
+    const tilesAfter = await countTilesOnStation(page, 'station-massicot');
 
     if (tilesAfter > tilesBefore) {
       // Task was placed - check it was auto-snapped to valid position
@@ -87,10 +87,10 @@ test.describe('UC-06: Precedence Validation', () => {
 
     // ACT: Drag task 2 to Polar station at a time before predecessor ends
     // Trying to place at 7:30 (should auto-snap to 8:30)
-    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-polar', 150);
+    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-massicot', 150);
 
     // ASSERT: If placed, should be at 8:30 or later
-    const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+    const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
     // Match root tile elements only (they have data-scheduled-start attribute)
     const polarTiles = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]');
     const count = await polarTiles.count();
@@ -118,21 +118,21 @@ test.describe('UC-06: Precedence Validation', () => {
     await expect(taskTile).toBeVisible();
 
     // Count tiles before
-    const tilesBefore = await countTilesOnStation(page, 'station-polar');
+    const tilesBefore = await countTilesOnStation(page, 'station-massicot');
 
     // ACT: Drag task 2 to Polar station at 9:00 (after 8:30)
     // v0.4.29: 9:00 is 3 hours after 6:00 start = 192px (at 64px/hour)
-    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-polar', 192);
+    await dragFromSidebarToStation(page, '[data-testid="task-tile-task-prec-2"]', 'station-massicot', 192);
 
     // ASSERT: Check what happened - task should be placed
-    const tilesAfter = await countTilesOnStation(page, 'station-polar');
+    const tilesAfter = await countTilesOnStation(page, 'station-massicot');
     console.log(`Tiles before: ${tilesBefore}, after: ${tilesAfter}`);
 
     // Task should be placed (it's after the predecessor ends)
     // Note: If it's not placed, this might indicate the drag didn't work or validation blocked it
     if (tilesAfter > tilesBefore) {
       // Verify the scheduled time
-      const polarColumn = page.locator('[data-testid="station-column-station-polar"]');
+      const polarColumn = page.locator('[data-testid="station-column-station-massicot"]');
       // Match root tile elements only (they have data-scheduled-start attribute)
       const newTile = polarColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
       const tileTime = await newTile.getAttribute('data-scheduled-start');
@@ -152,7 +152,7 @@ test.describe('UC-06: Precedence Validation', () => {
 
   test('Predecessor task is visible on grid', async ({ page }) => {
     // ARRANGE & ASSERT: Verify task 1 is scheduled at 7:00
-    const komoriColumn = page.locator('[data-testid="station-column-station-komori"]');
+    const komoriColumn = page.locator('[data-testid="station-column-station-offset"]');
     const task1Tile = komoriColumn.locator('[data-testid="tile-assign-prec-1"]');
 
     await expect(task1Tile).toBeVisible();

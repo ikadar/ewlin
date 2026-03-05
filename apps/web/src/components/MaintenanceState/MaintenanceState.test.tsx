@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { renderWithRedux, createTestStore } from '../../test/testUtils';
 import { Provider } from 'react-redux';
 import { MaintenanceState } from './MaintenanceState';
@@ -78,9 +78,7 @@ describe('MaintenanceState', () => {
     const store = createTestStore();
     store.dispatch(setServiceUnavailable(true));
 
-    renderWithRedux(<MaintenanceState onRetry={mockOnRetry} />, {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    });
+    render(<Provider store={store}><MaintenanceState onRetry={mockOnRetry} /></Provider>);
 
     fireEvent.click(screen.getByTestId('maintenance-retry'));
 
@@ -93,9 +91,7 @@ describe('MaintenanceState', () => {
     const store = createTestStore();
     store.dispatch(setServiceUnavailable(true));
 
-    renderWithRedux(<MaintenanceState onRetry={mockOnRetry} />, {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    });
+    render(<Provider store={store}><MaintenanceState onRetry={mockOnRetry} /></Provider>);
 
     expect(mockOnRetry).not.toHaveBeenCalled();
 

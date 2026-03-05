@@ -73,10 +73,17 @@ export function JcfImpressionAutocomplete({
     return mergeWithSession(baseSuggestions, sessionSuggestions, (s) => s.value);
   }, [presets, sessionPresets]);
 
-  // Display value: pretty when unfocused, editing when focused
+  // Display value: pretty when unfocused, editing when focused.
+  // Prefer stored label from preset over static toPrettyImpression fallback.
   const displayValue = isFocused
     ? editingValue
-    : toPrettyImpression(value);
+    : (() => {
+        const preset = (presets as Array<{ value: string; label?: string }>).find(
+          (p) => p.value === value
+        );
+        if (preset?.label) return preset.label;
+        return toPrettyImpression(value);
+      })();
 
   const handleFocus = useCallback(() => {
     setEditingValue(toDslImpression(value));

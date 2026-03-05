@@ -34,6 +34,7 @@ const mockElements: Element[] = [
     paperStatus: 'in_stock',
     batStatus: 'bat_approved',
     plateStatus: 'ready',
+    formeStatus: 'none',
     createdAt: '2025-12-15T10:00:00Z',
     updatedAt: '2025-12-15T10:00:00Z',
   },
@@ -200,7 +201,7 @@ describe('JobInfo', () => {
     expect(screen.getByText('12345')).toBeInTheDocument();
     expect(screen.getByText('Autosphere')).toBeInTheDocument();
     expect(screen.getByText('Brochures Autosphère accueil')).toBeInTheDocument();
-    expect(screen.getByText('18/12/2025')).toBeInTheDocument();
+    expect(screen.getByText('18/12/2025 14:00')).toBeInTheDocument();
   });
 });
 

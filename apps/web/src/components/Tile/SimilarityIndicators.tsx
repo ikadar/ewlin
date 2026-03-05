@@ -27,18 +27,18 @@ export function SimilarityIndicators({ results }: SimilarityIndicatorsProps) {
     >
       {results.map((result, index) => (
         <span
-          key={result.criterion.id || index}
+          key={result.criterion.fieldPath || index}
           title={result.criterion.name}
           data-testid={`similarity-icon-${index}`}
         >
           {result.isMatched ? (
             <Link
-              className="w-3.5 h-3.5 text-zinc-400"
+              className="w-3.5 h-3.5 text-emerald-400"
               data-testid="similarity-link-icon"
             />
           ) : (
             <Unlink
-              className="w-3.5 h-3.5 text-zinc-800"
+              className="w-3.5 h-3.5 text-orange-400"
               data-testid="similarity-unlink-icon"
             />
           )}

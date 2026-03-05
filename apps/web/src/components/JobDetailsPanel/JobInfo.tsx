@@ -12,13 +12,22 @@ export interface JobInfoProps {
  * Job information section displaying Code, Client, Intitulé, Départ.
  */
 export function JobInfo({ job, onDateClick }: JobInfoProps) {
-  // Format date as DD/MM/YYYY
+  // Format date as DD/MM/YYYY HH:mm
   const formatDate = (dateStr: string): string => {
+    if (dateStr.includes('T')) {
+      // Datetime format: parse from string directly to avoid timezone shifts
+      const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+      if (match) {
+        const [, year, month, day, hours, minutes] = match;
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+      }
+    }
+    // Date-only fallback
     const date = new Date(dateStr);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}/${month}/${year} 14:00`;
   };
 
   // REQ-02: Handle departure date click

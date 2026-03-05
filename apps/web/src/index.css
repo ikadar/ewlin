@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /* Base font size: 13px (reference/jcf compatible)
- * This makes Tailwind rem-based classes map to:
+ * Tailwind rem-based classes map to:
  * - text-xs (0.75rem) = 9.75px
- * - text-sm (0.875rem) = 11.375px ≈ 11px
+ * - text-sm (0.875rem) = 11.375px
  * - text-base (1rem) = 13px
  * - text-lg (1.125rem) = 14.625px
  */
@@ -34,6 +34,30 @@ html {
   --color-input: hsl(214.3 31.8% 91.4%);
   --color-ring: hsl(222.2 84% 4.9%);
   --radius: 0.5rem;
+
+  /* ── Flux Dashboard dark palette (spec 3.15) ── */
+  --color-flux-base:         rgb(15 15 15);
+  --color-flux-surface:      rgb(26 26 26);
+  --color-flux-elevated:     rgb(36 36 36);
+  --color-flux-hover:        rgb(44 44 44);
+  --color-flux-active:       rgb(52 52 52);
+  --color-flux-border:       rgb(42 42 42);
+  --color-flux-border-light: rgb(58 58 58);
+  --color-flux-text-primary:   rgb(245 245 245);
+  --color-flux-text-secondary: rgb(209 209 209);
+  --color-flux-text-tertiary:  rgb(161 161 161);
+  --color-flux-text-muted:     rgb(128 128 128);
+}
+
+/* ── Flux table global td rules (mockup2 spec) ── */
+td {
+  vertical-align: middle;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+td:has(> .inline-flex) {
+  line-height: 0;
 }
 
 body {
@@ -45,6 +69,102 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Flux Dashboard animations (v0.5.17) ── */
+
+@keyframes flux-subrow-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes flux-listbox-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Scrollbar: hidden by default, visible where opted in ── */
+*::-webkit-scrollbar { width: 0; height: 0; }
+
+.scrollbar-visible::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-visible::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-visible::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
+.scrollbar-visible::-webkit-scrollbar-thumb:hover { background: rgb(110 110 110); }
+
+/* Firefox */
+* {
+  scrollbar-width: none;
+}
+.scrollbar-visible {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(80 80 80) transparent;
+}
+
+/* Suppress default browser focus outline (blue ring) for mouse/touch interactions.
+   Keyboard users still see focus-visible where components opt in. */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── ST (Sous-traitance) column (v0.5.23, spec §4–5) ── */
+
+/* ST cell container — vertical flex, compact */
+.st-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11px;
+}
+
+/* ST line — icon + label */
+.st-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: default;
+  min-width: 0;
+}
+
+/* ST label — overflow ellipsis */
+.st-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(161 161 161);
+}
+
+/* 3-state colors */
+.st-pending  { color: rgb(128 128 128); }
+.st-progress { color: rgb(251 146 60); }
+.st-done     { color: rgb(74 222 128); }
+
+/* Custom tooltip — position: fixed, follows cursor */
+.st-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: rgb(36 36 36);
+  border: 1px solid rgb(58 58 58);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: rgb(209 209 209);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 /* Striped pattern for unavailability overlay (v0.3.60: CSS gradient → SVG for performance) */

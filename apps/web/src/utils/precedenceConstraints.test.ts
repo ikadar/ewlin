@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { getPredecessorConstraint, getSuccessorConstraint } from './precedenceConstraints';
-import type { ScheduleSnapshot, Task, TaskAssignment, Job, Element } from '@flux/types';
+import {
+  getPredecessorConstraint,
+  getSuccessorConstraint,
+  getOutsourcedTaskReturnTime,
+  getOutsourcedTaskDepartureTime,
+  getOutsourcingTimeInfo,
+} from './precedenceConstraints';
+import type { ScheduleSnapshot, Task, TaskAssignment, Job, Element, OutsourcedTask, OutsourcedProvider } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../components/TimelineColumn/HourMarker';
 
 /**
@@ -181,7 +187,7 @@ describe('getPredecessorConstraint', () => {
       tasks: [task1, task2],
       assignments: [assignment],
       stations: [
-        { id: 'station-cutting', name: 'Cutting', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
+        { id: 'station-cutting', name: 'Cutting', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
       ],
     });
 
@@ -215,11 +221,11 @@ describe('getPredecessorConstraint', () => {
       tasks: [printTask, cutTask],
       assignments: [assignment],
       stations: [
-        { id: 'station-offset', name: 'Offset Press', categoryId: 'cat-offset', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
+        { id: 'station-offset', name: 'Offset Press', status: 'Available', capacity: 1, categoryId: 'cat-offset', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
       ],
       categories: [
-        { id: 'cat-offset', name: 'Offset', colorCode: '#FF0000' },
-        { id: 'cat-cutting', name: 'Cutting', colorCode: '#00FF00' },
+        { id: 'cat-offset', name: 'Offset', similarityCriteria: [] },
+        { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [] },
       ],
     });
 
@@ -323,7 +329,7 @@ describe('getSuccessorConstraint', () => {
       elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
     const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR);
@@ -353,7 +359,7 @@ describe('getSuccessorConstraint', () => {
       elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', categoryId: 'cat-cutting', groupId: null, operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
     const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR);
@@ -362,5 +368,413 @@ describe('getSuccessorConstraint', () => {
     // Latest start for task1 = 14:00 - 2h = 12:00
     // 12:00 is 6 hours from startHour 6
     expect(result).toBe(6 * PIXELS_PER_HOUR);
+  });
+});
+
+// ============================================================================
+// v0.5.12: Outsourcing Precedence Calculation Tests
+// ============================================================================
+
+// Helper to create outsourced task
+function createOutsourcedTask(
+  id: string,
+  elementId: string,
+  sequenceOrder: number,
+  providerId: string,
+  overrides: Partial<OutsourcedTask> = {}
+): OutsourcedTask {
+  return {
+    id,
+    elementId,
+    sequenceOrder,
+    type: 'Outsourced',
+    providerId,
+    actionType: 'Pelliculage',
+    duration: {
+      openDays: 2,
+      latestDepartureTime: '14:00',
+      receptionTime: '09:00',
+    },
+    status: 'Ready',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+// Helper to create provider
+function createProvider(id: string, transitDays: number = 1): OutsourcedProvider {
+  return {
+    id,
+    name: `Provider ${id}`,
+    status: 'Active',
+    supportedActionTypes: ['Pelliculage'],
+    latestDepartureTime: '14:00',
+    receptionTime: '09:00',
+    transitDays,
+    groupId: 'grp-external',
+  };
+}
+
+describe('getOutsourcedTaskReturnTime (v0.5.12)', () => {
+  it('returns manual return date when set', () => {
+    const manualReturn = '2026-01-10T10:00:00.000Z';
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1', {
+      manualReturn,
+    });
+    const provider = createProvider('provider-1');
+
+    const result = getOutsourcedTaskReturnTime(task, undefined, provider);
+
+    expect(result).not.toBeNull();
+    expect(result!.toISOString()).toBe(manualReturn);
+  });
+
+  it('returns null when no manual return and no predecessor end time', () => {
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1');
+    const provider = createProvider('provider-1');
+
+    const result = getOutsourcedTaskReturnTime(task, undefined, provider);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when no provider', () => {
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1');
+
+    const result = getOutsourcedTaskReturnTime(task, '2026-01-06T10:00:00.000Z', undefined);
+
+    expect(result).toBeNull();
+  });
+
+  it('calculates return from predecessor end time when no manual dates', () => {
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1', {
+      duration: {
+        openDays: 2,
+        latestDepartureTime: '14:00',
+        receptionTime: '09:00',
+      },
+    });
+    const provider = createProvider('provider-1', 1); // 1 transit day
+
+    // Predecessor ends at 10:00 on Jan 6 (Monday)
+    const predecessorEnd = new Date(2026, 0, 6, 10, 0); // Monday Jan 6, 2026 at 10:00
+
+    const result = getOutsourcedTaskReturnTime(task, predecessorEnd, provider);
+
+    // Departure: Jan 6 at 14:00 (same day since 10:00 < 14:00)
+    // Transit out: +1 day = Jan 7
+    // Work: +2 days = Jan 8, Jan 9
+    // Transit back: +1 day = Jan 12 (Jan 10-11 are weekend)
+    // Return: Jan 12 at 09:00
+    expect(result).not.toBeNull();
+    expect(result!.getHours()).toBe(9);
+    expect(result!.getMinutes()).toBe(0);
+  });
+});
+
+describe('getOutsourcedTaskDepartureTime (v0.5.12)', () => {
+  it('returns manual departure date when set', () => {
+    const manualDeparture = '2026-01-06T14:00:00.000Z';
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1', {
+      manualDeparture,
+    });
+
+    const result = getOutsourcedTaskDepartureTime(task, undefined);
+
+    expect(result).not.toBeNull();
+    expect(result!.toISOString()).toBe(manualDeparture);
+  });
+
+  it('returns null when no manual departure and no predecessor end time', () => {
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1');
+
+    const result = getOutsourcedTaskDepartureTime(task, undefined);
+
+    expect(result).toBeNull();
+  });
+
+  it('calculates departure from predecessor end time', () => {
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1', {
+      duration: {
+        openDays: 2,
+        latestDepartureTime: '14:00',
+        receptionTime: '09:00',
+      },
+    });
+
+    // Predecessor ends at 10:00 - before latest departure, so same day
+    const predecessorEnd = new Date(2026, 0, 6, 10, 0); // Monday 10:00
+
+    const result = getOutsourcedTaskDepartureTime(task, predecessorEnd);
+
+    expect(result).not.toBeNull();
+    expect(result!.getDate()).toBe(6); // Same day
+    expect(result!.getHours()).toBe(14);
+    expect(result!.getMinutes()).toBe(0);
+  });
+
+  it('moves to next business day when predecessor ends after latest departure', () => {
+    const task = createOutsourcedTask('task-1', 'elem-1', 0, 'provider-1', {
+      duration: {
+        openDays: 2,
+        latestDepartureTime: '14:00',
+        receptionTime: '09:00',
+      },
+    });
+
+    // Predecessor ends at 15:00 - after latest departure, so next day
+    const predecessorEnd = new Date(2026, 0, 6, 15, 0); // Monday 15:00
+
+    const result = getOutsourcedTaskDepartureTime(task, predecessorEnd);
+
+    expect(result).not.toBeNull();
+    expect(result!.getDate()).toBe(7); // Next day
+    expect(result!.getHours()).toBe(14);
+    expect(result!.getMinutes()).toBe(0);
+  });
+});
+
+describe('getPredecessorConstraint with outsourced predecessor (v0.5.12)', () => {
+  it('uses manual return for outsourced predecessor', () => {
+    const job = createJob('job-1');
+    const manualReturn = createLocalTimeISO(10, 0); // 10:00
+    const outsourcedTask = createOutsourcedTask('task-out', 'element-job-1', 0, 'provider-1', {
+      manualReturn,
+    });
+    const internalTask = createTask('task-int', 'element-job-1', 1);
+    job.taskIds = ['task-out', 'task-int'];
+
+    const assignment = createAssignment(
+      'task-out',
+      createLocalTimeISO(14, 0), // departure
+      createLocalTimeISO(9, 0), // scheduled end (would be calculated return)
+      'provider-1',
+      true
+    );
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-out', 'task-int'])],
+      tasks: [outsourcedTask, internalTask],
+      assignments: [assignment],
+      providers: [createProvider('provider-1')],
+    });
+
+    const result = getPredecessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+
+    // Manual return at 10:00 = 4 hours from startHour 6
+    expect(result).toBe(4 * PIXELS_PER_HOUR);
+  });
+
+  it('uses scheduled end when no manual return', () => {
+    const job = createJob('job-1');
+    const outsourcedTask = createOutsourcedTask('task-out', 'element-job-1', 0, 'provider-1');
+    const internalTask = createTask('task-int', 'element-job-1', 1);
+    job.taskIds = ['task-out', 'task-int'];
+
+    const assignment = createAssignment(
+      'task-out',
+      createLocalTimeISO(14, 0), // departure
+      createLocalTimeISO(12, 0), // return at 12:00
+      'provider-1',
+      true
+    );
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-out', 'task-int'])],
+      tasks: [outsourcedTask, internalTask],
+      assignments: [assignment],
+      providers: [createProvider('provider-1')],
+    });
+
+    const result = getPredecessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+
+    // Scheduled end at 12:00 = 6 hours from startHour 6
+    expect(result).toBe(6 * PIXELS_PER_HOUR);
+  });
+});
+
+describe('getSuccessorConstraint with outsourced successor (v0.5.12)', () => {
+  it('uses manual departure for outsourced successor', () => {
+    const job = createJob('job-1');
+    const manualDeparture = createLocalTimeISO(14, 0); // 14:00
+    const internalTask = createTask('task-int', 'element-job-1', 0, 60); // 1 hour duration
+    const outsourcedTask = createOutsourcedTask('task-out', 'element-job-1', 1, 'provider-1', {
+      manualDeparture,
+    });
+    job.taskIds = ['task-int', 'task-out'];
+
+    const assignment = createAssignment(
+      'task-out',
+      createLocalTimeISO(14, 0), // departure (same as manual)
+      createLocalTimeISO(9, 0), // return
+      'provider-1',
+      true
+    );
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-int', 'task-out'])],
+      tasks: [internalTask, outsourcedTask],
+      assignments: [assignment],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      providers: [createProvider('provider-1')],
+    });
+
+    const result = getSuccessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+
+    // Manual departure at 14:00, internal task is 60 min
+    // Latest start = 14:00 - 60 min = 13:00
+    // 13:00 is 7 hours from startHour 6
+    expect(result).toBe(7 * PIXELS_PER_HOUR);
+  });
+
+  it('uses scheduled start (departure) when no manual departure', () => {
+    const job = createJob('job-1');
+    const internalTask = createTask('task-int', 'element-job-1', 0, 60); // 1 hour duration
+    const outsourcedTask = createOutsourcedTask('task-out', 'element-job-1', 1, 'provider-1');
+    job.taskIds = ['task-int', 'task-out'];
+
+    const assignment = createAssignment(
+      'task-out',
+      createLocalTimeISO(16, 0), // departure at 16:00
+      createLocalTimeISO(9, 0), // return
+      'provider-1',
+      true
+    );
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-int', 'task-out'])],
+      tasks: [internalTask, outsourcedTask],
+      assignments: [assignment],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      providers: [createProvider('provider-1')],
+    });
+
+    const result = getSuccessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+
+    // Scheduled departure at 16:00, internal task is 60 min
+    // Latest start = 16:00 - 60 min = 15:00
+    // 15:00 is 9 hours from startHour 6
+    expect(result).toBe(9 * PIXELS_PER_HOUR);
+  });
+});
+
+// ============================================================================
+// v0.5.13: Outsourcing Time Info Tests (Drag Visualization)
+// ============================================================================
+
+describe('getOutsourcingTimeInfo (v0.5.13)', () => {
+  it('returns null when task has no outsourced predecessor', () => {
+    const job = createJob('job-1');
+    const task1 = createTask('task-1', 'element-job-1', 0);
+    const task2 = createTask('task-2', 'element-job-1', 1);
+    job.taskIds = ['task-1', 'task-2'];
+
+    const assignment = createAssignment(
+      'task-1',
+      createLocalTimeISO(8, 0),
+      createLocalTimeISO(9, 0),
+      'station-1',
+      false
+    );
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-1', 'task-2'])],
+      tasks: [task1, task2],
+      assignments: [assignment],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+    });
+
+    const result = getOutsourcingTimeInfo(task2, snapshot, 6, PIXELS_PER_HOUR);
+    expect(result).toBeNull();
+  });
+
+  it('returns correct Y positions for outsourced predecessor', () => {
+    const job = createJob('job-1');
+    const outsourcedTask = createOutsourcedTask('task-out', 'element-job-1', 0, 'provider-1');
+    const internalTask = createTask('task-int', 'element-job-1', 1);
+    job.taskIds = ['task-out', 'task-int'];
+
+    // Outsourced: departs 14:00, returns 09:00 (next day or later)
+    const assignment = createAssignment(
+      'task-out',
+      createLocalTimeISO(14, 0), // departure
+      createLocalTimeISO(9, 0), // return (simplified for test)
+      'provider-1',
+      true
+    );
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-out', 'task-int'])],
+      tasks: [outsourcedTask, internalTask],
+      assignments: [assignment],
+      providers: [createProvider('provider-1')],
+    });
+
+    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+
+    expect(result).not.toBeNull();
+    // Departure at 14:00 = 8 hours from startHour 6
+    expect(result!.departureY).toBe(8 * PIXELS_PER_HOUR);
+    // Return at 09:00 = 3 hours from startHour 6
+    expect(result!.returnY).toBe(3 * PIXELS_PER_HOUR);
+  });
+
+  it('uses manual return for Y position when set', () => {
+    const job = createJob('job-1');
+    const manualReturn = createLocalTimeISO(12, 0); // Manual return at 12:00
+    const outsourcedTask = createOutsourcedTask('task-out', 'element-job-1', 0, 'provider-1', {
+      manualReturn,
+    });
+    const internalTask = createTask('task-int', 'element-job-1', 1);
+    job.taskIds = ['task-out', 'task-int'];
+
+    const assignment = createAssignment(
+      'task-out',
+      createLocalTimeISO(14, 0), // departure
+      createLocalTimeISO(9, 0), // scheduled return (will be overridden by manual)
+      'provider-1',
+      true
+    );
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-out', 'task-int'])],
+      tasks: [outsourcedTask, internalTask],
+      assignments: [assignment],
+      providers: [createProvider('provider-1')],
+    });
+
+    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+
+    expect(result).not.toBeNull();
+    // Departure at 14:00 = 8 hours from startHour 6
+    expect(result!.departureY).toBe(8 * PIXELS_PER_HOUR);
+    // Manual return at 12:00 = 6 hours from startHour 6
+    expect(result!.returnY).toBe(6 * PIXELS_PER_HOUR);
+  });
+
+  it('returns null when outsourced predecessor is not scheduled', () => {
+    const job = createJob('job-1');
+    const outsourcedTask = createOutsourcedTask('task-out', 'element-job-1', 0, 'provider-1');
+    const internalTask = createTask('task-int', 'element-job-1', 1);
+    job.taskIds = ['task-out', 'task-int'];
+
+    const snapshot = createSnapshot({
+      jobs: [job],
+      elements: [createElement('job-1', ['task-out', 'task-int'])],
+      tasks: [outsourcedTask, internalTask],
+      assignments: [], // No assignment
+      providers: [createProvider('provider-1')],
+    });
+
+    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    expect(result).toBeNull();
   });
 });

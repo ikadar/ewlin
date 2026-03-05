@@ -9,23 +9,40 @@
  */
 
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
+import { PRODUCT_FORMATS, IMPRESSION_PRESETS, SURFACAGE_PRESETS, FEUILLE_FORMATS } from '../../mock/reference-data';
+import type { FormatResponse } from './formatApi';
+import type { ImpressionPresetResponse } from './impressionPresetApi';
+import type { SurfacagePresetResponse } from './surfacagePresetApi';
+import type { FeuilleFormatResponse } from './feuilleFormatApi';
+import type { StationResponse } from './stationApi';
 import type {
   ScheduleSnapshot,
   AssignTaskRequest,
   AssignmentResponse,
   CompletionResponse,
   UnassignmentResponse,
+  CompactStationResponse,
   InternalTask,
+  OutsourcedTask,
   Station,
   TaskAssignment,
   CreateJobRequest,
+  UpdateJobRequest,
   Job,
   Element,
+  ElementSpec,
   Task,
   ReferenceLookupResponse,
+  JcfTemplateCreateInput,
+  JcfTemplateUpdateInput,
 } from '@flux/types';
+import { DRY_TIME_MS } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
+import { FLUX_STATIC_JOBS } from '../../mock/fluxStaticData';
+import { getTemplates as mockGetTemplates, createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
+import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
+import { isLastTaskOfJob } from '../../utils/taskHelpers';
 import { normalizeError, createNotFoundError } from './errorNormalization';
 
 // ============================================================================
@@ -40,6 +57,194 @@ interface MockRoute {
   method: string;
   pattern: RegExp;
   handler: MockRouteHandler;
+}
+
+// ============================================================================
+// Auto-assign outsourced successor tasks
+// ============================================================================
+
+/**
+ * After assigning an internal task, check if any outsourced tasks in successor
+ * elements can now be auto-assigned (all their predecessor elements' last tasks
+ * are scheduled).
+ *
+ * Returns new TaskAssignment[] to add to the snapshot.
+ */
+function autoAssignOutsourcedSuccessors(
+  snapshot: ScheduleSnapshot,
+  assignedTaskId: string,
+  currentAssignments: TaskAssignment[],
+): { newAssignments: TaskAssignment[]; updatedAssignments: TaskAssignment[] } {
+  const elements = snapshot.elements ?? [];
+  const providers = snapshot.providers ?? [];
+  if (elements.length === 0 || providers.length === 0) {
+    return { newAssignments: [], updatedAssignments: [] };
+  }
+
+  const assignmentByTaskId = new Map(currentAssignments.map((a) => [a.taskId, a]));
+  const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
+
+  // Find the element containing the assigned task
+  const assignedTask = taskById.get(assignedTaskId);
+  if (!assignedTask) return { newAssignments: [], updatedAssignments: [] };
+
+  const assignedElement = elements.find((e) => e.id === assignedTask.elementId);
+  if (!assignedElement) return { newAssignments: [], updatedAssignments: [] };
+
+  // Find elements that list assignedElement as a prerequisite
+  const dependentElements = elements.filter((e) =>
+    e.prerequisiteElementIds.includes(assignedElement.id)
+  );
+
+  const newAssignments: TaskAssignment[] = [];
+  const updatedAssignments: TaskAssignment[] = [];
+
+  for (const depElem of dependentElements) {
+    // Find outsourced tasks in this element
+    const outsourcedTasks = depElem.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is OutsourcedTask => t !== undefined && t.type === 'Outsourced');
+
+    if (outsourcedTasks.length === 0) continue;
+
+    // Find the latest scheduled predecessor end time (ALL must be scheduled)
+    let latestPredecessorEnd: string | undefined;
+    let allScheduled = true;
+
+    for (const prereqId of depElem.prerequisiteElementIds) {
+      const prereqElem = elements.find((e) => e.id === prereqId);
+      if (!prereqElem) { allScheduled = false; break; }
+
+      // Get last task by sequenceOrder
+      const prereqTasks = prereqElem.taskIds
+        .map((id) => taskById.get(id))
+        .filter((t): t is Task => t !== undefined)
+        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      const lastTask = prereqTasks[prereqTasks.length - 1];
+      if (!lastTask) { allScheduled = false; break; }
+
+      const lastAssignment = assignmentByTaskId.get(lastTask.id);
+      if (!lastAssignment) { allScheduled = false; break; }
+
+      if (!latestPredecessorEnd || lastAssignment.scheduledEnd > latestPredecessorEnd) {
+        latestPredecessorEnd = lastAssignment.scheduledEnd;
+      }
+    }
+
+    if (!allScheduled || !latestPredecessorEnd) continue;
+
+    // Auto-assign or update each outsourced task
+    for (const outTask of outsourcedTasks) {
+      const provider = providers.find((p) => p.id === outTask.providerId);
+      if (!provider) continue;
+
+      const oneWay = isLastTaskOfJob(outTask.id, elements, snapshot.tasks);
+      const dates = calculateOutsourcingDates(latestPredecessorEnd, {
+        workDays: outTask.duration.openDays,
+        latestDepartureTime: outTask.duration.latestDepartureTime,
+        receptionTime: outTask.duration.receptionTime,
+        transitDays: provider.transitDays,
+        oneWay,
+      });
+      if (!dates) continue;
+
+      const existingAssignment = assignmentByTaskId.get(outTask.id);
+
+      if (existingAssignment) {
+        // Update if the new dates are later (more constraining)
+        const newEnd = dates.return.toISOString();
+        if (newEnd > existingAssignment.scheduledEnd) {
+          const updated: TaskAssignment = {
+            ...existingAssignment,
+            scheduledStart: dates.departure.toISOString(),
+            scheduledEnd: newEnd,
+            updatedAt: new Date().toISOString(),
+          };
+          updatedAssignments.push(updated);
+          assignmentByTaskId.set(outTask.id, updated);
+        }
+      } else {
+        // Create new assignment
+        const outAssignment: TaskAssignment = {
+          id: generateId(),
+          taskId: outTask.id,
+          targetId: provider.id,
+          isOutsourced: true,
+          scheduledStart: dates.departure.toISOString(),
+          scheduledEnd: dates.return.toISOString(),
+          isCompleted: false,
+          completedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        newAssignments.push(outAssignment);
+        assignmentByTaskId.set(outTask.id, outAssignment);
+      }
+    }
+  }
+
+  return { newAssignments, updatedAssignments };
+}
+
+/**
+ * Find auto-assigned outsourced task IDs that should be removed when a
+ * predecessor task is unassigned. An outsourced task's assignment is removed
+ * if it no longer has ANY scheduled predecessor element last-tasks.
+ */
+function getOutsourcedTasksToRemoveOnUnassign(
+  snapshot: ScheduleSnapshot,
+  unassignedTaskId: string,
+  remainingAssignments: TaskAssignment[],
+): string[] {
+  const elements = snapshot.elements ?? [];
+  if (elements.length === 0) return [];
+
+  const assignmentByTaskId = new Map(remainingAssignments.map((a) => [a.taskId, a]));
+  const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
+
+  const unassignedTask = taskById.get(unassignedTaskId);
+  if (!unassignedTask) return [];
+
+  const unassignedElement = elements.find((e) => e.id === unassignedTask.elementId);
+  if (!unassignedElement) return [];
+
+  // Find elements that depend on the unassigned task's element
+  const dependentElements = elements.filter((e) =>
+    e.prerequisiteElementIds.includes(unassignedElement.id)
+  );
+
+  const toRemove: string[] = [];
+
+  for (const depElem of dependentElements) {
+    const outsourcedTasks = depElem.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is OutsourcedTask => t !== undefined && t.type === 'Outsourced')
+      .filter((t) => assignmentByTaskId.has(t.id));
+
+    for (const outTask of outsourcedTasks) {
+      // Check if ALL prerequisite elements' last tasks are still scheduled
+      // (symmetric with auto-assign which requires ALL to be scheduled)
+      let allPrereqsScheduled = true;
+      for (const prereqId of depElem.prerequisiteElementIds) {
+        const prereqElem = elements.find((e) => e.id === prereqId);
+        if (!prereqElem) { allPrereqsScheduled = false; break; }
+        const prereqTasks = prereqElem.taskIds
+          .map((id) => taskById.get(id))
+          .filter((t): t is Task => t !== undefined)
+          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        const lastTask = prereqTasks[prereqTasks.length - 1];
+        if (!lastTask || !assignmentByTaskId.has(lastTask.id)) {
+          allPrereqsScheduled = false;
+          break;
+        }
+      }
+      if (!allPrereqsScheduled) {
+        toRemove.push(outTask.id);
+      }
+    }
+  }
+
+  return toRemove;
 }
 
 // ============================================================================
@@ -99,10 +304,23 @@ const handleAssignTask = async (
     updatedAt: new Date().toISOString(),
   };
 
-  // Update snapshot
+  // Auto-assign or update outsourced successor tasks based on scheduled predecessors
+  const allAssignments = [...updatedAssignments, newAssignment];
+  const { newAssignments: outsourcedNew, updatedAssignments: outsourcedUpdated } =
+    autoAssignOutsourcedSuccessors(currentSnapshot, taskId, allAssignments);
+
+  // Apply outsourced updates to existing assignments
+  const finalAssignments = allAssignments
+    .map((a) => {
+      const updated = outsourcedUpdated.find((u) => u.taskId === a.taskId);
+      return updated ?? a;
+    })
+    .concat(outsourcedNew);
+
+  // Update snapshot (conflicts are automatically recalculated by updateSnapshot)
   updateSnapshot((snapshot) => ({
     ...snapshot,
-    assignments: [...updatedAssignments, newAssignment],
+    assignments: finalAssignments,
   }));
 
   const response: AssignmentResponse = {
@@ -160,9 +378,23 @@ const handleRescheduleTask = async (
     updatedAt: new Date().toISOString(),
   };
 
+  // Auto-assign or update outsourced successor tasks based on rescheduled position
+  const allAssignments = [...updatedAssignments, updatedAssignment];
+  const { newAssignments: outsourcedNew, updatedAssignments: outsourcedUpdated } =
+    autoAssignOutsourcedSuccessors(currentSnapshot, taskId, allAssignments);
+
+  // Apply outsourced updates to existing assignments
+  const finalAssignments = allAssignments
+    .map((a) => {
+      const updated = outsourcedUpdated.find((u) => u.taskId === a.taskId);
+      return updated ?? a;
+    })
+    .concat(outsourcedNew);
+
+  // Update snapshot (conflicts are automatically recalculated by updateSnapshot)
   updateSnapshot((snapshot) => ({
     ...snapshot,
-    assignments: [...updatedAssignments, updatedAssignment],
+    assignments: finalAssignments,
   }));
 
   const response: AssignmentResponse = {
@@ -196,9 +428,18 @@ const handleUnassignTask = async (
     return { error: createNotFoundError('Assignment not found') };
   }
 
+  // Check which assignments remain after removing this one
+  const remainingAssignments = currentSnapshot.assignments.filter((a) => a.taskId !== taskId);
+
+  // Find auto-assigned outsourced tasks that should be removed
+  const outsourcedToRemove = new Set(
+    getOutsourcedTasksToRemoveOnUnassign(currentSnapshot, taskId, remainingAssignments)
+  );
+
+  // Update snapshot (conflicts are automatically recalculated by updateSnapshot)
   updateSnapshot((snapshot) => ({
     ...snapshot,
-    assignments: snapshot.assignments.filter((a) => a.taskId !== taskId),
+    assignments: remainingAssignments.filter((a) => !outsourcedToRemove.has(a.taskId)),
   }));
 
   const response: UnassignmentResponse = {
@@ -277,6 +518,8 @@ interface CreateJobResponse {
 interface ParsedTask {
   actionType: string;
   durationMinutes: number;
+  setupMinutes?: number;
+  runMinutes?: number;
 }
 
 /**
@@ -322,8 +565,9 @@ const JOB_COLORS = [
 /**
  * Parse sequence DSL into individual tasks.
  *
- * Format: "[Action] duration | [Action2] duration2"
- * Example: "[Offset] 30 | [Massicot] 15" → [{actionType: "offset", duration: 30}, ...]
+ * Supports two formats:
+ * - JCF format: "PosteName(setup+run)" or "PosteName(total)" (one per line)
+ * - Legacy bracket format: "[ActionType] duration | [Action2] duration2"
  *
  * @param sequence - The sequence DSL string
  * @returns Array of parsed tasks
@@ -334,15 +578,30 @@ function parseSequenceDsl(sequence: string): ParsedTask[] {
   }
 
   const tasks: ParsedTask[] = [];
-  const parts = sequence.split('|').map((p) => p.trim()).filter((p) => p.length > 0);
+  const lines = sequence.split(/[\n|]/).map((p) => p.trim()).filter((p) => p.length > 0);
 
-  for (const part of parts) {
-    // Match pattern: [ActionType] duration
-    const match = part.match(/\[([^\]]+)\]\s*(\d+)/);
-    if (match) {
-      const actionType = match[1].toLowerCase().trim();
-      const durationMinutes = parseInt(match[2], 10);
-      tasks.push({ actionType, durationMinutes });
+  for (const line of lines) {
+    // JCF format: PosteName(setup+run) or PosteName(total)
+    const jcfMatch = line.match(/^(\w+)\((\d+)(?:\+(\d+))?\)$/);
+    if (jcfMatch) {
+      const setupMinutes = parseInt(jcfMatch[2], 10);
+      const runMinutes = jcfMatch[3] ? parseInt(jcfMatch[3], 10) : 0;
+      tasks.push({
+        actionType: jcfMatch[1],
+        durationMinutes: setupMinutes + runMinutes,
+        setupMinutes,
+        runMinutes,
+      });
+      continue;
+    }
+
+    // Legacy bracket format: [ActionType] duration
+    const bracketMatch = line.match(/\[([^\]]+)\]\s*(\d+)/);
+    if (bracketMatch) {
+      tasks.push({
+        actionType: bracketMatch[1].toLowerCase().trim(),
+        durationMinutes: parseInt(bracketMatch[2], 10),
+      });
     }
   }
 
@@ -350,25 +609,61 @@ function parseSequenceDsl(sequence: string): ParsedTask[] {
 }
 
 /**
- * Get station ID for an action type
+ * Get station ID for an action type.
+ * Dynamically looks up station by name from snapshot first,
+ * then falls back to ACTION_TO_STATION mapping.
  */
-function getStationForAction(actionType: string): string {
-  const normalizedAction = actionType.toLowerCase().trim();
+function getStationForAction(actionType: string, snapshot?: ScheduleSnapshot): string {
+  const normalized = actionType.toLowerCase().replace(/\s+/g, '');
 
-  // Direct match
+  // Dynamic lookup: match station name (spaces removed) from snapshot
+  if (snapshot) {
+    const station = snapshot.stations.find(
+      s => s.name.toLowerCase().replace(/\s+/g, '') === normalized
+    );
+    if (station) return station.id;
+  }
+
+  // Fallback to static mapping
+  const normalizedAction = actionType.toLowerCase().trim();
   if (ACTION_TO_STATION[normalizedAction]) {
     return ACTION_TO_STATION[normalizedAction];
   }
 
-  // Partial match
+  // Partial match in static mapping
   for (const [key, stationId] of Object.entries(ACTION_TO_STATION)) {
     if (normalizedAction.includes(key) || key.includes(normalizedAction)) {
       return stationId;
     }
   }
 
-  // Default to first offset press
-  return 'sta-komori-g40';
+  // Final fallback: first station in snapshot or hardcoded default
+  return snapshot?.stations[0]?.id ?? 'sta-komori-g40';
+}
+
+/** Build ElementSpec from JcfElementInput request fields + parsed label. */
+function buildSpecFromInput(input: { label?: string; quantite?: number; imposition?: string; impression?: string; surfacage?: string; autres?: string; qteFeuilles?: number; commentaires?: string }): ElementSpec | undefined {
+  // Parse label → format, pagination, papier
+  const labelParts = input.label ? input.label.split(' | ') : [];
+  const format = labelParts[0] || undefined;
+  const paginationStr = labelParts[1];
+  const pagination = paginationStr ? parseInt(paginationStr, 10) : undefined;
+  const papier = labelParts[2] || undefined;
+
+  const spec: ElementSpec = {
+    ...(format && { format }),
+    ...(papier && { papier }),
+    ...(pagination && !isNaN(pagination) && { pagination }),
+    ...(input.imposition && { imposition: input.imposition }),
+    ...(input.impression && { impression: input.impression }),
+    ...(input.surfacage && { surfacage: input.surfacage }),
+    ...(input.quantite !== undefined && { quantite: input.quantite }),
+    ...(input.qteFeuilles !== undefined && { qteFeuilles: input.qteFeuilles }),
+    ...(input.autres && { autres: input.autres }),
+    ...(input.commentaires && { commentaires: input.commentaires }),
+  };
+
+  return Object.keys(spec).length > 0 ? spec : undefined;
 }
 
 /**
@@ -421,11 +716,11 @@ const handleCreateJob = async (
       taskIds.push(taskId);
       allTaskIds.push(taskId);
 
-      const stationId = getStationForAction(parsedTask.actionType);
+      const stationId = getStationForAction(parsedTask.actionType, currentSnapshot);
 
-      // Calculate setup and run times (roughly 20% setup, 80% run)
-      const setupMinutes = Math.max(15, Math.round(parsedTask.durationMinutes * 0.2));
-      const runMinutes = parsedTask.durationMinutes - setupMinutes;
+      // Use explicit setup/run if provided (JCF format), otherwise estimate (20%/80%)
+      const setupMinutes = parsedTask.setupMinutes ?? Math.max(15, Math.round(parsedTask.durationMinutes * 0.2));
+      const runMinutes = parsedTask.runMinutes ?? (parsedTask.durationMinutes - setupMinutes);
 
       const task: InternalTask = {
         id: taskId,
@@ -446,6 +741,7 @@ const handleCreateJob = async (
     }
 
     // Create element
+    const spec = buildSpecFromInput(elementInput);
     const element: Element = {
       id: elementId,
       jobId,
@@ -453,9 +749,13 @@ const handleCreateJob = async (
       label: elementInput.label,
       prerequisiteElementIds: [], // Will be resolved in second pass
       taskIds,
+      ...(spec && { spec }),
       paperStatus: 'in_stock',
       batStatus: 'bat_approved',
       plateStatus: 'ready',
+      formeStatus: 'none',
+      createdAt: now,
+      updatedAt: now,
     };
 
     newElements.push(element);
@@ -479,6 +779,7 @@ const handleCreateJob = async (
     description: body.description,
     status: 'Draft',
     workshopExitDate: body.workshopExitDate,
+    ...(body.quantity !== undefined && { quantity: body.quantity }),
     fullyScheduled: false,
     color: jobColor,
     comments: [],
@@ -513,6 +814,373 @@ const handleCreateJob = async (
 };
 
 // ============================================================================
+// Job Update Handler
+// ============================================================================
+
+/**
+ * Response type for update job operation
+ */
+interface UpdateJobResponse {
+  id: string;
+  reference: string;
+  client: string;
+  description: string;
+  workshopExitDate: string;
+  status: string;
+  updatedAt: string;
+}
+
+/**
+ * PUT /jobs/:jobId - Update job (mock implementation)
+ *
+ * Updates an existing job's metadata fields and optionally replaces
+ * elements/tasks when `elements` array is provided in the body.
+ *
+ * @see docs/releases/v0.5.13b-job-edit-via-jcf-modal.md
+ */
+const handleUpdateJob = async (
+  args: FetchArgs
+): Promise<{ data: UpdateJobResponse } | { error: FetchBaseQueryError }> => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const body = args.body as UpdateJobRequest;
+  const currentSnapshot = getSnapshot();
+
+  const jobIndex = currentSnapshot.jobs.findIndex((j) => j.id === jobId);
+  if (jobIndex === -1) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const existingJob = currentSnapshot.jobs[jobIndex];
+  const now = new Date().toISOString();
+
+  // If elements provided, rebuild elements and tasks
+  let newElementIds = existingJob.elementIds;
+  let newTaskIds = existingJob.taskIds;
+  const newElements: Element[] = [];
+  const newTasks: Task[] = [];
+
+  if (body.elements && body.elements.length > 0) {
+    const elementNameToId: Record<string, string> = {};
+    newElementIds = [];
+    newTaskIds = [];
+
+    // First pass: create elements and tasks
+    for (let i = 0; i < body.elements.length; i++) {
+      const elementInput = body.elements[i];
+      const elementId = `elem-${jobId}-upd-${i}`;
+      newElementIds.push(elementId);
+      elementNameToId[elementInput.name] = elementId;
+
+      const parsedTasks = parseSequenceDsl(elementInput.sequence || '');
+      const taskIds: string[] = [];
+
+      for (let j = 0; j < parsedTasks.length; j++) {
+        const parsed = parsedTasks[j];
+        const taskId = `task-${jobId}-upd-${i}-${j}`;
+        taskIds.push(taskId);
+        newTaskIds.push(taskId);
+
+        const stationId = getStationForAction(parsed.actionType, currentSnapshot);
+        const setupMinutes = parsed.setupMinutes ?? Math.max(15, Math.round(parsed.durationMinutes * 0.2));
+        const runMinutes = parsed.runMinutes ?? (parsed.durationMinutes - setupMinutes);
+
+        newTasks.push({
+          id: taskId,
+          elementId,
+          sequenceOrder: j,
+          status: 'Ready',
+          type: 'Internal',
+          stationId,
+          duration: { setupMinutes, runMinutes },
+          createdAt: now,
+          updatedAt: now,
+        } as InternalTask);
+      }
+
+      const spec = buildSpecFromInput(elementInput);
+      newElements.push({
+        id: elementId,
+        jobId,
+        name: elementInput.name,
+        label: elementInput.label,
+        prerequisiteElementIds: [],
+        taskIds,
+        ...(spec && { spec }),
+        paperStatus: 'in_stock',
+        batStatus: 'bat_approved',
+        plateStatus: 'ready',
+        formeStatus: 'none',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // Second pass: resolve prerequisite names to IDs
+    for (let i = 0; i < body.elements.length; i++) {
+      const prereqNames = body.elements[i].prerequisiteNames;
+      if (prereqNames && prereqNames.length > 0) {
+        newElements[i].prerequisiteElementIds = prereqNames
+          .map((name) => elementNameToId[name])
+          .filter((id) => id !== undefined);
+      }
+    }
+  }
+
+  // Merge metadata (only provided fields)
+  const updatedJob: Job = {
+    ...existingJob,
+    ...(body.reference !== undefined && { reference: body.reference }),
+    ...(body.client !== undefined && { client: body.client }),
+    ...(body.description !== undefined && { description: body.description }),
+    ...(body.workshopExitDate !== undefined && { workshopExitDate: body.workshopExitDate }),
+    ...(body.quantity !== undefined && { quantity: body.quantity }),
+    elementIds: newElementIds,
+    taskIds: newTaskIds,
+    updatedAt: now,
+  };
+
+  // Update snapshot
+  updateSnapshot((snapshot) => {
+    const newJobs = [...snapshot.jobs];
+    newJobs[jobIndex] = updatedJob;
+
+    if (body.elements && body.elements.length > 0) {
+      // Remove old elements and tasks for this job, add new ones
+      const oldElementIds = new Set(existingJob.elementIds);
+      const oldTaskIds = new Set(existingJob.taskIds);
+
+      // Also remove assignments for deleted tasks
+      const filteredAssignments = snapshot.assignments.filter(
+        (a) => !oldTaskIds.has(a.taskId)
+      );
+
+      return {
+        ...snapshot,
+        jobs: newJobs,
+        elements: [
+          ...snapshot.elements.filter((e) => !oldElementIds.has(e.id)),
+          ...newElements,
+        ],
+        tasks: [
+          ...snapshot.tasks.filter((t) => !oldTaskIds.has(t.id)),
+          ...newTasks,
+        ],
+        assignments: filteredAssignments,
+      };
+    }
+
+    return { ...snapshot, jobs: newJobs };
+  });
+
+  const response: UpdateJobResponse = {
+    id: updatedJob.id,
+    reference: updatedJob.reference,
+    client: updatedJob.client,
+    description: updatedJob.description,
+    workshopExitDate: updatedJob.workshopExitDate,
+    status: updatedJob.status,
+    updatedAt: now,
+  };
+
+  return { data: response };
+};
+
+// ============================================================================
+// Delete Job Handler
+// ============================================================================
+
+/**
+ * DELETE /jobs/:jobId - Delete a job and all related data
+ */
+const handleDeleteJob = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const job = currentSnapshot.jobs.find((j) => j.id === jobId);
+  if (!job) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const jobElementIds = new Set(job.elementIds);
+  const jobTaskIds = new Set(job.taskIds);
+
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    jobs: snapshot.jobs.filter((j) => j.id !== jobId),
+    elements: snapshot.elements.filter((e) => !jobElementIds.has(e.id)),
+    tasks: snapshot.tasks.filter((t) => !jobTaskIds.has(t.id)),
+    assignments: snapshot.assignments.filter((a) => !jobTaskIds.has(a.taskId)),
+  }));
+
+  return { data: {} };
+};
+
+// ============================================================================
+// Station Compact Handler
+// ============================================================================
+
+/**
+ * POST /stations/:stationId/compact - Compact station assignments
+ *
+ * Removes gaps between tiles on a station by moving them as early as possible.
+ * For each tile (earliest to latest), earliestStart = max(previousTileEnd,
+ * predecessorEnd + optional drying time). First tile with no predecessor stays
+ * in place. Respects precedence rules and drying time after offset printing.
+ *
+ * @see services/php-api/src/Service/CompactStationService.php
+ */
+const handleCompactStation = async (
+  args: FetchArgs
+): Promise<{ data: CompactStationResponse } | { error: FetchBaseQueryError }> => {
+  const stationId = extractPathParam(args.url, /\/stations\/([^/]+)\/compact/);
+  if (!stationId) {
+    return { error: createNotFoundError('Invalid station ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const station = currentSnapshot.stations.find((s) => s.id === stationId);
+  if (!station) {
+    return { error: createNotFoundError('Station not found') };
+  }
+
+  // Get assignments for this station, sorted by start time
+  const stationAssignments = currentSnapshot.assignments
+    .filter((a) => a.targetId === stationId && !a.isOutsourced)
+    .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
+
+  if (stationAssignments.length === 0) {
+    return { data: { compactedCount: 0, assignments: [] } };
+  }
+
+  const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
+  const updatedEndTimes = new Map<string, Date>();
+  let compactedCount = 0;
+  let previousEndTime: Date | null = null;
+  const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
+
+  for (const assignment of stationAssignments) {
+    const task = taskMap.get(assignment.taskId);
+
+    // Calculate earliest valid start: max(previousTileEnd, predecessorEnd+dryTime)
+    let earliestStart: Date | null = null;
+
+    // Station constraint: previous tile on same station
+    if (previousEndTime !== null) {
+      earliestStart = previousEndTime;
+    }
+
+    // Precedence constraint: predecessor's end time (+ drying time if offset station)
+    if (task) {
+      const predecessorEnd = getCompactPredecessorEnd(task, currentSnapshot, updatedEndTimes);
+      if (predecessorEnd && (!earliestStart || predecessorEnd > earliestStart)) {
+        earliestStart = predecessorEnd;
+      }
+    }
+
+    // If no constraints (first tile with no predecessor), keep current position
+    if (earliestStart === null) {
+      earliestStart = new Date(assignment.scheduledStart);
+    }
+
+    // Calculate new end time
+    const newEnd: string = task?.type === 'Internal'
+      ? calculateEndTime(task as InternalTask, earliestStart.toISOString(), station)
+      : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
+
+    // Check if position actually changed
+    if (earliestStart.getTime() !== new Date(assignment.scheduledStart).getTime()) {
+      updatedAssignmentsMap.set(assignment.id, {
+        scheduledStart: earliestStart.toISOString(),
+        scheduledEnd: newEnd,
+      });
+      compactedCount++;
+    }
+
+    updatedEndTimes.set(assignment.taskId, new Date(newEnd));
+    previousEndTime = new Date(newEnd);
+  }
+
+  // Apply updates to snapshot
+  if (compactedCount > 0) {
+    updateSnapshot((snapshot) => ({
+      ...snapshot,
+      assignments: snapshot.assignments.map((assignment) => {
+        const updated = updatedAssignmentsMap.get(assignment.id);
+        return updated
+          ? { ...assignment, scheduledStart: updated.scheduledStart, scheduledEnd: updated.scheduledEnd, updatedAt: new Date().toISOString() }
+          : assignment;
+      }),
+    }));
+  }
+
+  // Build response
+  const responseAssignments: AssignmentResponse[] = stationAssignments.map((a) => {
+    const updated = updatedAssignmentsMap.get(a.id);
+    return {
+      taskId: a.taskId,
+      targetId: a.targetId,
+      isOutsourced: a.isOutsourced,
+      scheduledStart: updated?.scheduledStart ?? a.scheduledStart,
+      scheduledEnd: updated?.scheduledEnd ?? a.scheduledEnd,
+      isCompleted: a.isCompleted,
+      completedAt: a.completedAt,
+    };
+  });
+
+  return {
+    data: {
+      compactedCount,
+      assignments: responseAssignments,
+    },
+  };
+};
+
+/**
+ * Get the predecessor's effective end time for compaction.
+ *
+ * Returns the predecessor's scheduledEnd (or updated end if already compacted),
+ * plus DRY_TIME_MS if the predecessor is at a printing (offset) station.
+ */
+function getCompactPredecessorEnd(
+  task: Task,
+  snapshot: ScheduleSnapshot,
+  updatedEndTimes: Map<string, Date>,
+): Date | null {
+  const elementTasks = snapshot.tasks
+    .filter((t) => t.elementId === task.elementId)
+    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
+
+  if (taskIndex <= 0) return null;
+
+  const predecessorTask = elementTasks[taskIndex - 1];
+  const predecessorAssignment = snapshot.assignments.find((a) => a.taskId === predecessorTask.id);
+  if (!predecessorAssignment) return null;
+
+  // Use updated end time if predecessor was already compacted in this pass
+  const predecessorEnd = updatedEndTimes.get(predecessorTask.id)
+    ?? new Date(predecessorAssignment.scheduledEnd);
+
+  // Add drying time if predecessor is at a printing (offset) station
+  const predStation = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
+  const category = snapshot.categories.find((c) => c.id === predStation?.categoryId);
+  if (category?.name.toLowerCase().includes('offset')) {
+    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+  }
+
+  return predecessorEnd;
+}
+
+// ============================================================================
 // Route Configuration
 // ============================================================================
 
@@ -535,7 +1203,13 @@ const MOCK_CLIENT_NAMES = [
 ];
 
 /**
- * GET /jobs/clients?q={prefix} - Get client suggestions
+ * Mock client store for persistent client management.
+ * Starts with MOCK_CLIENT_NAMES and grows as new clients are created.
+ */
+let mockClientStore: string[] = [...MOCK_CLIENT_NAMES];
+
+/**
+ * GET /clients?q={prefix} - Get client suggestions
  *
  * Filters mock clients by prefix (case-insensitive).
  * Returns all clients if prefix is empty.
@@ -547,17 +1221,158 @@ const handleGetClientSuggestions = async (
 ): Promise<{ data: string[] }> => {
   // Extract query parameter from URL
   const url = new URL(args.url, 'http://localhost');
-  const prefix = url.searchParams.get('q') || '';
+  const prefix = url.searchParams.get('q');
+
+  // If no q param, return full client list (for management page)
+  if (prefix === null) {
+    return {
+      data: mockClientStore.map((name) => ({
+        id: `client-${name.toLowerCase().replace(/\s+/g, '-')}`,
+        name,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })) as unknown as string[],
+    };
+  }
+
   const normalizedPrefix = prefix.toLowerCase().trim();
 
   // Filter clients by prefix
   const suggestions = normalizedPrefix
-    ? MOCK_CLIENT_NAMES.filter((name) =>
+    ? mockClientStore.filter((name) =>
         name.toLowerCase().includes(normalizedPrefix)
       )
-    : MOCK_CLIENT_NAMES;
+    : mockClientStore;
 
   return { data: suggestions };
+};
+
+/**
+ * POST /clients - Create a new client
+ */
+const handleCreateClient = async (
+  args: FetchArgs
+): Promise<{ data: { id: string; name: string; createdAt: string; updatedAt: string } } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name: string };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Client name is required' },
+      },
+    };
+  }
+
+  // Check for duplicate
+  const exists = mockClientStore.some(
+    (n) => n.toLowerCase() === name.toLowerCase()
+  );
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Client '${name}' already exists` },
+      },
+    };
+  }
+
+  mockClientStore.push(name);
+  mockClientStore.sort();
+
+  const now = new Date().toISOString();
+  return {
+    data: {
+      id: `client-${name.toLowerCase().replace(/\s+/g, '-')}`,
+      name,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+};
+
+/**
+ * PUT /clients/:id - Update a client
+ */
+const handleUpdateClient = async (
+  args: FetchArgs
+): Promise<{ data: { id: string; name: string; createdAt: string; updatedAt: string } } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/clients\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing client ID' } } };
+  }
+
+  const body = args.body as { name: string };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Client name is required' },
+      },
+    };
+  }
+
+  // Find existing client by ID
+  const existingName = mockClientStore.find(
+    (n) => `client-${n.toLowerCase().replace(/\s+/g, '-')}` === id
+  );
+  if (!existingName) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Client not found' } } };
+  }
+
+  // Check for duplicate (excluding current)
+  const duplicate = mockClientStore.some(
+    (n) => n.toLowerCase() === name.toLowerCase() && n !== existingName
+  );
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Client '${name}' already exists` },
+      },
+    };
+  }
+
+  // Replace old name with new name
+  const idx = mockClientStore.indexOf(existingName);
+  mockClientStore[idx] = name;
+  mockClientStore.sort();
+
+  const now = new Date().toISOString();
+  return {
+    data: {
+      id: `client-${name.toLowerCase().replace(/\s+/g, '-')}`,
+      name,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+};
+
+/**
+ * DELETE /clients/:id - Delete a client
+ */
+const handleDeleteClient = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/clients\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing client ID' } } };
+  }
+
+  const existingName = mockClientStore.find(
+    (n) => `client-${n.toLowerCase().replace(/\s+/g, '-')}` === id
+  );
+  if (!existingName) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Client not found' } } };
+  }
+
+  mockClientStore = mockClientStore.filter((n) => n !== existingName);
+
+  return { data: {} };
 };
 
 /**
@@ -593,14 +1408,1285 @@ const handleLookupByReference = async (
   };
 };
 
+/**
+ * PUT /elements/:elementId/prerequisites - Update element prerequisite status
+ */
+const handleUpdateElementStatus = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const elementId = extractPathParam(args.url, /\/elements\/([^/]+)\/prerequisites$/);
+  if (!elementId) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing element ID' } } } };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const element = currentSnapshot.elements.find((e) => e.id === elementId);
+  if (!element) {
+    return { error: { status: 404, data: { error: { code: 'NOT_FOUND', message: 'Element not found' } } } };
+  }
+
+  const body = args.body as Record<string, string> | undefined;
+  if (!body) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing body' } } } };
+  }
+
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    elements: snapshot.elements.map((e) =>
+      e.id === elementId
+        ? { ...e, ...body, updatedAt: new Date().toISOString() }
+        : e
+    ),
+  }));
+
+  const updated = getSnapshot().elements.find((e) => e.id === elementId)!;
+  return {
+    data: {
+      elementId: updated.id,
+      paperStatus: updated.paperStatus,
+      batStatus: updated.batStatus,
+      plateStatus: updated.plateStatus,
+      formeStatus: updated.formeStatus,
+      isBlocked: false,
+    },
+  };
+};
+
+// ============================================================================
+// Station Category Handlers
+// ============================================================================
+
+/**
+ * GET /station-categories - List all station categories
+ */
+const handleGetStationCategories = async (): Promise<{ data: unknown }> => {
+  const snapshot = getSnapshot();
+  const now = new Date().toISOString();
+  const data = snapshot.categories.map((cat, index) => ({
+    id: cat.id,
+    name: cat.name,
+    description: cat.description,
+    similarityCriteria: cat.similarityCriteria,
+    abbreviation: (cat as { abbreviation?: string }).abbreviation ?? cat.name.substring(0, 5),
+    displayOrder: (cat as { displayOrder?: number }).displayOrder ?? index,
+    createdAt: now,
+    updatedAt: now,
+  }));
+  return { data };
+};
+
+/**
+ * POST /station-categories - Create a station category
+ */
+const handleCreateStationCategory = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name: string; description?: string; similarityCriteria: { name: string; fieldPath: string }[] };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Category name is required' },
+      },
+    };
+  }
+
+  const snapshot = getSnapshot();
+  const exists = snapshot.categories.some((c) => c.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Category '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newCategory = {
+    id: `cat-${Date.now()}`,
+    name,
+    description: body.description,
+    similarityCriteria: body.similarityCriteria ?? [],
+  };
+
+  updateSnapshot((s) => ({
+    ...s,
+    categories: [...s.categories, newCategory],
+  }));
+
+  return {
+    data: { ...newCategory, createdAt: now, updatedAt: now },
+  };
+};
+
+/**
+ * PUT /station-categories/:id - Update a station category
+ */
+const handleUpdateStationCategory = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/station-categories\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing category ID' } } };
+  }
+
+  const body = args.body as { name: string; description?: string; similarityCriteria: { name: string; fieldPath: string }[] };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        data: { error: 'ValidationError', message: 'Category name is required' },
+      },
+    };
+  }
+
+  const snapshot = getSnapshot();
+  const index = snapshot.categories.findIndex((c) => c.id === id);
+  if (index === -1) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Category not found' } } };
+  }
+
+  const duplicateName = snapshot.categories.some(
+    (c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase()
+  );
+  if (duplicateName) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Category '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated = {
+    ...snapshot.categories[index],
+    name,
+    description: body.description,
+    similarityCriteria: body.similarityCriteria ?? [],
+  };
+
+  updateSnapshot((s) => ({
+    ...s,
+    categories: s.categories.map((c) => (c.id === id ? updated : c)),
+  }));
+
+  return { data: { ...updated, createdAt: now, updatedAt: now } };
+};
+
+/**
+ * DELETE /station-categories/:id - Delete a station category
+ */
+const handleDeleteStationCategory = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/station-categories\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing category ID' } } };
+  }
+
+  const snapshot = getSnapshot();
+  const category = snapshot.categories.find((c) => c.id === id);
+  if (!category) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Category not found' } } };
+  }
+
+  const inUse = snapshot.stations.some((s) => s.categoryId === id);
+  if (inUse) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: 'Category is in use by one or more stations' },
+      },
+    };
+  }
+
+  updateSnapshot((s) => ({
+    ...s,
+    categories: s.categories.filter((c) => c.id !== id),
+  }));
+
+  return { data: {} };
+};
+
+// ============================================================================
+// Format Handlers
+// ============================================================================
+
+/**
+ * Mock format store — initialized from PRODUCT_FORMATS reference data.
+ * Grows / shrinks as formats are created / deleted.
+ */
+let mockFormatStore: FormatResponse[] = PRODUCT_FORMATS.map((f) => ({
+  id: `format-${f.id}`,
+  name: f.name,
+  width: f.width,
+  height: f.height,
+  createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+  updatedAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+}));
+
+/**
+ * GET /formats - List all formats
+ */
+const handleGetFormats = async (): Promise<{ data: FormatResponse[] }> => {
+  return { data: mockFormatStore };
+};
+
+/**
+ * POST /formats - Create a new format
+ */
+const handleCreateFormat = async (
+  args: FetchArgs
+): Promise<{ data: FormatResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name?: string; width?: number; height?: number };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format name is required' } },
+    };
+  }
+
+  if (!body.width || body.width <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Width must be a positive integer' } },
+    };
+  }
+
+  if (!body.height || body.height <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Height must be a positive integer' } },
+    };
+  }
+
+  const exists = mockFormatStore.some((f) => f.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Format '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newFormat: FormatResponse = {
+    id: `format-${Date.now()}`,
+    name,
+    width: body.width,
+    height: body.height,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockFormatStore = [...mockFormatStore, newFormat].sort((a, b) => a.name.localeCompare(b.name));
+
+  return { data: newFormat };
+};
+
+/**
+ * PUT /formats/:id - Update a format
+ */
+const handleUpdateFormat = async (
+  args: FetchArgs
+): Promise<{ data: FormatResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const body = args.body as { name?: string; width?: number; height?: number };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format name is required' } },
+    };
+  }
+
+  if (!body.width || body.width <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Width must be a positive integer' } },
+    };
+  }
+
+  if (!body.height || body.height <= 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Height must be a positive integer' } },
+    };
+  }
+
+  const existing = mockFormatStore.find((f) => f.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Format not found' } } };
+  }
+
+  const duplicate = mockFormatStore.some(
+    (f) => f.id !== id && f.name.toLowerCase() === name.toLowerCase()
+  );
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Format '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: FormatResponse = {
+    ...existing,
+    name,
+    width: body.width,
+    height: body.height,
+    updatedAt: now,
+  };
+
+  mockFormatStore = mockFormatStore
+    .map((f) => (f.id === id ? updated : f))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /formats/:id - Delete a format
+ */
+const handleDeleteFormat = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const exists = mockFormatStore.some((f) => f.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Format not found' } } };
+  }
+
+  mockFormatStore = mockFormatStore.filter((f) => f.id !== id);
+
+  return { data: {} };
+};
+
+// ============================================================================
+// Impression Preset Handlers
+// ============================================================================
+
+const IMPRESSION_PRESET_LABELS: Record<string, string> = {
+  'Q/Q': 'quadri recto/verso',
+  'Q/': 'quadri recto',
+  'N/N': 'noir recto/verso',
+  'N/': 'noir recto',
+};
+
+/**
+ * Mock impression preset store — initialized from IMPRESSION_PRESETS reference data.
+ */
+let mockImpressionPresetStore: ImpressionPresetResponse[] = IMPRESSION_PRESETS.map((p) => ({
+  id: `impression-preset-${p.id}`,
+  value: p.value,
+  description: p.description,
+  label: IMPRESSION_PRESET_LABELS[p.value] ?? '',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+/**
+ * GET /impression-presets - List all impression presets
+ */
+const handleGetImpressionPresets = async (): Promise<{ data: ImpressionPresetResponse[] }> => {
+  return { data: mockImpressionPresetStore };
+};
+
+/**
+ * POST /impression-presets - Create a new impression preset
+ */
+const handleCreateImpressionPreset = async (
+  args: FetchArgs
+): Promise<{ data: ImpressionPresetResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const exists = mockImpressionPresetStore.some((p) => p.value === value);
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Impression preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newPreset: ImpressionPresetResponse = {
+    id: `impression-preset-${Date.now()}`,
+    value,
+    description,
+    label,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockImpressionPresetStore = [...mockImpressionPresetStore, newPreset].sort((a, b) =>
+    a.value.localeCompare(b.value)
+  );
+
+  return { data: newPreset };
+};
+
+/**
+ * PUT /impression-presets/:id - Update an impression preset
+ */
+const handleUpdateImpressionPreset = async (
+  args: FetchArgs
+): Promise<{ data: ImpressionPresetResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/impression-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const existing = mockImpressionPresetStore.find((p) => p.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Impression preset not found' } } };
+  }
+
+  const duplicate = mockImpressionPresetStore.some((p) => p.id !== id && p.value === value);
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Impression preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: ImpressionPresetResponse = {
+    ...existing,
+    value,
+    description,
+    label,
+    updatedAt: now,
+  };
+
+  mockImpressionPresetStore = mockImpressionPresetStore
+    .map((p) => (p.id === id ? updated : p))
+    .sort((a, b) => a.value.localeCompare(b.value));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /impression-presets/:id - Delete an impression preset
+ */
+const handleDeleteImpressionPreset = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/impression-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const exists = mockImpressionPresetStore.some((p) => p.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Impression preset not found' } } };
+  }
+
+  mockImpressionPresetStore = mockImpressionPresetStore.filter((p) => p.id !== id);
+
+  return { data: {} };
+};
+
+// ============================================================================
+// Surfacage Preset Handlers
+// ============================================================================
+
+const SURFACAGE_PRESET_LABELS: Record<string, string> = {
+  'mat/mat': 'pelli mat recto/verso',
+  'satin/satin': 'pelli satin recto/verso',
+  'brillant/brillant': 'pelli brillant recto/verso',
+  'UV/UV': 'vernis UV recto/verso',
+  'dorure/dorure': 'dorure recto/verso',
+  'mat/': 'pelli mat recto',
+  'satin/': 'pelli satin recto',
+  'brillant/': 'pelli brillant recto',
+  'UV/': 'vernis UV recto',
+  'dorure/': 'dorure recto',
+};
+
+/**
+ * Mock surfacage preset store — initialized from SURFACAGE_PRESETS reference data.
+ */
+let mockSurfacagePresetStore: SurfacagePresetResponse[] = SURFACAGE_PRESETS.map((p) => ({
+  id: `surfacage-preset-${p.id}`,
+  value: p.value,
+  description: p.description,
+  label: SURFACAGE_PRESET_LABELS[p.value] ?? '',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+/**
+ * GET /surfacage-presets - List all surfacage presets
+ */
+const handleGetSurfacagePresets = async (): Promise<{ data: SurfacagePresetResponse[] }> => {
+  return { data: mockSurfacagePresetStore };
+};
+
+/**
+ * POST /surfacage-presets - Create a new surfacage preset
+ */
+const handleCreateSurfacagePreset = async (
+  args: FetchArgs
+): Promise<{ data: SurfacagePresetResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const exists = mockSurfacagePresetStore.some((p) => p.value === value);
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Surfacage preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newPreset: SurfacagePresetResponse = {
+    id: `surfacage-preset-${Date.now()}`,
+    value,
+    description,
+    label,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockSurfacagePresetStore = [...mockSurfacagePresetStore, newPreset].sort((a, b) =>
+    a.value.localeCompare(b.value)
+  );
+
+  return { data: newPreset };
+};
+
+/**
+ * PUT /surfacage-presets/:id - Update a surfacage preset
+ */
+const handleUpdateSurfacagePreset = async (
+  args: FetchArgs
+): Promise<{ data: SurfacagePresetResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/surfacage-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const body = args.body as { value?: string; description?: string; label?: string };
+  const value = body.value?.trim();
+  const description = body.description?.trim();
+  const label = body.label?.trim() ?? '';
+
+  if (!value) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value is required' } },
+    };
+  }
+
+  if (!value.includes('/')) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Value must contain a / separator' } },
+    };
+  }
+
+  if (!description) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Description is required' } },
+    };
+  }
+
+  const existing = mockSurfacagePresetStore.find((p) => p.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Surfacage preset not found' } } };
+  }
+
+  const duplicate = mockSurfacagePresetStore.some((p) => p.id !== id && p.value === value);
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Surfacage preset '${value}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: SurfacagePresetResponse = {
+    ...existing,
+    value,
+    description,
+    label,
+    updatedAt: now,
+  };
+
+  mockSurfacagePresetStore = mockSurfacagePresetStore
+    .map((p) => (p.id === id ? updated : p))
+    .sort((a, b) => a.value.localeCompare(b.value));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /surfacage-presets/:id - Delete a surfacage preset
+ */
+const handleDeleteSurfacagePreset = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/surfacage-presets\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing preset ID' } } };
+  }
+
+  const exists = mockSurfacagePresetStore.some((p) => p.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Surfacage preset not found' } } };
+  }
+
+  mockSurfacagePresetStore = mockSurfacagePresetStore.filter((p) => p.id !== id);
+
+  return { data: {} };
+};
+
+// ============================================================================
+// Feuille Format Handlers
+// ============================================================================
+
+/**
+ * Mock feuille format store — initialized from FEUILLE_FORMATS reference data.
+ */
+let mockFeuilleFormatStore: FeuilleFormatResponse[] = FEUILLE_FORMATS.map((f) => ({
+  id: `feuille-format-${f.format}`,
+  format: f.format,
+  poses: [...f.poses],
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+/**
+ * GET /feuille-formats - List all feuille formats
+ */
+const handleGetFeuilleFormats = async (): Promise<{ data: FeuilleFormatResponse[] }> => {
+  return { data: mockFeuilleFormatStore };
+};
+
+/**
+ * POST /feuille-formats - Create a new feuille format
+ */
+const handleCreateFeuilleFormat = async (
+  args: FetchArgs
+): Promise<{ data: FeuilleFormatResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { format?: string; poses?: number[] };
+  const format = body.format?.trim();
+
+  if (!format) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format is required' } },
+    };
+  }
+
+  if (!/^[1-9]\d*x[1-9]\d*$/i.test(format)) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format must match pattern WxH (e.g., 50x70)' } },
+    };
+  }
+
+  if (!Array.isArray(body.poses) || body.poses.length === 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'At least one poses value is required' } },
+    };
+  }
+
+  const exists = mockFeuilleFormatStore.some((f) => f.format === format);
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `FeuilleFormat '${format}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newFormat: FeuilleFormatResponse = {
+    id: `feuille-format-${Date.now()}`,
+    format,
+    poses: [...body.poses].sort((a, b) => a - b),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockFeuilleFormatStore = [...mockFeuilleFormatStore, newFormat].sort((a, b) =>
+    a.format.localeCompare(b.format)
+  );
+
+  return { data: newFormat };
+};
+
+/**
+ * PUT /feuille-formats/:id - Update a feuille format
+ */
+const handleUpdateFeuilleFormat = async (
+  args: FetchArgs
+): Promise<{ data: FeuilleFormatResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/feuille-formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const body = args.body as { format?: string; poses?: number[] };
+  const format = body.format?.trim();
+
+  if (!format) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format is required' } },
+    };
+  }
+
+  if (!/^[1-9]\d*x[1-9]\d*$/i.test(format)) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Format must match pattern WxH (e.g., 50x70)' } },
+    };
+  }
+
+  if (!Array.isArray(body.poses) || body.poses.length === 0) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'At least one poses value is required' } },
+    };
+  }
+
+  const existing = mockFeuilleFormatStore.find((f) => f.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'FeuilleFormat not found' } } };
+  }
+
+  const duplicate = mockFeuilleFormatStore.some((f) => f.id !== id && f.format === format);
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `FeuilleFormat '${format}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: FeuilleFormatResponse = {
+    ...existing,
+    format,
+    poses: [...body.poses].sort((a, b) => a - b),
+    updatedAt: now,
+  };
+
+  mockFeuilleFormatStore = mockFeuilleFormatStore
+    .map((f) => (f.id === id ? updated : f))
+    .sort((a, b) => a.format.localeCompare(b.format));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /feuille-formats/:id - Delete a feuille format
+ */
+const handleDeleteFeuilleFormat = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/feuille-formats\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing format ID' } } };
+  }
+
+  const exists = mockFeuilleFormatStore.some((f) => f.id === id);
+  if (!exists) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'FeuilleFormat not found' } } };
+  }
+
+  mockFeuilleFormatStore = mockFeuilleFormatStore.filter((f) => f.id !== id);
+
+  return { data: {} };
+};
+
+// ============================================================================
+// Station Handlers (Management CRUD)
+// ============================================================================
+
+/**
+ * Mock station store — initialized from snapshot stations.
+ */
+let mockStationStore: StationResponse[] = getSnapshot().stations.map((s, i) => ({
+  id: s.id,
+  name: s.name,
+  status: s.status as StationResponse['status'],
+  categoryId: s.categoryId,
+  groupId: s.groupId,
+  capacity: s.capacity,
+  displayOrder: i,
+  operatingSchedule: (s.operatingSchedule as unknown as Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>) ?? null,
+  scheduleExceptions: (s.exceptions ?? []).map((e) => ({
+    date: (e as { date: string }).date,
+    type: 'CLOSED',
+    schedule: (e as { schedule?: unknown }).schedule ?? null,
+    reason: (e as { reason?: string }).reason ?? null,
+  })),
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+}));
+
+/**
+ * GET /stations - List all stations
+ */
+const handleGetStations = async (): Promise<{ data: StationResponse[] }> => {
+  const sorted = [...mockStationStore].sort((a, b) => {
+    if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+    return a.name.localeCompare(b.name);
+  });
+  return { data: sorted };
+};
+
+/**
+ * POST /stations - Create a station
+ */
+const handleCreateStation = async (
+  args: FetchArgs
+): Promise<{ data: StationResponse } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { name?: string; status?: string; categoryId?: string; groupId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Station name is required' } },
+    };
+  }
+
+  const exists = mockStationStore.some((s) => s.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Station '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const newStation: StationResponse = {
+    id: `sta-${Date.now()}`,
+    name,
+    status: (body.status ?? 'Available') as StationResponse['status'],
+    categoryId: body.categoryId ?? '',
+    groupId: body.groupId ?? '',
+    capacity: body.capacity ?? 1,
+    displayOrder: body.displayOrder ?? 0,
+    operatingSchedule: (body.operatingSchedule as StationResponse['operatingSchedule']) ?? null,
+    scheduleExceptions: (body.scheduleExceptions as StationResponse['scheduleExceptions']) ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  mockStationStore = [...mockStationStore, newStation];
+
+  // Update snapshot so scheduler sees the new station
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    stations: [
+      ...snapshot.stations,
+      {
+        id: newStation.id,
+        name: newStation.name,
+        status: newStation.status,
+        categoryId: newStation.categoryId,
+        groupId: newStation.groupId,
+        capacity: newStation.capacity,
+        operatingSchedule: (newStation.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
+        exceptions: (newStation.scheduleExceptions ?? []).map((e, i) => ({
+          id: `exc-${newStation.id}-${i}`,
+          date: (e as { date: string }).date,
+          schedule: ((e as { schedule?: unknown }).schedule ?? { isOperating: false, slots: [] }) as import('@flux/types').DaySchedule,
+          reason: (e as { reason?: string | null }).reason ?? undefined,
+        })),
+      },
+    ],
+  }));
+
+  return { data: newStation };
+};
+
+/**
+ * PUT /stations/:id - Update a station
+ */
+const handleUpdateStation = async (
+  args: FetchArgs
+): Promise<{ data: StationResponse } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/stations\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing station ID' } } };
+  }
+
+  const body = args.body as { name?: string; status?: string; categoryId?: string; groupId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
+  const name = body.name?.trim();
+
+  if (!name) {
+    return {
+      error: { status: 400, data: { error: 'ValidationError', message: 'Station name is required' } },
+    };
+  }
+
+  const existing = mockStationStore.find((s) => s.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Station not found' } } };
+  }
+
+  const duplicate = mockStationStore.some(
+    (s) => s.id !== id && s.name.toLowerCase() === name.toLowerCase()
+  );
+  if (duplicate) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: `Station '${name}' already exists` },
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updated: StationResponse = {
+    ...existing,
+    name,
+    status: (body.status ?? existing.status) as StationResponse['status'],
+    categoryId: body.categoryId ?? existing.categoryId,
+    groupId: body.groupId ?? existing.groupId,
+    capacity: body.capacity ?? existing.capacity,
+    displayOrder: body.displayOrder ?? existing.displayOrder,
+    operatingSchedule: body.operatingSchedule !== undefined ? (body.operatingSchedule as StationResponse['operatingSchedule']) : existing.operatingSchedule,
+    scheduleExceptions: body.scheduleExceptions !== undefined ? (body.scheduleExceptions as StationResponse['scheduleExceptions']) : existing.scheduleExceptions,
+    updatedAt: now,
+  };
+
+  mockStationStore = mockStationStore.map((s) => (s.id === id ? updated : s));
+
+  // Update snapshot
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    stations: snapshot.stations.map((s) =>
+      s.id === id
+        ? {
+            ...s,
+            name: updated.name,
+            status: updated.status,
+            categoryId: updated.categoryId,
+            groupId: updated.groupId,
+            capacity: updated.capacity,
+            operatingSchedule: (updated.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
+            exceptions: (updated.scheduleExceptions ?? []).map((e, i) => ({
+              id: `exc-${updated.id}-${i}`,
+              date: (e as { date: string }).date,
+              schedule: ((e as { schedule?: unknown }).schedule ?? { isOperating: false, slots: [] }) as import('@flux/types').DaySchedule,
+              reason: (e as { reason?: string | null }).reason ?? undefined,
+            })),
+          }
+        : s
+    ),
+  }));
+
+  return { data: updated };
+};
+
+/**
+ * DELETE /stations/:id - Delete a station
+ */
+const handleDeleteStation = async (
+  args: FetchArgs
+): Promise<{ data: Record<string, never> } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/stations\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing station ID' } } };
+  }
+
+  const existing = mockStationStore.find((s) => s.id === id);
+  if (!existing) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Station not found' } } };
+  }
+
+  // Check if any tasks are assigned to this station
+  const snapshot = getSnapshot();
+  const hasAssignments = snapshot.assignments.some((a) => a.targetId === id);
+  if (hasAssignments) {
+    return {
+      error: {
+        status: 409,
+        data: { error: 'Conflict', message: 'Station has scheduled assignments and cannot be deleted' },
+      },
+    };
+  }
+
+  mockStationStore = mockStationStore.filter((s) => s.id !== id);
+
+  updateSnapshot((s) => ({
+    ...s,
+    stations: s.stations.filter((st) => st.id !== id),
+  }));
+
+  return { data: {} };
+};
+
+/**
+ * GET /templates - List templates
+ */
+const handleGetTemplates = async (
+  _args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const items = mockGetTemplates();
+  return { data: { items, total: items.length, page: 1, limit: 100, pages: 1 } };
+};
+
+/**
+ * POST /templates - Create a template
+ */
+const handleCreateTemplate = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const body = args.body as JcfTemplateCreateInput;
+  try {
+    const template = await mockCreateTemplate(body);
+    return { data: template };
+  } catch (e) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: String(e) } } } };
+  }
+};
+
+/**
+ * PUT /templates/:id - Update a template
+ */
+const handleUpdateTemplate = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/templates\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing template ID' } } } };
+  }
+
+  const body = args.body as JcfTemplateUpdateInput;
+  try {
+    const template = await mockUpdateTemplate(id, body);
+    return { data: template };
+  } catch {
+    return { error: { status: 404, data: { error: { code: 'NOT_FOUND', message: 'Template not found' } } } };
+  }
+};
+
+/**
+ * DELETE /templates/:id - Delete a template
+ */
+const handleDeleteTemplate = async (
+  args: FetchArgs
+): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
+  const id = extractPathParam(args.url, /\/templates\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: { code: 'BAD_REQUEST', message: 'Missing template ID' } } } };
+  }
+
+  try {
+    mockDeleteTemplate(id);
+    return { data: {} };
+  } catch {
+    return { error: { status: 404, data: { error: { code: 'NOT_FOUND', message: 'Template not found' } } } };
+  }
+};
+
+// ============================================================================
+// Flux (Production Flow Dashboard) Handlers
+// ============================================================================
+
+/**
+ * GET /flux/jobs — Return mock flux jobs for fixture/development mode.
+ *
+ * Returns FLUX_STATIC_JOBS directly (FluxJob[] shape).
+ * The fluxApi transformResponse handles this format transparently.
+ */
+const handleGetFluxJobs = async (): Promise<{ data: unknown }> => {
+  return { data: FLUX_STATIC_JOBS };
+};
+
+/**
+ * PATCH /flux/elements/{id} — Mock prerequisite update.
+ *
+ * Updates FLUX_STATIC_JOBS in-memory so subsequent GET /flux/jobs returns
+ * the updated value. The optimistic update already applied the change to
+ * the RTK Query cache via onQueryStarted; this ensures consistency if the
+ * cache is invalidated and refetched during the same session.
+ *
+ * Returns { data: {} } — the response body is not used by the mutation
+ * (onQueryStarted handles the cache update).
+ */
+const handlePatchFluxElement = async (
+  args: FetchArgs,
+): Promise<{ data: unknown }> => {
+  const urlMatch = args.url.match(/^\/flux\/elements\/(.+)$/);
+  const elementId = urlMatch?.[1];
+  const body = args.body as { column?: string; value?: string } | undefined;
+
+  if (elementId && body?.column && body?.value) {
+    const column = body.column as 'bat' | 'papier' | 'formes' | 'plaques';
+    const value = body.value;
+    for (const job of FLUX_STATIC_JOBS) {
+      const el = job.elements.find((e) => e.id === elementId);
+      if (el && column in el) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (el as any)[column] = value;
+        break;
+      }
+    }
+  }
+
+  return { data: {} };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
+
+  // Clients
+  { method: 'GET', pattern: /^\/clients/, handler: handleGetClientSuggestions },
+  { method: 'POST', pattern: /^\/clients$/, handler: handleCreateClient },
+  { method: 'PUT', pattern: /^\/clients\/[^/]+$/, handler: handleUpdateClient },
+  { method: 'DELETE', pattern: /^\/clients\/[^/]+$/, handler: handleDeleteClient },
 
   // Jobs
   { method: 'GET', pattern: /^\/jobs\/clients/, handler: handleGetClientSuggestions },
   { method: 'GET', pattern: /^\/jobs\/lookup-by-reference/, handler: handleLookupByReference },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
+  { method: 'PUT', pattern: /^\/jobs\/[^/]+$/, handler: handleUpdateJob },
+  { method: 'DELETE', pattern: /^\/jobs\/[^/]+$/, handler: handleDeleteJob },
+
+  // Elements
+  { method: 'PUT', pattern: /^\/elements\/[^/]+\/prerequisites$/, handler: handleUpdateElementStatus },
+
+  // Flux — Production Flow Dashboard
+  { method: 'GET',   pattern: /^\/flux\/jobs$/,           handler: handleGetFluxJobs },
+  { method: 'PATCH', pattern: /^\/flux\/elements\/[^/]+$/, handler: handlePatchFluxElement },
+
+  // Templates
+  { method: 'GET',  pattern: /^\/templates(\?.*)?$/, handler: handleGetTemplates },
+  { method: 'POST', pattern: /^\/templates$/, handler: handleCreateTemplate },
+  { method: 'PUT', pattern: /^\/templates\/[^/]+$/, handler: handleUpdateTemplate },
+  { method: 'DELETE', pattern: /^\/templates\/[^/]+$/, handler: handleDeleteTemplate },
+
+  // Station Categories
+  { method: 'GET',    pattern: /^\/station-categories$/,        handler: handleGetStationCategories },
+  { method: 'POST',   pattern: /^\/station-categories$/,        handler: handleCreateStationCategory },
+  { method: 'PUT',    pattern: /^\/station-categories\/[^/]+$/, handler: handleUpdateStationCategory },
+  { method: 'DELETE', pattern: /^\/station-categories\/[^/]+$/, handler: handleDeleteStationCategory },
+
+  // Formats
+  { method: 'GET',    pattern: /^\/formats$/,          handler: handleGetFormats },
+  { method: 'POST',   pattern: /^\/formats$/,           handler: handleCreateFormat },
+  { method: 'PUT',    pattern: /^\/formats\/[^/]+$/,    handler: handleUpdateFormat },
+  { method: 'DELETE', pattern: /^\/formats\/[^/]+$/,    handler: handleDeleteFormat },
+
+  // Impression Presets
+  { method: 'GET',    pattern: /^\/impression-presets$/,          handler: handleGetImpressionPresets },
+  { method: 'POST',   pattern: /^\/impression-presets$/,           handler: handleCreateImpressionPreset },
+  { method: 'PUT',    pattern: /^\/impression-presets\/[^/]+$/,    handler: handleUpdateImpressionPreset },
+  { method: 'DELETE', pattern: /^\/impression-presets\/[^/]+$/,    handler: handleDeleteImpressionPreset },
+
+  // Surfacage Presets
+  { method: 'GET',    pattern: /^\/surfacage-presets$/,          handler: handleGetSurfacagePresets },
+  { method: 'POST',   pattern: /^\/surfacage-presets$/,           handler: handleCreateSurfacagePreset },
+  { method: 'PUT',    pattern: /^\/surfacage-presets\/[^/]+$/,    handler: handleUpdateSurfacagePreset },
+  { method: 'DELETE', pattern: /^\/surfacage-presets\/[^/]+$/,    handler: handleDeleteSurfacagePreset },
+
+  // Feuille Formats
+  { method: 'GET',    pattern: /^\/feuille-formats$/,          handler: handleGetFeuilleFormats },
+  { method: 'POST',   pattern: /^\/feuille-formats$/,           handler: handleCreateFeuilleFormat },
+  { method: 'PUT',    pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleUpdateFeuilleFormat },
+  { method: 'DELETE', pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleDeleteFeuilleFormat },
+
+  // Stations (management CRUD — must come before the compact handler)
+  { method: 'GET',    pattern: /^\/stations$/,        handler: handleGetStations },
+  { method: 'POST',   pattern: /^\/stations$/,         handler: handleCreateStation },
+  { method: 'PUT',    pattern: /^\/stations\/[^/]+$/,  handler: handleUpdateStation },
+  { method: 'DELETE', pattern: /^\/stations\/[^/]+$/,  handler: handleDeleteStation },
+
+  // Station operations
+  { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },
 
   // Task assignments
   { method: 'POST', pattern: /^\/tasks\/[^/]+\/assign$/, handler: handleAssignTask },

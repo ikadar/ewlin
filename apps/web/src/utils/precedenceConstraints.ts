@@ -4,19 +4,19 @@
  * Calculate Y positions for precedence constraint visualization lines.
  * REQ-10: Precedence Constraint Visualization
  * v0.3.53: Precedence Lines + Working Hours (REQ-03)
+ * v0.5.12: Outsourcing Precedence Calculation
  *
  * Element-scoped: predecessor/successor are within the same element.
  * Cross-element: prerequisiteElementIds define finish-to-start dependencies.
  */
 
-import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element } from '@flux/types';
+import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element, OutsourcedTask, OutsourcedProvider } from '@flux/types';
+import { isOutsourcedTask, DRY_TIME_MS } from '@flux/types';
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
 import { subtractWorkingTime, snapToNextWorkingTime } from './workingTime';
 import { getElementTasks } from './taskHelpers';
-
-// Dry time in milliseconds (4 hours) - same as in @flux/schedule-validator
-const DRY_TIME_MS = 4 * 60 * 60 * 1000;
+import { calculateDepartureDate, calculateReturnDate } from './outsourcingCalculation';
 
 // ============================================================================
 // Element / Lookup helpers
@@ -37,10 +37,14 @@ function findStationById(snapshot: ScheduleSnapshot, stationId: string): Station
   return snapshot.stations.find((s) => s.id === stationId);
 }
 
+function findTaskById(snapshot: ScheduleSnapshot, taskId: string): Task | undefined {
+  return snapshot.tasks.find((t) => t.id === taskId);
+}
+
 /**
  * Check if a station is a printing (offset) station that requires dry time.
  */
-function isPrintingStation(snapshot: ScheduleSnapshot, stationId: string): boolean {
+export function isPrintingStation(snapshot: ScheduleSnapshot, stationId: string): boolean {
   const station = snapshot.stations.find((s) => s.id === stationId);
   if (!station) return false;
 
@@ -48,6 +52,143 @@ function isPrintingStation(snapshot: ScheduleSnapshot, stationId: string): boole
   if (!category) return false;
 
   return category.name.toLowerCase().includes('offset');
+}
+
+// ============================================================================
+// Outsourced task date helpers (v0.5.12)
+// ============================================================================
+
+/**
+ * Get the effective return time for an outsourced task.
+ * Uses manualReturn if set, otherwise calculates from predecessor end time.
+ *
+ * @param task - The outsourced task
+ * @param predecessorEndTime - When the predecessor task ends (needed for calculation)
+ * @param provider - The outsourced provider (for transit days and reception time)
+ * @returns Return date/time, or null if cannot be determined
+ */
+export function getOutsourcedTaskReturnTime(
+  task: OutsourcedTask,
+  predecessorEndTime: Date | string | undefined,
+  provider: OutsourcedProvider | undefined
+): Date | null {
+  // Priority 1: Manual return override
+  if (task.manualReturn) {
+    return new Date(task.manualReturn);
+  }
+
+  // Priority 2: Calculate from predecessor end time
+  if (!predecessorEndTime || !provider) {
+    return null;
+  }
+
+  // Calculate departure first
+  const departure = task.manualDeparture
+    ? new Date(task.manualDeparture)
+    : calculateDepartureDate(predecessorEndTime, task.duration.latestDepartureTime);
+
+  // Calculate return from departure
+  return calculateReturnDate(departure, {
+    workDays: task.duration.openDays,
+    transitDays: provider.transitDays,
+    receptionTime: task.duration.receptionTime,
+  });
+}
+
+/**
+ * Get the effective departure time for an outsourced task.
+ * Uses manualDeparture if set, otherwise calculates from predecessor end time.
+ *
+ * @param task - The outsourced task
+ * @param predecessorEndTime - When the predecessor task ends (needed for calculation)
+ * @returns Departure date/time, or null if cannot be determined
+ */
+export function getOutsourcedTaskDepartureTime(
+  task: OutsourcedTask,
+  predecessorEndTime: Date | string | undefined
+): Date | null {
+  // Priority 1: Manual departure override
+  if (task.manualDeparture) {
+    return new Date(task.manualDeparture);
+  }
+
+  // Priority 2: Calculate from predecessor end time
+  if (!predecessorEndTime) {
+    return null;
+  }
+
+  return calculateDepartureDate(predecessorEndTime, task.duration.latestDepartureTime);
+}
+
+/**
+ * Calculate the latest end time for a predecessor when the successor is outsourced.
+ * The predecessor must end before the outsourced successor's departure time.
+ *
+ * @param successorTask - The outsourced successor task
+ * @param predecessorTask - The predecessor task (internal or outsourced)
+ * @param snapshot - Full schedule snapshot
+ * @returns Latest end time for predecessor, or null if cannot be determined
+ */
+export function getLatestEndBeforeOutsourcedSuccessor(
+  successorTask: OutsourcedTask,
+  predecessorTask: Task,
+  snapshot: ScheduleSnapshot
+): Date | null {
+  // Get successor's departure time
+  // For backward calculation, we need to find what would be the departure time
+  // based on the successor's assignment (if any) or its predecessor's end time
+
+  const successorAssignment = findAssignmentByTaskId(snapshot, successorTask.id);
+
+  // If successor has manual departure, use that as the constraint
+  if (successorTask.manualDeparture) {
+    const departureTime = new Date(successorTask.manualDeparture);
+    return calculateLatestPredecessorEnd(departureTime, predecessorTask, snapshot);
+  }
+
+  // If successor is assigned, we can calculate its departure from its scheduled start
+  // But for outsourced tasks, the assignment's scheduledStart IS the departure
+  if (successorAssignment) {
+    const departureTime = parseTimestamp(successorAssignment.scheduledStart);
+    return calculateLatestPredecessorEnd(departureTime, predecessorTask, snapshot);
+  }
+
+  return null;
+}
+
+/**
+ * Calculate the latest end time for a predecessor given a successor's departure time.
+ */
+function calculateLatestPredecessorEnd(
+  successorDepartureTime: Date,
+  predecessorTask: Task,
+  snapshot: ScheduleSnapshot
+): Date {
+  if (predecessorTask.type === 'Internal') {
+    const taskDurationMinutes = predecessorTask.duration.setupMinutes + predecessorTask.duration.runMinutes;
+    const taskDurationMs = taskDurationMinutes * 60 * 1000;
+
+    // Check if predecessor is a printing station (needs dry time)
+    let dryTimeMs = 0;
+    if (isPrintingStation(snapshot, predecessorTask.stationId)) {
+      dryTimeMs = DRY_TIME_MS;
+    }
+
+    // Latest end = departure time - dry time
+    const latestEnd = dryTimeMs > 0
+      ? new Date(successorDepartureTime.getTime() - dryTimeMs)
+      : successorDepartureTime;
+
+    // Subtract task duration using working time
+    const station = findStationById(snapshot, predecessorTask.stationId);
+    return station
+      ? subtractWorkingTime(latestEnd, taskDurationMs, station)
+      : new Date(latestEnd.getTime() - taskDurationMs);
+  } else {
+    // Predecessor is also outsourced - for now, just return the departure time
+    // (outsourced predecessor's return must be before successor's departure)
+    return successorDepartureTime;
+  }
 }
 
 // ============================================================================
@@ -143,23 +284,33 @@ function getCrossElementSuccessors(snapshot: ScheduleSnapshot, task: Task): Task
 /**
  * Calculate the earliest start Date from a single predecessor assignment.
  * Handles dry time for printing stations + working hours snapping.
+ * v0.5.12: Handles outsourced predecessors with manual return override.
  */
 function getEarliestStartFromPredecessor(
   predecessorAssignment: TaskAssignment,
   snapshot: ScheduleSnapshot
 ): Date {
-  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+  // v0.5.12: Handle outsourced predecessor with potential manual return
+  if (predecessorAssignment.isOutsourced) {
+    const predecessorTask = findTaskById(snapshot, predecessorAssignment.taskId);
 
-  if (!predecessorAssignment.isOutsourced && isPrintingStation(snapshot, predecessorAssignment.targetId)) {
-    const dryingEnd = new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-    const station = findStationById(snapshot, predecessorAssignment.targetId);
-    return station ? snapToNextWorkingTime(dryingEnd, station) : dryingEnd;
+    // Check for manual return override
+    if (predecessorTask && isOutsourcedTask(predecessorTask) && predecessorTask.manualReturn) {
+      return new Date(predecessorTask.manualReturn);
+    }
+
+    // Use the scheduled end (which should be the calculated return time)
+    return parseTimestamp(predecessorAssignment.scheduledEnd);
   }
 
-  const station = predecessorAssignment.isOutsourced
-    ? undefined
-    : findStationById(snapshot, predecessorAssignment.targetId);
-  return station ? snapToNextWorkingTime(predecessorEnd, station) : predecessorEnd;
+  // Internal predecessor
+  const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
+
+  if (isPrintingStation(snapshot, predecessorAssignment.targetId)) {
+    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+  }
+
+  return predecessorEnd;
 }
 
 // ============================================================================
@@ -204,6 +355,14 @@ export function getPredecessorConstraint(
 
   if (!latestEarliestStart) return null;
 
+  // Snap to the successor (picked) task's station working hours
+  if (task.type === 'Internal') {
+    const successorStation = findStationById(snapshot, task.stationId);
+    if (successorStation) {
+      latestEarliestStart = snapToNextWorkingTime(latestEarliestStart, successorStation);
+    }
+  }
+
   return timeToYPosition(latestEarliestStart, startHour, pixelsPerHour, gridStartDate);
 }
 
@@ -217,11 +376,20 @@ export interface DryingTimeInfo {
   dryingEndY: number;
 }
 
+/** Information about outsourcing time for visualization (v0.5.13) */
+export interface OutsourcingTimeInfo {
+  /** Y position of outsourced task departure */
+  departureY: number;
+  /** Y position where outsourced task returns */
+  returnY: number;
+}
+
 /**
  * Calculate Y position for the successor constraint line (orange).
  *
  * Checks both intra-element successor and cross-element successors,
  * returning the most constraining (earliest / lowest Y).
+ * v0.5.12: Handles outsourced successors with manual departure override.
  */
 export function getSuccessorConstraint(
   task: Task,
@@ -233,7 +401,21 @@ export function getSuccessorConstraint(
   let earliestLatestStart: Date | null = null;
 
   // Helper to calculate latest start from a successor
-  const calcLatestStart = (currentTask: Task, successorAssignment: TaskAssignment): Date => {
+  // v0.5.12: Updated to handle outsourced successors
+  const calcLatestStart = (currentTask: Task, successorTask: Task, successorAssignment: TaskAssignment): Date => {
+    // v0.5.12: Handle outsourced successor
+    if (successorAssignment.isOutsourced && isOutsourcedTask(successorTask)) {
+      // For outsourced successor, the constraint is the departure time
+      // Check for manual departure override
+      const departureTime = successorTask.manualDeparture
+        ? new Date(successorTask.manualDeparture)
+        : parseTimestamp(successorAssignment.scheduledStart);
+
+      // Calculate latest end for predecessor before this departure
+      return calculateLatestPredecessorEnd(departureTime, currentTask, snapshot);
+    }
+
+    // Internal successor - existing logic
     const successorStart = parseTimestamp(successorAssignment.scheduledStart);
 
     const taskDurationMinutes = currentTask.type === 'Internal'
@@ -261,7 +443,7 @@ export function getSuccessorConstraint(
   if (successor) {
     const succAssignment = findAssignmentByTaskId(snapshot, successor.id);
     if (succAssignment) {
-      earliestLatestStart = calcLatestStart(task, succAssignment);
+      earliestLatestStart = calcLatestStart(task, successor, succAssignment);
     }
   }
 
@@ -270,7 +452,7 @@ export function getSuccessorConstraint(
   for (const crossSucc of crossSuccs) {
     const crossAssignment = findAssignmentByTaskId(snapshot, crossSucc.id);
     if (crossAssignment) {
-      const ls = calcLatestStart(task, crossAssignment);
+      const ls = calcLatestStart(task, crossSucc, crossAssignment);
       if (!earliestLatestStart || ls < earliestLatestStart) {
         earliestLatestStart = ls;
       }
@@ -335,5 +517,67 @@ export function getDryingTimeInfo(
     predecessorStationId: mostConstraining.targetId,
     predecessorEndY: timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate),
     dryingEndY: timeToYPosition(dryingEnd, startHour, pixelsPerHour, gridStartDate),
+  };
+}
+
+/**
+ * Get outsourcing time visualization info for a task (v0.5.13).
+ *
+ * Checks both intra-element and cross-element predecessors.
+ * Returns info for the most constraining outsourced predecessor.
+ */
+export function getOutsourcingTimeInfo(
+  task: Task,
+  snapshot: ScheduleSnapshot,
+  startHour: number,
+  pixelsPerHour: number,
+  gridStartDate?: Date
+): OutsourcingTimeInfo | null {
+  // Collect all outsourced predecessor assignments
+  const outsourcedPredecessors: { assignment: TaskAssignment; task: OutsourcedTask }[] = [];
+
+  // Intra-element predecessor
+  const predecessor = getPredecessorTask(snapshot, task);
+  if (predecessor && isOutsourcedTask(predecessor)) {
+    const predAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
+    if (predAssignment && predAssignment.isOutsourced) {
+      outsourcedPredecessors.push({ assignment: predAssignment, task: predecessor });
+    }
+  }
+
+  // Cross-element predecessors
+  const crossPreds = getCrossElementPredecessors(snapshot, task);
+  for (const crossPred of crossPreds) {
+    if (isOutsourcedTask(crossPred)) {
+      const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
+      if (crossAssignment && crossAssignment.isOutsourced) {
+        outsourcedPredecessors.push({ assignment: crossAssignment, task: crossPred });
+      }
+    }
+  }
+
+  if (outsourcedPredecessors.length === 0) return null;
+
+  // Pick the most constraining (latest return time)
+  let mostConstraining = outsourcedPredecessors[0];
+  for (let i = 1; i < outsourcedPredecessors.length; i++) {
+    const currentReturn = parseTimestamp(outsourcedPredecessors[i].assignment.scheduledEnd);
+    const bestReturn = parseTimestamp(mostConstraining.assignment.scheduledEnd);
+    if (currentReturn > bestReturn) {
+      mostConstraining = outsourcedPredecessors[i];
+    }
+  }
+
+  // Get departure time (scheduledStart is departure for outsourced)
+  const departureTime = parseTimestamp(mostConstraining.assignment.scheduledStart);
+
+  // Get return time - use manual override if set, otherwise scheduledEnd
+  const returnTime = mostConstraining.task.manualReturn
+    ? new Date(mostConstraining.task.manualReturn)
+    : parseTimestamp(mostConstraining.assignment.scheduledEnd);
+
+  return {
+    departureY: timeToYPosition(departureTime, startHour, pixelsPerHour, gridStartDate),
+    returnY: timeToYPosition(returnTime, startHour, pixelsPerHour, gridStartDate),
   };
 }

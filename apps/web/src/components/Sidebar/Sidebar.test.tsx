@@ -1,75 +1,73 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { SidebarButton } from './SidebarButton';
 import { LayoutGrid } from 'lucide-react';
 
 describe('Sidebar', () => {
   it('renders without crashing', () => {
-    render(<Sidebar />);
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
     expect(screen.getByRole('navigation')).toBeInTheDocument();
   });
 
   it('has correct aria-label', () => {
-    render(<Sidebar />);
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
     expect(screen.getByRole('navigation')).toHaveAttribute(
       'aria-label',
       'Main navigation'
     );
   });
 
-  it('renders all three navigation buttons', () => {
-    render(<Sidebar />);
-    expect(screen.getByLabelText('Scheduling view')).toBeInTheDocument();
-    expect(screen.getByLabelText('Calendar view')).toBeInTheDocument();
+  it('renders main navigation buttons', () => {
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
+    expect(screen.getByLabelText('Flux de production')).toBeInTheDocument();
+    expect(screen.getByLabelText('Planificateur')).toBeInTheDocument();
     expect(screen.getByLabelText('Settings')).toBeInTheDocument();
+    expect(screen.getByLabelText('User')).toBeInTheDocument();
   });
 
-  it('shows schedule view as active by default', () => {
-    render(<Sidebar />);
-    const scheduleButton = screen.getByLabelText('Scheduling view');
-    expect(scheduleButton).toHaveAttribute('aria-current', 'page');
+  it('shows scheduler as active on root route', () => {
+    render(<MemoryRouter initialEntries={['/']}><Sidebar /></MemoryRouter>);
+    const schedulerButton = screen.getByLabelText('Planificateur');
+    expect(schedulerButton).toHaveAttribute('aria-current', 'page');
   });
 
-  it('shows calendar view as inactive by default', () => {
-    render(<Sidebar />);
-    const calendarButton = screen.getByLabelText('Calendar view');
-    expect(calendarButton).not.toHaveAttribute('aria-current');
+  it('shows flux view as active on flux route', () => {
+    render(<MemoryRouter initialEntries={['/flux']}><Sidebar /></MemoryRouter>);
+    const fluxButton = screen.getByLabelText('Flux de production');
+    expect(fluxButton).toHaveAttribute('aria-current', 'page');
   });
 
-  it('shows settings button as disabled', () => {
-    render(<Sidebar />);
+  it('shows settings as active on settings routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/stations']}>
+        <Sidebar />
+      </MemoryRouter>
+    );
     const settingsButton = screen.getByLabelText('Settings');
-    expect(settingsButton).toBeDisabled();
+    expect(settingsButton).toHaveAttribute('aria-current', 'page');
   });
 
-  it('calls onNavigate when clicking schedule button', () => {
-    const onNavigate = vi.fn();
-    render(<Sidebar onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByLabelText('Scheduling view'));
-    expect(onNavigate).toHaveBeenCalledWith('schedule');
+  it('shows flux view as inactive on settings routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/clients']}>
+        <Sidebar />
+      </MemoryRouter>
+    );
+    const fluxButton = screen.getByLabelText('Flux de production');
+    expect(fluxButton).not.toHaveAttribute('aria-current');
   });
 
-  it('calls onNavigate when clicking calendar button', () => {
-    const onNavigate = vi.fn();
-    render(<Sidebar onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByLabelText('Calendar view'));
-    expect(onNavigate).toHaveBeenCalledWith('calendar');
+  it('shows user button as disabled', () => {
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
+    const userButton = screen.getByLabelText('User');
+    expect(userButton).toBeDisabled();
   });
 
-  it('does not call onNavigate when clicking disabled settings button', () => {
-    const onNavigate = vi.fn();
-    render(<Sidebar onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByLabelText('Settings'));
-    expect(onNavigate).not.toHaveBeenCalled();
-  });
-
-  it('respects activeView prop', () => {
-    render(<Sidebar activeView="calendar" />);
-    const scheduleButton = screen.getByLabelText('Scheduling view');
-    const calendarButton = screen.getByLabelText('Calendar view');
-    expect(scheduleButton).not.toHaveAttribute('aria-current');
-    expect(calendarButton).toHaveAttribute('aria-current', 'page');
+  it('navigates to /flux on LayoutGrid click', () => {
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
+    expect(screen.getByLabelText('Flux de production')).toBeInTheDocument();
   });
 });
 

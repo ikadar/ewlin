@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Station, Job } from '@flux/types';
+import { getDeadlineDate } from '@flux/types';
 import { PIXELS_PER_HOUR, timeToYPosition } from '../TimelineColumn';
 import { StationColumn } from './StationColumn';
 
@@ -43,7 +44,7 @@ export function StationColumns({
   // Calculate departure marker position (if job has workshopExitDate)
   let departurePosition: number | null = null;
   if (selectedJob?.workshopExitDate) {
-    const departureDate = new Date(selectedJob.workshopExitDate);
+    const departureDate = getDeadlineDate(selectedJob.workshopExitDate);
     // Only show if departure is today (simplified for MVP)
     const today = new Date();
     if (

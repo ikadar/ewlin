@@ -41,41 +41,65 @@ const mockJob: Job = {
   description: 'Test Job',
   status: 'Planned',
   workshopExitDate: '2025-12-20T18:00:00Z',
+  fullyScheduled: false,
   color: '#8b5cf6',
-  proofSentAt: null,
-  proofApprovedAt: null,
+  comments: [],
+  elementIds: ['elem-1'],
+  taskIds: ['task-1', 'task-2'],
+  createdAt: '2025-12-01T00:00:00Z',
+  updatedAt: '2025-12-01T00:00:00Z',
 };
 
 const mockInternalTask: Task = {
   id: 'task-1',
-  jobId: 'job-1',
+  elementId: 'elem-1',
   type: 'Internal',
-  name: 'Printing',
   stationId: 'station-1',
-  estimatedMinutes: 60,
-  sequenceNumber: 1,
-  requiredTaskIds: [],
+  sequenceOrder: 0,
+  status: 'Defined',
+  duration: { setupMinutes: 15, runMinutes: 45 },
+  createdAt: '2025-12-01T00:00:00Z',
+  updatedAt: '2025-12-01T00:00:00Z',
 };
 
 const mockOutsourcedTask: Task = {
   id: 'task-2',
-  jobId: 'job-1',
+  elementId: 'elem-1',
   type: 'Outsourced',
-  name: 'Lamination',
-  outsourceTo: 'provider-1',
-  estimatedMinutes: 120,
-  sequenceNumber: 2,
-  requiredTaskIds: ['task-1'],
+  providerId: 'provider-1',
+  actionType: 'Pelliculage',
+  sequenceOrder: 1,
+  status: 'Defined',
+  duration: { openDays: 2, latestDepartureTime: '14:00', receptionTime: '09:00' },
+  createdAt: '2025-12-01T00:00:00Z',
+  updatedAt: '2025-12-01T00:00:00Z',
 };
 
 const mockSnapshot: ScheduleSnapshot = {
+  version: 1,
+  generatedAt: '2025-12-01T00:00:00Z',
   stations: [mockStation],
-  stationGroups: [],
+  categories: [{ id: 'cat-1', name: 'Category 1', similarityCriteria: [] }],
+  groups: [],
   jobs: [mockJob],
+  elements: [
+    {
+      id: 'elem-1',
+      jobId: 'job-1',
+      name: 'Element 1',
+      prerequisiteElementIds: [],
+      taskIds: ['task-1', 'task-2'],
+      paperStatus: 'none',
+      batStatus: 'none',
+      plateStatus: 'none',
+      formeStatus: 'none',
+      createdAt: '2025-12-01T00:00:00Z',
+      updatedAt: '2025-12-01T00:00:00Z',
+    },
+  ],
   tasks: [mockInternalTask, mockOutsourcedTask],
   assignments: [],
   providers: [],
-  snapshotVersion: 1,
   lateJobs: [],
   conflicts: [],
 };
@@ -179,7 +203,7 @@ describe('useDropValidation', () => {
   it('returns isValid false when validation fails', () => {
     mockValidateAssignment.mockReturnValue({
       valid: false,
-      conflicts: [{ type: 'StationUnavailable', message: 'Station not operating' }],
+      conflicts: [{ type: 'AvailabilityConflict', message: 'Station not operating', taskId: 'task-1' }],
       suggestedStart: undefined,
     });
 
@@ -199,7 +223,7 @@ describe('useDropValidation', () => {
   it('detects precedence conflict', () => {
     mockValidateAssignment.mockReturnValue({
       valid: false,
-      conflicts: [{ type: 'PrecedenceConflict', message: 'Required task not completed' }],
+      conflicts: [{ type: 'PrecedenceConflict', message: 'Required task not completed', taskId: 'task-1' }],
       suggestedStart: '2025-12-16T12:00:00Z',
     });
 

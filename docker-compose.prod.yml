@@ -1,0 +1,45 @@
+# Production overrides for docker-compose.yml
+# Usage: docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  # Nginx disabled in prod — Apache serves static files and proxies PHP-FPM directly
+  nginx:
+    profiles:
+      - dev-only
+
+  php:
+    user: "1001:1001"  # Match host ordo user (uid=1001) for volume permissions
+    ports:
+      - "127.0.0.1:9000:9000"  # FastCGI - localhost only (Apache needs this)
+    volumes:
+      - ./docker/php/php-prod.ini:/usr/local/etc/php/php.ini:ro
+    environment:
+      - APP_ENV=prod
+      - APP_DEBUG=0
+    restart: unless-stopped
+
+  validation-service:
+    ports: !reset []  # Remove host port — only reachable via Docker network
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  mariadb:
+    ports: !override
+      - "127.0.0.1:3307:3306"  # Localhost :3307 → container :3306 (3306 already in use on host)
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    restart: unless-stopped
+
+  # Redis disabled in prod — not actively used (cache.yaml and messenger are commented out)
+  redis:
+    profiles:
+      - dev-only
+
+  node:
+    profiles:
+      - dev-only
+
+volumes:
+  mariadb_data:
+    driver: local

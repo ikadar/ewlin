@@ -20,6 +20,8 @@ export interface JcfModalProps {
   isSaving?: boolean;
   /** v0.4.33: Error message to display (from API failure) */
   error?: string | null;
+  /** v0.5.13b: Custom label for save button (default: "Enregistrer") */
+  saveLabel?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function JcfModal({
   onSave,
   isSaving = false,
   error = null,
+  saveLabel,
 }: JcfModalProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
@@ -97,7 +100,7 @@ export function JcfModal({
       aria-label="Close modal"
     >
       <div
-        className="w-[70vw] max-w-[1400px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
+        className="w-[95vw] max-w-[2200px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
         data-testid="jcf-modal-dialog"
       >
         {/* Header */}
@@ -187,7 +190,7 @@ export function JcfModal({
                 data-testid="jcf-modal-save"
               >
                 <Save size={14} />
-                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                {isSaving ? 'Enregistrement...' : (saveLabel ?? 'Enregistrer')}
               </button>
             )}
           </div>

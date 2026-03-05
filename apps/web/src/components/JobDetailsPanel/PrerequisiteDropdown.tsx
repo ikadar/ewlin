@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { Fragment, useRef, useState } from 'react';
+import { Listbox, Portal } from '@headlessui/react';
 import { ChevronDown } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../../utils';
 
@@ -26,6 +27,13 @@ function getStatusColor(type: 'paper' | 'bat' | 'plate' | 'forme', value: string
   return 'text-zinc-500';
 }
 
+function getPillBgColor(value: string): string {
+  if (value === 'to_order' || value === 'waiting_files') return 'bg-red-500/15';
+  if (value === 'in_stock' || value === 'delivered' || value === 'bat_approved' || value === 'ready') return 'bg-emerald-500/15';
+  if (value === 'ordered' || value === 'files_received' || value === 'bat_sent' || value === 'to_make') return 'bg-amber-500/15';
+  return 'bg-zinc-700/40';
+}
+
 export interface PrerequisiteDropdownProps<T extends string> {
   /** Dropdown label */
   label: string;
@@ -44,7 +52,7 @@ export interface PrerequisiteDropdownProps<T extends string> {
 }
 
 /**
- * A single prerequisite status dropdown.
+ * A single prerequisite status dropdown with pill-style trigger.
  */
 export function PrerequisiteDropdown<T extends string>({
   label,
@@ -55,67 +63,65 @@ export function PrerequisiteDropdown<T extends string>({
   testIdPrefix = 'prerequisite',
   dateValue,
 }: PrerequisiteDropdownProps<T>) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isOpen]);
-
   const currentOption = options.find((o) => o.value === value);
   const colorClass = getStatusColor(type, value);
   const formattedDate = formatDateDDMMYYYY(dateValue);
 
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
-        data-testid={`${testIdPrefix}-${type}-dropdown`}
-      >
-        <span className="text-zinc-500 font-medium">{label}:</span>
-        <span className={colorClass}>{currentOption?.label ?? value}</span>
-        {formattedDate && (
-          <span className="text-zinc-500 ml-0.5" data-testid={`${testIdPrefix}-${type}-date`}>
-            {formattedDate}
-          </span>
-        )}
-        <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+  // BAT: date shown only in tooltip, not next to pill
+  const tooltipText =
+    type === 'bat' && formattedDate
+      ? `${currentOption?.label ?? value} — ${formattedDate}`
+      : (currentOption?.label ?? value);
 
-      {isOpen && (
-        <div
-          className="absolute top-full left-0 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg z-50 min-w-[120px]"
-          data-testid={`${testIdPrefix}-${type}-options`}
-        >
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition-colors ${
-                option.value === value ? 'bg-white/5' : ''
-              } ${getStatusColor(type, option.value)}`}
-              data-testid={`${testIdPrefix}-${type}-option-${option.value}`}
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [buttonRect, setButtonRect] = useState<DOMRect | null>(null);
+
+  const handleButtonClick = () => {
+    if (buttonRef.current) {
+      setButtonRect(buttonRef.current.getBoundingClientRect());
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Listbox value={value} onChange={onChange}>
+        <div>
+          <Listbox.Button
+            ref={buttonRef}
+            title={tooltipText}
+            className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 cursor-pointer ${getPillBgColor(value)}`}
+            data-testid={`${testIdPrefix}-${type}-dropdown`}
+            onClick={handleButtonClick}
+          >
+            <span className={colorClass}>{label}</span>
+            <ChevronDown className="w-3 h-3 opacity-50 transition-transform ui-open:rotate-180" />
+          </Listbox.Button>
+          <Portal>
+            <Listbox.Options
+              className="fixed bg-zinc-800 border border-zinc-700 rounded shadow-lg z-[9999] min-w-[130px] focus:outline-none"
+              style={buttonRect ? { top: buttonRect.bottom + 4, left: buttonRect.left } : undefined}
+              data-testid={`${testIdPrefix}-${type}-options`}
             >
-              {option.label}
-            </button>
-          ))}
+              {options.map((option) => (
+                <Listbox.Option key={option.value} value={option.value} as={Fragment}>
+                  {({ active, selected }: { active: boolean; selected: boolean }) => (
+                    <button
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${active ? 'bg-white/10' : ''} ${selected ? 'bg-white/5' : ''} ${getStatusColor(type, option.value)}`}
+                      data-testid={`${testIdPrefix}-${type}-option-${option.value}`}
+                    >
+                      {option.label}
+                    </button>
+                  )}
+                </Listbox.Option>
+              ))}
+            </Listbox.Options>
+          </Portal>
         </div>
+      </Listbox>
+      {formattedDate && type !== 'bat' && (
+        <span className="text-zinc-500 text-xs" data-testid={`${testIdPrefix}-${type}-date`}>
+          {formattedDate}
+        </span>
       )}
     </div>
   );

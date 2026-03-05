@@ -16,9 +16,18 @@ import type { JcfElement } from '../components/JcfElementsTable/types';
  */
 export interface CreateJobElementRequest {
   name: string;
-  label?: string;
   sequence?: string;
   prerequisiteNames: string[];
+  format?: string;
+  papier?: string;
+  pagination?: number;
+  quantite?: number;
+  imposition?: string;
+  impression?: string;
+  surfacage?: string;
+  autres?: string;
+  qteFeuilles?: number;
+  commentaires?: string;
 }
 
 /**
@@ -29,6 +38,8 @@ export interface CreateJobRequest {
   client: string;
   description: string;
   workshopExitDate: string;
+  quantity?: number;
+  shipperId?: string;
   status: 'draft' | 'planned' | 'in_progress' | 'delayed' | 'completed' | 'cancelled';
   elements: CreateJobElementRequest[];
 }
@@ -46,7 +57,6 @@ export interface CreateJobResponse {
   elements: Array<{
     id: string;
     name: string;
-    label: string | null;
     prerequisiteElementIds: string[];
     tasks: unknown[];
   }>;
@@ -106,7 +116,7 @@ function isUseMock(): boolean {
  *
  * Maps frontend field names to backend API field names:
  * - precedences (comma-separated string) → prerequisiteNames (array)
- * - Combines format, pagination, papier fields into label
+ * - format, papier, pagination sent as spec fields (not combined into label)
  */
 export function transformJcfElementToRequest(element: JcfElement): CreateJobElementRequest {
   // Parse precedences: "A, B, C" → ["A", "B", "C"]
@@ -115,17 +125,20 @@ export function transformJcfElementToRequest(element: JcfElement): CreateJobElem
     .map((name) => name.trim())
     .filter((name) => name.length > 0);
 
-  // Build label from format, pagination, and papier
-  const labelParts = [element.format, element.pagination, element.papier].filter(
-    (part) => part && part.trim().length > 0
-  );
-  const label = labelParts.length > 0 ? labelParts.join(' | ') : undefined;
-
   return {
     name: element.name,
-    label,
     sequence: element.sequence || undefined,
     prerequisiteNames,
+    ...(element.format ? { format: element.format } : {}),
+    ...(element.papier ? { papier: element.papier } : {}),
+    ...(element.pagination ? { pagination: parseInt(element.pagination, 10) } : {}),
+    ...(element.quantite ? { quantite: parseInt(element.quantite, 10) } : {}),
+    ...(element.imposition ? { imposition: element.imposition } : {}),
+    ...(element.impression ? { impression: element.impression } : {}),
+    ...(element.surfacage ? { surfacage: element.surfacage } : {}),
+    ...(element.autres ? { autres: element.autres } : {}),
+    ...(element.qteFeuilles ? { qteFeuilles: parseInt(element.qteFeuilles, 10) } : {}),
+    ...(element.commentaires ? { commentaires: element.commentaires } : {}),
   };
 }
 
@@ -137,15 +150,19 @@ export function transformJcfToRequest(
   client: string,
   intitule: string,
   deadline: string,
-  elements: JcfElement[]
+  elements: JcfElement[],
+  quantity?: string,
+  shipperId?: string,
 ): CreateJobRequest {
   return {
     reference: jobId,
     client,
     description: intitule,
     workshopExitDate: deadline,
-    status: 'draft',
+    status: 'planned',
     elements: elements.map(transformJcfElementToRequest),
+    ...(quantity ? { quantity: parseInt(quantity, 10) } : {}),
+    ...(shipperId ? { shipperId } : {}),
   };
 }
 
@@ -176,7 +193,6 @@ export async function createJob(request: CreateJobRequest): Promise<CreateJobRes
       elements: request.elements.map((el, index) => ({
         id: `elem-${index}-${Date.now()}`,
         name: el.name,
-        label: el.label || null,
         prerequisiteElementIds: [],
         tasks: [],
       })),

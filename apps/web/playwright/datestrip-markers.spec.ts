@@ -135,11 +135,14 @@ test.describe('DateStrip Task Markers (v0.3.47)', () => {
     if (markerCount > 0) {
       const firstMarker = markers.first();
 
-      // Check that marker has horizontal line styling (h-0.5 = 2px height, w-full = full width)
+      // Check that marker has horizontal line styling:
+      // h-0.5 = 2px height (thin line, not a dot)
+      // rounded-full = rounded ends
+      // left-[50%] right-1 = spans from cell midpoint to right edge
       const classes = await firstMarker.getAttribute('class');
       expect(classes).toContain('h-0.5');
-      expect(classes).toContain('w-full');
       expect(classes).toContain('rounded-full');
+      expect(classes).toContain('left-[50%]');
     }
   });
 

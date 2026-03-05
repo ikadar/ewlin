@@ -65,7 +65,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori', // OFFSET station - requires 4h drying time
+      stationId: 'station-offset', // OFFSET station - requires 4h drying time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -77,7 +77,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -94,7 +94,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-heidelberg', // OFFSET station - requires 4h drying time
+      stationId: 'station-offset', // OFFSET station - requires 4h drying time
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -106,7 +106,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 },
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -118,7 +118,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     {
       id: 'assign-pwh-1',
       taskId: 'task-pwh-1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(6, 30),
       scheduledEnd: isoDate(8, 30),
@@ -131,7 +131,7 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     {
       id: 'assign-pwh-3',
       taskId: 'task-pwh-3',
-      targetId: 'station-heidelberg',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(9, 0),
       scheduledEnd: isoDate(11, 0),

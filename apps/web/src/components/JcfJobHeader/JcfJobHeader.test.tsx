@@ -115,13 +115,13 @@ describe('JcfJobHeader', () => {
     it('renders empty placeholder', () => {
       render(<JcfJobHeader {...defaultProps} />);
       const input = screen.getByTestId('jcf-field-deadline') as HTMLInputElement;
-      expect(input.placeholder).toBe('jj/mm');
+      expect(input.placeholder).toBe('jj/mm 14:00');
     });
 
     it('displays ISO date in French format', () => {
       render(<JcfJobHeader {...defaultProps} deadline="2026-06-15" />);
       const input = screen.getByTestId('jcf-field-deadline') as HTMLInputElement;
-      expect(input.value).toBe('15/06/2026');
+      expect(input.value).toBe('15/06 14:00');
     });
 
     it('displays raw input when not ISO format', () => {
@@ -144,7 +144,7 @@ describe('JcfJobHeader', () => {
       const input = screen.getByTestId('jcf-field-deadline');
       fireEvent.blur(input);
       const year = new Date().getFullYear();
-      expect(onChange).toHaveBeenCalledWith(`${year}-06-15`);
+      expect(onChange).toHaveBeenCalledWith(`${year}-06-15T14:00`);
     });
 
     it('does not convert invalid date on blur', () => {

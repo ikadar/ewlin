@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Sidebar, JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -10,21 +10,21 @@ import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
-import { createTemplate, updateTemplate } from './mock/templateApi';
 import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCreateJobMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
-import { calculateEndTime, applySwap, getAvailableTaskForStation, getLastUnscheduledTask, compactTimeline, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
+import { fluxApi } from './store/api/fluxApi';
+import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
-import type { DryingTimeInfo } from './utils';
+import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
 import {
   PickStateProvider,
@@ -32,9 +32,12 @@ import {
   usePickState,
   PICK_CURSOR_OFFSET_Y,
 } from './pick';
-import type { Task, Job, InternalTask, TaskAssignment, ScheduleSnapshot, Station, ProposedAssignment } from '@flux/types';
+import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory, ProposedAssignment } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
-import { transformJcfToRequest } from './api';
+import { calculateReturnDate } from './utils/outsourcingCalculation';
+import { isLastTaskOfJob } from './utils/taskHelpers';
+import { transformJcfToRequest, transformJcfElementToRequest } from './api';
+import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -44,11 +47,13 @@ const START_HOUR = 0;
  * Used when a test fixture is active to verify workflow-guided suggestions.
  * @see docs/releases/v0.4.22-jcf-sequence-workflow-suggestions.md
  */
-const TEST_SEQUENCE_WORKFLOW = [
-  'Presse offset, Presse numérique', // Step 0: Print (offset or digital)
-  'Massicot', // Step 1: Cutting
-  'Plieuse', // Step 2: Folding
-  'Conditionnement', // Step 3: Packaging
+const TEST_SEQUENCE_WORKFLOWS = [
+  [
+    'Presses Offset', // Step 0: Print (matches fixture category name)
+    'Massicots', // Step 1: Cutting
+    'Plieuses', // Step 2: Folding
+    'Conditionnement', // Step 3: Packaging
+  ],
 ];
 // v0.3.46: Restored to 365 days with virtual scrolling for performance
 const DAY_COUNT = 365;
@@ -85,99 +90,29 @@ function getLayoutDimensions(): {
 }
 
 // ============================================================================
-// Helper functions extracted to reduce nesting depth (SonarQube S2004)
+// v1: Tirage display mode — variable column width support
 // ============================================================================
 
 /**
- * Find the earliest start time for a task based on predecessor constraints.
- * Tasks in the same element (job) share the same elementId.
+ * Calculate a station's X offset and width, accounting for variable column widths.
+ * Uses getLayoutDimensions().stationWidth as the default (w-60 = 15rem, font-size-aware).
+ * Column width is mode-independent: applies in both Produit and Tirage modes.
  */
-function findPredecessorEndTime(
-  task: Task,
-  tasks: Task[],
-  assignments: TaskAssignment[],
-  updatedEndTimes: Map<string, Date>
-): Date | null {
-  // Tasks in the same element share the same elementId
-  const elementTasks = tasks
-    .filter((t) => t.elementId === task.elementId)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
-
-  if (taskIndex <= 0) return null;
-
-  const predecessorTask = elementTasks[taskIndex - 1];
-  const updatedPredecessorEnd = updatedEndTimes.get(predecessorTask.id);
-
-  if (updatedPredecessorEnd) return updatedPredecessorEnd;
-
-  const predecessorAssignment = assignments.find((a) => a.taskId === predecessorTask.id);
-  return predecessorAssignment ? new Date(predecessorAssignment.scheduledEnd) : null;
-}
-
-/**
- * Calculate the new end time for an assignment during compacting.
- */
-function calculateCompactedEndTime(
-  task: Task | undefined,
-  assignment: TaskAssignment,
-  newStart: Date,
-  station: Station | undefined,
-  calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
-): string {
-  if (task?.type === 'Internal') {
-    return calculateEndTimeFn(task as InternalTask, newStart.toISOString(), station);
+function getStationXOffset(
+  stationIndex: number,
+  stations: import('@flux/types').Station[],
+  catMap: Map<string, import('@flux/types').StationCategory>,
+): { x: number; stationWidth: number } {
+  const { gap, paddingLeft, stationWidth: defaultWidth } = getLayoutDimensions();
+  let x = paddingLeft;
+  for (let i = 0; i < stationIndex; i++) {
+    const cat = catMap.get(stations[i].categoryId);
+    const w = cat?.columnWidth ?? (cat ? getDefaultCategoryWidth(cat.name) : null) ?? defaultWidth;
+    x += w + gap;
   }
-  // Preserve original duration for non-internal tasks
-  const originalDuration = new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime();
-  return new Date(newStart.getTime() + originalDuration).toISOString();
-}
-
-function compactStationAssignments(
-  currentSnapshot: ScheduleSnapshot,
-  stationId: string,
-  calculateEndTimeFn: (task: InternalTask, start: string, station: Station | undefined) => string
-): ScheduleSnapshot {
-  const stationAssignments = currentSnapshot.assignments
-    .filter((a) => a.targetId === stationId && !a.isOutsourced)
-    .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
-
-  if (stationAssignments.length === 0) return currentSnapshot;
-
-  const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
-  const station = currentSnapshot.stations.find((s) => s.id === stationId);
-  const updatedEndTimes = new Map<string, Date>();
-  const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
-
-  let nextStartTime = new Date(stationAssignments[0].scheduledStart);
-
-  for (const assignment of stationAssignments) {
-    const task = taskMap.get(assignment.taskId);
-    let earliestStart = nextStartTime;
-
-    // Check predecessor constraint
-    if (task) {
-      const predecessorEnd = findPredecessorEndTime(task, currentSnapshot.tasks, currentSnapshot.assignments, updatedEndTimes);
-      if (predecessorEnd && predecessorEnd > earliestStart) {
-        earliestStart = predecessorEnd;
-      }
-    }
-
-    const newEnd = calculateCompactedEndTime(task, assignment, earliestStart, station, calculateEndTimeFn);
-    updatedAssignmentsMap.set(assignment.id, { scheduledStart: earliestStart.toISOString(), scheduledEnd: newEnd });
-    updatedEndTimes.set(assignment.taskId, new Date(newEnd));
-    nextStartTime = new Date(newEnd);
-  }
-
-  const newAssignments = currentSnapshot.assignments.map((assignment) => {
-    const updated = updatedAssignmentsMap.get(assignment.id);
-    return updated
-      ? { ...assignment, scheduledStart: updated.scheduledStart, scheduledEnd: updated.scheduledEnd, updatedAt: new Date().toISOString() }
-      : assignment;
-  });
-
-  console.log('Station compacted:', { stationId, compactedCount: updatedAssignmentsMap.size });
-  return { ...currentSnapshot, assignments: newAssignments };
+  const targetCat = catMap.get(stations[stationIndex].categoryId);
+  const stationWidth = targetCat?.columnWidth ?? (targetCat ? getDefaultCategoryWidth(targetCat.name) : null) ?? defaultWidth;
+  return { x, stationWidth };
 }
 
 // ============================================================================
@@ -187,6 +122,7 @@ function compactStationAssignments(
 interface KeyboardContext {
   selectedJobId: string | null;
   isQuickPlacementMode: boolean;
+  isJcfOpen: boolean;
   orderedJobIds: string[];
   selectedJob: Job | null;
   gridRef: React.RefObject<SchedulingGridHandle | null>;
@@ -211,8 +147,12 @@ function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): b
   if (e.altKey && e.code === 'KeyQ') {
     e.preventDefault();
     if (ctx.selectedJobId) {
+      const wasActive = ctx.isQuickPlacementMode;
       ctx.setIsQuickPlacementMode((prev) => !prev);
       ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+      if (wasActive) {
+        ctx.setSelectedJobId(null);
+      }
     }
     return true;
   }
@@ -223,6 +163,7 @@ function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boo
   if (e.key === 'Escape' && ctx.isQuickPlacementMode) {
     ctx.setIsQuickPlacementMode(() => false);
     ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+    ctx.setSelectedJobId(null);
     return true;
   }
   return false;
@@ -232,6 +173,17 @@ function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boo
 function handleEscapePick(e: KeyboardEvent, cancelPick: () => void, isPicking: boolean): boolean {
   if (e.key === 'Escape' && isPicking) {
     cancelPick();
+    return true;
+  }
+  return false;
+}
+
+function handleEscapeCloseJob(e: KeyboardEvent, ctx: KeyboardContext): boolean {
+  if (e.key === 'Escape' && ctx.selectedJobId && !ctx.isJcfOpen) {
+    ctx.setSelectedJobId(null);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     return true;
   }
   return false;
@@ -299,6 +251,32 @@ function handlePageScroll(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   return false;
 }
 
+function handleDisplayModeToggle(
+  e: KeyboardEvent,
+  setDisplayMode: (updater: (prev: 'produit' | 'tirage') => 'produit' | 'tirage') => void,
+): boolean {
+  if (e.key !== 'a' && e.key !== 'A') return false;
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return false;
+  setDisplayMode((prev) => (prev === 'produit' ? 'tirage' : 'produit'));
+  return true;
+}
+
+/**
+ * Derive poste presets from snapshot stations and categories.
+ * Station names have spaces removed (e.g., "Komori G40" → "KomoriG40").
+ */
+function stationsToPostes(
+  stations: Station[],
+  categories: StationCategory[]
+): Array<{ name: string; category: string }> {
+  const catNameMap = new Map(categories.map(c => [c.id, c.name]));
+  return stations.map(s => ({
+    name: s.name.replace(/\s+/g, ''),
+    category: catNameMap.get(s.categoryId) ?? '',
+  }));
+}
+
 // Inner App component that uses drag state context
 function AppContent() {
   // v0.4.37: RTK Query for snapshot data
@@ -323,27 +301,43 @@ function AppContent() {
 
   // Memoized snapshot with loading guard
   // snapshotData may be undefined during loading or error states
-  const snapshot = snapshotData ?? {
-    version: 0,
-    generatedAt: new Date().toISOString(),
-    stations: [],
-    categories: [],
-    groups: [],
-    providers: [],
-    jobs: [],
-    elements: [],
-    tasks: [],
-    assignments: [],
-    conflicts: [],
-    lateJobs: [],
-  };
+  const snapshot = useMemo(
+    () =>
+      snapshotData ?? {
+        version: 0,
+        generatedAt: new Date().toISOString(),
+        stations: [],
+        categories: [],
+        groups: [],
+        providers: [],
+        jobs: [],
+        elements: [],
+        tasks: [],
+        assignments: [],
+        conflicts: [],
+        lateJobs: [],
+      },
+    [snapshotData],
+  );
+
+  // Derive poste presets from snapshot stations (single source of truth)
+  const snapshotPostes = useMemo(
+    () => stationsToPostes(snapshot.stations, snapshot.categories),
+    [snapshot.stations, snapshot.categories],
+  );
 
   // v0.5.2: RTK Query mutations for assignment operations
   const [assignTask] = useAssignTaskMutation();
   const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
+  const [compactStation] = useCompactStationMutation();
   const [createJob] = useCreateJobMutation();
+  const [updateJob] = useUpdateJobMutation();
+  const [deleteJob] = useDeleteJobMutation();
+  const [updateElementStatus] = useUpdateElementStatusMutation();
+  const [createTemplate] = useCreateTemplateMutation();
+  const [updateTemplate] = useUpdateTemplateMutation();
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -396,6 +390,9 @@ function AppContent() {
     snappedY: number;
   }>({ stationId: null, y: 0, snappedY: 0 });
 
+  // Display mode state (Produit / Tirage)
+  const [displayMode, setDisplayMode] = useState<'produit' | 'tirage'>('produit');
+
   // v0.3.54: Pick & Place validation state
   const [pickValidation, setPickValidation] = useState<{
     scheduledStart: string | null;
@@ -424,10 +421,13 @@ function AppContent() {
   // v0.4.38: JCF modal state derived from URL
   // Modal opens when URL is /job/new
   const isJcfModalOpen = location.pathname === '/job/new';
+  // Remember which job was selected before JCF opened, so we can restore on close
+  const preJcfSelectedJobIdRef = useRef<string | null>(null);
   // v0.4.7: JCF form state (lifted from JcfJobHeader)
   const [jcfJobId, setJcfJobId] = useState('');
   const [jcfIntitule, setJcfIntitule] = useState('');
   const [jcfQuantity, setJcfQuantity] = useState('');
+  const [jcfShipperId, setJcfShipperId] = useState('');
   const [jcfDeadline, setJcfDeadline] = useState('');
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
@@ -435,8 +435,12 @@ function AppContent() {
   // v0.4.9: Elements table state
   const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
 
-  // v0.4.31: Sequence workflow from selected template (template-free mode when empty)
-  const [sequenceWorkflow, setSequenceWorkflow] = useState<string[]>([]);
+  // v0.5.13b: Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+
+  // v0.4.31: Sequence workflow from selected template (per-element, template-free mode when empty)
+  const [sequenceWorkflows, setSequenceWorkflows] = useState<string[][]>([]);
 
   // v0.4.34: Template editor modal state
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
@@ -449,36 +453,64 @@ function AppContent() {
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
 
   // v0.4.33: Save job via API (v0.5.4: migrated to RTK Query mutation)
+  // v0.5.13b: Supports both create and update modes
   const handleJcfSave = useCallback(async () => {
-    if (!jcfSaveAttemptRef.current) return;
-
-    const isValid = jcfSaveAttemptRef.current();
-    if (!isValid) return;
+    // In edit mode, skip JCF validation (elements table not editable)
+    if (!isEditMode) {
+      if (!jcfSaveAttemptRef.current) return;
+      const isValid = jcfSaveAttemptRef.current();
+      if (!isValid) return;
+    }
 
     setIsJcfSaving(true);
     setJcfSaveError(null);
 
     try {
-      const request = transformJcfToRequest(
-        jcfJobId,
-        jcfClient,
-        jcfIntitule,
-        jcfDeadline,
-        jcfElements
-      );
-      await createJob(request).unwrap();
+      if (isEditMode && editingJobId) {
+        // v0.5.13b: Update existing job (metadata + elements)
+        await updateJob({
+          jobId: editingJobId,
+          body: {
+            reference: jcfJobId,
+            client: jcfClient,
+            description: jcfIntitule,
+            workshopExitDate: jcfDeadline,
+            elements: jcfElements.map(transformJcfElementToRequest),
+            ...(jcfQuantity ? { quantity: parseInt(jcfQuantity, 10) } : {}),
+            shipperId: jcfShipperId || null,
+          },
+        }).unwrap();
+      } else {
+        // Create new job
+        const request = transformJcfToRequest(
+          jcfJobId,
+          jcfClient,
+          jcfIntitule,
+          jcfDeadline,
+          jcfElements,
+          jcfQuantity,
+          jcfShipperId || undefined,
+        );
+        await createJob(request).unwrap();
+      }
 
       // Success: close modal and reset form
-      // Cache invalidation is automatic via invalidatesTags: ['Snapshot']
+      // Cache invalidation: Snapshot is automatic via invalidatesTags, Flux needs explicit invalidation
       setIsJcfSaving(false);
-      navigate('/'); // v0.4.38: Navigate away to close modal
+      dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+      // Navigate back: Flux route if opened from Flux, otherwise scheduler root
+      const fromRoute = (location.state as { from?: string } | null)?.from;
+      navigate(fromRoute?.startsWith('/flux') ? fromRoute : '/', { replace: true });
       setJcfClient('');
       setJcfTemplate('');
       setJcfIntitule('');
       setJcfQuantity('');
+      setJcfShipperId('');
       setJcfDeadline('');
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
-      setSequenceWorkflow([]); // v0.4.31: Reset workflow on save
+      setSequenceWorkflows([]); // v0.4.31: Reset workflow on save
+      setIsEditMode(false); // v0.5.13b: Reset edit mode
+      setEditingJobId(null);
     } catch (error) {
       setIsJcfSaving(false);
       // v0.5.4: Use getErrorMessage for normalized error handling
@@ -486,26 +518,43 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, navigate, createJob, showToast]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, jcfShipperId, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
+    preJcfSelectedJobIdRef.current = selectedJobId;
     setJcfJobId(generateJobId());
     navigate('/job/new');
-  }, [navigate]);
+  }, [navigate, selectedJobId]);
 
   // v0.4.38: Navigate away from /job/new to close modal
+  // Restore URL to previously selected job (if any) instead of always to /
   const handleCloseJcf = useCallback(() => {
-    navigate('/');
+    const fromRoute = (location.state as { from?: string } | null)?.from;
+    const savedJobId = preJcfSelectedJobIdRef.current;
+
+    let restoreUrl: string;
+    if (fromRoute?.startsWith('/flux')) {
+      restoreUrl = fromRoute;
+    } else if (savedJobId) {
+      restoreUrl = `/job/${savedJobId}`;
+    } else {
+      restoreUrl = '/';
+    }
+
+    navigate(restoreUrl, { replace: true });
+    preJcfSelectedJobIdRef.current = null;
     setJcfClient('');
     setJcfTemplate('');
     setJcfIntitule('');
     setJcfQuantity('');
     setJcfDeadline('');
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
-    setSequenceWorkflow([]); // v0.4.31: Reset workflow on close
+    setSequenceWorkflows([]); // v0.4.31: Reset workflow on close
     setJcfSaveError(null); // v0.4.33: Reset API error on close
-  }, [navigate]);
+    setIsEditMode(false); // v0.5.13b: Reset edit mode on close
+    setEditingJobId(null);
+  }, [navigate, location.state]);
 
   // v0.4.34: Handler for "Save as Template" button in JcfModal
   const handleSaveAsTemplate = useCallback(() => {
@@ -516,30 +565,30 @@ function AppContent() {
   const handleTemplateSave = useCallback(async (data: TemplateEditorData & { id?: string }) => {
     setIsTemplateSaving(true);
     try {
+      // Derive sequenceWorkflow from each element's sequence (abstract category names)
+      const elementsWithWorkflow = data.elements.map(el => ({
+        ...el,
+        sequenceWorkflow: el.sequence.split('\n').map(s => s.trim()).filter(Boolean),
+      }));
+      const templateData = {
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        clientName: data.clientName,
+        elements: elementsWithWorkflow,
+      };
       if (data.id) {
-        await updateTemplate(data.id, {
-          name: data.name,
-          description: data.description,
-          category: data.category,
-          clientName: data.clientName,
-          elements: data.elements,
-        });
+        await updateTemplate({ id: data.id, body: templateData }).unwrap();
       } else {
-        await createTemplate({
-          name: data.name,
-          description: data.description,
-          category: data.category,
-          clientName: data.clientName,
-          elements: data.elements,
-        });
+        await createTemplate(templateData).unwrap();
       }
       setIsTemplateEditorOpen(false);
     } catch (error) {
-      console.error('Failed to save template:', error);
+      showToast(getErrorMessage(error), 'error');
     } finally {
       setIsTemplateSaving(false);
     }
-  }, []);
+  }, [createTemplate, updateTemplate, showToast]);
 
   // v0.4.34: Handler for canceling template editor
   const handleTemplateEditorCancel = useCallback(() => {
@@ -552,11 +601,11 @@ function AppContent() {
     if (!template) {
       // Clear template - reset to default state
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
-      setSequenceWorkflow([]);
+      setSequenceWorkflows([]);
       return;
     }
 
-    // Convert JcfTemplateElement to JcfElement
+    // Convert JcfTemplateElement to JcfElement — sequence starts empty (workflow guides the user)
     const newElements: JcfElement[] = template.elements.map(el => ({
       name: el.name,
       precedences: el.precedences,
@@ -570,15 +619,17 @@ function AppContent() {
       autres: el.autres,
       qteFeuilles: el.qteFeuilles,
       commentaires: el.commentaires,
-      sequence: el.sequence,
+      sequence: '',  // Empty — not the template's abstract workflow categories
       sequenceWorkflow: el.sequenceWorkflow,
+      links: el.links,
     }));
     setJcfElements(newElements.length > 0 ? newElements : [{ ...DEFAULT_ELEMENT }]);
     setJcfTemplate(template.name);
 
-    // v0.4.31: Extract workflow from first element's sequenceWorkflow (if available)
-    const firstElementWorkflow = template.elements[0]?.sequenceWorkflow;
-    setSequenceWorkflow(firstElementWorkflow ?? []);
+    // Derive per-element workflows from each element's sequenceWorkflow (abstract category names)
+    setSequenceWorkflows(
+      template.elements.map(el => el.sequenceWorkflow ?? []),
+    );
 
     // Also set client if the template has one
     if (template.clientName && !jcfClient) {
@@ -609,6 +660,9 @@ function AppContent() {
 
   // v0.3.56: Track last validated slot for early-exit optimization
   const lastPickSlotRef = useRef<string | null>(null);
+
+  // v0.5.14: Store original assignment info for grid picks (to restore outsourced on cancel)
+  const gridPickInfoRef = useRef<{ taskId: string; targetId: string; scheduledStart: string } | null>(null);
 
   // v0.3.47: Zoom handler that maintains grid center position
   const handleZoomChange = useCallback((newPixelsPerHour: number) => {
@@ -645,13 +699,123 @@ function AppContent() {
   // Find selected job
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
 
-  // REQ-14: Calculate grid/DateStrip start date (6 days before today)
+  // Populate JCF form fields from a Job object (shared by scheduler edit + Flux edit)
+  const populateJcfFromJob = useCallback((job: Job) => {
+    setJcfJobId(job.reference);
+    setJcfClient(job.client);
+    setJcfIntitule(job.description);
+    setJcfDeadline(job.workshopExitDate);
+    setJcfQuantity(job.quantity?.toString() ?? '');
+    setJcfShipperId(job.shipperId ?? '');
+    setJcfTemplate('');
+
+    // Build stationId → station name lookup for sequence DSL reconstruction
+    const stationNameMap = new Map(snapshot.stations.map((s) => [s.id, s.name]));
+    // Build provider lookup for outsourced tasks
+    const providerNameMap = new Map((snapshot.providers ?? []).map((p) => [p.id, p.name]));
+
+    // Map elements back to JcfElement[] format
+    const jobElements = snapshot.elements
+      .filter((e) => job.elementIds.includes(e.id))
+      .sort((a, b) => job.elementIds.indexOf(a.id) - job.elementIds.indexOf(b.id));
+    // Build elementId → name lookup for precedences
+    const elementNameMap = new Map(jobElements.map((el) => [el.id, el.name]));
+
+    if (jobElements.length > 0) {
+      const mappedElements: JcfElement[] = jobElements.map((el) => {
+        // Parse label back to format/pagination/papier (label = "format | pagination | papier")
+        const labelParts = el.label ? el.label.split(' | ') : [];
+
+        // Map prerequisiteElementIds back to comma-separated names
+        const precedences = el.prerequisiteElementIds
+          .map((id) => elementNameMap.get(id) ?? '')
+          .filter(Boolean)
+          .join(', ');
+
+        // Reconstruct sequence DSL from tasks (JCF format)
+        const elementTasks = snapshot.tasks
+          .filter((t) => t.elementId === el.id)
+          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        const sequenceParts = elementTasks.map((t) => {
+          if (t.type === 'Internal') {
+            const posteName = (stationNameMap.get(t.stationId) ?? t.stationId).replace(/\s+/g, '');
+            return `${posteName}(${t.duration.setupMinutes}+${t.duration.runMinutes})`;
+          }
+          // Outsourced tasks (type === 'Outsourced')
+          const providerName = providerNameMap.get(t.providerId) ?? 'Externe';
+          return `ST:${providerName}(${t.duration.openDays}j):${t.actionType ?? ''}`;
+        });
+        const sequence = sequenceParts.join('\n');
+
+        return {
+          name: el.name,
+          precedences,
+          quantite: el.spec?.quantite?.toString() ?? '',
+          format: el.spec?.format ?? labelParts[0] ?? '',
+          pagination: el.spec?.pagination?.toString() ?? labelParts[1] ?? '',
+          papier: el.spec?.papier ?? labelParts[2] ?? '',
+          imposition: el.spec?.imposition ?? '',
+          impression: el.spec?.impression ?? '',
+          surfacage: el.spec?.surfacage ?? '',
+          autres: el.spec?.autres ?? '',
+          qteFeuilles: el.spec?.qteFeuilles?.toString() ?? '',
+          commentaires: el.spec?.commentaires ?? '',
+          sequence,
+        };
+      });
+      setJcfElements(mappedElements);
+    }
+
+    setIsEditMode(true);
+    setEditingJobId(job.id);
+    setSequenceWorkflows([]);
+    setJcfSaveError(null);
+  }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers]);
+
+  // v0.5.13b: Handler for "Modifier" button in Job Details Panel (scheduler view)
+  const handleEditJob = useCallback(() => {
+    if (!selectedJob) return;
+    populateJcfFromJob(selectedJob);
+    preJcfSelectedJobIdRef.current = selectedJobId;
+    navigate('/job/new');
+  }, [selectedJob, selectedJobId, populateJcfFromJob, navigate]);
+
+  // Auto-populate JCF when arriving at /job/new with editJobId in state (from Flux)
+  useEffect(() => {
+    const state = location.state as { editJobId?: string } | null;
+    if (state?.editJobId && isJcfModalOpen) {
+      const job = jobMap.get(state.editJobId);
+      if (job) {
+        populateJcfFromJob(job);
+      }
+    }
+  }, [location.state, isJcfModalOpen, jobMap, populateJcfFromJob]);
+
+  const handleDeleteJob = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      await deleteJob(selectedJobId).unwrap();
+      setSelectedJobId(null);
+    } catch (err) {
+      showToast(`Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`, 'error');
+    }
+  }, [selectedJobId, deleteJob, setSelectedJobId, showToast]);
+
+  // REQ-14: Calculate grid/DateStrip start date (lookbackDays before today)
+  const lookbackDays = snapshotData?.lookbackDays ?? 6;
   const gridStartDate = useMemo(() => {
     const today = new Date();
-    today.setDate(today.getDate() - 6);
+    today.setDate(today.getDate() - lookbackDays);
     today.setHours(START_HOUR, 0, 0, 0);
     return today;
-  }, []);
+  }, [lookbackDays]);
+
+  // Category lookup map (for getStationXOffset)
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, import('@flux/types').StationCategory>();
+    snapshot.categories.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [snapshot.categories]);
 
   // v0.3.54: Calculate precedence constraints for pick
   const pickPrecedenceConstraints = useMemo(() => {
@@ -669,6 +833,14 @@ function AppContent() {
       return null;
     }
     return getDryingTimeInfo(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+  }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
+
+  // v0.5.13: Calculate outsourcing time info during pick
+  const pickOutsourcingTimeInfo = useMemo((): OutsourcingTimeInfo | null => {
+    if (!pickedTask) {
+      return null;
+    }
+    return getOutsourcingTimeInfo(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
   }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // REQ-14: Auto-scroll to today on initial load
@@ -715,6 +887,20 @@ function AppContent() {
     return days;
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
+  // Conflict task IDs for sidebar highlighting + DateStrip markers
+  // Only PrecedenceConflict and GroupCapacityConflict trigger amber glow —
+  // other types (ApprovalGateConflict, DeadlineConflict, etc.) have their own indicators.
+  const conflictTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of snapshot.conflicts) {
+      if (c.type === 'PrecedenceConflict' || c.type === 'GroupCapacityConflict') {
+        ids.add(c.taskId);
+        if (c.relatedTaskId) ids.add(c.relatedTaskId);
+      }
+    }
+    return ids;
+  }, [snapshot.conflicts]);
+
   // v0.3.47: Task markers per day for DateStrip
   // Groups tasks by date and determines their status (completed, late, conflict, scheduled)
   const taskMarkersPerDay = useMemo((): Map<string, TaskMarker[]> => {
@@ -722,7 +908,6 @@ function AppContent() {
     if (!selectedJobId) return markers;
 
     const now = new Date();
-    const conflictTaskIds = new Set(snapshot.conflicts.map((c) => c.taskId));
 
     // Get all tasks for the selected job
     const jobTasks = getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements);
@@ -732,8 +917,16 @@ function AppContent() {
     snapshot.assignments
       .filter((a) => taskIds.has(a.taskId))
       .forEach((assignment) => {
+        const scheduledStart = new Date(assignment.scheduledStart);
         const scheduledEnd = new Date(assignment.scheduledEnd);
-        const dateKey = new Date(assignment.scheduledStart).toISOString().split('T')[0];
+        // Use local date for dateKey (to match DateStrip's local calendar display)
+        const year = scheduledStart.getFullYear();
+        const month = String(scheduledStart.getMonth() + 1).padStart(2, '0');
+        const day = String(scheduledStart.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`;
+
+        // Extract start hour within the day (0-24, fractional)
+        const startHour = scheduledStart.getHours() + scheduledStart.getMinutes() / 60;
 
         // Determine task marker status
         let status: TaskMarker['status'] = 'scheduled';
@@ -748,6 +941,7 @@ function AppContent() {
         const marker: TaskMarker = {
           taskId: assignment.taskId,
           status,
+          startHour,
         };
 
         const existing = markers.get(dateKey) ?? [];
@@ -756,7 +950,7 @@ function AppContent() {
       });
 
     return markers;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, snapshot.conflicts]);
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
 
   // v0.3.47: Earliest task date for timeline (first scheduled task)
   const earliestTaskDate = useMemo((): Date | null => {
@@ -780,7 +974,7 @@ function AppContent() {
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
   // REQ-09.2: Focused date for DateStrip sync
-  const [focusedDate, setFocusedDate] = useState<Date | null>(null);
+  const [focusedDate, setFocusedDate] = useState<Date | null>(new Date());
   const scrollTimeoutRef = useRef<number | null>(null);
 
   // v0.3.47: Viewport hours for DateStrip indicator
@@ -877,6 +1071,7 @@ function AppContent() {
     const ctx: KeyboardContext = {
       selectedJobId,
       isQuickPlacementMode,
+      isJcfOpen: isJcfModalOpen,
       orderedJobIds,
       selectedJob,
       gridRef,
@@ -900,11 +1095,32 @@ function AppContent() {
           savedScrollRef.current = null;
         }
         lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking
+
+        // v0.5.14: Restore outsourced successor assignments for grid picks
+        // Reschedule at original position to trigger autoAssignOutsourcedSuccessors
+        const savedGridPickInfo = gridPickInfoRef.current;
+        gridPickInfoRef.current = null;
+
         pickActions.cancelPick();
         setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+
+        if (savedGridPickInfo) {
+          rescheduleTask({
+            taskId: savedGridPickInfo.taskId,
+            body: {
+              targetId: savedGridPickInfo.targetId,
+              scheduledStart: savedGridPickInfo.scheduledStart,
+              isOutsourced: false,
+            },
+          }).catch((error: unknown) => {
+            console.error('Failed to restore outsourced assignments on cancel:', error);
+          });
+        }
       }, isPicking)) return;
       if (handleQuickPlacementKeyboard(e, ctx)) return;
+      if (handleDisplayModeToggle(e, setDisplayMode)) return;
       if (handleEscapeQuickPlacement(e, ctx)) return;
+      if (handleEscapeCloseJob(e, ctx)) return;
       if (handleJobNavigation(e, ctx)) return;
       if (handleJumpToDeparture(e, ctx)) return;
       if (handleJumpToToday(e, ctx)) return;
@@ -924,39 +1140,37 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask]);
+
+  // Handle swap in a given direction using two rescheduleTask mutations
+  const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
+    // Guard: don't swap completed tiles
+    const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    if (assignment?.isCompleted) return;
+
+    const result = applySwap(snapshot.assignments, assignmentId, direction);
+    if (!result.swapped || result.reschedules.length < 2) return;
+
+    try {
+      await Promise.all(
+        result.reschedules.map(({ taskId, targetId, scheduledStart }) =>
+          rescheduleTask({ taskId, body: { targetId, scheduledStart } }).unwrap()
+        )
+      );
+    } catch (err) {
+      console.error(`Swap ${direction} failed:`, err);
+    }
+  }, [snapshot.assignments, rescheduleTask]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {
-    updateSnapshot((currentSnapshot) => {
-      const result = applySwap(currentSnapshot.assignments, assignmentId, 'up');
-      if (result.swapped) {
-        console.log('Swapped up:', { assignmentId, swappedWithId: result.swappedWithId });
-        return {
-          ...currentSnapshot,
-          assignments: result.assignments,
-        };
-      }
-      return currentSnapshot;
-    });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+    handleSwap(assignmentId, 'up');
+  }, [handleSwap]);
 
   // Handle swap down - exchange position with tile below
   const handleSwapDown = useCallback((assignmentId: string) => {
-    updateSnapshot((currentSnapshot) => {
-      const result = applySwap(currentSnapshot.assignments, assignmentId, 'down');
-      if (result.swapped) {
-        console.log('Swapped down:', { assignmentId, swappedWithId: result.swappedWithId });
-        return {
-          ...currentSnapshot,
-          assignments: result.assignments,
-        };
-      }
-      return currentSnapshot;
-    });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+    handleSwap(assignmentId, 'down');
+  }, [handleSwap]);
 
   // v0.3.58: Handle context menu open
   const handleContextMenuOpen = useCallback((x: number, y: number, assignmentId: string, isCompleted: boolean) => {
@@ -993,23 +1207,15 @@ function AppContent() {
     const viewportHeight = gridRef.current.getViewportHeight();
     const scrollTargetY = Math.max(0, y - viewportHeight * 0.2);
 
-    // Calculate X position from station index
-    // Station layout: px-3 (12px) padding, then each station is 240px + 12px gap
+    // Calculate X position from station index (accounts for variable column widths)
     const stationId = assignment.targetId;
     const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
 
     let scrollTargetX = gridRef.current.getScrollX(); // Default: keep current X
 
     if (stationIndex >= 0) {
-      // v0.4.29: Use computed dimensions based on root font-size (rem → px)
-      const { stationWidth, gap, paddingLeft, timelineWidth } = getLayoutDimensions();
-
-      // Calculate station's X position
-      const stationX = paddingLeft + stationIndex * (stationWidth + gap);
-
-      // Center the station in the viewport (accounting for timeline column width)
-      const viewportWidth = gridRef.current.getViewportWidth();
-      scrollTargetX = Math.max(0, stationX - (viewportWidth - timelineWidth - stationWidth) / 2);
+      const { x: stationX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
+      scrollTargetX = Math.max(0, stationX);
     }
 
     // Scroll both X and Y at once
@@ -1023,7 +1229,21 @@ function AppContent() {
       scrollTargetX,
       scrollTargetY,
     });
-  }, [snapshot.stations, pixelsPerHour, gridStartDate]);
+  }, [snapshot.stations, categoryMap, pixelsPerHour, gridStartDate]);
+
+  // F9: Deep-link from Flux dashboard — ?task= URL param → scroll to task
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const taskId = params.get('task');
+    if (!taskId || !gridRef.current || snapshot.assignments.length === 0) return;
+
+    const assignment = snapshot.assignments.find(a => a.taskId === taskId);
+    if (assignment) {
+      handleJumpToTask(assignment);
+      // Clean up URL param
+      window.history.replaceState(null, '', location.pathname);
+    }
+  }, [location.search, snapshot.assignments, handleJumpToTask, location.pathname]);
 
   // Handle recall - remove assignment (double-click on tile)
   // v0.5.2: Now uses RTK Query mutation
@@ -1049,31 +1269,14 @@ function AppContent() {
   }, [snapshot.assignments, unassignTask, showToast]);
 
   // v0.4.32a: Handle element prerequisite status change
-  const handleElementStatusChange = useCallback((update: ElementStatusUpdate) => {
-    updateSnapshot((currentSnapshot) => {
-      const elementIndex = currentSnapshot.elements.findIndex((e) => e.id === update.elementId);
-      if (elementIndex === -1) {
-        console.warn('Element not found for status update:', update.elementId);
-        return currentSnapshot;
-      }
-
-      console.log('Updating element status:', update);
-
-      // Create new elements array with updated element
-      const newElements = [...currentSnapshot.elements];
-      newElements[elementIndex] = {
-        ...newElements[elementIndex],
-        [update.field]: update.value,
-        updatedAt: new Date().toISOString(),
-      };
-
-      return {
-        ...currentSnapshot,
-        elements: newElements,
-      };
-    });
-    invalidateSnapshot();
-  }, [invalidateSnapshot]);
+  const handleElementStatusChange = useCallback(async (update: ElementStatusUpdate) => {
+    try {
+      await updateElementStatus(update).unwrap();
+    } catch (err) {
+      console.error('Failed to update element status:', err);
+      showToast(getErrorMessage(err));
+    }
+  }, [updateElementStatus, showToast]);
 
   // v0.5.11: Handle outsourcing work days change (local state only)
   const handleOutsourcingWorkDaysChange = useCallback((taskId: string, workDays: number) => {
@@ -1093,6 +1296,32 @@ function AppContent() {
         },
         updatedAt: new Date().toISOString(),
       };
+
+      // If no manual return, recalculate return date and sync assignment scheduledEnd
+      if (!task.manualReturn) {
+        const assignmentIndex = currentSnapshot.assignments.findIndex(
+          (a) => a.taskId === taskId
+        );
+        if (assignmentIndex !== -1) {
+          const assignment = currentSnapshot.assignments[assignmentIndex];
+          const provider = currentSnapshot.providers?.find((p) => p.id === task.providerId);
+          if (provider && assignment.scheduledStart) {
+            const oneWay = isLastTaskOfJob(taskId, currentSnapshot.elements, currentSnapshot.tasks);
+            const newReturn = calculateReturnDate(new Date(assignment.scheduledStart), {
+              workDays,
+              transitDays: provider.transitDays,
+              receptionTime: provider.receptionTime,
+              oneWay,
+            });
+            const newAssignments = [...currentSnapshot.assignments];
+            newAssignments[assignmentIndex] = {
+              ...assignment,
+              scheduledEnd: newReturn.toISOString(),
+            };
+            return { ...currentSnapshot, tasks: newTasks, assignments: newAssignments };
+          }
+        }
+      }
 
       return { ...currentSnapshot, tasks: newTasks };
     });
@@ -1115,6 +1344,19 @@ function AppContent() {
         updatedAt: new Date().toISOString(),
       };
 
+      // Sync assignment scheduledStart for conflict pipeline
+      const assignmentIndex = currentSnapshot.assignments.findIndex(
+        (a) => a.taskId === taskId
+      );
+      if (assignmentIndex !== -1) {
+        const newAssignments = [...currentSnapshot.assignments];
+        newAssignments[assignmentIndex] = {
+          ...newAssignments[assignmentIndex],
+          scheduledStart: departure?.toISOString() ?? newAssignments[assignmentIndex].scheduledStart,
+        };
+        return { ...currentSnapshot, tasks: newTasks, assignments: newAssignments };
+      }
+
       return { ...currentSnapshot, tasks: newTasks };
     });
     invalidateSnapshot();
@@ -1135,6 +1377,19 @@ function AppContent() {
         manualReturn: returnDate?.toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      // Sync assignment scheduledEnd for conflict pipeline
+      const assignmentIndex = currentSnapshot.assignments.findIndex(
+        (a) => a.taskId === taskId
+      );
+      if (assignmentIndex !== -1) {
+        const newAssignments = [...currentSnapshot.assignments];
+        newAssignments[assignmentIndex] = {
+          ...newAssignments[assignmentIndex],
+          scheduledEnd: returnDate?.toISOString() ?? newAssignments[assignmentIndex].scheduledEnd,
+        };
+        return { ...currentSnapshot, tasks: newTasks, assignments: newAssignments };
+      }
 
       return { ...currentSnapshot, tasks: newTasks };
     });
@@ -1160,6 +1415,15 @@ function AppContent() {
       scrollTarget,
     });
   }, [pixelsPerHour, gridStartDate]);
+
+  // Scroll grid to today on initial load
+  useEffect(() => {
+    // Small delay to ensure grid is mounted and rendered
+    const timer = setTimeout(() => {
+      handleDateClick(new Date());
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle toggle completion (v0.3.33, v0.5.3: migrated to RTK Query mutation)
   const handleToggleComplete = useCallback(async (assignmentId: string) => {
@@ -1210,6 +1474,9 @@ function AppContent() {
     const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
     if (!assignment) return { canSwapUp: false, canSwapDown: false };
 
+    // Completed tiles cannot be swapped
+    if (assignment.isCompleted) return { canSwapUp: false, canSwapDown: false };
+
     // Find adjacent tiles on the same station
     const stationAssignments = snapshot.assignments
       .filter((a) => a.targetId === assignment.targetId)
@@ -1217,9 +1484,13 @@ function AppContent() {
 
     const currentIndex = stationAssignments.findIndex((a) => a.id === contextMenu.assignmentId);
 
+    // Also check if adjacent tiles are completed
+    const adjacentUp = currentIndex > 0 ? stationAssignments[currentIndex - 1] : null;
+    const adjacentDown = currentIndex < stationAssignments.length - 1 ? stationAssignments[currentIndex + 1] : null;
+
     return {
-      canSwapUp: currentIndex > 0,
-      canSwapDown: currentIndex < stationAssignments.length - 1,
+      canSwapUp: currentIndex > 0 && !adjacentUp?.isCompleted,
+      canSwapDown: currentIndex < stationAssignments.length - 1 && !adjacentDown?.isCompleted,
     };
   }, [contextMenu, snapshot.assignments]);
 
@@ -1251,9 +1522,9 @@ function AppContent() {
     if (!quickPlacementHover.stationId || quickPlacementHover.snappedY === 0) {
       return null;
     }
-    const dropTime = yPositionToTime(quickPlacementHover.snappedY, START_HOUR, gridStartDate);
+    const dropTime = yPositionToTime(quickPlacementHover.snappedY, START_HOUR, gridStartDate, pixelsPerHour);
     return dropTime.toISOString();
-  }, [quickPlacementHover.stationId, quickPlacementHover.snappedY, gridStartDate]);
+  }, [quickPlacementHover.stationId, quickPlacementHover.snappedY, gridStartDate, pixelsPerHour]);
 
   // Quick Placement: validation using the same logic as drag
   const quickPlacementValidation = useDropValidation({
@@ -1261,7 +1532,7 @@ function AppContent() {
     task: quickPlacementTask,
     targetStationId: quickPlacementHover.stationId,
     scheduledStart: quickPlacementScheduledStart,
-    bypassPrecedence: false, // No bypass in quick placement mode
+    bypassPrecedence: isAltPressed,
   });
 
   // Quick Placement: precedence constraint Y positions
@@ -1273,6 +1544,41 @@ function AppContent() {
     const latestY = getSuccessorConstraint(quickPlacementTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
     return { earliestY, latestY };
   }, [quickPlacementTask, snapshot, pixelsPerHour, gridStartDate]);
+
+  // Quick Placement: auto-scroll grid to the target station and predecessor constraint line
+  useEffect(() => {
+    if (!isQuickPlacementMode || !lastUnscheduledTask || !gridRef.current) return;
+    if (lastUnscheduledTask.type !== 'Internal') return;
+
+    const stationIndex = snapshot.stations.findIndex((s) => s.id === lastUnscheduledTask.stationId);
+    if (stationIndex < 0) return;
+
+    // Horizontal: scroll to left edge of target station column
+    const { x: stationX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
+    const scrollX = Math.max(0, stationX);
+
+    // Vertical: scroll to predecessor constraint (purple line) if available, else successor (orange)
+    const earliestY = getPredecessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    const latestY = getSuccessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
+    const targetY = earliestY ?? latestY;
+
+    // Fallback: workshopExitDate (blue deadline line) when no precedence constraints
+    const deadlineY = selectedJob?.workshopExitDate
+      ? timeToYPosition(new Date(selectedJob.workshopExitDate), START_HOUR, pixelsPerHour, gridStartDate)
+      : null;
+
+    const scrollTargetY = targetY ?? deadlineY;
+
+    if (scrollTargetY !== null) {
+      const viewportHeight = gridRef.current.getViewportHeight();
+      // Constraint: viewport 30% | Deadline fallback: viewport 70% (bottom, since we place bottom-up)
+      const offset = targetY !== null ? 0.3 : 0.7;
+      const scrollY = Math.max(0, scrollTargetY - viewportHeight * offset);
+      gridRef.current.scrollTo(scrollX, scrollY, 'smooth');
+    } else {
+      gridRef.current.scrollToX(scrollX, 'smooth');
+    }
+  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, categoryMap, displayMode, pixelsPerHour, gridStartDate, selectedJob]);
 
   // Quick Placement: handle mouse move in station column
   // v0.3.48: Use pixelsPerHour for zoom-aware snapping
@@ -1317,16 +1623,18 @@ function AppContent() {
       targetId: stationId,
       isOutsourced: false,
       scheduledStart,
-      bypassPrecedence: false,
+      bypassPrecedence: isAltPressed,
     };
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
     // Check for blocking conflicts (same logic as drag & drop)
+    // StationConflict is non-blocking (push-down) UNLESS the existing tile is completed
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => c.type !== 'StationConflict' &&
+      (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
+             !(c.type === 'PrecedenceConflict' && isAltPressed) &&
              !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
     );
 
@@ -1341,6 +1649,10 @@ function AppContent() {
       scheduledStart,
     });
 
+    const hasPrecedenceConflict = validationResult.conflicts.some(
+      (c) => c.type === 'PrecedenceConflict'
+    );
+
     try {
       const result = await assignTask({
         taskId: taskToPlace.id,
@@ -1348,6 +1660,7 @@ function AppContent() {
           targetId: stationId,
           scheduledStart,
           isOutsourced: false,
+          ...(isAltPressed && hasPrecedenceConflict ? { bypassPrecedence: true } : {}),
         },
       }).unwrap();
 
@@ -1358,7 +1671,7 @@ function AppContent() {
       showToast(getErrorMessage(error));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, snapshot.elements, gridStartDate, pixelsPerHour, assignTask, showToast]);
+  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, snapshot.elements, gridStartDate, pixelsPerHour, assignTask, showToast, isAltPressed]);
 
   // Calculate which stations have available tasks (for quick placement cursor)
   const stationsWithAvailableTasks = useMemo(() => {
@@ -1381,30 +1694,33 @@ function AppContent() {
     return stationIds;
   }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
-  // Handle station compact - remove gaps between tiles (mock implementation)
+  // Handle station compact - remove gaps between tiles
   // Respects precedence: tasks cannot start before their predecessor ends
-  const handleCompact = useCallback((stationId: string) => {
+  // Works in both mock and API modes via RTK Query mutation
+  const handleCompact = useCallback(async (stationId: string) => {
     setCompactingStationId(stationId);
-
-    // Simulate async operation for UI feedback
-    setTimeout(() => {
-      // Use extracted helper function to reduce nesting depth
-      updateSnapshot((currentSnapshot) =>
-        compactStationAssignments(currentSnapshot, stationId, calculateEndTime)
-      );
-
-      invalidateSnapshot();
+    try {
+      await compactStation(stationId).unwrap();
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error');
+    } finally {
       setCompactingStationId(null);
-    }, 300); // Small delay for visual feedback
-  }, [invalidateSnapshot]);
+    }
+  }, [compactStation, showToast]);
 
   // Toggle Quick Placement (for TopNavBar button)
   const handleToggleQuickPlacement = useCallback(() => {
     if (selectedJobId) {
-      setIsQuickPlacementMode((prev) => !prev);
+      setIsQuickPlacementMode((prev) => {
+        if (prev) {
+          // Turning off: clear job selection to remove tile muting
+          setSelectedJobId(null);
+        }
+        return !prev;
+      });
       setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
     }
-  }, [selectedJobId]);
+  }, [selectedJobId, setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
 
   // v0.3.54: Handle pick from sidebar (unscheduled task)
   // v0.3.55: Added scroll to target column and save scroll position
@@ -1426,23 +1742,57 @@ function AppContent() {
         const targetStationId = task.stationId;
         const stationIndex = snapshot.stations.findIndex((s) => s.id === targetStationId);
         if (stationIndex >= 0) {
-          // v0.4.29: Use computed dimensions based on root font-size (rem → px)
-          const { stationWidth, gap, paddingLeft } = getLayoutDimensions();
-          const targetX = paddingLeft + stationIndex * (stationWidth + gap);
+          const { x: targetX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
           gridRef.current.scrollToX(targetX, 'smooth');
         }
       }
     }
-  }, [pickActions, snapshot.stations]);
+  }, [pickActions, snapshot.stations, categoryMap]);
 
   // v0.3.57: Handle pick from grid (reschedule existing task)
   // No scroll needed as user is already at tile location
-  const handlePickFromGrid = useCallback((task: InternalTask, job: Job, assignmentId: string) => {
+  const handlePickFromGrid = useCallback(async (task: InternalTask, job: Job, assignmentId: string) => {
     pickActions.pickFromGrid(task, job, assignmentId);
     // Initialize ghost position at cursor (will be updated on mouse move)
     pickActions.updateGhostPosition(0, 0);
     // No scroll position saving for grid picks - no scroll restoration needed
-  }, [pickActions]);
+
+    // v0.5.14: Store original position for cancel restoration
+    const originalAssignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    gridPickInfoRef.current = originalAssignment
+      ? { taskId: task.id, targetId: originalAssignment.targetId, scheduledStart: originalAssignment.scheduledStart }
+      : null;
+
+    // v0.5.14: Remove outsourced successor assignments when picking the last task of a prerequisite element
+    const element = snapshot.elements.find((e) => e.id === task.elementId);
+    if (!element) return;
+
+    const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
+    const elementTasks = element.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is Task => t !== undefined)
+      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    const lastTask = elementTasks[elementTasks.length - 1];
+    if (!lastTask || lastTask.id !== task.id) return;
+
+    // Find dependent elements that have outsourced tasks with assignments
+    const dependentElements = snapshot.elements.filter((e) =>
+      e.prerequisiteElementIds.includes(element.id)
+    );
+
+    for (const depElem of dependentElements) {
+      for (const depTaskId of depElem.taskIds) {
+        const depTask = taskById.get(depTaskId);
+        if (depTask?.type === 'Outsourced' && snapshot.assignments.some((a) => a.taskId === depTask.id)) {
+          try {
+            await unassignTask(depTask.id).unwrap();
+          } catch (error) {
+            console.error('Failed to unassign outsourced successor on pick:', error);
+          }
+        }
+      }
+    }
+  }, [pickActions, snapshot, unassignTask]);
 
   // v0.3.54: Handle mouse move during pick (update ghost position and validate)
   // v0.3.56: Added early-exit optimization when cursor stays in same slot
@@ -1543,11 +1893,11 @@ function AppContent() {
     const validationResult = validateAssignment(proposedAssignment, snapshot);
 
     // Check for blocking conflicts
-    // StationConflict is NOT blocking - push-down will handle overlapping tiles
+    // StationConflict is NOT blocking (push-down) UNLESS the existing tile is completed
     // PrecedenceConflict with suggestedStart is NOT blocking (can be placed at suggested time)
     // ApprovalGateConflict for Plates is NOT blocking
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => c.type !== 'StationConflict' &&
+      (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
@@ -1557,9 +1907,48 @@ function AppContent() {
     if (blockingConflicts.length > 0 && !isAltPressed) {
       console.log('Pick placement blocked: validation failed', blockingConflicts);
       // Cancel pick so the tile returns to its original state
+      // v0.5.14: Restore outsourced successor assignments (same as ESC cancel)
+      const savedGridPickInfo = gridPickInfoRef.current;
+      gridPickInfoRef.current = null;
       pickActions.cancelPick();
       setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+      if (savedGridPickInfo) {
+        rescheduleTask({
+          taskId: savedGridPickInfo.taskId,
+          body: {
+            targetId: savedGridPickInfo.targetId,
+            scheduledStart: savedGridPickInfo.scheduledStart,
+            isOutsourced: false,
+          },
+        }).catch((error: unknown) => {
+          console.error('Failed to restore outsourced assignments on blocked placement:', error);
+        });
+      }
       return;
+    }
+
+    // Check for precedence conflict WITHOUT bypass (to detect actual conflicts)
+    // This is needed because when ALT is pressed, the validation passes and conflicts are empty
+    const proposalWithoutBypass: ProposedAssignment = {
+      ...proposedAssignment,
+      bypassPrecedence: false,
+    };
+    const validationWithoutBypass = validateAssignment(proposalWithoutBypass, snapshot);
+    const hasPrecedenceConflict = validationWithoutBypass.conflicts.some(
+      (c) => c.type === 'PrecedenceConflict' && c.details?.constraintType === 'predecessor'
+    );
+
+    // Auto-snap to suggestedStart if there's a precedence conflict (without Alt bypass)
+    // This ensures the tile is placed at the earliest valid position
+    const effectiveStart = (!isAltPressed && hasPrecedenceConflict && validationWithoutBypass.suggestedStart)
+      ? validationWithoutBypass.suggestedStart
+      : scheduledStart;
+
+    if (effectiveStart !== scheduledStart) {
+      console.log('Auto-snap: precedence conflict detected, using suggestedStart:', {
+        original: scheduledStart,
+        snapped: effectiveStart,
+      });
     }
 
     // Cast to InternalTask for API call
@@ -1567,6 +1956,9 @@ function AppContent() {
 
     // v0.3.57: Determine if this is a reschedule (grid pick with assignmentId)
     const isRescheduleOp = pickedAssignmentId !== null;
+
+    // Determine if we're creating a precedence conflict via ALT bypass
+    const creatingPrecedenceConflict = isAltPressed && hasPrecedenceConflict;
 
     // v0.5.2: Use RTK Query mutations for assignment operations
     try {
@@ -1576,22 +1968,24 @@ function AppContent() {
           taskId: task.id,
           body: {
             targetId: stationId,
-            scheduledStart,
+            scheduledStart: effectiveStart,
             isOutsourced: false,
+            bypassPrecedence: creatingPrecedenceConflict,
           },
         }).unwrap();
-        console.log('Pick reschedule completed:', { taskId: task.id, scheduledStart });
+        console.log('Pick reschedule completed:', { taskId: task.id, scheduledStart: effectiveStart, bypassPrecedence: creatingPrecedenceConflict });
       } else {
         // Create new assignment
         await assignTask({
           taskId: task.id,
           body: {
             targetId: stationId,
-            scheduledStart,
+            scheduledStart: effectiveStart,
             isOutsourced: false,
+            bypassPrecedence: creatingPrecedenceConflict,
           },
         }).unwrap();
-        console.log('Pick placement created:', { taskId: task.id, scheduledStart });
+        console.log('Pick placement created:', { taskId: task.id, scheduledStart: effectiveStart, bypassPrecedence: creatingPrecedenceConflict });
       }
       // Cache invalidation is automatic via invalidatesTags
     } catch (error) {
@@ -1599,30 +1993,41 @@ function AppContent() {
       showToast(getErrorMessage(error));
     }
 
+    gridPickInfoRef.current = null; // v0.5.14: Clear grid pick info on successful placement
     pickActions.completePlacement();
     lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking on successful placement
     setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
   }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, assignTask, rescheduleTask, showToast]);
 
   // Handle global timeline compaction (v0.3.35)
-  const handleCompactTimeline = useCallback((horizonHours: CompactHorizon) => {
+  // Compacts each station that has assignments via the compact endpoint.
+  // Runs multiple passes to resolve cross-station dependencies: if a successor's
+  // station is compacted before its predecessor's station, the successor can only
+  // fully compact once the predecessor has been compacted in a previous pass.
+  const handleCompactTimeline = useCallback(async (_horizonHours: CompactHorizon) => {
     setIsCompactingTimeline(true);
-
-    // Simulate async operation for UI feedback
-    setTimeout(() => {
-      updateSnapshot((currentSnapshot) => {
-        const result = compactTimeline({
-          snapshot: currentSnapshot,
-          horizonHours,
-          calculateEndTime,
-        });
-        return result.snapshot;
-      });
-
-      invalidateSnapshot();
+    try {
+      const stationsWithAssignments = snapshot.stations.filter((s) =>
+        snapshot.assignments.some((a) => a.targetId === s.id && !a.isOutsourced)
+      );
+      // Multiple passes: each pass resolves one level of cross-station dependencies.
+      // $now advances between passes but only by seconds — negligible vs. hour-scale
+      // scheduling. Already-compacted tasks won't re-compact (earliestStart >= scheduledStart).
+      const MAX_PASSES = 5;
+      for (let pass = 0; pass < MAX_PASSES; pass++) {
+        let passCompacted = 0;
+        for (const station of stationsWithAssignments) {
+          const result = await compactStation(station.id).unwrap();
+          passCompacted += result.compactedCount;
+        }
+        if (passCompacted === 0) break;
+      }
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error');
+    } finally {
       setIsCompactingTimeline(false);
-    }, 300); // Small delay for visual feedback
-  }, [invalidateSnapshot]);
+    }
+  }, [snapshot.stations, snapshot.assignments, compactStation, showToast]);
 
   // v0.5.1: Show loading spinner during initial fetch (real API mode only)
   // In mock mode, data is always instantly available, so we skip the loading state
@@ -1644,13 +2049,7 @@ function AppContent() {
 
   return (
     <>
-      {/* REQ-07: Layout restructure - sidebar full height */}
-      <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
-        {/* Sidebar - full viewport height (REQ-07.1) */}
-        <Sidebar />
-
-        {/* Main area - right of sidebar */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Navigation Bar - now only spans width after sidebar (REQ-07.2/07.3) */}
           <TopNavBar
             isQuickPlacementMode={isQuickPlacementMode}
@@ -1660,6 +2059,7 @@ function AppContent() {
             onZoomChange={handleZoomChange}
             onCompactTimeline={handleCompactTimeline}
             isCompacting={isCompactingTimeline}
+            displayMode={displayMode}
           />
 
           {/* Content area */}
@@ -1681,18 +2081,23 @@ function AppContent() {
           elements={snapshot.elements}
           assignments={snapshot.assignments}
           stations={snapshot.stations}
+          categories={snapshot.categories}
           providers={snapshot.providers}
           activeTaskId={lastUnscheduledTask?.id}
           pickedTaskId={pickedTask?.id}
+          conflictTaskIds={conflictTaskIds}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
           onPick={handlePickTask}
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
           onElementStatusChange={handleElementStatusChange}
+          onToggleComplete={handleToggleComplete}
           onWorkDaysChange={handleOutsourcingWorkDaysChange}
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}
+          onEditJob={handleEditJob}
+          onDeleteJob={handleDeleteJob}
         />
         <DateStrip
           startDate={gridStartDate}
@@ -1732,6 +2137,7 @@ function AppContent() {
           onQuickPlacementMouseLeave={handleQuickPlacementMouseLeave}
           onQuickPlacementClick={handleQuickPlacementClick}
           quickPlacementValidation={quickPlacementValidation}
+          isAltPressed={isAltPressed}
           quickPlacementPrecedenceConstraints={quickPlacementPrecedenceConstraints}
           compactingStationId={compactingStationId}
           onCompact={handleCompact}
@@ -1747,13 +2153,14 @@ function AppContent() {
           onPickClick={handlePickClick}
           pickPrecedenceConstraints={pickPrecedenceConstraints}
           pickDryingTimeInfo={pickDryingTimeInfo}
+          pickOutsourcingTimeInfo={pickOutsourcingTimeInfo}
           pickedAssignmentId={pickedAssignmentId}
           onPickFromGrid={handlePickFromGrid}
           onContextMenu={handleContextMenuOpen}
+          displayMode={displayMode}
         />
           </div>
         </div>
-      </div>
 
       {/* v0.3.54: Pick preview - ghost tile during pick */}
       <PickPreview
@@ -1785,24 +2192,28 @@ function AppContent() {
       <JcfModal
         isOpen={isJcfModalOpen}
         onClose={handleCloseJcf}
+        title={isEditMode ? `Modifier ${jcfJobId}` : undefined}
+        saveLabel={isEditMode ? 'Mettre à jour' : undefined}
         onSave={handleJcfSave}
         isSaving={isJcfSaving}
         error={jcfSaveError}
-        onSaveAsTemplate={handleSaveAsTemplate}
+        onSaveAsTemplate={isEditMode ? undefined : handleSaveAsTemplate}
         canSaveAsTemplate={jcfElements.length > 0 && jcfElements.some(el => el.name.trim() !== '')}
       >
         <JcfJobHeader
           jobId={jcfJobId}
-          onJobIdChange={setJcfJobId}
+          onJobIdChange={isEditMode ? undefined : setJcfJobId}
           client={jcfClient}
           onClientChange={setJcfClient}
           template={jcfTemplate}
           onTemplateChange={setJcfTemplate}
-          onTemplateSelect={handleTemplateSelect}
+          onTemplateSelect={isEditMode ? undefined : handleTemplateSelect}
           intitule={jcfIntitule}
           onIntituleChange={setJcfIntitule}
           quantity={jcfQuantity}
           onQuantityChange={setJcfQuantity}
+          shipperId={jcfShipperId}
+          onShipperIdChange={setJcfShipperId}
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
         />
@@ -1811,7 +2222,8 @@ function AppContent() {
           <JcfElementsTable
             elements={jcfElements}
             onElementsChange={setJcfElements}
-            sequenceWorkflow={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOW : sequenceWorkflow}
+            postePresets={snapshotPostes}
+            sequenceWorkflows={shouldUseFixture() ? TEST_SEQUENCE_WORKFLOWS : sequenceWorkflows}
             jobQuantity={jcfQuantity}
             onSaveAttemptRef={jcfSaveAttemptRef}
           />
@@ -1824,7 +2236,8 @@ function AppContent() {
         onSave={handleTemplateSave}
         onCancel={handleTemplateEditorCancel}
         isSaving={isTemplateSaving}
-        initialElements={jcfElements.filter(el => el.name.trim() !== '').map(el => ({
+        postePresets={snapshotPostes}
+        initialElements={jcfElements.filter(el => el.name.trim() !== '').map((el, i) => ({
           name: el.name,
           precedences: el.precedences,
           quantite: el.quantite,
@@ -1837,7 +2250,7 @@ function AppContent() {
           autres: el.autres,
           qteFeuilles: el.qteFeuilles,
           commentaires: el.commentaires,
-          sequence: el.sequence,
+          sequence: sequenceWorkflows[i]?.length > 0 ? sequenceWorkflows[i].join('\n') : '',
         }))}
         initialClientName={jcfClient}
       />

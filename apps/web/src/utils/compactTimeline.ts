@@ -1,14 +1,29 @@
 import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Element } from '@flux/types';
+import { DRY_TIME_MS } from '@flux/types';
 import { getJobIdForTask } from './taskHelpers';
+import { isPrintingStation } from './precedenceConstraints';
+import { snapToNextWorkingTime } from './workingTime';
+import { COMPACT_HORIZONS } from '../constants';
+import type { CompactHorizon } from '../constants';
 
-/** Compact horizon options in hours */
-export const COMPACT_HORIZONS = [
-  { label: '4h', hours: 4 },
-  { label: '8h', hours: 8 },
-  { label: '24h', hours: 24 },
-] as const;
+export { COMPACT_HORIZONS };
+export type { CompactHorizon };
 
-export type CompactHorizon = (typeof COMPACT_HORIZONS)[number]['hours'];
+/**
+ * Round a date UP to the next 15-minute boundary.
+ * e.g., 12:11 → 12:15, 12:00 → 12:00, 12:46 → 13:00
+ */
+function snapToQuarterHour(date: Date): Date {
+  const snapped = new Date(date);
+  const minutes = snapped.getMinutes();
+  const remainder = minutes % 15;
+  if (remainder > 0) {
+    snapped.setMinutes(minutes + (15 - remainder), 0, 0);
+  } else {
+    snapped.setSeconds(0, 0);
+  }
+  return snapped;
+}
 
 /**
  * Check if a task is immobile (cannot be moved during compaction).
@@ -47,25 +62,72 @@ function findPredecessorTask(task: Task, allTasks: Task[], elements: Element[]):
 }
 
 /**
- * Get the end time of a predecessor task, considering any updates made during compaction.
+ * Get the end time of a single task, considering any updates made during compaction.
+ * Includes drying time if the task is at a printing station.
+ */
+function getTaskEndTime(
+  task: Task,
+  snapshot: ScheduleSnapshot,
+  updatedEndTimes: Map<string, Date>
+): Date | null {
+  const assignment = snapshot.assignments.find((a) => a.taskId === task.id);
+  if (!assignment) return null;
+
+  const updatedEnd = updatedEndTimes.get(task.id);
+  const endTime = updatedEnd ?? new Date(assignment.scheduledEnd);
+
+  if (isPrintingStation(snapshot, assignment.targetId)) {
+    return new Date(endTime.getTime() + DRY_TIME_MS);
+  }
+
+  return endTime;
+}
+
+/**
+ * Get the end time of predecessor tasks, considering any updates made during compaction.
+ * Checks both intra-element (same element, previous sequenceOrder) and cross-element
+ * (prerequisiteElementIds → last task of each prerequisite element) predecessors.
+ * Returns the latest end time across all scheduled predecessors.
  */
 function getPredecessorEndTime(
   task: Task,
-  allTasks: Task[],
-  elements: Element[],
-  assignments: TaskAssignment[],
+  snapshot: ScheduleSnapshot,
   updatedEndTimes: Map<string, Date>
 ): Date | null {
-  const predecessorTask = findPredecessorTask(task, allTasks, elements);
-  if (!predecessorTask) return null;
+  // Intra-element predecessor (same element, sequenceOrder - 1)
+  const intraElementPred = findPredecessorTask(task, snapshot.tasks, snapshot.elements);
+  if (intraElementPred) {
+    return getTaskEndTime(intraElementPred, snapshot, updatedEndTimes);
+  }
 
-  // Check if predecessor was already updated during this compaction
-  const updatedEnd = updatedEndTimes.get(predecessorTask.id);
-  if (updatedEnd) return updatedEnd;
+  // Cross-element predecessors (first task of element → check prerequisiteElementIds)
+  if (task.sequenceOrder > 0) return null;
 
-  // Otherwise, look up the original assignment
-  const predecessorAssignment = assignments.find((a) => a.taskId === predecessorTask.id);
-  return predecessorAssignment ? new Date(predecessorAssignment.scheduledEnd) : null;
+  const element = snapshot.elements.find((e) => e.id === task.elementId);
+  if (!element || element.prerequisiteElementIds.length === 0) return null;
+
+  const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
+  let latestEnd: Date | null = null;
+
+  for (const prereqElemId of element.prerequisiteElementIds) {
+    const prereqElem = snapshot.elements.find((e) => e.id === prereqElemId);
+    if (!prereqElem) continue;
+
+    // Find the last task of the prerequisite element (highest sequenceOrder)
+    const prereqTasks = prereqElem.taskIds
+      .map((id) => taskById.get(id))
+      .filter((t): t is Task => t !== undefined)
+      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    const lastTask = prereqTasks[prereqTasks.length - 1];
+    if (!lastTask) continue;
+
+    const endTime = getTaskEndTime(lastTask, snapshot, updatedEndTimes);
+    if (endTime && (!latestEnd || endTime > latestEnd)) {
+      latestEnd = endTime;
+    }
+  }
+
+  return latestEnd;
 }
 
 /**
@@ -154,13 +216,16 @@ function processAssignment(ctx: ProcessAssignmentContext): ProcessAssignmentResu
   // Calculate earliest possible start time
   let earliestStart = nextAvailableTime;
 
-  // Check precedence constraint
+  // Check precedence constraint (includes drying time for printing stations)
   if (task) {
-    const predecessorEnd = getPredecessorEndTime(task, snapshot.tasks, snapshot.elements, snapshot.assignments, updatedEndTimes);
+    const predecessorEnd = getPredecessorEndTime(task, snapshot, updatedEndTimes);
     if (predecessorEnd && predecessorEnd > earliestStart) {
       earliestStart = predecessorEnd;
     }
   }
+
+  // Snap to station operating hours (e.g., predecessor ends at 15:00 but station opens 07:00-14:00 → next day 07:00)
+  earliestStart = snapToNextWorkingTime(earliestStart, station);
 
   // Calculate new end time
   const newEnd = calculateCompactedEndTime(task, assignment, earliestStart, stationMap.get(station.id), calculateEndTimeFn);
@@ -195,7 +260,7 @@ function processAssignment(ctx: ProcessAssignmentContext): ProcessAssignmentResu
  */
 export function compactTimeline(options: CompactTimelineOptions): CompactTimelineResult {
   const { snapshot, horizonHours, calculateEndTime: calculateEndTimeFn } = options;
-  const now = options.now ?? new Date();
+  const now = snapToQuarterHour(options.now ?? new Date());
   const horizonMs = horizonHours * 60 * 60 * 1000;
 
   const taskMap = new Map(snapshot.tasks.map((t) => [t.id, t]));

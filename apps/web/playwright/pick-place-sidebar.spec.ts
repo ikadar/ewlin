@@ -61,15 +61,15 @@ test.describe('Pick & Place from Sidebar', () => {
     await jobCard.click();
     await page.waitForSelector('[data-testid="job-details-panel"]');
 
-    // Find first unscheduled task (should be for station-heidelberg)
+    // Find first unscheduled task (targets station-offset)
     const unscheduledTask = page.locator('[data-testid="task-tile-task-pick-2a"]');
     await unscheduledTask.click();
 
     // Verify ghost is visible
     await expect(page.locator('[data-testid="pick-preview"]')).toBeVisible();
 
-    // Move to the target station column (Heidelberg)
-    const targetColumn = page.locator('[data-testid="station-column-station-heidelberg"]');
+    // Move to the target station column (station-offset)
+    const targetColumn = page.locator('[data-testid="station-column-station-offset"]');
 
     // Get column bounding box and hover at a valid time position
     // Operating hours are 06:00-12:00 and 13:00-22:00
@@ -90,7 +90,7 @@ test.describe('Pick & Place from Sidebar', () => {
     await jobCard.click();
     await page.waitForSelector('[data-testid="job-details-panel"]');
 
-    // Pick the task (targets station-heidelberg)
+    // Pick the task (targets station-offset)
     const unscheduledTask = page.locator('[data-testid="task-tile-task-pick-2a"]');
     await unscheduledTask.click();
 
@@ -98,7 +98,7 @@ test.describe('Pick & Place from Sidebar', () => {
     await expect(page.locator('[data-testid="pick-preview"]')).toBeVisible();
 
     // Move mouse to target station at a valid time position
-    const targetColumn = page.locator('[data-testid="station-column-station-heidelberg"]');
+    const targetColumn = page.locator('[data-testid="station-column-station-offset"]');
     const box = await targetColumn.boundingBox();
     if (box) {
       // Hover at 100px from top (within operating hours)
@@ -109,7 +109,7 @@ test.describe('Pick & Place from Sidebar', () => {
     await expect(targetColumn).toHaveClass(/ring-green-500/);
 
     // Non-target column should be faded (15% opacity) with pointer-events disabled
-    const nonTargetColumn = page.locator('[data-testid="station-column-station-polar"]');
+    const nonTargetColumn = page.locator('[data-testid="station-column-station-massicot"]');
     await expect(nonTargetColumn).toHaveClass(/opacity-15/);
     await expect(nonTargetColumn).toHaveClass(/pointer-events-none/);
   });
@@ -135,22 +135,22 @@ test.describe('Pick & Place from Sidebar', () => {
   });
 
   test('should fade non-target columns to 15% opacity during sidebar pick', async ({ page }) => {
-    // Select job-pick-2 which has task for station-heidelberg first
+    // Select job-pick-2 which has task for station-offset first
     const jobCard = page.locator('[data-testid="job-card-job-pick-2"]');
     await jobCard.click();
     await page.waitForSelector('[data-testid="job-details-panel"]');
 
-    // Pick the first task (targets station-heidelberg)
+    // Pick the first task (targets station-offset)
     const unscheduledTask = page.locator('[data-testid="task-tile-task-pick-2a"]');
     await unscheduledTask.click();
 
     // Non-target columns should be faded (opacity-15) with pointer-events disabled
-    const nonTargetColumn = page.locator('[data-testid="station-column-station-polar"]');
+    const nonTargetColumn = page.locator('[data-testid="station-column-station-massicot"]');
     await expect(nonTargetColumn).toHaveClass(/opacity-15/);
     await expect(nonTargetColumn).toHaveClass(/pointer-events-none/);
 
     // Target column should NOT be faded
-    const targetColumn = page.locator('[data-testid="station-column-station-heidelberg"]');
+    const targetColumn = page.locator('[data-testid="station-column-station-offset"]');
     await expect(targetColumn).not.toHaveClass(/opacity-15/);
     await expect(targetColumn).not.toHaveClass(/pointer-events-none/);
   });
@@ -166,7 +166,7 @@ test.describe('Pick & Place from Sidebar', () => {
     await unscheduledTask.click();
 
     // Verify columns are faded
-    const nonTargetColumn = page.locator('[data-testid="station-column-station-polar"]');
+    const nonTargetColumn = page.locator('[data-testid="station-column-station-massicot"]');
     await expect(nonTargetColumn).toHaveClass(/opacity-15/);
 
     // Cancel with ESC

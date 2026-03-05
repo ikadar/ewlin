@@ -5,12 +5,28 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { ScheduleSnapshot } from '@flux/types';
 import { mockBaseQuery, __testing__ } from './mockBaseQuery';
 import * as snapshotModule from '../../mock/snapshot';
 
+const emptySnapshot: ScheduleSnapshot = {
+  version: 1,
+  generatedAt: '',
+  stations: [],
+  categories: [],
+  groups: [],
+  providers: [],
+  jobs: [],
+  elements: [],
+  tasks: [],
+  assignments: [],
+  conflicts: [],
+  lateJobs: [],
+};
+
 // Mock the snapshot module
 vi.mock('../../mock/snapshot', () => ({
-  getSnapshot: vi.fn(),
+  getSnapshot: vi.fn(() => ({ version: 1, stations: [], jobs: [], elements: [], tasks: [], assignments: [] })),
   updateSnapshot: vi.fn(),
 }));
 
@@ -103,7 +119,7 @@ describe('mockBaseQuery', () => {
         assignments: [],
       };
       vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
-      vi.mocked(snapshotModule.updateSnapshot).mockImplementation(() => {});
+      vi.mocked(snapshotModule.updateSnapshot).mockReturnValue(emptySnapshot);
 
       const result = await mockBaseQuery(
         {
@@ -141,7 +157,7 @@ describe('mockBaseQuery', () => {
         assignments: [],
       };
       vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
-      vi.mocked(snapshotModule.updateSnapshot).mockImplementation(() => {});
+      vi.mocked(snapshotModule.updateSnapshot).mockReturnValue(emptySnapshot);
 
       const result = await mockBaseQuery(
         {
@@ -192,7 +208,7 @@ describe('mockBaseQuery', () => {
         assignments: [{ id: 'assign-1', taskId: 'task-1' }],
       };
       vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
-      vi.mocked(snapshotModule.updateSnapshot).mockImplementation(() => {});
+      vi.mocked(snapshotModule.updateSnapshot).mockReturnValue(emptySnapshot);
 
       const result = await mockBaseQuery(
         { url: '/tasks/task-1/assign', method: 'DELETE' },
@@ -212,7 +228,7 @@ describe('mockBaseQuery', () => {
         ],
       };
       vi.mocked(snapshotModule.getSnapshot).mockReturnValue(mockSnapshot as any);
-      vi.mocked(snapshotModule.updateSnapshot).mockImplementation(() => {});
+      vi.mocked(snapshotModule.updateSnapshot).mockReturnValue(emptySnapshot);
 
       const result = await mockBaseQuery(
         { url: '/tasks/task-1/completion', method: 'PUT' },

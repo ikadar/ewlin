@@ -6,11 +6,21 @@
 
 /* eslint-disable react-refresh/only-export-components */
 
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
-import { render, RenderOptions } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import type { RenderOptions } from '@testing-library/react';
 import { scheduleApi } from '../store/api/scheduleApi';
+import { templateApi } from '../store/api/templateApi';
+import { clientApi } from '../store/api/clientApi';
+import { formatApi } from '../store/api/formatApi';
+import { impressionPresetApi } from '../store/api/impressionPresetApi';
+import { surfacagePresetApi } from '../store/api/surfacagePresetApi';
+import { stationCategoryApi } from '../store/api/stationCategoryApi';
+import { feuilleFormatApi } from '../store/api/feuilleFormatApi';
+import { providerApi } from '../store/api/providerApi';
+import { shipperApi } from '../store/api/shipperApi';
 import { uiReducer } from '../store/slices/uiSlice';
 import { jcfReducer } from '../store/slices/jcfSlice';
 import { errorReducer } from '../store/slices/errorSlice';
@@ -18,17 +28,35 @@ import { errorReducer } from '../store/slices/errorSlice';
 /**
  * Create a test store with optional preloaded state
  */
-export function createTestStore(preloadedState?: Record<string, unknown>) {
+export function createTestStore() {
   return configureStore({
     reducer: {
-      [scheduleApi.reducerPath]: scheduleApi.reducer,
+      scheduleApi: scheduleApi.reducer,
+      templateApi: templateApi.reducer,
+      clientApi: clientApi.reducer,
+      formatApi: formatApi.reducer,
+      impressionPresetApi: impressionPresetApi.reducer,
+      surfacagePresetApi: surfacagePresetApi.reducer,
+      stationCategoryApi: stationCategoryApi.reducer,
+      feuilleFormatApi: feuilleFormatApi.reducer,
+      providerApi: providerApi.reducer,
+      shipperApi: shipperApi.reducer,
       ui: uiReducer,
       jcf: jcfReducer,
       error: errorReducer,
     },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(scheduleApi.middleware),
-    preloadedState,
+      getDefaultMiddleware()
+        .concat(scheduleApi.middleware)
+        .concat(templateApi.middleware)
+        .concat(clientApi.middleware)
+        .concat(formatApi.middleware)
+        .concat(impressionPresetApi.middleware)
+        .concat(surfacagePresetApi.middleware)
+        .concat(stationCategoryApi.middleware)
+        .concat(feuilleFormatApi.middleware)
+        .concat(providerApi.middleware)
+        .concat(shipperApi.middleware),
   });
 }
 

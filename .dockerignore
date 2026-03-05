@@ -1,5 +1,5 @@
 # Docker build ignore file for Flux monorepo
-# Used when building validation-service from monorepo root context
+# Used by: validation-service build AND frontend multi-stage build
 
 # Node modules (will be installed in container)
 **/node_modules/
@@ -11,8 +11,15 @@
 # Test files
 **/tests/
 **/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
 **/vitest.config.ts
+**/cypress.config.ts
+**/playwright.config.ts
 **/__tests__/
+**/test/
+**/sonar-*
 
 # Development files
 **/.git/
@@ -30,9 +37,16 @@
 **/.dockerignore
 docker/
 
-# Services not needed for validation-service build
+# Services/apps not needed for Docker builds
 services/php-api/
-apps/
+apps/qa-api/
+apps/qa-tracker/
+apps/web/cypress/
+apps/web/playwright/
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/.scannerwork/
+apps/web/scripts/
 docs/
 
 # Environment files

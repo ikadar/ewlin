@@ -22,8 +22,8 @@ test.describe('UC-09: Swap Operations', () => {
   });
 
   test('AC-09.1: Swap up exchanges position with tile above', async ({ page }) => {
-    // ARRANGE: Get the second tile (middle tile) on Komori station
-    const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+    // ARRANGE: Get the second tile (middle tile) on Offset station
+    const stationColumn = page.locator('[data-testid="station-column-station-offset"]');
     const tiles = stationColumn.locator('[data-testid^="tile-assign-"]');
 
     const count = await tiles.count();
@@ -61,8 +61,8 @@ test.describe('UC-09: Swap Operations', () => {
   });
 
   test('AC-09.2: Swap down exchanges position with tile below', async ({ page }) => {
-    // ARRANGE: Get the first tile on Komori station
-    const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+    // ARRANGE: Get the first tile on Offset station
+    const stationColumn = page.locator('[data-testid="station-column-station-offset"]');
     const tiles = stationColumn.locator('[data-testid^="tile-assign-"]');
 
     const count = await tiles.count();
@@ -100,8 +100,8 @@ test.describe('UC-09: Swap Operations', () => {
   });
 
   test('AC-09.3: Top tile has no swap-up button', async ({ page }) => {
-    // ARRANGE: Get the first (top) tile on Komori station
-    const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+    // ARRANGE: Get the first (top) tile on Offset station
+    const stationColumn = page.locator('[data-testid="station-column-station-offset"]');
     const topTile = stationColumn.locator('[data-testid^="tile-assign-"]').first();
 
     // Hover to show buttons
@@ -116,8 +116,8 @@ test.describe('UC-09: Swap Operations', () => {
   });
 
   test('AC-09.4: Bottom tile has no swap-down button', async ({ page }) => {
-    // ARRANGE: Get the last (bottom) tile on Komori station
-    const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+    // ARRANGE: Get the last (bottom) tile on Offset station
+    const stationColumn = page.locator('[data-testid="station-column-station-offset"]');
     const tiles = stationColumn.locator('[data-testid^="tile-assign-"]');
     const count = await tiles.count();
     const bottomTile = tiles.nth(count - 1);
@@ -135,7 +135,7 @@ test.describe('UC-09: Swap Operations', () => {
 
   test('AC-09.5: Swap maintains tile durations', async ({ page }) => {
     // ARRANGE: Get tiles and their durations (from height)
-    const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+    const stationColumn = page.locator('[data-testid="station-column-station-offset"]');
     const tiles = stationColumn.locator('[data-testid^="tile-assign-"]');
 
     const firstTile = tiles.nth(0);

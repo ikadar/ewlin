@@ -616,11 +616,11 @@ describe('Mock API', () => {
   // ==========================================================================
 
   describe('reference data endpoints', () => {
-    it('getPaperTypes returns 5 paper types', async () => {
+    it('getPaperTypes returns 9 paper types', async () => {
       const api = createMockApi({ latencyMs: 0, latencyVariance: 0 });
       const papers = await api.getPaperTypes();
 
-      expect(papers).toHaveLength(5);
+      expect(papers).toHaveLength(9);
       expect(papers[0].id).toBeDefined();
       expect(papers[0].type).toBeDefined();
       expect(papers[0].grammages.length).toBeGreaterThan(0);

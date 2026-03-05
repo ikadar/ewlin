@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "id": "a0359eef-7a50-411e-adc7-ca4a706742ee",
+      "testId": "scheduler/datestrip-pickplace.md::DS-004",
+      "fixture": "datestrip-markers",
+      "currentNotes": "ViewportIndicator, task markers testing",
+      "requestedChange": "There should never be a mono-element job with an encarteuse piqueuse task. Add this to the general fixture creation guidelines and correct all fixtures accordingly.",
+      "status": "resolved",
+      "resolution": "Replaced encarteuse route with dépliant recto-verso pattern (double offset pass). Added encarteuse mono-element rule to fixture-guide.md §11.",
+      "resolvedAt": "2026-02-06T01:15:00.000Z",
+      "createdAt": "2026-02-06T00:48:44.073Z"
+    },
+    {
+      "id": "8fc7079d-ece4-4a5f-a020-edf444912d56",
+      "testId": "scheduler/datestrip-pickplace.md::DS-003",
+      "fixture": "datestrip-markers",
+      "currentNotes": "ViewportIndicator, task markers testing",
+      "requestedChange": "There should never be two consecutive offset tasks in a given element of a job.",
+      "status": "implemented",
+      "createdAt": "2026-02-06T00:56:23.401Z"
+    }
+  ]
+}

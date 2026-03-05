@@ -76,7 +76,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned', // Scheduled
       type: 'Internal',
-      stationId: 'station-komori', // Offset
+      stationId: 'station-offset', // Offset
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -87,7 +87,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled - waiting for predecessor
       type: 'Internal',
-      stationId: 'station-polar', // Cutting
+      stationId: 'station-massicot', // Cutting
       duration: { setupMinutes: 15, runMinutes: 30 }, // 45min
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -98,7 +98,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-plieuse',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -111,7 +111,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -122,7 +122,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -135,7 +135,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned', // Scheduled
       type: 'Internal',
-      stationId: 'station-komori', // Offset - requires dry time
+      stationId: 'station-offset', // Offset - requires dry time
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -146,7 +146,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready', // Unscheduled - has precedence constraint (predecessor + dry time)
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 30 }, // 45min
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -158,7 +158,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     {
       id: 'assign-pick-1a',
       taskId: 'task-pick-1a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(9, 30),
@@ -171,7 +171,7 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     {
       id: 'assign-pick-3a',
       taskId: 'task-pick-3a',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0),
       scheduledEnd: isoDate(11, 30),

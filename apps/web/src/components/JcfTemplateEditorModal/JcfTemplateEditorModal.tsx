@@ -62,6 +62,8 @@ export interface JcfTemplateEditorModalProps {
   onCancel: () => void;
   /** Disable interactions while saving */
   isSaving?: boolean;
+  /** Poste presets from snapshot (for workflow sequence categories) */
+  postePresets?: Array<{ name: string; category: string }>;
 }
 
 /**
@@ -83,6 +85,7 @@ function convertElement<T extends JcfElement | JcfTemplateElement>(el: T): T {
     qteFeuilles: el.qteFeuilles,
     commentaires: el.commentaires,
     sequence: el.sequence,
+    links: el.links,
   } as T;
 }
 
@@ -156,6 +159,7 @@ interface TemplateEditorContentProps {
   onSave: (data: TemplateEditorData & { id?: string }) => void;
   onCancel: () => void;
   isSaving?: boolean;
+  postePresets?: Array<{ name: string; category: string }>;
 }
 
 /**
@@ -169,6 +173,7 @@ function TemplateEditorContent({
   onSave,
   onCancel,
   isSaving,
+  postePresets,
 }: TemplateEditorContentProps) {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
@@ -188,6 +193,14 @@ function TemplateEditorContent({
   const [header, setHeader] = useState<TemplateHeaderData>(initialData.header);
   const [elements, setElements] = useState<JcfElement[]>(initialData.elements);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // JSON editor suggestions — use snapshot categories when available
+  const jsonSuggestions = useMemo<JsonEditorSuggestions>(() => {
+    const cats = postePresets && postePresets.length > 0
+      ? [...new Set(postePresets.map(p => p.category).filter(Boolean))]
+      : [...POSTE_CATEGORIES];
+    return { ...JSON_EDITOR_SUGGESTIONS, sequence: cats };
+  }, [postePresets]);
 
   // v0.4.35: Dual-mode editor tab state
   const [activeTab, setActiveTab] = useState<EditorTab>('form');
@@ -354,7 +367,7 @@ function TemplateEditorContent({
       aria-label="Close modal"
     >
       <div
-        className="w-[70vw] max-w-[1400px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
+        className="w-[95vw] max-w-[2200px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
         data-testid="template-editor-dialog"
       >
         {/* Header */}
@@ -429,6 +442,7 @@ function TemplateEditorContent({
               onElementsChange={setElements}
               mode="template"
               jobQuantity="1"
+              postePresets={postePresets}
             />
           ) : (
             /* JSON editor (JSON mode) */
@@ -439,7 +453,7 @@ function TemplateEditorContent({
                 readOnly={isSaving}
                 className="h-full"
                 data-testid="template-editor-json"
-                suggestions={JSON_EDITOR_SUGGESTIONS}
+                suggestions={jsonSuggestions}
               />
             </div>
           )}
@@ -524,6 +538,7 @@ export function JcfTemplateEditorModal({
   onSave,
   onCancel,
   isSaving,
+  postePresets,
 }: JcfTemplateEditorModalProps) {
   // Only render content when modal is open
   // This ensures state is fresh on each open (component remounts)
@@ -537,6 +552,7 @@ export function JcfTemplateEditorModal({
       onSave={onSave}
       onCancel={onCancel}
       isSaving={isSaving}
+      postePresets={postePresets}
     />
   );
 }

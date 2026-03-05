@@ -1,6 +1,6 @@
 import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element } from '@flux/types';
-import type { DryingTimeInfo } from '../../utils';
-import { isInternalTask } from '@flux/types';
+import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
+import { isInternalTask, getDeadlineDate } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
@@ -11,6 +11,7 @@ import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { getJobIdForTask } from '../../utils/taskHelpers';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
+import { getTirageLabel } from '../../utils/tileLabelResolver';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -86,6 +87,8 @@ export interface SchedulingGridProps {
     suggestedStart: string | null;
     hasWarningOnly: boolean;
   };
+  /** Whether ALT key is pressed (for precedence bypass in quick placement) */
+  isAltPressed?: boolean;
   /** Quick placement precedence constraint Y positions */
   quickPlacementPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** Station ID currently being compacted (for loading state) */
@@ -120,12 +123,16 @@ export interface SchedulingGridProps {
   pickPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** v0.3.54: Drying time info during pick */
   pickDryingTimeInfo?: DryingTimeInfo | null;
+  /** v0.5.13: Outsourcing time info during pick */
+  pickOutsourcingTimeInfo?: OutsourcingTimeInfo | null;
   /** v0.3.57: Assignment ID of picked tile (for showing placeholder) */
   pickedAssignmentId?: string | null;
   /** v0.3.57: Callback when tile is clicked to pick from grid */
   onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
   /** v0.3.58: Callback when tile is right-clicked (context menu) */
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
+  /** Current display mode (Produit or Tirage) — affects column widths */
+  displayMode?: 'produit' | 'tirage';
 }
 
 /**
@@ -159,6 +166,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onQuickPlacementMouseLeave,
       onQuickPlacementClick,
       quickPlacementValidation,
+      isAltPressed = false,
       quickPlacementPrecedenceConstraints,
       compactingStationId,
       onCompact,
@@ -177,11 +185,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onPickClick,
       pickPrecedenceConstraints,
       pickDryingTimeInfo,
+      pickOutsourcingTimeInfo,
       // v0.3.57: Pick from grid props
       pickedAssignmentId,
       onPickFromGrid,
       // v0.3.58: Context menu props
       onContextMenu,
+      displayMode,
     },
     ref
   ) {
@@ -292,6 +302,21 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return map;
   }, [categories]);
 
+  // Station IDs for assembly categories (Encarteuses-Piqueuses / Assembleuses-Piqueuses).
+  // Used by getTirageLabel → detectBrochureOrLeaflet to distinguish brochure from leaflet.
+  const assemblyStationIds = useMemo(() => {
+    return new Set(
+      stations
+        .filter((s) => {
+          const cat = categoryMap.get(s.categoryId);
+          if (!cat) return false;
+          const n = cat.name.toLowerCase();
+          return n.includes('encarteuse') || (n.includes('assembleuse') && n.includes('piqueuse'));
+        })
+        .map((s) => s.id),
+    );
+  }, [stations, categoryMap]);
+
   // REQ-18: Calculate group capacity info for each station
   const groupCapacityMap = useMemo((): Map<string, GroupCapacityInfo> => {
     if (groups.length === 0) return new Map();
@@ -357,7 +382,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) : null;
   let departurePosition: number | null = null;
   if (selectedJob?.workshopExitDate) {
-    const departureDate = new Date(selectedJob.workshopExitDate);
+    const departureDate = getDeadlineDate(selectedJob.workshopExitDate);
     // In multi-day mode (when startDate provided), always show the marker
     // In single-day mode, only show if departure is today
     if (startDate) {
@@ -398,6 +423,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isCompacting = compactingStationId === station.id;
               // REQ-18: Get group capacity info for this station
               const groupCapacity = groupCapacityMap.get(station.id);
+              const headerCategory = categoryMap.get(station.categoryId);
               return (
                 <StationHeader
                   key={station.id}
@@ -407,6 +433,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   isCompacting={isCompacting}
                   onCompact={onCompact}
                   groupCapacity={groupCapacity}
+                  displayMode={displayMode}
+                  category={headerCategory}
                 />
               );
             })}
@@ -464,9 +492,15 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isQuickPlacementValid = isHoveredForQuickPlacement &&
                 hasAvailableTaskForQuickPlacement &&
                 quickPlacementValidation?.isValid;
+              const isQuickPlacementBypass = isHoveredForQuickPlacement &&
+                hasAvailableTaskForQuickPlacement &&
+                !quickPlacementValidation?.isValid &&
+                quickPlacementValidation?.hasPrecedenceConflict &&
+                isAltPressed;
               const isQuickPlacementInvalid = isHoveredForQuickPlacement &&
                 hasAvailableTaskForQuickPlacement &&
-                !quickPlacementValidation?.isValid;
+                !quickPlacementValidation?.isValid &&
+                !isQuickPlacementBypass;
 
               // Precedence constraints: show for quick placement or pick
               const isPickTarget = isPicking && pickTargetStationId === station.id;
@@ -481,6 +515,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               // v0.3.51: Drying time info - show only on the predecessor's station
               const effectiveDryingTimeInfo = pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined;
 
+              // v0.5.13: Outsourcing time info - show on the pick target station
+              const effectiveOutsourcingTimeInfo = isPickTarget ? pickOutsourcingTimeInfo : undefined;
+
               return (
                 <StationColumn
                   key={station.id}
@@ -492,6 +529,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   isCollapsed={isCollapsed}
                   isValidDrop={isQuickPlacementValid}
                   isInvalidDrop={isQuickPlacementInvalid}
+                  isQuickPlacementBypass={isQuickPlacementBypass}
                   isQuickPlacementMode={isQuickPlacementMode}
                   hasAvailableTask={hasAvailableTaskForQuickPlacement}
                   placementIndicatorY={isHoveredForQuickPlacement ? quickPlacementIndicatorY : undefined}
@@ -500,6 +538,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onQuickPlacementClick={onQuickPlacementClick}
                   precedenceConstraints={effectivePrecedenceConstraints}
                   dryingTimeInfo={effectiveDryingTimeInfo}
+                  outsourcingTimeInfo={effectiveOutsourcingTimeInfo ?? undefined}
                   visibleDayRange={virtualScroll.visibleRange}
                   isPicking={isPicking}
                   isPickTarget={isPickTarget}
@@ -508,6 +547,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onPickMouseMove={onPickMouseMove}
                   onPickMouseLeave={onPickMouseLeave}
                   onPickClick={onPickClick}
+                  displayMode={displayMode}
+                  category={category}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
@@ -527,21 +568,39 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     const startTime = new Date(assignment.scheduledStart);
                     const top = timeToYPosition(startTime, startHour, pixelsPerHour, startDate);
 
-                    // Determine swap button visibility
-                    const showSwapUp = index > 0;
-                    const showSwapDown = index < stationAssignments.length - 1;
+                    // Determine swap button visibility (completed tiles cannot be swapped)
+                    const isCurrentCompleted = assignment.isCompleted;
+                    const adjacentUp = index > 0 ? stationAssignments[index - 1] : null;
+                    const adjacentDown = index < stationAssignments.length - 1 ? stationAssignments[index + 1] : null;
+                    const showSwapUp = !isCurrentCompleted && index > 0 && !adjacentUp?.isCompleted;
+                    const showSwapDown = !isCurrentCompleted && index < stationAssignments.length - 1 && !adjacentDown?.isCompleted;
 
                     // Calculate similarity results with previous tile (if any)
+                    // Compares element specs (papier, format, impression) between consecutive tasks
                     let similarityResults = undefined;
-                    if (index > 0 && criteria.length > 0) {
+                    if (index > 0 && criteria.length > 0 && element?.spec) {
                       const prevAssignment = stationAssignments[index - 1];
                       const prevTask = taskMap.get(prevAssignment.taskId);
-                      const prevJobId = prevTask ? getJobIdForTask(prevTask, elements) : null;
-                      const prevJob = prevJobId ? jobMap.get(prevJobId) : null;
-                      if (prevJob) {
-                        similarityResults = compareSimilarity(prevJob, job, criteria);
+                      const prevElement = prevTask ? elements.find((e) => e.id === prevTask.elementId) : null;
+                      if (prevElement?.spec) {
+                        similarityResults = compareSimilarity(prevElement.spec, element.spec, criteria);
                       }
                     }
+
+                    // Compute Tirage label for this tile
+                    const jobElements = elements.filter((e) => e.jobId === job.id);
+                    const rawTirageLabel =
+                      category && element
+                        ? getTirageLabel(
+                            category.name,
+                            element,
+                            job,
+                            jobElements,
+                            taskMap,
+                            assemblyStationIds,
+                          )
+                        : '';
+                    const tileLabel = rawTirageLabel || undefined;
 
                     return (
                       <Tile
@@ -549,6 +608,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         assignment={assignment}
                         task={task}
                         job={job}
+                        element={element}
                         top={top}
                         isSelected={selectedJobId === job.id}
                         showSwapUp={showSwapUp}
@@ -568,6 +628,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onContextMenu={onContextMenu}
                         isBlocked={blocked}
                         blockingInfo={blockingInfo}
+                        displayMode={displayMode}
+                        tirageLabel={tileLabel}
                       />
                     );
                   })}

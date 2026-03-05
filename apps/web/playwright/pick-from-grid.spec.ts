@@ -55,7 +55,7 @@ test.describe('Pick & Place from Grid', () => {
     await expect(page.locator('[data-testid="pick-preview"]')).toBeVisible();
 
     // Non-target columns should NOT be faded (key difference from sidebar pick)
-    const otherColumn = page.locator('[data-testid="station-column-station-polar"]');
+    const otherColumn = page.locator('[data-testid="station-column-station-massicot"]');
     await expect(otherColumn).not.toHaveClass(/opacity-15/);
     await expect(otherColumn).not.toHaveClass(/pointer-events-none/);
   });
@@ -91,7 +91,7 @@ test.describe('Pick & Place from Grid', () => {
     await expect(page.locator('[data-testid="pick-preview"]')).toBeVisible();
 
     // Move to the same station column at a different time
-    const targetColumn = page.locator('[data-testid="station-column-station-komori"]');
+    const targetColumn = page.locator('[data-testid="station-column-station-offset"]');
     const box = await targetColumn.boundingBox();
     if (box) {
       // Hover at a different Y position (later in the day)
@@ -112,7 +112,7 @@ test.describe('Pick & Place from Grid', () => {
     await expect(page.locator('[data-testid="pick-preview"]')).toBeVisible();
 
     // Move to the same station column at a different time and verify green ring
-    const targetColumn = page.locator('[data-testid="station-column-station-komori"]');
+    const targetColumn = page.locator('[data-testid="station-column-station-offset"]');
     const box = await targetColumn.boundingBox();
     if (box) {
       // Move to a position later in the day (around 14:00 - well within working hours)

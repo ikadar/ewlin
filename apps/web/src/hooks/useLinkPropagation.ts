@@ -34,6 +34,9 @@ export interface UseLinkPropagationOptions {
   onElementsChange: (elements: JcfElement[]) => void;
 }
 
+/** Alias for UseLinkPropagationResult — used in CellContent props */
+export type LinkPropagationState = UseLinkPropagationResult;
+
 export interface UseLinkPropagationResult {
   /**
    * Toggle link state for a specific element and field.

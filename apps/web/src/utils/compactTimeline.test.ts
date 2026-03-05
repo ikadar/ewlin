@@ -135,14 +135,16 @@ function mockCalculateEndTime(task: InternalTask, start: string): string {
 
 describe('compactTimeline', () => {
   describe('COMPACT_HORIZONS', () => {
-    it('has three horizon options', () => {
-      expect(COMPACT_HORIZONS).toHaveLength(3);
+    it('has five horizon options', () => {
+      expect(COMPACT_HORIZONS).toHaveLength(5);
     });
 
     it('has correct horizon values', () => {
       expect(COMPACT_HORIZONS[0]).toEqual({ label: '4h', hours: 4 });
       expect(COMPACT_HORIZONS[1]).toEqual({ label: '8h', hours: 8 });
       expect(COMPACT_HORIZONS[2]).toEqual({ label: '24h', hours: 24 });
+      expect(COMPACT_HORIZONS[3]).toEqual({ label: '48h', hours: 48 });
+      expect(COMPACT_HORIZONS[4]).toEqual({ label: '72h', hours: 72 });
     });
   });
 

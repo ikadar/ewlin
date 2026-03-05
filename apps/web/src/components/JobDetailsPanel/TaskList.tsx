@@ -1,16 +1,10 @@
-import type { Task, TaskAssignment, Station, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
-import { isMultiElementJob } from '@flux/types';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
+import { isLastTaskOfJob } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
 import type { ElementStatusUpdate } from './JobDetailsPanel';
-import { DIE_CUTTING_CATEGORY_ID } from '../../utils';
-
-/** Category ID for printing stations (offset press) */
-const PRINTING_CATEGORY_ID = 'cat-offset';
-
-/** Keywords for detecting die-cutting in outsourced action types */
-const DIE_CUTTING_KEYWORDS = ['découpe', 'die-cut', 'die cut', 'stancolás'];
 
 export interface TaskListProps {
   /** Tasks to display */
@@ -23,12 +17,16 @@ export interface TaskListProps {
   assignments: TaskAssignment[];
   /** All stations to get station names */
   stations: Station[];
+  /** Station categories for printing/die-cutting detection */
+  categories?: StationCategory[];
   /** v0.5.11: All providers for outsourced tasks */
   providers?: OutsourcedProvider[];
   /** Task ID that is the active placement target in Quick Placement Mode */
   activeTaskId?: string | null;
   /** Task ID that is currently picked (v0.3.54 Pick & Place) */
   pickedTaskId?: string | null;
+  /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
+  conflictTaskIds?: Set<string>;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
@@ -43,6 +41,8 @@ export interface TaskListProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
+  /** Callback when completion icon is clicked (assignmentId) */
+  onToggleComplete?: (assignmentId: string) => void;
 }
 
 /**
@@ -55,8 +55,10 @@ export function TaskList({
   assignments,
   stations,
   providers = [],
+  categories = [],
   activeTaskId,
   pickedTaskId,
+  conflictTaskIds,
   onJumpToTask,
   onRecallTask,
   onPick,
@@ -64,6 +66,7 @@ export function TaskList({
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
+  onToggleComplete,
 }: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
@@ -91,12 +94,20 @@ export function TaskList({
   }
 
   /**
+   * Get category name for a station.
+   */
+  const getCategoryName = (categoryId: string): string => {
+    return categories.find((c) => c.id === categoryId)?.name.toLowerCase() ?? '';
+  };
+
+  /**
    * Check if a task is assigned to a printing station (offset press).
    */
   const isPrintingTask = (task: Task): boolean => {
     if (task.type !== 'Internal') return false;
     const station = stationById.get(task.stationId);
-    return station?.categoryId === PRINTING_CATEGORY_ID;
+    if (!station) return false;
+    return getCategoryName(station.categoryId).includes('offset');
   };
 
   /**
@@ -115,7 +126,8 @@ export function TaskList({
   const isDieCuttingTask = (task: Task): boolean => {
     if (task.type === 'Internal') {
       const station = stationById.get(task.stationId);
-      return station?.categoryId === DIE_CUTTING_CATEGORY_ID;
+      if (!station) return false;
+      return getCategoryName(station.categoryId).includes('découpe') || getCategoryName(station.categoryId).includes('die-cut');
     }
     if (task.type === 'Outsourced') {
       const actionLower = task.actionType?.toLowerCase() || '';
@@ -135,19 +147,45 @@ export function TaskList({
   };
 
   /**
-   * Check if an element is an assembly element (has prerequisite elements but no printing).
-   * Assembly elements typically only combine other elements without their own printing.
+   * Check if an element is an assembly element (no printing or die-cutting tasks).
+   * Uses structural task-type check rather than mutable status values so that
+   * manually setting all statuses to 'none' doesn't hide the dropdowns.
    */
   const isAssemblyElement = (element: Element): boolean => {
-    // An element is considered "assembly" if it has prerequisites but no tasks
-    // or if all its statuses are 'none' (explicitly marked as assembly)
-    return element.paperStatus === 'none' && element.batStatus === 'none' && element.plateStatus === 'none';
+    return !elementHasOffset(element) && !elementHasDieCutting(element);
+  };
+
+  /**
+   * Get the latest scheduledEnd from cross-element predecessor tasks.
+   * Used when the first task in an element needs a predecessorEndTime from prerequisite elements.
+   */
+  const getCrossElementPredecessorEnd = (element: Element): string | undefined => {
+    if (element.prerequisiteElementIds.length === 0) return undefined;
+
+    // Only return a value when ALL prerequisite elements' last tasks are scheduled
+    let latest: string | undefined;
+    for (const prereqId of element.prerequisiteElementIds) {
+      const prereqElem = elements.find((e) => e.id === prereqId);
+      if (!prereqElem) return undefined;
+      const prereqTasks = prereqElem.taskIds
+        .map((id) => taskById.get(id))
+        .filter((t): t is Task => t !== undefined)
+        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      const lastTask = prereqTasks[prereqTasks.length - 1];
+      if (!lastTask) return undefined;
+      const lastAssignment = assignmentByTaskId.get(lastTask.id);
+      if (!lastAssignment?.scheduledEnd) return undefined;
+      if (!latest || lastAssignment.scheduledEnd > latest) {
+        latest = lastAssignment.scheduledEnd;
+      }
+    }
+    return latest;
   };
 
   /**
    * Render task tiles for an element
    */
-  const renderTaskTiles = (elementTasks: Task[]) => {
+  const renderTaskTiles = (elementTasks: Task[], element: Element) => {
     const sortedTasks = [...elementTasks].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
 
     return sortedTasks.map((task, index) => {
@@ -159,12 +197,21 @@ export function TaskList({
       const provider = task.type === 'Outsourced' ? providerById.get(task.providerId) : undefined;
 
       // v0.5.11: Get predecessor end time for outsourcing calculations
+      // First try intra-element predecessor, then fall back to cross-element predecessors
+      // v0.5.14: Only pass predecessorEndTime for outsourced tasks that have an assignment
+      // (unassigned outsourced tasks should show empty dates, e.g. during grid pick)
       const prevTask = index > 0 ? sortedTasks[index - 1] : null;
       const prevAssignment = prevTask ? assignmentByTaskId.get(prevTask.id) : undefined;
-      const predecessorEndTime = prevAssignment?.scheduledEnd;
+      const predecessorEndTime = (task.type === 'Outsourced' && !assignment)
+        ? undefined
+        : (prevAssignment?.scheduledEnd
+          ?? (index === 0 ? getCrossElementPredecessorEnd(element) : undefined));
 
       // Check if previous task is a printing task (for dry time label)
       const showDryTimeLabel = prevTask && isPrintingTask(prevTask);
+
+      // One-way shipping: last outsourced task of a job ships directly to client
+      const isLastTask = task.type === 'Outsourced' && isLastTaskOfJob(task.id, elements, tasks);
 
       return (
         <div key={task.id}>
@@ -177,14 +224,18 @@ export function TaskList({
             station={station}
             isActivePlacement={activeTaskId === task.id}
             isPicked={pickedTaskId === task.id}
+            hasConflict={conflictTaskIds?.has(task.id)}
             onJumpToTask={onJumpToTask}
             onRecallTask={onRecallTask}
             onPick={!assignment ? onPick : undefined}
             provider={provider}
             predecessorEndTime={predecessorEndTime}
+            isLastTaskOfJob={isLastTask}
             onWorkDaysChange={onWorkDaysChange}
             onDepartureChange={onDepartureChange}
             onReturnChange={onReturnChange}
+            isCompleted={assignment?.isCompleted ?? false}
+            onToggleComplete={onToggleComplete}
           />
         </div>
       );
@@ -194,8 +245,10 @@ export function TaskList({
   // Check if this is a single-element job
   const isSingleElement = !isMultiElementJob(job.elementIds);
 
-  // Get elements for this job, preserving order
-  const jobElements = elements.filter((e) => job.elementIds.includes(e.id));
+  // Get elements for this job, preserving order from job.elementIds (matches JCF order)
+  const jobElements = elements
+    .filter((e) => job.elementIds.includes(e.id))
+    .sort((a, b) => job.elementIds.indexOf(a.id) - job.elementIds.indexOf(b.id));
 
   return (
     <div className="p-3 overflow-y-auto flex-grow bg-zinc-900/30">
@@ -233,7 +286,7 @@ export function TaskList({
             onPlateStatusChange={handlePlateStatusChange}
             onFormeStatusChange={handleFormeStatusChange}
           >
-            {renderTaskTiles(elementTasks)}
+            {renderTaskTiles(elementTasks, element)}
           </ElementSection>
         );
       })}

@@ -135,24 +135,182 @@ Csak a jóváhagyás után!
 
 ## Teszt szcenárió írási útmutató
 
+### KRITIKUS: A szcenáriók önállóan végrehajthatók legyenek!
+
+**A Manual QA-t végző munkatárs NEM ismeri a rendszert behatóan!**
+
+A szcenárióknak annyira részletesnek kell lenniük, hogy egy QA mérnök minden további segítség nélkül végre tudja hajtani a tesztet. Ez azt jelenti:
+
+1. **Konkrét teszt adatokkal** - Ne "valid data", hanem pontos JSON payload
+2. **Teljes context-tel** - Mit kell előtte beállítani, milyen állapotban van a rendszer
+3. **Egyértelmű ellenőrzési pontokkal** - Pontosan milyen értékeket, mezőket kell ellenőrizni
+
+### ROSSZ példa (túl általános, nem végrehajtható):
+
+```markdown
+#### Scenario: Precedence conflict returns valid: false
+
+**Steps:**
+1. POST /validate with task scheduled before its predecessor
+
+**Expected Results:**
+- [ ] HTTP 200 OK
+- [ ] Response contains valid: false
+- [ ] Response contains conflict with type: "PrecedenceConflict"
+```
+
+**Miért rossz?**
+- Nincs JSON payload - a tesztelő nem tudja, mit küldjön
+- Nem definiált a "predecessor" - honnan tudja beállítani?
+- Nincs fixture/teszt adat leírás
+
+### JÓ példa (részletes, végrehajtható):
+
+```markdown
+#### Scenario: Precedence conflict - task scheduled before predecessor ends
+
+**Preconditions:**
+- Job with 2 tasks: Task A (sequence 1), Task B (sequence 2)
+- Task A assigned: scheduledStart 09:00, scheduledEnd 11:00
+- Task B NOT yet assigned
+
+**Steps:**
+1. POST `http://localhost:3001/validate`:
+
+\`\`\`json
+{
+  "proposed": {
+    "taskId": "task-b-uuid",
+    "targetId": "station-456",
+    "isOutsourced": false,
+    "scheduledStart": "2025-12-14T08:00:00.000Z",
+    "bypassPrecedence": false
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2025-12-14T07:00:00.000Z",
+    "stations": [{"id": "station-456", "name": "Komori", "status": "active"}],
+    "jobs": [{"id": "job-1", "tasks": ["task-a", "task-b"]}],
+    "tasks": [
+      {"id": "task-a", "jobId": "job-1", "sequenceOrder": 1},
+      {"id": "task-b", "jobId": "job-1", "sequenceOrder": 2}
+    ],
+    "assignments": [
+      {
+        "taskId": "task-a",
+        "targetId": "station-456",
+        "scheduledStart": "2025-12-14T09:00:00.000Z",
+        "scheduledEnd": "2025-12-14T11:00:00.000Z"
+      }
+    ],
+    "conflicts": [],
+    "lateJobs": []
+  }
+}
+\`\`\`
+
+**Expected Results:**
+- [ ] HTTP 200 OK
+- [ ] `valid`: false
+- [ ] `conflicts[0].type`: "PrecedenceConflict"
+- [ ] `conflicts[0].message` contains "predecessor" or "sequence"
+- [ ] `conflicts[0].taskId`: "task-b-uuid"
+- [ ] `conflicts[0].relatedTaskId`: "task-a-uuid"
+```
+
+---
+
+### FONTOS: Minden feature-nek kell teszt szcenárió!
+
+**Egyetlen feature sem maradhat ki a QA dokumentumból!**
+
+- A Feature Katalógusban szereplő MINDEN feature-hez tartoznia kell legalább egy teszt szcenáriónak
+- Ha egy feature közvetlenül nem tesztelhető (pl. domain entity, enum, value object), akkor az API-n vagy UI-on keresztül **közvetetten** kell tesztelni
+- Példa: `StationStatus Enum` → teszteld az API-n keresztül, hogy mind a 4 státusz érték elfogadott
+
 ### Preconditions
-- Mindig add meg a fixture URL-t
-- Írd le az alkalmazás kezdő állapotát
-- Sorold fel az előfeltételeket (pl. "At least one tile visible")
+- Mindig add meg a fixture URL-t (UI) vagy az API base URL-t (API)
+- Írd le az alkalmazás/rendszer kezdő állapotát
+- Sorold fel az előfeltételeket (pl. "At least one tile visible" vagy "Station category exists")
+- **Add meg a teszt adatok konkrét értékeit** (UUID-k, nevek, státuszok)
 
 ### Steps
 - Konkrét, végrehajtható lépések
-- Használj pontos UI elemneveket
-- Kerüld az általános utasításokat ("kattints valahova")
+- Használj pontos UI elemneveket vagy API endpoint URL-eket
+- **Teljes JSON payload kódblokkal** - ne csak leírd, hanem mutasd meg
+- Kerüld az általános utasításokat ("kattints valahova", "valid data")
 
 ### Expected Results
 - Checkbox formátumban (`- [ ]`)
 - Specifikus, ellenőrizhető eredmények
-- Vizuális visszajelzések részletesen (szín, ikon, animáció)
+- **Konkrét mezőnevek és értékek** (pl. `status`: "ready", nem csak "status changed")
+- Vizuális visszajelzések részletesen (szín, ikon, animáció) - UI esetén
+- Response mezők és HTTP státusz kódok - API esetén
 
-### Példa:
+---
+
+## API-specifikus teszt formátum
+
+**API csoportoknál (station-management, job-management, scheduling) kötelező:**
+
+### Request formátum
+- HTTP method és teljes endpoint URL
+- **Teljes JSON request payload** kódblokkal
+- Query paraméterek ahol releváns
+
+### Expected Results formátum
+- HTTP státusz kód (pl. `201 Created`, `400 Bad Request`)
+- **Response mezők ellenőrzése** checkboxokkal
+- Error response struktúra ellenőrzése hiba esetén
+
+### API teszt példa:
 
 ```markdown
+### API-009 - DaySchedule Value Object
+
+#### Scenario: Overlapping time slots rejected
+
+**Steps:**
+1. PUT `/api/v1/stations/{id}/schedule` with overlapping slots:
+
+\`\`\`json
+{
+  "operatingSchedule": {
+    "monday": {
+      "isOperating": true,
+      "slots": [
+        {"start": "06:00", "end": "14:00"},
+        {"start": "12:00", "end": "17:00"}
+      ]
+    },
+    "tuesday": {"isOperating": false, "slots": []},
+    "wednesday": {"isOperating": false, "slots": []},
+    "thursday": {"isOperating": false, "slots": []},
+    "friday": {"isOperating": false, "slots": []},
+    "saturday": {"isOperating": false, "slots": []},
+    "sunday": {"isOperating": false, "slots": []}
+  }
+}
+\`\`\`
+
+**Expected Results:**
+- [ ] HTTP 400 Bad Request
+- [ ] Error code: "VALIDATION_ERROR"
+- [ ] Error message mentions "overlap"
+- [ ] Error details include day name ("monday")
+```
+
+---
+
+## UI-specifikus teszt formátum
+
+**UI csoportoknál (layout-grid, drag-drop, navigation-ux, stb.) kötelező:**
+
+### UI teszt példa:
+
+```markdown
+### SCHED-045 - Context Menu Toggle Completion
+
 #### Scenario: Toggle task completion via context menu
 
 **Preconditions:**

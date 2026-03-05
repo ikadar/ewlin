@@ -10,18 +10,39 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { scheduleApi } from './api/scheduleApi';
+import { templateApi } from './api/templateApi';
+import { clientApi } from './api/clientApi';
+import { stationCategoryApi } from './api/stationCategoryApi';
+import { formatApi } from './api/formatApi';
+import { impressionPresetApi } from './api/impressionPresetApi';
+import { surfacagePresetApi } from './api/surfacagePresetApi';
+import { feuilleFormatApi } from './api/feuilleFormatApi';
+import { stationApi } from './api/stationApi';
+import { providerApi } from './api/providerApi';
+import { shipperApi } from './api/shipperApi';
+import { fluxApi } from './api/fluxApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
-
 // ============================================================================
 // Store Configuration
 // ============================================================================
 
 export const store = configureStore({
   reducer: {
-    // RTK Query API reducer
+    // RTK Query API reducers
     [scheduleApi.reducerPath]: scheduleApi.reducer,
+    [templateApi.reducerPath]: templateApi.reducer,
+    [clientApi.reducerPath]: clientApi.reducer,
+    [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
+    [formatApi.reducerPath]: formatApi.reducer,
+    [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
+    [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
+    [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
+    [stationApi.reducerPath]: stationApi.reducer,
+    [providerApi.reducerPath]: providerApi.reducer,
+    [shipperApi.reducerPath]: shipperApi.reducer,
+    [fluxApi.reducerPath]: fluxApi.reducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -30,7 +51,19 @@ export const store = configureStore({
     error: errorReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(scheduleApi.middleware),
+    getDefaultMiddleware()
+      .concat(scheduleApi.middleware)
+      .concat(templateApi.middleware)
+      .concat(clientApi.middleware)
+      .concat(stationCategoryApi.middleware)
+      .concat(formatApi.middleware)
+      .concat(impressionPresetApi.middleware)
+      .concat(surfacagePresetApi.middleware)
+      .concat(feuilleFormatApi.middleware)
+      .concat(stationApi.middleware)
+      .concat(providerApi.middleware)
+      .concat(shipperApi.middleware)
+      .concat(fluxApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -71,12 +104,101 @@ export {
   useLookupByReferenceQuery,
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
+  useUpdateJobMutation,
+  useDeleteJobMutation,
+  useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
+  useCompactStationMutation,
   scheduleApi,
 } from './api/scheduleApi';
+
+export { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation, templateApi } from './api/templateApi';
+
+export {
+  useGetClientsQuery,
+  useCreateClientMutation,
+  useUpdateClientMutation,
+  useDeleteClientMutation,
+  clientApi,
+} from './api/clientApi';
+export type { ClientResponse } from './api/clientApi';
+
+export {
+  useGetStationCategoriesQuery,
+  useCreateStationCategoryMutation,
+  useUpdateStationCategoryMutation,
+  useDeleteStationCategoryMutation,
+  stationCategoryApi,
+} from './api/stationCategoryApi';
+export type { StationCategoryResponse, StationCategoryInput, SimilarityCriterionInput } from './api/stationCategoryApi';
+
+export {
+  useGetFormatsQuery,
+  useCreateFormatMutation,
+  useUpdateFormatMutation,
+  useDeleteFormatMutation,
+  formatApi,
+} from './api/formatApi';
+export type { FormatResponse, FormatInput } from './api/formatApi';
+
+export {
+  useGetImpressionPresetsQuery,
+  useCreateImpressionPresetMutation,
+  useUpdateImpressionPresetMutation,
+  useDeleteImpressionPresetMutation,
+  impressionPresetApi,
+} from './api/impressionPresetApi';
+export type { ImpressionPresetResponse, ImpressionPresetInput } from './api/impressionPresetApi';
+
+export {
+  useGetSurfacagePresetsQuery,
+  useCreateSurfacagePresetMutation,
+  useUpdateSurfacagePresetMutation,
+  useDeleteSurfacagePresetMutation,
+  surfacagePresetApi,
+} from './api/surfacagePresetApi';
+export type { SurfacagePresetResponse, SurfacagePresetInput } from './api/surfacagePresetApi';
+
+export {
+  useGetFeuilleFormatsQuery,
+  useCreateFeuilleFormatMutation,
+  useUpdateFeuilleFormatMutation,
+  useDeleteFeuilleFormatMutation,
+  feuilleFormatApi,
+} from './api/feuilleFormatApi';
+export type { FeuilleFormatResponse, FeuilleFormatInput } from './api/feuilleFormatApi';
+
+export {
+  useGetStationsQuery,
+  useCreateStationMutation,
+  useUpdateStationMutation,
+  useDeleteStationMutation,
+  stationApi,
+} from './api/stationApi';
+export type { StationResponse, StationInput } from './api/stationApi';
+
+export {
+  useGetProvidersQuery,
+  useCreateProviderMutation,
+  useUpdateProviderMutation,
+  useDeleteProviderMutation,
+  providerApi,
+} from './api/providerApi';
+export type { ProviderResponse, ProviderInput } from './api/providerApi';
+
+export {
+  useGetShippersQuery,
+  useCreateShipperMutation,
+  useUpdateShipperMutation,
+  useDeleteShipperMutation,
+  shipperApi,
+} from './api/shipperApi';
+export type { ShipperResponse, ShipperInput } from './api/shipperApi';
+
+export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, fluxApi } from './api/fluxApi';
 
 // Re-export slice actions
 export {
@@ -104,6 +226,7 @@ export {
   setJcfIntitule,
   setJcfQuantity,
   setJcfDeadline,
+  setJcfShipperId,
   setJcfElements,
   setSequenceWorkflow,
   setIsTemplateEditorOpen,
@@ -121,3 +244,4 @@ export {
   selectCurrentError,
   selectIsServiceUnavailable,
 } from './slices/errorSlice';
+

@@ -224,33 +224,39 @@ export function JcfTemplateList({
             </td>
             <td className="py-[10px] pr-[13px] text-right">
               <div className="flex items-center justify-end gap-[3px]">
+                {onDeleteClick && (
                 <button
                   className="p-[5px] text-zinc-500 hover:text-red-400 rounded transition-colors"
                   aria-label="Supprimer le template"
                   title="Supprimer"
-                  onClick={() => onDeleteClick?.(template)}
+                  onClick={() => onDeleteClick(template)}
                   data-testid={`template-delete-${template.id}`}
                 >
                   <Trash2 size={16} aria-hidden="true" />
                 </button>
+                )}
+                {onEditClick && (
                 <button
                   className="p-[5px] text-zinc-500 hover:text-blue-400 rounded transition-colors"
                   aria-label="Modifier les propriétés"
                   title="Modifier"
-                  onClick={() => onEditClick?.(template)}
+                  onClick={() => onEditClick(template)}
                   data-testid={`template-edit-${template.id}`}
                 >
                   <Pencil size={16} aria-hidden="true" />
                 </button>
+                )}
+                {onUseClick && (
                 <button
                   className="p-[5px] text-zinc-500 hover:text-emerald-400 rounded transition-colors"
                   aria-label="Utiliser ce template"
                   title="Utiliser"
-                  onClick={() => onUseClick?.(template)}
+                  onClick={() => onUseClick(template)}
                   data-testid={`template-use-${template.id}`}
                 >
                   <Play size={16} aria-hidden="true" />
                 </button>
+                )}
               </div>
             </td>
           </tr>

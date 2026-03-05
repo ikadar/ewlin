@@ -1,11 +1,13 @@
 import { type ReactNode, type MouseEvent, useRef, useMemo, memo } from 'react';
-import type { Station, DaySchedule } from '@flux/types';
+import type { Station, DaySchedule, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import { PlacementIndicator } from '../PlacementIndicator';
 import { PrecedenceLines } from '../PrecedenceLines';
 import { DryingTimeIndicator } from '../DryingTimeIndicator';
-import type { DryingTimeInfo } from '../../utils';
+import { OutsourcingTimeIndicator } from '../OutsourcingTimeIndicator';
+import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
+import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 
 export interface StationColumnProps {
   /** Station to display */
@@ -28,6 +30,8 @@ export interface StationColumnProps {
   isValidDrop?: boolean;
   /** Whether an invalid drop is being hovered over this column (quick placement) */
   isInvalidDrop?: boolean;
+  /** Whether a precedence bypass (ALT) drop is being hovered over this column (quick placement) */
+  isQuickPlacementBypass?: boolean;
   /** Whether quick placement mode is active */
   isQuickPlacementMode?: boolean;
   /** Whether there's an available task for this station in quick placement mode */
@@ -44,6 +48,8 @@ export interface StationColumnProps {
   precedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** v0.3.51: Drying time visualization info during drag */
   dryingTimeInfo?: DryingTimeInfo;
+  /** v0.5.13: Outsourcing time visualization info during drag */
+  outsourcingTimeInfo?: OutsourcingTimeInfo;
   /** v0.3.46: Visible day range for virtual scrolling (only render overlays/lines for these days) */
   visibleDayRange?: { start: number; end: number };
   /** v0.3.54: Whether a task is currently picked (Pick & Place mode) */
@@ -60,6 +66,10 @@ export interface StationColumnProps {
   onPickMouseLeave?: () => void;
   /** v0.3.54: Callback for click to place during pick */
   onPickClick?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
+  /** Current display mode (for dynamic column width) */
+  displayMode?: 'produit' | 'tirage';
+  /** Station category (for columnWidth lookup) */
+  category?: StationCategory;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -93,9 +103,10 @@ export const StationColumn = memo(function StationColumn({
   dayOfWeek,
   gridStartDate,
   children,
-  isCollapsed = false,
+  isCollapsed: _isCollapsed = false,
   isValidDrop = false,
   isInvalidDrop = false,
+  isQuickPlacementBypass = false,
   isQuickPlacementMode = false,
   hasAvailableTask = false,
   placementIndicatorY,
@@ -104,6 +115,7 @@ export const StationColumn = memo(function StationColumn({
   onQuickPlacementClick,
   precedenceConstraints,
   dryingTimeInfo,
+  outsourcingTimeInfo,
   visibleDayRange,
   // v0.3.54: Pick & Place props
   isPicking = false,
@@ -113,6 +125,8 @@ export const StationColumn = memo(function StationColumn({
   onPickMouseMove,
   onPickMouseLeave,
   onPickClick,
+  displayMode: _displayMode,
+  category,
 }: StationColumnProps) {
   // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -173,6 +187,10 @@ export const StationColumn = memo(function StationColumn({
     }
 
     // Quick placement validation highlighting
+    if (isQuickPlacementBypass) {
+      // Precedence bypass (ALT held) - amber indicator
+      return 'ring-2 ring-amber-500 bg-amber-500/10';
+    }
     if (isInvalidDrop) {
       // Invalid drop zone - red indicator (blocking conflicts)
       return 'ring-2 ring-red-500 bg-red-500/10';
@@ -194,8 +212,8 @@ export const StationColumn = memo(function StationColumn({
     return '';
   };
 
-  // Column width: full (240px / w-60) or collapsed (120px / w-30)
-  const widthClass = isCollapsed ? 'w-30' : 'w-60';
+  // Custom width: explicit DB value takes priority, then category-based default, then CSS w-60.
+  const customWidth = category?.columnWidth ?? (category ? getDefaultCategoryWidth(category.name) : null);
 
   // Quick placement mode handlers
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
@@ -252,8 +270,8 @@ export const StationColumn = memo(function StationColumn({
   return (
     <div
       ref={columnRef}
-      className={`${widthClass} shrink-0 bg-[#0a0a0a] relative transition-all duration-150 ease-out ${getHighlightClass()} ${getCursorClass()}`}
-      style={{ height: `${totalHeight}px` }}
+      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-[#0a0a0a] relative transition-[filter,opacity,box-shadow] duration-150 ease-out outline-none ${getHighlightClass()} ${getCursorClass()}`}
+      style={{ ...(customWidth !== null ? { width: `${customWidth}px` } : {}), height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -338,6 +356,16 @@ export const StationColumn = memo(function StationColumn({
         <DryingTimeIndicator
           predecessorEndY={dryingTimeInfo.predecessorEndY}
           dryingEndY={dryingTimeInfo.dryingEndY}
+          isVisible={isPicking}
+        />
+      )}
+
+      {/* v0.5.13: Outsourcing Time Indicator (during pick) */}
+      {/* Note: outsourcingTimeInfo is only passed when this IS the outsourced predecessor's provider */}
+      {outsourcingTimeInfo && (
+        <OutsourcingTimeIndicator
+          departureY={outsourcingTimeInfo.departureY}
+          returnY={outsourcingTimeInfo.returnY}
           isVisible={isPicking}
         />
       )}

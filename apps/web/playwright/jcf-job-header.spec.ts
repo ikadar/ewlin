@@ -68,9 +68,9 @@ test.describe('v0.4.7: JCF Job Header Basic Fields', () => {
   });
 
   test.describe('Deadline field', () => {
-    test('has jj/mm placeholder', async ({ page }) => {
+    test('has jj/mm 14:00 placeholder', async ({ page }) => {
       const input = page.locator('[data-testid="jcf-field-deadline"]');
-      await expect(input).toHaveAttribute('placeholder', 'jj/mm');
+      await expect(input).toHaveAttribute('placeholder', 'jj/mm 14:00');
     });
 
     test('converts French date to ISO on blur', async ({ page }) => {
@@ -78,16 +78,17 @@ test.describe('v0.4.7: JCF Job Header Basic Fields', () => {
       await input.fill('15/06');
       await input.blur();
 
-      // After blur, the value should be formatted as jj/mm/aaaa (French display of ISO)
-      const year = new Date().getFullYear();
-      await expect(input).toHaveValue(`15/06/${year}`);
+      // After blur, parseFrenchDate converts '15/06' → ISO, then formatToFrench
+      // displays it as 'DD/MM HH:mm' (e.g. '15/06 14:00'). No year in display.
+      await expect(input).toHaveValue('15/06 14:00');
     });
 
     test('accepts full French date format', async ({ page }) => {
       const input = page.locator('[data-testid="jcf-field-deadline"]');
       await input.fill('25/12/2026');
       await input.blur();
-      await expect(input).toHaveValue('25/12/2026');
+      // Formatter always converts to DD/MM HH:mm (no year in display)
+      await expect(input).toHaveValue('25/12 14:00');
     });
   });
 
@@ -102,6 +103,11 @@ test.describe('v0.4.7: JCF Job Header Basic Fields', () => {
       await page.keyboard.press('Tab');
       const quantite = page.locator('[data-testid="jcf-field-quantite"]');
       await expect(quantite).toBeFocused();
+
+      // Tab to Transporteur (added between Quantité and Deadline)
+      await page.keyboard.press('Tab');
+      const transporteur = page.locator('[data-testid="jcf-field-transporteur"]');
+      await expect(transporteur).toBeFocused();
 
       // Tab to Deadline
       await page.keyboard.press('Tab');

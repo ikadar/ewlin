@@ -1,11 +1,12 @@
 import { useState, useCallback, useMemo, useEffect, type MutableRefObject } from 'react';
 import { GitBranch, Minus, Plus } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
-import type { JcfElement, JcfFieldKey } from './types';
+import type { JcfElement, JcfFieldKey, JcfLinkableField } from './types';
 import { useLinkPropagation, isLinkableField } from '../../hooks/useLinkPropagation';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
 import { CellContent } from './CellContent';
+import type { PostePresetLike } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
 import { validateAllElements, validateAllForSubmit, getCellError } from './validation';
 import {
   getAllRequiredFields,
@@ -21,7 +22,7 @@ import {
 // ── Row definitions ──
 
 interface RowDef {
-  key: JcfFieldKey;
+  key: Exclude<JcfFieldKey, 'links'>;
   label: string;
   icon?: 'git-branch';
 }
@@ -63,12 +64,14 @@ export interface JcfElementsTableProps {
   elements: JcfElement[];
   /** Callback when elements change */
   onElementsChange: (elements: JcfElement[]) => void;
+  /** Poste presets for sequence autocomplete (from snapshot or reference data) */
+  postePresets?: ReadonlyArray<PostePresetLike>;
   /**
-   * Workflow-guided suggestion ordering for sequence autocomplete.
-   * Array of expected production step categories in order.
+   * Per-element workflow-guided suggestion ordering for sequence autocomplete.
+   * Outer array indexed by element, inner array is expected production step categories in order.
    * @see JcfSequenceAutocompleteProps.sequenceWorkflow
    */
-  sequenceWorkflow?: string[];
+  sequenceWorkflows?: string[][];
   /** Job quantity for qteFeuilles auto-calculation */
   jobQuantity?: string;
   /** Mode: 'job' shows required indicators, 'template' does not */
@@ -89,7 +92,8 @@ export interface JcfElementsTableProps {
 export function JcfElementsTable({
   elements,
   onElementsChange,
-  sequenceWorkflow,
+  postePresets = [],
+  sequenceWorkflows,
   jobQuantity = '',
   mode = 'job',
   onSaveAttemptRef,
@@ -154,7 +158,7 @@ export function JcfElementsTable({
     () =>
       hasAttemptedSubmit
         ? validateAllForSubmit(elements, mode)
-        : validateAllElements(elements, touchedFields),
+        : validateAllElements(elements, touchedFields, mode),
     [elements, touchedFields, hasAttemptedSubmit, mode],
   );
 
@@ -485,6 +489,7 @@ export function JcfElementsTable({
                   onBlur={() => handleSaveName(index)}
                   autoFocus
                   onFocus={(e) => e.target.select()}
+                  autoComplete="off"
                   className="text-base text-zinc-100 font-medium bg-transparent border border-zinc-600 rounded-[3px] px-[3px] flex-1 min-w-0 focus:border-blue-500 focus:outline-none"
                   data-testid={`jcf-element-name-input-${index}`}
                 />
@@ -602,6 +607,7 @@ export function JcfElementsTable({
                   <CellContent
                     rowKey={row.key}
                     value={value}
+                    mode={mode}
                     isEmpty={isEmpty}
                     isTextarea={isTextarea}
                     isNumeric={isNumeric}
@@ -619,7 +625,8 @@ export function JcfElementsTable({
                     inputLinkedClass={inputLinkedClass}
                     elementNames={elementNames}
                     currentElementName={element.name}
-                    sequenceWorkflow={sequenceWorkflow}
+                    postePresets={postePresets}
+                    sequenceWorkflow={sequenceWorkflows?.[elementIndex]}
                     sessionLearning={sessionLearning}
                     linkPropagation={linkPropagation}
                     focusCell={focusCell}

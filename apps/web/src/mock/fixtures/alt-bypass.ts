@@ -45,7 +45,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
       sequenceOrder: 0,  // First task
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 30 }, // 1h total (10:00-11:00)
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -56,7 +56,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
       sequenceOrder: 1,  // Second task (must wait for first to complete at 11:00)
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-polar', // Different station to allow placement
+      stationId: 'station-massicot', // Different station to allow placement
       duration: { setupMinutes: 15, runMinutes: 30 }, // 45min
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -70,7 +70,7 @@ export function createAltBypassFixture(): ScheduleSnapshot {
     {
       id: 'assign-bypass-1',
       taskId: 'task-bypass-1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(10, 0),
       scheduledEnd: isoDate(11, 0),

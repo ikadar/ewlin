@@ -45,7 +45,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
       sequenceOrder: 0,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-komori',
+      stationId: 'station-offset',
       duration: { setupMinutes: 30, runMinutes: 90 }, // 2h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -58,7 +58,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
       sequenceOrder: 1,
       status: 'Ready',
       type: 'Internal',
-      stationId: 'station-heidelberg',
+      stationId: 'station-plieuse',
       duration: { setupMinutes: 30, runMinutes: 60 }, // 1.5h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -71,7 +71,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
       sequenceOrder: 2,
       status: 'Assigned',
       type: 'Internal',
-      stationId: 'station-polar',
+      stationId: 'station-massicot',
       duration: { setupMinutes: 15, runMinutes: 45 }, // 1h total
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
@@ -83,7 +83,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     {
       id: 'assign-pv-1',
       taskId: 'task-pv-1',
-      targetId: 'station-komori',
+      targetId: 'station-offset',
       isOutsourced: false,
       scheduledStart: isoDate(8, 0),
       scheduledEnd: isoDate(10, 0),
@@ -96,7 +96,7 @@ export function createPrecedenceVisualizationFixture(): ScheduleSnapshot {
     {
       id: 'assign-pv-3',
       taskId: 'task-pv-3',
-      targetId: 'station-polar',
+      targetId: 'station-massicot',
       isOutsourced: false,
       scheduledStart: isoDate(18, 0),
       scheduledEnd: isoDate(19, 0),

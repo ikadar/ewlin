@@ -18,14 +18,20 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 import type {
   ScheduleSnapshot,
   CreateJobRequest,
+  UpdateJobRequest,
   AssignTaskRequest,
   AssignmentResponse,
   CompletionResponse,
   UnassignmentResponse,
+  CompactStationResponse,
   ClientSuggestionsResponse,
   ReferenceLookupResponse,
   InternalTask,
   TaskAssignment,
+  PaperStatus,
+  BatStatus,
+  PlateStatus,
+  FormeStatus,
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
@@ -45,7 +51,51 @@ interface CreateJobResponse {
   taskIds: string[];
   createdAt: string;
 }
+
+/**
+ * Response from updateJob mutation.
+ * Returns updated job metadata.
+ */
+interface UpdateJobResponse {
+  id: string;
+  reference: string;
+  client: string;
+  description: string;
+  workshopExitDate: string;
+  status: string;
+  updatedAt: string;
+}
+/**
+ * Request for updating element prerequisite status.
+ */
+interface UpdateElementStatusRequest {
+  elementId: string;
+  field: 'paperStatus' | 'batStatus' | 'plateStatus' | 'formeStatus';
+  value: PaperStatus | BatStatus | PlateStatus | FormeStatus;
+}
+
+/**
+ * Response from updateElementStatus mutation.
+ * Mirrors PHP ElementController::updatePrerequisites response.
+ */
+interface UpdateElementStatusResponse {
+  elementId: string;
+  paperStatus: PaperStatus;
+  batStatus: BatStatus;
+  plateStatus: PlateStatus;
+  formeStatus: FormeStatus;
+  isBlocked: boolean;
+}
+
 import { baseQueryWithFixtureSupport } from './baseApi';
+
+/**
+ * Extended snapshot type that includes server-side config values.
+ * lookbackDays is served by the PHP API but not yet in @flux/types.
+ */
+interface SnapshotWithConfig extends ScheduleSnapshot {
+  lookbackDays?: number;
+}
 
 // ============================================================================
 // Optimistic Update Helpers
@@ -101,7 +151,7 @@ export const scheduleApi = createApi({
      *
      * @see docs/architecture/rtk-query-design.md#getSnapshot
      */
-    getSnapshot: builder.query<ScheduleSnapshot, void>({
+    getSnapshot: builder.query<SnapshotWithConfig, void>({
       query: () => '/schedule/snapshot',
       providesTags: ['Snapshot'],
     }),
@@ -110,13 +160,13 @@ export const scheduleApi = createApi({
      * Get client name suggestions for autocomplete.
      *
      * Mock mode: mockBaseQuery filters MOCK_CLIENTS by prefix
-     * Real mode: GET /jobs/clients?q={prefix}
+     * Real mode: GET /clients?q={prefix}
      *
      * @param prefix - Search prefix (min 2 chars recommended)
      * @see docs/releases/v0.5.5-client-autocomplete-api.md
      */
     getClientSuggestions: builder.query<ClientSuggestionsResponse, string>({
-      query: (prefix) => `/jobs/clients?q=${encodeURIComponent(prefix)}`,
+      query: (prefix) => `/clients?q=${encodeURIComponent(prefix)}`,
       providesTags: ['ClientSuggestions'],
     }),
 
@@ -154,6 +204,73 @@ export const scheduleApi = createApi({
         body,
       }),
       invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Update an existing job's metadata.
+     *
+     * Mock mode: Updates job in mock snapshot
+     * Real mode: PUT /jobs/{id}
+     *
+     * @see docs/releases/v0.5.13b-job-edit-via-jcf-modal.md
+     */
+    updateJob: builder.mutation<UpdateJobResponse, { jobId: string; body: UpdateJobRequest }>({
+      query: ({ jobId, body }) => ({
+        url: `/jobs/${jobId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Delete a job and all related data (elements, tasks, assignments).
+     *
+     * Mock mode: Removes job, elements, tasks, assignments from snapshot
+     * Real mode: DELETE /jobs/{id} (cascade via Doctrine ORM)
+     */
+    deleteJob: builder.mutation<void, string>({
+      query: (jobId) => ({
+        url: `/jobs/${jobId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Update element prerequisite status (paper, bat, plate, forme).
+     *
+     * Mock mode: Updates element in mock snapshot
+     * Real mode: PUT /elements/{id}/prerequisites
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    updateElementStatus: builder.mutation<UpdateElementStatusResponse, UpdateElementStatusRequest>({
+      query: ({ elementId, field, value }) => ({
+        url: `/elements/${elementId}/prerequisites`,
+        method: 'PUT',
+        body: { [field]: value },
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted({ elementId, field, value }, { dispatch, queryFulfilled }) {
+        // Optimistic update: immediately update element status in cache
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const element = draft.elements.find((e) => e.id === elementId);
+            if (element) {
+              (element as unknown as Record<string, unknown>)[field] = value;
+              element.updatedAt = new Date().toISOString();
+            }
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          // Rollback on error
+          patchResult.undo();
+        }
+      },
     }),
 
     /**
@@ -378,6 +495,24 @@ export const scheduleApi = createApi({
         }
       },
     }),
+
+    /**
+     * Compact a station's assignments (remove gaps).
+     *
+     * Mock mode: mockBaseQuery handles this via handleCompactStation
+     * Real mode: POST /stations/{stationId}/compact
+     *
+     * Uses optimistic update for instant UI feedback:
+     * - Immediately compacts assignments in cache
+     * - Automatically rolls back on error
+     */
+    compactStation: builder.mutation<CompactStationResponse, string>({
+      query: (stationId) => ({
+        url: `/stations/${stationId}/compact`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
   }),
 });
 
@@ -391,8 +526,12 @@ export const {
   useLookupByReferenceQuery,
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
+  useUpdateJobMutation,
+  useDeleteJobMutation,
+  useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
+  useCompactStationMutation,
 } = scheduleApi;

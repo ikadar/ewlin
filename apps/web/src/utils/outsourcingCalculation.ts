@@ -97,16 +97,19 @@ export function calculateDepartureDate(
  */
 export function calculateReturnDate(
   departureDate: Date | string,
-  params: Pick<OutsourcingParams, 'workDays' | 'transitDays' | 'receptionTime'>
+  params: Pick<OutsourcingParams, 'workDays' | 'transitDays' | 'receptionTime'> & { oneWay?: boolean }
 ): Date {
   const departure = typeof departureDate === 'string'
     ? new Date(departureDate)
     : new Date(departureDate);
 
-  const { workDays, transitDays, receptionTime } = params;
+  const { workDays, transitDays, receptionTime, oneWay } = params;
 
-  // Total business days: transit out + work + transit back
-  const totalDays = transitDays + workDays + transitDays;
+  // One-way: transit + work (no return transit) — product ships directly to client
+  // Two-way: transit out + work + transit back
+  const totalDays = oneWay
+    ? transitDays + workDays
+    : transitDays + workDays + transitDays;
 
   // Add business days to departure
   const returnDate = addBusinessDays(departure, totalDays);
@@ -127,7 +130,7 @@ export function calculateReturnDate(
  */
 export function calculateOutsourcingDates(
   predecessorEndTime: Date | string | undefined,
-  params: OutsourcingParams
+  params: OutsourcingParams & { oneWay?: boolean }
 ): { departure: Date; return: Date } | null {
   if (!predecessorEndTime) {
     return null;

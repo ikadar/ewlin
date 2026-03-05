@@ -11,12 +11,14 @@ import type {
   InternalTask,
   OutsourcedTask,
   TaskStatus,
+  TaskAssignment,
   LateJob,
   Element,
   PaperStatus,
   BatStatus,
   PlateStatus,
 } from '@flux/types';
+import { SHIPPING_DEPARTURE_HOUR, getDeadlineDate } from '@flux/types';
 import { createElement, getElementIdForJob } from './elements';
 
 // ============================================================================
@@ -282,7 +284,7 @@ function generateJob(options: GenerateJobOptions): { job: Job; element: Element;
     client,
     description: `${description} - ${quantity} ex`,
     status,
-    workshopExitDate: formatDate(workshopExitDate),
+    workshopExitDate: `${formatDate(workshopExitDate)}T${String(SHIPPING_DEPARTURE_HOUR).padStart(2, '0')}:00`,
     fullyScheduled,
     color: JOB_COLORS[index % JOB_COLORS.length],
     paperType: randomElement(PAPER_TYPES),
@@ -375,24 +377,56 @@ export function generateJobs(options: JobGeneratorOptions = {}): JobData {
 // Late Jobs Detection
 // ============================================================================
 
-export function identifyLateJobs(jobs: Job[], _tasks?: Task[]): LateJob[] {
+export function identifyLateJobs(jobs: Job[], tasks?: Task[], assignments?: TaskAssignment[]): LateJob[] {
   const lateJobs: LateJob[] = [];
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setHours(SHIPPING_DEPARTURE_HOUR, 0, 0, 0);
+
+  // Build job task ID sets for assignment lookup
+  const jobTaskIds = new Map<string, Set<string>>();
+  if (tasks) {
+    for (const job of jobs) {
+      jobTaskIds.set(job.id, new Set(job.taskIds));
+    }
+  }
 
   for (const job of jobs) {
-    const deadline = new Date(job.workshopExitDate);
-    deadline.setHours(0, 0, 0, 0);
+    const deadline = getDeadlineDate(job.workshopExitDate);
 
-    // Check if deadline has passed
+    let isLate = false;
+    let latestEnd: Date | null = null;
+
+    // Check 1: deadline has already passed
     if (deadline < today) {
-      const delayMs = today.getTime() - deadline.getTime();
-      const delayDays = Math.ceil(delayMs / (1000 * 60 * 60 * 24));
+      isLate = true;
+    }
+
+    // Check 2: any task scheduled after the deadline
+    if (assignments && jobTaskIds.has(job.id)) {
+      const taskIdSet = jobTaskIds.get(job.id)!;
+      for (const assignment of assignments) {
+        if (taskIdSet.has(assignment.taskId)) {
+          const endDate = new Date(assignment.scheduledEnd);
+          if (endDate > deadline) {
+            isLate = true;
+          }
+          if (!latestEnd || endDate > latestEnd) {
+            latestEnd = endDate;
+          }
+        }
+      }
+    }
+
+    if (isLate) {
+      // Calculate delay: difference between latest task end (or today) and deadline
+      const referenceDate = latestEnd && latestEnd > today ? latestEnd : today;
+      const delayMs = referenceDate.getTime() - deadline.getTime();
+      const delayDays = Math.max(1, Math.ceil(delayMs / (1000 * 60 * 60 * 24)));
 
       lateJobs.push({
         jobId: job.id,
         deadline: job.workshopExitDate,
-        expectedCompletion: formatDate(addDays(today, randomInt(1, 5))),
+        expectedCompletion: latestEnd ? formatDate(latestEnd) : formatDate(addDays(today, randomInt(1, 5))),
         delayDays,
       });
     }

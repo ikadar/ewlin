@@ -34,6 +34,8 @@ export interface JcfState {
   jcfQuantity: string;
   /** Deadline (ISO date string or French format) */
   jcfDeadline: string;
+  /** Shipper (transporteur) ID */
+  jcfShipperId: string;
   /** Elements array */
   jcfElements: JcfElement[];
   /** Sequence workflow from selected template */
@@ -60,6 +62,7 @@ const initialState: JcfState = {
   jcfIntitule: '',
   jcfQuantity: '',
   jcfDeadline: '',
+  jcfShipperId: '',
   jcfElements: [{ ...DEFAULT_ELEMENT }],
   sequenceWorkflow: [],
   isTemplateEditorOpen: false,
@@ -89,6 +92,7 @@ const jcfSlice = createSlice({
       state.jcfIntitule = '';
       state.jcfQuantity = '';
       state.jcfDeadline = '';
+      state.jcfShipperId = '';
       state.jcfElements = [{ ...DEFAULT_ELEMENT }];
       state.sequenceWorkflow = [];
       state.jcfSaveError = null;
@@ -116,6 +120,10 @@ const jcfSlice = createSlice({
 
     setJcfDeadline: (state, action: PayloadAction<string>) => {
       state.jcfDeadline = action.payload;
+    },
+
+    setJcfShipperId: (state, action: PayloadAction<string>) => {
+      state.jcfShipperId = action.payload;
     },
 
     setJcfElements: (state, action: PayloadAction<JcfElement[]>) => {
@@ -148,6 +156,7 @@ const jcfSlice = createSlice({
       state.jcfIntitule = '';
       state.jcfQuantity = '';
       state.jcfDeadline = '';
+      state.jcfShipperId = '';
       state.jcfElements = [{ ...DEFAULT_ELEMENT }];
       state.sequenceWorkflow = [];
       state.jcfSaveError = null;
@@ -169,6 +178,7 @@ export const {
   setJcfIntitule,
   setJcfQuantity,
   setJcfDeadline,
+  setJcfShipperId,
   setJcfElements,
   setSequenceWorkflow,
   setIsTemplateEditorOpen,
