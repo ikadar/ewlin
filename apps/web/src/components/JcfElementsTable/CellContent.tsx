@@ -33,6 +33,7 @@ import { useGetFormatsQuery } from '../../store/api/formatApi';
 import { useGetImpressionPresetsQuery } from '../../store/api/impressionPresetApi';
 import { useGetSurfacagePresetsQuery } from '../../store/api/surfacagePresetApi';
 import { useGetFeuilleFormatsQuery } from '../../store/api/feuilleFormatApi';
+import { useGetProvidersQuery } from '../../store/api/providerApi';
 import type { JcfMode } from './requiredFields';
 import { createTabOutHandler, createArrowNavHandler } from './navigationUtils';
 
@@ -75,6 +76,15 @@ function SequenceCell(props: CellContentProps) {
   const { cellId, value, inputFilledClass, elementIndex, rowIndex, rowCount, elementCount } = props;
   const { postePresets, sequenceWorkflow, sessionLearning, focusCell, handleCellChange, markFieldTouched } = props;
 
+  const { data: providers } = useGetProvidersQuery();
+
+  const dynamicSoustraitantPresets = useMemo(() => {
+    if (!providers) return SOUSTRAITANT_PRESETS;
+    return providers
+      .filter(p => p.status === 'Active')
+      .map(p => ({ name: p.name }));
+  }, [providers]);
+
   return (
     <JcfSequenceAutocomplete
       id={cellId}
@@ -83,7 +93,7 @@ function SequenceCell(props: CellContentProps) {
       postePresets={postePresets}
       sessionPostes={sessionLearning.postes}
       onLearnPoste={(poste: PostePresetLike) => sessionLearning.learnPoste(poste as import('@flux/types').PostePreset)}
-      soustraitantPresets={SOUSTRAITANT_PRESETS}
+      soustraitantPresets={dynamicSoustraitantPresets}
       sessionSoustraitants={sessionLearning.soustraitants}
       onLearnSoustraitant={sessionLearning.learnSoustraitant}
       sequenceWorkflow={sequenceWorkflow}

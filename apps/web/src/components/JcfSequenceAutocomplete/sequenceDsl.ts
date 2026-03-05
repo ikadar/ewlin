@@ -11,8 +11,8 @@
 /** Poste line validation regex: Name(duration) or Name(setup+run) */
 const POSTE_REGEX = /^\w+\(\d+(\+\d+)?\)$/;
 
-/** ST line validation regex: ST:Name(duration):description */
-const ST_REGEX = /^ST:\w+\(\d+[jh]?\):.+$/;
+/** ST line validation regex: ST:Name(duration):description — supports accented chars */
+const ST_REGEX = /^ST:[\w\p{L}]+\(\d+[jh]?\):.+$/u;
 
 /** Default duration suggestions for poste mode */
 export const DEFAULT_DURATIONS = [
@@ -79,7 +79,7 @@ export interface CurrentLineInfo {
 export function parseLine(line: string): ParsedLine {
   // ST description: ST:Name(duration):... — typing free-text description
   // Must check before generic complete since ST desc also has (...)
-  const stDescMatch = line.match(/^ST:\w+\([^)]+\):(.*)$/i);
+  const stDescMatch = line.match(/^ST:[\w\p{L}]+\([^)]+\):(.*)$/iu);
   if (stDescMatch) {
     return {
       step: 'st-description',
@@ -99,7 +99,7 @@ export function parseLine(line: string): ParsedLine {
     const afterST = stMatch[2];
 
     // Inside parentheses (typing duration)
-    const parenMatch = afterST.match(/^(\w+)\((.*)$/);
+    const parenMatch = afterST.match(/^([\w\p{L}]+)\((.*)$/u);
     if (parenMatch) {
       return {
         step: 'st-duration',
