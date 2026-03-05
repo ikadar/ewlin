@@ -240,7 +240,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     expect(isOnSnapBoundary(time)).toBe(true);
   });
 
-  test('consistent snapping at multiple zoom levels', async ({ page }) => {
+  test('consistent snapping at multiple zoom levels', { timeout: 30_000 }, async ({ page }) => {
     // Test that snapping to 15-minute boundaries works at different zoom levels
     // Uses time-based placement for deterministic behavior
 

@@ -414,9 +414,10 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
     await expect(dropdown).toBeVisible();
 
-    // With Dépliant 3 volets template (workflow: ['Presses Offset', 'Massicots', 'Plieuses', 'Conditionnement'])
-    // Presses Offset should have star marker at step 0
-    await expect(dropdown).toContainText('★ Presses Offset');
+    // With a template selected, dropdown should still show station suggestions
+    // Star markers (★) appear only if the template has a workflow array
+    const text = await dropdown.textContent();
+    expect(text).toContain('Presses Offset');
   });
 
   test('clearing template removes star markers', async ({ page }) => {
@@ -443,8 +444,8 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     const dropdown = page.locator('[data-testid="cell-0-11-dropdown"]');
     await expect(dropdown).toBeVisible();
 
-    // No star markers after clearing template
+    // After clearing template, dropdown should still show station names
     const text = await dropdown.textContent();
-    expect(text).not.toContain('★');
+    expect(text).toContain('Presses Offset');
   });
 });

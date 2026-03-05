@@ -104,6 +104,11 @@ test.describe('v0.4.7: JCF Job Header Basic Fields', () => {
       const quantite = page.locator('[data-testid="jcf-field-quantite"]');
       await expect(quantite).toBeFocused();
 
+      // Tab to Transporteur (added between Quantité and Deadline)
+      await page.keyboard.press('Tab');
+      const transporteur = page.locator('[data-testid="jcf-field-transporteur"]');
+      await expect(transporteur).toBeFocused();
+
       // Tab to Deadline
       await page.keyboard.press('Tab');
       const deadline = page.locator('[data-testid="jcf-field-deadline"]');
