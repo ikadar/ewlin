@@ -619,7 +619,7 @@ export const FluxTable = memo(function FluxTable({
   return (
     <FluxTableContext.Provider value={ctxValue}>
       <div
-        className="h-full overflow-auto"
+        className="h-full overflow-auto scrollbar-visible"
       >
         <table
           className="w-full table-fixed"

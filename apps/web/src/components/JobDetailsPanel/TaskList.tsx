@@ -251,7 +251,7 @@ export function TaskList({
     .sort((a, b) => job.elementIds.indexOf(a.id) - job.elementIds.indexOf(b.id));
 
   return (
-    <div className="p-3 overflow-y-auto flex-grow bg-zinc-900/30 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    <div className="p-3 overflow-y-auto flex-grow bg-zinc-900/30">
       {jobElements.map((element) => {
         // Get tasks for this element
         const elementTasks = element.taskIds

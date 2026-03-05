@@ -95,15 +95,19 @@ body {
   }
 }
 
-/* ── Global dark scrollbar ── */
-/* Thin dark scrollbar for all scrollable elements (Chromium + Firefox). */
-*::-webkit-scrollbar { width: 6px; height: 6px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
-*::-webkit-scrollbar-thumb:hover { background: rgb(110 110 110); }
+/* ── Scrollbar: hidden by default, visible where opted in ── */
+*::-webkit-scrollbar { width: 0; height: 0; }
+
+.scrollbar-visible::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-visible::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-visible::-webkit-scrollbar-thumb { background: rgb(80 80 80); border-radius: 3px; }
+.scrollbar-visible::-webkit-scrollbar-thumb:hover { background: rgb(110 110 110); }
 
 /* Firefox */
 * {
+  scrollbar-width: none;
+}
+.scrollbar-visible {
   scrollbar-width: thin;
   scrollbar-color: rgb(80 80 80) transparent;
 }

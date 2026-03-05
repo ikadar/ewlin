@@ -402,7 +402,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   return (
     <div
       ref={scrollContainerRef}
-      className="flex-1 overflow-auto min-w-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      className="flex-1 overflow-auto min-w-0"
       data-testid="scheduling-grid"
     >
       {/* Grid content wrapper - enables horizontal scrolling */}

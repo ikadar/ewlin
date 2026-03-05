@@ -177,7 +177,7 @@ describe('SchedulingGrid', () => {
     render(<SchedulingGrid stations={mockStations} />);
 
     const container = screen.getByTestId('scheduling-grid');
-    expect(container).toHaveClass('overflow-auto', '[scrollbar-width:none]');
+    expect(container).toHaveClass('overflow-auto');
   });
 
   it('renders hour grid lines in station columns', () => {
