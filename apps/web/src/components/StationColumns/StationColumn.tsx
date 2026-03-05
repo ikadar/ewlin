@@ -270,7 +270,7 @@ export const StationColumn = memo(function StationColumn({
   return (
     <div
       ref={columnRef}
-      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-[#0a0a0a] relative transition-[filter,opacity,box-shadow] duration-150 ease-out ${getHighlightClass()} ${getCursorClass()}`}
+      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-[#0a0a0a] relative transition-[filter,opacity,box-shadow] duration-150 ease-out outline-none ${getHighlightClass()} ${getCursorClass()}`}
       style={{ ...(customWidth !== null ? { width: `${customWidth}px` } : {}), height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
       onMouseMove={handleMouseMove}

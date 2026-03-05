@@ -108,6 +108,12 @@ body {
   scrollbar-color: rgb(80 80 80) transparent;
 }
 
+/* Suppress default browser focus outline (blue ring) for mouse/touch interactions.
+   Keyboard users still see focus-visible where components opt in. */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* ── ST (Sous-traitance) column (v0.5.23, spec §4–5) ── */
 
 /* ST cell container — vertical flex, compact */

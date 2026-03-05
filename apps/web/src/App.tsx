@@ -181,6 +181,9 @@ function handleEscapePick(e: KeyboardEvent, cancelPick: () => void, isPicking: b
 function handleEscapeCloseJob(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (e.key === 'Escape' && ctx.selectedJobId && !ctx.isJcfOpen) {
     ctx.setSelectedJobId(null);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     return true;
   }
   return false;
