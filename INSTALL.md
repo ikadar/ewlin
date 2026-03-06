@@ -2,16 +2,6 @@
 
 Complete setup guide for the development environment. Intended for automated execution by Claude Code or similar AI assistants.
 
-## Prerequisites
-
-| Tool | Minimum version | Check command |
-|------|----------------|---------------|
-| Docker Desktop | 28.x | `docker --version` |
-| Docker Compose | v2.x | `docker compose version` |
-| Node.js | 20.x (recommended: 22+) | `node --version` |
-| pnpm | 9.x | `pnpm --version` |
-| Git | 2.x | `git --version` |
-
 ## Architecture Overview
 
 ```
@@ -28,8 +18,125 @@ ewlin/                          # Monorepo root (pnpm workspace)
 │   ├── php/Dockerfile          # PHP 8.3 FPM Alpine
 │   ├── nginx/default.conf      # Nginx reverse proxy
 │   └── mariadb/init/01-init.sql # DB init script
-└── docker-compose.yml          # All backend services
+└── docker-compose.yml          # Backend services (PHP, MariaDB, Redis, Nginx, validation-service)
 ```
+
+### Git submodules
+
+| Path | Remote repo |
+|------|-------------|
+| `services/php-api` | `git@github.com:ikadar/ewlin-php-api.git` |
+| `packages/types` | `git@github.com:ikadar/ewlin-types.git` |
+| `packages/validator` | `git@github.com:ikadar/ewlin-validator.git` |
+| `services/validation-service` | `git@github.com:ikadar/ewlin-validation-service.git` |
+
+## Setup paths
+
+There are two ways to run the project:
+
+| Path | What you get | Docker needed? |
+|------|-------------|----------------|
+| **A) Frontend only (mock data)** | React UI with built-in mock data, no backend | No |
+| **B) Full stack (real API)** | React UI + PHP API + MariaDB + Redis + validation service | Yes |
+
+Choose path A if you only work on the frontend. Choose path B if you need the real API backend.
+
+---
+
+## Common steps (both paths)
+
+### 1. Clone the repository
+
+```bash
+git clone --recurse-submodules git@github.com:ikadar/ewlin.git
+cd ewlin
+```
+
+If already cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### 2. Prerequisites (common)
+
+| Tool | Minimum version | Check command |
+|------|----------------|---------------|
+| Node.js | 20.x (recommended: 22+) | `node --version` |
+| pnpm | 9.x | `pnpm --version` |
+| Git | 2.x | `git --version` |
+
+### 3. Install pnpm dependencies
+
+From the monorepo root:
+
+```bash
+pnpm install
+```
+
+This installs dependencies for all workspace packages: `packages/types`, `packages/validator`, `services/validation-service`, `apps/web`.
+
+### 4. Build TypeScript packages (dependency order)
+
+```bash
+pnpm --filter @flux/types build
+pnpm --filter @flux/schedule-validator build
+```
+
+Build order matters: `types` first, then `validator` (which depends on types). These must be built before the web app can use them — `apps/web` links to them directly via the pnpm workspace.
+
+---
+
+## Path A: Frontend only (mock data)
+
+No Docker required. After completing the common steps above:
+
+### A1. Configure mock mode
+
+```bash
+cat > apps/web/.env.development.local << 'EOF'
+VITE_USE_MOCK=true
+EOF
+```
+
+### A2. Start the dev server
+
+```bash
+cd apps/web
+pnpm dev
+```
+
+The Vite dev server starts at **http://localhost:5173**. The app uses built-in mock data — no backend services needed.
+
+### A3. Verify
+
+```bash
+cd apps/web
+
+# TypeScript check
+pnpm tsc -b --noEmit
+
+# ESLint
+pnpm lint
+
+# Vitest unit tests
+pnpm test
+```
+
+You're done. Skip to the [Quick reference](#quick-reference) section.
+
+---
+
+## Path B: Full stack (real API)
+
+Requires Docker in addition to the common prerequisites. After completing the common steps above:
+
+### Additional prerequisites
+
+| Tool | Minimum version | Check command |
+|------|----------------|---------------|
+| Docker Desktop | 28.x | `docker --version` |
+| Docker Compose | v2.x | `docker compose version` |
 
 ### Docker services
 
@@ -50,29 +157,7 @@ ewlin/                          # Monorepo root (pnpm workspace)
 
 The test database exists because Symfony's Doctrine config (`config/packages/doctrine.yaml`) appends `_test` suffix in the `test` environment via `dbname_suffix`.
 
-## Step 1: Clone the repository
-
-```bash
-git clone --recurse-submodules git@github.com:ikadar/ewlin.git
-cd ewlin
-```
-
-If already cloned without submodules:
-
-```bash
-git submodule update --init --recursive
-```
-
-### Git submodules
-
-| Path | Remote repo |
-|------|-------------|
-| `services/php-api` | `git@github.com:ikadar/ewlin-php-api.git` |
-| `packages/types` | `git@github.com:ikadar/ewlin-types.git` |
-| `packages/validator` | `git@github.com:ikadar/ewlin-validator.git` |
-| `services/validation-service` | `git@github.com:ikadar/ewlin-validation-service.git` |
-
-## Step 2: Environment file
+### B1. Environment file
 
 ```bash
 cp .env.example .env
@@ -92,7 +177,7 @@ APP_ENV=development
 
 **IMPORTANT:** The `APP_ENV` is `development` (not `dev`). This is a non-standard Symfony environment name. The PHP container receives this value and all bundle registrations must include `'development' => true`.
 
-## Step 3: Start Docker services
+### B2. Start Docker services
 
 ```bash
 docker compose up -d --build
@@ -121,15 +206,15 @@ docker compose exec -T mariadb mariadb -u root -pflux_root_secret_change_me -e "
 "
 ```
 
-## Step 4: PHP API setup
+### B3. PHP API setup
 
-### 4a. Install Composer dependencies
+#### Install Composer dependencies
 
 ```bash
 docker compose exec -T php composer install
 ```
 
-### 4b. Run database migrations
+#### Run database migrations
 
 ```bash
 docker compose exec -T php php bin/console doctrine:migrations:migrate --no-interaction
@@ -137,7 +222,7 @@ docker compose exec -T php php bin/console doctrine:migrations:migrate --no-inte
 
 This applies all 39 migrations to the `flux_scheduler` database.
 
-### 4c. Set up the test database schema
+#### Set up the test database schema
 
 The test database uses `doctrine:schema:create` (NOT migrations), because integration tests expect a clean schema:
 
@@ -152,7 +237,7 @@ docker compose exec -T php php bin/console doctrine:schema:drop --force --env=te
 docker compose exec -T php php bin/console doctrine:schema:create --env=test
 ```
 
-### 4d. Load fixture data
+#### Load fixture data
 
 ```bash
 docker compose exec -T php php bin/console doctrine:fixtures:load --no-interaction
@@ -174,7 +259,7 @@ To reload fixtures at any time (purges all data first):
 docker compose exec -T php php bin/console doctrine:fixtures:load --no-interaction
 ```
 
-### 4e. Verify PHP API
+#### Verify PHP API
 
 ```bash
 # Health check
@@ -187,43 +272,7 @@ curl -s http://localhost:8080/health
 curl -s http://localhost:8080/api/v1/stations | head -c 200
 ```
 
-## Step 5: Node.js packages setup
-
-### 5a. Install all pnpm dependencies
-
-From the monorepo root:
-
-```bash
-pnpm install
-```
-
-This installs dependencies for all workspace packages: `packages/types`, `packages/validator`, `services/validation-service`, `apps/web`, and any others in the pnpm workspace.
-
-### 5b. Build TypeScript packages (dependency order)
-
-```bash
-pnpm --filter @flux/types build
-pnpm --filter @flux/schedule-validator build
-```
-
-These must be built before the web app or validation-service can use them. The build order matters: `types` → `validator` (validator depends on types).
-
-**NOTE:** The `validation-service` is built inside its Docker container (multi-stage Dockerfile), so you do not need to build it locally. But the workspace packages (`types`, `validator`) must be built locally because `apps/web` links to them directly.
-
-## Step 6: React frontend setup
-
-### 6a. Environment files
-
-The web app has multiple env files:
-
-| File | Purpose |
-|------|---------|
-| `apps/web/.env.development` | Default dev config |
-| `apps/web/.env.development.local` | Local overrides (gitignored) |
-| `apps/web/.env.local` | General local overrides (gitignored) |
-| `apps/web/.env.production` | Production config |
-
-For development with the real API backend:
+### B4. Configure frontend for real API
 
 ```bash
 cat > apps/web/.env.development.local << 'EOF'
@@ -232,15 +281,7 @@ VITE_API_URL=http://localhost:8080/api/v1
 EOF
 ```
 
-For development with mock data (no backend needed):
-
-```bash
-cat > apps/web/.env.development.local << 'EOF'
-VITE_USE_MOCK=true
-EOF
-```
-
-### 6b. Start the dev server
+### B5. Start the frontend dev server
 
 ```bash
 cd apps/web
@@ -251,16 +292,16 @@ The Vite dev server starts at **http://localhost:5173**.
 
 CORS is pre-configured in `docker/nginx/default.conf` to allow requests from `http://localhost:5173`.
 
-### Alternative dev commands
+Alternative dev commands:
 
 ```bash
 pnpm dev:mock   # Force mock data mode (VITE_USE_MOCK=true)
 pnpm dev:api    # Force real API mode (VITE_USE_MOCK=false)
 ```
 
-## Verification
+### B6. Verify full stack
 
-### PHP API checks
+#### PHP API checks
 
 ```bash
 # PHPStan static analysis (level 8)
@@ -273,7 +314,7 @@ docker compose exec -T php vendor/bin/phpunit --testsuite=Unit
 docker compose exec -T php vendor/bin/phpunit --testsuite=Integration
 ```
 
-### Frontend checks
+#### Frontend checks
 
 ```bash
 cd apps/web
@@ -291,11 +332,13 @@ pnpm test
 # npx playwright test
 ```
 
-### Validation service check
+#### Validation service check
 
 ```bash
 curl -s http://localhost:3001/health
 ```
+
+---
 
 ## Troubleshooting
 
@@ -363,6 +406,20 @@ docker compose exec -T php php bin/console doctrine:fixtures:load --no-interacti
 
 ## Quick reference
 
+### Frontend (no Docker needed)
+
+| What | Command |
+|------|---------|
+| Frontend dev server | `cd apps/web && pnpm dev` |
+| Frontend dev (mock) | `cd apps/web && pnpm dev:mock` |
+| Frontend dev (API) | `cd apps/web && pnpm dev:api` |
+| Frontend tests | `cd apps/web && pnpm test` |
+| ESLint | `cd apps/web && pnpm lint` |
+| TypeScript check | `cd apps/web && pnpm tsc -b --noEmit` |
+| Build TS packages | `pnpm --filter @flux/types build && pnpm --filter @flux/schedule-validator build` |
+
+### Backend (Docker)
+
 | What | Command |
 |------|---------|
 | Start all services | `docker compose up -d` |
@@ -375,6 +432,3 @@ docker compose exec -T php php bin/console doctrine:fixtures:load --no-interacti
 | PHPStan | `docker compose exec -T php vendor/bin/phpstan analyse --level=8 --memory-limit=512M` |
 | PHP unit tests | `docker compose exec -T php vendor/bin/phpunit --testsuite=Unit` |
 | PHP integration tests | `docker compose exec -T php vendor/bin/phpunit --testsuite=Integration` |
-| Frontend dev server | `cd apps/web && pnpm dev` |
-| Frontend tests | `cd apps/web && pnpm test` |
-| Build TS packages | `pnpm --filter @flux/types build && pnpm --filter @flux/schedule-validator build` |
