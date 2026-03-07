@@ -172,13 +172,22 @@ export function TopNavBar({
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-zinc-500">Affichage</span>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${
+              className={`px-2.5 py-0.5 rounded-l-full text-xs font-semibold uppercase tracking-wide transition-colors ${
+                displayMode === 'produit'
+                  ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                  : 'bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              produit
+            </span>
+            <span
+              className={`-ml-1.5 px-2.5 py-0.5 rounded-r-full text-xs font-semibold uppercase tracking-wide transition-colors ${
                 displayMode === 'tirage'
                   ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
                   : 'bg-zinc-700 text-zinc-300'
               }`}
             >
-              {displayMode}
+              tirage
             </span>
           </div>
         )}
