@@ -1,4 +1,4 @@
-import { Crosshair, Minus, Plus, Loader2 } from 'lucide-react';
+import { Crosshair, Minus, Plus, Loader2, Save } from 'lucide-react';
 import { ZOOM_LEVELS } from './constants';
 import { COMPACT_HORIZONS, type CompactHorizon } from '../../utils/compactTimeline';
 
@@ -29,6 +29,8 @@ export interface TopNavBarProps {
   isCompacting?: boolean;
   /** Current display mode (Produit or Tirage) */
   displayMode?: 'produit' | 'tirage';
+  /** Callback to open save/load modal */
+  onOpenSaveLoad?: () => void;
 }
 
 /**
@@ -44,6 +46,7 @@ export function TopNavBar({
   onCompactTimeline,
   isCompacting = false,
   displayMode,
+  onOpenSaveLoad,
 }: TopNavBarProps) {
   // Find current zoom level index
   const currentZoomIndex = ZOOM_LEVELS.findIndex((z) => z.pixelsPerHour === pixelsPerHour);
@@ -152,19 +155,39 @@ export function TopNavBar({
         </div>
       </div>
 
-      {/* Right section: Display mode indicator */}
-      <div className="flex items-center gap-2">
+      {/* Right section: Save/Load + Display mode indicator */}
+      <div className="flex items-center gap-3">
+        {onOpenSaveLoad && (
+          <button
+            onClick={onOpenSaveLoad}
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide text-zinc-300 bg-zinc-700 hover:bg-zinc-600 transition-colors"
+            title="Sauvegardes"
+            data-testid="schedule-save-load-button"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Sauvegardes
+          </button>
+        )}
         {displayMode && (
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-zinc-500">Affichage</span>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${
+              className={`px-2.5 py-0.5 rounded-l-full text-xs font-semibold uppercase tracking-wide transition-colors ${
+                displayMode === 'produit'
+                  ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                  : 'bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              produit
+            </span>
+            <span
+              className={`-ml-1.5 px-2.5 py-0.5 rounded-r-full text-xs font-semibold uppercase tracking-wide transition-colors ${
                 displayMode === 'tirage'
                   ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
                   : 'bg-zinc-700 text-zinc-300'
               }`}
             >
-              {displayMode}
+              tirage
             </span>
           </div>
         )}

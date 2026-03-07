@@ -112,8 +112,13 @@ export {
   useUnassignTaskMutation,
   useToggleCompletionMutation,
   useCompactStationMutation,
+  useGetSavedSchedulesQuery,
+  useSaveScheduleMutation,
+  useLoadScheduleMutation,
+  useDeleteSavedScheduleMutation,
   scheduleApi,
 } from './api/scheduleApi';
+export type { SavedScheduleItem } from './api/scheduleApi';
 
 export { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation, templateApi } from './api/templateApi';
 
