@@ -2052,8 +2052,20 @@ function AppContent() {
 
   return (
     <>
-      <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Navigation Bar - now only spans width after sidebar (REQ-07.2/07.3) */}
+      <div className="flex-1 flex overflow-hidden">
+        <JobsList
+          jobs={snapshot.jobs}
+          tasks={snapshot.tasks}
+          elements={snapshot.elements}
+          assignments={snapshot.assignments}
+          lateJobs={snapshot.lateJobs}
+          conflicts={snapshot.conflicts}
+          selectedJobId={selectedJobId}
+          onSelectJob={setSelectedJobId}
+          onAddJob={handleOpenJcf}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Top Navigation Bar - spans width from DateStrip onward */}
           <TopNavBar
             isQuickPlacementMode={isQuickPlacementMode}
             onToggleQuickPlacement={handleToggleQuickPlacement}
@@ -2068,17 +2080,6 @@ function AppContent() {
 
           {/* Content area */}
           <div className="flex-1 flex overflow-hidden">
-          <JobsList
-          jobs={snapshot.jobs}
-          tasks={snapshot.tasks}
-          elements={snapshot.elements}
-          assignments={snapshot.assignments}
-          lateJobs={snapshot.lateJobs}
-          conflicts={snapshot.conflicts}
-          selectedJobId={selectedJobId}
-          onSelectJob={setSelectedJobId}
-          onAddJob={handleOpenJcf}
-        />
         <JobDetailsPanel
           job={selectedJob}
           tasks={snapshot.tasks}
@@ -2165,6 +2166,7 @@ function AppContent() {
         />
           </div>
         </div>
+      </div>
 
       {/* v0.3.54: Pick preview - ghost tile during pick */}
       <PickPreview
