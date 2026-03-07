@@ -8,6 +8,7 @@ import { GlobalToast } from './components/GlobalToast';
 import { MaintenanceState } from './components/MaintenanceState';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
+import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
@@ -451,6 +452,8 @@ function AppContent() {
   const [isJcfSaving, setIsJcfSaving] = useState(false);
   // v0.4.33: API error state
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
+  // Schedule save/load modal
+  const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
 
   // v0.4.33: Save job via API (v0.5.4: migrated to RTK Query mutation)
   // v0.5.13b: Supports both create and update modes
@@ -2060,6 +2063,7 @@ function AppContent() {
             onCompactTimeline={handleCompactTimeline}
             isCompacting={isCompactingTimeline}
             displayMode={displayMode}
+            onOpenSaveLoad={() => setIsSaveLoadOpen(true)}
           />
 
           {/* Content area */}
@@ -2265,6 +2269,12 @@ function AppContent() {
 
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
+
+      {/* Schedule save/load modal */}
+      <ScheduleSaveLoadModal
+        isOpen={isSaveLoadOpen}
+        onClose={() => setIsSaveLoadOpen(false)}
+      />
     </>
   );
 }

@@ -37,6 +37,34 @@ import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
 
 /**
+ * Response from getSavedSchedules query.
+ */
+export interface SavedScheduleItem {
+  id: string;
+  name: string;
+  assignmentCount: number;
+  sourceVersion: number;
+  createdAt: string;
+}
+
+/**
+ * Warning generated during schedule load (inconsistency detection).
+ */
+export interface LoadWarning {
+  type: 'task_filtered_deleted' | 'task_filtered_cancelled' | 'target_filtered_deleted' | 'end_time_recalculated';
+  details: Record<string, string | boolean | null>;
+}
+
+/**
+ * Response from loadSchedule mutation.
+ */
+export interface LoadScheduleResponse {
+  version: number;
+  assignmentCount: number;
+  warnings: LoadWarning[];
+}
+
+/**
  * Response from createJob mutation.
  * Simplified response with essential job info.
  */
@@ -136,7 +164,7 @@ function calculateOptimisticEndTime(
 export const scheduleApi = createApi({
   reducerPath: 'scheduleApi',
   baseQuery: baseQueryWithFixtureSupport,
-  tagTypes: ['Snapshot', 'ClientSuggestions'],
+  tagTypes: ['Snapshot', 'ClientSuggestions', 'SavedSchedules'],
 
   endpoints: (builder) => ({
     // ========================================================================
@@ -513,6 +541,40 @@ export const scheduleApi = createApi({
       }),
       invalidatesTags: ['Snapshot'],
     }),
+
+    // ========================================================================
+    // Saved Schedules
+    // ========================================================================
+
+    getSavedSchedules: builder.query<SavedScheduleItem[], void>({
+      query: () => '/saved-schedules',
+      providesTags: ['SavedSchedules'],
+    }),
+
+    saveSchedule: builder.mutation<SavedScheduleItem, { name: string }>({
+      query: (body) => ({
+        url: '/saved-schedules',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['SavedSchedules'],
+    }),
+
+    loadSchedule: builder.mutation<LoadScheduleResponse, string>({
+      query: (id) => ({
+        url: `/saved-schedules/${id}/load`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Snapshot', 'SavedSchedules'],
+    }),
+
+    deleteSavedSchedule: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/saved-schedules/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['SavedSchedules'],
+    }),
   }),
 });
 
@@ -534,4 +596,8 @@ export const {
   useUnassignTaskMutation,
   useToggleCompletionMutation,
   useCompactStationMutation,
+  useGetSavedSchedulesQuery,
+  useSaveScheduleMutation,
+  useLoadScheduleMutation,
+  useDeleteSavedScheduleMutation,
 } = scheduleApi;

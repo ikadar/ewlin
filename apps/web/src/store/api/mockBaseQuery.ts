@@ -2619,6 +2619,102 @@ const handlePatchFluxElement = async (
   return { data: {} };
 };
 
+// ============================================================================
+// Saved Schedules (in-memory store)
+// ============================================================================
+
+interface MockSavedSchedule {
+  id: string;
+  name: string;
+  assignments: TaskAssignment[];
+  assignmentCount: number;
+  sourceVersion: number;
+  createdAt: string;
+}
+
+const mockSavedSchedules: MockSavedSchedule[] = [];
+
+const handleGetSavedSchedules: MockRouteHandler = async () => {
+  return {
+    data: mockSavedSchedules.map(({ id, name, assignmentCount, sourceVersion, createdAt }) => ({
+      id, name, assignmentCount, sourceVersion, createdAt,
+    })),
+  };
+};
+
+const handleSaveSchedule: MockRouteHandler = async (args: FetchArgs) => {
+  const body = args.body as { name?: string } | undefined;
+  const name = body?.name ?? 'Untitled';
+
+  const snapshot = getSnapshot();
+  const assignments = [...snapshot.assignments];
+
+  const saved: MockSavedSchedule = {
+    id: generateId(),
+    name,
+    assignments,
+    assignmentCount: assignments.length,
+    sourceVersion: snapshot.version ?? 0,
+    createdAt: new Date().toISOString(),
+  };
+
+  mockSavedSchedules.unshift(saved);
+
+  return {
+    data: {
+      id: saved.id,
+      name: saved.name,
+      assignmentCount: saved.assignmentCount,
+      sourceVersion: saved.sourceVersion,
+      createdAt: saved.createdAt,
+    },
+  };
+};
+
+const handleLoadSchedule: MockRouteHandler = async (args: FetchArgs) => {
+  const id = extractPathParam(args.url, /^\/saved-schedules\/([^/]+)\/load$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing saved schedule ID' } } };
+  }
+
+  const saved = mockSavedSchedules.find((s) => s.id === id);
+  if (!saved) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Saved schedule not found' } } };
+  }
+
+  // Replace snapshot assignments with saved ones
+  const snapshot = getSnapshot();
+  updateSnapshot({
+    ...snapshot,
+    assignments: [...saved.assignments],
+    version: (snapshot.version ?? 0) + 1,
+  });
+
+  const updated = getSnapshot();
+  return {
+    data: {
+      version: updated.version ?? 1,
+      assignmentCount: updated.assignments.length,
+      warnings: [],
+    },
+  };
+};
+
+const handleDeleteSavedSchedule: MockRouteHandler = async (args: FetchArgs) => {
+  const id = extractPathParam(args.url, /^\/saved-schedules\/([^/]+)$/);
+  if (!id) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing saved schedule ID' } } };
+  }
+
+  const index = mockSavedSchedules.findIndex((s) => s.id === id);
+  if (index === -1) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Saved schedule not found' } } };
+  }
+
+  mockSavedSchedules.splice(index, 1);
+  return { data: null };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
@@ -2695,6 +2791,12 @@ const routes: MockRoute[] = [
 
   // Task completion
   { method: 'PUT', pattern: /^\/tasks\/[^/]+\/completion$/, handler: handleToggleCompletion },
+
+  // Saved Schedules (load must come before generic ID route)
+  { method: 'GET',    pattern: /^\/saved-schedules$/,              handler: handleGetSavedSchedules },
+  { method: 'POST',   pattern: /^\/saved-schedules$/,              handler: handleSaveSchedule },
+  { method: 'POST',   pattern: /^\/saved-schedules\/[^/]+\/load$/, handler: handleLoadSchedule },
+  { method: 'DELETE', pattern: /^\/saved-schedules\/[^/]+$/,       handler: handleDeleteSavedSchedule },
 ];
 
 // ============================================================================
