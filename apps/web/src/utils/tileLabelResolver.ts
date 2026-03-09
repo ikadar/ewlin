@@ -74,16 +74,16 @@ export function getTirageLabel(
   if (name.includes('offset')) {
     const { type, grammage } = parsePapierDSL(s?.papier ?? '');
     const dims = extractDimensions(s?.imposition);
-    content = [type, grammage, dims, s?.impression, s?.quantite ? `${s.quantite}ex` : '']
+    content = [type, grammage, dims, s?.impression, job.quantity ? `${job.quantity}ex` : '']
       .filter(Boolean)
       .join(' ');
   } else if (name.includes('massicot')) {
-    content = [s?.format, s?.quantite ? `${s.quantite}ex` : ''].filter(Boolean).join(' ');
+    content = [s?.format, job.quantity ? `${job.quantity}ex` : ''].filter(Boolean).join(' ');
   } else if (name.includes('plieuse')) {
     const { type, grammage } = parsePapierDSL(s?.papier ?? '');
     const mode = detectBrochureOrLeaflet(element, jobElements, taskMap, assemblyStationIds);
     if (mode === 'leaflet') {
-      content = [s?.format, type, grammage, s?.quantite ? `${s.quantite}ex` : '']
+      content = [s?.format, type, grammage, job.quantity ? `${job.quantity}ex` : '']
         .filter(Boolean)
         .join(' ');
     } else {
@@ -92,7 +92,7 @@ export function getTirageLabel(
         s?.pagination ? `${s.pagination}p` : null,
         type,
         grammage,
-        s?.quantite ? `${s.quantite}ex` : '',
+        job.quantity ? `${job.quantity}ex` : '',
       ]
         .filter(Boolean)
         .join(' ');
@@ -118,7 +118,7 @@ export function getTirageLabel(
   } else if (name.includes('assembleuse')) {
     // Assembleuses (not piqueuse — already handled above)
     const feuillets = s?.pagination ? Math.ceil(s.pagination / 4) : null;
-    content = [feuillets ? `${feuillets} feuillets` : null, s?.quantite ? `${s.quantite}ex` : '']
+    content = [feuillets ? `${feuillets} feuillets` : null, job.quantity ? `${job.quantity}ex` : '']
       .filter(Boolean)
       .join(' ');
   } else if (name.includes('typographie')) {

@@ -240,20 +240,19 @@ describe('Tile', () => {
     expect(screen.queryByTestId('tile-incomplete-icon')).not.toBeInTheDocument();
   });
 
-  it('applies brightness filter and pulse animation when selected', () => {
+  it('applies glow when selected', () => {
     render(<Tile {...defaultProps} isSelected={true} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).toHaveStyle({ filter: 'brightness(1.35)' });
-    expect(tile).toHaveClass('animate-sel-pulse');
+    expect(tile).toHaveClass('tile-selected-glow');
+    expect(tile.style.getPropertyValue('--glow-color')).toBe('rgba(59,130,246,0.4)');
   });
 
   it('does not apply selection styling when not selected', () => {
     render(<Tile {...defaultProps} isSelected={false} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).not.toHaveClass('animate-sel-pulse');
-    expect(tile.style.filter).toBeFalsy();
+    expect(tile).not.toHaveClass('tile-selected-glow');
   });
 
   it('calls onSelect with job id when clicked', () => {
@@ -444,7 +443,7 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).toHaveClass('transition-[filter,opacity]');
+    expect(tile).toHaveClass('transition-[filter,opacity,box-shadow,outline]');
     expect(tile).toHaveClass('duration-150');
     expect(tile).toHaveClass('ease-out');
   });

@@ -173,13 +173,17 @@ body {
   background-repeat: repeat;
 }
 
-/* State-based tile selection pulse */
-@keyframes sel-pulse {
-  0%, 100% { background-color: rgba(255,255,255,0); }
-  50% { background-color: rgba(255,255,255,0.07); }
+
+/* Tile selection: pulsating glow + outline (playground-derived) */
+@keyframes tile-selection-glow {
+  0%, 100% { box-shadow: 0 0 8px 2px var(--glow-color); }
+  50% { box-shadow: 0 0 16px 4px var(--glow-color); }
 }
-.animate-sel-pulse {
-  animation: sel-pulse 2s ease-in-out infinite;
+
+.tile-selected-glow {
+  animation: tile-selection-glow 2s ease-in-out infinite;
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 1px;
 }
 
 /* v0.3.56: Pick & Place visual feedback */

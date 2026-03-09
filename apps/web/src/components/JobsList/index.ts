@@ -13,5 +13,5 @@ export type { JobsSectionProps } from './JobsSection';
 export { JobCard } from './JobCard';
 export type { JobCardProps, JobProblemType } from './JobCard';
 
-export { ProgressSegments, getSegmentState, getSegmentWidth, getOutsourcedLabel } from './ProgressSegments';
-export type { ProgressSegmentsProps, SegmentState } from './ProgressSegments';
+export { ProgressDots, getDotState } from './ProgressDots';
+export type { ProgressDotsProps, DotState } from './ProgressDots';

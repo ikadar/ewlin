@@ -1,8 +1,8 @@
 export { Sidebar, SidebarButton } from './Sidebar';
 export type { SidebarProps, SidebarButtonProps } from './Sidebar';
 
-export { JobsList, JobsListHeader, ProblemsSection, JobsSection, JobCard, ProgressSegments, getSegmentState, getSegmentWidth, getOutsourcedLabel } from './JobsList';
-export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSectionProps, JobCardProps, JobProblemType, ProgressSegmentsProps, SegmentState } from './JobsList';
+export { JobsList, JobsListHeader, ProblemsSection, JobsSection, JobCard, ProgressDots, getDotState } from './JobsList';
+export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSectionProps, JobCardProps, JobProblemType, ProgressDotsProps, DotState } from './JobsList';
 
 export { JobDetailsPanel, JobInfo, InfoField, TaskList, TaskTile, ElementSection, PrerequisiteStatus, OutsourcingMiniForm, WorkDaysInput, DateTimePicker } from './JobDetailsPanel';
 export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, PrerequisiteStatusProps, ElementStatusUpdate, OutsourcingMiniFormProps, WorkDaysInputProps, DateTimePickerProps } from './JobDetailsPanel';
@@ -54,3 +54,12 @@ export type { JcfAutocompleteProps, Suggestion } from './JcfAutocomplete';
 
 export { JcfElementsTable, generateElementName, DEFAULT_ELEMENT } from './JcfElementsTable';
 export type { JcfElementsTableProps, JcfElement, JcfFieldKey } from './JcfElementsTable';
+
+export { ShortcutFooter } from './ShortcutFooter/ShortcutFooter';
+export type { ShortcutFooterProps, FooterMode } from './ShortcutFooter/ShortcutFooter';
+
+export { CommandPalette } from './CommandPalette/CommandPalette';
+export type { CommandPaletteProps } from './CommandPalette/CommandPalette';
+
+export { useCommands } from './CommandPalette/useCommands';
+export type { Command } from './CommandPalette/useCommands';

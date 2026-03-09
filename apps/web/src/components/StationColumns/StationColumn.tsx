@@ -70,6 +70,10 @@ export interface StationColumnProps {
   displayMode?: 'produit' | 'tirage';
   /** Station category (for columnWidth lookup) */
   category?: StationCategory;
+  /** Ghost preview label for quick placement (job reference) */
+  ghostPreviewLabel?: string;
+  /** Ghost preview height in pixels for quick placement */
+  ghostPreviewHeight?: number;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -127,6 +131,8 @@ export const StationColumn = memo(function StationColumn({
   onPickClick,
   displayMode: _displayMode,
   category,
+  ghostPreviewLabel,
+  ghostPreviewHeight,
 }: StationColumnProps) {
   // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -339,6 +345,16 @@ export const StationColumn = memo(function StationColumn({
       {/* Quick Placement Indicator */}
       {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && (
         <PlacementIndicator y={placementIndicatorY} isVisible={true} />
+      )}
+
+      {/* Ghost preview tile during quick placement */}
+      {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && ghostPreviewLabel && (
+        <div
+          className="absolute left-1 right-1 rounded border-l-4 border-l-blue-500 bg-blue-500/10 opacity-50 pointer-events-none z-20 overflow-hidden"
+          style={{ top: `${placementIndicatorY}px`, height: `${Math.max(ghostPreviewHeight ?? 12, 12)}px` }}
+        >
+          <span className="text-[9px] text-blue-300/70 px-1.5 py-0.5 truncate block">{ghostPreviewLabel}</span>
+        </div>
       )}
 
       {/* REQ-10: Precedence Constraint Lines (during quick placement or pick) */}

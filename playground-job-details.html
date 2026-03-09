@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JobDetailsPanel Playground</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Inter, system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e4e4e7; font-size: 13px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Layout */
+  .app { display: flex; flex: 1; overflow: hidden; }
+  .controls-panel { width: 320px; background: #111; border-right: 1px solid #222; padding: 16px; overflow-y: auto; flex-shrink: 0; }
+  .preview-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .preview-container { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 24px; overflow-y: auto; background: #050505; }
+  .prompt-area { border-top: 1px solid #222; padding: 12px 16px; background: #111; }
+
+  /* Controls */
+  .control-group { margin-bottom: 16px; }
+  .control-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #71717a; margin-bottom: 8px; font-weight: 600; }
+  .control-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .control-row label { font-size: 11px; color: #a1a1aa; min-width: 90px; }
+  select, input[type="number"] { background: #1a1a1a; border: 1px solid #333; color: #e4e4e7; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-family: inherit; }
+  select { cursor: pointer; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer; }
+  .toggle-row input[type="checkbox"] { accent-color: #3b82f6; }
+  .toggle-row span { font-size: 11px; color: #a1a1aa; }
+
+  /* Prompt */
+  .prompt-box { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #a1a1aa; line-height: 1.5; max-height: 80px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; }
+  .copy-btn { margin-top: 8px; background: #3b82f6; color: white; border: none; padding: 5px 14px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: inherit; }
+  .copy-btn:hover { background: #2563eb; }
+  .copy-btn.copied { background: #10b981; }
+
+  /* === Panel Simulation === */
+  .panel { width: 320px; background: rgba(24,24,27,0.5); border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; height: 700px; font-size: 13px; border-radius: 4px; overflow: hidden; }
+
+  /* Header */
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 4px; }
+  .panel-header .label { font-size: 10px; font-weight: 500; color: #71717a; text-transform: uppercase; letter-spacing: 0.08em; }
+  .panel-header .actions { display: flex; align-items: center; gap: 4px; }
+  .btn-edit { display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 10px; color: #a1a1aa; background: none; border: none; cursor: pointer; border-radius: 3px; font-family: inherit; }
+  .btn-edit:hover { color: #f4f4f5; background: rgba(255,255,255,0.05); }
+  .btn-close { color: #71717a; background: none; border: none; cursor: pointer; padding: 2px; }
+  .btn-close:hover { color: #d4d4d8; }
+
+  /* Info section */
+  .info-section { padding: 0 12px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .info-field { margin-bottom: 8px; }
+  .info-field-row { display: grid; grid-template-columns: auto 1fr; gap: 1px 12px; }
+  .info-field .field-label { font-size: 10px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1px; }
+  .info-field .field-value { color: #e4e4e7; font-size: 13px; line-height: 18px; }
+  .info-field .field-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; }
+  .info-field .field-value.clickable { cursor: pointer; color: #e4e4e7; background: none; border: none; font-family: inherit; font-size: 13px; padding: 0; }
+  .info-field .field-value.clickable:hover { text-decoration: underline; color: #f4f4f5; }
+
+  .btn-modifier { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #e4e4e7; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); cursor: pointer; padding: 5px 10px; border-radius: 4px; font-family: inherit; }
+  .btn-modifier:hover { background: rgba(255,255,255,0.1); }
+  .delete-btn { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #71717a; background: none; border: none; cursor: pointer; padding: 4px 0 0; font-family: inherit; }
+  .delete-btn:hover { color: #f87171; }
+
+  /* Task list */
+  .task-list { padding: 12px; overflow-y: auto; flex: 1; background: rgba(24,24,27,0.3); }
+
+  /* Element section */
+  .element-section { margin-bottom: 25px; }
+  .element-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; padding: 0 4px; }
+  .element-name { font-size: 10px; font-weight: 600; color: #a1a1aa; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
+  .element-prereq { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #71717a; }
+
+  /* Prerequisite pills */
+  .prereq-row { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+  .pill:hover { opacity: 0.8; }
+  .pill .chevron { font-size: 8px; opacity: 0.5; }
+  .pill-date { font-size: 10px; color: #71717a; }
+
+  /* Pill colors */
+  .pill-red { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .pill-amber { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .pill-green { background: rgba(16,185,129,0.15); color: #10b981; }
+  .pill-gray { background: rgba(113,113,122,0.25); color: #71717a; }
+
+  /* Task tiles */
+  .task-tiles { display: flex; flex-direction: column; gap: 6px; }
+
+  .task-tile { height: 32px; display: flex; align-items: center; padding: 2px 8px; font-size: 13px; border-left: 4px solid; transition: all 0.15s; }
+
+  .task-tile-unscheduled { cursor: pointer; }
+  .task-tile-scheduled { border-color: #475569; background: rgba(30,41,59,0.4); cursor: pointer; }
+  .task-tile-scheduled:hover { background: rgba(30,41,59,0.6); }
+  .task-tile-completed { border-color: #475569; background: rgba(30,41,59,0.4); opacity: 0.5; }
+
+  .task-tile .tile-content { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; }
+  .task-tile .tile-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .task-tile .tile-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-tile .tile-time { color: #71717a; flex-shrink: 0; font-size: 12px; }
+  .task-tile .tile-name.completed-text { color: #71717a; text-decoration: line-through; }
+
+  /* Completion circle */
+  .completion-circle { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .completion-circle.incomplete { border-color: #52525b; }
+  .completion-circle.incomplete:hover { border-color: #a1a1aa; }
+  .completion-circle.complete { border-color: #10b981; background: #10b981; }
+  .completion-circle .check-svg { display: none; }
+  .completion-circle.complete .check-svg { display: block; }
+
+  /* Dry time label */
+  .dry-time { display: flex; align-items: center; gap: 6px; padding: 6px 0; font-size: 10px; color: rgba(251,191,36,0.8); }
+  .dry-time .line { flex: 1; height: 1px; background: rgba(251,191,36,0.3); }
+
+  /* Outsourcing mini-form */
+  .outsourcing-form { border-left: 4px solid; font-size: 13px; background: rgba(24,24,27,0.5); }
+  .outsourcing-header { padding: 4px 8px; display: flex; align-items: center; gap: 8px; }
+  .outsourcing-header .action-type { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .outsourcing-provider { padding: 4px 8px 0; font-size: 10px; color: #71717a; }
+  .outsourcing-fields { padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .outsourcing-field { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .outsourcing-field .field-lbl { color: #71717a; min-width: 24px; }
+  .outsourcing-field input { background: #1a1a1a; border: 1px solid #333; color: #e4e4e7; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-family: inherit; width: 60px; }
+  .outsourcing-field .date-val { color: #a1a1aa; font-size: 11px; }
+  .outsourcing-field .aller-simple { font-style: italic; color: #52525b; font-size: 11px; }
+
+  /* Style picker cards */
+  .style-card { padding: 8px; margin-bottom: 6px; border: 1px solid #333; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+  .style-card:hover { border-color: #555; }
+  .style-card.active { border-color: #3b82f6; background: rgba(59,130,246,0.08); }
+  .style-card .style-name { font-size: 11px; font-weight: 600; color: #e4e4e7; margin-bottom: 2px; }
+  .style-card .style-desc { font-size: 10px; color: #71717a; line-height: 1.4; }
+
+  /* SVG icons inline */
+  .icon { display: inline-flex; align-items: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Controls -->
+  <div class="controls-panel">
+    <div style="font-size:14px; font-weight:600; color:#e4e4e7; margin-bottom:16px;">JobDetailsPanel Playground</div>
+
+    <div class="control-group">
+      <h3>Job Selection</h3>
+      <div class="control-row">
+        <label>Job</label>
+        <select id="jobSelect" onchange="updateAll()">
+          <option value="single">BRO-2024-0847 (Single element)</option>
+          <option value="multi" selected>CAT-2024-1203 (Multi element)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Prerequisite Statuses</h3>
+      <div class="control-row">
+        <label>Papier</label>
+        <select id="paperStatus" onchange="updateAll()">
+          <option value="to_order">A commander</option>
+          <option value="ordered" selected>Commande</option>
+          <option value="in_stock">En stock</option>
+          <option value="delivered">Livre</option>
+          <option value="none">N/A</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label>BAT</label>
+        <select id="batStatus" onchange="updateAll()">
+          <option value="waiting_files">En attente fichiers</option>
+          <option value="files_received">Fichiers recus</option>
+          <option value="bat_sent" selected>BAT envoye</option>
+          <option value="bat_approved">BAT approuve</option>
+          <option value="none">N/A</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label>Plaques</label>
+        <select id="plateStatus" onchange="updateAll()">
+          <option value="to_make" selected>A graver</option>
+          <option value="ready">Pretes</option>
+          <option value="none">N/A</option>
+        </select>
+      </div>
+      <div class="control-row" id="formeRow">
+        <label>Forme</label>
+        <select id="formeStatus" onchange="updateAll()">
+          <option value="to_order">A commander</option>
+          <option value="ordered">Commandee</option>
+          <option value="delivered" selected>Livree</option>
+          <option value="none">N/A</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Task States (per tile)</h3>
+      <div id="taskStateControls">
+        <!-- Populated by JS based on selected job -->
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Panel Options</h3>
+      <div class="toggle-row" onclick="this.querySelector('input').click()">
+        <input type="checkbox" id="showDelete" onchange="updateAll()" onclick="event.stopPropagation()">
+        <span>Show delete button</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview + Prompt -->
+  <div class="preview-area">
+    <div class="preview-container">
+      <div class="panel" id="panel">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+    <div class="prompt-area">
+      <div class="prompt-box" id="promptBox"></div>
+      <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy Prompt</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === DATA ===
+const JOBS = {
+  single: {
+    reference: '12345',
+    client: 'Autosphere',
+    description: 'Brochures A4 24p',
+    workshopExitDate: '15/03/2026 à 14h00',
+    elements: [
+      {
+        name: 'Interieur',
+        spec: null,
+        isSingle: true,
+        hasOffset: true,
+        hasDieCutting: false,
+        prerequisiteNames: [],
+        tasks: [
+          { id: 's-t1', name: 'Offset 4C', duration: '2h30', type: 'internal', scheduledTime: 'Lu 10/03 07:00' },
+          { id: 's-t2', name: 'Massicot', duration: '0h45', type: 'internal', scheduledTime: 'Lu 10/03 14:00', hasDryBefore: true },
+        ]
+      }
+    ]
+  },
+  multi: {
+    reference: '12345',
+    client: 'Leroy Merlin',
+    description: 'Catalogue 148p',
+    workshopExitDate: '22/03/2026 à 14h00',
+    elements: [
+      {
+        name: 'Couverture',
+        spec: 'A4 | 4p | Couche 350g',
+        isSingle: false,
+        hasOffset: true,
+        hasDieCutting: true,
+        prerequisiteNames: [],
+        tasks: [
+          { id: 'm-t1', name: 'Offset 4C', duration: '1h30', type: 'internal', scheduledTime: 'Ma 11/03 07:00' },
+          { id: 'm-t-out', name: 'Pelliculage', duration: '3j', type: 'outsourced', provider: 'Derprosa France', actionType: 'Pelliculage mat', hasDryBefore: true },
+          { id: 'm-t3', name: 'Decoupe', duration: '0h45', type: 'internal', scheduledTime: 'Ve 14/03 09:00' },
+        ]
+      },
+      {
+        name: 'Interieur',
+        spec: 'A4 | 148p | Couche 135g',
+        isSingle: false,
+        hasOffset: true,
+        hasDieCutting: false,
+        prerequisiteNames: ['couverture'],
+        tasks: [
+          { id: 'm-t4', name: 'Offset 4C', duration: '4h00', type: 'internal', scheduledTime: 'Me 12/03 06:00' },
+          { id: 'm-t5', name: 'Massicot', duration: '1h00', type: 'internal', scheduledTime: 'Me 12/03 14:00', hasDryBefore: true },
+          { id: 'm-t6', name: 'Encarteuse-Piqueuse', duration: '2h00', type: 'internal', scheduledTime: 'Je 13/03 07:00' },
+        ]
+      }
+    ]
+  }
+};
+
+// Per-task state: keyed by task id → { placed: bool, tileState: string }
+const taskConfig = {};
+
+// State color config matching the new state-based tile coloring
+const STATE_COLORS = {
+  default:   { border: '#3b82f6', bg: 'rgba(59,130,246,0.09)',  text: '#93c5fd' },
+  completed: { border: '#22c55e', bg: 'rgba(34,197,94,0.09)',   text: '#86efac' },
+  late:      { border: '#ef4444', bg: 'rgba(239,68,68,0.09)',   text: '#fca5a5' },
+  conflict:  { border: '#f59e0b', bg: 'rgba(245,158,11,0.09)',  text: '#fcd34d' },
+};
+
+// Placed default style (outline blue)
+const PLACED_DEFAULT = {
+  border: '#3b82f6',
+  bg: 'transparent',
+  nameColor: '#60a5fa',
+  timeColor: '#71717a',
+  outline: '1px solid rgba(59,130,246,0.25)',
+};
+
+const PILL_COLORS = {
+  to_order: 'pill-red', waiting_files: 'pill-red',
+  ordered: 'pill-amber', files_received: 'pill-amber', bat_sent: 'pill-amber', to_make: 'pill-amber',
+  in_stock: 'pill-green', delivered: 'pill-green', bat_approved: 'pill-green', ready: 'pill-green',
+  none: 'pill-gray',
+};
+
+const PILL_LABELS = {
+  to_order: 'A cmd', ordered: 'Cmd', in_stock: 'Stock', delivered: 'Livre', none: 'N/A',
+  waiting_files: 'Attente', files_received: 'Fichiers', bat_sent: 'Envoye', bat_approved: 'Approuve',
+  to_make: 'A graver', ready: 'Pretes',
+};
+
+// SVG icons
+const ICONS = {
+  pencil: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
+  x: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+  trash: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
+  timer: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  workflow: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M6 9v3a3 3 0 0 0 3 3h3"/><path d="m15 15-3-3"/></svg>`,
+  check: `<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+};
+
+// === Helpers ===
+function getAllInternalTasks(jobKey) {
+  const job = JOBS[jobKey];
+  const result = [];
+  job.elements.forEach(el => {
+    el.tasks.forEach(t => {
+      if (t.type === 'internal') result.push(t);
+    });
+  });
+  return result;
+}
+
+// Init some variety for multi-job
+const taskConfigDefaults = { 'm-t1': 'completed', 'm-t3': 'late', 'm-t4': 'conflict', 'm-t5': 'unplaced', 'm-t6': 'unplaced' };
+Object.entries(taskConfigDefaults).forEach(([id, st]) => { taskConfig[id] = st; });
+
+function getTaskConfig(taskId) {
+  if (!taskConfig[taskId]) taskConfig[taskId] = 'default';
+  return taskConfig[taskId]; // 'unplaced' | 'default' | 'completed' | 'late' | 'conflict'
+}
+
+function setTaskState(taskId, state) {
+  taskConfig[taskId] = state;
+  updateAll();
+}
+
+function renderStateCircle(state) {
+  if (state === 'completed') {
+    return `<span class="completion-circle" style="border-color:#10b981;background:#10b981;"><span class="check-svg" style="display:block;">${ICONS.check}</span></span>`;
+  }
+  // Late and conflict: empty circle, no check
+  return renderCompletionCircle(false);
+}
+
+// Build task state control dropdowns for the current job
+// Element separation style variants
+const ELEMENT_SEP_STYLES = {
+  'spacing-only': {
+    name: 'A. Spacing only',
+    desc: 'Current: just 12px margin between groups. Minimal but easy to miss.',
+    sectionStyle: 'margin-bottom:25px;',
+    headerStyle: '',
+    wrapperStyle: '',
+    divider: false,
+  },
+  'border-bottom': {
+    name: 'B. Bottom border',
+    desc: 'Thin horizontal line between element groups. Subtle but clear.',
+    sectionStyle: 'margin-bottom:25px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.06);',
+    headerStyle: '',
+    wrapperStyle: '',
+    divider: false,
+  },
+  'card': {
+    name: 'C. Card',
+    desc: 'Each element in a rounded card with border. Strong grouping.',
+    sectionStyle: 'margin-bottom:10px; padding:8px; border:1px solid rgba(255,255,255,0.06); border-radius:6px; background:rgba(255,255,255,0.02);',
+    headerStyle: '',
+    wrapperStyle: '',
+    divider: false,
+  },
+  'left-accent': {
+    name: 'D. Left accent bar',
+    desc: 'Vertical bar on the left edge of each group. Clear grouping without heavy borders.',
+    sectionStyle: 'margin-bottom:25px; padding-left:8px; border-left:2px solid rgba(255,255,255,0.08);',
+    headerStyle: '',
+    wrapperStyle: '',
+    divider: false,
+  },
+  'header-bar': {
+    name: 'E. Header background',
+    desc: 'Element header gets a dark background bar. Anchors the group visually.',
+    sectionStyle: 'margin-bottom:25px;',
+    headerStyle: 'background:rgba(255,255,255,0.04); margin:0 -4px; padding:4px 8px; border-radius:4px;',
+    wrapperStyle: '',
+    divider: false,
+  },
+  'divider-line': {
+    name: 'F. Divider between groups',
+    desc: 'Centered line with extra spacing between groups. Like a section break.',
+    sectionStyle: 'margin-bottom:0; padding-bottom:16px;',
+    headerStyle: '',
+    wrapperStyle: '',
+    divider: true,
+  },
+};
+
+let activeElementSep = 'spacing-only';
+
+function setElementSep(key) {
+  activeElementSep = key;
+  updateAll();
+}
+
+function buildElementSepCards() {
+  const container = document.getElementById('elementSepCards');
+  container.innerHTML = Object.entries(ELEMENT_SEP_STYLES).map(([key, style]) => {
+    const isActive = key === activeElementSep;
+    return `<div class="style-card ${isActive ? 'active' : ''}" onclick="setElementSep('${key}')">
+      <div class="style-name">${style.name}</div>
+      <div class="style-desc">${style.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+function buildTaskStateControls() {
+  const jobKey = document.getElementById('jobSelect').value;
+  const tasks = getAllInternalTasks(jobKey);
+  const container = document.getElementById('taskStateControls');
+
+  container.innerHTML = tasks.map(t => {
+    const state = getTaskConfig(t.id);
+    const dotColor = state === 'unplaced' ? '#52525b' : (STATE_COLORS[state]?.border || '#3b82f6');
+    return `<div class="control-row" style="align-items:center;">
+      <label style="display:flex;align-items:center;gap:5px;min-width:110px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;"></span>
+        ${t.name}
+      </label>
+      <select onchange="setTaskState('${t.id}', this.value)" style="flex:1;">
+        <option value="unplaced" ${state === 'unplaced' ? 'selected' : ''}>Unplaced</option>
+        <option value="default" ${state === 'default' ? 'selected' : ''}>Placed (blue)</option>
+        <option value="completed" ${state === 'completed' ? 'selected' : ''}>Completed (green)</option>
+        <option value="late" ${state === 'late' ? 'selected' : ''}>Late (red)</option>
+        <option value="conflict" ${state === 'conflict' ? 'selected' : ''}>Conflict (amber)</option>
+      </select>
+    </div>`;
+  }).join('');
+}
+
+// === RENDER ===
+function getState() {
+  return {
+    jobKey: document.getElementById('jobSelect').value,
+    paperStatus: document.getElementById('paperStatus').value,
+    batStatus: document.getElementById('batStatus').value,
+    plateStatus: document.getElementById('plateStatus').value,
+    formeStatus: document.getElementById('formeStatus').value,
+    showDelete: document.getElementById('showDelete').checked,
+  };
+}
+
+function renderPill(label, status) {
+  const colorClass = PILL_COLORS[status] || 'pill-gray';
+  return `<span class="pill ${colorClass}"><span>${label}</span><span class="chevron">&#9662;</span></span>`;
+}
+
+function renderCompletionCircle(isCompleted) {
+  const cls = isCompleted ? 'complete' : 'incomplete';
+  return `<span class="completion-circle ${cls}"><span class="check-svg">${ICONS.check}</span></span>`;
+}
+
+function renderTaskTile(task) {
+  if (task.type === 'outsourced') {
+    return renderOutsourcingForm(task);
+  }
+
+  const state = getTaskConfig(task.id);
+
+  // UNPLACED: solid blue, prominent — station name + duration, no completion circle
+  if (state === 'unplaced') {
+    return `<div class="task-tile task-tile-unscheduled" style="border-color:#3b82f6; background:rgba(59,130,246,0.12);">
+      <div class="tile-content">
+        <span class="tile-name" style="color:#93c5fd;">${task.name}</span>
+        <span class="tile-time" style="color:#a1a1aa;">${task.duration}</span>
+      </div>
+    </div>`;
+  }
+
+  // PLACED states: completed/late/conflict use their state colors, default uses active placed style
+  const isCompleted = state === 'completed';
+
+  if (state === 'default') {
+    return `<div class="task-tile" style="border-color:${PLACED_DEFAULT.border}; background:${PLACED_DEFAULT.bg}; outline:${PLACED_DEFAULT.outline}; cursor:pointer;">
+      <div class="tile-content">
+        <div class="tile-left">${renderCompletionCircle(false)}<span class="tile-name" style="color:${PLACED_DEFAULT.nameColor};">${task.name}</span></div>
+        <span class="tile-time" style="color:${PLACED_DEFAULT.timeColor};">${task.scheduledTime}</span>
+      </div>
+    </div>`;
+  }
+
+  // Completed, late, conflict — state-colored border + bg + filled circle
+  const colors = STATE_COLORS[state];
+  const opacity = isCompleted ? 0.5 : 1;
+  return `<div class="task-tile" style="border-color:${colors.border}; background:${colors.bg}; opacity:${opacity}; cursor:pointer;">
+    <div class="tile-content">
+      <div class="tile-left">${renderStateCircle(state)}<span class="tile-name" style="color:${colors.text};">${task.name}</span></div>
+      <span class="tile-time">${task.scheduledTime}</span>
+    </div>
+  </div>`;
+}
+
+function renderOutsourcingForm(task) {
+  return `<div class="outsourcing-form" style="border-color:#3b82f6;">
+    <div class="outsourcing-header" style="background:rgba(59,130,246,0.08);">
+      <span class="action-type" style="color:#3b82f6;">${task.actionType}</span>
+    </div>
+    <div class="outsourcing-provider">Provider: ${task.provider}</div>
+    <div class="outsourcing-fields">
+      <div class="outsourcing-field">
+        <span class="field-lbl">JO:</span>
+        <input type="number" value="3" style="width:40px;" onclick="event.stopPropagation()">
+      </div>
+      <div class="outsourcing-field">
+        <span class="field-lbl">Dep:</span>
+        <span class="date-val">Ma 11/03 17:00</span>
+      </div>
+      <div class="outsourcing-field">
+        <span class="field-lbl">Ret:</span>
+        <span class="date-val">Ve 14/03 08:00</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderDryTimeLabel() {
+  return `<div class="dry-time">
+    <div class="line"></div>
+    ${ICONS.timer}
+    <span>+4h drying</span>
+    <div class="line"></div>
+  </div>`;
+}
+
+function renderElement(el, s) {
+  const sep = ELEMENT_SEP_STYLES[activeElementSep];
+  let html = '';
+
+  html += `<div class="element-section" style="${sep.sectionStyle}">`;
+
+  // Prerequisite pills
+  const pills = [];
+  pills.push(renderPill('Papier', s.paperStatus));
+  pills.push(renderPill('BAT', s.batStatus));
+  if (el.hasOffset) pills.push(renderPill('Plaques', s.plateStatus));
+  if (el.hasDieCutting) pills.push(renderPill('Forme', s.formeStatus));
+
+  if (!el.isSingle) {
+    html += `<div class="element-header" style="${sep.headerStyle}">
+      <span class="element-name">${el.name.toUpperCase()}</span>
+      <div class="prereq-row">${pills.join('')}</div>
+    </div>`;
+  } else {
+    html += `<div class="element-header"><div class="prereq-row">${pills.join('')}</div></div>`;
+  }
+
+  // Task tiles
+  html += `<div class="task-tiles">`;
+  el.tasks.forEach(task => {
+    if (task.hasDryBefore) {
+      html += renderDryTimeLabel();
+    }
+    html += renderTaskTile(task);
+  });
+  html += `</div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function renderPanel() {
+  const s = getState();
+  const job = JOBS[s.jobKey];
+  const panel = document.getElementById('panel');
+
+  // Show/hide forme row based on job type
+  const hasAnyCutting = job.elements.some(e => e.hasDieCutting);
+  document.getElementById('formeRow').style.display = hasAnyCutting ? 'flex' : 'none';
+
+  let html = '';
+
+  // Info section with close button on first line
+  html += `<div class="info-section">
+    <div class="info-field" style="margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;"><div><span class="field-value mono">${job.reference}</span> <span style="color:#71717a;">–</span> <span class="field-value">${job.client}</span></div><button class="btn-close">${ICONS.x}</button></div>
+    <div class="info-field" style="margin-bottom:4px;"><span class="field-value" style="color:#a1a1aa;">${job.description}</span></div>
+    <div class="info-field" style="margin-bottom:8px;"><span class="field-value" style="color:#a1a1aa;">Dép. ${job.workshopExitDate}</span></div>
+    <button class="btn-modifier">${ICONS.pencil}<span>Modifier</span></button>
+    ${s.showDelete ? `<button class="delete-btn" style="margin-top:4px;">${ICONS.trash}<span>Supprimer ce job</span></button>` : ''}
+  </div>`;
+
+  // Task list
+  const sep = ELEMENT_SEP_STYLES[activeElementSep];
+  html += `<div class="task-list">`;
+  job.elements.forEach((el, i) => {
+    if (sep.divider && i > 0) {
+      html += `<div style="display:flex;align-items:center;gap:8px;margin:8px 0 12px;"><div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div></div>`;
+    }
+    html += renderElement(el, s);
+  });
+  html += `</div>`;
+
+  panel.innerHTML = html;
+}
+
+function updatePrompt() {
+  const s = getState();
+  const job = JOBS[s.jobKey];
+  const parts = [];
+
+  parts.push(`JobDetailsPanel showing "${job.reference}" (${job.client})`);
+
+  if (s.jobKey === 'multi') {
+    parts.push(`multi-element job with ${job.elements.length} elements (${job.elements.map(e => e.name).join(', ')})`);
+  } else {
+    parts.push('single-element job');
+  }
+
+  const statusParts = [];
+  if (s.paperStatus !== 'none') statusParts.push(`Papier: ${PILL_LABELS[s.paperStatus]}`);
+  if (s.batStatus !== 'none') statusParts.push(`BAT: ${PILL_LABELS[s.batStatus]}`);
+  if (statusParts.length) parts.push(`prerequisites: ${statusParts.join(', ')}`);
+
+  // Summarize task states
+  const internalTasks = getAllInternalTasks(s.jobKey);
+  const counts = { unplaced: 0, completed: 0, late: 0, conflict: 0 };
+  internalTasks.forEach(t => {
+    const st = getTaskConfig(t.id);
+    if (st === 'unplaced') counts.unplaced++;
+    else if (st !== 'default') counts[st]++;
+  });
+  const stateDescs = [];
+  if (counts.unplaced) stateDescs.push(`${counts.unplaced} unplaced (station + duration)`);
+  if (counts.completed) stateDescs.push(`${counts.completed} completed (green)`);
+  if (counts.late) stateDescs.push(`${counts.late} late (red)`);
+  if (counts.conflict) stateDescs.push(`${counts.conflict} conflict (amber)`);
+  if (stateDescs.length) parts.push(`tiles: ${stateDescs.join(', ')}`);
+
+  if (s.showDelete) parts.push('delete button visible');
+
+  document.getElementById('promptBox').textContent = parts.join('. ') + '.';
+}
+
+function updateAll() {
+  buildTaskStateControls();
+  renderPanel();
+  updatePrompt();
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptBox').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy Prompt'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+// Init
+updateAll();
+</script>
+</body>
+</html>

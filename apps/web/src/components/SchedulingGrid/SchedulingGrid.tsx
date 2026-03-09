@@ -10,7 +10,7 @@ import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { getJobIdForTask } from '../../utils/taskHelpers';
-import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
+import { isElementBlocked, getPrerequisiteBlockingInfo, hasDieCuttingAction, hasOffsetAction } from '../../utils';
 import { getTirageLabel } from '../../utils/tileLabelResolver';
 
 /** Handle for programmatic grid scrolling */
@@ -135,6 +135,10 @@ export interface SchedulingGridProps {
   displayMode?: 'produit' | 'tirage';
   /** Set of job IDs that are late (for state-based tile coloring) */
   lateJobIds?: Set<string>;
+  /** Ghost preview label for quick placement (job reference) */
+  quickPlacementGhostLabel?: string;
+  /** Ghost preview height in pixels for quick placement */
+  quickPlacementGhostHeight?: number;
 }
 
 /**
@@ -195,6 +199,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onContextMenu,
       displayMode,
       lateJobIds,
+      quickPlacementGhostLabel,
+      quickPlacementGhostHeight,
     },
     ref
   ) {
@@ -461,7 +467,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           </div>
 
           {/* Station columns area */}
-          <div className="flex gap-3 px-3 bg-[#050505] relative">
+          <div className={`flex gap-3 px-3 bg-[#050505] relative ${isQuickPlacementMode ? 'ring-2 ring-inset ring-emerald-500/60' : ''}`}>
             {/* Now line spanning all station columns */}
             <div
               className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
@@ -552,6 +558,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onPickClick={onPickClick}
                   displayMode={displayMode}
                   category={category}
+                  ghostPreviewLabel={isHoveredForQuickPlacement ? quickPlacementGhostLabel : undefined}
+                  ghostPreviewHeight={isHoveredForQuickPlacement ? quickPlacementGhostHeight : undefined}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
@@ -563,8 +571,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
                     // v0.4.32b: Get element for blocking status
                     const element = elements.find((e) => e.id === task.elementId);
-                    const blocked = element ? isElementBlocked(element) : false;
-                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element) : undefined;
+                    const hasOffset = element ? hasOffsetAction(element, tasks, stations, categories) : false;
+                    const hasDieCutting = element ? hasDieCuttingAction(element, tasks, stations) : false;
+                    const blockOpts = { hasOffset, hasDieCutting };
+                    const blocked = element ? isElementBlocked(element, blockOpts) : false;
+                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element, blockOpts) : undefined;
 
                     // Calculate top position from assignment.scheduledStart
                     // Use multi-day calculation when startDate is provided (REQ-14)
@@ -606,7 +617,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     const tileLabel = rawTirageLabel || undefined;
 
                     // Compute tile state for state-based coloring
-                    const isLate = lateJobIds?.has(job.id) ?? false;
+                    const isJobLate = lateJobIds?.has(job.id) ?? false;
+                    const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < now;
+                    const isLate = isJobLate || isTaskOverdue;
                     const hasConflict = conflictTaskIds.has(task.id);
                     const tileState = computeTileState(isLate, hasConflict, blocked, assignment.isCompleted);
 

@@ -4,11 +4,12 @@ import { getTirageLabel, getDefaultCategoryWidth } from './tileLabelResolver';
 
 // --- Fixtures ---
 
-const makeJob = (reference = 'REF-001'): Job => ({
+const makeJob = (reference = 'REF-001', quantity?: number): Job => ({
   id: 'job-1',
   reference,
   client: 'Client SA',
   description: 'Test Job',
+  quantity,
   color: '#FF0000',
   status: 'InProgress',
   workshopExitDate: '2025-12-31T00:00:00Z',
@@ -98,7 +99,7 @@ describe('getDefaultCategoryWidth', () => {
 // --- getTirageLabel ---
 
 describe('getTirageLabel — Presses Offset', () => {
-  const job = makeJob();
+  const job = makeJob('REF-001', 5000);
   const element = makeElement('e1', 'int', {
     papier: 'Couché mat:135',
     imposition: '50x70(8)',
@@ -114,14 +115,15 @@ describe('getTirageLabel — Presses Offset', () => {
 
   it('skips missing fields', () => {
     const el = makeElement('e1', 'int', { papier: 'Offset' });
+    const jobNoQty = makeJob();
     expect(
-      getTirageLabel('Presses Offset', el, job, [el], emptyTaskMap, noAssemblyStations),
+      getTirageLabel('Presses Offset', el, jobNoQty, [el], emptyTaskMap, noAssemblyStations),
     ).toBe('REF-001 • Offset');
   });
 });
 
 describe('getTirageLabel — Massicots', () => {
-  const job = makeJob();
+  const job = makeJob('REF-001', 1000);
 
   it('builds label with format and quantity', () => {
     const el = makeElement('e1', 'int', { format: 'A4', quantite: 1000 });
@@ -130,19 +132,20 @@ describe('getTirageLabel — Massicots', () => {
     ).toBe('REF-001 • A4 1000ex');
   });
 
-  it('returns empty string when no spec fields', () => {
+  it('returns empty string when no spec fields and no job quantity', () => {
     const el = makeElement('e1', 'int', {});
+    const jobNoQty = makeJob();
     expect(
-      getTirageLabel('Massicots', el, job, [el], emptyTaskMap, noAssemblyStations),
+      getTirageLabel('Massicots', el, jobNoQty, [el], emptyTaskMap, noAssemblyStations),
     ).toBe('');
   });
 });
 
 describe('getTirageLabel — Plieuses', () => {
-  const job = makeJob();
   const assemblyStations = new Set(['assembly-1']);
 
   it('leaflet format (no assembly siblings)', () => {
+    const job = makeJob('REF-001', 5000);
     const el = makeElement('e1', 'int', { format: 'A5', papier: 'Offset:80', quantite: 5000 }, ['t1']);
     const taskMap = new Map<string, Task>([['t1', makeInternalTask('t1', 'plieuse-1')]]);
     expect(
@@ -151,6 +154,7 @@ describe('getTirageLabel — Plieuses', () => {
   });
 
   it('brochure format (has assembly sibling)', () => {
+    const job = makeJob('REF-001', 3000);
     const el = makeElement('e1', 'int', { format: 'A5', papier: 'Couché mat:115', pagination: 16, quantite: 3000 }, ['t1']);
     const sibling = makeElement('e2', 'couv', {}, ['t2']);
     const taskMap = new Map<string, Task>([
@@ -198,9 +202,8 @@ describe('getTirageLabel — Assembleuses-Piqueuses', () => {
 });
 
 describe('getTirageLabel — Assembleuses (not piqueuse)', () => {
-  const job = makeJob();
-
   it('builds feuillets label', () => {
+    const job = makeJob('REF-001', 2000);
     const el = makeElement('e1', 'int', { pagination: 16, quantite: 2000 });
     expect(
       getTirageLabel('Assembleuses', el, job, [el], emptyTaskMap, noAssemblyStations),
@@ -208,6 +211,7 @@ describe('getTirageLabel — Assembleuses (not piqueuse)', () => {
   });
 
   it('ceils feuillets correctly (e.g. 18/4 = 4.5 → 5)', () => {
+    const job = makeJob('REF-001', 500);
     const el = makeElement('e1', 'int', { pagination: 18, quantite: 500 });
     expect(
       getTirageLabel('Assembleuses', el, job, [el], emptyTaskMap, noAssemblyStations),
@@ -259,7 +263,7 @@ describe('getTirageLabel — single vs multi element prefix', () => {
   it('omits element name for single-element job', () => {
     const el = makeElement('e1', 'ELT', { papier: 'Offset:80', imposition: '50x70', impression: 'R°', quantite: 1000 });
     expect(
-      getTirageLabel('Presses Offset', el, makeJob(), [el], emptyTaskMap, noAssemblyStations),
+      getTirageLabel('Presses Offset', el, makeJob('REF-001', 1000), [el], emptyTaskMap, noAssemblyStations),
     ).toBe('REF-001 • Offset 80g 50x70 R° 1000ex');
   });
 
@@ -267,7 +271,7 @@ describe('getTirageLabel — single vs multi element prefix', () => {
     const el = makeElement('e1', 'int', { papier: 'Offset:80', imposition: '50x70', impression: 'R°', quantite: 1000 });
     const el2 = makeElement('e2', 'couv');
     expect(
-      getTirageLabel('Presses Offset', el, makeJob(), [el, el2], emptyTaskMap, noAssemblyStations),
+      getTirageLabel('Presses Offset', el, makeJob('REF-001', 1000), [el, el2], emptyTaskMap, noAssemblyStations),
     ).toBe('REF-001 · int • Offset 80g 50x70 R° 1000ex');
   });
 });

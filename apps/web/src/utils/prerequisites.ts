@@ -14,6 +14,7 @@ import type {
   FormeStatus,
   Task,
   Station,
+  StationCategory,
 } from '@flux/types';
 import {
   PAPER_READY_STATES,
@@ -89,17 +90,51 @@ export function hasDieCuttingAction(
 }
 
 /**
- * Check if an element is blocked due to missing prerequisites.
- * An element is blocked if ANY prerequisite is not in a ready state.
+ * Check if an element has any offset printing tasks.
+ * Used to determine if Plates prerequisite is relevant.
  *
  * @param element - The element to check
+ * @param tasks - All tasks
+ * @param stations - All stations
+ * @param categories - All station categories
+ * @returns true if element has offset printing action
+ */
+export function hasOffsetAction(
+  element: Element,
+  tasks: Task[],
+  stations: Station[],
+  categories: StationCategory[]
+): boolean {
+  const categoryMap = new Map(categories.map((c) => [c.id, c]));
+  return element.taskIds.some((taskId) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.type !== 'Internal') return false;
+    const station = stations.find((s) => s.id === task.stationId);
+    if (!station) return false;
+    const cat = categoryMap.get(station.categoryId);
+    return cat?.name.toLowerCase().includes('offset') ?? false;
+  });
+}
+
+export interface ElementBlockingOpts {
+  hasOffset?: boolean;
+  hasDieCutting?: boolean;
+}
+
+/**
+ * Check if an element is blocked due to missing prerequisites.
+ * An element is blocked if ANY relevant prerequisite is not in a ready state.
+ * When hasOffset/hasDieCutting are false, the corresponding prerequisite is skipped.
+ *
+ * @param element - The element to check
+ * @param opts - Optional flags to skip irrelevant prerequisites
  * @returns true if blocked, false if ready
  */
-export function isElementBlocked(element: Element): boolean {
+export function isElementBlocked(element: Element, opts?: ElementBlockingOpts): boolean {
   const paperReady = isPaperReady(element.paperStatus);
   const batReady = isBatReady(element.batStatus);
-  const platesReady = isPlatesReady(element.plateStatus);
-  const formeReady = isFormeReady(element.formeStatus);
+  const platesReady = (opts?.hasOffset === false) || isPlatesReady(element.plateStatus);
+  const formeReady = (opts?.hasDieCutting === false) || isFormeReady(element.formeStatus);
 
   return !paperReady || !batReady || !platesReady || !formeReady;
 }
@@ -138,11 +173,11 @@ export interface PrerequisiteBlockingInfo {
   };
 }
 
-export function getPrerequisiteBlockingInfo(element: Element): PrerequisiteBlockingInfo {
+export function getPrerequisiteBlockingInfo(element: Element, opts?: ElementBlockingOpts): PrerequisiteBlockingInfo {
   const paperReady = isPaperReady(element.paperStatus);
   const batReady = isBatReady(element.batStatus);
-  const platesReady = isPlatesReady(element.plateStatus);
-  const formeReady = isFormeReady(element.formeStatus);
+  const platesReady = (opts?.hasOffset === false) || isPlatesReady(element.plateStatus);
+  const formeReady = (opts?.hasDieCutting === false) || isFormeReady(element.formeStatus);
 
   return {
     isBlocked: !paperReady || !batReady || !platesReady || !formeReady,

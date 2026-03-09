@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress Dots — Job Card Explorer</title>
+<style>
+  :root {
+    --zinc-50: #fafafa; --zinc-100: #f4f4f5; --zinc-200: #e4e4e7;
+    --zinc-300: #d4d4d8; --zinc-400: #a1a1aa; --zinc-500: #71717a;
+    --zinc-600: #52525b; --zinc-700: #3f3f46; --zinc-800: #27272a;
+    --zinc-900: #18181b; --zinc-950: #09090b;
+    --red-400: #f87171; --red-500: #ef4444;
+    --amber-300: #fcd34d; --amber-400: #fbbf24;
+    --emerald-400: #34d399; --emerald-500: #10b981;
+    --blue-400: #60a5fa; --blue-500: #3b82f6; --blue-600: #2563eb;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--zinc-950);
+    color: var(--zinc-300);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  .controls-panel {
+    width: 320px;
+    min-width: 320px;
+    background: var(--zinc-900);
+    border-right: 1px solid var(--zinc-800);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .main-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .preview-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .prompt-area {
+    border-top: 1px solid var(--zinc-800);
+    background: var(--zinc-900);
+    padding: 16px 24px;
+  }
+
+  /* ── Controls ── */
+  h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--zinc-100);
+    margin-bottom: 4px;
+  }
+
+  .subtitle { font-size: 12px; color: var(--zinc-500); }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--zinc-500);
+    margin-bottom: 8px;
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 12px; }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .control-row label {
+    font-size: 13px;
+    color: var(--zinc-400);
+    white-space: nowrap;
+  }
+
+  .control-row .value {
+    font-size: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--zinc-500);
+    min-width: 32px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    max-width: 140px;
+    accent-color: var(--emerald-500);
+    height: 4px;
+  }
+
+  select {
+    background: var(--zinc-800);
+    color: var(--zinc-300);
+    border: 1px solid var(--zinc-700);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  /* ── Presets ── */
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .preset-btn {
+    background: var(--zinc-800);
+    color: var(--zinc-400);
+    border: 1px solid var(--zinc-700);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .preset-btn:hover { background: var(--zinc-700); color: var(--zinc-200); }
+  .preset-btn.active { background: var(--emerald-500); color: white; border-color: var(--emerald-500); }
+
+  /* ── Job Card Mock ── */
+  .job-card {
+    background: var(--zinc-900);
+    border: 1px solid var(--zinc-800);
+    border-radius: 8px;
+    padding: 10px 12px;
+    width: 260px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .job-card:hover { background: #1e1e22; }
+
+  .job-card.late {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+
+  .job-card.conflict {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.2);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    overflow: hidden;
+  }
+
+  .card-ref {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 14px;
+    color: var(--zinc-500);
+    flex-shrink: 0;
+  }
+
+  .card-ref.late { color: var(--red-400); }
+  .card-ref.conflict { color: var(--amber-300); }
+
+  .card-sep { color: var(--zinc-600); flex-shrink: 0; }
+  .card-client { color: var(--zinc-400); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-deadline { color: var(--zinc-600); font-size: 12px; margin-left: auto; flex-shrink: 0; }
+
+  .card-desc {
+    font-size: 13px;
+    color: var(--zinc-300);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 8px;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-badge { font-size: 12px; font-weight: 500; }
+  .card-badge.late { color: var(--red-400); }
+  .card-badge.conflict { color: var(--amber-400); }
+
+  /* ── Dots container ── */
+  .dots-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* ── Section: preview groups ── */
+  .preview-section { display: flex; flex-direction: column; gap: 8px; }
+  .preview-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--zinc-600);
+  }
+
+  .cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--zinc-900);
+    border: 1px solid var(--zinc-800);
+    border-radius: 8px;
+    width: fit-content;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--zinc-400);
+  }
+
+  /* ── Prompt ── */
+  .prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .prompt-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--zinc-500);
+    font-weight: 600;
+  }
+
+  .copy-btn {
+    background: var(--zinc-800);
+    color: var(--zinc-300);
+    border: 1px solid var(--zinc-700);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { background: var(--zinc-700); }
+
+  .prompt-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--zinc-300);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: pre-wrap;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════ CONTROLS ══════════ -->
+<div class="controls-panel">
+  <div>
+    <h1>Progress Dots</h1>
+    <div class="subtitle">Replace bar segments with dots on job cards</div>
+  </div>
+
+  <!-- Presets -->
+  <div>
+    <div class="section-title">Presets</div>
+    <div class="presets">
+      <button class="preset-btn active" onclick="applyPreset('compact')">Compact</button>
+      <button class="preset-btn" onclick="applyPreset('comfortable')">Comfortable</button>
+      <button class="preset-btn" onclick="applyPreset('minimal')">Minimal</button>
+      <button class="preset-btn" onclick="applyPreset('bold')">Bold</button>
+    </div>
+  </div>
+
+  <!-- Dot geometry -->
+  <div>
+    <div class="section-title">Dot Geometry</div>
+    <div class="control-group">
+      <div class="control-row">
+        <label>Dot size</label>
+        <input type="range" min="4" max="12" step="1" value="6" oninput="setState('dotSize', +this.value)">
+        <span class="value" id="val-dotSize">6px</span>
+      </div>
+      <div class="control-row">
+        <label>Gap</label>
+        <input type="range" min="1" max="8" step="0.5" value="3" oninput="setState('gap', +this.value)">
+        <span class="value" id="val-gap">3px</span>
+      </div>
+      <div class="control-row">
+        <label>Border width</label>
+        <input type="range" min="1" max="3" step="0.5" value="1.5" oninput="setState('borderWidth', +this.value)">
+        <span class="value" id="val-borderWidth">1.5px</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outsourced marker -->
+  <div>
+    <div class="section-title">Outsourced Marker</div>
+    <div class="control-group">
+      <div class="control-row">
+        <label>Style</label>
+        <select onchange="setState('outsourcedStyle', this.value)">
+          <option value="ring">Ring (double border)</option>
+          <option value="diamond">Diamond shape</option>
+          <option value="square">Square shape</option>
+          <option value="star">Star / asterisk</option>
+          <option value="half">Half-filled</option>
+          <option value="crosshair">Crosshair</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label>Ring gap</label>
+        <input type="range" min="1" max="4" step="0.5" value="2" oninput="setState('ringGap', +this.value)">
+        <span class="value" id="val-ringGap">2px</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Colors -->
+  <div>
+    <div class="section-title">Colors</div>
+    <div class="control-group">
+      <div class="control-row">
+        <label>Unscheduled</label>
+        <select onchange="setState('unscheduledColor', this.value)">
+          <option value="#52525b">zinc-600</option>
+          <option value="#3f3f46">zinc-700</option>
+          <option value="#71717a">zinc-500</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label>Scheduled</label>
+        <select onchange="setState('scheduledColor', this.value)">
+          <option value="#3b82f6">blue-500</option>
+          <option value="#60a5fa">blue-400</option>
+          <option value="#2563eb">blue-600</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label>Completed</label>
+        <select onchange="setState('completedColor', this.value)">
+          <option value="#10b981">emerald-500</option>
+          <option value="#34d399">emerald-400</option>
+          <option value="#059669">emerald-600</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label>Late</label>
+        <select onchange="setState('lateColor', this.value)">
+          <option value="#ef4444">red-500</option>
+          <option value="#f87171">red-400</option>
+          <option value="#dc2626">red-600</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MAIN ══════════ -->
+<div class="main-panel">
+  <div class="preview-area" id="preview-area"></div>
+
+  <div class="prompt-area">
+    <div class="prompt-header">
+      <span class="prompt-title">Prompt output</span>
+      <button class="copy-btn" onclick="copyPrompt()">Copy</button>
+    </div>
+    <div class="prompt-text" id="prompt-output"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+const DEFAULTS = {
+  dotSize: 6,
+  gap: 3,
+  borderWidth: 1.5,
+  outsourcedStyle: 'ring',
+  ringGap: 2,
+  unscheduledColor: '#52525b',
+  scheduledColor: '#3b82f6',
+  completedColor: '#10b981',
+  lateColor: '#ef4444',
+};
+
+const state = { ...DEFAULTS };
+
+const PRESETS = {
+  compact:     { dotSize: 6,  gap: 3, borderWidth: 1.5, outsourcedStyle: 'ring',    ringGap: 2 },
+  comfortable: { dotSize: 8,  gap: 4, borderWidth: 1.5, outsourcedStyle: 'ring',    ringGap: 2.5 },
+  minimal:     { dotSize: 5,  gap: 2, borderWidth: 1,   outsourcedStyle: 'diamond', ringGap: 2 },
+  bold:        { dotSize: 10, gap: 4, borderWidth: 2,   outsourcedStyle: 'square',  ringGap: 3 },
+};
+
+// ── Sample jobs ──
+const JOBS = [
+  {
+    ref: '24-1847', client: 'Imprimerie du Nord', desc: 'Brochure A4 quadri 32p',
+    deadline: '17/03', problem: null,
+    tasks: [
+      { state: 'completed', outsourced: false },
+      { state: 'completed', outsourced: false },
+      { state: 'scheduled', outsourced: true },
+      { state: 'scheduled', outsourced: false },
+      { state: 'unscheduled', outsourced: false },
+      { state: 'unscheduled', outsourced: false },
+    ]
+  },
+  {
+    ref: '24-1852', client: 'Duval & Fils', desc: 'Catalogue 148p reliure dos carré',
+    deadline: '20/03', problem: null,
+    tasks: [
+      { state: 'completed', outsourced: false },
+      { state: 'completed', outsourced: false },
+      { state: 'completed', outsourced: false },
+      { state: 'completed', outsourced: true },
+      { state: 'scheduled', outsourced: false },
+      { state: 'scheduled', outsourced: false },
+      { state: 'scheduled', outsourced: false },
+      { state: 'unscheduled', outsourced: false },
+      { state: 'unscheduled', outsourced: true },
+      { state: 'unscheduled', outsourced: false },
+    ]
+  },
+  {
+    ref: '24-1839', client: 'Martel Corp', desc: 'Affiche grand format 120×176',
+    deadline: '12/03', problem: 'late',
+    tasks: [
+      { state: 'completed', outsourced: false },
+      { state: 'late', outsourced: false },
+      { state: 'late', outsourced: true },
+      { state: 'unscheduled', outsourced: false },
+    ]
+  },
+  {
+    ref: '24-1861', client: 'Éditions Soleil', desc: 'Livre 256p offset',
+    deadline: '25/03', problem: null,
+    tasks: [
+      { state: 'unscheduled', outsourced: false },
+      { state: 'unscheduled', outsourced: false },
+      { state: 'unscheduled', outsourced: true },
+      { state: 'unscheduled', outsourced: false },
+      { state: 'unscheduled', outsourced: false },
+    ]
+  },
+  {
+    ref: '24-1844', client: 'AgriPro', desc: 'Dépliant 6 volets',
+    deadline: '14/03', problem: 'conflict',
+    tasks: [
+      { state: 'completed', outsourced: false },
+      { state: 'scheduled', outsourced: false },
+      { state: 'scheduled', outsourced: false },
+    ]
+  },
+  {
+    ref: '24-1870', client: 'MédiaSud', desc: 'Carte de visite recto-verso',
+    deadline: '22/03', problem: null,
+    tasks: [
+      { state: 'completed', outsourced: false },
+      { state: 'completed', outsourced: false },
+    ]
+  },
+];
+
+// ── Rendering ──
+function setState(key, value) {
+  state[key] = value;
+  // Update value display
+  const valEl = document.getElementById('val-' + key);
+  if (valEl) valEl.textContent = typeof value === 'number' ? value + 'px' : value;
+  updateAll();
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  Object.assign(state, p);
+  // Sync controls
+  document.querySelectorAll('.controls-panel input[type=range]').forEach(el => {
+    const key = el.getAttribute('oninput').match(/setState\('(\w+)'/)[1];
+    if (p[key] !== undefined) {
+      el.value = p[key];
+      const valEl = document.getElementById('val-' + key);
+      if (valEl) valEl.textContent = p[key] + 'px';
+    }
+  });
+  document.querySelectorAll('.controls-panel select').forEach(el => {
+    const key = el.getAttribute('onchange').match(/setState\('(\w+)'/)[1];
+    if (p[key] !== undefined) el.value = p[key];
+  });
+  // Preset button highlight
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase() === name));
+  updateAll();
+}
+
+function renderDot(task) {
+  const { dotSize, borderWidth, outsourcedStyle, ringGap, unscheduledColor, scheduledColor, completedColor, lateColor } = state;
+  const isOut = task.outsourced;
+  const s = task.state;
+
+  const colorMap = { unscheduled: unscheduledColor, scheduled: scheduledColor, completed: completedColor, late: lateColor };
+  const color = colorMap[s];
+  const isFilled = true; // All states are filled dots (including unscheduled = gray)
+
+  // Outer size for outsourced with ring
+  const outerSize = isOut && outsourcedStyle === 'ring' ? dotSize + ringGap * 2 : dotSize;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.width = outerSize + 'px';
+  wrapper.style.height = outerSize + 'px';
+  wrapper.style.position = 'relative';
+  wrapper.style.display = 'flex';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.justifyContent = 'center';
+  wrapper.style.flexShrink = '0';
+
+  if (isOut && outsourcedStyle === 'ring') {
+    // Outer ring
+    wrapper.style.borderRadius = '50%';
+    wrapper.style.border = `${borderWidth}px solid ${color}`;
+    // Inner dot
+    const inner = document.createElement('div');
+    inner.style.width = (dotSize - borderWidth * 2) + 'px';
+    inner.style.height = (dotSize - borderWidth * 2) + 'px';
+    inner.style.borderRadius = '50%';
+    if (isFilled) {
+      inner.style.background = color;
+    } else {
+      inner.style.border = `${borderWidth}px solid ${color}`;
+    }
+    wrapper.appendChild(inner);
+  } else if (isOut && outsourcedStyle === 'diamond') {
+    wrapper.style.width = dotSize + 'px';
+    wrapper.style.height = dotSize + 'px';
+    const diamond = document.createElement('div');
+    diamond.style.width = (dotSize * 0.75) + 'px';
+    diamond.style.height = (dotSize * 0.75) + 'px';
+    diamond.style.transform = 'rotate(45deg)';
+    diamond.style.borderRadius = '1px';
+    if (isFilled) {
+      diamond.style.background = color;
+    } else {
+      diamond.style.border = `${borderWidth}px solid ${color}`;
+    }
+    wrapper.appendChild(diamond);
+  } else if (isOut && outsourcedStyle === 'square') {
+    wrapper.style.width = dotSize + 'px';
+    wrapper.style.height = dotSize + 'px';
+    const sq = document.createElement('div');
+    sq.style.width = dotSize + 'px';
+    sq.style.height = dotSize + 'px';
+    sq.style.borderRadius = '1.5px';
+    if (isFilled) {
+      sq.style.background = color;
+    } else {
+      sq.style.border = `${borderWidth}px solid ${color}`;
+    }
+    wrapper.appendChild(sq);
+  } else if (isOut && outsourcedStyle === 'star') {
+    wrapper.style.width = (dotSize + 4) + 'px';
+    wrapper.style.height = (dotSize + 4) + 'px';
+    // Circle dot
+    const dot = document.createElement('div');
+    dot.style.width = dotSize + 'px';
+    dot.style.height = dotSize + 'px';
+    dot.style.borderRadius = '50%';
+    dot.style.position = 'absolute';
+    dot.style.top = '50%';
+    dot.style.left = '50%';
+    dot.style.transform = 'translate(-50%,-50%)';
+    if (isFilled) {
+      dot.style.background = color;
+    } else {
+      dot.style.border = `${borderWidth}px solid ${color}`;
+    }
+    wrapper.appendChild(dot);
+    // Star lines (crosshair-like decorations)
+    const armLen = dotSize * 0.4;
+    for (let angle = 0; angle < 360; angle += 90) {
+      const arm = document.createElement('div');
+      arm.style.position = 'absolute';
+      arm.style.width = borderWidth + 'px';
+      arm.style.height = armLen + 'px';
+      arm.style.background = color;
+      arm.style.top = '50%';
+      arm.style.left = '50%';
+      arm.style.transformOrigin = '50% 0%';
+      arm.style.transform = `translate(-50%, 0) rotate(${angle}deg) translateY(-${dotSize/2 + armLen * 0.3}px)`;
+      wrapper.appendChild(arm);
+    }
+  } else if (isOut && outsourcedStyle === 'half') {
+    wrapper.style.width = dotSize + 'px';
+    wrapper.style.height = dotSize + 'px';
+    wrapper.style.borderRadius = '50%';
+    wrapper.style.overflow = 'hidden';
+    wrapper.style.border = `${borderWidth}px solid ${color}`;
+    // Left half filled
+    const half = document.createElement('div');
+    half.style.position = 'absolute';
+    half.style.left = '0';
+    half.style.top = '0';
+    half.style.width = '50%';
+    half.style.height = '100%';
+    half.style.background = color;
+    wrapper.appendChild(half);
+    if (isFilled) {
+      // Fill right half too but slightly lighter
+      const right = document.createElement('div');
+      right.style.position = 'absolute';
+      right.style.right = '0';
+      right.style.top = '0';
+      right.style.width = '50%';
+      right.style.height = '100%';
+      right.style.background = color;
+      right.style.opacity = '0.4';
+      wrapper.appendChild(right);
+    }
+  } else if (isOut && outsourcedStyle === 'crosshair') {
+    wrapper.style.width = dotSize + 'px';
+    wrapper.style.height = dotSize + 'px';
+    wrapper.style.borderRadius = '50%';
+    if (isFilled) {
+      wrapper.style.background = color;
+    } else {
+      wrapper.style.border = `${borderWidth}px solid ${color}`;
+    }
+    // Cross lines
+    const lineH = document.createElement('div');
+    lineH.style.position = 'absolute';
+    lineH.style.width = (dotSize + 4) + 'px';
+    lineH.style.height = borderWidth + 'px';
+    lineH.style.background = color;
+    lineH.style.top = '50%';
+    lineH.style.left = '50%';
+    lineH.style.transform = 'translate(-50%,-50%)';
+    wrapper.appendChild(lineH);
+    const lineV = document.createElement('div');
+    lineV.style.position = 'absolute';
+    lineV.style.width = borderWidth + 'px';
+    lineV.style.height = (dotSize + 4) + 'px';
+    lineV.style.background = color;
+    lineV.style.top = '50%';
+    lineV.style.left = '50%';
+    lineV.style.transform = 'translate(-50%,-50%)';
+    wrapper.appendChild(lineV);
+  } else {
+    // Normal internal dot
+    wrapper.style.width = dotSize + 'px';
+    wrapper.style.height = dotSize + 'px';
+    wrapper.style.borderRadius = '50%';
+    if (isFilled) {
+      wrapper.style.background = color;
+    } else {
+      wrapper.style.border = `${borderWidth}px solid ${color}`;
+    }
+  }
+
+  return wrapper;
+}
+
+function renderJobCard(job) {
+  const card = document.createElement('div');
+  card.className = 'job-card' + (job.problem ? ' ' + job.problem : '');
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  const ref = document.createElement('span');
+  ref.className = 'card-ref' + (job.problem ? ' ' + job.problem : '');
+  ref.textContent = job.ref;
+  const sep = document.createElement('span');
+  sep.className = 'card-sep';
+  sep.textContent = '·';
+  const client = document.createElement('span');
+  client.className = 'card-client';
+  client.textContent = job.client;
+  header.append(ref, sep, client);
+  if (!job.problem && job.deadline) {
+    const dl = document.createElement('span');
+    dl.className = 'card-deadline';
+    dl.textContent = job.deadline;
+    header.appendChild(dl);
+  }
+  card.appendChild(header);
+
+  // Description
+  const desc = document.createElement('div');
+  desc.className = 'card-desc';
+  desc.textContent = job.desc;
+  card.appendChild(desc);
+
+  // Footer
+  const footer = document.createElement('div');
+  footer.className = 'card-footer';
+
+  const dotsRow = document.createElement('div');
+  dotsRow.className = 'dots-row';
+  dotsRow.style.gap = state.gap + 'px';
+  job.tasks.forEach(t => dotsRow.appendChild(renderDot(t)));
+  footer.appendChild(dotsRow);
+
+  if (job.problem === 'late') {
+    const badge = document.createElement('span');
+    badge.className = 'card-badge late';
+    badge.textContent = 'En retard';
+    footer.appendChild(badge);
+  } else if (job.problem === 'conflict') {
+    const badge = document.createElement('span');
+    badge.className = 'card-badge conflict';
+    badge.textContent = 'Conflit';
+    footer.appendChild(badge);
+  }
+
+  card.appendChild(footer);
+  return card;
+}
+
+function renderLegend() {
+  const legend = document.createElement('div');
+  legend.className = 'legend';
+
+  const states = [
+    { state: 'unscheduled', label: 'Unscheduled', outsourced: false },
+    { state: 'scheduled', label: 'Scheduled', outsourced: false },
+    { state: 'completed', label: 'Completed', outsourced: false },
+    { state: 'late', label: 'Late', outsourced: false },
+    { state: 'scheduled', label: 'Outsourced', outsourced: true },
+  ];
+
+  states.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.appendChild(renderDot(s));
+    const label = document.createElement('span');
+    label.textContent = s.label;
+    item.appendChild(label);
+    legend.appendChild(item);
+  });
+
+  return legend;
+}
+
+function renderPreview() {
+  const area = document.getElementById('preview-area');
+  area.innerHTML = '';
+
+  // Legend
+  const legendSection = document.createElement('div');
+  legendSection.className = 'preview-section';
+  const legendLabel = document.createElement('div');
+  legendLabel.className = 'preview-label';
+  legendLabel.textContent = 'Legend';
+  legendSection.appendChild(legendLabel);
+  legendSection.appendChild(renderLegend());
+  area.appendChild(legendSection);
+
+  // Normal jobs
+  const normalJobs = JOBS.filter(j => !j.problem);
+  const problemJobs = JOBS.filter(j => j.problem);
+
+  if (normalJobs.length) {
+    const section = document.createElement('div');
+    section.className = 'preview-section';
+    const label = document.createElement('div');
+    label.className = 'preview-label';
+    label.textContent = 'Travaux';
+    section.appendChild(label);
+    const row = document.createElement('div');
+    row.className = 'cards-row';
+    normalJobs.forEach(j => row.appendChild(renderJobCard(j)));
+    section.appendChild(row);
+    area.appendChild(section);
+  }
+
+  if (problemJobs.length) {
+    const section = document.createElement('div');
+    section.className = 'preview-section';
+    const label = document.createElement('div');
+    label.className = 'preview-label';
+    label.textContent = 'Problèmes';
+    section.appendChild(label);
+    const row = document.createElement('div');
+    row.className = 'cards-row';
+    problemJobs.forEach(j => row.appendChild(renderJobCard(j)));
+    section.appendChild(row);
+    area.appendChild(section);
+  }
+}
+
+function updatePrompt() {
+  const parts = [];
+
+  parts.push(`Replace ProgressSegments with ProgressDots in the JobCard footer.`);
+  parts.push(`Each task is rendered as a single dot (circle) instead of a variable-width bar segment.`);
+
+  // Dot size
+  parts.push(`\nDot size: ${state.dotSize}px, gap: ${state.gap}px, border-width: ${state.borderWidth}px.`);
+
+  // States
+  parts.push(`\nStates:`);
+  parts.push(`- Unscheduled: filled gray circle (${state.unscheduledColor})`);
+  parts.push(`- Scheduled: filled blue circle (${state.scheduledColor})`);
+  parts.push(`- Completed: filled green circle (${state.completedColor})`);
+  parts.push(`- Late: filled red circle (${state.lateColor})`);
+
+  // Outsourced
+  const styleDesc = {
+    ring: `double-ring (outer ring with ${state.ringGap}px gap around inner dot)`,
+    diamond: 'diamond shape (rotated 45° square)',
+    square: 'square with rounded corners instead of circle',
+    star: 'circle with 4 crosshair arms extending outward',
+    half: 'half-filled circle (left half filled)',
+    crosshair: 'circle with cross lines extending beyond edges',
+  };
+  parts.push(`\nOutsourced tasks: ${styleDesc[state.outsourcedStyle]}.`);
+  parts.push(`Outsourced dots use the same color coding as internal dots but with the distinctive shape/marker.`);
+
+  parts.push(`\nLayout: flex-wrap row, same position as current ProgressSegments in JobCard footer.`);
+
+  document.getElementById('prompt-output').textContent = parts.join('\n');
+}
+
+function updateAll() {
+  renderPreview();
+  updatePrompt();
+}
+
+function copyPrompt() {
+  const text = document.getElementById('prompt-output').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+// Initial render
+updateAll();
+</script>
+</body>
+</html>

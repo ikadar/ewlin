@@ -35,8 +35,8 @@ describe('ElementSection', () => {
     expect(screen.getByText('COUV')).toBeInTheDocument();
   });
 
-  it('renders element label when provided', () => {
-    const element = createElement({ label: 'Couverture' });
+  it('renders prerequisite pills on same row as element name', () => {
+    const element = createElement({ name: 'COUV' });
 
     render(
       <ElementSection element={element} allElements={[element]}>
@@ -44,61 +44,8 @@ describe('ElementSection', () => {
       </ElementSection>
     );
 
-    expect(screen.getByText('Couverture')).toBeInTheDocument();
-  });
-
-  it('does not render label when not provided', () => {
-    const element = createElement({ label: undefined });
-
-    render(
-      <ElementSection element={element} allElements={[element]}>
-        <div>Task content</div>
-      </ElementSection>
-    );
-
-    expect(screen.queryByText('Couverture')).not.toBeInTheDocument();
-  });
-
-  it('renders prerequisite namees with Workflow icon', () => {
-    const couvElement = createElement({
-      id: 'elem-couv',
-      name: 'COUV',
-      prerequisiteElementIds: [],
-    });
-    const intElement = createElement({
-      id: 'elem-int',
-      name: 'INT',
-      prerequisiteElementIds: [],
-    });
-    const finElement = createElement({
-      id: 'elem-fin',
-      name: 'FIN',
-      prerequisiteElementIds: ['elem-couv', 'elem-int'],
-    });
-
-    const allElements = [couvElement, intElement, finElement];
-
-    render(
-      <ElementSection element={finElement} allElements={allElements}>
-        <div>Task content</div>
-      </ElementSection>
-    );
-
-    // Should show lowercase prerequisite namees
-    expect(screen.getByText('couv int')).toBeInTheDocument();
-  });
-
-  it('does not show prerequisites section when there are none', () => {
-    const element = createElement({ prerequisiteElementIds: [] });
-
-    render(
-      <ElementSection element={element} allElements={[element]}>
-        <div>Task content</div>
-      </ElementSection>
-    );
-
-    // Should not find the Workflow icon text (no prerequisites)
-    expect(screen.queryByText('couv int')).not.toBeInTheDocument();
+    // Prerequisite status pills should be rendered
+    expect(screen.getByTestId('prerequisite-status')).toBeInTheDocument();
   });
 
   it('hides header for single-element jobs', () => {

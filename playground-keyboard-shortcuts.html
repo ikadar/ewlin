@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Scheduler - Keyboard Shortcuts Reference</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232736;
+    --border: #2e3348;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa8;
+    --accent: #6c8cff;
+    --accent-dim: #3d5199;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --orange: #fb923c;
+    --red: #f87171;
+    --purple: #a78bfa;
+    --cyan: #22d3ee;
+    --pink: #f472b6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+
+  header p {
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 20px;
+    text-align: center;
+    min-width: 120px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 240px;
+    position: relative;
+  }
+
+  .search-box input {
+    width: 100%;
+    padding: 10px 14px 10px 38px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-box input:focus {
+    border-color: var(--accent);
+  }
+
+  .search-box::before {
+    content: '\1F50D';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.5;
+  }
+
+  .filter-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .chip:hover { border-color: var(--accent-dim); color: var(--text); }
+  .chip.active { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
+
+  .view-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .view-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--text-dim);
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .view-btn:hover { color: var(--text); }
+  .view-btn.active { background: var(--accent-dim); color: #fff; }
+
+  .context-section {
+    margin-bottom: 28px;
+  }
+
+  .context-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .context-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .context-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .context-count {
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--surface2);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .context-chevron {
+    margin-left: auto;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+    font-size: 12px;
+  }
+
+  .context-section.collapsed .context-chevron {
+    transform: rotate(-90deg);
+  }
+
+  .context-section.collapsed .shortcuts-grid {
+    display: none;
+  }
+
+  .shortcuts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 10px;
+  }
+
+  .shortcut-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+
+  .shortcut-card:hover {
+    border-color: var(--accent-dim);
+    transform: translateY(-1px);
+  }
+
+  .shortcut-card.highlight {
+    border-color: var(--accent);
+    background: rgba(108, 140, 255, 0.05);
+  }
+
+  .key-combo {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 100px;
+    flex-wrap: wrap;
+  }
+
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 26px;
+    padding: 0 7px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .key-sep {
+    color: var(--text-dim);
+    font-size: 10px;
+    margin: 0 1px;
+  }
+
+  .shortcut-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .shortcut-action {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .shortcut-detail {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  .shortcut-file {
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.6;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-top: 3px;
+    cursor: pointer;
+  }
+
+  .shortcut-file:hover { opacity: 1; color: var(--accent); }
+
+  .shortcut-tags {
+    display: flex;
+    gap: 4px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .tag-modifier { background: rgba(108, 140, 255, 0.15); color: var(--accent); }
+  .tag-nav { background: rgba(34, 211, 238, 0.15); color: var(--cyan); }
+  .tag-action { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+  .tag-cancel { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+  .tag-toggle { background: rgba(250, 204, 21, 0.15); color: var(--yellow); }
+
+  /* Table view */
+  .shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    display: none;
+  }
+
+  .shortcuts-table.active { display: table; }
+  .shortcuts-grid.active { display: grid; }
+
+  .shortcuts-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .shortcuts-table td {
+    padding: 10px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .shortcuts-table tr:hover td {
+    background: rgba(108, 140, 255, 0.03);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px;
+    color: var(--text-dim);
+  }
+
+  .empty-state p { font-size: 14px; }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+
+  @media (max-width: 768px) {
+    .shortcuts-grid { grid-template-columns: 1fr; }
+    .controls { flex-direction: column; }
+    .search-box { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>Flux Scheduler - Keyboard Shortcuts</h1>
+    <p>Complete reference of all <span id="totalCount">0</span> keyboard shortcuts across the application</p>
+  </header>
+
+  <div class="stats-bar" id="statsBar"></div>
+
+  <div class="controls">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search shortcuts by key, action, or context...">
+    </div>
+    <div class="filter-chips" id="filterChips"></div>
+    <div class="view-toggle">
+      <button class="view-btn active" data-view="cards">Cards</button>
+      <button class="view-btn" data-view="table">Table</button>
+    </div>
+  </div>
+
+  <div id="content"></div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background: var(--accent)"></div> Modifier</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--cyan)"></div> Navigation</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--green)"></div> Action</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--red)"></div> Cancel / Close</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--yellow)"></div> Toggle</div>
+  </div>
+</div>
+
+<script>
+const SHORTCUTS = [
+  // === GLOBAL (App.tsx) ===
+  {
+    keys: ['Alt'], action: 'Activate Alt mode', context: 'Global',
+    detail: 'Sets isAltPressed state; used as modifier for other shortcuts. Clears on key release.',
+    file: 'App.tsx:138-145', tags: ['modifier'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Alt', 'Q'], action: 'Toggle quick placement mode', context: 'Global',
+    detail: 'Enters/exits quick placement mode for the selected job. Requires a job to be selected.',
+    file: 'App.tsx:147-161', tags: ['toggle'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Escape'], action: 'Exit quick placement mode', context: 'Quick Placement active',
+    detail: 'Deactivates quick placement, clears hover state, deselects job.',
+    file: 'App.tsx:163-171', tags: ['cancel'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Escape'], action: 'Cancel pick operation', context: 'Pick mode active',
+    detail: 'Cancels current pick/rescheduling operation. Restores scroll position for sidebar picks.',
+    file: 'App.tsx:174-180', tags: ['cancel'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Escape'], action: 'Deselect job', context: 'Job selected, JCF closed',
+    detail: 'Deselects the currently selected job and blurs the active element.',
+    file: 'App.tsx:182-191', tags: ['cancel'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Alt', '\u2191'], action: 'Previous job', context: 'Scheduling grid',
+    detail: 'Cycles up through ordered job list (problems first: late, conflicts, then normal). Wraps circularly.',
+    file: 'App.tsx:193-210', tags: ['nav'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Alt', '\u2193'], action: 'Next job', context: 'Scheduling grid',
+    detail: 'Cycles down through ordered job list (problems first: late, conflicts, then normal). Wraps circularly.',
+    file: 'App.tsx:193-210', tags: ['nav'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Alt', 'D'], action: 'Jump to departure date', context: 'Job selected with workshopExitDate',
+    detail: 'Scrolls the scheduling grid so the job\'s workshop exit date is centered at the bottom of the viewport.',
+    file: 'App.tsx:212-225', tags: ['nav'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['Home'], action: 'Jump to today / now', context: 'Scheduling grid',
+    detail: 'Scrolls grid to center on current date/time. No modifiers required.',
+    file: 'App.tsx:227-240', tags: ['nav'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['PageUp'], action: 'Scroll grid up (1 day)', context: 'Scheduling grid',
+    detail: 'Scrolls the scheduling grid up by one day worth of pixels.',
+    file: 'App.tsx:242-253', tags: ['nav'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['PageDown'], action: 'Scroll grid down (1 day)', context: 'Scheduling grid',
+    detail: 'Scrolls the scheduling grid down by one day worth of pixels.',
+    file: 'App.tsx:242-253', tags: ['nav'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+  {
+    keys: ['A'], action: 'Toggle PRODUIT / TIRAGE display', context: 'No input focused',
+    detail: 'Toggles between product and print-run display modes. Only works when focus is not on an input/textarea.',
+    file: 'App.tsx:255-264', tags: ['toggle'],
+    category: 'global', color: '#6c8cff', icon: '\u{1F30D}'
+  },
+
+  // === TILE ===
+  {
+    keys: ['Enter'], action: 'Select tile / job', context: 'Tile focused',
+    detail: 'Selects the job associated with the focused tile in the scheduling grid.',
+    file: 'Tile/Tile.tsx:253-255', tags: ['action'],
+    category: 'tile', color: '#4ade80', icon: '\u{1F4CB}'
+  },
+  {
+    keys: ['Enter', '/', 'Space'], action: 'Place task (quick placement)', context: 'Quick placement active, station hover',
+    detail: 'Places the task at the hovered position on the station column during quick placement mode.',
+    file: 'StationColumns/StationColumn.tsx:282-285', tags: ['action'],
+    category: 'tile', color: '#4ade80', icon: '\u{1F4CB}'
+  },
+
+  // === FLUX PAGE ===
+  {
+    keys: ['Alt', 'F'], action: 'Focus search input', context: 'Flux (Jobs table) page',
+    detail: 'Focuses the search input. If already focused, selects all text for easy replacement.',
+    file: 'pages/FluxPage.tsx:208-215', tags: ['action'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+  {
+    keys: ['Alt', 'N'], action: 'New job', context: 'Any page',
+    detail: 'Navigates to /job/new to create a new job.',
+    file: 'pages/FluxPage.tsx:217-220', tags: ['action'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+  {
+    keys: ['Alt', '\u2192'], action: 'Next tab', context: 'Flux page tabs',
+    detail: 'Navigates to the next tab (All, Enqu\u00EAte, Presse, Fa\u00E7onnage, Shipper, Archive). Wraps circularly.',
+    file: 'pages/FluxPage.tsx:222-227', tags: ['nav'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+  {
+    keys: ['Alt', '\u2190'], action: 'Previous tab', context: 'Flux page tabs',
+    detail: 'Navigates to the previous tab. Wraps circularly.',
+    file: 'pages/FluxPage.tsx:229-234', tags: ['nav'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+
+  // === JCF MODAL ===
+  {
+    keys: ['\u2318/Ctrl', 'S'], action: 'Save form', context: 'JCF Modal open',
+    detail: 'Saves the JCF form. Works on macOS (Cmd+S) and Windows/Linux (Ctrl+S).',
+    file: 'JcfModal/JcfModal.tsx:59-62', tags: ['action'],
+    category: 'jcf', color: '#a78bfa', icon: '\u{1F4DD}'
+  },
+  {
+    keys: ['Escape'], action: 'Close JCF modal', context: 'JCF Modal open',
+    detail: 'Closes the JCF modal. Only if event is not prevented by a child (e.g., dropdown escape).',
+    file: 'JcfModal/JcfModal.tsx:65-67', tags: ['cancel'],
+    category: 'jcf', color: '#a78bfa', icon: '\u{1F4DD}'
+  },
+
+  // === JCF ELEMENTS TABLE ===
+  {
+    keys: ['Alt', '\u2191/\u2193/\u2190/\u2192'], action: 'Navigate cells (4-way)', context: 'JCF Elements Table cell focused',
+    detail: 'Excel-style circular navigation: moves focus between cells in all four directions. Wraps at edges.',
+    file: 'JcfElementsTable.tsx:340-347', tags: ['nav'],
+    category: 'jcf-table', color: '#f472b6', icon: '\u{1F5C2}'
+  },
+  {
+    keys: ['Enter'], action: 'Move to next cell below', context: 'JCF Table text input (non-textarea)',
+    detail: 'Moves focus to the cell below in the same column. Skips textarea fields.',
+    file: 'JcfElementsTable.tsx:350-357', tags: ['nav'],
+    category: 'jcf-table', color: '#f472b6', icon: '\u{1F5C2}'
+  },
+  {
+    keys: ['Tab'], action: 'Next cell down', context: 'JCF Table cell focused',
+    detail: 'Navigates down within the column. At boundary, allows browser default Tab behavior.',
+    file: 'JcfElementsTable.tsx:367-376', tags: ['nav'],
+    category: 'jcf-table', color: '#f472b6', icon: '\u{1F5C2}'
+  },
+  {
+    keys: ['Shift', 'Tab'], action: 'Previous cell up', context: 'JCF Table cell focused',
+    detail: 'Navigates up within the column. At boundary, allows browser default Shift+Tab behavior.',
+    file: 'JcfElementsTable.tsx:367-376', tags: ['nav'],
+    category: 'jcf-table', color: '#f472b6', icon: '\u{1F5C2}'
+  },
+  {
+    keys: ['Escape'], action: 'Blur cell / exit focus', context: 'JCF Table cell focused',
+    detail: 'Blurs the current cell. Stops propagation to prevent JCF modal from closing.',
+    file: 'JcfElementsTable.tsx:359-365', tags: ['cancel'],
+    category: 'jcf-table', color: '#f472b6', icon: '\u{1F5C2}'
+  },
+  {
+    keys: ['Enter'], action: 'Save element name', context: 'Element name inline edit',
+    detail: 'Confirms and saves the edited element name.',
+    file: 'JcfElementsTable.tsx:259-271', tags: ['action'],
+    category: 'jcf-table', color: '#f472b6', icon: '\u{1F5C2}'
+  },
+  {
+    keys: ['Escape'], action: 'Cancel element name edit', context: 'Element name inline edit',
+    detail: 'Cancels editing without saving. Stops propagation to prevent modal close.',
+    file: 'JcfElementsTable.tsx:264-268', tags: ['cancel'],
+    category: 'jcf-table', color: '#f472b6', icon: '\u{1F5C2}'
+  },
+
+  // === AUTOCOMPLETE DROPDOWNS ===
+  {
+    keys: ['\u2193'], action: 'Highlight next item / open dropdown', context: 'Autocomplete input focused',
+    detail: 'When open: moves highlight down. When closed: opens the dropdown. Used across all autocomplete components.',
+    file: 'JcfAutocomplete/keyboardUtils.ts:22-62', tags: ['nav'],
+    category: 'autocomplete', color: '#22d3ee', icon: '\u{1F50D}'
+  },
+  {
+    keys: ['\u2191'], action: 'Highlight previous item / open dropdown', context: 'Autocomplete input focused',
+    detail: 'When open: moves highlight up. When closed: opens the dropdown.',
+    file: 'JcfAutocomplete/keyboardUtils.ts:22-62', tags: ['nav'],
+    category: 'autocomplete', color: '#22d3ee', icon: '\u{1F50D}'
+  },
+  {
+    keys: ['Enter'], action: 'Select highlighted item', context: 'Autocomplete dropdown open',
+    detail: 'Selects the currently highlighted dropdown item. Prevents default form submission.',
+    file: 'JcfAutocomplete/keyboardUtils.ts:22-62', tags: ['action'],
+    category: 'autocomplete', color: '#22d3ee', icon: '\u{1F50D}'
+  },
+  {
+    keys: ['Escape'], action: 'Close dropdown', context: 'Autocomplete dropdown open',
+    detail: 'Closes the dropdown and blurs input. Stops propagation to prevent parent Escape handlers.',
+    file: 'JcfAutocomplete/keyboardUtils.ts:22-62', tags: ['cancel'],
+    category: 'autocomplete', color: '#22d3ee', icon: '\u{1F50D}'
+  },
+  {
+    keys: ['Tab'], action: 'Close & navigate to next cell', context: 'Autocomplete in table',
+    detail: 'Closes dropdown and delegates to parent table navigation (forward direction).',
+    file: 'JcfAutocomplete.tsx:134-140', tags: ['nav'],
+    category: 'autocomplete', color: '#22d3ee', icon: '\u{1F50D}'
+  },
+  {
+    keys: ['Shift', 'Tab'], action: 'Close & navigate to previous cell', context: 'Autocomplete in table',
+    detail: 'Closes dropdown and delegates to parent table navigation (backward direction).',
+    file: 'JcfAutocomplete.tsx:134-140', tags: ['nav'],
+    category: 'autocomplete', color: '#22d3ee', icon: '\u{1F50D}'
+  },
+  {
+    keys: ['Alt', '\u2191/\u2193/\u2190/\u2192'], action: 'Close & navigate table cells', context: 'Autocomplete in table',
+    detail: 'Closes dropdown and delegates to parent for Excel-style 4-way cell navigation.',
+    file: 'JcfAutocomplete.tsx:125-130', tags: ['nav'],
+    category: 'autocomplete', color: '#22d3ee', icon: '\u{1F50D}'
+  },
+
+  // === QUANTITY INPUT ===
+  {
+    keys: ['\u2191'], action: 'Increment quantity (+1)', context: 'Quantity input focused',
+    detail: 'Increases the quantity value by 1.',
+    file: 'JcfQuantiteInput.tsx:73-77', tags: ['action'],
+    category: 'jcf-input', color: '#facc15', icon: '\u{1F522}'
+  },
+  {
+    keys: ['\u2193'], action: 'Decrement quantity (-1)', context: 'Quantity input focused',
+    detail: 'Decreases the quantity value by 1. Minimum value is 1.',
+    file: 'JcfQuantiteInput.tsx:81-87', tags: ['action'],
+    category: 'jcf-input', color: '#facc15', icon: '\u{1F522}'
+  },
+
+  // === DATE/TIME PICKER ===
+  {
+    keys: ['Enter'], action: 'Confirm date/time entry', context: 'DateTimePicker input focused',
+    detail: 'Blurs the input to confirm the entered date/time value.',
+    file: 'OutsourcingMiniForm/DateTimePicker.tsx:76-79', tags: ['action'],
+    category: 'jcf-input', color: '#facc15', icon: '\u{1F522}'
+  },
+  {
+    keys: ['Escape'], action: 'Cancel date/time edit', context: 'DateTimePicker editing',
+    detail: 'Cancels the current edit and blurs the input.',
+    file: 'OutsourcingMiniForm/DateTimePicker.tsx:80-83', tags: ['cancel'],
+    category: 'jcf-input', color: '#facc15', icon: '\u{1F522}'
+  },
+
+  // === SCHEDULE SAVE/LOAD ===
+  {
+    keys: ['Enter'], action: 'Save schedule', context: 'Save name input focused',
+    detail: 'Triggers schedule save with the entered name.',
+    file: 'ScheduleSaveLoad/ScheduleSaveLoadModal.tsx:85-88', tags: ['action'],
+    category: 'misc', color: '#8b8fa8', icon: '\u{1F4BE}'
+  },
+
+  // === FLUX PREREQUISITE LISTBOX ===
+  {
+    keys: ['Enter', '/', 'Space'], action: 'Open/toggle prerequisite dropdown', context: 'Prerequisite trigger button focused',
+    detail: 'Opens or toggles the prerequisite selection dropdown.',
+    file: 'FluxTable/FluxPrerequisiteListbox.tsx:110-114', tags: ['action'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+  {
+    keys: ['\u2193'], action: 'Next prerequisite option', context: 'Prerequisite dropdown open',
+    detail: 'Moves focus to the next option in the dropdown.',
+    file: 'FluxTable/FluxPrerequisiteListbox.tsx:119-140', tags: ['nav'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+  {
+    keys: ['\u2191'], action: 'Previous prerequisite option', context: 'Prerequisite dropdown open',
+    detail: 'Moves focus to the previous option in the dropdown.',
+    file: 'FluxTable/FluxPrerequisiteListbox.tsx:119-140', tags: ['nav'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+  {
+    keys: ['Enter', '/', 'Space'], action: 'Select prerequisite option', context: 'Prerequisite dropdown option focused',
+    detail: 'Selects the currently focused option.',
+    file: 'FluxTable/FluxPrerequisiteListbox.tsx:119-140', tags: ['action'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+  {
+    keys: ['Escape'], action: 'Close prerequisite dropdown', context: 'Prerequisite dropdown open',
+    detail: 'Closes the dropdown and returns focus to the trigger button.',
+    file: 'FluxTable/FluxPrerequisiteListbox.tsx:119-140', tags: ['cancel'],
+    category: 'flux', color: '#fb923c', icon: '\u{1F4C4}'
+  },
+
+  // === REFERENCE DATA PAGES ===
+  {
+    keys: ['Escape'], action: 'Close CRUD modal', context: 'Reference data page modal open',
+    detail: 'Closes the open form modal on reference data pages (FeuilleFormats, SurfacagePresets, etc.).',
+    file: 'pages/FeuilleFormatsPage.tsx:59-64', tags: ['cancel'],
+    category: 'misc', color: '#8b8fa8', icon: '\u{1F4BE}'
+  },
+  {
+    keys: ['Enter'], action: 'Add custom pose', context: 'Custom pose input in FeuilleFormat form',
+    detail: 'Adds the entered custom pose value to the list.',
+    file: 'pages/FeuilleFormatsPage.tsx:115-119', tags: ['action'],
+    category: 'misc', color: '#8b8fa8', icon: '\u{1F4BE}'
+  },
+];
+
+// Category definitions
+const CATEGORIES = {
+  global:       { label: 'Global / Scheduling Grid', icon: '\u{1F30D}', color: '#6c8cff' },
+  tile:         { label: 'Tile Interaction',          icon: '\u{1F4CB}', color: '#4ade80' },
+  flux:         { label: 'Flux Page / Jobs Table',    icon: '\u{1F4C4}', color: '#fb923c' },
+  jcf:          { label: 'JCF Modal',                 icon: '\u{1F4DD}', color: '#a78bfa' },
+  'jcf-table':  { label: 'JCF Elements Table',        icon: '\u{1F5C2}', color: '#f472b6' },
+  autocomplete: { label: 'Autocomplete Dropdowns',    icon: '\u{1F50D}', color: '#22d3ee' },
+  'jcf-input':  { label: 'JCF Inputs (Qty, Date)',    icon: '\u{1F522}', color: '#facc15' },
+  misc:         { label: 'Other / Misc',              icon: '\u{1F4BE}', color: '#8b8fa8' },
+};
+
+const TAG_CLASSES = {
+  modifier: 'tag-modifier',
+  nav: 'tag-nav',
+  action: 'tag-action',
+  cancel: 'tag-cancel',
+  toggle: 'tag-toggle',
+};
+
+const TAG_LABELS = {
+  modifier: 'Modifier',
+  nav: 'Navigation',
+  action: 'Action',
+  cancel: 'Cancel',
+  toggle: 'Toggle',
+};
+
+let activeFilter = 'all';
+let activeView = 'cards';
+let searchQuery = '';
+
+function renderKeys(keys) {
+  return keys.map((k, i) => {
+    if (k === '/') return `<span class="key-sep">/</span>`;
+    return `${i > 0 && keys[i-1] !== '/' ? '<span class="key-sep">+</span>' : ''}<kbd>${k}</kbd>`;
+  }).join('');
+}
+
+function renderCard(s) {
+  const cat = CATEGORIES[s.category];
+  return `
+    <div class="shortcut-card" data-category="${s.category}">
+      <div class="key-combo">${renderKeys(s.keys)}</div>
+      <div class="shortcut-info">
+        <div class="shortcut-action">${s.action}</div>
+        <div class="shortcut-detail">${s.detail}</div>
+        <div class="shortcut-tags">
+          ${s.tags.map(t => `<span class="tag ${TAG_CLASSES[t]}">${TAG_LABELS[t]}</span>`).join('')}
+          <span class="tag" style="background: ${cat.color}22; color: ${cat.color}">${s.context}</span>
+        </div>
+        <div class="shortcut-file" title="Click to copy">${s.file}</div>
+      </div>
+    </div>`;
+}
+
+function filterShortcuts() {
+  const q = searchQuery.toLowerCase();
+  return SHORTCUTS.filter(s => {
+    if (activeFilter !== 'all' && s.category !== activeFilter) return false;
+    if (q) {
+      const haystack = [
+        s.keys.join(' '), s.action, s.context, s.detail, s.file, ...s.tags
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    }
+    return true;
+  });
+}
+
+function render() {
+  const filtered = filterShortcuts();
+  const content = document.getElementById('content');
+
+  if (filtered.length === 0) {
+    content.innerHTML = '<div class="empty-state"><p>No shortcuts match your search.</p></div>';
+    return;
+  }
+
+  if (activeView === 'cards') {
+    // Group by category
+    const groups = {};
+    filtered.forEach(s => {
+      if (!groups[s.category]) groups[s.category] = [];
+      groups[s.category].push(s);
+    });
+
+    content.innerHTML = Object.entries(groups).map(([cat, items]) => {
+      const c = CATEGORIES[cat];
+      return `
+        <div class="context-section" data-cat="${cat}">
+          <div class="context-header" onclick="toggleSection(this)">
+            <div class="context-icon" style="background: ${c.color}22; color: ${c.color}">${c.icon}</div>
+            <span class="context-title">${c.label}</span>
+            <span class="context-count">${items.length}</span>
+            <span class="context-chevron">\u25BC</span>
+          </div>
+          <div class="shortcuts-grid active">
+            ${items.map(renderCard).join('')}
+          </div>
+        </div>`;
+    }).join('');
+  } else {
+    content.innerHTML = `
+      <table class="shortcuts-table active">
+        <thead>
+          <tr>
+            <th>Keys</th>
+            <th>Action</th>
+            <th>Context</th>
+            <th>Type</th>
+            <th>File</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map(s => `
+            <tr>
+              <td>${renderKeys(s.keys)}</td>
+              <td>${s.action}</td>
+              <td style="color: var(--text-dim); font-size: 12px">${s.context}</td>
+              <td>${s.tags.map(t => `<span class="tag ${TAG_CLASSES[t]}">${TAG_LABELS[t]}</span>`).join(' ')}</td>
+              <td style="font-family: monospace; font-size: 11px; color: var(--text-dim)">${s.file}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  document.getElementById('totalCount').textContent = SHORTCUTS.length;
+}
+
+function renderStats() {
+  const cats = {};
+  SHORTCUTS.forEach(s => {
+    cats[s.category] = (cats[s.category] || 0) + 1;
+  });
+
+  const tagCounts = {};
+  SHORTCUTS.forEach(s => s.tags.forEach(t => tagCounts[t] = (tagCounts[t] || 0) + 1));
+
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat"><div class="stat-value">${SHORTCUTS.length}</div><div class="stat-label">Total Shortcuts</div></div>
+    <div class="stat"><div class="stat-value">${Object.keys(cats).length}</div><div class="stat-label">Contexts</div></div>
+    <div class="stat"><div class="stat-value" style="color: var(--cyan)">${tagCounts.nav || 0}</div><div class="stat-label">Navigation</div></div>
+    <div class="stat"><div class="stat-value" style="color: var(--green)">${tagCounts.action || 0}</div><div class="stat-label">Actions</div></div>
+    <div class="stat"><div class="stat-value" style="color: var(--red)">${tagCounts.cancel || 0}</div><div class="stat-label">Cancel / Close</div></div>
+    <div class="stat"><div class="stat-value" style="color: var(--yellow)">${tagCounts.toggle || 0}</div><div class="stat-label">Toggles</div></div>
+  `;
+}
+
+function renderFilters() {
+  const cats = {};
+  SHORTCUTS.forEach(s => cats[s.category] = (cats[s.category] || 0) + 1);
+
+  document.getElementById('filterChips').innerHTML =
+    `<span class="chip ${activeFilter === 'all' ? 'active' : ''}" data-filter="all">All</span>` +
+    Object.entries(CATEGORIES).map(([key, cat]) =>
+      `<span class="chip ${activeFilter === key ? 'active' : ''}" data-filter="${key}">${cat.icon} ${cat.label} (${cats[key] || 0})</span>`
+    ).join('');
+
+  document.querySelectorAll('.chip').forEach(el => {
+    el.addEventListener('click', () => {
+      activeFilter = el.dataset.filter;
+      renderFilters();
+      render();
+    });
+  });
+}
+
+function toggleSection(header) {
+  header.parentElement.classList.toggle('collapsed');
+}
+
+// View toggle
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeView = btn.dataset.view;
+    render();
+  });
+});
+
+// Search
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  searchQuery = e.target.value;
+  render();
+});
+
+// Copy file path on click
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('shortcut-file')) {
+    navigator.clipboard.writeText(e.target.textContent);
+    const orig = e.target.textContent;
+    e.target.textContent = 'Copied!';
+    setTimeout(() => e.target.textContent = orig, 1000);
+  }
+});
+
+// Init
+renderStats();
+renderFilters();
+render();
+document.getElementById('totalCount').textContent = SHORTCUTS.length;
+</script>
+</body>
+</html>

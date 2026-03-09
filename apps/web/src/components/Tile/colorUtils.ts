@@ -34,9 +34,9 @@ export function computeTileState(
 const stateColorMap: Record<TileState, ColorClasses> = {
   default: {
     border: 'border-l-blue-500',
-    setupBg: 'bg-blue-500/[0.14]',
+    setupBg: 'bg-blue-500/[0.12]',
     setupBorder: 'border-blue-400/20',
-    runBg: 'bg-blue-500/[0.09]',
+    runBg: 'bg-blue-500/[0.12]',
     text: 'text-blue-300',
   },
   completed: {
@@ -74,4 +74,19 @@ const stateColorMap: Record<TileState, ColorClasses> = {
  */
 export function getStateColorClasses(state: TileState): ColorClasses {
   return stateColorMap[state];
+}
+
+/**
+ * Get the glow color (rgba) for selection effect, derived from state border color.
+ */
+const stateGlowColorMap: Record<TileState, string> = {
+  default: 'rgba(59,130,246,0.4)',
+  completed: 'rgba(34,197,94,0.4)',
+  conflict: 'rgba(245,158,11,0.4)',
+  late: 'rgba(239,68,68,0.4)',
+  blocked: 'rgba(113,113,122,0.4)',
+};
+
+export function getStateGlowColor(state: TileState): string {
+  return stateGlowColorMap[state];
 }

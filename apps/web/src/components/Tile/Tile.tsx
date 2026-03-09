@@ -5,7 +5,7 @@ import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { TileTooltip } from './TileTooltip';
-import { getStateColorClasses } from './colorUtils';
+import { getStateColorClasses, getStateGlowColor } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
@@ -199,11 +199,8 @@ export const Tile = memo(function Tile({
   // Determine if we have setup time to show
   const hasSetup = setupMinutes > 0;
 
-  // Selection effect: brightness + pulse animation
-  const selectionStyle = isSelected
-    ? { filter: 'brightness(1.35)' }
-    : undefined;
-  const selectionClass = isSelected ? 'animate-sel-pulse' : '';
+  // Selection effect: glow + outline via CSS class
+  const selectionGlowClass = isSelected ? 'tile-selected-glow' : '';
 
   // During pick mode, disable pointer events on non-picked tiles
   const pickStyle = isPickingActive && !isPicked
@@ -230,13 +227,13 @@ export const Tile = memo(function Tile({
 
   return (
     <div
-      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity] duration-150 ease-out ${selectionClass}`}
+      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} ${selectionGlowClass} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow,outline] duration-150 ease-out`}
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
         left: 0,
         right: 0,
-        ...selectionStyle,
+        ...(isSelected ? { '--glow-color': getStateGlowColor(tileState) } as React.CSSProperties : undefined),
         ...pickStyle,
       }}
       onClick={handleClick}
@@ -262,74 +259,51 @@ export const Tile = memo(function Tile({
         <SimilarityIndicators results={similarityResults} />
       )}
 
-      {/* Setup section (if has setup time) - contains the label */}
+      {/* Setup section (if has setup time) - background only */}
       {hasSetup && (
         <div
-          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder} pt-0.5 px-2`}
+          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder}`}
           style={{
             top: 0,
             height: `${setupHeight}px`,
           }}
           data-testid="tile-setup-section"
-        >
-          {/* Content: completion icon + reference + client */}
-          <div className="flex items-center gap-2">
-            {isCompleted ? (
-              <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-completed-icon"
-              />
-            ) : (
-              <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-incomplete-icon"
-              />
-            )}
-            <span
-              className={`${colorClasses.text} font-medium truncate min-w-0`}
-              data-testid="tile-content"
-            >
-              {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
-            </span>
-          </div>
-        </div>
+        />
       )}
 
-      {/* Run section */}
+      {/* Run section - background only */}
       <div
-        className={`absolute left-0 right-0 ${colorClasses.runBg} ${!hasSetup ? 'pt-0.5 px-2' : ''}`}
+        className={`absolute left-0 right-0 ${colorClasses.runBg}`}
         style={{
           top: hasSetup ? `${setupHeight}px` : 0,
           height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
         }}
         data-testid="tile-run-section"
-      >
-        {/* Content only if no setup section */}
-        {!hasSetup && (
-          <div className="flex items-center gap-2">
-            {isCompleted ? (
-              <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-completed-icon"
-              />
-            ) : (
-              <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-incomplete-icon"
-              />
-            )}
-            <span
-              className={`${colorClasses.text} font-medium truncate min-w-0`}
-              data-testid="tile-content"
-            >
-              {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
-            </span>
-          </div>
-        )}
+      />
+
+      {/* Label overlay spanning both sections */}
+      <div className="absolute inset-0 z-10 pt-0.5 px-2 pointer-events-none overflow-hidden">
+        <div className="flex items-start gap-2">
+          {isCompleted ? (
+            <CircleCheck
+              className="w-4 h-4 text-emerald-500 shrink-0 pointer-events-auto cursor-pointer hover:text-emerald-400 transition-colors"
+              onClick={handleToggleComplete}
+              data-testid="tile-completed-icon"
+            />
+          ) : (
+            <Circle
+              className="w-4 h-4 text-zinc-600 shrink-0 pointer-events-auto cursor-pointer hover:text-zinc-400 transition-colors"
+              onClick={handleToggleComplete}
+              data-testid="tile-incomplete-icon"
+            />
+          )}
+          <span
+            className={`${colorClasses.text} font-medium break-words min-w-0 leading-tight`}
+            data-testid="tile-content"
+          >
+            {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
+          </span>
+        </div>
       </div>
 
       {/* Swap buttons (visible on hover) */}

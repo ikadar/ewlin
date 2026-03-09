@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ShortcutFooter } from '@/components/ShortcutFooter/ShortcutFooter';
+import { detectKeyboardLayout, isAltLetter } from '@/utils/keyboardLayout';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
@@ -200,25 +202,25 @@ export function FluxPage() {
   // ── Keyboard shortcuts (spec 3.4) ────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!e.altKey) return;
+      detectKeyboardLayout(e);
 
-      // Use e.code (physical key) instead of e.key to avoid macOS Option key
-      // remapping (e.g. Alt+F → e.key='ƒ' on macOS, but e.code='KeyF' always).
+      if (isAltLetter(e, 'f')) {
+        e.preventDefault();
+        if (document.activeElement === searchInputRef.current) {
+          searchInputRef.current?.select();
+        } else {
+          searchInputRef.current?.focus();
+        }
+        return;
+      }
+      if (isAltLetter(e, 'n')) {
+        e.preventDefault();
+        navigate('/job/new', { state: { from: location.pathname } });
+        return;
+      }
+
+      if (!e.altKey) return;
       switch (e.code) {
-        case 'KeyF': {
-          e.preventDefault();
-          if (document.activeElement === searchInputRef.current) {
-            searchInputRef.current?.select();
-          } else {
-            searchInputRef.current?.focus();
-          }
-          break;
-        }
-        case 'KeyN': {
-          e.preventDefault();
-          navigate('/job/new', { state: { from: location.pathname } });
-          break;
-        }
         case 'ArrowRight': {
           e.preventDefault();
           const currentIndex = TAB_IDS.indexOf(activeTab);
@@ -310,6 +312,8 @@ export function FluxPage() {
           onConfirm={handleConfirmDelete}
         />
       )}
+
+      <ShortcutFooter mode="flux" />
     </div>
   );
 }
