@@ -22,8 +22,8 @@ export type { StationColumnsProps, StationColumnProps, UnavailabilityOverlayProp
 export { SchedulingGrid } from './SchedulingGrid';
 export type { SchedulingGridProps, SchedulingGridHandle } from './SchedulingGrid';
 
-export { Tile, TileContextMenu, SwapButtons, hexToTailwindColor, getColorClasses, getJobColorClasses } from './Tile';
-export type { TileProps, TileContextMenuProps, SwapButtonsProps, TailwindColor } from './Tile';
+export { Tile, TileContextMenu, SwapButtons, getStateColorClasses, computeTileState } from './Tile';
+export type { TileProps, TileContextMenuProps, SwapButtonsProps, TileState, ColorClasses } from './Tile';
 
 export { DragPreview, snapToGrid, yPositionToTime, formatTime, getPixelsPerSnap, SNAP_INTERVAL_MINUTES, PIXELS_PER_SNAP } from './DragPreview';
 export type { DragPreviewProps } from './DragPreview';

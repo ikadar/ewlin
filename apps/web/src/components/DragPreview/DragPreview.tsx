@@ -1,5 +1,5 @@
 import type { Task, Job } from '@flux/types';
-import { hexToTailwindColor, getColorClasses } from '../Tile';
+import { getStateColorClasses } from '../Tile';
 
 export interface DragPreviewProps {
   /** The task being dragged */
@@ -15,9 +15,8 @@ export interface DragPreviewProps {
  * Displays a semi-transparent version of the task tile.
  */
 export function DragPreview({ task, job, pixelsPerHour = 80 }: DragPreviewProps) {
-  // Get color classes from job color
-  const tailwindColor = hexToTailwindColor(job.color);
-  const colors = getColorClasses(tailwindColor);
+  // Use default state color for preview
+  const colors = getStateColorClasses('default');
 
   // Get station name for internal tasks
   const stationName = task.type === 'Internal' ? task.stationId : 'Outsourced';

@@ -1033,10 +1033,15 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pixelsPerHour]); // handleGridScroll is stable, pixelsPerHour triggers recalc
 
+  // Late job IDs for state-based tile coloring
+  const lateJobIds = useMemo(
+    () => new Set(snapshot.lateJobs.map((lj) => lj.jobId)),
+    [snapshot.lateJobs],
+  );
+
   // Get ordered job IDs for navigation (matching JobsList display order)
   // Problems first (late, then conflicts), then normal jobs
   const orderedJobIds = useMemo(() => {
-    const lateJobIds = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
     const conflictJobIds = new Set<string>();
     snapshot.conflicts.forEach((c) => {
       const task = snapshot.tasks.find((t) => t.id === c.taskId);
@@ -2163,6 +2168,7 @@ function AppContent() {
           onPickFromGrid={handlePickFromGrid}
           onContextMenu={handleContextMenuOpen}
           displayMode={displayMode}
+          lateJobIds={lateJobIds}
         />
           </div>
         </div>

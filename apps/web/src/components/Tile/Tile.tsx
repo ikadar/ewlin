@@ -5,7 +5,8 @@ import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { TileTooltip } from './TileTooltip';
-import { getJobColorClasses } from './colorUtils';
+import { getStateColorClasses } from './colorUtils';
+import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 
@@ -34,8 +35,6 @@ export interface TileProps {
   isSelected?: boolean;
   /** Similarity comparison results with previous tile (if any) */
   similarityResults?: SimilarityResult[];
-  /** ID of the currently selected job (for muting non-selected jobs - REQ-01) */
-  selectedJobId?: string;
   /** Whether this tile has a conflict (precedence violation - REQ-12) */
   hasConflict?: boolean;
   /** Callback when completion icon is clicked */
@@ -60,6 +59,8 @@ export interface TileProps {
   displayMode?: 'produit' | 'tirage';
   /** Pre-computed Tirage label string (full label including prefix). Empty → Produit fallback. */
   tirageLabel?: string;
+  /** State-based tile color */
+  tileState?: TileState;
 }
 
 /**
@@ -71,7 +72,7 @@ function minutesToPixels(minutes: number, pixelsPerHour: number = PIXELS_PER_HOU
 
 /**
  * Tile - Visual representation of a scheduled task assignment.
- * Shows job color, setup/run sections, completion status, and swap buttons.
+ * Shows state-based color, setup/run sections, completion status, and swap buttons.
  * Draggable within its station column for repositioning.
  * v0.3.46: Memoized to prevent unnecessary re-renders during drag.
  */
@@ -88,7 +89,6 @@ export const Tile = memo(function Tile({
   showSwapDown = true,
   isSelected = false,
   similarityResults,
-  selectedJobId,
   hasConflict = false,
   onToggleComplete,
   pixelsPerHour = PIXELS_PER_HOUR,
@@ -101,6 +101,7 @@ export const Tile = memo(function Tile({
   element,
   displayMode,
   tirageLabel,
+  tileState = 'default',
 }: TileProps) {
   // v0.4.32b: Tooltip visibility state with 2-second hover delay
   const [showTooltip, setShowTooltip] = useState(false);
@@ -146,20 +147,11 @@ export const Tile = memo(function Tile({
   const setupHeight = totalHeight * setupRatio;
   const runHeight = totalHeight * (1 - setupRatio);
 
-  // Get color classes
-  const colorClasses = getJobColorClasses(job.color);
+  // Get state-based color classes
+  const colorClasses = getStateColorClasses(tileState);
 
   // Completion state
   const isCompleted = assignment.isCompleted;
-
-  // Muting state: tile is muted when a job is selected (REQ-01)
-  const isMutedBySelection = selectedJobId !== undefined && selectedJobId !== job.id;
-  const isMuted = isMutedBySelection;
-
-  // Completed gradient style
-  const completedGradient = isCompleted
-    ? 'linear-gradient(to right, rgba(34,197,94,0.6) 0%, rgba(34,197,94,0.2) 50%, transparent 100%)'
-    : undefined;
 
   // Handle click - v0.3.57: Pick for reschedule or select job
   const handleClick = () => {
@@ -207,35 +199,16 @@ export const Tile = memo(function Tile({
   // Determine if we have setup time to show
   const hasSetup = setupMinutes > 0;
 
-  // REQ-12: Conflict glow (amber) overrides selection glow (job color)
-  // Selected state styling - glow effect using job color at 60% opacity
-  const getGlowStyle = () => {
-    if (hasConflict) {
-      // Amber glow for conflict tiles (overrides selection glow)
-      return { boxShadow: '0 0 12px 4px #F59E0B99' }; // amber-500 at ~60% opacity
-    }
-    if (isSelected) {
-      // Job color glow for selected tiles
-      return { boxShadow: `0 0 12px 4px ${job.color}99` }; // 99 hex = ~60% opacity
-    }
-    return undefined;
-  };
-  const glowStyle = getGlowStyle();
+  // Selection effect: brightness + pulse animation
+  const selectionStyle = isSelected
+    ? { filter: 'brightness(1.35)' }
+    : undefined;
+  const selectionClass = isSelected ? 'animate-sel-pulse' : '';
 
-  // Muting style: desaturate and reduce opacity for other jobs during selection
-  // v0.3.57: During pick, non-picked tiles remain clickable but placement goes to StationColumn
-  const getMutingStyle = () => {
-    // v0.3.57: During active pick, disable pointer events on non-picked tiles
-    // so clicks pass through to StationColumn for placement
-    if (isPickingActive && !isPicked) {
-      if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const };
-      return { pointerEvents: 'none' as const };
-    }
-    // When just muted by selection: visual muting only, keep clickable
-    if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6 };
-    return undefined;
-  };
-  const mutingStyle = getMutingStyle();
+  // During pick mode, disable pointer events on non-picked tiles
+  const pickStyle = isPickingActive && !isPicked
+    ? { pointerEvents: 'none' as const }
+    : undefined;
 
   // v0.4.32b: Blocked tiles show dashed border
   const borderStyleClass = isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
@@ -257,14 +230,14 @@ export const Tile = memo(function Tile({
 
   return (
     <div
-      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity] duration-150 ease-out ${selectionClass}`}
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
         left: 0,
         right: 0,
-        ...glowStyle,
-        ...mutingStyle,
+        ...selectionStyle,
+        ...pickStyle,
       }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -296,7 +269,6 @@ export const Tile = memo(function Tile({
           style={{
             top: 0,
             height: `${setupHeight}px`,
-            backgroundImage: completedGradient,
           }}
           data-testid="tile-setup-section"
         >
@@ -331,7 +303,6 @@ export const Tile = memo(function Tile({
         style={{
           top: hasSetup ? `${setupHeight}px` : 0,
           height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
-          backgroundImage: completedGradient,
         }}
         data-testid="tile-run-section"
       >
@@ -414,7 +385,8 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.isBlocked !== next.isBlocked ||
     prev.blockingInfo !== next.blockingInfo ||
     prev.displayMode !== next.displayMode ||
-    prev.tirageLabel !== next.tirageLabel
+    prev.tirageLabel !== next.tirageLabel ||
+    prev.tileState !== next.tileState
   );
 }
 
@@ -436,17 +408,8 @@ function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
 
 /**
  * Custom comparison function for memo to prevent unnecessary re-renders.
- * v0.3.46: Initial implementation
- * v0.3.57: Updated for pick instead of drag
- * v0.4.32b: Added blocking state
- * v0.4.39: Refactored to reduce cognitive complexity
  */
 function arePropsEqual(prevProps: TileProps, nextProps: TileProps): boolean {
-  // For selectedJobId, compare the computed mute state, not raw values
-  const prevMutedBySelection = prevProps.selectedJobId !== undefined && prevProps.selectedJobId !== prevProps.job.id;
-  const nextMutedBySelection = nextProps.selectedJobId !== undefined && nextProps.selectedJobId !== nextProps.job.id;
-
-  if (prevMutedBySelection !== nextMutedBySelection) return false;
   if (haveDataPropsChanged(prevProps, nextProps)) return false;
   if (haveStatePropsChanged(prevProps, nextProps)) return false;
   if (haveCallbackPropsChanged(prevProps, nextProps)) return false;

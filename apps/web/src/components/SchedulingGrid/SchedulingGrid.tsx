@@ -4,7 +4,7 @@ import { isInternalTask, getDeadlineDate } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
-import { Tile, compareSimilarity } from '../Tile';
+import { Tile, compareSimilarity, computeTileState } from '../Tile';
 import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
@@ -133,6 +133,8 @@ export interface SchedulingGridProps {
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
   /** Current display mode (Produit or Tirage) — affects column widths */
   displayMode?: 'produit' | 'tirage';
+  /** Set of job IDs that are late (for state-based tile coloring) */
+  lateJobIds?: Set<string>;
 }
 
 /**
@@ -192,6 +194,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       // v0.3.58: Context menu props
       onContextMenu,
       displayMode,
+      lateJobIds,
     },
     ref
   ) {
@@ -602,6 +605,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         : '';
                     const tileLabel = rawTirageLabel || undefined;
 
+                    // Compute tile state for state-based coloring
+                    const isLate = lateJobIds?.has(job.id) ?? false;
+                    const hasConflict = conflictTaskIds.has(task.id);
+                    const tileState = computeTileState(isLate, hasConflict, blocked, assignment.isCompleted);
+
                     return (
                       <Tile
                         key={assignment.id}
@@ -619,8 +627,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
                         onToggleComplete={onToggleComplete}
-                        selectedJobId={selectedJobId ?? undefined}
-                        hasConflict={conflictTaskIds.has(task.id)}
+                        hasConflict={hasConflict}
+                        tileState={tileState}
                         pixelsPerHour={pixelsPerHour}
                         isPicked={pickedAssignmentId === assignment.id}
                         onPickFromGrid={onPickFromGrid}

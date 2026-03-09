@@ -173,6 +173,15 @@ body {
   background-repeat: repeat;
 }
 
+/* State-based tile selection pulse */
+@keyframes sel-pulse {
+  0%, 100% { background-color: rgba(255,255,255,0); }
+  50% { background-color: rgba(255,255,255,0.07); }
+}
+.animate-sel-pulse {
+  animation: sel-pulse 2s ease-in-out infinite;
+}
+
 /* v0.3.56: Pick & Place visual feedback */
 
 /* Pulse opacity animation for picked tile placeholder (v0.3.57) */

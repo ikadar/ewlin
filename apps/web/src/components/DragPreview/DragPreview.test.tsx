@@ -78,7 +78,7 @@ describe('DragPreview', () => {
     render(<DragPreview task={mockTask} job={mockJob} />);
     const preview = screen.getByTestId('drag-preview');
     expect(preview).toHaveClass('border-l-4');
-    expect(preview).toHaveClass('border-l-purple-500');
+    expect(preview).toHaveClass('border-l-blue-500');
   });
 
   it('calculates correct height for short tasks', () => {

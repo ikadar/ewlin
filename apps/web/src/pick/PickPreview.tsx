@@ -17,7 +17,7 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { Task, Job } from '@flux/types';
-import { hexToTailwindColor, getColorClasses } from '../components/Tile';
+import { getStateColorClasses } from '../components/Tile';
 import { snapToGrid, ValidationMessage } from '../components/DragPreview';
 import { usePickState } from './PickStateContext';
 import { useGetSnapshotQuery } from '../store';
@@ -92,9 +92,8 @@ function PickPreviewInner({ task, job, validationMessage, debugInfo }: PickPrevi
     column: null,
   });
 
-  // Get color classes from job color
-  const tailwindColor = hexToTailwindColor(job.color);
-  const colors = getColorClasses(tailwindColor);
+  // Use default state color for preview
+  const colors = getStateColorClasses('default');
 
   // Resolve station name from snapshot (instead of showing UUID)
   const { data: snapshotData } = useGetSnapshotQuery();
