@@ -49,7 +49,7 @@ export function getPrimaryValidationMessage(
   const blockingConflicts = conflicts.filter(
     (c) =>
       c.type !== 'StationConflict' && // Auto-resolved
-      !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates') // Warning only
+      !(c.type === 'ApprovalGateConflict') // Warning only (all gates)
   );
 
   if (blockingConflicts.length === 0) {
@@ -177,6 +177,14 @@ function getApprovalMessage(conflict: ScheduleConflict): string {
 
   if (gate === 'Plates') {
     return 'Plaques non prêtes';
+  }
+
+  if (gate === 'Paper') {
+    return 'Papier non disponible';
+  }
+
+  if (gate === 'Forme') {
+    return 'Forme non disponible';
   }
 
   return 'Approbation requise';

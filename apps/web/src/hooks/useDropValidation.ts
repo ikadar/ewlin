@@ -135,10 +135,10 @@ export function useDropValidation({
       (c) =>
         !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
         !(c.type === 'PrecedenceConflict' && validationResult.suggestedStart) &&
-        !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+        !(c.type === 'ApprovalGateConflict')
     );
     const warningConflicts = validationResult.conflicts.filter(
-      (c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates'
+      (c) => c.type === 'ApprovalGateConflict'
     );
     const hasWarningOnly = hasConflicts && blockingConflicts.length === 0 && warningConflicts.length > 0;
 

@@ -1638,7 +1638,7 @@ function AppContent() {
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
              !(c.type === 'PrecedenceConflict' && isAltPressed) &&
-             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+             !(c.type === 'ApprovalGateConflict')
     );
 
     if (blockingConflicts.length > 0) {
@@ -1832,12 +1832,12 @@ function AppContent() {
     // so PrecedenceConflict is always blocking (unless Alt-bypassed).
     // StationConflict IS blocking in pick mode (means overlap with another task).
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+      (c) => !(c.type === 'ApprovalGateConflict')
     );
 
     // Check if only warning (non-blocking) conflicts exist
     const hasWarningOnly = blockingConflicts.length === 0 &&
-      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates');
+      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict');
 
     // Determine ring state
     let ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
@@ -1904,7 +1904,7 @@ function AppContent() {
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
-             !(c.type === 'ApprovalGateConflict' && c.details?.gate === 'Plates')
+             !(c.type === 'ApprovalGateConflict')
     );
 
     if (blockingConflicts.length > 0 && !isAltPressed) {
