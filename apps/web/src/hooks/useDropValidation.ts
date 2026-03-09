@@ -32,7 +32,7 @@ export interface DropValidationResult {
   validationResult: ValidationResult | null;
   /** All conflicts */
   conflicts: ValidationResult['conflicts'];
-  /** Whether there are only warning conflicts (non-blocking, like Plates approval) */
+  /** Whether there are only warning conflicts (non-blocking, like approval gates) */
   hasWarningOnly: boolean;
   /** Whether there's a group capacity conflict (REQ-18) */
   hasGroupCapacityConflict: boolean;
@@ -128,7 +128,7 @@ export function useDropValidation({
     );
 
     // Check if there are only warning conflicts (non-blocking)
-    // Warning-only conflicts: Plates ApprovalGateConflict
+    // Warning-only conflicts: all ApprovalGateConflict (Paper, BAT, Plates, Forme)
     // Non-blocking (handled by system): StationConflict (push-down), PrecedenceConflict with suggestedStart (auto-snap)
     const hasConflicts = validationResult.conflicts.length > 0;
     const blockingConflicts = validationResult.conflicts.filter(

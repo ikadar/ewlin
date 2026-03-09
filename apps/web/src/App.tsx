@@ -1898,7 +1898,7 @@ function AppContent() {
     // Check for blocking conflicts
     // StationConflict is NOT blocking (push-down) UNLESS the existing tile is completed
     // PrecedenceConflict with suggestedStart is NOT blocking (can be placed at suggested time)
-    // ApprovalGateConflict for Plates is NOT blocking
+    // ApprovalGateConflict is NOT blocking (all gates are warning-only)
     const blockingConflicts = validationResult.conflicts.filter(
       (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
              !(c.type === 'PrecedenceConflict' &&
