@@ -13,3 +13,5 @@ export type { SessionLearningState, SessionLearningActions } from './useSessionL
 export { useToast } from './useToast';
 
 export { useDebouncedValue } from './useDebouncedValue';
+
+export { useTooltipDelay } from './useTooltipDelay';

@@ -139,19 +139,19 @@ export function JcfErrorTooltip({
           role="tooltip"
           data-testid="error-tooltip"
         >
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl px-3 py-2.5 max-w-[320px]">
+          <div className="flux-tooltip max-w-[320px]">
             <div className="flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
               <div
-                className="text-xs text-zinc-200 leading-relaxed [&_strong]:text-zinc-100 [&_strong]:font-semibold [&_code]:bg-zinc-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-zinc-300 [&_code]:font-mono [&_code]:text-xs"
+                className="text-xs text-[var(--tt-secondary)] leading-relaxed [&_strong]:text-[var(--tt-text)] [&_strong]:font-semibold [&_code]:bg-zinc-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[var(--tt-secondary)] [&_code]:font-mono [&_code]:text-xs"
                 dangerouslySetInnerHTML={{ __html: message }}
               />
             </div>
           </div>
           {/* Arrow pointing down */}
           <div
-            className="absolute -bottom-1.5 w-3 h-3 bg-zinc-800 border-r border-b border-zinc-700 transform rotate-45"
-            style={{ left: position?.arrowLeft ?? '50%', marginLeft: '-6px' }}
+            className="absolute -bottom-1.5 w-0 h-0 border-l-[var(--tt-arrow)] border-l-transparent border-r-[var(--tt-arrow)] border-r-transparent border-t-[var(--tt-arrow)] border-t-[var(--tt-bg)]"
+            style={{ left: position?.arrowLeft ?? '50%', marginLeft: `calc(var(--tt-arrow) * -1)` }}
           />
         </div>
       )}

@@ -214,25 +214,25 @@ export const TileTooltip = memo(function TileTooltip({
       className="absolute left-0 bottom-full mb-2 z-50 pointer-events-none w-72"
       data-testid="tile-tooltip"
     >
-      <div className="bg-slate-800 border border-white/10 rounded-lg shadow-xl px-3 py-2.5 text-xs text-zinc-100 space-y-2">
+      <div className="flux-tooltip space-y-2">
 
         {/* Header: reference — client */}
         <div data-testid="tile-tooltip-header">
-          <span className="font-bold text-white">{job.reference}</span>
-          <span className="text-zinc-400"> — {job.client}</span>
+          <span className="font-bold text-[var(--tt-text)]">{job.reference}</span>
+          <span className="text-[var(--tt-muted)]"> — {job.client}</span>
         </div>
 
         {/* Description (only if non-empty) */}
         {job.description && (
-          <div className="italic text-zinc-300" data-testid="tile-tooltip-description">
+          <div className="italic text-[var(--tt-secondary)]" data-testid="tile-tooltip-description">
             {job.description}
           </div>
         )}
 
         {/* Deadline */}
         {deadlineFormatted && (
-          <div className="text-zinc-400" data-testid="tile-tooltip-deadline">
-            Sortie atelier: <span className="text-zinc-200">{deadlineFormatted}</span>
+          <div className="text-[var(--tt-muted)]" data-testid="tile-tooltip-deadline">
+            Sortie atelier: <span className="text-[var(--tt-secondary)]">{deadlineFormatted}</span>
           </div>
         )}
 
@@ -241,8 +241,8 @@ export const TileTooltip = memo(function TileTooltip({
           <div className="grid grid-cols-2 gap-x-2 gap-y-0.5" data-testid="tile-tooltip-spec">
             {specRows.map((row) => (
               <div key={row.label} className="contents">
-                <span className="text-zinc-500">{row.label}:</span>
-                <span className="text-zinc-200">{row.value}</span>
+                <span className="text-[var(--tt-muted)]">{row.label}:</span>
+                <span className="text-[var(--tt-secondary)]">{row.value}</span>
               </div>
             ))}
           </div>
@@ -250,18 +250,18 @@ export const TileTooltip = memo(function TileTooltip({
 
         {/* Prerequisites (only when there are non-"none" fields) */}
         {prerequisiteItems.length > 0 && (
-          <div className="space-y-0.5 border-t border-white/10 pt-1.5" data-testid="tile-tooltip-prerequisites">
+          <div className="space-y-0.5 border-t border-white/5 pt-1.5" data-testid="tile-tooltip-prerequisites">
             {prerequisiteItems.map((item) => (
               <div key={item.key} className="flex items-center gap-1.5">
                 <span className={item.isReady ? 'text-green-400' : 'text-amber-400'}>
                   {item.isReady ? '✓' : '⚠'}
                 </span>
-                <span className="text-zinc-400">{item.label}:</span>
-                <span className={item.isReady ? 'text-zinc-300' : 'text-amber-200'}>
+                <span className="text-[var(--tt-muted)]">{item.label}:</span>
+                <span className={item.isReady ? 'text-[var(--tt-secondary)]' : 'text-amber-200'}>
                   {item.statusLabel}
                 </span>
                 {item.date && (
-                  <span className="text-zinc-500 ml-0.5">{item.date}</span>
+                  <span className="text-[var(--tt-muted)] ml-0.5">{item.date}</span>
                 )}
               </div>
             ))}
@@ -269,24 +269,24 @@ export const TileTooltip = memo(function TileTooltip({
         )}
 
         {/* Task: setup + run times */}
-        <div className="text-zinc-400 border-t border-white/10 pt-1.5" data-testid="tile-tooltip-task">
-          Setup: <span className="text-zinc-200">{setupMinutes}min</span>
+        <div className="text-[var(--tt-muted)] border-t border-white/5 pt-1.5" data-testid="tile-tooltip-task">
+          Setup: <span className="text-[var(--tt-secondary)]">{setupMinutes}min</span>
           {' · '}
-          Run: <span className="text-zinc-200">{runMinutes}min</span>
+          Run: <span className="text-[var(--tt-secondary)]">{runMinutes}min</span>
         </div>
 
         {/* Schedule: start → end */}
         {startFormatted && endFormatted && (
-          <div className="text-zinc-400" data-testid="tile-tooltip-schedule">
-            <span className="text-zinc-200">{startFormatted}</span>
+          <div className="text-[var(--tt-muted)]" data-testid="tile-tooltip-schedule">
+            <span className="text-[var(--tt-secondary)]">{startFormatted}</span>
             {' → '}
-            <span className="text-zinc-200">{endFormatted}</span>
+            <span className="text-[var(--tt-secondary)]">{endFormatted}</span>
           </div>
         )}
       </div>
 
       {/* Arrow pointing down */}
-      <div className="absolute left-4 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800" />
+      <div className="flux-tooltip-arrow absolute left-4 top-full" />
     </div>
   );
 });

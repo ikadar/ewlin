@@ -150,21 +150,56 @@ body {
 .st-progress { color: rgb(251 146 60); }
 .st-done     { color: rgb(74 222 128); }
 
+/* ── Unified tooltip tokens ── */
+:root {
+  --tt-bg: rgba(35,35,35,1);
+  --tt-border: 1px solid rgba(35,35,35,1);
+  --tt-radius: 4px;
+  --tt-padding: 8px 12px;
+  --tt-arrow: 9px;
+  --tt-font-size: 12px;
+  --tt-text: #f4f4f5;
+  --tt-secondary: #d4d4d8;
+  --tt-muted: #a1a1aa;
+  --tt-shadow: 0 4px 12px rgba(0,0,0,.4);
+  --tt-hover-delay: 500ms;
+  --tt-fade-in: 150ms;
+}
+
+.flux-tooltip {
+  background: var(--tt-bg);
+  border: var(--tt-border);
+  border-radius: var(--tt-radius);
+  padding: var(--tt-padding);
+  font-size: var(--tt-font-size);
+  color: var(--tt-text);
+  box-shadow: var(--tt-shadow);
+  pointer-events: none;
+}
+
+.flux-tooltip-arrow {
+  width: 0;
+  height: 0;
+  border-left: var(--tt-arrow) solid transparent;
+  border-right: var(--tt-arrow) solid transparent;
+  border-top: var(--tt-arrow) solid var(--tt-bg);
+}
+
 /* Custom tooltip — position: fixed, follows cursor */
 .st-tooltip {
   position: fixed;
   z-index: 9999;
-  background: rgb(36 36 36);
-  border: 1px solid rgb(58 58 58);
-  border-radius: 4px;
+  background: var(--tt-bg);
+  border: var(--tt-border);
+  border-radius: var(--tt-radius);
   padding: 3px 8px;
-  font-size: 11px;
-  color: rgb(209 209 209);
+  font-size: var(--tt-font-size);
+  color: var(--tt-secondary);
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.12s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: opacity var(--tt-fade-in);
+  box-shadow: var(--tt-shadow);
 }
 
 /* Striped pattern for unavailability overlay (v0.3.60: CSS gradient → SVG for performance) */

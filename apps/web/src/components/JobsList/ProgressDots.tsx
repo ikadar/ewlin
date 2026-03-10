@@ -1,8 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { Task, TaskAssignment } from '@flux/types';
 import { isOutsourcedTask, isInternalTask } from '@flux/types';
 import { formatScheduleDateTime } from '../../utils/dateFormat';
+import { useTooltipDelay } from '../../hooks';
 
 export interface ProgressDotsProps {
   tasks: Task[];
@@ -84,12 +85,12 @@ function DotTooltip({ x, y, line1, line2 }: Omit<DotTooltipState, 'taskId'>) {
       style={{ left: x, top: y, transform: 'translate(-50%, -100%)' }}
       data-testid="dot-tooltip"
     >
-      <div className="bg-zinc-800 border border-white/10 rounded-md shadow-lg px-2.5 py-1.5 text-[11px] leading-tight whitespace-nowrap">
-        <div className="text-zinc-100 font-medium">{line1}</div>
-        <div className="text-zinc-400 mt-0.5">{line2}</div>
+      <div className="flux-tooltip whitespace-nowrap leading-tight">
+        <div className="text-[var(--tt-text)] font-medium">{line1}</div>
+        <div className="text-[var(--tt-muted)] mt-0.5">{line2}</div>
       </div>
       <div className="flex justify-center">
-        <div className="w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-zinc-800" />
+        <div className="flux-tooltip-arrow" />
       </div>
     </div>
   );
@@ -97,7 +98,7 @@ function DotTooltip({ x, y, line1, line2 }: Omit<DotTooltipState, 'taskId'>) {
 
 export function ProgressDots({ tasks, assignments }: ProgressDotsProps) {
   const [tooltip, setTooltip] = useState<DotTooltipState | null>(null);
-  const hideTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const { isVisible: delayVisible, onMouseEnter: delayEnter, onMouseLeave: delayLeave } = useTooltipDelay({ showDelay: 0, hideDelay: 100 });
 
   if (tasks.length === 0) return null;
 
@@ -107,7 +108,6 @@ export function ProgressDots({ tasks, assignments }: ProgressDotsProps) {
   const sortedTasks = [...tasks].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
 
   const handleEnter = useCallback((e: React.MouseEvent, task: Task, assignment: TaskAssignment | undefined, state: DotState) => {
-    clearTimeout(hideTimeout.current);
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const { line1, line2 } = buildTooltipText(task, assignment, state);
     setTooltip({
@@ -117,11 +117,12 @@ export function ProgressDots({ tasks, assignments }: ProgressDotsProps) {
       line1,
       line2,
     });
-  }, []);
+    delayEnter();
+  }, [delayEnter]);
 
   const handleLeave = useCallback(() => {
-    hideTimeout.current = setTimeout(() => setTooltip(null), 100);
-  }, []);
+    delayLeave();
+  }, [delayLeave]);
 
   return (
     <>
@@ -177,7 +178,7 @@ export function ProgressDots({ tasks, assignments }: ProgressDotsProps) {
           );
         })}
       </div>
-      {tooltip && <DotTooltip x={tooltip.x} y={tooltip.y} line1={tooltip.line1} line2={tooltip.line2} />}
+      {tooltip && delayVisible && <DotTooltip x={tooltip.x} y={tooltip.y} line1={tooltip.line1} line2={tooltip.line2} />}
     </>
   );
 }

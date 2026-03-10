@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import { memo } from 'react';
 import { Circle, CircleCheck } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
@@ -9,6 +9,7 @@ import { getStateColorClasses, getStateGlowColor } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
+import { useTooltipDelay } from '../../hooks';
 
 export interface TileProps {
   /** Task assignment data */
@@ -103,34 +104,8 @@ export const Tile = memo(function Tile({
   tirageLabel,
   tileState = 'default',
 }: TileProps) {
-  // v0.4.32b: Tooltip visibility state with 2-second hover delay
-  const [showTooltip, setShowTooltip] = useState(false);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Clear timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Fázis D: Handle mouse enter - start 500ms timer for tooltip (all tiles)
-  const handleMouseEnter = useCallback(() => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setShowTooltip(true);
-    }, 500);
-  }, []);
-
-  // v0.4.32b: Handle mouse leave - cancel timer and hide tooltip
-  const handleMouseLeave = useCallback(() => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setShowTooltip(false);
-  }, []);
+  // Unified tooltip delay (500ms show, 0ms hide)
+  const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ViewportIndicator } from './ViewportIndicator';
 import { TaskMarkers, type TaskMarker } from './TaskMarkers';
 import { ExitTriangle } from './ExitTriangle';
+import { useTooltipDelay } from '../../hooks';
 
 export interface DateCellProps {
   /** The date to display */
@@ -76,8 +77,8 @@ export function DateCell({
   // Capitalize first letter (toLocaleDateString returns lowercase weekday)
   const tooltipDate = fullDateString.charAt(0).toUpperCase() + fullDateString.slice(1);
 
-  // Custom tooltip state for fast appearance
-  const [showTooltip, setShowTooltip] = useState(false);
+  // Unified tooltip delay
+  const { isVisible: showTooltip, onMouseEnter: tooltipEnter, onMouseLeave: tooltipLeave } = useTooltipDelay();
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
 
   // Calculate tooltip position on mouse enter
@@ -87,7 +88,7 @@ export function DateCell({
       top: rect.top + rect.height / 2,
       left: rect.right + 8, // 8px gap from the cell
     });
-    setShowTooltip(true);
+    tooltipEnter();
   };
 
   // Determine styling based on state (priority: departure > focused > normal)
@@ -135,13 +136,13 @@ export function DateCell({
       className={`h-10 w-full flex flex-col items-center justify-center text-xs font-mono ${textColor} border-b ${borderColor} cursor-pointer hover:bg-white/5 transition-colors ${bgColor} relative overflow-visible`}
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setShowTooltip(false)}
+      onMouseLeave={tooltipLeave}
       data-testid={`date-cell-${date.toISOString().split('T')[0]}`}
     >
       {/* REQ-01: Custom tooltip with fast appearance - uses fixed position to escape overflow */}
       {showTooltip && (
         <div
-          className="fixed z-50 px-2 py-1 bg-zinc-800 text-zinc-200 text-xs rounded shadow-lg whitespace-nowrap pointer-events-none -translate-y-1/2"
+          className="fixed z-50 flux-tooltip whitespace-nowrap -translate-y-1/2"
           style={{ top: tooltipPosition.top, left: tooltipPosition.left }}
           role="tooltip"
         >
