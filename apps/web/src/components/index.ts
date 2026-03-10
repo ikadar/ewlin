@@ -62,4 +62,6 @@ export { CommandPalette } from './CommandPalette/CommandPalette';
 export type { CommandPaletteProps } from './CommandPalette/CommandPalette';
 
 export { useCommands } from './CommandPalette/useCommands';
-export type { Command } from './CommandPalette/useCommands';
+export type { Command, UseCommandsOptions } from './CommandPalette/useCommands';
+
+export { CommandCenterProvider, useCommandCenter } from './CommandPalette/CommandCenterContext';

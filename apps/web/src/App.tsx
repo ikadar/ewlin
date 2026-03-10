@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, CommandPalette, useCommands } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter } from './components';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -41,7 +41,6 @@ import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
-import { SquareSlash } from 'lucide-react';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -457,8 +456,8 @@ function AppContent() {
   // Schedule save/load modal
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
 
-  // Command palette state
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  // Command Center (global — provided by RootLayout)
+  const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands } = useCommandCenter();
 
   // Sidebar visibility toggle (Alt+B)
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -1105,13 +1104,6 @@ function AppContent() {
 
       // Command palette is open — let it handle its own keys
       if (isCommandPaletteOpen) return;
-
-      // Alt+K: open command palette
-      if (isAltLetter(e, 'k')) {
-        e.preventDefault();
-        setIsCommandPaletteOpen(true);
-        return;
-      }
 
       // Alt+E: edit selected job
       if (isAltLetter(e, 'e') && selectedJobId) {
@@ -2081,8 +2073,8 @@ function AppContent() {
     return 'default' as const;
   }, [isPicking, isQuickPlacementMode, isJcfModalOpen, selectedJobId]);
 
-  // Command palette commands
-  const commands = useCommands({
+  // Scheduler-specific commands — registered into the global Command Center
+  const schedulerCommands = useCommands({
     selectedJobId,
     isQuickPlacementMode,
     onJumpToToday: useCallback(() => {
@@ -2131,10 +2123,16 @@ function AppContent() {
       setIsSidebarVisible(prev => !prev);
     }, []),
     onShowAllShortcuts: useCallback(() => {
-      // Placeholder — could open a full shortcuts modal in the future
       setIsCommandPaletteOpen(true);
-    }, []),
+    }, [setIsCommandPaletteOpen]),
+    onCompactTimeline: handleCompactTimeline,
   });
+
+  // Register scheduler-specific commands into the global Command Center
+  useEffect(() => {
+    registerPageCommands(schedulerCommands);
+    return () => unregisterPageCommands();
+  }, [schedulerCommands, registerPageCommands, unregisterPageCommands]);
 
   // v0.5.1: Show loading spinner during initial fetch (real API mode only)
   // In mock mode, data is always instantly available, so we skip the loading state
@@ -2210,7 +2208,6 @@ function AppContent() {
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}
           onEditJob={handleEditJob}
-          onDeleteJob={handleDeleteJob}
           lateJobIds={lateJobIds}
         />
         <DateStrip
@@ -2392,24 +2389,6 @@ function AppContent() {
         onClose={() => setIsSaveLoadOpen(false)}
       />
 
-      {/* Floating command center button */}
-      {!isCommandPaletteOpen && (
-        <button
-          onClick={() => setIsCommandPaletteOpen(true)}
-          className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-          aria-label="Open command center"
-          data-testid="command-center-fab"
-        >
-          <SquareSlash size={24} />
-        </button>
-      )}
-
-      {/* Command palette */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        commands={commands}
-      />
     </>
   );
 }

@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Tooltip — Unified Style Explorer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #e4e4e7;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ──────────────────────────────────────────────────── */
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ── Controls Panel ──────────────────────────────────────────── */
+  .controls {
+    background: #111113;
+    border-right: 1px solid #27272a;
+    padding: 24px 20px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .controls h1 { font-size: 20px; font-weight: 700; color: #fafafa; margin-bottom: 4px; }
+  .controls .subtitle { font-size: 12px; color: #52525b; margin-bottom: 24px; }
+
+  .ctrl-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #1e1e21;
+  }
+  .ctrl-section:last-child { border-bottom: none; }
+  .ctrl-section h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #71717a;
+    margin-bottom: 12px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .ctrl-row label {
+    font-size: 12px;
+    color: #a1a1aa;
+    flex-shrink: 0;
+  }
+  .ctrl-row .value-display {
+    font-size: 11px;
+    color: #52525b;
+    font-family: 'JetBrains Mono', monospace;
+    min-width: 48px;
+    text-align: right;
+    margin-left: 4px;
+  }
+  .ctrl-row input[type="range"] {
+    width: 120px;
+    accent-color: #3b82f6;
+    cursor: pointer;
+  }
+  .ctrl-row input[type="color"] {
+    width: 32px;
+    height: 24px;
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+  .ctrl-row select {
+    background: #1e1e21;
+    border: 1px solid #3f3f46;
+    color: #e4e4e7;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  /* Toggle switch */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .toggle-row label { font-size: 12px; color: #a1a1aa; }
+  .toggle {
+    width: 36px;
+    height: 20px;
+    background: #3f3f46;
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .toggle.on { background: #3b82f6; }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform .15s;
+  }
+  .toggle.on::after { transform: translateX(16px); }
+
+  /* Preset buttons */
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .preset-btn {
+    font-size: 11px;
+    padding: 5px 10px;
+    background: #1e1e21;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .preset-btn:hover { background: #27272a; color: #e4e4e7; border-color: #52525b; }
+  .preset-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+  /* Copy output */
+  .output-box {
+    margin-top: 16px;
+    padding: 12px;
+    background: #0a0a0a;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #71717a;
+    line-height: 1.6;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .copy-btn {
+    margin-top: 6px;
+    width: 100%;
+    padding: 6px;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    color: #a1a1aa;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .copy-btn:hover { background: #3f3f46; color: #e4e4e7; }
+
+  /* ── Preview Area ────────────────────────────────────────────── */
+  .preview {
+    padding: 40px 32px;
+  }
+  .preview h2 { font-size: 18px; font-weight: 600; color: #fafafa; margin-bottom: 24px; }
+  .preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 28px;
+  }
+
+  /* ── Preview Card ────────────────────────────────────────────── */
+  .pcard {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .pcard-label {
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #71717a;
+    border-bottom: 1px solid #27272a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .pcard-label .source {
+    font-size: 10px;
+    font-weight: 400;
+    font-family: 'JetBrains Mono', monospace;
+    color: #3f3f46;
+  }
+  .pcard-body {
+    padding: 32px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    position: relative;
+  }
+
+  /* ── Hover hint ──────────────────────────────────────────────── */
+  .hover-hint {
+    position: absolute;
+    bottom: 6px;
+    right: 10px;
+    font-size: 9px;
+    color: #27272a;
+    pointer-events: none;
+  }
+
+  /* ── Tooltip base (driven by CSS vars) ───────────────────────── */
+  .tt {
+    pointer-events: none;
+    opacity: 0;
+    transition-property: opacity;
+    z-index: 50;
+  }
+  .tt-box {
+    background: var(--tt-bg);
+    border: var(--tt-border-w) solid var(--tt-border-color);
+    border-radius: var(--tt-radius);
+    box-shadow: var(--tt-shadow);
+    padding: var(--tt-py) var(--tt-px);
+    font-size: var(--tt-font-size);
+    color: var(--tt-text);
+    backdrop-filter: var(--tt-backdrop);
+    -webkit-backdrop-filter: var(--tt-backdrop);
+  }
+  .tt-arrow-down {
+    width: 0; height: 0;
+    border-left: var(--tt-arrow) solid transparent;
+    border-right: var(--tt-arrow) solid transparent;
+    border-top: var(--tt-arrow) solid var(--tt-bg);
+  }
+  .tt-arrow-right {
+    width: 0; height: 0;
+    border-top: var(--tt-arrow) solid transparent;
+    border-bottom: var(--tt-arrow) solid transparent;
+    border-left: var(--tt-arrow) solid var(--tt-bg);
+  }
+
+  /* ── 1. Tile Tooltip ─────────────────────────────────────────── */
+  .tile-demo {
+    width: 160px; height: 48px;
+    background: linear-gradient(135deg, #1e3a5f, #1e40af);
+    border-radius: 6px;
+    display: flex; align-items: center; padding: 0 10px;
+    font-size: 11px; font-weight: 600; color: #e2e8f0;
+    cursor: pointer; position: relative; user-select: none;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .tile-tt { position: absolute; left: 0; bottom: calc(100% + 8px); width: 280px; }
+  .tt.visible { opacity: 1; }
+  .tile-tt .tt-arrow-down { margin-left: 16px; }
+  .tt-header { margin-bottom: 4px; }
+  .tt-header strong { color: #fff; }
+  .tt-header .secondary { color: var(--tt-muted); }
+  .tt-desc { font-style: italic; color: var(--tt-secondary); margin-bottom: 4px; }
+  .tt-deadline { color: var(--tt-muted); margin-bottom: 4px; }
+  .tt-deadline em { color: var(--tt-text); font-style: normal; }
+  .tt-spec { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin-bottom: 4px; }
+  .tt-spec .lbl { color: var(--tt-muted); }
+  .tt-spec .val { color: var(--tt-text); }
+  .tt-prereqs { border-top: 1px solid var(--tt-divider); padding-top: 4px; margin-bottom: 4px; }
+  .tt-prereq-row { display: flex; align-items: center; gap: 6px; }
+  .tt-prereq-row .ok { color: #4ade80; }
+  .tt-prereq-row .warn { color: #fbbf24; }
+  .tt-prereq-row .lbl { color: var(--tt-muted); }
+  .tt-prereq-row .status { color: #fde68a; }
+  .tt-prereq-row .status.ok { color: var(--tt-secondary); }
+  .tt-timing { border-top: 1px solid var(--tt-divider); padding-top: 4px; color: var(--tt-muted); margin-bottom: 2px; }
+  .tt-timing em { color: var(--tt-text); font-style: normal; }
+  .tt-schedule { color: var(--tt-muted); }
+  .tt-schedule em { color: var(--tt-text); font-style: normal; }
+
+  /* ── 2. Prerequisite Tooltip ─────────────────────────────────── */
+  .blocked-demo {
+    width: 160px; height: 48px;
+    background: repeating-linear-gradient(-45deg, #3f1a1a, #3f1a1a 4px, #2d1515 4px, #2d1515 8px);
+    border: 2px solid #ef4444; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: #fca5a5;
+    cursor: pointer; position: relative; user-select: none;
+  }
+  .prereq-tt { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100% + 8px); }
+  .prereq-tt .tt-box { white-space: nowrap; }
+  .prereq-tt .tt-arrow-down { margin: 0 auto; }
+
+  /* ── 3. Error Tooltip ────────────────────────────────────────── */
+  .jcf-cell {
+    width: 200px; height: 40px;
+    background: #27272a; border: 1px solid #3f3f46; border-radius: 6px;
+    display: flex; align-items: center; padding: 0 12px;
+    position: relative; cursor: default;
+  }
+  .jcf-cell input {
+    background: transparent; border: none; outline: none;
+    color: #e4e4e7; font-size: 13px; width: 100%;
+  }
+  .err-badge {
+    position: absolute; top: -3px; right: 3px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #ef4444; color: #fff; font-size: 9px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    cursor: help; z-index: 20;
+    transition: transform .2s, background .2s;
+  }
+  .err-badge:hover { transform: scale(1.1); background: #f87171; }
+  .err-tt { position: absolute; bottom: calc(100% + 12px); right: -4px; max-width: 320px; }
+  .jcf-cell input:focus ~ .err-tt { opacity: 1; }
+  .err-tt .tt-box { display: flex; align-items: flex-start; gap: 10px; }
+  .err-tt .err-icon { flex-shrink: 0; width: 16px; height: 16px; color: #f87171; margin-top: 1px; }
+  .err-tt .err-text { line-height: 1.6; }
+  .err-tt .err-text strong { color: var(--tt-text); font-weight: 600; }
+  .err-tt .err-text code {
+    background: rgba(0,0,0,.3); padding: 1px 6px; border-radius: 4px;
+    color: var(--tt-secondary); font-family: 'JetBrains Mono', monospace;
+  }
+  .err-tt .tt-arrow-rot {
+    position: absolute; bottom: -6px; right: 10px;
+    width: 12px; height: 12px;
+    background: var(--tt-bg);
+    border-right: var(--tt-border-w) solid var(--tt-border-color);
+    border-bottom: var(--tt-border-w) solid var(--tt-border-color);
+    transform: rotate(45deg);
+  }
+
+  /* ── 4. Dot Tooltip ──────────────────────────────────────────── */
+  .dots-area { display: flex; align-items: center; gap: 3px; padding: 8px 16px; background: #27272a; border-radius: 6px; }
+  .pdot {
+    width: 8px; height: 8px; border-radius: 50%;
+    cursor: pointer; position: relative;
+  }
+  .pdiamond {
+    width: 8px; height: 8px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; position: relative;
+  }
+  .pdiamond-inner { width: 6px; height: 6px; transform: rotate(45deg); border-radius: 1px; }
+  .dot-tt { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); }
+  .dot-tt .tt-box { white-space: nowrap; line-height: 1.3; }
+  .dot-tt .line1 { font-weight: 500; color: var(--tt-text); }
+  .dot-tt .line2 { margin-top: 2px; color: var(--tt-muted); }
+  .dot-tt .tt-arrow-down { margin: 0 auto; }
+
+  /* ── 5. ST Tooltip ───────────────────────────────────────────── */
+  .st-area { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; background: #27272a; border-radius: 6px; }
+  .st-line {
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; padding: 2px 4px; border-radius: 4px;
+    transition: background .12s;
+  }
+  .st-line:hover { background: rgba(255,255,255,.04); }
+  .st-line svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .st-line span { font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  #st-cursor-tt {
+    position: fixed; z-index: 9999;
+    pointer-events: none; opacity: 0;
+    transition: opacity .12s;
+    white-space: nowrap;
+  }
+
+  /* ── 6. DateCell Tooltip ─────────────────────────────────────── */
+  .datecells { display: flex; }
+  .dcell {
+    width: 44px; height: 40px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #71717a;
+    border: none; border-bottom: 1px solid rgba(255,255,255,.05);
+    background: transparent; cursor: pointer; position: relative;
+    transition: background .12s;
+  }
+  .dcell:hover { background: rgba(255,255,255,.05); }
+  .dcell .dn { font-weight: 500; color: #a1a1aa; }
+  .dcell-tt {
+    position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%);
+    white-space: nowrap;
+  }
+
+  /* ── 7. Native Replacement ───────────────────────────────────── */
+  .nav-btns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .nav-btn {
+    padding: 6px 12px; background: #27272a; border: 1px solid #3f3f46;
+    border-radius: 6px; color: #a1a1aa; font-size: 12px;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: background .12s; position: relative;
+  }
+  .nav-btn:hover { background: #3f3f46; color: #e4e4e7; }
+  .nav-btn svg { width: 14px; height: 14px; }
+  .nav-tt {
+    position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .nav-tt .tt-arrow-down { margin: 0 auto; }
+  .nav-tt .tt-box .kbd {
+    display: inline-block; padding: 1px 5px; margin-left: 6px;
+    background: rgba(255,255,255,.08); border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--tt-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- CONTROLS PANEL                                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="controls">
+    <h1>Tooltip Style</h1>
+    <p class="subtitle">Mix & match to find a unified look</p>
+
+    <!-- Presets -->
+    <div class="ctrl-section">
+      <h3>Presets</h3>
+      <div class="presets">
+        <button class="preset-btn active" data-preset="current-mix">Current Mix</button>
+        <button class="preset-btn" data-preset="zinc-solid">Zinc Solid</button>
+        <button class="preset-btn" data-preset="slate-dark">Slate Dark</button>
+        <button class="preset-btn" data-preset="glass">Glass</button>
+        <button class="preset-btn" data-preset="high-contrast">High Contrast</button>
+        <button class="preset-btn" data-preset="subtle">Subtle</button>
+      </div>
+    </div>
+
+    <!-- Background -->
+    <div class="ctrl-section">
+      <h3>Background</h3>
+      <div class="ctrl-row">
+        <label>Color</label>
+        <input type="color" id="bg-color" value="#27272a" />
+      </div>
+      <div class="ctrl-row">
+        <label>Opacity</label>
+        <input type="range" id="bg-opacity" min="0" max="100" value="100" />
+        <span class="value-display" id="bg-opacity-val">100%</span>
+      </div>
+      <div class="toggle-row">
+        <label>Backdrop blur</label>
+        <div class="toggle" id="backdrop-toggle" data-on="false"></div>
+      </div>
+      <div class="ctrl-row" id="blur-row" style="display:none;">
+        <label>Blur amount</label>
+        <input type="range" id="blur-amount" min="2" max="24" value="12" />
+        <span class="value-display" id="blur-val">12px</span>
+      </div>
+    </div>
+
+    <!-- Border -->
+    <div class="ctrl-section">
+      <h3>Border</h3>
+      <div class="ctrl-row">
+        <label>Color</label>
+        <input type="color" id="border-color" value="#3f3f46" />
+      </div>
+      <div class="ctrl-row">
+        <label>Width</label>
+        <input type="range" id="border-width" min="0" max="3" value="1" step="0.5" />
+        <span class="value-display" id="border-w-val">1px</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Opacity</label>
+        <input type="range" id="border-opacity" min="0" max="100" value="100" />
+        <span class="value-display" id="border-o-val">100%</span>
+      </div>
+    </div>
+
+    <!-- Shape -->
+    <div class="ctrl-section">
+      <h3>Shape</h3>
+      <div class="ctrl-row">
+        <label>Border radius</label>
+        <input type="range" id="radius" min="0" max="16" value="8" />
+        <span class="value-display" id="radius-val">8px</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Padding X</label>
+        <input type="range" id="pad-x" min="4" max="20" value="12" />
+        <span class="value-display" id="pad-x-val">12px</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Padding Y</label>
+        <input type="range" id="pad-y" min="2" max="16" value="8" />
+        <span class="value-display" id="pad-y-val">8px</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Arrow size</label>
+        <input type="range" id="arrow-size" min="0" max="10" value="6" />
+        <span class="value-display" id="arrow-val">6px</span>
+      </div>
+    </div>
+
+    <!-- Typography -->
+    <div class="ctrl-section">
+      <h3>Typography</h3>
+      <div class="ctrl-row">
+        <label>Font size</label>
+        <input type="range" id="font-size" min="9" max="15" value="12" />
+        <span class="value-display" id="font-val">12px</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Text color</label>
+        <input type="color" id="text-color" value="#f4f4f5" />
+      </div>
+      <div class="ctrl-row">
+        <label>Secondary</label>
+        <input type="color" id="text-secondary" value="#d4d4d8" />
+      </div>
+      <div class="ctrl-row">
+        <label>Muted</label>
+        <input type="color" id="text-muted" value="#a1a1aa" />
+      </div>
+    </div>
+
+    <!-- Shadow -->
+    <div class="ctrl-section">
+      <h3>Shadow</h3>
+      <div class="ctrl-row">
+        <label>Style</label>
+        <select id="shadow-style">
+          <option value="none">None</option>
+          <option value="sm">Small</option>
+          <option value="md" selected>Medium</option>
+          <option value="lg">Large</option>
+          <option value="xl">Extra Large</option>
+          <option value="glow">Glow</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Timing -->
+    <div class="ctrl-section">
+      <h3>Timing</h3>
+      <div class="ctrl-row">
+        <label>Hover delay</label>
+        <input type="range" id="hover-delay" min="0" max="2000" value="0" step="50" />
+        <span class="value-display" id="delay-val">0ms</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Fade in</label>
+        <input type="range" id="transition-dur" min="0" max="400" value="150" step="10" />
+        <span class="value-display" id="trans-val">150ms</span>
+      </div>
+    </div>
+
+    <!-- Output -->
+    <div class="ctrl-section">
+      <h3>CSS Variables Output</h3>
+      <div class="output-box" id="css-output"></div>
+      <button class="copy-btn" id="copy-btn">Copy CSS</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PREVIEW AREA                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="preview">
+    <h2>All 7 Tooltip Types — Unified Preview</h2>
+
+    <div class="preview-grid">
+
+      <!-- 1. TileTooltip -->
+      <div class="pcard">
+        <div class="pcard-label">TileTooltip <span class="source">Tile/TileTooltip.tsx</span></div>
+        <div class="pcard-body">
+          <div class="tile-demo">
+            JOB-2024-0042
+            <div class="tt tile-tt">
+              <div class="tt-box">
+                <div class="tt-header"><strong>JOB-2024-0042</strong> <span class="secondary">— Imprimerie Leclerc</span></div>
+                <div class="tt-desc">Catalogue printemps 2026</div>
+                <div class="tt-deadline">Sortie atelier: <em>15/03/2026</em></div>
+                <div class="tt-spec">
+                  <span class="lbl">Format:</span><span class="val">A4</span>
+                  <span class="lbl">Papier:</span><span class="val">Couche 135g</span>
+                  <span class="lbl">Pagination:</span><span class="val">32p</span>
+                  <span class="lbl">Impression:</span><span class="val">4/4</span>
+                </div>
+                <div class="tt-prereqs">
+                  <div class="tt-prereq-row"><span class="ok">&#10003;</span><span class="lbl">Papier:</span><span class="status ok">En stock</span></div>
+                  <div class="tt-prereq-row"><span class="warn">&#9888;</span><span class="lbl">BAT:</span><span class="status">BAT envoye</span></div>
+                  <div class="tt-prereq-row"><span class="ok">&#10003;</span><span class="lbl">Plaques:</span><span class="status ok">Pretes</span></div>
+                </div>
+                <div class="tt-timing">Setup: <em>15min</em> &middot; Run: <em>45min</em></div>
+                <div class="tt-schedule"><em>10/03 08:00</em> &rarr; <em>10/03 09:00</em></div>
+              </div>
+              <div class="tt-arrow-down"></div>
+            </div>
+          </div>
+          <span class="hover-hint">hover</span>
+        </div>
+      </div>
+
+      <!-- 2. PrerequisiteTooltip -->
+      <div class="pcard">
+        <div class="pcard-label">PrerequisiteTooltip <span class="source">Tile/PrerequisiteTooltip.tsx</span></div>
+        <div class="pcard-body">
+          <div class="blocked-demo">
+            BLOCKED
+            <div class="tt prereq-tt">
+              <div class="tt-box">
+                <div class="tt-prereq-row"><span class="warn">&#9888;</span> Papier: A commander</div>
+                <div class="tt-prereq-row"><span class="warn">&#9888;</span> BAT: Attente fichiers</div>
+                <div class="tt-prereq-row"><span class="ok">&#10003;</span> Plaques: Pretes</div>
+                <div class="tt-prereq-row"><span class="warn">&#9888;</span> Forme: Commandee <span style="color:var(--tt-muted); margin-left:4px;">05/03</span></div>
+              </div>
+              <div class="tt-arrow-down"></div>
+            </div>
+          </div>
+          <span class="hover-hint">hover</span>
+        </div>
+      </div>
+
+      <!-- 3. JcfErrorTooltip -->
+      <div class="pcard">
+        <div class="pcard-label">JcfErrorTooltip <span class="source">JcfErrorTooltip.tsx</span></div>
+        <div class="pcard-body">
+          <div class="jcf-cell">
+            <input type="text" value="abc" />
+            <div class="err-badge">!</div>
+            <div class="tt err-tt">
+              <div class="tt-box">
+                <svg class="err-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <div class="err-text">
+                  <strong>Format invalide.</strong> Valeur entre <code>1</code> et <code>9999</code>.
+                </div>
+              </div>
+              <div class="tt-arrow-rot"></div>
+            </div>
+          </div>
+          <span class="hover-hint">hover badge / focus</span>
+        </div>
+      </div>
+
+      <!-- 4. DotTooltip -->
+      <div class="pcard">
+        <div class="pcard-label">DotTooltip <span class="source">ProgressDots.tsx</span></div>
+        <div class="pcard-body">
+          <div class="dots-area">
+            <div class="pdot" style="background:#10b981;">
+              <div class="tt dot-tt"><div class="tt-box"><div class="line1">Etape 1 &middot; Terminee</div><div class="line2">09/03 08:00 &rarr; 09/03 09:30</div></div><div class="tt-arrow-down"></div></div>
+            </div>
+            <div class="pdot" style="background:#3b82f6;">
+              <div class="tt dot-tt"><div class="tt-box"><div class="line1">Etape 2 &middot; Planifiee</div><div class="line2">10/03 14:00 &rarr; 10/03 15:30</div></div><div class="tt-arrow-down"></div></div>
+            </div>
+            <div class="pdiamond">
+              <div class="pdiamond-inner" style="background:#fbbf24;"></div>
+              <div class="tt dot-tt"><div class="tt-box"><div class="line1">Vernis UV &middot; Planifiee</div><div class="line2">2 jour(s) ouvre(s)</div></div><div class="tt-arrow-down"></div></div>
+            </div>
+            <div class="pdot" style="background:#52525b;">
+              <div class="tt dot-tt"><div class="tt-box"><div class="line1">Etape 4 &middot; Non planifiee</div><div class="line2">30 min (10+20)</div></div><div class="tt-arrow-down"></div></div>
+            </div>
+            <div class="pdot" style="background:#ef4444;">
+              <div class="tt dot-tt"><div class="tt-box"><div class="line1">Etape 5 &middot; En retard</div><div class="line2">08/03 16:00 &rarr; 17:00</div></div><div class="tt-arrow-down"></div></div>
+            </div>
+          </div>
+          <span class="hover-hint">hover dots</span>
+        </div>
+      </div>
+
+      <!-- 5. STCell Tooltip -->
+      <div class="pcard">
+        <div class="pcard-label">STCell Tooltip <span class="source">STCell.tsx</span></div>
+        <div class="pcard-body">
+          <div class="st-area" id="st-area">
+            <div class="st-line" data-label="Reliure Martin &middot; Dorure">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#808080" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+              <span>Reliure Martin &middot; Dorure</span>
+            </div>
+            <div class="st-line" data-label="Transport Dupont &middot; Livraison">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="#fb923c" stroke="none"/></svg>
+              <span>Transport Dupont &middot; Livraison</span>
+            </div>
+            <div class="st-line" data-label="Vernis Express &middot; Pelliculage">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+              <span>Vernis Express &middot; Pelliculage</span>
+            </div>
+          </div>
+          <div class="tt-box" id="st-cursor-tt" style="position:fixed;z-index:9999;pointer-events:none;opacity:0;transition:opacity .12s;white-space:nowrap;"></div>
+          <span class="hover-hint">hover lines</span>
+        </div>
+      </div>
+
+      <!-- 6. DateCell Tooltip -->
+      <div class="pcard">
+        <div class="pcard-label">DateCell Tooltip <span class="source">DateCell.tsx</span></div>
+        <div class="pcard-body">
+          <div class="datecells">
+            <div class="dcell"><span>Lu</span><span class="dn">09</span><div class="tt dcell-tt"><div class="tt-box">Lundi 9 mars 2026</div></div></div>
+            <div class="dcell" style="border-left:1px solid rgba(255,255,255,.05);">
+              <span>Ma</span><span class="dn" style="color:#f4f4f5;">10</span>
+              <div class="tt dcell-tt"><div class="tt-box">Mardi 10 mars 2026</div></div>
+              <div style="position:absolute;left:4px;right:4px;top:50%;height:2px;background:#ef4444;transform:translateY(-50%);pointer-events:none;border-radius:1px;"></div>
+            </div>
+            <div class="dcell" style="border-left:1px solid rgba(255,255,255,.05);"><span>Me</span><span class="dn">11</span><div class="tt dcell-tt"><div class="tt-box">Mercredi 11 mars 2026</div></div></div>
+            <div class="dcell" style="border-left:1px solid rgba(255,255,255,.05);"><span>Je</span><span class="dn">12</span><div class="tt dcell-tt"><div class="tt-box">Jeudi 12 mars 2026</div></div></div>
+            <div class="dcell" style="border-left:1px solid rgba(255,255,255,.05);"><span>Ve</span><span class="dn">13</span><div class="tt dcell-tt"><div class="tt-box">Vendredi 13 mars 2026</div></div></div>
+          </div>
+          <span class="hover-hint">hover cells</span>
+        </div>
+      </div>
+
+      <!-- 7. Native title= replacement -->
+      <div class="pcard">
+        <div class="pcard-label">Native title= (unified) <span class="source">TopNavBar, SwapButtons</span></div>
+        <div class="pcard-body">
+          <div class="nav-btns">
+            <div class="nav-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Quick Place
+              <div class="tt nav-tt"><div class="tt-box">Toggle Quick Placement <span class="kbd">Alt+Q</span></div><div class="tt-arrow-down"></div></div>
+            </div>
+            <div class="nav-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M4 6h16M4 18h16"/></svg>
+              Compact
+              <div class="tt nav-tt"><div class="tt-box">Compact next 4 hours</div><div class="tt-arrow-down"></div></div>
+            </div>
+            <div class="nav-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              <div class="tt nav-tt"><div class="tt-box">Zoom out</div><div class="tt-arrow-down"></div></div>
+            </div>
+            <div class="nav-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              <div class="tt nav-tt"><div class="tt-box">Zoom in</div><div class="tt-arrow-down"></div></div>
+            </div>
+          </div>
+          <span class="hover-hint">hover buttons</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const PRESETS = {
+  'current-mix': {
+    bgColor: '#27272a', bgOpacity: 100, backdrop: false, blur: 12,
+    borderColor: '#3f3f46', borderWidth: 1, borderOpacity: 100,
+    radius: 8, padX: 12, padY: 8, arrow: 6,
+    fontSize: 12, textColor: '#f4f4f5', textSecondary: '#d4d4d8', textMuted: '#a1a1aa',
+    shadow: 'md', hoverDelay: 0, transition: 150,
+  },
+  'zinc-solid': {
+    bgColor: '#18181b', bgOpacity: 100, backdrop: false, blur: 12,
+    borderColor: '#3f3f46', borderWidth: 1, borderOpacity: 100,
+    radius: 6, padX: 10, padY: 6, arrow: 5,
+    fontSize: 11, textColor: '#e4e4e7', textSecondary: '#d4d4d8', textMuted: '#a1a1aa',
+    shadow: 'sm', hoverDelay: 100, transition: 120,
+  },
+  'slate-dark': {
+    bgColor: '#1e293b', bgOpacity: 100, backdrop: false, blur: 12,
+    borderColor: '#334155', borderWidth: 1, borderOpacity: 40,
+    radius: 8, padX: 12, padY: 10, arrow: 6,
+    fontSize: 12, textColor: '#f1f5f9', textSecondary: '#cbd5e1', textMuted: '#94a3b8',
+    shadow: 'lg', hoverDelay: 200, transition: 150,
+  },
+  'glass': {
+    bgColor: '#27272a', bgOpacity: 70, backdrop: true, blur: 16,
+    borderColor: '#ffffff', borderWidth: 1, borderOpacity: 12,
+    radius: 10, padX: 14, padY: 10, arrow: 6,
+    fontSize: 12, textColor: '#fafafa', textSecondary: '#e4e4e7', textMuted: '#a1a1aa',
+    shadow: 'lg', hoverDelay: 150, transition: 180,
+  },
+  'high-contrast': {
+    bgColor: '#000000', bgOpacity: 95, backdrop: false, blur: 12,
+    borderColor: '#525252', borderWidth: 1, borderOpacity: 100,
+    radius: 6, padX: 12, padY: 8, arrow: 6,
+    fontSize: 12, textColor: '#ffffff', textSecondary: '#e5e5e5', textMuted: '#a3a3a3',
+    shadow: 'xl', hoverDelay: 0, transition: 100,
+  },
+  'subtle': {
+    bgColor: '#1c1c1f', bgOpacity: 95, backdrop: true, blur: 8,
+    borderColor: '#ffffff', borderWidth: 0.5, borderOpacity: 8,
+    radius: 8, padX: 10, padY: 7, arrow: 5,
+    fontSize: 11, textColor: '#d4d4d8', textSecondary: '#a1a1aa', textMuted: '#71717a',
+    shadow: 'sm', hoverDelay: 300, transition: 200,
+  },
+};
+
+const SHADOWS = {
+  none: 'none',
+  sm: '0 1px 3px rgba(0,0,0,.3)',
+  md: '0 4px 12px rgba(0,0,0,.4)',
+  lg: '0 10px 25px rgba(0,0,0,.5)',
+  xl: '0 20px 40px rgba(0,0,0,.6)',
+  glow: '0 0 20px rgba(59,130,246,.15), 0 4px 12px rgba(0,0,0,.4)',
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return { r, g, b };
+}
+
+function el(id) { return document.getElementById(id); }
+
+function getState() {
+  return {
+    bgColor: el('bg-color').value,
+    bgOpacity: +el('bg-opacity').value,
+    backdrop: el('backdrop-toggle').dataset.on === 'true',
+    blur: +el('blur-amount').value,
+    borderColor: el('border-color').value,
+    borderWidth: +el('border-width').value,
+    borderOpacity: +el('border-opacity').value,
+    radius: +el('radius').value,
+    padX: +el('pad-x').value,
+    padY: +el('pad-y').value,
+    arrow: +el('arrow-size').value,
+    fontSize: +el('font-size').value,
+    textColor: el('text-color').value,
+    textSecondary: el('text-secondary').value,
+    textMuted: el('text-muted').value,
+    shadow: el('shadow-style').value,
+    hoverDelay: +el('hover-delay').value,
+    transition: +el('transition-dur').value,
+  };
+}
+
+function setState(s) {
+  el('bg-color').value = s.bgColor;
+  el('bg-opacity').value = s.bgOpacity;
+  el('backdrop-toggle').dataset.on = String(s.backdrop);
+  el('backdrop-toggle').className = 'toggle' + (s.backdrop ? ' on' : '');
+  el('blur-amount').value = s.blur;
+  el('blur-row').style.display = s.backdrop ? 'flex' : 'none';
+  el('border-color').value = s.borderColor;
+  el('border-width').value = s.borderWidth;
+  el('border-opacity').value = s.borderOpacity;
+  el('radius').value = s.radius;
+  el('pad-x').value = s.padX;
+  el('pad-y').value = s.padY;
+  el('arrow-size').value = s.arrow;
+  el('font-size').value = s.fontSize;
+  el('text-color').value = s.textColor;
+  el('text-secondary').value = s.textSecondary;
+  el('text-muted').value = s.textMuted;
+  el('shadow-style').value = s.shadow;
+  el('hover-delay').value = s.hoverDelay;
+  el('transition-dur').value = s.transition;
+  updateDisplayValues();
+  applyStyles();
+}
+
+function updateDisplayValues() {
+  el('bg-opacity-val').textContent = el('bg-opacity').value + '%';
+  el('blur-val').textContent = el('blur-amount').value + 'px';
+  el('border-w-val').textContent = el('border-width').value + 'px';
+  el('border-o-val').textContent = el('border-opacity').value + '%';
+  el('radius-val').textContent = el('radius').value + 'px';
+  el('pad-x-val').textContent = el('pad-x').value + 'px';
+  el('pad-y-val').textContent = el('pad-y').value + 'px';
+  el('arrow-val').textContent = el('arrow-size').value + 'px';
+  el('font-val').textContent = el('font-size').value + 'px';
+  el('delay-val').textContent = el('hover-delay').value + 'ms';
+  el('trans-val').textContent = el('transition-dur').value + 'ms';
+}
+
+function applyStyles() {
+  const s = getState();
+  const bg = hexToRgb(s.bgColor);
+  const bc = hexToRgb(s.borderColor);
+  const bgRgba = `rgba(${bg.r},${bg.g},${bg.b},${s.bgOpacity/100})`;
+  const borderRgba = `rgba(${bc.r},${bc.g},${bc.b},${s.borderOpacity/100})`;
+  const backdropVal = s.backdrop ? `blur(${s.blur}px)` : 'none';
+  const dividerRgba = `rgba(${bc.r},${bc.g},${bc.b},${Math.min(s.borderOpacity/100, 0.15)})`;
+
+  const root = document.documentElement.style;
+  root.setProperty('--tt-bg', bgRgba);
+  root.setProperty('--tt-border-color', borderRgba);
+  root.setProperty('--tt-border-w', s.borderWidth + 'px');
+  root.setProperty('--tt-radius', s.radius + 'px');
+  root.setProperty('--tt-px', s.padX + 'px');
+  root.setProperty('--tt-py', s.padY + 'px');
+  root.setProperty('--tt-arrow', s.arrow + 'px');
+  root.setProperty('--tt-font-size', s.fontSize + 'px');
+  root.setProperty('--tt-text', s.textColor);
+  root.setProperty('--tt-secondary', s.textSecondary);
+  root.setProperty('--tt-muted', s.textMuted);
+  root.setProperty('--tt-shadow', SHADOWS[s.shadow]);
+  root.setProperty('--tt-backdrop', backdropVal);
+  root.setProperty('--tt-divider', dividerRgba);
+
+  // Transition on all .tt elements
+  document.querySelectorAll('.tt').forEach(t => {
+    t.style.transitionDuration = s.transition + 'ms';
+  });
+
+  // Update CSS output
+  el('css-output').textContent =
+`--tt-bg: ${bgRgba};
+--tt-border: ${s.borderWidth}px solid ${borderRgba};
+--tt-radius: ${s.radius}px;
+--tt-padding: ${s.padY}px ${s.padX}px;
+--tt-arrow: ${s.arrow}px;
+--tt-font-size: ${s.fontSize}px;
+--tt-text: ${s.textColor};
+--tt-secondary: ${s.textSecondary};
+--tt-muted: ${s.textMuted};
+--tt-shadow: ${SHADOWS[s.shadow]};
+--tt-backdrop: ${backdropVal};
+--tt-hover-delay: ${s.hoverDelay}ms;
+--tt-fade-in: ${s.transition}ms;`;
+}
+
+// ── Hover Delay System ────────────────────────────────────────────────────────
+// Manages delayed show/instant hide for all tooltips via JS
+const hoverTimers = new WeakMap();
+
+function setupHoverTargets() {
+  // Pairs: [trigger element, tooltip element]
+  // We find all .tt elements and their parent trigger
+  const triggers = [
+    // 1. Tile
+    { trigger: '.tile-demo', tt: '.tile-tt' },
+    // 2. Blocked tile
+    { trigger: '.blocked-demo', tt: '.prereq-tt' },
+    // 3. Error badge
+    { trigger: '.err-badge', tt: '.err-tt' },
+    // 4. Dots
+    { trigger: '.pdot', tt: '.dot-tt' },
+    { trigger: '.pdiamond', tt: '.dot-tt' },
+    // 5. DateCells
+    { trigger: '.dcell', tt: '.dcell-tt' },
+    // 6. Nav buttons
+    { trigger: '.nav-btn', tt: '.nav-tt' },
+  ];
+
+  triggers.forEach(({ trigger, tt }) => {
+    document.querySelectorAll(trigger).forEach(triggerEl => {
+      const ttEl = triggerEl.querySelector(tt);
+      if (!ttEl) return;
+
+      triggerEl.addEventListener('mouseenter', () => {
+        const delay = +el('hover-delay').value;
+        clearTimeout(hoverTimers.get(triggerEl));
+        if (delay === 0) {
+          ttEl.classList.add('visible');
+        } else {
+          hoverTimers.set(triggerEl, setTimeout(() => {
+            ttEl.classList.add('visible');
+          }, delay));
+        }
+      });
+
+      triggerEl.addEventListener('mouseleave', () => {
+        clearTimeout(hoverTimers.get(triggerEl));
+        ttEl.classList.remove('visible');
+      });
+    });
+  });
+}
+
+// ── Event Binding ─────────────────────────────────────────────────────────────
+
+// All range/color/select inputs
+document.querySelectorAll('.controls input, .controls select').forEach(input => {
+  input.addEventListener('input', () => {
+    updateDisplayValues();
+    applyStyles();
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  });
+});
+
+// Backdrop toggle
+el('backdrop-toggle').addEventListener('click', function() {
+  const on = this.dataset.on !== 'true';
+  this.dataset.on = String(on);
+  this.className = 'toggle' + (on ? ' on' : '');
+  el('blur-row').style.display = on ? 'flex' : 'none';
+  applyStyles();
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+});
+
+// Preset buttons
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setState(PRESETS[btn.dataset.preset]);
+  });
+});
+
+// Copy button
+el('copy-btn').addEventListener('click', () => {
+  navigator.clipboard.writeText(el('css-output').textContent).then(() => {
+    el('copy-btn').textContent = 'Copied!';
+    setTimeout(() => el('copy-btn').textContent = 'Copy CSS', 1500);
+  });
+});
+
+// ── STCell cursor-following tooltip ───────────────────────────────────────────
+(function() {
+  const tt = el('st-cursor-tt');
+  const area = el('st-area');
+  if (!tt || !area) return;
+  area.querySelectorAll('.st-line').forEach(line => {
+    const label = line.dataset.label;
+    let timer;
+    line.addEventListener('mouseenter', (e) => {
+      const delay = +el('hover-delay').value;
+      tt.textContent = label;
+      tt.style.left = (e.clientX + 14) + 'px';
+      tt.style.top = (e.clientY + 14) + 'px';
+      clearTimeout(timer);
+      if (delay === 0) {
+        tt.style.opacity = '1';
+      } else {
+        timer = setTimeout(() => { tt.style.opacity = '1'; }, delay);
+      }
+    });
+    line.addEventListener('mousemove', (e) => {
+      tt.style.left = (e.clientX + 14) + 'px';
+      tt.style.top = (e.clientY + 14) + 'px';
+    });
+    line.addEventListener('mouseleave', () => {
+      clearTimeout(timer);
+      tt.style.opacity = '0';
+    });
+  });
+})();
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+setupHoverTargets();
+setState(PRESETS['current-mix']);
+</script>
+
+</body>
+</html>
