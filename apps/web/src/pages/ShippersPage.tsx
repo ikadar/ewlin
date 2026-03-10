@@ -256,9 +256,9 @@ export function ShippersPage() {
               <table className="w-full text-sm">
                 <thead className="bg-flux-hover">
                   <tr className="bg-flux-hover border-b border-flux-border text-flux-text-secondary">
-                    <th className="text-left px-4 py-1.5 font-medium">Nom</th>
-                    <th className="text-left px-4 py-1.5 font-medium">Créé le</th>
-                    <th className="px-4 py-1.5" />
+                    <th className="text-left px-4 py-3 font-medium">Nom</th>
+                    <th className="text-left px-4 py-3 font-medium">Créé le</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -272,13 +272,13 @@ export function ShippersPage() {
                   {filteredShippers.map((shipper) => (
                     <tr
                       key={shipper.id}
-                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors"
+                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
                     >
-                      <td className="px-4 py-1.5 text-flux-text-primary font-medium">{shipper.name}</td>
-                      <td className="px-4 py-1.5 text-flux-text-secondary">
+                      <td className="px-4 py-3 text-flux-text-primary font-medium">{shipper.name}</td>
+                      <td className="px-4 py-3 text-flux-text-secondary">
                         {new Date(shipper.createdAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td className="px-4 py-1.5">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setSaveError(null); setEditingShipper(shipper); }}

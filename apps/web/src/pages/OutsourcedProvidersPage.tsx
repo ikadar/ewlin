@@ -404,14 +404,14 @@ export function OutsourcedProvidersPage() {
               <table className="w-full text-sm">
                 <thead className="bg-flux-hover">
                   <tr className="bg-flux-hover border-b border-flux-border text-flux-text-secondary">
-                    <th className="text-left px-4 py-1.5 font-medium">Nom</th>
-                    <th className="text-left px-4 py-1.5 font-medium">Statut</th>
-                    <th className="text-left px-4 py-1.5 font-medium">Types d&apos;actions</th>
-                    <th className="text-left px-4 py-1.5 font-medium">Départ</th>
-                    <th className="text-left px-4 py-1.5 font-medium">Réception</th>
-                    <th className="text-left px-4 py-1.5 font-medium">Transit</th>
-                    <th className="text-left px-4 py-1.5 font-medium">Créé le</th>
-                    <th className="px-4 py-1.5" />
+                    <th className="text-left px-4 py-3 font-medium">Nom</th>
+                    <th className="text-left px-4 py-3 font-medium">Statut</th>
+                    <th className="text-left px-4 py-3 font-medium">Types d&apos;actions</th>
+                    <th className="text-left px-4 py-3 font-medium">Départ</th>
+                    <th className="text-left px-4 py-3 font-medium">Réception</th>
+                    <th className="text-left px-4 py-3 font-medium">Transit</th>
+                    <th className="text-left px-4 py-3 font-medium">Créé le</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -425,24 +425,24 @@ export function OutsourcedProvidersPage() {
                   {filteredProviders.map((provider) => (
                     <tr
                       key={provider.id}
-                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors"
+                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
                     >
-                      <td className="px-4 py-1.5 text-flux-text-primary font-medium">{provider.name}</td>
-                      <td className="px-4 py-1.5">
+                      <td className="px-4 py-3 text-flux-text-primary font-medium">{provider.name}</td>
+                      <td className="px-4 py-3">
                         <StatusBadge status={provider.status} />
                       </td>
-                      <td className="px-4 py-1.5 text-flux-text-secondary">
+                      <td className="px-4 py-3 text-flux-text-secondary">
                         {provider.supportedActionTypes.length > 0
                           ? provider.supportedActionTypes.join(', ')
                           : <span className="text-flux-text-muted">—</span>}
                       </td>
-                      <td className="px-4 py-1.5 text-flux-text-secondary">{provider.latestDepartureTime}</td>
-                      <td className="px-4 py-1.5 text-flux-text-secondary">{provider.receptionTime}</td>
-                      <td className="px-4 py-1.5 text-flux-text-secondary">{provider.transitDays} j</td>
-                      <td className="px-4 py-1.5 text-flux-text-secondary">
+                      <td className="px-4 py-3 text-flux-text-secondary">{provider.latestDepartureTime}</td>
+                      <td className="px-4 py-3 text-flux-text-secondary">{provider.receptionTime}</td>
+                      <td className="px-4 py-3 text-flux-text-secondary">{provider.transitDays} j</td>
+                      <td className="px-4 py-3 text-flux-text-secondary">
                         {new Date(provider.createdAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td className="px-4 py-1.5">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setSaveError(null); setEditingProvider(provider); }}
