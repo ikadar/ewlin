@@ -27,6 +27,8 @@ import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
 import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
+import { autoPlace } from './utils/autoPlace';
+import { calculateEndTime } from './utils/timeCalculations';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
@@ -159,6 +161,15 @@ function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): b
     if (wasActive) {
       ctx.setSelectedJobId(null);
     }
+    return true;
+  }
+  return false;
+}
+
+function handleAutoPlaceKeyboard(e: KeyboardEvent, onAutoPlace: () => void): boolean {
+  if (isAltLetter(e, 'g')) {
+    e.preventDefault();
+    onAutoPlace();
     return true;
   }
   return false;
@@ -411,6 +422,9 @@ function AppContent() {
 
   // Global timeline compact loading state (v0.3.35)
   const [isCompactingTimeline, setIsCompactingTimeline] = useState(false);
+
+  // Auto-place loading state
+  const [isAutoPlacing, setIsAutoPlacing] = useState(false);
 
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
@@ -1085,6 +1099,57 @@ function AppContent() {
     return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
   }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
 
+  // Auto-place: ALAP backward scheduling for selected job
+  const handleAutoPlace = useCallback(async () => {
+    if (!selectedJobId || isAutoPlacing) return;
+
+    setIsAutoPlacing(true);
+    try {
+      const result = autoPlace({
+        snapshot,
+        jobIds: [selectedJobId],
+        calculateEndTime,
+      });
+
+      if (result.placedCount === 0) {
+        showToast('No tasks to place', 'error');
+        return;
+      }
+
+      // Persist each new assignment via API
+      const newAssignments = result.snapshot.assignments.filter(
+        (a) => a.id.startsWith('auto-')
+      );
+
+      let successCount = 0;
+      for (const assignment of newAssignments) {
+        try {
+          await assignTask({
+            taskId: assignment.taskId,
+            body: {
+              targetId: assignment.targetId,
+              scheduledStart: assignment.scheduledStart,
+              isOutsourced: false,
+            },
+          }).unwrap();
+          successCount++;
+        } catch (err) {
+          console.error('Auto-place assignment failed:', err);
+        }
+      }
+
+      const warningCount = result.warnings.length;
+      const msg = warningCount > 0
+        ? `Placed ${successCount} tasks (${warningCount} warnings)`
+        : `Placed ${successCount} tasks`;
+      showToast(msg, warningCount > 0 ? 'error' : 'success');
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error');
+    } finally {
+      setIsAutoPlacing(false);
+    }
+  }, [selectedJobId, isAutoPlacing, snapshot, assignTask, showToast]);
+
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const ctx: KeyboardContext = {
@@ -1177,6 +1242,7 @@ function AppContent() {
         }
       }, isPicking)) return;
       if (handleQuickPlacementKeyboard(e, ctx)) return;
+      if (handleAutoPlaceKeyboard(e, handleAutoPlace)) return;
       if (handleDisplayModeToggle(e, setDisplayMode)) return;
       if (handleEscapeQuickPlacement(e, ctx)) return;
       if (handleEscapeCloseJob(e, ctx)) return;
@@ -1199,7 +1265,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleAutoPlace]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -2131,6 +2197,7 @@ function AppContent() {
       if (!selectedJobId) return;
       setIsQuickPlacementMode(prev => !prev);
     }, [selectedJobId]),
+    onAutoPlace: handleAutoPlace,
     onEditJob: handleEditJob,
     onNewJob: useCallback(() => {
       navigate('/job/new');

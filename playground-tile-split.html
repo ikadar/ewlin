@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tile Split — Playground</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --zinc-50: #fafafa; --zinc-100: #f4f4f5; --zinc-200: #e4e4e7;
+    --zinc-300: #d4d4d8; --zinc-400: #a1a1aa; --zinc-500: #71717a;
+    --zinc-600: #52525b; --zinc-700: #3f3f46; --zinc-800: #27272a;
+    --zinc-900: #18181b; --zinc-950: #09090b;
+    --blue-300: #93c5fd; --blue-400: #60a5fa; --blue-500: #3b82f6;
+    --blue-600: #2563eb; --blue-700: #1d4ed8;
+    --green-300: #86efac; --green-400: #4ade80; --green-500: #22c55e;
+    --amber-300: #fcd34d; --amber-400: #fbbf24; --amber-500: #f59e0b;
+    --red-300: #fca5a5; --red-400: #f87171; --red-500: #ef4444;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--zinc-950); color: var(--zinc-200);
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+
+  /* Layout */
+  .app { display: flex; flex: 1; overflow: hidden; }
+  .station-panel {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    overflow-y: auto; padding: 24px; background: var(--zinc-900);
+  }
+  .controls-panel {
+    width: 320px; min-width: 320px; padding: 20px; overflow-y: auto;
+    background: rgba(39,39,42,0.8); backdrop-filter: blur(16px);
+    border-left: 1px solid var(--zinc-700);
+  }
+
+  /* Station column */
+  .station-header {
+    text-align: center; padding: 10px 0 16px; font-size: 13px;
+    font-weight: 600; color: var(--zinc-400); text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .station-column {
+    width: 220px; position: relative; min-height: 200px;
+    border-left: 1px solid var(--zinc-800); border-right: 1px solid var(--zinc-800);
+  }
+  .time-markers { position: absolute; left: -50px; top: 0; bottom: 0; width: 44px; }
+  .time-marker {
+    position: absolute; right: 0; font-size: 10px; color: var(--zinc-600);
+    transform: translateY(-50%); text-align: right; width: 44px;
+  }
+  .time-grid-line {
+    position: absolute; left: 50px; right: 0; height: 1px;
+    background: var(--zinc-800); pointer-events: none;
+  }
+
+  /* Tile */
+  .tile {
+    position: absolute; left: 0; right: 0; border-left: 4px solid;
+    cursor: pointer; user-select: none; transition: filter 0.15s, opacity 0.15s;
+    overflow: hidden;
+  }
+  .tile:hover { filter: brightness(1.15); }
+
+  .tile-setup {
+    position: absolute; left: 0; right: 0; top: 0;
+    background-image: repeating-linear-gradient(
+      45deg, transparent, transparent 3px, rgba(255,255,255,0.04) 3px, rgba(255,255,255,0.04) 6px
+    );
+  }
+  .tile-run { position: absolute; left: 0; right: 0; }
+
+  .tile-label {
+    position: absolute; inset: 0; z-index: 10; padding: 3px 8px;
+    pointer-events: none; display: flex; align-items: flex-start; gap: 6px;
+    overflow: hidden; font-size: 12px; font-weight: 500;
+  }
+  .tile-circle {
+    width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid;
+    flex-shrink: 0; margin-top: 1px; pointer-events: auto; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .tile-circle svg { width: 8px; height: 8px; }
+  .tile-text { line-height: 1.3; min-width: 0; }
+  .part-badge {
+    font-size: 9px; font-weight: 700; opacity: 0.7;
+    background: rgba(255,255,255,0.08); border-radius: 3px;
+    padding: 1px 4px; margin-left: 2px; white-space: nowrap;
+    display: inline-block; vertical-align: middle;
+  }
+
+  /* Tile states */
+  .tile-default { border-color: var(--blue-500); }
+  .tile-default .tile-setup { background-color: rgba(59,130,246,0.15); border-bottom: 1px solid rgba(59,130,246,0.2); }
+  .tile-default .tile-run { background-color: rgba(59,130,246,0.10); }
+  .tile-default .tile-label { color: var(--blue-300); }
+  .tile-default .tile-circle { border-color: var(--zinc-600); }
+  .tile-default .tile-circle:hover { border-color: var(--zinc-400); }
+
+  .tile-completed { border-color: var(--green-500); }
+  .tile-completed .tile-setup { background-color: rgba(34,197,94,0.18); border-bottom: 1px solid rgba(34,197,94,0.2); }
+  .tile-completed .tile-run { background-color: rgba(34,197,94,0.10); }
+  .tile-completed .tile-label { color: var(--green-300); }
+  .tile-completed .tile-circle { border-color: var(--green-500); color: var(--green-500); }
+
+  .tile-conflict { border-color: var(--amber-500); }
+  .tile-conflict .tile-setup { background-color: rgba(245,158,11,0.18); border-bottom: 1px solid rgba(245,158,11,0.2); }
+  .tile-conflict .tile-run { background-color: rgba(245,158,11,0.10); }
+  .tile-conflict .tile-label { color: var(--amber-300); }
+  .tile-conflict .tile-circle { border-color: var(--zinc-600); }
+
+  .tile-late { border-color: var(--red-500); }
+  .tile-late .tile-setup { background-color: rgba(239,68,68,0.18); border-bottom: 1px solid rgba(239,68,68,0.2); }
+  .tile-late .tile-run { background-color: rgba(239,68,68,0.10); }
+  .tile-late .tile-label { color: var(--red-300); }
+  .tile-late .tile-circle { border-color: var(--zinc-600); }
+
+  .tile-blocked { border-color: var(--zinc-500); border-style: dashed; border-left-style: dashed; }
+  .tile-blocked .tile-setup { background-color: rgba(113,113,122,0.12); border-bottom: 1px solid rgba(113,113,122,0.15); }
+  .tile-blocked .tile-run { background-color: rgba(113,113,122,0.06); }
+  .tile-blocked .tile-label { color: var(--zinc-400); }
+  .tile-blocked .tile-circle { border-color: var(--zinc-600); }
+
+  /* Split visual: dashed bottom on non-final parts */
+  .tile-split-continues {
+    border-bottom: 2px dashed rgba(255,255,255,0.15);
+  }
+
+  /* Context menu */
+  .ctx-menu {
+    position: fixed; z-index: 9999; min-width: 200px;
+    background: var(--zinc-800); border: 1px solid var(--zinc-700);
+    border-radius: 8px; padding: 4px 0; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .ctx-menu-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; font-size: 13px; color: var(--zinc-200);
+    cursor: pointer; border: none; background: none; width: 100%;
+    text-align: left; transition: background 0.1s;
+  }
+  .ctx-menu-item:hover { background: var(--zinc-700); }
+  .ctx-menu-item.disabled { color: var(--zinc-500); cursor: not-allowed; }
+  .ctx-menu-item.disabled:hover { background: none; }
+  .ctx-menu-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .ctx-sep { height: 1px; background: var(--zinc-700); margin: 4px 0; }
+
+  /* Split popover */
+  .split-popover {
+    position: fixed; z-index: 10000; width: 310px;
+    background: rgba(39,39,42,0.95); backdrop-filter: blur(20px);
+    border: 1px solid var(--zinc-600); border-radius: 12px;
+    padding: 20px; box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+  }
+  .split-popover h3 {
+    font-size: 14px; font-weight: 600; color: var(--zinc-100);
+    margin-bottom: 16px;
+  }
+  .split-preview {
+    display: flex; gap: 12px; justify-content: center; align-items: flex-end;
+    margin-bottom: 16px; height: 120px;
+  }
+  .split-preview-part {
+    width: 80px; border-radius: 4px; overflow: hidden; position: relative;
+    border-left: 3px solid var(--blue-500); transition: height 0.2s ease;
+  }
+  .split-preview-setup {
+    background: rgba(59,130,246,0.2);
+    background-image: repeating-linear-gradient(
+      45deg, transparent, transparent 2px, rgba(255,255,255,0.04) 2px, rgba(255,255,255,0.04) 4px
+    );
+    border-bottom: 1px solid rgba(59,130,246,0.3);
+  }
+  .split-preview-run { background: rgba(59,130,246,0.12); }
+  .split-preview-label {
+    position: absolute; bottom: 4px; left: 0; right: 0;
+    text-align: center; font-size: 11px; color: var(--blue-300); font-weight: 600;
+  }
+  .split-preview-tag {
+    text-align: center; font-size: 10px; color: var(--zinc-400);
+    margin-top: 4px; font-weight: 500;
+  }
+
+  /* Slider */
+  .split-slider-row { margin: 12px 0 8px; }
+  .split-slider-row label { font-size: 11px; color: var(--zinc-400); display: block; margin-bottom: 6px; }
+  .split-slider-track {
+    position: relative; height: 24px; background: var(--zinc-700);
+    border-radius: 6px; cursor: pointer; overflow: hidden;
+  }
+  .split-slider-fill {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    background: rgba(59,130,246,0.3); border-radius: 6px 0 0 6px;
+    transition: width 0.1s;
+  }
+  .split-slider-handle {
+    position: absolute; top: -2px; width: 4px; height: 28px;
+    background: var(--blue-400); border-radius: 2px; cursor: grab;
+    transform: translateX(-2px); transition: left 0.1s;
+    box-shadow: 0 0 8px rgba(59,130,246,0.4);
+  }
+  .split-slider-labels {
+    display: flex; justify-content: space-between; margin-top: 4px;
+    font-size: 11px; color: var(--zinc-400);
+  }
+  .split-info {
+    font-size: 11px; color: var(--zinc-500); margin: 8px 0 16px;
+    padding: 6px 10px; background: rgba(255,255,255,0.03);
+    border-radius: 6px; border: 1px solid var(--zinc-700);
+  }
+  .split-info span { color: var(--amber-400); font-weight: 600; }
+  .split-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+  .btn {
+    padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    cursor: pointer; border: none; transition: background 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-ghost { background: var(--zinc-700); color: var(--zinc-300); }
+  .btn-ghost:hover { background: var(--zinc-600); }
+  .btn-primary { background: var(--blue-600); color: white; }
+  .btn-primary:hover { background: var(--blue-500); }
+
+  /* Controls panel */
+  .ctrl-section { margin-bottom: 20px; }
+  .ctrl-section h4 {
+    font-size: 11px; font-weight: 600; color: var(--zinc-400);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;
+  }
+  .ctrl-row { margin-bottom: 12px; }
+  .ctrl-row label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--zinc-300); margin-bottom: 4px;
+  }
+  .ctrl-row label span { color: var(--zinc-500); font-variant-numeric: tabular-nums; }
+  .ctrl-row input[type=range] {
+    width: 100%; accent-color: var(--blue-500); height: 4px;
+    -webkit-appearance: none; background: var(--zinc-700); border-radius: 2px;
+    outline: none;
+  }
+  .ctrl-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: var(--blue-400); border-radius: 50%; cursor: pointer;
+    border: 2px solid var(--zinc-900);
+  }
+  .state-btns { display: flex; flex-wrap: wrap; gap: 4px; }
+  .state-btn {
+    padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--zinc-600); background: var(--zinc-800);
+    color: var(--zinc-300); transition: all 0.15s;
+  }
+  .state-btn.active { border-color: var(--blue-500); background: rgba(59,130,246,0.15); color: var(--blue-300); }
+  .state-btn:hover:not(.active) { border-color: var(--zinc-500); }
+
+  .btn-reset {
+    width: 100%; padding: 8px; border-radius: 6px; font-size: 12px;
+    background: var(--zinc-800); color: var(--zinc-400); border: 1px solid var(--zinc-700);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-reset:hover { background: var(--zinc-700); color: var(--zinc-200); }
+
+  .stats-box {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--zinc-700);
+    border-radius: 8px; padding: 12px; margin-top: 12px;
+  }
+  .stat-row {
+    display: flex; justify-content: space-between; font-size: 12px;
+    padding: 3px 0;
+  }
+  .stat-row .stat-label { color: var(--zinc-400); }
+  .stat-row .stat-value { color: var(--zinc-200); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat-row.highlight .stat-value { color: var(--amber-400); }
+
+  /* Prompt output */
+  .prompt-bar {
+    border-top: 1px solid var(--zinc-800); padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px; background: var(--zinc-950);
+  }
+  .prompt-text {
+    flex: 1; font-size: 12px; color: var(--zinc-400); font-family: 'SF Mono', Monaco, Consolas, monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .btn-copy {
+    padding: 5px 14px; border-radius: 5px; font-size: 11px; font-weight: 500;
+    background: var(--zinc-800); color: var(--zinc-300); border: 1px solid var(--zinc-700);
+    cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  }
+  .btn-copy:hover { background: var(--zinc-700); }
+  .btn-copy.copied { background: rgba(34,197,94,0.15); color: var(--green-400); border-color: var(--green-500); }
+
+  /* Hint */
+  .hint {
+    text-align: center; font-size: 11px; color: var(--zinc-600);
+    margin-top: 16px; padding: 8px;
+  }
+
+  /* Animation */
+  @keyframes tile-appear {
+    from { opacity: 0; transform: scaleY(0.8); }
+    to { opacity: 1; transform: scaleY(1); }
+  }
+  .tile-animate { animation: tile-appear 0.25s ease-out; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--zinc-700); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Station Column -->
+  <div class="station-panel">
+    <div class="station-header">Heidelberg XL-106 — Station</div>
+    <div style="position: relative; display: flex;">
+      <div class="time-markers" id="timeMarkers"></div>
+      <div class="station-column" id="stationColumn"></div>
+    </div>
+    <div class="hint">Clic droit sur une tuile → Diviser / Fusionner</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls-panel">
+    <div class="ctrl-section">
+      <h4>Configuration</h4>
+      <div class="ctrl-row">
+        <label>Calage (setup) <span id="setupVal">30 min</span></label>
+        <input type="range" id="setupSlider" min="0" max="60" step="5" value="30">
+      </div>
+      <div class="ctrl-row">
+        <label>Roulage (run) <span id="runVal">240 min</span></label>
+        <input type="range" id="runSlider" min="30" max="480" step="15" value="240">
+      </div>
+      <div class="ctrl-row">
+        <label>Pixels/heure <span id="pphVal">80</span></label>
+        <input type="range" id="pphSlider" min="40" max="160" step="10" value="80">
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <h4>État de la tuile</h4>
+      <div class="state-btns" id="stateBtns">
+        <button class="state-btn active" data-state="default">Default</button>
+        <button class="state-btn" data-state="completed">Completed</button>
+        <button class="state-btn" data-state="conflict">Conflict</button>
+        <button class="state-btn" data-state="late">Late</button>
+        <button class="state-btn" data-state="blocked">Blocked</button>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <h4>Statistiques</h4>
+      <div class="stats-box" id="statsBox">
+        <div class="stat-row"><span class="stat-label">Parties</span><span class="stat-value" id="statParts">1</span></div>
+        <div class="stat-row"><span class="stat-label">Roulage total</span><span class="stat-value" id="statRun">4h 00</span></div>
+        <div class="stat-row"><span class="stat-label">Calage total</span><span class="stat-value" id="statSetup">0h 30</span></div>
+        <div class="stat-row highlight"><span class="stat-label">Temps total planifié</span><span class="stat-value" id="statTotal">4h 30</span></div>
+        <div class="stat-row highlight"><span class="stat-label">Surcoût (re-calage)</span><span class="stat-value" id="statOverhead">+0 min</span></div>
+      </div>
+    </div>
+
+    <button class="btn-reset" id="resetBtn">Réinitialiser</button>
+  </div>
+</div>
+
+<!-- Prompt bar -->
+<div class="prompt-bar">
+  <div class="prompt-text" id="promptText">Tile split playground — right-click a tile to split.</div>
+  <button class="btn-copy" id="copyBtn">Copier</button>
+</div>
+
+<!-- Context menu (hidden) -->
+<div class="ctx-menu" id="ctxMenu" style="display:none;"></div>
+
+<!-- Split popover (hidden) -->
+<div class="split-popover" id="splitPopover" style="display:none;"></div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+
+const DEFAULTS = { setupMinutes: 30, runMinutes: 240, pixelsPerHour: 80, tileState: 'default' };
+
+const state = {
+  setupMinutes: 30,
+  runMinutes: 240,
+  pixelsPerHour: 80,
+  tileState: 'default',
+  // Parts: array of { runMinutes }. Initial = single part with full run.
+  parts: [{ runMinutes: 240 }],
+};
+
+// ─── SVG Icons ───────────────────────────────────────────────────────────────
+
+const ICONS = {
+  scissors: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>`,
+  merge: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6L12 2L16 6"/><path d="M12 2V14"/><path d="M8 18L12 22L16 18"/><path d="M12 22V14"/></svg>`,
+  eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  circle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/></svg>`,
+  circleCheck: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11.5 14.5 16 9.5"/></svg>`,
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmt(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, '0')}`;
+}
+
+function minToPx(min) { return (min / 60) * state.pixelsPerHour; }
+
+function snap15(val) { return Math.round(val / 15) * 15; }
+
+// ─── Render Tiles ────────────────────────────────────────────────────────────
+
+function renderAll() {
+  renderTiles();
+  renderStats();
+  updatePrompt();
+}
+
+function renderTiles() {
+  const col = document.getElementById('stationColumn');
+  const markers = document.getElementById('timeMarkers');
+  col.innerHTML = '';
+  markers.innerHTML = '';
+
+  let y = 0;
+  const totalParts = state.parts.length;
+
+  state.parts.forEach((part, i) => {
+    const setupPx = minToPx(state.setupMinutes);
+    const runPx = minToPx(part.runMinutes);
+    const totalPx = setupPx + runPx;
+    const isFinal = i === totalParts - 1;
+
+    const tile = document.createElement('div');
+    tile.className = `tile tile-${state.tileState} tile-animate${!isFinal ? ' tile-split-continues' : ''}`;
+    tile.style.top = `${y}px`;
+    tile.style.height = `${totalPx}px`;
+
+    // Setup section
+    const setup = document.createElement('div');
+    setup.className = 'tile-setup';
+    setup.style.height = `${setupPx}px`;
+    tile.appendChild(setup);
+
+    // Run section
+    const run = document.createElement('div');
+    run.className = 'tile-run';
+    run.style.top = `${setupPx}px`;
+    run.style.height = `${runPx}px`;
+    tile.appendChild(run);
+
+    // Label
+    const label = document.createElement('div');
+    label.className = 'tile-label';
+
+    const circle = document.createElement('div');
+    circle.className = 'tile-circle';
+    circle.innerHTML = state.tileState === 'completed' ? ICONS.circleCheck : ICONS.circle;
+    label.appendChild(circle);
+
+    const text = document.createElement('div');
+    text.className = 'tile-text';
+    let labelHtml = '12345 · Client XY';
+    if (totalParts > 1) {
+      labelHtml += ` <span class="part-badge">[${i + 1}/${totalParts}]</span>`;
+    }
+    text.innerHTML = labelHtml;
+    label.appendChild(text);
+
+    tile.appendChild(label);
+
+    // Context menu handler
+    tile.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(e.clientX, e.clientY, i);
+    });
+
+    col.appendChild(tile);
+    y += totalPx + 2; // 2px gap between tiles
+  });
+
+  // Set column height
+  col.style.height = `${y + 40}px`;
+
+  // Time markers
+  const totalMinutes = state.parts.reduce((sum, p) => sum + state.setupMinutes + p.runMinutes, 0);
+  const totalHours = Math.ceil(totalMinutes / 60);
+  for (let h = 0; h <= totalHours; h++) {
+    const py = minToPx(h * 60);
+    const marker = document.createElement('div');
+    marker.className = 'time-marker';
+    marker.style.top = `${py}px`;
+    marker.textContent = `${String(8 + h).padStart(2, '0')}:00`;
+    markers.appendChild(marker);
+
+    if (h < totalHours) {
+      const line = document.createElement('div');
+      line.className = 'time-grid-line';
+      line.style.top = `${py}px`;
+      line.style.left = '0';
+      line.style.right = '0';
+      line.style.position = 'absolute';
+      col.appendChild(line);
+    }
+  }
+}
+
+function renderStats() {
+  const totalParts = state.parts.length;
+  const totalRun = state.parts.reduce((s, p) => s + p.runMinutes, 0);
+  const totalSetup = state.setupMinutes * totalParts;
+  const totalTime = totalRun + totalSetup;
+  const overhead = state.setupMinutes * (totalParts - 1);
+
+  document.getElementById('statParts').textContent = totalParts;
+  document.getElementById('statRun').textContent = fmt(totalRun);
+  document.getElementById('statSetup').textContent = fmt(totalSetup);
+  document.getElementById('statTotal').textContent = fmt(totalTime);
+  document.getElementById('statOverhead').textContent = overhead > 0 ? `+${fmt(overhead)}` : '+0 min';
+}
+
+// ─── Context Menu ────────────────────────────────────────────────────────────
+
+let activeCtx = null;
+
+function showContextMenu(x, y, partIndex) {
+  closeSplitPopover();
+  const menu = document.getElementById('ctxMenu');
+  const totalParts = state.parts.length;
+  const canSplit = state.parts[partIndex].runMinutes >= 30 && state.tileState !== 'completed';
+
+  // Can merge? Check if adjacent part exists in same split group
+  const canMergeUp = totalParts > 1 && partIndex > 0;
+  const canMergeDown = totalParts > 1 && partIndex < totalParts - 1;
+  const canMerge = canMergeUp || canMergeDown;
+
+  let html = `
+    <button class="ctx-menu-item" data-action="details">${ICONS.eye} Voir détails</button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-menu-item${!canSplit ? ' disabled' : ''}" data-action="split">${ICONS.scissors} Diviser</button>
+  `;
+
+  if (canMerge) {
+    if (canMergeUp) {
+      html += `<button class="ctx-menu-item" data-action="merge-up">${ICONS.merge} Fusionner avec partie ${partIndex}</button>`;
+    }
+    if (canMergeDown) {
+      html += `<button class="ctx-menu-item" data-action="merge-down">${ICONS.merge} Fusionner avec partie ${partIndex + 2}</button>`;
+    }
+  }
+
+  menu.innerHTML = html;
+
+  // Position
+  const mw = 220, mh = menu.children.length * 36 + 20;
+  menu.style.left = `${x + mw > window.innerWidth ? x - mw : x}px`;
+  menu.style.top = `${y + mh > window.innerHeight ? y - mh : y}px`;
+  menu.style.display = 'block';
+  activeCtx = partIndex;
+
+  // Handlers
+  menu.querySelectorAll('[data-action]').forEach(btn => {
+    btn.onclick = () => {
+      const action = btn.dataset.action;
+      menu.style.display = 'none';
+      if (action === 'split' && canSplit) showSplitPopover(x, y, partIndex);
+      if (action === 'merge-up' && canMergeUp) doMerge(partIndex - 1, partIndex);
+      if (action === 'merge-down' && canMergeDown) doMerge(partIndex, partIndex + 1);
+    };
+  });
+}
+
+// Close context menu on click outside
+document.addEventListener('mousedown', (e) => {
+  const menu = document.getElementById('ctxMenu');
+  if (menu.style.display === 'block' && !menu.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
+// ─── Split Popover ───────────────────────────────────────────────────────────
+
+let splitState = { partIndex: 0, splitAt: 0, totalRun: 0 };
+
+function showSplitPopover(x, y, partIndex) {
+  const pop = document.getElementById('splitPopover');
+  const part = state.parts[partIndex];
+  const totalRun = part.runMinutes;
+  const half = snap15(Math.floor(totalRun / 2));
+
+  splitState = { partIndex, splitAt: half, totalRun };
+
+  renderSplitPopover();
+
+  // Position near the click
+  const pw = 310, ph = 330;
+  let px = x + 16;
+  let py = y - ph / 2;
+  if (px + pw > window.innerWidth) px = x - pw - 16;
+  if (py < 8) py = 8;
+  if (py + ph > window.innerHeight) py = window.innerHeight - ph - 8;
+
+  pop.style.left = `${px}px`;
+  pop.style.top = `${py}px`;
+  pop.style.display = 'block';
+
+  // Setup slider interaction
+  requestAnimationFrame(() => {
+    const track = pop.querySelector('.split-slider-track');
+    if (track) setupSliderDrag(track);
+  });
+}
+
+function renderSplitPopover() {
+  const pop = document.getElementById('splitPopover');
+  const { splitAt, totalRun } = splitState;
+  const part1Run = splitAt;
+  const part2Run = totalRun - splitAt;
+  const setupMin = state.setupMinutes;
+
+  // Preview heights (max 100px total)
+  const maxH = 100;
+  const part1Total = setupMin + part1Run;
+  const part2Total = setupMin + part2Run;
+  const scale = maxH / Math.max(part1Total, part2Total);
+  const p1h = part1Total * scale;
+  const p2h = part2Total * scale;
+  const p1setup = setupMin * scale;
+  const p2setup = setupMin * scale;
+
+  const pct = (splitAt / totalRun) * 100;
+
+  pop.innerHTML = `
+    <h3>Diviser la tâche</h3>
+
+    <div class="split-preview">
+      <div>
+        <div class="split-preview-part" style="height:${p1h}px">
+          <div class="split-preview-setup" style="height:${p1setup}px"></div>
+          <div class="split-preview-run" style="height:${p1h - p1setup}px"></div>
+          <div class="split-preview-label">${fmt(part1Run)}</div>
+        </div>
+        <div class="split-preview-tag">Partie 1</div>
+      </div>
+      <div>
+        <div class="split-preview-part" style="height:${p2h}px">
+          <div class="split-preview-setup" style="height:${p2setup}px"></div>
+          <div class="split-preview-run" style="height:${p2h - p2setup}px"></div>
+          <div class="split-preview-label">${fmt(part2Run)}</div>
+        </div>
+        <div class="split-preview-tag">Partie 2</div>
+      </div>
+    </div>
+
+    <div class="split-slider-row">
+      <label>Point de division</label>
+      <div class="split-slider-track">
+        <div class="split-slider-fill" style="width:${pct}%"></div>
+        <div class="split-slider-handle" style="left:${pct}%"></div>
+      </div>
+      <div class="split-slider-labels">
+        <span>${fmt(part1Run)}</span>
+        <span>Roulage total: ${fmt(totalRun)}</span>
+        <span>${fmt(part2Run)}</span>
+      </div>
+    </div>
+
+    <div class="split-info">
+      Calage partie 2 : <span>${fmt(setupMin)}</span> (re-calage complet)
+    </div>
+
+    <div class="split-actions">
+      <button class="btn btn-ghost" id="splitCancel">Annuler</button>
+      <button class="btn btn-primary" id="splitConfirm">Diviser</button>
+    </div>
+  `;
+
+  // Button handlers
+  pop.querySelector('#splitCancel').onclick = closeSplitPopover;
+  pop.querySelector('#splitConfirm').onclick = () => {
+    doSplit(splitState.partIndex, splitState.splitAt);
+    closeSplitPopover();
+  };
+}
+
+function setupSliderDrag(track) {
+  const onMove = (clientX) => {
+    const rect = track.getBoundingClientRect();
+    let pct = (clientX - rect.left) / rect.width;
+    pct = Math.max(0.05, Math.min(0.95, pct));
+    const rawMin = pct * splitState.totalRun;
+    const snapped = snap15(rawMin);
+    const clamped = Math.max(15, Math.min(splitState.totalRun - 15, snapped));
+    splitState.splitAt = clamped;
+    renderSplitPopover();
+    // Re-attach after re-render
+    const newTrack = document.querySelector('.split-slider-track');
+    if (newTrack) setupSliderDrag(newTrack);
+  };
+
+  let dragging = false;
+
+  track.onmousedown = (e) => {
+    e.preventDefault();
+    dragging = true;
+    onMove(e.clientX);
+
+    const moveHandler = (ev) => { if (dragging) onMove(ev.clientX); };
+    const upHandler = () => { dragging = false; document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', upHandler); };
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup', upHandler);
+  };
+}
+
+function closeSplitPopover() {
+  document.getElementById('splitPopover').style.display = 'none';
+}
+
+// Close popover on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('ctxMenu').style.display = 'none';
+    closeSplitPopover();
+  }
+});
+
+// ─── Split / Merge Logic ─────────────────────────────────────────────────────
+
+function doSplit(partIndex, splitAtMinutes) {
+  const part = state.parts[partIndex];
+  const remaining = part.runMinutes - splitAtMinutes;
+  part.runMinutes = splitAtMinutes;
+  state.parts.splice(partIndex + 1, 0, { runMinutes: remaining });
+  renderAll();
+}
+
+function doMerge(indexA, indexB) {
+  state.parts[indexA].runMinutes += state.parts[indexB].runMinutes;
+  state.parts.splice(indexB, 1);
+  renderAll();
+}
+
+// ─── Controls ────────────────────────────────────────────────────────────────
+
+document.getElementById('setupSlider').oninput = function() {
+  state.setupMinutes = +this.value;
+  document.getElementById('setupVal').textContent = `${this.value} min`;
+  renderAll();
+};
+
+document.getElementById('runSlider').oninput = function() {
+  const newRun = +this.value;
+  // Redistribute proportionally
+  const oldTotal = state.parts.reduce((s, p) => s + p.runMinutes, 0);
+  if (oldTotal > 0) {
+    state.parts.forEach(p => {
+      p.runMinutes = Math.max(15, snap15(Math.round((p.runMinutes / oldTotal) * newRun)));
+    });
+    // Adjust last part to match exactly
+    const newTotal = state.parts.reduce((s, p) => s + p.runMinutes, 0);
+    state.parts[state.parts.length - 1].runMinutes += newRun - newTotal;
+  } else {
+    state.parts = [{ runMinutes: newRun }];
+  }
+  state.runMinutes = newRun;
+  document.getElementById('runVal').textContent = `${newRun} min`;
+  renderAll();
+};
+
+document.getElementById('pphSlider').oninput = function() {
+  state.pixelsPerHour = +this.value;
+  document.getElementById('pphVal').textContent = this.value;
+  renderAll();
+};
+
+// State buttons
+document.getElementById('stateBtns').addEventListener('click', (e) => {
+  const btn = e.target.closest('.state-btn');
+  if (!btn) return;
+  document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.tileState = btn.dataset.state;
+  renderAll();
+});
+
+// Reset
+document.getElementById('resetBtn').onclick = () => {
+  Object.assign(state, { ...DEFAULTS, parts: [{ runMinutes: DEFAULTS.runMinutes }] });
+  document.getElementById('setupSlider').value = DEFAULTS.setupMinutes;
+  document.getElementById('runSlider').value = DEFAULTS.runMinutes;
+  document.getElementById('pphSlider').value = DEFAULTS.pixelsPerHour;
+  document.getElementById('setupVal').textContent = `${DEFAULTS.setupMinutes} min`;
+  document.getElementById('runVal').textContent = `${DEFAULTS.runMinutes} min`;
+  document.getElementById('pphVal').textContent = DEFAULTS.pixelsPerHour;
+  document.querySelectorAll('.state-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.state === 'default');
+  });
+  renderAll();
+};
+
+// ─── Prompt ──────────────────────────────────────────────────────────────────
+
+function updatePrompt() {
+  const parts = [];
+  const n = state.parts.length;
+
+  if (n > 1) {
+    const breakdown = state.parts.map((p, i) => `Part ${i + 1}: ${fmt(p.runMinutes)} run`).join(', ');
+    parts.push(`Split tile into ${n} parts (${breakdown})`);
+    parts.push(`each part gets full re-setup of ${fmt(state.setupMinutes)}`);
+  }
+
+  if (state.tileState !== DEFAULTS.tileState) parts.push(`tile state: ${state.tileState}`);
+  if (state.pixelsPerHour !== DEFAULTS.pixelsPerHour) parts.push(`scale: ${state.pixelsPerHour}px/hr`);
+  if (state.setupMinutes !== DEFAULTS.setupMinutes) parts.push(`setup: ${fmt(state.setupMinutes)}`);
+
+  const text = parts.length > 0
+    ? `Implement tile split: ${parts.join('. ')}.`
+    : 'Tile split playground — right-click a tile to split.';
+
+  document.getElementById('promptText').textContent = text;
+}
+
+// Copy
+document.getElementById('copyBtn').onclick = function() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    this.textContent = 'Copié !';
+    this.classList.add('copied');
+    setTimeout(() => { this.textContent = 'Copier'; this.classList.remove('copied'); }, 1500);
+  });
+};
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+renderAll();
+</script>
+</body>
+</html>

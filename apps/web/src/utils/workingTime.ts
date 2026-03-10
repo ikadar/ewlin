@@ -310,6 +310,47 @@ export function isWithinWorkingHours(time: Date, station: Station): boolean {
  * But work can only START during working hours. So if drying ends at 12:30 (during lunch),
  * the earliest a task can start is 13:00 (when lunch ends).
  */
+/**
+ * Snap a time to the previous available working time (end of slot).
+ * If the time is already within working hours, returns the same time.
+ * If not, returns the end of the previous working slot (same day or previous working day).
+ *
+ * Use case: ALAP scheduling — when LFT falls outside operating hours after clock-time
+ * drying subtraction, snap backward to the end of the most recent operating slot.
+ */
+export function snapToPreviousWorkingTime(time: Date, station: Station): Date {
+  // If already within working hours, return as-is
+  if (isWithinWorkingHours(time, station)) {
+    return new Date(time);
+  }
+
+  const daySchedule = getDayScheduleForDate(time, station);
+
+  // If day is not operating, skip to previous working day
+  if (!daySchedule.isOperating || daySchedule.slots.length === 0) {
+    return getPreviousWorkingDayEnd(time, station);
+  }
+
+  // Find the latest slot that ends before (or at) the current time
+  const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+
+  for (let i = daySchedule.slots.length - 1; i >= 0; i--) {
+    const slot = daySchedule.slots[i];
+    if (slot.end <= timeStr) {
+      // This slot ended before our time — snap to its end
+      return parseTimeToDate(slot.end, time);
+    }
+    if (slot.start <= timeStr) {
+      // We're after the slot start but before its end — should be within working hours
+      // This case is handled by isWithinWorkingHours above, but as a safeguard:
+      return new Date(time);
+    }
+  }
+
+  // All slots start after our time — go to previous working day
+  return getPreviousWorkingDayEnd(time, station);
+}
+
 export function snapToNextWorkingTime(time: Date, station: Station): Date {
   // If already within working hours, return as-is
   if (isWithinWorkingHours(time, station)) {

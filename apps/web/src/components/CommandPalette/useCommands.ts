@@ -34,6 +34,7 @@ export interface UseCommandsOptions {
   onPrevJob?: () => void;
   onNextJob?: () => void;
   onToggleQuickPlacement?: () => void;
+  onAutoPlace?: () => void;
   onEditJob?: () => void;
   onToggleDisplayMode?: () => void;
   onToggleSidebar?: () => void;
@@ -83,6 +84,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     title: 'Actions',
     shortcuts: [
       { label: 'Placement rapide', keys: ['Alt', 'Q'] },
+      { label: 'Auto-placer', keys: ['Alt', 'G'] },
       { label: 'Modifier le job', keys: ['Alt', 'E'] },
       { label: 'Nouveau job', keys: ['Alt', 'N'] },
       { label: 'Rechercher des jobs', keys: ['Alt', 'F'] },
@@ -150,6 +152,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onPrevJob,
     onNextJob,
     onToggleQuickPlacement,
+    onAutoPlace,
     onEditJob,
     onToggleDisplayMode,
     onToggleSidebar,
@@ -195,6 +198,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     if (onToggleQuickPlacement) {
       commands.push({ id: 'quick-placement', label: isQuickPlacementMode ? 'Quitter le placement rapide' : 'Mode placement rapide', category: 'Actions', shortcut: 'Alt+Q', keywords: 'place assign quick rapide placement', icon: 'zap', action: onToggleQuickPlacement });
     }
+    if (onAutoPlace) {
+      commands.push({ id: 'auto-place', label: 'Auto-placer ce job', category: 'Actions', shortcut: 'Alt+G', keywords: 'auto place autoplace generate backward alap jit scheduler', icon: 'wand', action: onAutoPlace });
+    }
     if (onEditJob) {
       commands.push({ id: 'edit-job', label: 'Modifier le job', category: 'Actions', shortcut: 'Alt+E', keywords: 'edit modifier job formulaire', icon: 'pencil', action: onEditJob });
     }
@@ -222,5 +228,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onAutoPlace, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }
