@@ -25,7 +25,7 @@ import { sortFluxJobs, type SortColumn, type SortDirection } from '@/components/
  * v0.5.16: Tab filtering, full-text search, URL persistence, keyboard shortcuts.
  * v0.5.17: Prerequisite listbox, expand/collapse, delete confirmation, edit navigation.
  */
-export function FluxPage() {
+export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -201,6 +201,9 @@ export function FluxPage() {
 
   // ── Keyboard shortcuts (spec 3.4) ────────────────────────────────────────
   useEffect(() => {
+    // When rendered as a backdrop behind JCF modal, suppress all keyboard shortcuts
+    if (backdrop) return;
+
     const handler = (e: KeyboardEvent) => {
       detectKeyboardLayout(e);
 
@@ -240,7 +243,7 @@ export function FluxPage() {
 
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [activeTab, navigate, location.pathname]);
+  }, [activeTab, navigate, location.pathname, backdrop]);
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (isLoading) {

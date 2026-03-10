@@ -44,6 +44,7 @@ import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
+import { FluxPage } from './pages/FluxPage';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -2180,23 +2181,27 @@ function AppContent() {
   // In mock mode, data is always instantly available, so we skip the loading state
   // This check is placed after all hooks to comply with Rules of Hooks
   const isMockMode = shouldUseMockMode();
-  if (isLoading && !isMockMode) {
+  if (isLoading && !isMockMode && !isJcfFromFlux) {
     return <LoadingSpinner message="Chargement des données..." />;
   }
 
   // v0.5.7: Show maintenance page for 503 Service Unavailable
-  if (isServiceUnavailable) {
+  if (isServiceUnavailable && !isJcfFromFlux) {
     return <MaintenanceState onRetry={refetch} />;
   }
 
   // v0.5.1: Show error state with retry button if fetch failed
-  if (isError) {
+  if (isError && !isJcfFromFlux) {
     return <ErrorState error={error} onRetry={refetch} />;
   }
 
   return (
     <>
-      {!isJcfFromFlux && (
+      {isJcfFromFlux ? (
+        <div inert="" className="flex-1 flex flex-col overflow-hidden">
+          <FluxPage backdrop />
+        </div>
+      ) : (
       <div className="flex-1 flex overflow-hidden">
         {isSidebarVisible && (
           <div>
@@ -2312,6 +2317,7 @@ function AppContent() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
       {selectedJobId && (
@@ -2345,7 +2351,6 @@ function AppContent() {
           onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
           onClose={handleContextMenuClose}
         />
-      )}
       )}
 
       {/* v0.4.6: JCF Modal */}
