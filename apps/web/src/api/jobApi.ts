@@ -6,6 +6,7 @@
  */
 
 import type { JcfElement } from '../components/JcfElementsTable/types';
+import { store } from '../store';
 
 // ============================================================================
 // Types
@@ -203,11 +204,13 @@ export async function createJob(request: CreateJobRequest): Promise<CreateJobRes
 
   // Real API call
   const baseUrl = getApiBaseUrl();
+  const token = store.getState().auth?.token;
   const response = await fetch(`${baseUrl}/api/v1/jobs`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(request),
   });

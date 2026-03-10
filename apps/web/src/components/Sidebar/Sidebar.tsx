@@ -1,6 +1,10 @@
-import { CalendarDays, TowerControl, Settings, User } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { CalendarDays, TowerControl, Settings, User, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { selectCurrentUser, selectIsAuthenticated, logout } from '../../store/slices/authSlice';
+import { shouldUseMockMode } from '../../store/api/baseApi';
 
 /**
  * Sidebar navigation component.
@@ -11,9 +15,44 @@ import { SidebarButton } from './SidebarButton';
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useAppDispatch();
+  const currentUser = useAppSelector(selectCurrentUser);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isMock = shouldUseMockMode();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const isSettings = location.pathname.startsWith('/settings');
   const isFlux = location.pathname.startsWith('/flux');
   const isScheduler = !isSettings && !isFlux;
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showUserMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showUserMenu]);
+
+  function handleLogout() {
+    setShowUserMenu(false);
+    dispatch(logout());
+    navigate('/login', { replace: true });
+  }
+
+  function getUserInitials(): string {
+    if (!currentUser?.displayName) return '?';
+    return currentUser.displayName
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  }
 
   return (
     <nav
@@ -50,12 +89,42 @@ export function Sidebar() {
             onClick={() => navigate('/settings/stations')}
             testId="sidebar-settings-button"
           />
-          <SidebarButton
-            icon={User}
-            label="User"
-            isDisabled
-            testId="sidebar-user-button"
-          />
+          {isMock || !isAuthenticated ? (
+            <SidebarButton
+              icon={User}
+              label="User"
+              isDisabled
+              testId="sidebar-user-button"
+            />
+          ) : (
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setShowUserMenu((v) => !v)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-zinc-300 hover:bg-white/15 hover:text-white transition-colors text-xs font-semibold"
+                aria-label="User menu"
+                data-testid="sidebar-user-button"
+              >
+                {getUserInitials()}
+              </button>
+              {showUserMenu && (
+                <div className="absolute bottom-12 left-0 bg-flux-surface border border-flux-border rounded-lg shadow-lg py-1 min-w-[160px] z-50">
+                  <div className="px-3 py-2 text-xs text-flux-text-muted border-b border-flux-border truncate">
+                    {currentUser?.email}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-flux-text-secondary hover:bg-flux-hover transition-colors"
+                    data-testid="sidebar-logout-button"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Kijelentkezés
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </nav>

@@ -21,9 +21,11 @@ import { stationApi } from './api/stationApi';
 import { providerApi } from './api/providerApi';
 import { shipperApi } from './api/shipperApi';
 import { fluxApi } from './api/fluxApi';
+import { authApi } from './api/authApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
+import { authReducer } from './slices/authSlice';
 // ============================================================================
 // Store Configuration
 // ============================================================================
@@ -43,6 +45,9 @@ export const store = configureStore({
     [providerApi.reducerPath]: providerApi.reducer,
     [shipperApi.reducerPath]: shipperApi.reducer,
     [fluxApi.reducerPath]: fluxApi.reducer,
+    [authApi.reducerPath]: authApi.reducer,
+    // Auth state slice
+    auth: authReducer,
     // UI state slice
     ui: uiReducer,
     // JCF form state slice
@@ -63,7 +68,8 @@ export const store = configureStore({
       .concat(stationApi.middleware)
       .concat(providerApi.middleware)
       .concat(shipperApi.middleware)
-      .concat(fluxApi.middleware),
+      .concat(fluxApi.middleware)
+      .concat(authApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -205,6 +211,8 @@ export type { ShipperResponse, ShipperInput } from './api/shipperApi';
 
 export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, fluxApi } from './api/fluxApi';
 
+export { useLoginMutation, useGetMeQuery, authApi } from './api/authApi';
+
 // Re-export slice actions
 export {
   setSelectedJobId,
@@ -249,4 +257,13 @@ export {
   selectCurrentError,
   selectIsServiceUnavailable,
 } from './slices/errorSlice';
+
+export {
+  setCredentials,
+  logout,
+  selectAuthToken,
+  selectCurrentUser,
+  selectIsAuthenticated,
+} from './slices/authSlice';
+export type { AuthUser } from './slices/authSlice';
 

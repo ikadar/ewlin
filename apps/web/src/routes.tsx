@@ -27,6 +27,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import App from './App';
 import { RootLayout } from './components/RootLayout';
+import { RequireAuth } from './components/Auth/RequireAuth';
 import { SettingsLayout } from './components/SettingsLayout/SettingsLayout';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { StationCategoriesPage } from './pages/StationCategoriesPage';
@@ -39,6 +40,7 @@ import { StationsPage } from './pages/StationsPage';
 import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { ShippersPage } from './pages/ShippersPage';
+import { LoginPage } from './pages/LoginPage';
 
 /**
  * Application routes.
@@ -48,7 +50,8 @@ import { ShippersPage } from './pages/ShippersPage';
 export function AppRoutes() {
   return (
     <Routes>
-      <Route element={<RootLayout />}>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<RequireAuth><RootLayout /></RequireAuth>}>
         {/* Production Flow Dashboard — tab nested routes (v0.5.16) */}
         <Route path="/flux" element={<FluxPage />}>
           <Route index element={null} />

@@ -13,6 +13,8 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { normalizeError } from './errorNormalization';
+import type { AuthState } from '../slices/authSlice';
+import { logout } from '../slices/authSlice';
 
 // ============================================================================
 // Configuration
@@ -36,16 +38,16 @@ function getApiBaseUrl(): string {
 /**
  * Standard headers for API requests
  */
-function prepareHeaders(headers: Headers): Headers {
+function prepareHeaders(headers: Headers, { getState }: { getState: () => unknown }): Headers {
   // Content type for JSON
   headers.set('Content-Type', 'application/json');
   headers.set('Accept', 'application/json');
 
-  // TODO: Add authentication header when auth is implemented
-  // const token = getAuthToken();
-  // if (token) {
-  //   headers.set('Authorization', `Bearer ${token}`);
-  // }
+  // Attach JWT token if available
+  const token = (getState() as { auth: AuthState }).auth?.token;
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
   return headers;
 }
@@ -93,6 +95,11 @@ export const realBaseQuery: BaseQueryFn<
       } else {
         console.log(`[API] ${method} ${url} - OK (${duration}ms)`);
       }
+    }
+
+    // On 401: dispatch logout → clears sessionStorage → RequireAuth redirects
+    if (result.error && typeof result.error === 'object' && 'status' in result.error && result.error.status === 401) {
+      api.dispatch(logout());
     }
 
     // Normalize errors

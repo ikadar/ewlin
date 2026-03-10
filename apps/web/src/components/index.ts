@@ -1,5 +1,5 @@
 export { Sidebar, SidebarButton } from './Sidebar';
-export type { SidebarProps, SidebarButtonProps } from './Sidebar';
+export type { SidebarButtonProps } from './Sidebar';
 
 export { JobsList, JobsListHeader, ProblemsSection, JobsSection, JobCard, ProgressSegments, getSegmentState, getSegmentWidth, getOutsourcedLabel } from './JobsList';
 export type { JobsListProps, JobsListHeaderProps, ProblemsSectionProps, JobsSectionProps, JobCardProps, JobProblemType, ProgressSegmentsProps, SegmentState } from './JobsList';
