@@ -70,9 +70,9 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     id: 'navigation',
     title: 'Navigation',
     shortcuts: [
-      { label: "Aller a aujourd'hui", keys: ['Home'] },
-      { label: 'Aller au depart', keys: ['Alt', 'D'] },
-      { label: 'Job precedent', keys: ['Alt', '\u2191'] },
+      { label: "Aller à aujourd'hui", keys: ['Home'] },
+      { label: 'Aller au départ', keys: ['Alt', 'D'] },
+      { label: 'Job précédent', keys: ['Alt', '\u2191'] },
       { label: 'Job suivant', keys: ['Alt', '\u2193'] },
       { label: 'Aller au Planning', keys: ['Alt', 'P'] },
       { label: 'Aller au Flux', keys: ['Alt', 'X'] },
@@ -93,7 +93,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     title: 'Affichage',
     shortcuts: [
       { label: 'PRODUIT / TIRAGE', keys: ['Alt', 'A'] },
-      { label: 'Panneau lateral', keys: ['Alt', 'B'] },
+      { label: 'Panneau latéral', keys: ['Alt', 'B'] },
     ],
   },
   {
@@ -101,7 +101,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     title: 'Grille',
     shortcuts: [
       { label: 'Jour suivant', keys: ['PgDn'] },
-      { label: 'Jour precedent', keys: ['PgUp'] },
+      { label: 'Jour précédent', keys: ['PgUp'] },
       { label: 'Zoom +', keys: ['Ctrl', '+'] },
       { label: 'Zoom -', keys: ['Ctrl', '-'] },
     ],
@@ -182,10 +182,10 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       commands.push({ id: 'go-today', label: "Aller a aujourd'hui", category: 'Navigation', shortcut: 'Home', keywords: 'today aujourdhui scroll', icon: 'calendar', action: onJumpToToday });
     }
     if (onJumpToDeparture) {
-      commands.push({ id: 'go-departure', label: 'Aller au depart', category: 'Navigation', shortcut: 'Alt+D', keywords: 'departure depart deadline echeance', icon: 'truck', action: onJumpToDeparture });
+      commands.push({ id: 'go-departure', label: 'Aller au départ', category: 'Navigation', shortcut: 'Alt+D', keywords: 'departure depart deadline echeance', icon: 'truck', action: onJumpToDeparture });
     }
     if (onPrevJob) {
-      commands.push({ id: 'prev-job', label: 'Job precedent', category: 'Navigation', shortcut: 'Alt+\u2191', keywords: 'navigate precedent haut', icon: 'arrow-up', action: onPrevJob });
+      commands.push({ id: 'prev-job', label: 'Job précédent', category: 'Navigation', shortcut: 'Alt+\u2191', keywords: 'navigate precedent haut', icon: 'arrow-up', action: onPrevJob });
     }
     if (onNextJob) {
       commands.push({ id: 'next-job', label: 'Job suivant', category: 'Navigation', shortcut: 'Alt+\u2193', keywords: 'navigate suivant bas', icon: 'arrow-down', action: onNextJob });

@@ -47,6 +47,8 @@ html {
   --color-flux-text-secondary: rgb(209 209 209);
   --color-flux-text-tertiary:  rgb(161 161 161);
   --color-flux-text-muted:     rgb(128 128 128);
+
+  --flux-frozen-shadow: rgba(0,0,0,0.3);
 }
 
 /* ── Flux table global td rules (mockup2 spec) ── */
@@ -239,4 +241,197 @@ body.pick-mode-active {
 
 body.pick-mode-active * {
   cursor: grabbing !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Light mode — CSS variable overrides (t3.chat-inspired warm theme)
+   All existing Tailwind classes auto-remap via --color-* properties.
+   ══════════════════════════════════════════════════════════ */
+
+html.light {
+  /* ── Zinc palette inversion ──
+     Anchored to t3.chat default-light #ecddf0 (warm mauve).
+     NO whites — everything has the pink/mauve tint. */
+  --color-zinc-950: #ecddf0;   /* base bg — the t3.chat signature mauve */
+  --color-zinc-900: #e3d2e8;   /* surface — slightly deeper */
+  --color-zinc-800: #d8c5de;   /* elevated / hover bg */
+  --color-zinc-700: #c9b3d0;   /* borders — a touch darker */
+  --color-zinc-600: #9a88a8;   /* muted UI elements */
+  --color-zinc-500: #7a6888;   /* secondary text — darker */
+  --color-zinc-400: #5c4568;   /* tertiary text — darker */
+  --color-zinc-300: #412c52;   /* body text — darker */
+  --color-zinc-200: #2e1a3e;   /* strong text */
+  --color-zinc-100: #1e0e2a;   /* primary text — deep purple-black */
+
+  /* ── Flux palette ── */
+  --color-flux-base:           #ecddf0;
+  --color-flux-surface:        #e3d2e8;
+  --color-flux-elevated:       #dac8e0;
+  --color-flux-hover:          #d0bdd7;
+  --color-flux-active:         #c7b2ce;
+  --color-flux-border:         #c9b3d0;
+  --color-flux-border-light:   #baa5c4;
+  --color-flux-text-primary:   #1e0e2a;
+  --color-flux-text-secondary: #412c52;
+  --color-flux-text-tertiary:  #5c4568;
+  --color-flux-text-muted:     #7a6888;
+
+  /* ── Tooltip overrides — mauve surface, no white ── */
+  --tt-bg: #e3d2e8;
+  --tt-border: 1px solid #c9b3d0;
+  --tt-text: #1e0e2a;
+  --tt-secondary: #412c52;
+  --tt-muted: #7a6888;
+  --tt-shadow: 0 4px 12px rgba(30, 14, 42, 0.15);
+
+  --flux-frozen-shadow: rgba(30,14,42,0.06);
+
+  /* ── Accent color adjustments for warm mauve bg ── */
+  --color-blue-300: #6366f1;
+  --color-blue-400: #818cf8;
+  --color-green-300: #22c55e;
+  --color-amber-300: #f59e0b;
+  --color-red-300: #ef4444;
+}
+
+/* ── Light mode: white-opacity overlays → dark-opacity overlays ──
+   bg-white/5, bg-white/10, bg-white/15, bg-white/20 are used for
+   subtle overlays in dark mode. In light mode, swap to dark overlays. */
+html.light .bg-white\/5  { background-color: rgba(30, 14, 42, 0.05) !important; }
+html.light .bg-white\/10 { background-color: rgba(30, 14, 42, 0.08) !important; }
+html.light .bg-white\/15 { background-color: rgba(30, 14, 42, 0.11) !important; }
+html.light .bg-white\/20 { background-color: rgba(30, 14, 42, 0.14) !important; }
+
+html.light .border-white\/5  { border-color: rgba(30, 14, 42, 0.10) !important; }
+html.light .border-white\/10 { border-color: rgba(30, 14, 42, 0.14) !important; }
+html.light .border-white\/20 { border-color: rgba(30, 14, 42, 0.18) !important; }
+html.light .border-white\/30 { border-color: rgba(30, 14, 42, 0.22) !important; }
+
+/* hover variants */
+html.light .hover\:bg-white\/10:hover { background-color: rgba(30, 14, 42, 0.10) !important; }
+html.light .hover\:bg-white\/15:hover { background-color: rgba(30, 14, 42, 0.13) !important; }
+html.light .hover\:bg-white\/20:hover { background-color: rgba(30, 14, 42, 0.16) !important; }
+html.light .hover\:text-white:hover   { color: #1e0e2a !important; }
+
+/* focus ring overlay */
+html.light .focus\:ring-white\/20:focus  { --tw-ring-color: rgba(30, 14, 42, 0.18) !important; }
+html.light .focus-visible\:ring-white\/30:focus-visible { --tw-ring-color: rgba(30, 14, 42, 0.24) !important; }
+html.light .focus\:ring-offset-zinc-900:focus { --tw-ring-offset-color: #e3d2e8 !important; }
+
+/* Light mode scrollbar — mauve tinted */
+html.light .scrollbar-visible::-webkit-scrollbar-thumb { background: rgb(175 155 185); border-radius: 3px; }
+html.light .scrollbar-visible::-webkit-scrollbar-thumb:hover { background: rgb(148 128 160); }
+html.light .scrollbar-visible { scrollbar-color: rgb(175 155 185) transparent; }
+
+/* Light mode ST status colors */
+html.light .st-label    { color: #6b5878; }
+html.light .st-pending  { color: #887898; }
+html.light .st-progress { color: #d97706; }
+html.light .st-done     { color: #16a34a; }
+
+/* Light mode stripes overlay — dark purple hatching */
+html.light .bg-stripes-dark {
+  background-image: url('/stripes-light.svg');
+  opacity: 1;
+}
+
+/* ── Flux page light mode fixes ── */
+
+/* Prerequisite listbox dropdown — mauve surface, soft shadow */
+html.light [data-testid="flux-prereq-dropdown"] {
+  background-color: var(--color-flux-surface) !important;
+  border-color: var(--color-flux-border) !important;
+  box-shadow: 0 12px 36px rgba(30,14,42,0.12), 0 2px 6px rgba(30,14,42,0.08) !important;
+}
+
+/* Prerequisite dropdown option text — legible on mauve */
+html.light [data-testid="flux-prereq-option"] {
+  color: var(--color-flux-text-primary) !important;
+}
+
+/* Delete confirm dialog backdrop — lighter overlay */
+html.light [data-testid="flux-delete-dialog-backdrop"] {
+  background-color: rgba(30,14,42,0.25) !important;
+}
+
+/* Prerequisite badge colors — boosted for light bg contrast */
+html.light [data-testid="flux-prereq-badge"] [data-color="green"] {
+  background-color: rgba(22,163,74,0.12);
+  color: #15803d;
+  border-color: rgba(22,163,74,0.30);
+}
+html.light [data-testid="flux-prereq-badge"] [data-color="yellow"] {
+  background-color: rgba(202,138,4,0.12);
+  color: #a16207;
+  border-color: rgba(202,138,4,0.30);
+}
+html.light [data-testid="flux-prereq-badge"] [data-color="red"] {
+  background-color: rgba(220,38,38,0.12);
+  color: #dc2626;
+  border-color: rgba(220,38,38,0.30);
+}
+html.light [data-testid="flux-prereq-badge"] [data-color="gray"] {
+  background-color: rgba(30,14,42,0.06);
+  color: #5c4568;
+  border-color: rgba(30,14,42,0.15);
+}
+
+/* All modal/dialog backdrops — lighter on mauve */
+html.light [style*="rgba(0,0,0,0.5)"] { background-color: rgba(30,14,42,0.20) !important; }
+html.light [style*="rgba(0,0,0,0.4)"] { background-color: rgba(30,14,42,0.15) !important; }
+
+/* Command palette dropdown shadow */
+html.light .shadow-\[0_12px_40px_rgba\(0\,0\,0\,0\.6\)\] {
+  box-shadow: 0 12px 40px rgba(30,14,42,0.12) !important;
+}
+
+/* Flux tab bar — active tab text should be dark, not white */
+html.light [data-testid="flux-tab-bar"] .text-white { color: var(--color-flux-text-primary) !important; }
+
+/* Station indicators — boost opacity for light bg visibility */
+html.light [data-testid="flux-station-indicator"][data-state="done"] circle { fill-opacity: 0.9 !important; }
+html.light [data-testid="flux-station-indicator"][data-state="in-progress"] circle[stroke-opacity],
+html.light [data-testid="flux-station-indicator"][data-state="late"] circle[stroke-opacity] { stroke-opacity: 0.3 !important; }
+html.light [data-testid="flux-station-indicator"][data-state="in-progress"] circle[fill-opacity],
+html.light [data-testid="flux-station-indicator"][data-state="late"] circle[fill-opacity] { fill-opacity: 0.9 !important; }
+
+/* shadow-xl / shadow-lg — soften for light mode */
+html.light .shadow-xl { box-shadow: 0 8px 24px rgba(30,14,42,0.10) !important; }
+html.light .shadow-lg { box-shadow: 0 4px 16px rgba(30,14,42,0.08) !important; }
+
+/* ── Job Details TaskTile light mode — boosted contrast ── */
+
+/* Unplaced (blue fill) */
+html.light .bg-\[rgba\(59\,130\,246\,0\.12\)\] { background-color: rgba(59,130,246,0.18) !important; }
+/* Default scheduled (outline) */
+html.light .outline-\[rgba\(59\,130\,246\,0\.25\)\] { outline-color: rgba(79,70,229,0.40) !important; }
+/* Completed (green) */
+html.light .bg-\[rgba\(34\,197\,94\,0\.09\)\] { background-color: rgba(22,163,74,0.30) !important; }
+/* Late (red) */
+html.light .bg-\[rgba\(239\,68\,68\,0\.09\)\] { background-color: rgba(220,38,38,0.16) !important; }
+/* Conflict (amber) */
+html.light .bg-\[rgba\(245\,158\,11\,0\.09\)\] { background-color: rgba(202,138,4,0.16) !important; }
+
+/* Tile name text — use darker, saturated versions for light bg */
+html.light .text-blue-300   { color: #4338ca !important; }  /* indigo-700 */
+html.light .text-blue-400   { color: #4f46e5 !important; }  /* indigo-600 */
+html.light .text-green-300  { color: #052e16 !important; }  /* darker than green-900 */
+html.light .text-amber-300  { color: #a16207 !important; }  /* amber-700 */
+html.light .text-amber-400  { color: #92400e !important; }  /* amber-800 */
+html.light .text-amber-500  { color: #78350f !important; }  /* amber-900 */
+html.light .text-red-300    { color: #b91c1c !important; }  /* red-700 */
+html.light .text-red-400    { color: #991b1b !important; }  /* red-800 */
+html.light .text-red-500    { color: #7f1d1d !important; }  /* red-900 */
+html.light .text-emerald-500 { color: #065f46 !important; } /* emerald-800 */
+
+/* Dry time label — dark amber on mauve */
+html.light [data-testid="dry-time-label"] { color: #92400e !important; }
+html.light [data-testid="dry-time-label"] .h-px { background-color: rgba(146,64,14,0.35) !important; }
+
+/* Completed tile opacity — don't fade as much on light bg */
+html.light .opacity-50 { opacity: 0.75 !important; }
+
+/* Active placement halo — purple instead of white */
+html.light [data-testid^="task-tile-"][style*="white"] {
+  box-shadow: 0 0 0 2px rgb(147,51,234), 0 0 16px rgba(147,51,234,0.5) !important;
 }

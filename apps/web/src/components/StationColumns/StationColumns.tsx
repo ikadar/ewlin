@@ -58,7 +58,7 @@ export function StationColumns({
 
   return (
     <div
-      className="flex gap-3 px-3 bg-[#050505] relative"
+      className="flex gap-3 px-3 bg-zinc-950 relative"
       style={{ height: `${totalHeight}px` }}
       data-testid="station-columns-container"
     >

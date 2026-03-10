@@ -52,7 +52,7 @@ export const FluxStationIndicator = memo(function FluxStationIndicator({
         data-state={state}
       >
         <title>{tooltipText}</title>
-        <circle cx="12" cy="12" r="3.5" fill={color} fillOpacity="0.25" />
+        <circle cx="12" cy="12" r="5" fill={color} stroke="var(--color-flux-elevated)" strokeWidth="1.5" />
       </svg>
     );
   }

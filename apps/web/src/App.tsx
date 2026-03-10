@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
+import { useTheme } from './contexts/ThemeContext';
 import { ZOOM_LEVELS } from './utils/zoom';
 import { Save } from 'lucide-react';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -343,6 +344,7 @@ function AppContent() {
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
+  const { theme } = useTheme();
 
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
@@ -2311,7 +2313,7 @@ function AppContent() {
 
       {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
       {selectedJobId && (
-        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: 0 0 0 2px rgba(255,255,255,0.7); }`}</style>
+        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: 0 0 0 2px ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; }`}</style>
       )}
 
       <ShortcutFooter mode={footerMode} />

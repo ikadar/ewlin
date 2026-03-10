@@ -123,7 +123,7 @@ export function JobDetailsPanel({
     : undefined;
 
   return (
-    <div className="w-80 shrink-0 bg-[#050505] border-r border-white/5 flex flex-col" data-testid="job-details-panel">
+    <div className="w-80 shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col" data-testid="job-details-panel">
       {/* Compact info header */}
       <div className="px-3 pt-3 pb-3 border-b border-white/5 space-y-1">
         {/* Line 1: reference - client + close button */}

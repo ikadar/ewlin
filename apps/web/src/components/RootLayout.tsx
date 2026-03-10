@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar/Sidebar';
 import { CommandPalette } from './CommandPalette/CommandPalette';
 import { CommandCenterProvider, useCommandCenter } from './CommandPalette/CommandCenterContext';
 import { useCommands } from './CommandPalette/useCommands';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
 import type { CompactHorizon } from '../utils';
 
@@ -128,8 +129,10 @@ function RootLayoutInner() {
  */
 export function RootLayout() {
   return (
-    <CommandCenterProvider>
-      <RootLayoutInner />
-    </CommandCenterProvider>
+    <ThemeProvider>
+      <CommandCenterProvider>
+        <RootLayoutInner />
+      </CommandCenterProvider>
+    </ThemeProvider>
   );
 }

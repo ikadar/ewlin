@@ -1,6 +1,7 @@
-import { CalendarDays, TowerControl, Settings, User } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * Sidebar navigation component.
@@ -11,6 +12,7 @@ import { SidebarButton } from './SidebarButton';
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
   const isSettings = location.pathname.startsWith('/settings');
   const isFlux = location.pathname.startsWith('/flux');
   const isScheduler = !isSettings && !isFlux;
@@ -55,6 +57,12 @@ export function Sidebar() {
             label="User"
             isDisabled
             testId="sidebar-user-button"
+          />
+          <SidebarButton
+            icon={theme === 'dark' ? Sun : Moon}
+            label={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            onClick={toggleTheme}
+            testId="sidebar-theme-toggle"
           />
         </div>
       </div>

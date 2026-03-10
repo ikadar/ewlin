@@ -235,7 +235,7 @@ export function CommandPalette({ isOpen, onClose, commands, jobs = [], onSelectJ
             >
               {showNoResults ? (
                 <div className="px-4 py-6 text-center text-zinc-500 text-sm">
-                  Aucune commande trouvee
+                  Aucune commande trouvée
                 </div>
               ) : (
                 <>

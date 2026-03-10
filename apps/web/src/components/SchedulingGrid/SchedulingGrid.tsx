@@ -467,7 +467,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           </div>
 
           {/* Station columns area */}
-          <div className={`flex gap-3 px-3 bg-[#050505] relative ${isQuickPlacementMode ? 'ring-2 ring-inset ring-emerald-500/60' : ''}`}>
+          <div className={`flex gap-3 px-3 bg-zinc-950 relative ${isQuickPlacementMode ? 'ring-2 ring-inset ring-emerald-500/60' : ''}`}>
             {/* Now line spanning all station columns */}
             <div
               className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
