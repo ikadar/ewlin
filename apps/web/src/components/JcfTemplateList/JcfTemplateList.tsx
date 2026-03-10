@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Trash2, Pencil, Play } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsUpDown, Trash2, Pencil, Play } from 'lucide-react';
 import type { JcfTemplate } from '@flux/types';
 
 export interface JcfTemplateListProps {
@@ -68,11 +68,15 @@ function SortIcon({
   sortColumn: SortColumn;
   sortDirection: SortDirection;
 }) {
-  if (sortColumn !== column) return null;
-  return sortDirection === 'asc' ? (
-    <ChevronUp size={14} className="inline ml-[3px]" aria-hidden="true" />
-  ) : (
-    <ChevronDown size={14} className="inline ml-[3px]" aria-hidden="true" />
+  if (sortColumn === column) {
+    return sortDirection === 'asc' ? (
+      <ChevronUp size={14} className="inline ml-[3px] text-blue-400" aria-hidden="true" />
+    ) : (
+      <ChevronDown size={14} className="inline ml-[3px] text-blue-400" aria-hidden="true" />
+    );
+  }
+  return (
+    <ChevronsUpDown size={14} className="inline ml-[3px] opacity-0 group-hover/th:opacity-100 text-flux-text-tertiary transition-opacity" aria-hidden="true" />
   );
 }
 
@@ -133,7 +137,7 @@ export function JcfTemplateList({
   if (templates.length === 0) {
     return (
       <div
-        className="text-center text-zinc-500 py-[48px]"
+        className="text-center text-flux-text-tertiary py-[48px]"
         data-testid="template-list-empty"
       >
         <p>Aucun template trouvé</p>
@@ -146,12 +150,13 @@ export function JcfTemplateList({
 
   // Header styles
   const thClass =
-    'pb-[10px] font-medium cursor-pointer hover:text-zinc-200 transition-colors text-left';
+    'py-3 font-medium cursor-pointer hover:text-flux-text-primary transition-colors text-left group/th';
 
   return (
+    <div className="bg-flux-elevated rounded-lg border border-flux-border overflow-hidden">
     <table className="w-full" data-testid="template-list-table">
       <caption className="sr-only">Liste des templates</caption>
-      <thead className="text-zinc-400 text-sm border-b border-zinc-800">
+      <thead className="bg-flux-hover text-flux-text-secondary text-sm border-b border-flux-border">
         <tr>
           <th
             className={`${thClass} pl-[13px]`}
@@ -193,7 +198,7 @@ export function JcfTemplateList({
             Modifié
             <SortIcon column="updatedAt" sortColumn={sortColumn} sortDirection={sortDirection} />
           </th>
-          <th className="pb-[10px] pr-[13px]">
+          <th className="py-3 pr-[13px]">
             <span className="sr-only">Actions</span>
           </th>
         </tr>
@@ -202,31 +207,31 @@ export function JcfTemplateList({
         {sortedTemplates.map((template) => (
           <tr
             key={template.id}
-            className="border-b border-zinc-800/50 hover:bg-zinc-800/50 transition-colors"
+            className="border-b border-flux-border group hover:bg-flux-hover transition-colors"
             data-testid={`template-row-${template.id}`}
           >
-            <td className="py-[10px] pl-[13px] text-zinc-100 font-medium">
+            <td className="py-[10px] pl-[13px] text-flux-text-primary font-medium">
               {template.name}
             </td>
-            <td className="py-[10px] px-[13px] text-zinc-300">
+            <td className="py-[10px] px-[13px] text-flux-text-secondary">
               {template.clientName || (
-                <span className="text-zinc-500 italic">Universel</span>
+                <span className="text-flux-text-tertiary italic">Universel</span>
               )}
             </td>
-            <td className="py-[10px] px-[13px] text-zinc-400">
-              {template.category || <span className="text-zinc-600">—</span>}
+            <td className="py-[10px] px-[13px] text-flux-text-secondary">
+              {template.category || <span className="text-flux-text-muted">—</span>}
             </td>
-            <td className="py-[10px] px-[13px] text-zinc-400 text-right tabular-nums">
+            <td className="py-[10px] px-[13px] text-flux-text-secondary text-right tabular-nums">
               {template.elements.length}
             </td>
-            <td className="py-[10px] px-[13px] text-zinc-400">
+            <td className="py-[10px] px-[13px] text-flux-text-secondary">
               {formatRelativeDate(template.updatedAt)}
             </td>
             <td className="py-[10px] pr-[13px] text-right">
               <div className="flex items-center justify-end gap-[3px]">
                 {onDeleteClick && (
                 <button
-                  className="p-[5px] text-zinc-500 hover:text-red-400 rounded transition-colors"
+                  className="p-[5px] text-flux-text-tertiary hover:text-red-400 rounded transition-colors"
                   aria-label="Supprimer le template"
                   title="Supprimer"
                   onClick={() => onDeleteClick(template)}
@@ -237,7 +242,7 @@ export function JcfTemplateList({
                 )}
                 {onEditClick && (
                 <button
-                  className="p-[5px] text-zinc-500 hover:text-blue-400 rounded transition-colors"
+                  className="p-[5px] text-flux-text-tertiary hover:text-blue-400 rounded transition-colors"
                   aria-label="Modifier les propriétés"
                   title="Modifier"
                   onClick={() => onEditClick(template)}
@@ -248,7 +253,7 @@ export function JcfTemplateList({
                 )}
                 {onUseClick && (
                 <button
-                  className="p-[5px] text-zinc-500 hover:text-emerald-400 rounded transition-colors"
+                  className="p-[5px] text-flux-text-tertiary hover:text-emerald-400 rounded transition-colors"
                   aria-label="Utiliser ce template"
                   title="Utiliser"
                   onClick={() => onUseClick(template)}
@@ -263,5 +268,6 @@ export function JcfTemplateList({
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

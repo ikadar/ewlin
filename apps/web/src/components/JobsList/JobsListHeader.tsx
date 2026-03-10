@@ -22,7 +22,7 @@ export function JobsListHeader({
       {/* Add Job button */}
       <button
         type="button"
-        className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="shrink-0 w-9 self-stretch flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={onAddJob}
         disabled={!onAddJob}
         aria-label="Ajouter un travail"

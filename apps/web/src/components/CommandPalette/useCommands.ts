@@ -4,7 +4,7 @@ import type { CompactHorizon } from '../../utils';
 export interface Command {
   id: string;
   label: string;
-  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Compaction' | 'Systeme';
+  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Compaction';
   shortcut?: string;
   keywords?: string;
   icon?: string;
@@ -24,7 +24,6 @@ export interface UseCommandsOptions {
   onNavigateFlux: () => void;
   onNewJob: () => void;
   onSearchJobs: () => void;
-  onShowAllShortcuts: () => void;
   onCompactTimeline: (horizon: CompactHorizon) => void;
 
   // Scheduler-specific (optional — omitted when called from non-scheduler pages)
@@ -133,7 +132,6 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     title: 'Systeme',
     shortcuts: [
       { label: 'Command Center', keys: ['Alt', 'K'] },
-      { label: 'Tous les raccourcis', keys: ['?'] },
     ],
   },
 ];
@@ -146,7 +144,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onNavigateFlux,
     onNewJob,
     onSearchJobs,
-    onShowAllShortcuts,
     onCompactTimeline,
     onJumpToToday,
     onJumpToDeparture,
@@ -178,8 +175,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       { id: 'compact-48h', label: 'Compacter 48h', category: 'Compaction', shortcut: 'Alt+C 4', keywords: 'compact compacter timeline global 48h', action: () => onCompactTimeline(48) },
       { id: 'compact-72h', label: 'Compacter 72h', category: 'Compaction', shortcut: 'Alt+C 5', keywords: 'compact compacter timeline global 72h', action: () => onCompactTimeline(72) },
 
-      // Systeme (shared)
-      { id: 'show-shortcuts', label: 'Afficher tous les raccourcis', category: 'Systeme', shortcut: '?', keywords: 'aide help raccourcis clavier shortcuts', icon: 'keyboard', action: onShowAllShortcuts },
     ];
 
     // Scheduler-specific: Navigation
@@ -227,5 +222,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onShowAllShortcuts, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

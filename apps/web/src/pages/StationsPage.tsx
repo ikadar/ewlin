@@ -56,7 +56,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLES[status] ?? 'text-zinc-400 bg-zinc-400/10'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLES[status] ?? 'text-flux-text-secondary bg-flux-text-secondary/10'}`}>
       {STATUS_LABELS[status] ?? status}
     </span>
   );
@@ -171,15 +171,15 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-zinc-100 font-medium mb-4">
+      <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+        <h2 className="text-flux-text-primary font-medium mb-4">
           {initial ? 'Modifier la station' : 'Nouvelle station'}
         </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Row 1: Name */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">
+            <label className="block text-sm text-flux-text-secondary mb-1">
               Nom <span className="text-red-400">*</span>
             </label>
             <input
@@ -188,7 +188,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
+              className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
               placeholder="Ex : Komori G40"
             />
           </div>
@@ -196,11 +196,11 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
           {/* Row 2: Status + Capacity + DisplayOrder */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">Statut</label>
+              <label className="block text-sm text-flux-text-secondary mb-1">Statut</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 focus:outline-none focus:border-zinc-400"
+                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -208,22 +208,22 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               </select>
             </div>
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">Capacité</label>
+              <label className="block text-sm text-flux-text-secondary mb-1">Capacité</label>
               <input
                 type="number"
                 min={1}
                 value={capacity}
                 onChange={(e) => setCapacity(parseInt(e.target.value, 10) || 1)}
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 focus:outline-none focus:border-zinc-400"
+                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
               />
             </div>
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">Ordre d'affichage</label>
+              <label className="block text-sm text-flux-text-secondary mb-1">Ordre d'affichage</label>
               <input
                 type="number"
                 value={displayOrder}
                 onChange={(e) => setDisplayOrder(parseInt(e.target.value, 10) || 0)}
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 focus:outline-none focus:border-zinc-400"
+                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
               />
             </div>
           </div>
@@ -231,11 +231,11 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
           {/* Row 3: Category + Group */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">Catégorie</label>
+              <label className="block text-sm text-flux-text-secondary mb-1">Catégorie</label>
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 focus:outline-none focus:border-zinc-400"
+                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -243,11 +243,11 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               </select>
             </div>
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">Groupe</label>
+              <label className="block text-sm text-flux-text-secondary mb-1">Groupe</label>
               <select
                 value={groupId}
                 onChange={(e) => setGroupId(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 focus:outline-none focus:border-zinc-400"
+                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
               >
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>{g.name}</option>
@@ -258,7 +258,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
 
           {/* Row 4: Operating Schedule JSON */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Planning d'exploitation (JSON)</label>
+            <label className="block text-sm text-flux-text-secondary mb-1">Planning d'exploitation (JSON)</label>
             <textarea
               rows={10}
               value={scheduleJson}
@@ -267,7 +267,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
                 setScheduleError(null);
               }}
               onBlur={() => validateScheduleJson(scheduleJson)}
-              className={`w-full px-3 py-2 bg-zinc-900 border rounded text-zinc-100 placeholder-zinc-500 focus:outline-none font-mono text-xs resize-y ${scheduleError ? 'border-red-500 focus:border-red-400' : 'border-zinc-600 focus:border-zinc-400'}`}
+              className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${scheduleError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
               placeholder="{}"
               spellCheck={false}
             />
@@ -278,7 +278,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
 
           {/* Row 5: Exceptions JSON */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Exceptions (JSON)</label>
+            <label className="block text-sm text-flux-text-secondary mb-1">Exceptions (JSON)</label>
             <textarea
               rows={5}
               value={exceptionsJson}
@@ -287,7 +287,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
                 setExceptionsError(null);
               }}
               onBlur={() => validateExceptionsJson(exceptionsJson)}
-              className={`w-full px-3 py-2 bg-zinc-900 border rounded text-zinc-100 placeholder-zinc-500 focus:outline-none font-mono text-xs resize-y ${exceptionsError ? 'border-red-500 focus:border-red-400' : 'border-zinc-600 focus:border-zinc-400'}`}
+              className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${exceptionsError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
               placeholder="[]"
               spellCheck={false}
             />
@@ -302,14 +302,14 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               type="button"
               onClick={onCancel}
               disabled={isSaving}
-              className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 rounded transition-colors"
+              className="px-3 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover disabled:opacity-50 rounded transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isSaving || !canSave}
-              className="px-3 py-1.5 text-sm font-medium text-zinc-100 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+              className="px-3 py-1.5 text-sm font-medium text-flux-text-primary bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
             >
               {isSaving ? 'Enregistrement...' : 'Enregistrer'}
             </button>
@@ -423,23 +423,23 @@ export function StationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 flex flex-col">
+    <div className="min-h-screen bg-flux-base flex flex-col">
       {/* Header */}
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-flux-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100 transition-colors"
+            className="flex items-center gap-2 text-flux-text-secondary hover:text-flux-text-primary transition-colors"
             title="Retour (Esc)"
           >
             <ArrowLeft size={20} />
             <span>Retour</span>
           </button>
-          <h1 className="text-xl font-semibold text-zinc-100">Stations</h1>
+          <h1 className="text-xl font-semibold text-flux-text-primary">Stations</h1>
         </div>
         <button
           onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-100 bg-blue-600 hover:bg-blue-500 rounded transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-flux-text-primary bg-blue-600 hover:bg-blue-500 rounded transition-colors"
         >
           <Plus size={16} />
           Nouvelle station
@@ -449,7 +449,7 @@ export function StationsPage() {
       {/* Content */}
       <main className="flex-1 p-6">
         {isLoading && (
-          <div className="text-center text-zinc-500 mt-20">Chargement...</div>
+          <div className="text-center text-flux-text-tertiary mt-20">Chargement...</div>
         )}
 
         {error && (
@@ -464,7 +464,7 @@ export function StationsPage() {
             <div className="mb-4 flex items-center gap-4">
               <div className="relative flex-1 max-w-md">
                 <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-flux-text-tertiary"
                   aria-hidden="true"
                 />
                 <input
@@ -474,10 +474,10 @@ export function StationsPage() {
                   aria-label="Rechercher une station"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                  className="w-full pl-10 pr-4 py-2 bg-flux-hover border border-flux-border-light rounded-lg text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-border-light"
                 />
               </div>
-              <span className="text-zinc-500 text-sm">
+              <span className="text-flux-text-tertiary text-sm">
                 {filteredStations.length} station
                 {filteredStations.length !== 1 ? 's' : ''}
                 {searchQuery && ` / ${stations.length}`}
@@ -485,24 +485,24 @@ export function StationsPage() {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto">
+            <div className="bg-flux-elevated rounded-lg border border-flux-border overflow-hidden">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-400">
-                    <th className="text-left px-4 py-3 font-medium">Nom</th>
-                    <th className="text-left px-4 py-3 font-medium">Statut</th>
-                    <th className="text-left px-4 py-3 font-medium">Catégorie</th>
-                    <th className="text-left px-4 py-3 font-medium">Groupe</th>
-                    <th className="text-left px-4 py-3 font-medium">Cap.</th>
-                    <th className="text-left px-4 py-3 font-medium">Ordre</th>
-                    <th className="text-left px-4 py-3 font-medium">Créé le</th>
-                    <th className="px-4 py-3" />
+                <thead className="bg-flux-hover">
+                  <tr className="bg-flux-hover border-b border-flux-border text-flux-text-secondary">
+                    <th className="text-left px-4 py-1.5 font-medium">Nom</th>
+                    <th className="text-left px-4 py-1.5 font-medium">Statut</th>
+                    <th className="text-left px-4 py-1.5 font-medium">Catégorie</th>
+                    <th className="text-left px-4 py-1.5 font-medium">Groupe</th>
+                    <th className="text-left px-4 py-1.5 font-medium">Cap.</th>
+                    <th className="text-left px-4 py-1.5 font-medium">Ordre</th>
+                    <th className="text-left px-4 py-1.5 font-medium">Créé le</th>
+                    <th className="px-4 py-1.5" />
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStations.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="text-center text-zinc-600 py-12">
+                      <td colSpan={8} className="text-center text-flux-text-muted py-12">
                         Aucune station trouvée
                       </td>
                     </tr>
@@ -510,32 +510,32 @@ export function StationsPage() {
                   {filteredStations.map((station) => (
                     <tr
                       key={station.id}
-                      className="border-b border-zinc-800/60 hover:bg-zinc-800/40 transition-colors"
+                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors"
                     >
-                      <td className="px-4 py-3 text-zinc-100 font-medium">{station.name}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-1.5 text-flux-text-primary font-medium">{station.name}</td>
+                      <td className="px-4 py-1.5">
                         <StatusBadge status={station.status} />
                       </td>
-                      <td className="px-4 py-3 text-zinc-400">
+                      <td className="px-4 py-1.5 text-flux-text-secondary">
                         {categoryById.get(station.categoryId) ?? (
-                          <span className="text-zinc-600 text-xs font-mono">{station.categoryId}</span>
+                          <span className="text-flux-text-muted text-xs font-mono">{station.categoryId}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-zinc-400">
+                      <td className="px-4 py-1.5 text-flux-text-secondary">
                         {groupById.get(station.groupId) ?? (
-                          <span className="text-zinc-600 text-xs font-mono">{station.groupId}</span>
+                          <span className="text-flux-text-muted text-xs font-mono">{station.groupId}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-zinc-400">{station.capacity}</td>
-                      <td className="px-4 py-3 text-zinc-400">{station.displayOrder}</td>
-                      <td className="px-4 py-3 text-zinc-500 text-xs">
+                      <td className="px-4 py-1.5 text-flux-text-secondary">{station.capacity}</td>
+                      <td className="px-4 py-1.5 text-flux-text-secondary">{station.displayOrder}</td>
+                      <td className="px-4 py-1.5 text-flux-text-tertiary text-xs">
                         {new Date(station.createdAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-1.5">
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => setEditingStation(station)}
-                            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-colors"
+                            className="p-1.5 text-flux-text-tertiary hover:text-flux-text-primary transition-colors"
                             title="Modifier"
                           >
                             <Pencil size={15} />
@@ -545,7 +545,7 @@ export function StationsPage() {
                               setDeleteError(null);
                               setDeletingStation(station);
                             }}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
+                            className="p-1.5 text-flux-text-tertiary hover:text-red-400 transition-colors"
                             title="Supprimer"
                           >
                             <Trash2 size={15} />
@@ -588,11 +588,11 @@ export function StationsPage() {
       {/* Delete confirmation */}
       {deletingStation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h2 className="text-zinc-100 font-medium mb-2">Supprimer la station</h2>
-            <p className="text-sm text-zinc-400 mb-4">
+          <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h2 className="text-flux-text-primary font-medium mb-2">Supprimer la station</h2>
+            <p className="text-sm text-flux-text-secondary mb-4">
               Supprimer{' '}
-              <span className="font-medium text-zinc-200">{deletingStation.name}</span> ?
+              <span className="font-medium text-flux-text-primary">{deletingStation.name}</span> ?
               Cette action est irréversible.
             </p>
             {deleteError && (
@@ -604,7 +604,7 @@ export function StationsPage() {
                   setDeletingStation(null);
                   setDeleteError(null);
                 }}
-                className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 bg-zinc-700 hover:bg-zinc-600 rounded transition-colors"
+                className="px-3 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded transition-colors"
               >
                 Annuler
               </button>

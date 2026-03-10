@@ -21,7 +21,6 @@ function RootLayoutInner() {
     onNavigateFlux: useCallback(() => navigate('/flux'), [navigate]),
     onNewJob: useCallback(() => navigate('/job/new'), [navigate]),
     onSearchJobs: useCallback(() => navigate('/flux'), [navigate]),
-    onShowAllShortcuts: useCallback(() => setIsOpen(true), [setIsOpen]),
     onCompactTimeline: useCallback((_h: CompactHorizon) => {
       // No-op at root level — compaction is page-specific and registered via context
     }, []),

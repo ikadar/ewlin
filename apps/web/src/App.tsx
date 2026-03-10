@@ -2140,9 +2140,6 @@ function AppContent() {
     onToggleSidebar: useCallback(() => {
       setIsSidebarVisible(prev => !prev);
     }, []),
-    onShowAllShortcuts: useCallback(() => {
-      setIsCommandPaletteOpen(true);
-    }, [setIsCommandPaletteOpen]),
     onCompactTimeline: handleCompactTimeline,
     onZoomIn: useCallback(() => {
       const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
