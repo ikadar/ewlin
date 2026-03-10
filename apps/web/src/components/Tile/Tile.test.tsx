@@ -240,18 +240,11 @@ describe('Tile', () => {
     expect(screen.queryByTestId('tile-incomplete-icon')).not.toBeInTheDocument();
   });
 
-  it('applies selection outline when selected', () => {
-    render(<Tile {...defaultProps} isSelected={true} />);
+  it('has data-job-id attribute for CSS selection highlighting', () => {
+    render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).toHaveClass('tile-selected-glow');
-  });
-
-  it('does not apply selection styling when not selected', () => {
-    render(<Tile {...defaultProps} isSelected={false} />);
-
-    const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).not.toHaveClass('tile-selected-glow');
+    expect(tile).toHaveAttribute('data-job-id', 'job-1');
   });
 
   it('calls onSelect with job id when clicked (non-selected tile)', () => {

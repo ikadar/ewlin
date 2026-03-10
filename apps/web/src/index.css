@@ -209,11 +209,7 @@ body {
 }
 
 
-/* Tile selection: white outline (no glow — clean for "select then act") */
-.tile-selected-glow {
-  outline: 2px solid rgba(255, 255, 255, 0.7);
-  outline-offset: 1px;
-}
+/* Tile selection ring is applied via dynamic <style> tag on [data-job-id] selector (box-shadow) */
 
 /* v0.3.56: Pick & Place visual feedback */
 

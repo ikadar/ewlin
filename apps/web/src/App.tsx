@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
 import { ZOOM_LEVELS } from './utils/zoom';
@@ -372,6 +372,9 @@ function AppContent() {
     const newUrl = jobId ? `/job/${jobId}` : '/';
     window.history.replaceState(null, '', newUrl);
   }, []);
+
+  // Deferred value for grid: tile isSelected logic can lag, visual highlight is handled by CSS selector
+  const deferredSelectedJobId = useDeferredValue(selectedJobId);
 
   // v0.3.54: Pick & Place state
   // v0.3.57: Added assignmentId for grid picks (reschedule)
@@ -2250,7 +2253,7 @@ function AppContent() {
           tasks={snapshot.tasks}
           elements={snapshot.elements}
           assignments={snapshot.assignments}
-          selectedJobId={selectedJobId}
+          selectedJobId={deferredSelectedJobId}
           startHour={START_HOUR}
           hoursToDisplay={DAY_COUNT * 24}
           onScroll={handleGridScroll}
@@ -2299,6 +2302,11 @@ function AppContent() {
           </div>
         </div>
       </div>
+
+      {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
+      {selectedJobId && (
+        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: 0 0 0 2px rgba(255,255,255,0.7); }`}</style>
+      )}
 
       <ShortcutFooter mode={footerMode} />
 

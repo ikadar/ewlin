@@ -163,8 +163,7 @@ export const Tile = memo(function Tile({
   // Determine if we have setup time to show
   const hasSetup = setupMinutes > 0;
 
-  // Selection effect: glow + outline via CSS class
-  const selectionGlowClass = isSelected ? 'tile-selected-glow' : '';
+  // Selection outline is handled by CSS selector on [data-job-id] (instant, no re-render needed)
 
   // During pick mode, disable pointer events on non-picked tiles
   const pickStyle = isPickingActive && !isPicked
@@ -193,7 +192,7 @@ export const Tile = memo(function Tile({
 
   return (
     <div
-      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} ${selectionGlowClass} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
@@ -205,6 +204,7 @@ export const Tile = memo(function Tile({
       onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      data-job-id={job.id}
       data-testid={`tile-${assignment.id}`}
       data-scheduled-start={assignment.scheduledStart}
       data-scheduled-end={assignment.scheduledEnd}

@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { TAB_IDS, TAB_LABELS, type TabId } from '../FluxTable/fluxFilters';
-import { KBD_CLASS } from '../ShortcutFooter/kbdStyles';
 
 interface FluxTabBarProps {
   activeTab: TabId;
@@ -21,7 +20,7 @@ export const FluxTabBar = memo(function FluxTabBar({
 }: FluxTabBarProps) {
   return (
     <div
-      className="flex items-end justify-between border-b border-flux-border bg-flux-elevated px-4"
+      className="flex items-end border-b border-flux-border bg-flux-elevated px-4"
       data-testid="flux-tab-bar"
     >
       {/* Tabs */}
@@ -54,29 +53,6 @@ export const FluxTabBar = memo(function FluxTabBar({
         })}
       </div>
 
-      {/* Keyboard hint bar */}
-      <div
-        className="flex items-center gap-5 shrink-0 pb-2"
-        aria-hidden="true"
-        data-testid="flux-keyboard-hints"
-      >
-        <span className="flex items-center gap-2">
-          <span className="flex items-center gap-1">
-            <kbd className={KBD_CLASS}>Alt</kbd>
-            <span className="text-zinc-500 text-xs font-mono">+</span>
-            <kbd className={KBD_CLASS}>←→</kbd>
-          </span>
-          <span className="text-zinc-500 text-[11px]">onglets</span>
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="flex items-center gap-1">
-            <kbd className={KBD_CLASS}>Alt</kbd>
-            <span className="text-zinc-500 text-xs font-mono">+</span>
-            <kbd className={KBD_CLASS}>F</kbd>
-          </span>
-          <span className="text-zinc-500 text-[11px]">rechercher</span>
-        </span>
-      </div>
     </div>
   );
 });
