@@ -58,8 +58,8 @@ export interface SchedulingGridProps {
   pixelsPerHour?: number;
   /** Callback when a tile is clicked (select job) */
   onSelectJob?: (jobId: string) => void;
-  /** Callback when a tile is double-clicked (recall) */
-  onRecallAssignment?: (assignmentId: string) => void;
+  /** Callback when clicking the grid background (deselect) */
+  onDeselect?: () => void;
   /** Callback when swap up is clicked */
   onSwapUp?: (assignmentId: string) => void;
   /** Callback when swap down is clicked */
@@ -160,7 +160,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       startDate,
       pixelsPerHour = PIXELS_PER_HOUR,
       onSelectJob,
-      onRecallAssignment,
+      onDeselect,
       onSwapUp,
       onSwapDown,
       onToggleComplete,
@@ -560,6 +560,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   category={category}
                   ghostPreviewLabel={isHoveredForQuickPlacement ? quickPlacementGhostLabel : undefined}
                   ghostPreviewHeight={isHoveredForQuickPlacement ? quickPlacementGhostHeight : undefined}
+                  onDeselect={onDeselect}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
@@ -636,7 +637,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         showSwapDown={showSwapDown}
                         similarityResults={similarityResults}
                         onSelect={onSelectJob}
-                        onRecall={onRecallAssignment}
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
                         onToggleComplete={onToggleComplete}

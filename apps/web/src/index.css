@@ -209,14 +209,8 @@ body {
 }
 
 
-/* Tile selection: pulsating glow + outline (playground-derived) */
-@keyframes tile-selection-glow {
-  0%, 100% { box-shadow: 0 0 8px 2px var(--glow-color); }
-  50% { box-shadow: 0 0 16px 4px var(--glow-color); }
-}
-
+/* Tile selection: white outline (no glow — clean for "select then act") */
 .tile-selected-glow {
-  animation: tile-selection-glow 2s ease-in-out infinite;
   outline: 2px solid rgba(255, 255, 255, 0.7);
   outline-offset: 1px;
 }
@@ -235,6 +229,11 @@ body {
 
 .animate-pulse-opacity {
   animation: pulse-opacity 1.5s ease-in-out infinite;
+}
+
+@keyframes banner-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 /* Global cursor during pick mode */

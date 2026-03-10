@@ -40,8 +40,8 @@ export type { DryingTimeIndicatorProps } from './DryingTimeIndicator';
 export { OutsourcingTimeIndicator } from './OutsourcingTimeIndicator';
 export type { OutsourcingTimeIndicatorProps } from './OutsourcingTimeIndicator';
 
-export { TopNavBar, ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from './TopNavBar';
-export type { TopNavBarProps } from './TopNavBar';
+export { ModeBanner } from './ModeBanner';
+export { ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from '../utils/zoom';
 
 export { JcfModal } from './JcfModal';
 export type { JcfModalProps } from './JcfModal';

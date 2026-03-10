@@ -1,6 +1,8 @@
-import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
+import { ZOOM_LEVELS } from './utils/zoom';
+import { Save } from 'lucide-react';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -149,13 +151,11 @@ function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
 function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (isAltLetter(e, 'q')) {
     e.preventDefault();
-    if (ctx.selectedJobId) {
-      const wasActive = ctx.isQuickPlacementMode;
-      ctx.setIsQuickPlacementMode((prev) => !prev);
-      ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-      if (wasActive) {
-        ctx.setSelectedJobId(null);
-      }
+    const wasActive = ctx.isQuickPlacementMode;
+    ctx.setIsQuickPlacementMode((prev) => !prev);
+    ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+    if (wasActive) {
+      ctx.setSelectedJobId(null);
     }
     return true;
   }
@@ -372,9 +372,6 @@ function AppContent() {
     const newUrl = jobId ? `/job/${jobId}` : '/';
     window.history.replaceState(null, '', newUrl);
   }, []);
-
-  // v0.3.46: Use deferred value for grid to keep sidebar responsive during selection
-  const deferredSelectedJobId = useDeferredValue(selectedJobId);
 
   // v0.3.54: Pick & Place state
   // v0.3.57: Added assignmentId for grid picks (reschedule)
@@ -1119,6 +1116,26 @@ function AppContent() {
         return;
       }
 
+      // Ctrl+Plus: zoom in
+      if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+        if (idx < ZOOM_LEVELS.length - 1) {
+          handleZoomChange(ZOOM_LEVELS[idx + 1].pixelsPerHour);
+        }
+        return;
+      }
+
+      // Ctrl+Minus: zoom out
+      if (e.ctrlKey && e.key === '-') {
+        e.preventDefault();
+        const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+        if (idx > 0) {
+          handleZoomChange(ZOOM_LEVELS[idx - 1].pixelsPerHour);
+        }
+        return;
+      }
+
       // Each handler returns true if it handled the event
       if (handleAltKey(e, ctx)) return;
       // v0.3.54: Handle ESC to cancel pick (priority over quick placement)
@@ -1175,7 +1192,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -1743,19 +1760,17 @@ function AppContent() {
     }
   }, [compactStation, showToast]);
 
-  // Toggle Quick Placement (for TopNavBar button)
+  // Toggle Quick Placement
   const handleToggleQuickPlacement = useCallback(() => {
-    if (selectedJobId) {
-      setIsQuickPlacementMode((prev) => {
-        if (prev) {
-          // Turning off: clear job selection to remove tile muting
-          setSelectedJobId(null);
-        }
-        return !prev;
-      });
-      setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-    }
-  }, [selectedJobId, setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
+    setIsQuickPlacementMode((prev) => {
+      if (prev) {
+        // Turning off: clear job selection to remove tile muting
+        setSelectedJobId(null);
+      }
+      return !prev;
+    });
+    setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+  }, [setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
 
   // v0.3.54: Handle pick from sidebar (unscheduled task)
   // v0.3.55: Added scroll to target column and save scroll position
@@ -2126,6 +2141,21 @@ function AppContent() {
       setIsCommandPaletteOpen(true);
     }, [setIsCommandPaletteOpen]),
     onCompactTimeline: handleCompactTimeline,
+    onZoomIn: useCallback(() => {
+      const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+      if (idx < ZOOM_LEVELS.length - 1) {
+        handleZoomChange(ZOOM_LEVELS[idx + 1].pixelsPerHour);
+      }
+    }, [pixelsPerHour, handleZoomChange]),
+    onZoomOut: useCallback(() => {
+      const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+      if (idx > 0) {
+        handleZoomChange(ZOOM_LEVELS[idx - 1].pixelsPerHour);
+      }
+    }, [pixelsPerHour, handleZoomChange]),
+    onOpenSaveLoad: useCallback(() => {
+      setIsSaveLoadOpen(true);
+    }, []),
   });
 
   // Register scheduler-specific commands into the global Command Center
@@ -2156,7 +2186,7 @@ function AppContent() {
     <>
       <div className="flex-1 flex overflow-hidden">
         {isSidebarVisible && (
-          <div className={isQuickPlacementMode ? 'opacity-60 pointer-events-none select-none' : ''}>
+          <div>
             <JobsList
               jobs={snapshot.jobs}
               tasks={snapshot.tasks}
@@ -2171,19 +2201,6 @@ function AppContent() {
           </div>
         )}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Navigation Bar - spans width from DateStrip onward */}
-          <TopNavBar
-            isQuickPlacementMode={isQuickPlacementMode}
-            onToggleQuickPlacement={handleToggleQuickPlacement}
-            canEnableQuickPlacement={selectedJobId !== null}
-            pixelsPerHour={pixelsPerHour}
-            onZoomChange={handleZoomChange}
-            onCompactTimeline={handleCompactTimeline}
-            isCompacting={isCompactingTimeline}
-            displayMode={displayMode}
-            onOpenSaveLoad={() => setIsSaveLoadOpen(true)}
-          />
-
           {/* Content area */}
           <div className="flex-1 flex overflow-hidden">
         <JobDetailsPanel
@@ -2210,6 +2227,10 @@ function AppContent() {
           onEditJob={handleEditJob}
           lateJobIds={lateJobIds}
         />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mode banner — shows active mode (quick placement / picking) */}
+          <ModeBanner mode={isPicking ? 'picking' : isQuickPlacementMode ? 'quickPlacement' : null} />
+          <div className="flex-1 flex overflow-hidden">
         <DateStrip
           startDate={gridStartDate}
           onDateClick={handleDateClick}
@@ -2229,16 +2250,16 @@ function AppContent() {
           tasks={snapshot.tasks}
           elements={snapshot.elements}
           assignments={snapshot.assignments}
-          selectedJobId={deferredSelectedJobId}
+          selectedJobId={selectedJobId}
           startHour={START_HOUR}
           hoursToDisplay={DAY_COUNT * 24}
           onScroll={handleGridScroll}
           startDate={gridStartDate}
           totalDays={DAY_COUNT}
           onSelectJob={setSelectedJobId}
+          onDeselect={() => setSelectedJobId(null)}
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
-          onRecallAssignment={handleRecallAssignment}
           onToggleComplete={handleToggleComplete}
           isQuickPlacementMode={isQuickPlacementMode}
           stationsWithAvailableTasks={stationsWithAvailableTasks}
@@ -2274,6 +2295,8 @@ function AppContent() {
           quickPlacementGhostHeight={quickPlacementTask ? ((quickPlacementTask.duration.setupMinutes + quickPlacementTask.duration.runMinutes) / 60) * pixelsPerHour : undefined}
         />
           </div>
+          </div>
+          </div>
         </div>
       </div>
 
@@ -2301,6 +2324,7 @@ function AppContent() {
           onToggleComplete={handleContextMenuToggleComplete}
           onSwapUp={handleContextMenuMoveUp}
           onSwapDown={handleContextMenuMoveDown}
+          onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
           onClose={handleContextMenuClose}
         />
       )}
@@ -2382,6 +2406,16 @@ function AppContent() {
 
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
+
+      {/* Save/Load FAB — stacked above Command Center FAB */}
+      <button
+        onClick={() => setIsSaveLoadOpen(true)}
+        className="fixed bottom-[88px] right-6 z-40 w-12 h-12 rounded-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 shadow-lg transition-all flex items-center justify-center"
+        aria-label="Sauvegardes"
+        data-testid="save-load-fab"
+      >
+        <Save size={20} />
+      </button>
 
       {/* Schedule save/load modal */}
       <ScheduleSaveLoadModal

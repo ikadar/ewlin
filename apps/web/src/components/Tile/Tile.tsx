@@ -5,7 +5,7 @@ import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { TileTooltip } from './TileTooltip';
-import { getStateColorClasses, getStateGlowColor } from './colorUtils';
+import { getStateColorClasses } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
@@ -22,8 +22,6 @@ export interface TileProps {
   top: number;
   /** Callback when tile is clicked (select job) */
   onSelect?: (jobId: string) => void;
-  /** Callback when tile is double-clicked (recall) */
-  onRecall?: (assignmentId: string) => void;
   /** Callback when swap up is clicked */
   onSwapUp?: (assignmentId: string) => void;
   /** Callback when swap down is clicked */
@@ -83,7 +81,6 @@ export const Tile = memo(function Tile({
   job,
   top,
   onSelect,
-  onRecall,
   onSwapUp,
   onSwapDown,
   showSwapUp = true,
@@ -128,25 +125,17 @@ export const Tile = memo(function Tile({
   // Completion state
   const isCompleted = assignment.isCompleted;
 
-  // Handle click - v0.3.57: Pick for reschedule or select job
+  // Handle click - "Select Then Act": click to select, click selected tile to pick
   const handleClick = () => {
-    // If picking is active, this tile might be the target for placement (handled by StationColumn)
-    // Don't start a new pick from a tile while picking is active
     if (isPickingActive) return;
 
-    // If not completed, pick for reschedule
-    if (!isCompleted && onPickFromGrid) {
+    if (isSelected && !isCompleted && onPickFromGrid) {
+      // Already-selected job's tile → pick for repositioning
       onPickFromGrid(task, job, assignment.id);
-      return;
+    } else {
+      // Select (or switch to) this job
+      onSelect?.(job.id);
     }
-
-    // Otherwise just select the job
-    onSelect?.(job.id);
-  };
-
-  // Handle double click (recall)
-  const handleDoubleClick = () => {
-    onRecall?.(assignment.id);
   };
 
   // Handle swap
@@ -185,8 +174,10 @@ export const Tile = memo(function Tile({
   // v0.4.32b: Blocked tiles show dashed border
   const borderStyleClass = isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
 
-  // v0.3.57: Cursor is pointer for pickable tiles (not completed)
-  const cursorClass = !isCompleted && onPickFromGrid ? 'cursor-pointer' : 'cursor-default';
+  // Cursor: grab for selected pickable tiles, pointer for all others
+  const cursorClass = isSelected && !isCompleted && onPickFromGrid
+    ? 'cursor-grab'
+    : 'cursor-pointer';
 
   // v0.3.57: Pulsating placeholder shown at original position when tile is picked
   if (isPicked) {
@@ -202,17 +193,15 @@ export const Tile = memo(function Tile({
 
   return (
     <div
-      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} ${selectionGlowClass} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow,outline] duration-150 ease-out`}
+      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} ${selectionGlowClass} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
         left: 0,
         right: 0,
-        ...(isSelected ? { '--glow-color': getStateGlowColor(tileState) } as React.CSSProperties : undefined),
         ...pickStyle,
       }}
       onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -346,7 +335,6 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
 function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
   return (
     prev.onSelect !== next.onSelect ||
-    prev.onRecall !== next.onRecall ||
     prev.onSwapUp !== next.onSwapUp ||
     prev.onSwapDown !== next.onSwapDown ||
     prev.onToggleComplete !== next.onToggleComplete ||

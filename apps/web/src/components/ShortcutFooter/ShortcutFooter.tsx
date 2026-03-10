@@ -24,12 +24,14 @@ const MODE_CONFIGS: Record<FooterMode, ModeConfig> = {
     shortcuts: [
       { keys: ['Home'], label: 'Today' },
       { keys: ['PgUp', 'PgDn'], label: 'Scroll' },
+      { keys: ['Ctrl', '+', '-'], label: 'Zoom' },
       { keys: ['Alt', 'A'], label: 'Display' },
       { keys: ['Alt', 'K'], label: 'Commands' },
     ],
   },
   jobSelected: {
     shortcuts: [
+      { keys: ['Click'], label: 'Pick tile' },
       { keys: ['Esc'], label: 'Close' },
       { keys: ['Alt', 'Q'], label: 'Place' },
       { keys: ['Alt', 'D'], label: 'Departure' },

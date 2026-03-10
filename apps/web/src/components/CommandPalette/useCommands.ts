@@ -38,6 +38,9 @@ export interface UseCommandsOptions {
   onEditJob?: () => void;
   onToggleDisplayMode?: () => void;
   onToggleSidebar?: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onOpenSaveLoad?: () => void;
 }
 
 const RECENT_KEY = 'flux-recent-commands';
@@ -153,6 +156,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onEditJob,
     onToggleDisplayMode,
     onToggleSidebar,
+    onZoomIn,
+    onZoomOut,
+    onOpenSaveLoad,
   } = options;
 
   return useMemo(() => {
@@ -206,7 +212,20 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       commands.push({ id: 'toggle-sidebar', label: 'Afficher/masquer le panneau lateral', category: 'Affichage', shortcut: 'Alt+B', keywords: 'sidebar panneau lateral masquer afficher', icon: 'panel-left', action: onToggleSidebar });
     }
 
+    // Scheduler-specific: Grille (zoom)
+    if (onZoomIn) {
+      commands.push({ id: 'zoom-in', label: 'Zoom +', category: 'Grille', shortcut: 'Ctrl++', keywords: 'zoom agrandir plus', icon: 'zoom-in', action: onZoomIn });
+    }
+    if (onZoomOut) {
+      commands.push({ id: 'zoom-out', label: 'Zoom -', category: 'Grille', shortcut: 'Ctrl+-', keywords: 'zoom reduire moins', icon: 'zoom-out', action: onZoomOut });
+    }
+
+    // Scheduler-specific: Actions (save/load)
+    if (onOpenSaveLoad) {
+      commands.push({ id: 'save-load', label: 'Sauvegardes', category: 'Actions', keywords: 'save load sauvegarder charger sauvegarde', icon: 'save', action: onOpenSaveLoad });
+    }
+
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onShowAllShortcuts, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onToggleDisplayMode, onToggleSidebar]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onShowAllShortcuts, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

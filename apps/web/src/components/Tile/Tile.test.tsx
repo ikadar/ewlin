@@ -240,12 +240,11 @@ describe('Tile', () => {
     expect(screen.queryByTestId('tile-incomplete-icon')).not.toBeInTheDocument();
   });
 
-  it('applies glow when selected', () => {
+  it('applies selection outline when selected', () => {
     render(<Tile {...defaultProps} isSelected={true} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
     expect(tile).toHaveClass('tile-selected-glow');
-    expect(tile.style.getPropertyValue('--glow-color')).toBe('rgba(59,130,246,0.4)');
   });
 
   it('does not apply selection styling when not selected', () => {
@@ -255,7 +254,7 @@ describe('Tile', () => {
     expect(tile).not.toHaveClass('tile-selected-glow');
   });
 
-  it('calls onSelect with job id when clicked', () => {
+  it('calls onSelect with job id when clicked (non-selected tile)', () => {
     const onSelect = vi.fn();
     render(<Tile {...defaultProps} onSelect={onSelect} />);
 
@@ -263,12 +262,25 @@ describe('Tile', () => {
     expect(onSelect).toHaveBeenCalledWith('job-1');
   });
 
-  it('calls onRecall with assignment id when double-clicked', () => {
-    const onRecall = vi.fn();
-    render(<Tile {...defaultProps} onRecall={onRecall} />);
+  it('calls onPickFromGrid when clicking an already-selected non-completed tile', () => {
+    const onPickFromGrid = vi.fn();
+    render(<Tile {...defaultProps} isSelected={true} onPickFromGrid={onPickFromGrid} />);
 
-    fireEvent.doubleClick(screen.getByTestId('tile-assignment-1'));
-    expect(onRecall).toHaveBeenCalledWith('assignment-1');
+    fireEvent.click(screen.getByTestId('tile-assignment-1'));
+    expect(onPickFromGrid).toHaveBeenCalledWith(mockTask, mockJob, 'assignment-1');
+  });
+
+  it('calls onSelect when clicking a selected but completed tile', () => {
+    const onSelect = vi.fn();
+    const onPickFromGrid = vi.fn();
+    const completedAssignment: TaskAssignment = { ...mockAssignment, isCompleted: true };
+    render(
+      <Tile {...defaultProps} assignment={completedAssignment} isSelected={true} onSelect={onSelect} onPickFromGrid={onPickFromGrid} />
+    );
+
+    fireEvent.click(screen.getByTestId('tile-assignment-1'));
+    expect(onSelect).toHaveBeenCalledWith('job-1');
+    expect(onPickFromGrid).not.toHaveBeenCalled();
   });
 
   it('shows swap buttons on hover (via group class)', () => {
@@ -443,7 +455,7 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).toHaveClass('transition-[filter,opacity,box-shadow,outline]');
+    expect(tile).toHaveClass('transition-[filter,opacity,box-shadow]');
     expect(tile).toHaveClass('duration-150');
     expect(tile).toHaveClass('ease-out');
   });

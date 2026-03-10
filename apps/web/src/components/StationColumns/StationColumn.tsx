@@ -74,6 +74,8 @@ export interface StationColumnProps {
   ghostPreviewLabel?: string;
   /** Ghost preview height in pixels for quick placement */
   ghostPreviewHeight?: number;
+  /** Callback when clicking the column background (deselect) */
+  onDeselect?: () => void;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -133,6 +135,7 @@ export const StationColumn = memo(function StationColumn({
   category,
   ghostPreviewLabel,
   ghostPreviewHeight,
+  onDeselect,
 }: StationColumnProps) {
   // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -257,10 +260,16 @@ export const StationColumn = memo(function StationColumn({
       return;
     }
     // Quick placement mode
-    if (!isQuickPlacementMode || !hasAvailableTask || !onQuickPlacementClick) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = e.clientY - rect.top;
-    onQuickPlacementClick(station.id, relativeY);
+    if (isQuickPlacementMode && hasAvailableTask && onQuickPlacementClick) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+      onQuickPlacementClick(station.id, relativeY);
+      return;
+    }
+    // Background click → deselect (only if click was directly on column, not on a tile)
+    if (e.target === e.currentTarget) {
+      onDeselect?.();
+    }
   };
 
   // Cursor style for quick placement mode
