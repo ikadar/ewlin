@@ -14,7 +14,9 @@ export function Sidebar() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const isSettings = location.pathname.startsWith('/settings');
-  const isFlux = location.pathname.startsWith('/flux');
+  const fromRoute = (location.state as { from?: string } | null)?.from;
+  const isJcfFromFlux = location.pathname === '/job/new' && fromRoute?.startsWith('/flux');
+  const isFlux = location.pathname.startsWith('/flux') || isJcfFromFlux;
   const isScheduler = !isSettings && !isFlux;
 
   return (

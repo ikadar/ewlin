@@ -425,6 +425,7 @@ function AppContent() {
   // v0.4.38: JCF modal state derived from URL
   // Modal opens when URL is /job/new
   const isJcfModalOpen = location.pathname === '/job/new';
+  const isJcfFromFlux = isJcfModalOpen && (location.state as { from?: string } | null)?.from?.startsWith('/flux');
   // Remember which job was selected before JCF opened, so we can restore on close
   const preJcfSelectedJobIdRef = useRef<string | null>(null);
   // v0.4.7: JCF form state (lifted from JcfJobHeader)
@@ -2195,6 +2196,7 @@ function AppContent() {
 
   return (
     <>
+      {!isJcfFromFlux && (
       <div className="flex-1 flex overflow-hidden">
         {isSidebarVisible && (
           <div>
@@ -2343,6 +2345,7 @@ function AppContent() {
           onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
           onClose={handleContextMenuClose}
         />
+      )}
       )}
 
       {/* v0.4.6: JCF Modal */}
