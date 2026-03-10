@@ -4,7 +4,7 @@ import type { CompactHorizon } from '../../utils';
 export interface Command {
   id: string;
   label: string;
-  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Compaction';
+  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Compaction' | 'Jobs';
   shortcut?: string;
   keywords?: string;
   icon?: string;

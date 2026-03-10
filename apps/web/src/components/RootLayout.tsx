@@ -10,7 +10,7 @@ import type { CompactHorizon } from '../utils';
 
 function RootLayoutInner() {
   const navigate = useNavigate();
-  const { isOpen, setIsOpen, pageCommands } = useCommandCenter();
+  const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
 
   const chordPendingRef = useRef<'compact' | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -115,6 +115,8 @@ function RootLayoutInner() {
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         commands={allCommands}
+        jobs={jobs}
+        onSelectJob={onSelectJob}
       />
     </div>
   );

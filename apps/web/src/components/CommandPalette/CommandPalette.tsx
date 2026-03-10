@@ -2,11 +2,14 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { SquareSlash } from 'lucide-react';
 import type { Command } from './useCommands';
 import { SHORTCUT_ZONES, addRecentCommand } from './useCommands';
+import type { JobSearchEntry } from './CommandCenterContext';
 
 export interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   commands: Command[];
+  jobs?: JobSearchEntry[];
+  onSelectJob?: ((jobId: string) => void) | null;
 }
 
 const KBD_CLASS =
@@ -56,7 +59,7 @@ function highlightMatch(text: string, query: string) {
   );
 }
 
-export function CommandPalette({ isOpen, onClose, commands }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, commands, jobs = [], onSelectJob }: CommandPaletteProps) {
   const [search, setSearch] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,27 +80,56 @@ export function CommandPalette({ isOpen, onClose, commands }: CommandPaletteProp
 
     const q = search.toLowerCase();
 
-    // Job ID shortcut: digits only → "Go to Job"
-    const isJobId = /^\d+$/.test(search.trim());
     const matched = commands.filter(c =>
       c.label.toLowerCase().includes(q) ||
       (c.keywords && c.keywords.toLowerCase().includes(q))
     );
 
-    if (isJobId) {
-      const goToJob: Command = {
-        id: `go-job-${search.trim()}`,
-        label: `Aller au Job #${search.trim()}`,
-        category: 'Navigation',
-        icon: 'hash',
-        keywords: '',
-        action: () => { /* handled by consumer */ },
-      };
-      return [goToJob, ...matched];
+    // Search jobs by reference, client, description
+    const jobResults: Command[] = [];
+    if (onSelectJob && jobs.length > 0) {
+      const isDigitsOnly = /^\d+$/.test(search.trim());
+
+      for (const job of jobs) {
+        if (jobResults.length >= 10) break;
+        const matchesRef = job.reference.toLowerCase().includes(q);
+        const matchesClient = job.client.toLowerCase().includes(q);
+        const matchesDesc = job.description.toLowerCase().includes(q);
+        if (matchesRef || matchesClient || matchesDesc) {
+          const selectJob = onSelectJob;
+          const jobId = job.id;
+          jobResults.push({
+            id: `job-${job.id}`,
+            label: `#${job.reference} — ${job.client} — ${job.description}`,
+            category: 'Jobs',
+            icon: 'hash',
+            keywords: '',
+            action: () => selectJob(jobId),
+          });
+        }
+      }
+
+      // When digits typed, if no exact ref match found, show "Go to Job #xxx"
+      if (isDigitsOnly && !jobResults.some(j => j.label.includes(`#${search.trim()} `))) {
+        const refMatch = jobs.find(j => j.reference.includes(search.trim()));
+        if (refMatch) {
+          const selectJob = onSelectJob;
+          const jobId = refMatch.id;
+          const goToJob: Command = {
+            id: `go-job-${search.trim()}`,
+            label: `Aller au Job #${refMatch.reference}`,
+            category: 'Navigation',
+            icon: 'hash',
+            keywords: '',
+            action: () => selectJob(jobId),
+          };
+          return [goToJob, ...matched, ...jobResults.filter(j => j.id !== `job-${refMatch.id}`)];
+        }
+      }
     }
 
-    return matched;
-  }, [search, commands]);
+    return [...matched, ...jobResults];
+  }, [search, commands, jobs, onSelectJob]);
 
   const hasDropdown = filteredCommands.length > 0 && search.trim().length > 0;
   const showNoResults = search.trim().length > 0 && filteredCommands.length === 0;

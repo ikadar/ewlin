@@ -457,7 +457,7 @@ function AppContent() {
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
 
   // Command Center (global — provided by RootLayout)
-  const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands } = useCommandCenter();
+  const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
 
   // Sidebar visibility toggle (Alt+B)
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -2163,6 +2163,15 @@ function AppContent() {
     registerPageCommands(schedulerCommands);
     return () => unregisterPageCommands();
   }, [schedulerCommands, registerPageCommands, unregisterPageCommands]);
+
+  // Register jobs for Command Palette search
+  useEffect(() => {
+    registerJobs(
+      snapshot.jobs.map(j => ({ id: j.id, reference: j.reference, client: j.client, description: j.description })),
+      (jobId) => setSelectedJobId(jobId),
+    );
+    return () => unregisterJobs();
+  }, [snapshot.jobs, setSelectedJobId, registerJobs, unregisterJobs]);
 
   // v0.5.1: Show loading spinner during initial fetch (real API mode only)
   // In mock mode, data is always instantly available, so we skip the loading state
