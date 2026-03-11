@@ -2,16 +2,19 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { SquareSlash } from 'lucide-react';
 import { Sidebar } from './Sidebar/Sidebar';
+import { Toast } from './Toast/Toast';
 import { CommandPalette } from './CommandPalette/CommandPalette';
 import { CommandCenterProvider, useCommandCenter } from './CommandPalette/CommandCenterContext';
 import { useCommands } from './CommandPalette/useCommands';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { useMercureSubscription } from '../hooks/useMercureSubscription';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
 import type { CompactHorizon } from '../utils';
 
 function RootLayoutInner() {
   const navigate = useNavigate();
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
+  const { toastMessage, dismissToast } = useMercureSubscription();
 
   const chordPendingRef = useRef<'compact' | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,6 +121,14 @@ function RootLayoutInner() {
         commands={allCommands}
         jobs={jobs}
         onSelectJob={onSelectJob}
+      />
+
+      {/* Mercure real-time update toast */}
+      <Toast
+        type="info"
+        message={toastMessage ?? ''}
+        isVisible={!!toastMessage}
+        onDismiss={dismissToast}
       />
     </div>
   );

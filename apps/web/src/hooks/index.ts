@@ -15,8 +15,3 @@ export { useToast } from './useToast';
 export { useDebouncedValue } from './useDebouncedValue';
 
 export { useTooltipDelay } from './useTooltipDelay';
-
-export { useMercureSubscription } from './useMercureSubscription';
-export type { MercureSubscription } from './useMercureSubscription';
-
-export { muteMercure, isMercureMuted } from './mercureMute';
