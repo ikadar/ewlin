@@ -22,7 +22,9 @@ interface LoginResponse {
     email: string;
     displayName: string;
     permissions: string[];
-    groups: string[];
+    groups: { id: string; name: string }[];
+    isActive: boolean;
+    lastLoginAt: string | null;
   };
 }
 
@@ -31,7 +33,9 @@ interface UserResponse {
   email: string;
   displayName: string;
   permissions: string[];
-  groups: string[];
+  groups: { id: string; name: string }[];
+  isActive: boolean;
+  lastLoginAt: string | null;
 }
 
 // ============================================================================

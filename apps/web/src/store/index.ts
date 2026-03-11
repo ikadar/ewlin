@@ -22,6 +22,8 @@ import { providerApi } from './api/providerApi';
 import { shipperApi } from './api/shipperApi';
 import { fluxApi } from './api/fluxApi';
 import { authApi } from './api/authApi';
+import { adminUserApi } from './api/adminUserApi';
+import { adminUserGroupApi } from './api/adminUserGroupApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -46,6 +48,8 @@ export const store = configureStore({
     [shipperApi.reducerPath]: shipperApi.reducer,
     [fluxApi.reducerPath]: fluxApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
+    [adminUserApi.reducerPath]: adminUserApi.reducer,
+    [adminUserGroupApi.reducerPath]: adminUserGroupApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -69,7 +73,9 @@ export const store = configureStore({
       .concat(providerApi.middleware)
       .concat(shipperApi.middleware)
       .concat(fluxApi.middleware)
-      .concat(authApi.middleware),
+      .concat(authApi.middleware)
+      .concat(adminUserApi.middleware)
+      .concat(adminUserGroupApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
@@ -213,6 +219,24 @@ export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequ
 
 export { useLoginMutation, useGetMeQuery, authApi } from './api/authApi';
 
+export {
+  useGetUsersQuery,
+  useCreateUserMutation,
+  useUpdateUserMutation,
+  useDeleteUserMutation,
+  adminUserApi,
+} from './api/adminUserApi';
+export type { AdminUserResponse, AdminUserInput, AdminUserGroup } from './api/adminUserApi';
+
+export {
+  useGetUserGroupsQuery,
+  useCreateUserGroupMutation,
+  useUpdateUserGroupMutation,
+  useDeleteUserGroupMutation,
+  adminUserGroupApi,
+} from './api/adminUserGroupApi';
+export type { AdminUserGroupResponse, AdminUserGroupInput } from './api/adminUserGroupApi';
+
 // Re-export slice actions
 export {
   setSelectedJobId,
@@ -265,5 +289,5 @@ export {
   selectCurrentUser,
   selectIsAuthenticated,
 } from './slices/authSlice';
-export type { AuthUser } from './slices/authSlice';
+export type { AuthUser, AuthUserGroup } from './slices/authSlice';
 

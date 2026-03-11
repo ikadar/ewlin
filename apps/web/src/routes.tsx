@@ -22,12 +22,15 @@
  * /settings/feuille-formats    → Feuille format (imposition) config
  * /settings/templates          → Template config
  * /settings/providers           → Outsourced provider config
+ * /settings/users              → User management (admin)
+ * /settings/user-groups        → User group management (admin)
  */
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import App from './App';
 import { RootLayout } from './components/RootLayout';
 import { RequireAuth } from './components/Auth/RequireAuth';
+import { RequirePermission } from './components/Auth/RequirePermission';
 import { SettingsLayout } from './components/SettingsLayout/SettingsLayout';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { StationCategoriesPage } from './pages/StationCategoriesPage';
@@ -41,6 +44,8 @@ import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { ShippersPage } from './pages/ShippersPage';
 import { LoginPage } from './pages/LoginPage';
+import { UsersPage } from './pages/UsersPage';
+import { UserGroupsPage } from './pages/UserGroupsPage';
 
 /**
  * Application routes.
@@ -68,7 +73,7 @@ export function AppRoutes() {
         <Route path="/job/:jobId" element={<App />} />
 
         {/* Settings routes — SettingsLayout provides the w-72 submenu */}
-        <Route path="/settings" element={<SettingsLayout />}>
+        <Route path="/settings" element={<RequirePermission permission={['settings.view', 'admin.users']}><SettingsLayout /></RequirePermission>}>
           <Route index element={<Navigate to="/settings/stations" replace />} />
           <Route path="stations" element={<StationsPage />} />
           <Route path="station-categories" element={<StationCategoriesPage />} />
@@ -80,6 +85,8 @@ export function AppRoutes() {
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="providers" element={<OutsourcedProvidersPage />} />
           <Route path="shippers" element={<ShippersPage />} />
+          <Route path="users" element={<RequirePermission permission="admin.users"><UsersPage /></RequirePermission>} />
+          <Route path="user-groups" element={<RequirePermission permission="admin.users"><UserGroupsPage /></RequirePermission>} />
         </Route>
       </Route>
     </Routes>

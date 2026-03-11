@@ -6,6 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { selectCurrentUser, selectIsAuthenticated, logout } from '../../store/slices/authSlice';
 import { shouldUseMockMode } from '../../store/api/baseApi';
+import { useHasPermission } from '../../hooks/useHasPermission';
 
 /**
  * Sidebar navigation component.
@@ -21,6 +22,7 @@ export function Sidebar() {
   const currentUser = useAppSelector(selectCurrentUser);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isMock = shouldUseMockMode();
+  const canSeeSettings = useHasPermission('settings.view', 'admin.users');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -86,13 +88,15 @@ export function Sidebar() {
 
         {/* Bottom section: Settings/User (REQ-07.3) */}
         <div className="flex flex-col items-center py-3 gap-2 border-t border-white/5">
-          <SidebarButton
-            icon={Settings}
-            label="Settings"
-            isActive={isSettings}
-            onClick={() => navigate('/settings/stations')}
-            testId="sidebar-settings-button"
-          />
+          {canSeeSettings && (
+            <SidebarButton
+              icon={Settings}
+              label="Settings"
+              isActive={isSettings}
+              onClick={() => navigate('/settings/stations')}
+              testId="sidebar-settings-button"
+            />
+          )}
           <SidebarButton
             icon={User}
             label="User"
@@ -135,7 +139,7 @@ export function Sidebar() {
                     data-testid="sidebar-logout-button"
                   >
                     <LogOut className="w-4 h-4" />
-                    Kijelentkezés
+                    Déconnexion
                   </button>
                 </div>
               )}

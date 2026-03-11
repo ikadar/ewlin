@@ -15,3 +15,5 @@ export { useToast } from './useToast';
 export { useDebouncedValue } from './useDebouncedValue';
 
 export { useTooltipDelay } from './useTooltipDelay';
+
+export { useHasPermission } from './useHasPermission';

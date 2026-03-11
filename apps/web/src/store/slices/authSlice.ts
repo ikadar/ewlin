@@ -13,12 +13,19 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 // Types
 // ============================================================================
 
+export interface AuthUserGroup {
+  id: string;
+  name: string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
   permissions: string[];
-  groups: string[];
+  groups: AuthUserGroup[];
+  isActive?: boolean;
+  lastLoginAt?: string | null;
 }
 
 export interface AuthState {
