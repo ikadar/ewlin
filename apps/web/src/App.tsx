@@ -810,10 +810,11 @@ function AppContent() {
     try {
       await deleteJob(selectedJobId).unwrap();
       setSelectedJobId(null);
+      dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
     } catch (err) {
       showToast(`Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`, 'error');
     }
-  }, [selectedJobId, deleteJob, setSelectedJobId, showToast]);
+  }, [selectedJobId, deleteJob, setSelectedJobId, showToast, dispatch]);
 
   // REQ-14: Calculate grid/DateStrip start date (lookbackDays before today)
   const lookbackDays = snapshotData?.lookbackDays ?? 6;
