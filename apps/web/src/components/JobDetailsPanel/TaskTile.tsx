@@ -248,7 +248,10 @@ export function TaskTile({
       <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>
         {displayName}
       </span>
-      <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
+      <span className="text-zinc-400 shrink-0">
+        {splitBadge && <span className="text-zinc-600 mr-1">[{splitBadge}]</span>}
+        {formatDuration()}
+      </span>
     </div>
   );
 

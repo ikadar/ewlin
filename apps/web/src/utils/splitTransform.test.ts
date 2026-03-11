@@ -3,6 +3,7 @@ import {
   expandSplitAssignments,
   addSplit,
   removeSplit,
+  unplaceSplitPart,
   reSplit,
   getRealAssignmentId,
   moveSplitPart,
@@ -251,6 +252,80 @@ describe('removeSplit', () => {
 
     expect(result.size).toBe(1);
     expect(result.has('a2')).toBe(true);
+  });
+});
+
+describe('unplaceSplitPart', () => {
+  it('clears scheduledStart for the specified part', () => {
+    const configs = new Map<string, SplitConfig>([
+      ['a1', createConfig('a1', 't1', 30, [
+        { runMinutes: 120, scheduledStart: '2026-03-11T08:00:00.000Z' },
+        { runMinutes: 120, scheduledStart: '2026-03-11T10:30:00.000Z' },
+      ])],
+    ]);
+    const result = unplaceSplitPart(configs, 'a1', 0);
+    const parts = result.get('a1')!.parts;
+
+    expect(parts).toHaveLength(2);
+    expect(parts[0].scheduledStart).toBeUndefined();
+    expect(parts[0].runMinutes).toBe(120);
+    expect(parts[1].scheduledStart).toBe('2026-03-11T10:30:00.000Z');
+  });
+
+  it('returns unchanged for invalid partIndex', () => {
+    const configs = new Map<string, SplitConfig>([
+      ['a1', createConfig('a1', 't1', 30, [
+        { runMinutes: 120, scheduledStart: '2026-03-11T08:00:00.000Z' },
+      ])],
+    ]);
+    expect(unplaceSplitPart(configs, 'a1', 5)).toBe(configs);
+    expect(unplaceSplitPart(configs, 'a1', -1)).toBe(configs);
+  });
+
+  it('returns unchanged for unknown assignment', () => {
+    const configs = new Map<string, SplitConfig>();
+    expect(unplaceSplitPart(configs, 'unknown', 0)).toBe(configs);
+  });
+});
+
+describe('expandSplitAssignments skips unplaced parts', () => {
+  it('only produces virtual assignments for parts with scheduledStart', () => {
+    const assignments = [createAssignment('a1', 't1', 's1', 8, 4.5)];
+    const tasks = [createTask('t1', 's1', 30, 240)];
+    const configs = new Map<string, SplitConfig>([
+      ['a1', createConfig('a1', 't1', 30, [
+        { runMinutes: 120, scheduledStart: undefined },
+        { runMinutes: 120, scheduledStart: '2026-03-11T10:30:00.000Z' },
+      ])],
+    ]);
+
+    const { virtualAssignments, virtualTasks } = expandSplitAssignments(
+      assignments, tasks, [], configs
+    );
+
+    expect(virtualAssignments).toHaveLength(1);
+    expect(virtualAssignments[0].id).toBe('a1:split:1');
+    expect(virtualAssignments[0].splitPartIndex).toBe(1);
+    expect(virtualAssignments[0].splitPartTotal).toBe(2);
+    // Only 1 extra virtual task (for the placed part)
+    expect(virtualTasks).toHaveLength(2); // original + 1 virtual
+  });
+
+  it('produces no virtual assignments when all parts unplaced', () => {
+    const assignments = [createAssignment('a1', 't1', 's1', 8, 4.5)];
+    const tasks = [createTask('t1', 's1', 30, 240)];
+    const configs = new Map<string, SplitConfig>([
+      ['a1', createConfig('a1', 't1', 30, [
+        { runMinutes: 120, scheduledStart: undefined },
+        { runMinutes: 120, scheduledStart: undefined },
+      ])],
+    ]);
+
+    const { virtualAssignments } = expandSplitAssignments(
+      assignments, tasks, [], configs
+    );
+
+    expect(virtualAssignments).toHaveLength(0);
   });
 });
 

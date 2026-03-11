@@ -36,6 +36,8 @@ export interface JobDetailsPanelProps {
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
   onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
+  /** Callback when an unplaced split part is clicked (pick for re-placement) */
+  onPickSplitPart?: (task: Task, job: Job, virtualAssignmentId: string, partIndex: number, clientX: number, clientY: number) => void;
   /** Callback when close button is clicked (REQ-02) */
   onClose?: () => void;
   /** REQ-02: Callback when departure date is clicked (scrolls grid to date) */
@@ -95,6 +97,7 @@ export function JobDetailsPanel({
   onJumpToTask,
   onRecallTask,
   onPick,
+  onPickSplitPart,
   onClose,
   onDateClick,
   onElementStatusChange,
@@ -187,6 +190,7 @@ export function JobDetailsPanel({
         onJumpToTask={onJumpToTask}
         onRecallTask={onRecallTask}
         onPick={onPick}
+        onPickSplitPart={onPickSplitPart}
         onElementStatusChange={onElementStatusChange}
         onWorkDaysChange={onWorkDaysChange}
         onDepartureChange={onDepartureChange}

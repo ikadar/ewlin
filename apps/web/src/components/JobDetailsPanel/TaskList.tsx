@@ -37,6 +37,8 @@ export interface TaskListProps {
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
   onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
+  /** Callback when an unplaced split part is clicked (pick for re-placement) */
+  onPickSplitPart?: (task: Task, job: Job, virtualAssignmentId: string, partIndex: number, clientX: number, clientY: number) => void;
   /** Callback when element prerequisite status changes (v0.4.32a) */
   onElementStatusChange?: (update: ElementStatusUpdate) => void;
   /** v0.5.11: Callback when work days changes for outsourced task */
@@ -69,6 +71,7 @@ export function TaskList({
   onJumpToTask,
   onRecallTask,
   onPick,
+  onPickSplitPart,
   onElementStatusChange,
   onWorkDaysChange,
   onDepartureChange,
@@ -244,6 +247,25 @@ export function TaskList({
           <div key={task.id}>
             {showDryTimeLabel && <DryTimeLabel />}
             {splitConfig.parts.map((part, i) => {
+              if (!part.scheduledStart) {
+                // Unplaced part: show with unplaced styling, part-specific duration
+                const partTask = { ...task, duration: { setupMinutes: splitConfig.setupMinutes, runMinutes: part.runMinutes } } as Task;
+                const virtualId = `${assignment.id}:split:${i}`;
+                return (
+                  <TaskTile
+                    key={`${task.id}:split:${i}`}
+                    task={partTask}
+                    job={job}
+                    tileState="unplaced"
+                    station={station}
+                    splitBadge={`${i + 1}/${splitConfig.parts.length}`}
+                    onPick={onPickSplitPart
+                      ? (_t, _j, cx, cy) => onPickSplitPart(partTask, job, virtualId, i, cx, cy)
+                      : undefined}
+                  />
+                );
+              }
+
               const partStart = new Date(part.scheduledStart);
               const totalMs = (splitConfig.setupMinutes + part.runMinutes) * 60_000;
               const partEnd = addWorkingTime(partStart, totalMs, station);
@@ -265,7 +287,7 @@ export function TaskList({
                   station={station}
                   splitBadge={`${i + 1}/${splitConfig.parts.length}`}
                   onJumpToTask={onJumpToTask}
-                  onRecallTask={() => onRecallTask?.(assignment.id)}
+                  onRecallTask={() => onRecallTask?.(virtualAssignment.id)}
                   onToggleComplete={() => onToggleComplete?.(assignment.id)}
                   isCompleted={isCompleted}
                 />

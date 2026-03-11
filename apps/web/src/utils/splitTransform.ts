@@ -13,7 +13,7 @@ import { addWorkingTime } from './workingTime';
 
 export interface SplitPart {
   runMinutes: number;
-  scheduledStart: string; // ISO timestamp — each part independently positionable
+  scheduledStart?: string; // ISO timestamp — undefined = unplaced
 }
 
 export interface SplitConfig {
@@ -66,6 +66,7 @@ export function expandSplitAssignments(
 
     for (let i = 0; i < config.parts.length; i++) {
       const part = config.parts[i];
+      if (!part.scheduledStart) continue; // unplaced → no virtual assignment
       const partStart = new Date(part.scheduledStart);
       const totalMs = (config.setupMinutes + part.runMinutes) * 60 * 1000;
       const endTime = station
@@ -132,6 +133,26 @@ export function removeSplit(
 ): Map<string, SplitConfig> {
   const newConfigs = new Map(configs);
   newConfigs.delete(assignmentId);
+  return newConfigs;
+}
+
+/**
+ * Unplace a single split part (clear its scheduledStart).
+ * The part stays in the array so it remains visible in the sidebar.
+ */
+export function unplaceSplitPart(
+  configs: Map<string, SplitConfig>,
+  assignmentId: string,
+  partIndex: number
+): Map<string, SplitConfig> {
+  const existing = configs.get(assignmentId);
+  if (!existing || partIndex < 0 || partIndex >= existing.parts.length) return configs;
+
+  const newParts = [...existing.parts];
+  newParts[partIndex] = { ...newParts[partIndex], scheduledStart: undefined };
+
+  const newConfigs = new Map(configs);
+  newConfigs.set(assignmentId, { ...existing, parts: newParts });
   return newConfigs;
 }
 

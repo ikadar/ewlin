@@ -47,7 +47,7 @@ import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
 import { FluxPage } from './pages/FluxPage';
-import { expandSplitAssignments, addSplit, removeSplit, reSplit, getRealAssignmentId, moveSplitPart, getSplitPartIndex } from './utils/splitTransform';
+import { expandSplitAssignments, addSplit, removeSplit, unplaceSplitPart, reSplit, getRealAssignmentId, moveSplitPart, getSplitPartIndex } from './utils/splitTransform';
 import type { SplitConfig, VirtualAssignment } from './utils/splitTransform';
 import { addWorkingTime } from './utils/workingTime';
 
@@ -715,10 +715,11 @@ function AppContent() {
   const gridPickInfoRef = useRef<{ taskId: string; targetId: string; scheduledStart: string } | null>(null);
 
   // Split tile pick: store original position for ESC cancel (view-layer only, no API call)
+  // originalScheduledStart is undefined when picking an unplaced split part (no position to restore)
   const splitPickInfoRef = useRef<{
     realAssignmentId: string;
     partIndex: number;
-    originalScheduledStart: string;
+    originalScheduledStart: string | undefined;
   } | null>(null);
 
   // v0.3.47: Zoom handler that maintains grid center position
@@ -1261,10 +1262,12 @@ function AppContent() {
         pickActions.cancelPick();
         setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
 
-        if (savedSplitPickInfo) {
+        const splitOriginalStart = savedSplitPickInfo?.originalScheduledStart;
+        if (savedSplitPickInfo && splitOriginalStart) {
+          // Restore split part to its original position (only if it was placed before)
           setSplitConfigs(prev => moveSplitPart(
             prev, savedSplitPickInfo.realAssignmentId,
-            savedSplitPickInfo.partIndex, savedSplitPickInfo.originalScheduledStart
+            savedSplitPickInfo.partIndex, splitOriginalStart
           ));
         } else if (savedGridPickInfo) {
           rescheduleTask({
@@ -1413,9 +1416,22 @@ function AppContent() {
   // v0.5.2: Now uses RTK Query mutation
   const handleRecallAssignment = useCallback(async (assignmentId: string) => {
     const realId = getRealAssignmentId(assignmentId);
+    const partIndex = getSplitPartIndex(assignmentId);
 
-    // Clear split config if exists
-    if (splitConfigs.has(realId)) {
+    // Per-part recall: unplace this part (keep it visible in sidebar)
+    if (partIndex !== null && splitConfigs.has(realId)) {
+      const config = splitConfigs.get(realId)!;
+      const hasOtherScheduled = config.parts.some(
+        (p, i) => i !== partIndex && p.scheduledStart !== undefined
+      );
+      if (hasOtherScheduled) {
+        setSplitConfigs(prev => unplaceSplitPart(prev, realId, partIndex));
+        return; // don't API-unassign
+      }
+      // All parts now unplaced → full recall below
+      setSplitConfigs(prev => removeSplit(prev, realId));
+    } else if (splitConfigs.has(realId)) {
+      // Non-split recall of a split assignment (e.g. from context menu)
       setSplitConfigs(prev => removeSplit(prev, realId));
     }
 
@@ -1716,6 +1732,7 @@ function AppContent() {
       if (!config) { setSplitPopoverData(null); return; }
       const station = snapshot.stations.find(s => s.id === va.targetId);
       const partStart = config.parts[va.splitPartIndex!].scheduledStart;
+      if (!partStart) { setSplitPopoverData(null); return; }
       const subPartEndMs = (config.setupMinutes + splitAtRunMinutes) * 60 * 1000;
       const newSubPartStart = station
         ? addWorkingTime(new Date(partStart), subPartEndMs, station).toISOString()
@@ -2009,6 +2026,32 @@ function AppContent() {
     }
   }, [pickActions, snapshot.stations, categoryMap]);
 
+  // Handle pick of an unplaced split part from sidebar
+  // Uses pickFromGrid to set assignmentId so handlePickClick uses the moveSplitPart path
+  const handlePickSplitPart = useCallback((task: Task, job: Job, virtualAssignmentId: string, partIndex: number, clientX: number, clientY: number) => {
+    pickActions.pickFromGrid(task, job, virtualAssignmentId);
+    pickActions.updateGhostPosition(clientX, clientY);
+
+    const realId = getRealAssignmentId(virtualAssignmentId);
+    splitPickInfoRef.current = { realAssignmentId: realId, partIndex, originalScheduledStart: undefined };
+    gridPickInfoRef.current = null;
+
+    // Save scroll position and scroll to target station (same as handlePickTask)
+    if (gridRef.current) {
+      savedScrollRef.current = {
+        x: gridRef.current.getScrollX(),
+        y: gridRef.current.getScrollY(),
+      };
+      if (task.type === 'Internal') {
+        const stationIndex = snapshot.stations.findIndex((s) => s.id === task.stationId);
+        if (stationIndex >= 0) {
+          const { x: targetX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
+          gridRef.current.scrollToX(targetX, 'smooth');
+        }
+      }
+    }
+  }, [pickActions, snapshot.stations, categoryMap]);
+
   // v0.3.57: Handle pick from grid (reschedule existing task)
   // No scroll needed as user is already at tile location
   const handlePickFromGrid = useCallback(async (task: InternalTask, job: Job, assignmentId: string) => {
@@ -2208,10 +2251,11 @@ function AppContent() {
       gridPickInfoRef.current = null;
       pickActions.cancelPick();
       setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
-      if (savedSplitPickInfo) {
+      const splitOrigStart = savedSplitPickInfo?.originalScheduledStart;
+      if (savedSplitPickInfo && splitOrigStart) {
         setSplitConfigs(prev => moveSplitPart(
           prev, savedSplitPickInfo.realAssignmentId,
-          savedSplitPickInfo.partIndex, savedSplitPickInfo.originalScheduledStart
+          savedSplitPickInfo.partIndex, splitOrigStart
         ));
       } else if (savedGridPickInfo) {
         rescheduleTask({
@@ -2480,6 +2524,7 @@ function AppContent() {
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
           onPick={handlePickTask}
+          onPickSplitPart={handlePickSplitPart}
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
           onElementStatusChange={handleElementStatusChange}
