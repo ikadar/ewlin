@@ -55,6 +55,8 @@ export interface JobDetailsPanelProps {
   onEditJob?: () => void;
   /** Job IDs that are late (past workshop exit date) */
   lateJobIds?: Set<string>;
+  /** Job IDs that are shipped (highest priority tile coloring) */
+  shippedJobIds?: Set<string>;
 }
 
 /** Format workshop exit date as DD/MM/YYYY a HHhMM */
@@ -101,6 +103,7 @@ export function JobDetailsPanel({
   onReturnChange,
   onEditJob,
   lateJobIds,
+  shippedJobIds,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -180,6 +183,7 @@ export function JobDetailsPanel({
         pickedTaskId={pickedTaskId}
         conflictTaskIds={conflictTaskIds}
         lateJobIds={lateJobIds}
+        shippedJobIds={shippedJobIds}
         onJumpToTask={onJumpToTask}
         onRecallTask={onRecallTask}
         onPick={onPick}

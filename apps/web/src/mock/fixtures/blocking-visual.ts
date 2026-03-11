@@ -92,6 +92,8 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: Blocked (paper to_order)
     {
@@ -108,6 +110,8 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 3: Blocked (BAT waiting_files)
     {
@@ -124,6 +128,8 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 4: Blocked (plates to_make)
     {
@@ -140,6 +146,8 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

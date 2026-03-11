@@ -263,6 +263,8 @@ function monoRoute(
     taskIds: tasks.map(t => t.id),
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   };
 
   return { job, elements: [elem], tasks };
@@ -344,6 +346,8 @@ function generateBrochurePiquee(jobNum: number): RouteResult {
     taskIds: allTasks.map(t => t.id),
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   };
 
   return { job, elements, tasks: allTasks };
@@ -407,6 +411,8 @@ function generateBrochurePiqueePelli(jobNum: number): RouteResult {
     taskIds: allTasks.map(t => t.id),
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   };
 
   return { job, elements, tasks: allTasks };
@@ -481,6 +487,8 @@ function generateLiasse(jobNum: number): RouteResult {
     taskIds: allTasks.map(t => t.id),
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   };
 
   return { job, elements, tasks: allTasks };
@@ -536,6 +544,8 @@ function generateBrochureAssembleePiquee(jobNum: number): RouteResult {
     taskIds: allTasks.map(t => t.id),
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   };
 
   return { job, elements, tasks: allTasks };

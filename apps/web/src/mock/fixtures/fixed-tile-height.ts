@@ -43,6 +43,8 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     {
       id: 'job-height-2',
@@ -57,6 +59,8 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

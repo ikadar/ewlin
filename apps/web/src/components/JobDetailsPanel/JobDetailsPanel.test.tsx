@@ -22,6 +22,8 @@ const mockJob: Job = {
   elementIds: ['element-1'],
   createdAt: '2025-12-15T10:00:00Z',
   updatedAt: '2025-12-15T10:00:00Z',
+    shipped: false,
+    shippedAt: null,
 };
 
 const mockElements: Element[] = [

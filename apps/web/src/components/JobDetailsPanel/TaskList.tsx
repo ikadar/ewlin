@@ -29,6 +29,8 @@ export interface TaskListProps {
   conflictTaskIds?: Set<string>;
   /** Job IDs that are late (past workshop exit date) */
   lateJobIds?: Set<string>;
+  /** Job IDs that are shipped (highest priority tile coloring) */
+  shippedJobIds?: Set<string>;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
@@ -62,6 +64,7 @@ export function TaskList({
   pickedTaskId,
   conflictTaskIds,
   lateJobIds,
+  shippedJobIds,
   onJumpToTask,
   onRecallTask,
   onPick,
@@ -219,16 +222,18 @@ export function TaskList({
       // Compute tile state for state-based coloring
       const isScheduled = !!assignment;
       const isCompleted = assignment?.isCompleted ?? false;
+      const isJobShipped = shippedJobIds?.has(job.id) ?? false;
       const isJobLate = lateJobIds?.has(job.id) ?? false;
       const isTaskOverdue = isScheduled && !isCompleted && new Date(assignment!.scheduledEnd) < new Date();
       const isLate = isJobLate || isTaskOverdue;
       const hasConflictFlag = conflictTaskIds?.has(task.id) ?? false;
 
-      let tileState: 'unplaced' | 'default' | 'completed' | 'late' | 'conflict';
+      let tileState: 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
       if (!isScheduled) tileState = 'unplaced';
-      else if (isCompleted) tileState = 'completed';
+      else if (isJobShipped) tileState = 'shipped';
       else if (isLate) tileState = 'late';
       else if (hasConflictFlag) tileState = 'conflict';
+      else if (isCompleted) tileState = 'completed';
       else tileState = 'default';
 
       return (

@@ -35,6 +35,8 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: All unscheduled (for testing multiple picks)
     {
@@ -50,6 +52,8 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 3: Has existing scheduled task (for conflict testing)
     {
@@ -65,6 +69,8 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

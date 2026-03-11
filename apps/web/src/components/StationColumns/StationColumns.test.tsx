@@ -83,6 +83,8 @@ const mockJob: Job = {
   taskIds: [],
   createdAt: '2025-12-01T00:00:00Z',
   updatedAt: '2025-12-01T00:00:00Z',
+    shipped: false,
+    shippedAt: null,
 };
 
 describe('UnavailabilityOverlay', () => {

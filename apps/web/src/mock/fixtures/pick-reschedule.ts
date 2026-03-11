@@ -74,6 +74,8 @@ export function createPickRescheduleFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     {
       id: 'job-test-2',
@@ -88,6 +90,8 @@ export function createPickRescheduleFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     {
       id: 'job-test-3',
@@ -102,6 +106,8 @@ export function createPickRescheduleFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

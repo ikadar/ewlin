@@ -34,6 +34,8 @@ export function createSwapFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     {
       id: 'job-swap-2',
@@ -48,6 +50,8 @@ export function createSwapFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     {
       id: 'job-swap-3',
@@ -62,6 +66,8 @@ export function createSwapFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

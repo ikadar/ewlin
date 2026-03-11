@@ -48,6 +48,8 @@ const mockJob: Job = {
   taskIds: ['task-1', 'task-2'],
   createdAt: '2025-12-01T00:00:00Z',
   updatedAt: '2025-12-01T00:00:00Z',
+    shipped: false,
+    shippedAt: null,
 };
 
 const mockInternalTask: Task = {

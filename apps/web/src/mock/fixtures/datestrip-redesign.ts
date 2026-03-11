@@ -35,6 +35,8 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job with departure 14 days from now, task scheduled day 10
     {
@@ -50,6 +52,8 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

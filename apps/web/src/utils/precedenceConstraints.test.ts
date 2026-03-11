@@ -69,6 +69,8 @@ function createJob(id: string): Job {
     elementIds: [`element-${id}`],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    shipped: false,
+    shippedAt: null,
   };
 }
 

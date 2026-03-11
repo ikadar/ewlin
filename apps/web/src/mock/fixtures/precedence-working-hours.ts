@@ -35,6 +35,8 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: Drying ends within working hours - no snap needed
     {
@@ -50,6 +52,8 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

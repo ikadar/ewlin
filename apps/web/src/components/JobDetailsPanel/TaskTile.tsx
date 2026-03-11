@@ -4,7 +4,7 @@ import { Circle, CircleCheck } from 'lucide-react';
 import { useTooltipDelay } from '../../hooks';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 
-export type TileState = 'unplaced' | 'default' | 'completed' | 'late' | 'conflict';
+export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
 export interface TaskTileProps {
   /** The task to display */
@@ -57,6 +57,11 @@ const TILE_STYLES: Record<TileState, {
     borderColor: '#3b82f6',
     bg: 'bg-[rgba(59,130,246,0.12)]',
     nameColor: 'text-blue-300',
+  },
+  shipped: {
+    borderColor: '#10b981',
+    bg: 'bg-[rgba(16,185,129,0.09)]',
+    nameColor: 'text-emerald-300',
   },
   default: {
     borderColor: '#3b82f6',

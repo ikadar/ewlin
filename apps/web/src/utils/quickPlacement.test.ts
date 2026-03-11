@@ -23,6 +23,8 @@ function createJob(id: string): Job {
     elementIds: [`element-${id}`],
     createdAt: '2025-12-15T00:00:00Z',
     updatedAt: '2025-12-15T00:00:00Z',
+    shipped: false,
+    shippedAt: null,
   };
 }
 

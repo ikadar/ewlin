@@ -51,6 +51,8 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job with BAT approved (can schedule)
     {
@@ -66,6 +68,8 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job with Plates pending (warning only)
     {
@@ -81,6 +85,8 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

@@ -58,6 +58,8 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
         taskIds: ['task-1', 'task-2'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        shipped: false,
+        shippedAt: null,
       },
     ],
     elements: [

@@ -22,6 +22,8 @@ const mockJob: Job = {
   taskIds: [],
   createdAt: '2025-12-01T00:00:00Z',
   updatedAt: '2025-12-01T00:00:00Z',
+    shipped: false,
+    shippedAt: null,
 };
 
 const mockTask: InternalTask = {
@@ -55,24 +57,28 @@ const mockAssignment: TaskAssignment = {
 
 describe('colorUtils', () => {
   describe('computeTileState', () => {
-    it('returns late when isLate (highest priority)', () => {
-      expect(computeTileState(true, true, true, true)).toBe('late');
+    it('returns shipped when isShipped (highest priority)', () => {
+      expect(computeTileState(true, true, true, true, true)).toBe('shipped');
     });
 
-    it('returns conflict when hasConflict and not late', () => {
-      expect(computeTileState(false, true, true, true)).toBe('conflict');
+    it('returns late when isLate (second highest priority)', () => {
+      expect(computeTileState(false, true, true, true, true)).toBe('late');
+    });
+
+    it('returns conflict when hasConflict and not late/shipped', () => {
+      expect(computeTileState(false, false, true, true, true)).toBe('conflict');
     });
 
     it('returns blocked when isBlocked and no higher priority', () => {
-      expect(computeTileState(false, false, true, true)).toBe('blocked');
+      expect(computeTileState(false, false, false, true, true)).toBe('blocked');
     });
 
     it('returns completed when isCompleted and no higher priority', () => {
-      expect(computeTileState(false, false, false, true)).toBe('completed');
+      expect(computeTileState(false, false, false, false, true)).toBe('completed');
     });
 
     it('returns default when no flags set', () => {
-      expect(computeTileState(false, false, false, false)).toBe('default');
+      expect(computeTileState(false, false, false, false, false)).toBe('default');
     });
   });
 

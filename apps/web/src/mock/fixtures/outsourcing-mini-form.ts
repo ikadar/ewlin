@@ -72,6 +72,8 @@ export function createOutsourcingMiniFormFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: Print (unscheduled) → Dorure (outsourced) → Finish
     // Predecessor not scheduled, dates should be empty
@@ -88,6 +90,8 @@ export function createOutsourcingMiniFormFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 3: Cut → Reliure (outsourced with manual dates)
     // Has manual override values
@@ -104,6 +108,8 @@ export function createOutsourcingMiniFormFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 4: Internal-only job (no outsourcing)
     // For regression testing - should show standard tiles
@@ -120,6 +126,8 @@ export function createOutsourcingMiniFormFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

@@ -34,6 +34,8 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: Single tile (for isolated menu testing)
     {
@@ -49,6 +51,8 @@ export function createContextMenuFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

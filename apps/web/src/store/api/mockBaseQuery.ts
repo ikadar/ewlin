@@ -787,6 +787,8 @@ const handleCreateJob = async (
     taskIds: allTaskIds,
     createdAt: now,
     updatedAt: now,
+    shipped: false,
+    shippedAt: null,
   };
 
   // Update snapshot

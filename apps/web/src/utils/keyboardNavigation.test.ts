@@ -24,6 +24,8 @@ function createJob(id: string): Job {
     taskIds: [],
     createdAt: '2025-12-15T00:00:00Z',
     updatedAt: '2025-12-15T00:00:00Z',
+    shipped: false,
+    shippedAt: null,
   };
 }
 

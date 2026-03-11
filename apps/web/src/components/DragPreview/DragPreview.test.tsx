@@ -17,6 +17,8 @@ const mockJob: Job = {
   elementIds: ['element-1'],
   createdAt: '2025-12-15T00:00:00Z',
   updatedAt: '2025-12-15T00:00:00Z',
+    shipped: false,
+    shippedAt: null,
 };
 
 const mockTask: InternalTask = {

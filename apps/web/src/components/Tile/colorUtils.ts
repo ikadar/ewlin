@@ -4,7 +4,7 @@
  * rather than per-job decorative colors.
  */
 
-export type TileState = 'late' | 'conflict' | 'blocked' | 'completed' | 'default';
+export type TileState = 'shipped' | 'late' | 'conflict' | 'blocked' | 'completed' | 'default';
 
 export interface ColorClasses {
   border: string;
@@ -16,14 +16,16 @@ export interface ColorClasses {
 
 /**
  * Compute tile state from boolean flags.
- * Priority (highest wins): late > conflict > blocked > completed > default.
+ * Priority (highest wins): shipped > late > conflict > blocked > completed > default.
  */
 export function computeTileState(
+  isShipped: boolean,
   isLate: boolean,
   hasConflict: boolean,
   isBlocked: boolean,
   isCompleted: boolean,
 ): TileState {
+  if (isShipped) return 'shipped';
   if (isLate) return 'late';
   if (hasConflict) return 'conflict';
   if (isBlocked) return 'blocked';
@@ -32,6 +34,13 @@ export function computeTileState(
 }
 
 const stateColorMap: Record<TileState, ColorClasses> = {
+  shipped: {
+    border: 'border-l-emerald-500',
+    setupBg: 'bg-emerald-500/[0.14]',
+    setupBorder: 'border-emerald-400/20',
+    runBg: 'bg-emerald-500/[0.09]',
+    text: 'text-emerald-300',
+  },
   default: {
     border: 'border-l-blue-500',
     setupBg: 'bg-blue-500/[0.12]',
@@ -80,6 +89,7 @@ export function getStateColorClasses(state: TileState): ColorClasses {
  * Get the glow color (rgba) for selection effect, derived from state border color.
  */
 const stateGlowColorMap: Record<TileState, string> = {
+  shipped: 'rgba(16,185,129,0.4)',
   default: 'rgba(59,130,246,0.4)',
   completed: 'rgba(34,197,94,0.4)',
   conflict: 'rgba(245,158,11,0.4)',

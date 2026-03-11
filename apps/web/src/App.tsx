@@ -1050,6 +1050,12 @@ function AppContent() {
     [snapshot.lateJobs],
   );
 
+  // Shipped job IDs for state-based tile coloring (highest priority)
+  const shippedJobIds = useMemo(
+    () => new Set(snapshot.jobs.filter((j) => j.shipped).map((j) => j.id)),
+    [snapshot.jobs],
+  );
+
   // Get ordered job IDs for navigation (matching JobsList display order)
   // Problems first (late, then conflicts), then normal jobs
   const orderedJobIds = useMemo(() => {
@@ -2244,6 +2250,7 @@ function AppContent() {
           onReturnChange={handleOutsourcingReturnChange}
           onEditJob={handleEditJob}
           lateJobIds={lateJobIds}
+          shippedJobIds={shippedJobIds}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Mode banner — shows active mode (quick placement / picking) */}
@@ -2309,6 +2316,7 @@ function AppContent() {
           onContextMenu={handleContextMenuOpen}
           displayMode={displayMode}
           lateJobIds={lateJobIds}
+          shippedJobIds={shippedJobIds}
           quickPlacementGhostLabel={selectedJob?.reference}
           quickPlacementGhostHeight={quickPlacementTask ? ((quickPlacementTask.duration.setupMinutes + quickPlacementTask.duration.runMinutes) / 60) * pixelsPerHour : undefined}
         />

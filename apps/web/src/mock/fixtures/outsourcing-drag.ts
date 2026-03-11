@@ -52,6 +52,8 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: Internal → Outsourced → Internal (unscheduled)
     // Full chain - the last internal task is unscheduled
@@ -68,6 +70,8 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 3: Internal-only (regression test - no outsourcing indicator)
     {
@@ -83,6 +87,8 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

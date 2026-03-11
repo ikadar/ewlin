@@ -135,6 +135,8 @@ export interface SchedulingGridProps {
   displayMode?: 'produit' | 'tirage';
   /** Set of job IDs that are late (for state-based tile coloring) */
   lateJobIds?: Set<string>;
+  /** Set of job IDs that are shipped (highest priority tile coloring) */
+  shippedJobIds?: Set<string>;
   /** Ghost preview label for quick placement (job reference) */
   quickPlacementGhostLabel?: string;
   /** Ghost preview height in pixels for quick placement */
@@ -199,6 +201,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onContextMenu,
       displayMode,
       lateJobIds,
+      shippedJobIds,
       quickPlacementGhostLabel,
       quickPlacementGhostHeight,
     },
@@ -618,11 +621,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     const tileLabel = rawTirageLabel || undefined;
 
                     // Compute tile state for state-based coloring
+                    const isJobShipped = shippedJobIds?.has(job.id) ?? false;
                     const isJobLate = lateJobIds?.has(job.id) ?? false;
                     const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < now;
                     const isLate = isJobLate || isTaskOverdue;
                     const hasConflict = conflictTaskIds.has(task.id);
-                    const tileState = computeTileState(isLate, hasConflict, blocked, assignment.isCompleted);
+                    const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocked, assignment.isCompleted);
 
                     return (
                       <Tile

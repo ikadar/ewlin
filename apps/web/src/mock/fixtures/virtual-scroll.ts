@@ -42,6 +42,8 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     fullyScheduled: false,
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   });
 
   jobs.push({
@@ -57,6 +59,8 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     fullyScheduled: false,
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   });
 
   jobs.push({
@@ -72,6 +76,8 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     fullyScheduled: false,
     createdAt: today.toISOString(),
     updatedAt: today.toISOString(),
+    shipped: false,
+    shippedAt: null,
   });
 
   // Tasks for job 1: on days 0, 10, 20, 30

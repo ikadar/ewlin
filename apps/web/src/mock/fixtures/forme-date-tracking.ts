@@ -122,6 +122,8 @@ export function createFormeDateTrackingFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: Without die-cutting (should NOT show Forme dropdown)
     {
@@ -138,6 +140,8 @@ export function createFormeDateTrackingFixture(): ScheduleSnapshot {
       fullyScheduled: true,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

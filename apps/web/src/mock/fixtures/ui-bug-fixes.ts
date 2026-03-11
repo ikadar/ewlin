@@ -35,6 +35,8 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job A - has scheduled task (for REQ-06 click test)
     {
@@ -50,6 +52,8 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job B - has scheduled task on same station (for REQ-06 muted tile click test)
     {
@@ -65,6 +69,8 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job C - scheduled on Day 2 (for REQ-04 multi-day overlay test)
     {
@@ -80,6 +86,8 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

@@ -412,7 +412,13 @@ html.light .bg-\[rgba\(239\,68\,68\,0\.09\)\] { background-color: rgba(220,38,38
 /* Conflict (amber) */
 html.light .bg-\[rgba\(245\,158\,11\,0\.09\)\] { background-color: rgba(202,138,4,0.16) !important; }
 
+/* Shipped (emerald) */
+html.light .bg-\[rgba\(16\,185\,129\,0\.09\)\] { background-color: rgba(5,150,105,0.20) !important; }
+html.light .bg-emerald-500\/\[0\.14\] { background-color: rgba(5,150,105,0.22) !important; }
+html.light .bg-emerald-500\/\[0\.09\] { background-color: rgba(5,150,105,0.16) !important; }
+
 /* Tile name text — use darker, saturated versions for light bg */
+html.light .text-emerald-300 { color: #065f46 !important; }  /* emerald-800 */
 html.light .text-blue-300   { color: #4338ca !important; }  /* indigo-700 */
 html.light .text-blue-400   { color: #4f46e5 !important; }  /* indigo-600 */
 html.light .text-green-300  { color: #052e16 !important; }  /* darker than green-900 */

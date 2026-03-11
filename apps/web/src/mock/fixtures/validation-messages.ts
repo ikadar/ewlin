@@ -35,6 +35,8 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: BAT not approved - for approval gate conflict
     {
@@ -50,6 +52,8 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 3: Normal job with valid task for comparison
     {
@@ -65,6 +69,8 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

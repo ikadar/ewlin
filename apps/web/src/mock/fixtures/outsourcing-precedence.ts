@@ -62,6 +62,8 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 2: Internal → Outsourced (with manual dates)
     // Tests manual return override affecting constraint
@@ -78,6 +80,8 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 3: Internal → Internal (before outsourced)
     // Tests backward calculation: predecessor should have constraint at outsourced departure time
@@ -94,6 +98,8 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
     // Job 4: Internal-only chain (regression test)
     {
@@ -109,6 +115,8 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
       fullyScheduled: false,
       createdAt: today.toISOString(),
       updatedAt: today.toISOString(),
+      shipped: false,
+      shippedAt: null,
     },
   ];
 

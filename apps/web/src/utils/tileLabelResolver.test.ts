@@ -19,6 +19,8 @@ const makeJob = (reference = 'REF-001', quantity?: number): Job => ({
   taskIds: [],
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-01T00:00:00Z',
+    shipped: false,
+    shippedAt: null,
 });
 
 const makeElement = (

@@ -296,6 +296,8 @@ function generateJob(options: GenerateJobOptions): { job: Job; element: Element;
     taskIds: tasks.map((t) => t.id),
     createdAt: formatTimestamp(addDays(now, -randomInt(5, 30))),
     updatedAt: formatTimestamp(now),
+    shipped: false,
+    shippedAt: null,
   };
 
   // Create element for this job (1:1 relationship for v0.4.0)
