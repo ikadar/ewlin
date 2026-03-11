@@ -25,6 +25,7 @@ export interface UseCommandsOptions {
   onNewJob: () => void;
   onSearchJobs: () => void;
   onCompactTimeline: (horizon: CompactHorizon) => void;
+  onSmartCompactTimeline: (horizon: CompactHorizon) => void;
 
   // Scheduler-specific (optional — omitted when called from non-scheduler pages)
   selectedJobId?: string | null;
@@ -130,6 +131,17 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     ],
   },
   {
+    id: 'smart-compaction',
+    title: 'Smart Compaction',
+    shortcuts: [
+      { label: 'Smart compact 4h', keys: ['Alt+O', '1'] },
+      { label: 'Smart compact 8h', keys: ['Alt+O', '2'] },
+      { label: 'Smart compact 24h', keys: ['Alt+O', '3'] },
+      { label: 'Smart compact 48h', keys: ['Alt+O', '4'] },
+      { label: 'Smart compact 72h', keys: ['Alt+O', '5'] },
+    ],
+  },
+  {
     id: 'system',
     title: 'Systeme',
     shortcuts: [
@@ -147,6 +159,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onNewJob,
     onSearchJobs,
     onCompactTimeline,
+    onSmartCompactTimeline,
     onJumpToToday,
     onJumpToDeparture,
     onPrevJob,
@@ -177,6 +190,13 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       { id: 'compact-24h', label: 'Compacter 24h', category: 'Compaction', shortcut: 'Alt+C 3', keywords: 'compact compacter timeline global 24h', action: () => onCompactTimeline(24) },
       { id: 'compact-48h', label: 'Compacter 48h', category: 'Compaction', shortcut: 'Alt+C 4', keywords: 'compact compacter timeline global 48h', action: () => onCompactTimeline(48) },
       { id: 'compact-72h', label: 'Compacter 72h', category: 'Compaction', shortcut: 'Alt+C 5', keywords: 'compact compacter timeline global 72h', action: () => onCompactTimeline(72) },
+
+      // Smart compaction (similarity-aware reordering)
+      { id: 'smart-compact-4h', label: 'Smart compact 4h', category: 'Compaction', shortcut: 'Alt+O 1', keywords: 'smart intelligent compact similarity reorder 4h', action: () => onSmartCompactTimeline(4) },
+      { id: 'smart-compact-8h', label: 'Smart compact 8h', category: 'Compaction', shortcut: 'Alt+O 2', keywords: 'smart intelligent compact similarity reorder 8h', action: () => onSmartCompactTimeline(8) },
+      { id: 'smart-compact-24h', label: 'Smart compact 24h', category: 'Compaction', shortcut: 'Alt+O 3', keywords: 'smart intelligent compact similarity reorder 24h', action: () => onSmartCompactTimeline(24) },
+      { id: 'smart-compact-48h', label: 'Smart compact 48h', category: 'Compaction', shortcut: 'Alt+O 4', keywords: 'smart intelligent compact similarity reorder 48h', action: () => onSmartCompactTimeline(48) },
+      { id: 'smart-compact-72h', label: 'Smart compact 72h', category: 'Compaction', shortcut: 'Alt+O 5', keywords: 'smart intelligent compact similarity reorder 72h', action: () => onSmartCompactTimeline(72) },
 
     ];
 
@@ -228,5 +248,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onAutoPlace, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onSmartCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onAutoPlace, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

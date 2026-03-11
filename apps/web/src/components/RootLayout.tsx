@@ -13,7 +13,7 @@ function RootLayoutInner() {
   const navigate = useNavigate();
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
 
-  const chordPendingRef = useRef<'compact' | null>(null);
+  const chordPendingRef = useRef<'compact' | 'smartCompact' | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Shared commands available on all pages
@@ -24,6 +24,9 @@ function RootLayoutInner() {
     onSearchJobs: useCallback(() => navigate('/flux'), [navigate]),
     onCompactTimeline: useCallback((_h: CompactHorizon) => {
       // No-op at root level — compaction is page-specific and registered via context
+    }, []),
+    onSmartCompactTimeline: useCallback((_h: CompactHorizon) => {
+      // No-op at root level — smart compaction is page-specific
     }, []),
   });
 
@@ -57,10 +60,33 @@ function RootLayoutInner() {
         }
       }
 
+      // Chord shortcut: if Alt+O was pressed, wait for 1-5
+      if (chordPendingRef.current === 'smartCompact') {
+        chordPendingRef.current = null;
+        if (chordTimeoutRef.current) { clearTimeout(chordTimeoutRef.current); chordTimeoutRef.current = null; }
+        const horizonMap: Record<string, string> = { '1': 'smart-compact-4h', '2': 'smart-compact-8h', '3': 'smart-compact-24h', '4': 'smart-compact-48h', '5': 'smart-compact-72h' };
+        const cmdId = horizonMap[e.key];
+        if (cmdId) {
+          e.preventDefault();
+          const cmd = allCommands.find(c => c.id === cmdId);
+          cmd?.action();
+          return;
+        }
+      }
+
       // Alt+C: start compact chord
       if (isAltLetter(e, 'c')) {
         e.preventDefault();
         chordPendingRef.current = 'compact';
+        if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
+        chordTimeoutRef.current = setTimeout(() => { chordPendingRef.current = null; }, 1500);
+        return;
+      }
+
+      // Alt+O: start smart compact chord
+      if (isAltLetter(e, 'o')) {
+        e.preventDefault();
+        chordPendingRef.current = 'smartCompact';
         if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
         chordTimeoutRef.current = setTimeout(() => { chordPendingRef.current = null; }, 1500);
         return;

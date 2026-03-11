@@ -28,6 +28,7 @@ import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
 import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
 import { autoPlace } from './utils/autoPlace';
+import { intelligentCompact } from './utils/intelligentCompact';
 import { calculateEndTime } from './utils/timeCalculations';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
@@ -425,6 +426,9 @@ function AppContent() {
 
   // Global timeline compact loading state (v0.3.35)
   const [isCompactingTimeline, setIsCompactingTimeline] = useState(false);
+
+  // Smart compaction loading state
+  const [isSmartCompacting, setIsSmartCompacting] = useState(false);
 
   // Auto-place loading state
   const [isAutoPlacing, setIsAutoPlacing] = useState(false);
@@ -2374,6 +2378,63 @@ function AppContent() {
     }
   }, [snapshot.stations, snapshot.assignments, compactStation, showToast]);
 
+  // Handle smart compaction (similarity-aware reordering)
+  const handleSmartCompactTimeline = useCallback(async (horizonHours: CompactHorizon) => {
+    setIsSmartCompacting(true);
+    try {
+      const result = intelligentCompact({
+        snapshot,
+        horizonHours,
+        now: new Date(),
+        calculateEndTime,
+      });
+
+      if (result.movedCount === 0 && result.reorderedCount === 0) {
+        showToast('No tiles to compact', 'info');
+        return;
+      }
+
+      // Find assignments that changed (start or end time different)
+      const changedAssignments = result.snapshot.assignments.filter((newA) => {
+        const origA = snapshot.assignments.find((a) => a.id === newA.id);
+        if (!origA) return false;
+        return origA.scheduledStart !== newA.scheduledStart || origA.scheduledEnd !== newA.scheduledEnd;
+      });
+
+      // Persist via rescheduleTask API
+      let successCount = 0;
+      for (const assignment of changedAssignments) {
+        try {
+          await rescheduleTask({
+            taskId: assignment.taskId,
+            body: {
+              targetId: assignment.targetId,
+              scheduledStart: assignment.scheduledStart,
+            },
+          }).unwrap();
+          successCount++;
+        } catch (err) {
+          console.error('Smart compact reschedule failed:', err);
+        }
+      }
+
+      // Toast with similarity metrics
+      const simDelta = result.similarityAfter - result.similarityBefore;
+      const simPct = result.similarityBefore > 0
+        ? Math.round((simDelta / result.similarityBefore) * 100)
+        : 0;
+      const reorderMsg = result.reorderedCount > 0
+        ? `, ${result.reorderedCount} reordered`
+        : '';
+      const simMsg = simPct > 0 ? ` (+${simPct}% similarity)` : '';
+      showToast(`Smart compact: ${successCount} tiles moved${reorderMsg}${simMsg}`, 'success');
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error');
+    } finally {
+      setIsSmartCompacting(false);
+    }
+  }, [snapshot, rescheduleTask, showToast]);
+
   // Compute footer mode from app state
   const footerMode = useMemo(() => {
     if (isPicking) return 'picking' as const;
@@ -2434,6 +2495,7 @@ function AppContent() {
       setIsSidebarVisible(prev => !prev);
     }, []),
     onCompactTimeline: handleCompactTimeline,
+    onSmartCompactTimeline: handleSmartCompactTimeline,
     onZoomIn: useCallback(() => {
       const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
       if (idx < ZOOM_LEVELS.length - 1) {
