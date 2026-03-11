@@ -15,6 +15,7 @@ import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolk
 import { normalizeError } from './errorNormalization';
 import type { AuthState } from '../slices/authSlice';
 import { logout } from '../slices/authSlice';
+import { muteMercure } from '../../hooks/mercureMute';
 
 // ============================================================================
 // Configuration
@@ -82,6 +83,11 @@ export const realBaseQuery: BaseQueryFn<
   const startTime = Date.now();
   const url = typeof args === 'string' ? args : args.url;
   const method = typeof args === 'string' ? 'GET' : (args.method ?? 'GET');
+
+  // Mute Mercure for mutations — the mutating client already has latest data
+  if (method !== 'GET') {
+    muteMercure();
+  }
 
   try {
     // Execute the request

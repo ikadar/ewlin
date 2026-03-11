@@ -31,6 +31,13 @@ services:
       - mariadb_data:/var/lib/mysql
     restart: unless-stopped
 
+  mercure:
+    environment:
+      MERCURE_EXTRA_DIRECTIVES: |
+        cors_origins ${CORS_ALLOW_ORIGIN}
+    ports: !reset []
+    restart: unless-stopped
+
   # Redis disabled in prod — not actively used (cache.yaml and messenger are commented out)
   redis:
     profiles:
