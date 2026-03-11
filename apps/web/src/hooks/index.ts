@@ -13,3 +13,8 @@ export type { SessionLearningState, SessionLearningActions } from './useSessionL
 export { useToast } from './useToast';
 
 export { useDebouncedValue } from './useDebouncedValue';
+
+export { useMercureSubscription } from './useMercureSubscription';
+export type { MercureSubscription } from './useMercureSubscription';
+
+export { muteMercure, isMercureMuted } from './mercureMute';

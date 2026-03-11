@@ -57,6 +57,9 @@ services:
       REDIS_URL: redis://redis:6379
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET:-change_me_in_production}
+      MERCURE_URL: http://mercure:3000/.well-known/mercure
+      MERCURE_PUBLIC_URL: http://localhost:${MERCURE_PORT:-3000}/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -112,6 +115,30 @@ services:
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - flux-network
+
+  # ===========================================
+  # Mercure Hub (SSE real-time push)
+  # ===========================================
+  mercure:
+    image: dunglas/mercure:latest
+    container_name: flux-mercure
+    restart: unless-stopped
+    environment:
+      SERVER_NAME: ':3000'
+      MERCURE_PUBLISHER_JWT_KEY: '${MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}'
+      MERCURE_SUBSCRIBER_JWT_KEY: '${MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}'
+      MERCURE_EXTRA_DIRECTIVES: |
+        cors_origins http://localhost:5173 http://localhost:8080
+        anonymous
+    ports:
+      - "${MERCURE_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
       interval: 10s
       timeout: 5s
       retries: 3
