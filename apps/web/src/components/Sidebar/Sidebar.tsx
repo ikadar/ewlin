@@ -1,6 +1,5 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { CalendarDays, TowerControl, Settings, User, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
 import { useTheme } from '../../contexts/ThemeContext';
