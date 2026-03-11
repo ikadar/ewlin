@@ -8,6 +8,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { injectTestAuth } from './helpers/auth';
 
 /** Read the numeric count from a tab badge (format: "(N)"). */
 async function getTabCount(page: Page, tabId: string): Promise<number> {
@@ -17,10 +18,11 @@ async function getTabCount(page: Page, tabId: string): Promise<number> {
 
 test.describe('ST Column — header', () => {
   test('ST column header is visible with title tooltip', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
 
-    const stHeader = page.locator('th[title="Sous-traitance"]');
+    const stHeader = page.locator('th[title="Sous-traitance"]').filter({ hasText: 'ST' });
     await expect(stHeader).toBeVisible();
     await expect(stHeader).toHaveText('ST');
   });
@@ -28,6 +30,7 @@ test.describe('ST Column — header', () => {
 
 test.describe('ST Column — cell rendering', () => {
   test('rows with ST tasks show toggle buttons', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
 
@@ -44,6 +47,7 @@ test.describe('ST Column — cell rendering', () => {
   });
 
   test('some rows have empty ST cells (no tasks)', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
 
@@ -57,6 +61,7 @@ test.describe('ST Column — cell rendering', () => {
 
 test.describe('ST Column — click cycle', () => {
   test('clicking ST toggle does not break the table', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
 
@@ -72,6 +77,7 @@ test.describe('ST Column — click cycle', () => {
 
 test.describe('ST Column — S-T à faire tab', () => {
   test('navigating to /flux/soustraitance shows matching row count', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
 
@@ -85,6 +91,7 @@ test.describe('ST Column — S-T à faire tab', () => {
   });
 
   test('S-T à faire tab URL is /flux/soustraitance', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
 
@@ -94,6 +101,7 @@ test.describe('ST Column — S-T à faire tab', () => {
   });
 
   test('S-T à faire tab only shows jobs with non-done ST tasks', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux/soustraitance');
     await page.waitForSelector('[data-testid="flux-table"]');
 

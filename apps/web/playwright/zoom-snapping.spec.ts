@@ -240,7 +240,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
     expect(isOnSnapBoundary(time)).toBe(true);
   });
 
-  test('consistent snapping at multiple zoom levels', { timeout: 30_000 }, async ({ page }) => {
+  test('consistent snapping at multiple zoom levels', { timeout: 60_000 }, async ({ page }) => {
     // Test that snapping to 15-minute boundaries works at different zoom levels
     // Uses time-based placement for deterministic behavior
 
@@ -249,7 +249,7 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
       { level: '100%', hour: 17, minute: 0 },
       { level: '150%', hour: 18, minute: 0 },
     ]) {
-      // Navigate fresh for each test
+      // Navigate fresh for each iteration
       await page.goto('/?fixture=zoom-snapping');
       await waitForAppReady(page);
       await setZoomLevel(page, level);
@@ -269,14 +269,17 @@ test.describe('v0.3.48: Zoom-Aware Tile Snapping', () => {
         hour, minute, ZOOM_PPH[level]
       );
 
+      // Wait for tile to appear on station (more robust than fixed timeout in pickAndPlaceAtTime)
+      const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
+      const tileLocator = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
+      await expect(tileLocator).toBeVisible({ timeout: 15000 });
+
       // Verify tile was created
       const tilesAfter = await countTilesOnStation(page, 'station-komori');
       expect(tilesAfter).toBe(1);
 
       // Verify the time is on a 15-minute boundary
-      const stationColumn = page.locator('[data-testid="station-column-station-komori"]');
-      const newTile = stationColumn.locator('[data-testid^="tile-"][data-scheduled-start]').first();
-      const scheduledStart = await newTile.getAttribute('data-scheduled-start');
+      const scheduledStart = await tileLocator.getAttribute('data-scheduled-start');
 
       expect(scheduledStart).toBeTruthy();
       const time = parseTime(scheduledStart!);

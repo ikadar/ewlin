@@ -10,6 +10,7 @@
  */
 
 import { test, expect, type Page, type Locator } from '@playwright/test';
+import { injectTestAuth } from './helpers/auth';
 
 /**
  * Find the first single-element row (no expand toggle = 1 element).
@@ -49,6 +50,7 @@ async function getJobId(row: Locator): Promise<string> {
 
 test.describe('Flux Dashboard — Prerequisite Listbox', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
   });
@@ -175,6 +177,7 @@ test.describe('Flux Dashboard — Prerequisite Listbox', () => {
 
 test.describe('Flux Dashboard — Expand / Collapse', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
   });
@@ -259,6 +262,7 @@ test.describe('Flux Dashboard — Expand / Collapse', () => {
 
 test.describe('Flux Dashboard — Delete Confirmation', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
   });
@@ -317,6 +321,7 @@ test.describe('Flux Dashboard — Delete Confirmation', () => {
 
 test.describe('Flux Dashboard — Edit Navigation', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
   });

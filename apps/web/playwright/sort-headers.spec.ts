@@ -7,9 +7,11 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { injectTestAuth } from './helpers/auth';
 
 test.describe('Flux Dashboard — Sortable Column Headers', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-table"]');
   });

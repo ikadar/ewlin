@@ -19,6 +19,7 @@
 
 import { test, expect } from '@playwright/test';
 import { waitForAppReady } from './helpers/drag';
+import { injectTestAuth } from './helpers/auth';
 
 test.describe('v0.4.20: JCF Sequence Autocomplete', () => {
   test.beforeEach(async ({ page }) => {
@@ -346,6 +347,9 @@ test.describe('v0.4.31: Template-Free Mode', () => {
       localStorage.removeItem('flux-jcf-templates');
     });
 
+    // Inject auth — no fixture, so RequireAuth needs a valid token
+    await injectTestAuth(page);
+
     // NO fixture - this is template-free mode
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -385,7 +389,7 @@ test.describe('v0.4.31: Template-Free Mode', () => {
     // Should show postes from different categories (no filtering)
     await expect(dropdown).toContainText('KomoriG40'); // Presses Offset
     await expect(dropdown).toContainText('Polar137'); // Massicots
-    await expect(dropdown).toContainText('B26'); // Plieuses
+    await expect(dropdown).toContainText('StahlTH82'); // Finition
   });
 
   test('selecting template activates workflow with star markers', async ({

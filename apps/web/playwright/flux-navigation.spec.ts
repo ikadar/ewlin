@@ -9,6 +9,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { injectTestAuth } from './helpers/auth';
 
 /** Read the numeric count from a tab badge (format: "(N)"). */
 async function getTabCount(page: Page, tabId: string): Promise<number> {
@@ -18,6 +19,7 @@ async function getTabCount(page: Page, tabId: string): Promise<number> {
 
 test.describe('Flux Dashboard — Tab Navigation', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
   });
@@ -80,6 +82,7 @@ test.describe('Flux Dashboard — Tab Navigation', () => {
 
 test.describe('Flux Dashboard — URL Persistence', () => {
   test('direct navigation to /flux/papier loads correct tab', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux/papier');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
     await expect(page.locator('[data-testid="flux-tab-papier"]')).toHaveAttribute('aria-selected', 'true');
@@ -88,6 +91,7 @@ test.describe('Flux Dashboard — URL Persistence', () => {
   });
 
   test('direct navigation to /flux/formes loads correct tab', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux/formes');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
     await expect(page.locator('[data-testid="flux-tab-formes"]')).toHaveAttribute('aria-selected', 'true');
@@ -96,6 +100,7 @@ test.describe('Flux Dashboard — URL Persistence', () => {
   });
 
   test('page reload on /flux/plaques preserves active tab', async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux/plaques');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
     await page.reload();
@@ -108,6 +113,7 @@ test.describe('Flux Dashboard — URL Persistence', () => {
 
 test.describe('Flux Dashboard — Count Badges', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
   });
@@ -131,6 +137,7 @@ test.describe('Flux Dashboard — Count Badges', () => {
 
 test.describe('Flux Dashboard — Search', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-search"]');
   });
@@ -217,6 +224,7 @@ test.describe('Flux Dashboard — Search', () => {
 
 test.describe('Flux Dashboard — Keyboard Shortcuts', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-tab-bar"]');
   });
@@ -255,6 +263,7 @@ test.describe('Flux Dashboard — Keyboard Shortcuts', () => {
 
 test.describe('Flux Dashboard — Toolbar', () => {
   test.beforeEach(async ({ page }) => {
+    await injectTestAuth(page);
     await page.goto('/flux');
     await page.waitForSelector('[data-testid="flux-toolbar"]');
   });
