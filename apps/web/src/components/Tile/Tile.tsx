@@ -60,6 +60,10 @@ export interface TileProps {
   tirageLabel?: string;
   /** State-based tile color */
   tileState?: TileState;
+  /** Split badge text (e.g., "1/2") — shown after reference */
+  splitBadge?: string;
+  /** Whether this is a non-final split part (dashed bottom border) */
+  isNonFinalPart?: boolean;
 }
 
 /**
@@ -100,6 +104,8 @@ export const Tile = memo(function Tile({
   displayMode,
   tirageLabel,
   tileState = 'default',
+  splitBadge,
+  isNonFinalPart = false,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
@@ -237,7 +243,7 @@ export const Tile = memo(function Tile({
 
       {/* Run section - background only */}
       <div
-        className={`absolute left-0 right-0 ${colorClasses.runBg}`}
+        className={`absolute left-0 right-0 ${colorClasses.runBg}${isNonFinalPart ? ' border-b-2 border-dashed border-white/15' : ''}`}
         style={{
           top: hasSetup ? `${setupHeight}px` : 0,
           height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
@@ -266,6 +272,9 @@ export const Tile = memo(function Tile({
             data-testid="tile-content"
           >
             {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
+            {splitBadge && (
+              <span className="ml-1 text-[10px] opacity-70 font-normal">[{splitBadge}]</span>
+            )}
           </span>
         </div>
       </div>
@@ -324,7 +333,9 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.blockingInfo !== next.blockingInfo ||
     prev.displayMode !== next.displayMode ||
     prev.tirageLabel !== next.tirageLabel ||
-    prev.tileState !== next.tileState
+    prev.tileState !== next.tileState ||
+    prev.splitBadge !== next.splitBadge ||
+    prev.isNonFinalPart !== next.isNonFinalPart
   );
 }
 

@@ -4,6 +4,9 @@ export type { TileProps } from './Tile';
 export { TileContextMenu } from './TileContextMenu';
 export type { TileContextMenuProps } from './TileContextMenu';
 
+export { SplitPopover } from './SplitPopover';
+export type { SplitPopoverProps } from './SplitPopover';
+
 export { SwapButtons } from './SwapButtons';
 export type { SwapButtonsProps } from './SwapButtons';
 

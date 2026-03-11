@@ -1,6 +1,8 @@
 import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
 import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { isLastTaskOfJob } from '../../utils/taskHelpers';
+import { addWorkingTime } from '../../utils/workingTime';
+import type { SplitConfig } from '../../utils/splitTransform';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
@@ -45,6 +47,8 @@ export interface TaskListProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Callback when completion icon is clicked (assignmentId) */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Split configurations for expanding split tasks into sub-rows */
+  splitConfigs?: Map<string, SplitConfig>;
 }
 
 /**
@@ -70,6 +74,7 @@ export function TaskList({
   onDepartureChange,
   onReturnChange,
   onToggleComplete,
+  splitConfigs,
 }: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
@@ -230,6 +235,45 @@ export function TaskList({
       else if (isLate) tileState = 'late';
       else if (hasConflictFlag) tileState = 'conflict';
       else tileState = 'default';
+
+      // Check if this assignment has a split config → render N sub-rows
+      const splitConfig = assignment ? splitConfigs?.get(assignment.id) : undefined;
+
+      if (splitConfig && assignment && station) {
+        return (
+          <div key={task.id}>
+            {showDryTimeLabel && <DryTimeLabel />}
+            {splitConfig.parts.map((part, i) => {
+              const partStart = new Date(part.scheduledStart);
+              const totalMs = (splitConfig.setupMinutes + part.runMinutes) * 60_000;
+              const partEnd = addWorkingTime(partStart, totalMs, station);
+
+              const virtualAssignment: TaskAssignment = {
+                ...assignment,
+                id: `${assignment.id}:split:${i}`,
+                scheduledStart: partStart.toISOString(),
+                scheduledEnd: partEnd.toISOString(),
+              };
+
+              return (
+                <TaskTile
+                  key={`${task.id}:split:${i}`}
+                  task={task}
+                  job={job}
+                  tileState={tileState}
+                  assignment={virtualAssignment}
+                  station={station}
+                  splitBadge={`${i + 1}/${splitConfig.parts.length}`}
+                  onJumpToTask={onJumpToTask}
+                  onRecallTask={() => onRecallTask?.(assignment.id)}
+                  onToggleComplete={() => onToggleComplete?.(assignment.id)}
+                  isCompleted={isCompleted}
+                />
+              );
+            })}
+          </div>
+        );
+      }
 
       return (
         <div key={task.id}>

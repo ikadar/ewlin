@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, SplitPopover, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
 import { useTheme } from './contexts/ThemeContext';
 import { ZOOM_LEVELS } from './utils/zoom';
 import { Save } from 'lucide-react';
@@ -39,7 +39,7 @@ import {
   PICK_CURSOR_OFFSET_Y,
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory, ProposedAssignment } from '@flux/types';
-import { getDeadlineDate } from '@flux/types';
+import { getDeadlineDate, isInternalTask } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
@@ -47,6 +47,9 @@ import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
 import { FluxPage } from './pages/FluxPage';
+import { expandSplitAssignments, addSplit, removeSplit, reSplit, getRealAssignmentId, moveSplitPart, getSplitPartIndex } from './utils/splitTransform';
+import type { SplitConfig, VirtualAssignment } from './utils/splitTransform';
+import { addWorkingTime } from './utils/workingTime';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -437,6 +440,25 @@ function AppContent() {
     isCompleted: boolean;
   } | null>(null);
 
+  // Split tile state (view-layer only, session-local)
+  const [splitConfigs, setSplitConfigs] = useState<Map<string, SplitConfig>>(new Map());
+  const [splitPopoverData, setSplitPopoverData] = useState<{
+    assignmentId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // Split transform: expand split assignments into virtual tiles
+  // Must be declared before any useCallback that references virtualAssignments/virtualTasks
+  const { virtualAssignments, virtualTasks } = useMemo(() => {
+    if (splitConfigs.size === 0) {
+      return { virtualAssignments: snapshot.assignments, virtualTasks: snapshot.tasks };
+    }
+    return expandSplitAssignments(
+      snapshot.assignments, snapshot.tasks, snapshot.stations, splitConfigs
+    );
+  }, [snapshot.assignments, snapshot.tasks, snapshot.stations, splitConfigs]);
+
   // v0.4.38: JCF modal state derived from URL
   // Modal opens when URL is /job/new
   const isJcfModalOpen = location.pathname === '/job/new';
@@ -691,6 +713,13 @@ function AppContent() {
 
   // v0.5.14: Store original assignment info for grid picks (to restore outsourced on cancel)
   const gridPickInfoRef = useRef<{ taskId: string; targetId: string; scheduledStart: string } | null>(null);
+
+  // Split tile pick: store original position for ESC cancel (view-layer only, no API call)
+  const splitPickInfoRef = useRef<{
+    realAssignmentId: string;
+    partIndex: number;
+    originalScheduledStart: string;
+  } | null>(null);
 
   // v0.3.47: Zoom handler that maintains grid center position
   const handleZoomChange = useCallback((newPixelsPerHour: number) => {
@@ -1129,7 +1158,7 @@ function AppContent() {
             body: {
               targetId: assignment.targetId,
               scheduledStart: assignment.scheduledStart,
-              isOutsourced: false,
+              isOutsourced: assignment.isOutsourced,
             },
           }).unwrap();
           successCount++;
@@ -1220,6 +1249,10 @@ function AppContent() {
         }
         lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking
 
+        // Split tile cancel: restore part position (view-layer only, no API call)
+        const savedSplitPickInfo = splitPickInfoRef.current;
+        splitPickInfoRef.current = null;
+
         // v0.5.14: Restore outsourced successor assignments for grid picks
         // Reschedule at original position to trigger autoAssignOutsourcedSuccessors
         const savedGridPickInfo = gridPickInfoRef.current;
@@ -1228,7 +1261,12 @@ function AppContent() {
         pickActions.cancelPick();
         setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
 
-        if (savedGridPickInfo) {
+        if (savedSplitPickInfo) {
+          setSplitConfigs(prev => moveSplitPart(
+            prev, savedSplitPickInfo.realAssignmentId,
+            savedSplitPickInfo.partIndex, savedSplitPickInfo.originalScheduledStart
+          ));
+        } else if (savedGridPickInfo) {
           rescheduleTask({
             taskId: savedGridPickInfo.taskId,
             body: {
@@ -1310,15 +1348,16 @@ function AppContent() {
   // v0.3.58: Handle context menu "View details" action
   const handleContextMenuViewDetails = useCallback(() => {
     if (!contextMenu) return;
-    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
-    if (assignment) {
-      const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
+    // Use virtualAssignments to find both real and split tiles
+    const va = virtualAssignments.find((a) => a.id === contextMenu.assignmentId);
+    if (va) {
+      const task = virtualTasks.find((t) => t.id === va.taskId);
       if (task) {
         const jobId = getJobIdForTask(task, snapshot.elements);
         if (jobId) setSelectedJobId(jobId);
       }
     }
-  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.elements, setSelectedJobId]);
+  }, [contextMenu, virtualAssignments, virtualTasks, snapshot.elements, setSelectedJobId]);
 
   // Handle jump to task - scroll grid to assignment position (single-click in Job Details Panel)
   const handleJumpToTask = useCallback((assignment: TaskAssignment) => {
@@ -1373,14 +1412,21 @@ function AppContent() {
   // Handle recall - remove assignment (double-click on tile)
   // v0.5.2: Now uses RTK Query mutation
   const handleRecallAssignment = useCallback(async (assignmentId: string) => {
-    const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    const realId = getRealAssignmentId(assignmentId);
+
+    // Clear split config if exists
+    if (splitConfigs.has(realId)) {
+      setSplitConfigs(prev => removeSplit(prev, realId));
+    }
+
+    const assignment = snapshot.assignments.find((a) => a.id === realId);
     if (!assignment) {
-      console.warn('Assignment not found for recall:', assignmentId);
+      console.warn('Assignment not found for recall:', realId);
       return;
     }
 
     console.log('Recalling assignment:', {
-      assignmentId,
+      assignmentId: realId,
       taskId: assignment.taskId,
     });
 
@@ -1391,7 +1437,7 @@ function AppContent() {
       console.error('Failed to recall assignment:', error);
       showToast(getErrorMessage(error));
     }
-  }, [snapshot.assignments, unassignTask, showToast]);
+  }, [snapshot.assignments, unassignTask, showToast, splitConfigs]);
 
   // v0.4.32a: Handle element prerequisite status change
   const handleElementStatusChange = useCallback(async (update: ElementStatusUpdate) => {
@@ -1577,26 +1623,32 @@ function AppContent() {
   // v0.3.58: Handle context menu "Toggle completion" action
   const handleContextMenuToggleComplete = useCallback(() => {
     if (!contextMenu) return;
-    handleToggleComplete(contextMenu.assignmentId);
+    // Resolve to real assignment ID for API call (split tiles use virtual IDs)
+    handleToggleComplete(getRealAssignmentId(contextMenu.assignmentId));
   }, [contextMenu, handleToggleComplete]);
 
   // v0.3.58: Handle context menu "Move up" action
   const handleContextMenuMoveUp = useCallback(() => {
     if (!contextMenu) return;
-    handleSwapUp(contextMenu.assignmentId);
+    handleSwapUp(getRealAssignmentId(contextMenu.assignmentId));
   }, [contextMenu, handleSwapUp]);
 
   // v0.3.58: Handle context menu "Move down" action
   const handleContextMenuMoveDown = useCallback(() => {
     if (!contextMenu) return;
-    handleSwapDown(contextMenu.assignmentId);
+    handleSwapDown(getRealAssignmentId(contextMenu.assignmentId));
   }, [contextMenu, handleSwapDown]);
 
   // v0.3.58: Calculate if swap is available for context menu
   const getContextMenuSwapAvailability = useCallback(() => {
     if (!contextMenu) return { canSwapUp: false, canSwapDown: false };
 
-    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    // Resolve to real assignment ID (split tiles can't swap)
+    const realId = getRealAssignmentId(contextMenu.assignmentId);
+    const isSplitTile = realId !== contextMenu.assignmentId;
+    if (isSplitTile) return { canSwapUp: false, canSwapDown: false };
+
+    const assignment = snapshot.assignments.find((a) => a.id === realId);
     if (!assignment) return { canSwapUp: false, canSwapDown: false };
 
     // Completed tiles cannot be swapped
@@ -1607,7 +1659,7 @@ function AppContent() {
       .filter((a) => a.targetId === assignment.targetId)
       .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
 
-    const currentIndex = stationAssignments.findIndex((a) => a.id === contextMenu.assignmentId);
+    const currentIndex = stationAssignments.findIndex((a) => a.id === realId);
 
     // Also check if adjacent tiles are completed
     const adjacentUp = currentIndex > 0 ? stationAssignments[currentIndex - 1] : null;
@@ -1618,6 +1670,91 @@ function AppContent() {
       canSwapDown: currentIndex < stationAssignments.length - 1 && !adjacentDown?.isCompleted,
     };
   }, [contextMenu, snapshot.assignments]);
+
+  // Split: determine canSplit/canMerge for current context menu target
+  const getContextMenuSplitAvailability = useCallback(() => {
+    if (!contextMenu) return { canSplit: false, canMerge: false };
+    if (contextMenu.isCompleted) return { canSplit: false, canMerge: false };
+
+    const va = (virtualAssignments as VirtualAssignment[]).find(
+      (a) => a.id === contextMenu.assignmentId
+    );
+    if (!va) return { canSplit: false, canMerge: false };
+
+    const realId = va.realAssignmentId ?? va.id;
+    const canMerge = splitConfigs.has(realId);
+
+    // For canSplit: check runMinutes >= 30
+    const task = virtualTasks.find(t => t.id === va.taskId);
+    const canSplit = task && isInternalTask(task) && task.duration.runMinutes >= 30;
+
+    return { canSplit: !!canSplit, canMerge };
+  }, [contextMenu, virtualAssignments, virtualTasks, splitConfigs]);
+
+  // Split: open split popover (called from context menu "Diviser")
+  const handleContextMenuSplit = useCallback(() => {
+    if (!contextMenu) return;
+    const { x, y, assignmentId } = contextMenu;
+    setContextMenu(null); // Close context menu
+    setSplitPopoverData({ assignmentId, x, y }); // Open split popover
+  }, [contextMenu]);
+
+  // Split: confirm split from popover
+  const handleSplitConfirm = useCallback((splitAtRunMinutes: number) => {
+    if (!splitPopoverData) return;
+
+    const va = (virtualAssignments as VirtualAssignment[]).find(
+      (a) => a.id === splitPopoverData.assignmentId
+    );
+    if (!va) { setSplitPopoverData(null); return; }
+
+    const realId = va.realAssignmentId ?? va.id;
+
+    if (va.splitPartIndex !== undefined) {
+      // Re-split an already-split part
+      const config = splitConfigs.get(realId);
+      if (!config) { setSplitPopoverData(null); return; }
+      const station = snapshot.stations.find(s => s.id === va.targetId);
+      const partStart = config.parts[va.splitPartIndex!].scheduledStart;
+      const subPartEndMs = (config.setupMinutes + splitAtRunMinutes) * 60 * 1000;
+      const newSubPartStart = station
+        ? addWorkingTime(new Date(partStart), subPartEndMs, station).toISOString()
+        : new Date(new Date(partStart).getTime() + subPartEndMs).toISOString();
+      setSplitConfigs(prev => reSplit(prev, realId, va.splitPartIndex!, splitAtRunMinutes, newSubPartStart));
+    } else {
+      // New split
+      const assignment = snapshot.assignments.find(a => a.id === realId);
+      if (!assignment) { setSplitPopoverData(null); return; }
+      const task = snapshot.tasks.find(t => t.id === assignment.taskId);
+      if (!task || !isInternalTask(task)) { setSplitPopoverData(null); return; }
+      const station = snapshot.stations.find(s => s.id === assignment.targetId);
+      const part0Start = assignment.scheduledStart;
+      const part0EndMs = (task.duration.setupMinutes + splitAtRunMinutes) * 60 * 1000;
+      const part1Start = station
+        ? addWorkingTime(new Date(part0Start), part0EndMs, station).toISOString()
+        : new Date(new Date(part0Start).getTime() + part0EndMs).toISOString();
+      setSplitConfigs(prev => addSplit(prev, realId, task.id, task.duration.setupMinutes, [
+        { runMinutes: splitAtRunMinutes, scheduledStart: part0Start },
+        { runMinutes: task.duration.runMinutes - splitAtRunMinutes, scheduledStart: part1Start },
+      ]));
+    }
+
+    setSplitPopoverData(null);
+  }, [splitPopoverData, virtualAssignments, snapshot.assignments, snapshot.tasks, snapshot.stations, splitConfigs]);
+
+  // Split: merge (remove split config)
+  const handleContextMenuMerge = useCallback(() => {
+    if (!contextMenu) return;
+
+    const va = (virtualAssignments as VirtualAssignment[]).find(
+      (a) => a.id === contextMenu.assignmentId
+    );
+    if (!va) return;
+
+    const realId = va.realAssignmentId ?? va.id;
+    setSplitConfigs(prev => removeSplit(prev, realId));
+    setContextMenu(null);
+  }, [contextMenu, virtualAssignments]);
 
   // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
   // In backward scheduling, we always show the last task as the one to place
@@ -1875,10 +2012,28 @@ function AppContent() {
   // v0.3.57: Handle pick from grid (reschedule existing task)
   // No scroll needed as user is already at tile location
   const handlePickFromGrid = useCallback(async (task: InternalTask, job: Job, assignmentId: string) => {
+    // Detect virtual (split) tile
+    const partIndex = getSplitPartIndex(assignmentId);
+    const isVirtualPick = partIndex !== null;
+
     pickActions.pickFromGrid(task, job, assignmentId);
     // Initialize ghost position at cursor (will be updated on mouse move)
     pickActions.updateGhostPosition(0, 0);
     // No scroll position saving for grid picks - no scroll restoration needed
+
+    if (isVirtualPick) {
+      // Virtual tile: store original position for ESC cancel (view-layer only)
+      const realId = getRealAssignmentId(assignmentId);
+      const va = (virtualAssignments as VirtualAssignment[]).find(a => a.id === assignmentId);
+      splitPickInfoRef.current = va
+        ? { realAssignmentId: realId, partIndex, originalScheduledStart: va.scheduledStart }
+        : null;
+      gridPickInfoRef.current = null; // Not a real grid pick
+      return; // Skip outsourced successor removal (view-layer only)
+    }
+
+    // Real tile: existing behavior
+    splitPickInfoRef.current = null;
 
     // v0.5.14: Store original position for cancel restoration
     const originalAssignment = snapshot.assignments.find((a) => a.id === assignmentId);
@@ -1915,7 +2070,7 @@ function AppContent() {
         }
       }
     }
-  }, [pickActions, snapshot, unassignTask]);
+  }, [pickActions, snapshot, unassignTask, virtualAssignments]);
 
   // v0.3.54: Handle mouse move during pick (update ghost position and validate)
   // v0.3.56: Added early-exit optimization when cursor stays in same slot
@@ -2005,6 +2160,22 @@ function AppContent() {
     startDate.setMinutes(snappedMinutes, 0, 0);
     const scheduledStart = startDate.toISOString();
 
+    // Virtual (split) tile reschedule — view-layer only, no API call
+    const isVirtualReschedule = pickedAssignmentId?.includes(':split:') ?? false;
+    if (isVirtualReschedule) {
+      const realId = getRealAssignmentId(pickedAssignmentId!);
+      const partIndex = getSplitPartIndex(pickedAssignmentId!);
+      if (partIndex !== null) {
+        setSplitConfigs(prev => moveSplitPart(prev, realId, partIndex, scheduledStart));
+      }
+      splitPickInfoRef.current = null;
+      gridPickInfoRef.current = null;
+      pickActions.completePlacement();
+      lastPickSlotRef.current = null;
+      setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
+      return;
+    }
+
     // Validate
     const proposedAssignment: ProposedAssignment = {
       taskId: pickedTask.id,
@@ -2030,12 +2201,19 @@ function AppContent() {
     if (blockingConflicts.length > 0 && !isAltPressed) {
       console.log('Pick placement blocked: validation failed', blockingConflicts);
       // Cancel pick so the tile returns to its original state
+      const savedSplitPickInfo = splitPickInfoRef.current;
+      splitPickInfoRef.current = null;
       // v0.5.14: Restore outsourced successor assignments (same as ESC cancel)
       const savedGridPickInfo = gridPickInfoRef.current;
       gridPickInfoRef.current = null;
       pickActions.cancelPick();
       setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
-      if (savedGridPickInfo) {
+      if (savedSplitPickInfo) {
+        setSplitConfigs(prev => moveSplitPart(
+          prev, savedSplitPickInfo.realAssignmentId,
+          savedSplitPickInfo.partIndex, savedSplitPickInfo.originalScheduledStart
+        ));
+      } else if (savedGridPickInfo) {
         rescheduleTask({
           taskId: savedGridPickInfo.taskId,
           body: {
@@ -2311,6 +2489,7 @@ function AppContent() {
           onReturnChange={handleOutsourcingReturnChange}
           onEditJob={handleEditJob}
           lateJobIds={lateJobIds}
+          splitConfigs={splitConfigs}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Mode banner — shows active mode (quick placement / picking) */}
@@ -2332,9 +2511,9 @@ function AppContent() {
           stations={snapshot.stations}
           categories={snapshot.categories}
           jobs={snapshot.jobs}
-          tasks={snapshot.tasks}
+          tasks={virtualTasks}
           elements={snapshot.elements}
-          assignments={snapshot.assignments}
+          assignments={virtualAssignments}
           selectedJobId={deferredSelectedJobId}
           startHour={START_HOUR}
           hoursToDisplay={DAY_COUNT * 24}
@@ -2411,14 +2590,52 @@ function AppContent() {
           isCompleted={contextMenu.isCompleted}
           canSwapUp={getContextMenuSwapAvailability().canSwapUp}
           canSwapDown={getContextMenuSwapAvailability().canSwapDown}
+          canSplit={getContextMenuSplitAvailability().canSplit}
+          canMerge={getContextMenuSplitAvailability().canMerge}
           onViewDetails={handleContextMenuViewDetails}
           onToggleComplete={handleContextMenuToggleComplete}
           onSwapUp={handleContextMenuMoveUp}
           onSwapDown={handleContextMenuMoveDown}
-          onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
+          onRecall={() => {
+            // Clear split config before recalling
+            const va = (virtualAssignments as VirtualAssignment[]).find(
+              a => a.id === contextMenu.assignmentId
+            );
+            const realId = va?.realAssignmentId ?? contextMenu.assignmentId;
+            if (splitConfigs.has(realId)) {
+              setSplitConfigs(prev => removeSplit(prev, realId));
+            }
+            handleRecallAssignment(getRealAssignmentId(contextMenu.assignmentId));
+          }}
+          onSplit={handleContextMenuSplit}
+          onMerge={handleContextMenuMerge}
           onClose={handleContextMenuClose}
         />
       )}
+
+      {/* Split popover */}
+      {splitPopoverData && (() => {
+        const va = (virtualAssignments as VirtualAssignment[]).find(
+          a => a.id === splitPopoverData.assignmentId
+        );
+        if (!va) return null;
+        const task = virtualTasks.find(t => t.id === va.taskId);
+        if (!task || !isInternalTask(task)) return null;
+        const jobId = getJobIdForTask(task, snapshot.elements);
+        const job = jobId ? snapshot.jobs.find(j => j.id === jobId) : null;
+        if (!job) return null;
+        return (
+          <SplitPopover
+            x={splitPopoverData.x}
+            y={splitPopoverData.y}
+            task={task}
+            job={job}
+            assignment={va}
+            onConfirm={handleSplitConfirm}
+            onCancel={() => setSplitPopoverData(null)}
+          />
+        );
+      })()}
 
       {/* v0.4.6: JCF Modal */}
       <JcfModal

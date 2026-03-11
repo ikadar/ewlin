@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2 } from 'lucide-react';
+import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2, Scissors, Merge } from 'lucide-react';
 
 export interface TileContextMenuProps {
   /** Menu position X coordinate (from cursor) */
@@ -23,6 +23,14 @@ export interface TileContextMenuProps {
   onSwapDown: () => void;
   /** Callback for "Recall" action (unassign) */
   onRecall: () => void;
+  /** Whether split is available (runMinutes >= 30 && !completed) */
+  canSplit?: boolean;
+  /** Whether merge is available (tile is part of a split group) */
+  canMerge?: boolean;
+  /** Callback for "Diviser" action */
+  onSplit?: () => void;
+  /** Callback for "Fusionner" action */
+  onMerge?: () => void;
   /** Callback to close the menu */
   onClose: () => void;
 }
@@ -82,6 +90,10 @@ export function TileContextMenu({
   onSwapUp,
   onSwapDown,
   onRecall,
+  canSplit = false,
+  canMerge = false,
+  onSplit,
+  onMerge,
   onClose,
 }: TileContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -89,7 +101,7 @@ export function TileContextMenu({
   // Calculate position with viewport edge detection
   const getPosition = useCallback(() => {
     const menuWidth = 200;
-    const menuHeight = 180; // Approximate height
+    const menuHeight = 240; // Approximate height (includes split/merge items)
     const padding = 8;
 
     let posX = x;
@@ -188,6 +200,20 @@ export function TileContextMenu({
     }
   };
 
+  const handleSplit = () => {
+    if (canSplit) {
+      onSplit?.();
+      // Don't close — split popover opens instead
+    }
+  };
+
+  const handleMerge = () => {
+    if (canMerge) {
+      onMerge?.();
+      onClose();
+    }
+  };
+
   return createPortal(
     <div
       ref={menuRef}
@@ -215,6 +241,21 @@ export function TileContextMenu({
         disabled={isCompleted}
         testId="context-menu-recall"
       />
+      <MenuItem
+        icon={<Scissors className="w-4 h-4" />}
+        label="Diviser"
+        onClick={handleSplit}
+        disabled={!canSplit}
+        testId="context-menu-split"
+      />
+      {canMerge && (
+        <MenuItem
+          icon={<Merge className="w-4 h-4" />}
+          label="Fusionner"
+          onClick={handleMerge}
+          testId="context-menu-merge"
+        />
+      )}
       <Separator />
       <MenuItem
         icon={<ChevronUp className="w-4 h-4" />}

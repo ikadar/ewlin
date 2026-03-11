@@ -48,7 +48,7 @@ export interface AutoPlaceResult {
 export interface AutoPlaceWarning {
   taskId: string;
   jobId: string;
-  type: 'infeasible' | 'placed_with_delay' | 'group_capacity_violation';
+  type: 'infeasible' | 'placed_with_delay' | 'group_capacity_violation' | 'precedence_conflict';
   message: string;
 }
 
@@ -601,14 +601,17 @@ export function autoPlace(options: AutoPlaceOptions): AutoPlaceResult {
   const stationMap = new Map(snapshot.stations.map((s) => [s.id, s]));
   const chainDurationCache = new Map<string, number>();
 
-  // Collect placeable tasks (unassigned internal tasks)
-  const placeableTasks = topoOrder.filter((id) => {
+  // Collect placeable tasks (unassigned internal tasks) as a Set
+  const placeableSet = new Set<string>();
+  for (const id of topoOrder) {
     const node = graph.get(id)!;
-    return !node.isAssigned && !node.isOutsourced;
-  });
+    if (!node.isAssigned && !node.isOutsourced) {
+      placeableSet.add(id);
+    }
+  }
 
-  // Sort by composite priority
-  placeableTasks.sort((aId, bId) => {
+  // Priority comparator (same 3-tier logic: slack, deadline, chain)
+  function comparePriority(aId: string, bId: string): number {
     const aBack = backwardResults.get(aId)!;
     const bBack = backwardResults.get(bId)!;
     const aNode = graph.get(aId)!;
@@ -628,7 +631,19 @@ export function autoPlace(options: AutoPlaceOptions): AutoPlaceResult {
     const aChain = computeRemainingChainDuration(aId, graph, chainDurationCache);
     const bChain = computeRemainingChainDuration(bId, graph, chainDurationCache);
     return bChain - aChain; // descending — longer chains first
-  });
+  }
+
+  // Initialize ready set: tasks whose successors are ALL outside placeableSet
+  // (i.e., already assigned, outsourced, or not in graph — these are "terminal")
+  const readySet = new Set<string>();
+  const placedSet = new Set<string>();
+  for (const taskId of placeableSet) {
+    const node = graph.get(taskId)!;
+    const hasUnplacedSuccessor = node.successors.some((s) => placeableSet.has(s));
+    if (!hasUnplacedSuccessor) {
+      readySet.add(taskId);
+    }
+  }
 
   // Track all assignments (existing + new)
   const allAssignments = [...snapshot.assignments];
@@ -637,7 +652,18 @@ export function autoPlace(options: AutoPlaceOptions): AutoPlaceResult {
   let placedCount = 0;
   let skippedCount = 0;
 
-  for (const taskId of placeableTasks) {
+  // Ready-list loop: pick highest-priority task from readySet, place it,
+  // then unlock predecessors whose successors are all placed.
+  while (readySet.size > 0) {
+    // Pick highest-priority task from readySet
+    let bestId: string | null = null;
+    for (const id of readySet) {
+      if (bestId === null || comparePriority(id, bestId) < 0) {
+        bestId = id;
+      }
+    }
+    const taskId = bestId!;
+    readySet.delete(taskId);
     const node = graph.get(taskId)!;
     const br = backwardResults.get(taskId)!;
     const station = stationMap.get(node.stationId!);
@@ -791,6 +817,126 @@ export function autoPlace(options: AutoPlaceOptions): AutoPlaceResult {
           jobId: node.jobId,
           type: 'infeasible',
           message: `No slot found on station ${station.name}`,
+        });
+      }
+    }
+
+    // Mark task as placed and unlock predecessors
+    placedSet.add(taskId);
+    for (const predId of node.predecessors) {
+      if (!placeableSet.has(predId) || placedSet.has(predId)) continue;
+      const predNode = graph.get(predId)!;
+      const allSuccsPlaced = predNode.successors.every(
+        (s) => !placeableSet.has(s) || placedSet.has(s)
+      );
+      if (allSuccsPlaced) {
+        readySet.add(predId);
+      }
+    }
+  }
+
+  // Phase 5: Outsourced task placement (post-loop)
+  // Outsourced tasks don't compete for station resources — create assignments
+  // based on predecessor end times computed from actual placements.
+  for (const taskId of topoOrder) {
+    const node = graph.get(taskId)!;
+    if (node.isAssigned || !node.isOutsourced) continue;
+    if (!isOutsourcedTask(node.task)) continue;
+
+    // Find actual predecessor end time
+    let predecessorEnd: Date | undefined;
+    for (const predId of node.predecessors) {
+      const predNode = graph.get(predId);
+      if (!predNode) continue;
+
+      const predAssignment = allAssignments.find((a) => a.taskId === predId);
+      if (predAssignment) {
+        let predEnd = new Date(predAssignment.scheduledEnd);
+        if (isInternalTask(predNode.task) && isPrintingStation(snapshot, predNode.task.stationId)) {
+          predEnd = new Date(predEnd.getTime() + DRY_TIME_MS);
+        }
+        if (!predecessorEnd || predEnd > predecessorEnd) {
+          predecessorEnd = predEnd;
+        }
+      }
+    }
+
+    const departureTime = getOutsourcedDepartureTimeForSuccessor(node.task, predecessorEnd);
+    const returnTime = getOutsourcedReturnTime(node.task, predecessorEnd, snapshot);
+
+    if (departureTime && returnTime) {
+      const assignment: TaskAssignment = {
+        id: `auto-${taskId}`,
+        taskId,
+        targetId: node.task.providerId,
+        isOutsourced: true,
+        scheduledStart: departureTime.toISOString(),
+        scheduledEnd: returnTime.toISOString(),
+        isCompleted: false,
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      allAssignments.push(assignment);
+      newAssignments.push(assignment);
+      placedStartTimes.set(taskId, departureTime);
+      placedCount++;
+    } else {
+      skippedCount++;
+      warnings.push({
+        taskId,
+        jobId: node.jobId,
+        type: 'infeasible',
+        message: `Cannot compute outsourced departure/return times (no predecessor end or provider)`,
+      });
+    }
+  }
+
+  // Warn about unreachable tasks (cycle or orphan)
+  for (const taskId of placeableSet) {
+    if (!placedSet.has(taskId)) {
+      const node = graph.get(taskId)!;
+      skippedCount++;
+      warnings.push({
+        taskId,
+        jobId: node.jobId,
+        type: 'infeasible',
+        message: `Task unreachable in ready-list (possible cycle or orphan)`,
+      });
+    }
+  }
+
+  // Post-placement precedence validation (safety net)
+  for (const taskId of placedSet) {
+    const node = graph.get(taskId)!;
+    const taskStart = placedStartTimes.get(taskId);
+    if (!taskStart) continue;
+
+    for (const predId of node.predecessors) {
+      const predNode = graph.get(predId);
+      if (!predNode) continue;
+
+      let predEnd: Date | undefined;
+      // Check placed predecessors
+      const predAssignment = allAssignments.find((a) => a.taskId === predId);
+      if (predAssignment) {
+        predEnd = new Date(predAssignment.scheduledEnd);
+      }
+      if (!predEnd) continue;
+
+      // Add drying time if predecessor is on printing station
+      let effectivePredEnd = predEnd;
+      if (isInternalTask(predNode.task) && isPrintingStation(snapshot, predNode.task.stationId)) {
+        effectivePredEnd = new Date(predEnd.getTime() + DRY_TIME_MS);
+      }
+
+      if (effectivePredEnd.getTime() > taskStart.getTime()) {
+        warnings.push({
+          taskId,
+          jobId: node.jobId,
+          type: 'precedence_conflict',
+          message: `Predecessor ${predId} ends at ${effectivePredEnd.toISOString()} but task starts at ${taskStart.toISOString()}`,
         });
       }
     }

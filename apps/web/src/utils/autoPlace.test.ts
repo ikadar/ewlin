@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { autoPlace } from './autoPlace';
-import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Job, Element, StationCategory } from '@flux/types';
+import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Job, Element, StationCategory, OutsourcedProvider } from '@flux/types';
 
 // ============================================================================
 // Test helpers (mirrors compactTimeline.test.ts pattern)
@@ -141,6 +141,46 @@ const offsetCategory: StationCategory = {
   name: 'Offset',
   displayOrder: 1,
 };
+
+function createOutsourcedTask(
+  id: string,
+  elementId: string,
+  providerId: string,
+  sequenceOrder: number,
+  options: { manualDeparture?: string; manualReturn?: string; openDays?: number } = {}
+): Task {
+  return {
+    id,
+    elementId,
+    type: 'Outsourced',
+    providerId,
+    actionType: 'Pelliculage',
+    sequenceOrder,
+    status: 'Defined',
+    duration: {
+      openDays: options.openDays ?? 3,
+      latestDepartureTime: '14:00',
+      receptionTime: '09:00',
+    },
+    manualDeparture: options.manualDeparture,
+    manualReturn: options.manualReturn,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  } as Task;
+}
+
+function createProvider(id: string): OutsourcedProvider {
+  return {
+    id,
+    name: `Provider ${id}`,
+    status: 'Active',
+    supportedActionTypes: ['Pelliculage'],
+    latestDepartureTime: '14:00',
+    receptionTime: '09:00',
+    transitDays: 1,
+    groupId: 'grp-outsourced',
+  };
+}
 
 function mockCalculateEndTime(task: InternalTask, start: string): string {
   const startDate = new Date(start);
@@ -608,6 +648,180 @@ describe('autoPlace', () => {
       // Should not be on Saturday (6) or Sunday (0)
       expect(startDay).not.toBe(0);
       expect(startDay).not.toBe(6);
+    });
+  });
+
+  describe('ready-list ordering', () => {
+    it('successor displaced, predecessor cascades to actual position', () => {
+      // Job A: t1 (s1, 60min) → t2 (s2, 60min)
+      // Job B: t3 (s2, 60min) — competes for s2 with earlier deadline
+      // t3 should take t2's theoretical ALAP slot, forcing t2 earlier.
+      // t1 must then adjust to t2's ACTUAL position, not theoretical.
+      const s1 = createStation('s1');
+      const s2 = createStation('s2');
+      const t1 = createTask('t1', 'elem-ja', 's1', 0, 60);
+      const t2 = createTask('t2', 'elem-ja', 's2', 1, 60);
+      const t3 = createTask('t3', 'elem-jb', 's2', 0, 60);
+
+      const snapshot = createSnapshot({
+        stations: [s1, s2],
+        categories: [defaultCategory],
+        // Job B has earlier deadline → higher priority → gets the latest slot on s2
+        jobs: [createJob('ja', '2026-03-20'), createJob('jb', '2026-03-19')],
+        elements: [
+          createElement('elem-ja', 'ja', ['t1', 't2']),
+          createElement('elem-jb', 'jb', ['t3']),
+        ],
+        tasks: [t1, t2, t3],
+      });
+
+      const result = autoPlace({
+        snapshot,
+        jobIds: ['ja', 'jb'],
+        now: new Date('2026-03-16T08:00:00Z'),
+        calculateEndTime: mockCalculateEndTime,
+      });
+
+      expect(result.placedCount).toBe(3);
+
+      const a1 = result.snapshot.assignments.find((a) => a.taskId === 't1')!;
+      const a2 = result.snapshot.assignments.find((a) => a.taskId === 't2')!;
+
+      // Precedence: t1 must end before or at t2's start
+      expect(new Date(a1.scheduledEnd).getTime()).toBeLessThanOrEqual(
+        new Date(a2.scheduledStart).getTime()
+      );
+    });
+
+    it('same-station chain with competing job — no overlap', () => {
+      // 3 tasks all on station s1:
+      // Job A chain: tA1 (60min) → tA2 (60min)
+      // Job B: tB1 (60min)
+      const s1 = createStation('s1');
+      const tA1 = createTask('tA1', 'elem-ja', 's1', 0, 60);
+      const tA2 = createTask('tA2', 'elem-ja', 's1', 1, 60);
+      const tB1 = createTask('tB1', 'elem-jb', 's1', 0, 60);
+
+      const snapshot = createSnapshot({
+        stations: [s1],
+        categories: [defaultCategory],
+        jobs: [createJob('ja', '2026-03-20'), createJob('jb', '2026-03-20')],
+        elements: [
+          createElement('elem-ja', 'ja', ['tA1', 'tA2']),
+          createElement('elem-jb', 'jb', ['tB1']),
+        ],
+        tasks: [tA1, tA2, tB1],
+      });
+
+      const result = autoPlace({
+        snapshot,
+        jobIds: ['ja', 'jb'],
+        now: new Date('2026-03-16T08:00:00Z'),
+        calculateEndTime: mockCalculateEndTime,
+      });
+
+      expect(result.placedCount).toBe(3);
+
+      const assignments = result.snapshot.assignments.filter((a) => a.id.startsWith('auto-'));
+      // No pair should overlap
+      for (let i = 0; i < assignments.length; i++) {
+        for (let j = i + 1; j < assignments.length; j++) {
+          const si = new Date(assignments[i].scheduledStart).getTime();
+          const ei = new Date(assignments[i].scheduledEnd).getTime();
+          const sj = new Date(assignments[j].scheduledStart).getTime();
+          const ej = new Date(assignments[j].scheduledEnd).getTime();
+          const noOverlap = ei <= sj || ej <= si;
+          expect(noOverlap).toBe(true);
+        }
+      }
+
+      // Precedence: tA1 ends ≤ tA2 starts
+      const aA1 = result.snapshot.assignments.find((a) => a.taskId === 'tA1')!;
+      const aA2 = result.snapshot.assignments.find((a) => a.taskId === 'tA2')!;
+      expect(new Date(aA1.scheduledEnd).getTime()).toBeLessThanOrEqual(
+        new Date(aA2.scheduledStart).getTime()
+      );
+    });
+
+    it('no precedence_conflict warnings for simple chain', () => {
+      const s1 = createStation('s1');
+      const s2 = createStation('s2');
+      const t1 = createTask('t1', 'elem-j1', 's1', 0, 60);
+      const t2 = createTask('t2', 'elem-j1', 's2', 1, 60);
+
+      const snapshot = createSnapshot({
+        stations: [s1, s2],
+        categories: [defaultCategory],
+        jobs: [createJob('j1', '2026-03-20')],
+        elements: [createElement('elem-j1', 'j1', ['t1', 't2'])],
+        tasks: [t1, t2],
+      });
+
+      const result = autoPlace({
+        snapshot,
+        jobIds: ['j1'],
+        now: new Date('2026-03-16T08:00:00Z'),
+        calculateEndTime: mockCalculateEndTime,
+      });
+
+      expect(result.placedCount).toBe(2);
+      const precedenceWarnings = result.warnings.filter((w) => w.type === 'precedence_conflict');
+      expect(precedenceWarnings).toHaveLength(0);
+    });
+  });
+
+  describe('outsourced task placement', () => {
+    it('creates assignment for outsourced task in chain with correct times and targetId', () => {
+      // Chain: internal t1 (s1, 60min) → outsourced t2 → internal t3 (s2, 60min)
+      const s1 = createStation('s1');
+      const s2 = createStation('s2');
+      const provider = createProvider('prov-1');
+
+      const t1 = createTask('t1', 'elem-j1', 's1', 0, 60);
+      const t2 = createOutsourcedTask('t2', 'elem-j1', 'prov-1', 1, {
+        manualDeparture: '2026-03-18T14:00:00Z',
+        manualReturn: '2026-03-19T09:00:00Z',
+      });
+      const t3 = createTask('t3', 'elem-j1', 's2', 2, 60);
+
+      const snapshot = createSnapshot({
+        stations: [s1, s2],
+        categories: [defaultCategory],
+        providers: [provider],
+        jobs: [createJob('j1', '2026-03-20')],
+        elements: [createElement('elem-j1', 'j1', ['t1', 't2', 't3'])],
+        tasks: [t1, t2, t3],
+      });
+
+      const result = autoPlace({
+        snapshot,
+        jobIds: ['j1'],
+        now: new Date('2026-03-16T08:00:00Z'),
+        calculateEndTime: mockCalculateEndTime,
+      });
+
+      // All 3 tasks should be placed (2 internal + 1 outsourced)
+      expect(result.placedCount).toBe(3);
+
+      // Verify outsourced assignment
+      const a2 = result.snapshot.assignments.find((a) => a.taskId === 't2')!;
+      expect(a2).toBeDefined();
+      expect(a2.isOutsourced).toBe(true);
+      expect(a2.targetId).toBe('prov-1');
+      expect(a2.scheduledStart).toBe('2026-03-18T14:00:00.000Z');
+      expect(a2.scheduledEnd).toBe('2026-03-19T09:00:00.000Z');
+
+      // Verify precedence: t1 ends before t2 departure
+      const a1 = result.snapshot.assignments.find((a) => a.taskId === 't1')!;
+      expect(new Date(a1.scheduledEnd).getTime()).toBeLessThanOrEqual(
+        new Date(a2.scheduledStart).getTime()
+      );
+
+      // Verify precedence: t3 starts after t2 return
+      const a3 = result.snapshot.assignments.find((a) => a.taskId === 't3')!;
+      expect(new Date(a3.scheduledStart).getTime()).toBeGreaterThanOrEqual(
+        new Date(a2.scheduledEnd).getTime()
+      );
     });
   });
 

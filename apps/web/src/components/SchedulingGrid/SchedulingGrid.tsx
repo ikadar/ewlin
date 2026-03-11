@@ -12,6 +12,7 @@ import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { getJobIdForTask } from '../../utils/taskHelpers';
 import { isElementBlocked, getPrerequisiteBlockingInfo, hasDieCuttingAction, hasOffsetAction } from '../../utils';
 import { getTirageLabel } from '../../utils/tileLabelResolver';
+import type { VirtualAssignment } from '../../utils/splitTransform';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -624,6 +625,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     const hasConflict = conflictTaskIds.has(task.id);
                     const tileState = computeTileState(isLate, hasConflict, blocked, assignment.isCompleted);
 
+                    // Split tile metadata (VirtualAssignment fields)
+                    const va = assignment as VirtualAssignment;
+                    const isSplit = va.splitPartIndex !== undefined;
+                    const splitBadge = isSplit ? `${va.splitPartIndex! + 1}/${va.splitPartTotal}` : undefined;
+                    const isNonFinalPart = isSplit && va.splitPartIndex! < (va.splitPartTotal ?? 0) - 1;
+
                     return (
                       <Tile
                         key={assignment.id}
@@ -633,12 +640,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         element={element}
                         top={top}
                         isSelected={selectedJobId === job.id}
-                        showSwapUp={showSwapUp}
-                        showSwapDown={showSwapDown}
+                        showSwapUp={isSplit ? false : showSwapUp}
+                        showSwapDown={isSplit ? false : showSwapDown}
                         similarityResults={similarityResults}
                         onSelect={onSelectJob}
-                        onSwapUp={onSwapUp}
-                        onSwapDown={onSwapDown}
+                        onSwapUp={isSplit ? undefined : onSwapUp}
+                        onSwapDown={isSplit ? undefined : onSwapDown}
                         onToggleComplete={onToggleComplete}
                         hasConflict={hasConflict}
                         tileState={tileState}
@@ -651,6 +658,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         blockingInfo={blockingInfo}
                         displayMode={displayMode}
                         tirageLabel={tileLabel}
+                        splitBadge={splitBadge}
+                        isNonFinalPart={isNonFinalPart}
                       />
                     );
                   })}

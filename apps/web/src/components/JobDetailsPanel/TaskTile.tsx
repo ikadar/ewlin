@@ -1,7 +1,5 @@
-import { useRef, useState } from 'react';
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask } from '@flux/types';
 import { Circle, CircleCheck } from 'lucide-react';
-import { useTooltipDelay } from '../../hooks';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 
 export type TileState = 'unplaced' | 'default' | 'completed' | 'late' | 'conflict';
@@ -43,6 +41,8 @@ export interface TaskTileProps {
   isCompleted?: boolean;
   /** Callback to toggle completion state */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Split badge label (e.g. "1/2") — shown before scheduled time */
+  splitBadge?: string;
 }
 
 /** Visual style config per tile state */
@@ -109,6 +109,7 @@ export function TaskTile({
   isLastTaskOfJob: isLastTask,
   isCompleted = false,
   onToggleComplete,
+  splitBadge,
 }: TaskTileProps) {
   // v0.5.11: Outsourced tasks render as mini-form
   if (task.type === 'Outsourced') {
@@ -130,19 +131,6 @@ export function TaskTile({
   // Internal task handling
   const isScheduled = !!assignment;
   const style = TILE_STYLES[tileState];
-
-  // Tooltip for scheduled tiles (recall hint)
-  const { isVisible: showRecallTip, onMouseEnter: tipEnter, onMouseLeave: tipLeave } = useTooltipDelay();
-  const tileRef = useRef<HTMLButtonElement>(null);
-  const [tipPos, setTipPos] = useState({ top: 0, left: 0 });
-
-  const handleTipEnter = () => {
-    if (tileRef.current) {
-      const rect = tileRef.current.getBoundingClientRect();
-      setTipPos({ top: rect.top - 4, left: rect.left + rect.width / 2 });
-    }
-    tipEnter();
-  };
 
   // Format duration as Xh YY
   const formatDuration = (): string => {
@@ -206,52 +194,35 @@ export function TaskTile({
     };
 
     return (
-      <>
-        <button
-          ref={tileRef}
-          type="button"
-          className={`h-8 pt-0.5 px-2 text-sm border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full`}
-          style={tileInlineStyle}
-          data-testid={`task-tile-${task.id}`}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onMouseEnter={handleTipEnter}
-          onMouseLeave={tipLeave}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              {isCompleted ? (
-                <CircleCheck
-                  className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                  onClick={handleToggleComplete}
-                />
-              ) : (
-                <Circle
-                  className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                  onClick={handleToggleComplete}
-                />
-              )}
-              <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>{displayName}</span>
-            </div>
-            <span className="text-zinc-500 shrink-0">
-              {formatScheduledTime(assignment.scheduledStart)}
-            </span>
+      <button
+        type="button"
+        className={`h-8 pt-0.5 px-2 text-sm border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full`}
+        style={tileInlineStyle}
+        data-testid={`task-tile-${task.id}`}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {isCompleted ? (
+              <CircleCheck
+                className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={handleToggleComplete}
+              />
+            ) : (
+              <Circle
+                className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
+                onClick={handleToggleComplete}
+              />
+            )}
+            <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>{displayName}</span>
           </div>
-        </button>
-        {showRecallTip && (
-          <div
-            className="fixed z-50 pointer-events-none"
-            style={{ left: tipPos.left, top: tipPos.top, transform: 'translate(-50%, -100%)' }}
-          >
-            <div className="flux-tooltip whitespace-nowrap">
-              <span className="text-[var(--tt-text)]">Double-clic pour rappeler</span>
-            </div>
-            <div className="flex justify-center">
-              <div className="flux-tooltip-arrow" />
-            </div>
-          </div>
-        )}
-      </>
+          <span className="text-zinc-500 shrink-0">
+            {splitBadge && <span className="text-zinc-600 mr-1">[{splitBadge}]</span>}
+            {formatScheduledTime(assignment.scheduledStart)}
+          </span>
+        </div>
+      </button>
     );
   }
 

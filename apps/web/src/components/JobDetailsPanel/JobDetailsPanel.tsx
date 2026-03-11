@@ -1,4 +1,5 @@
 import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import type { SplitConfig } from '../../utils/splitTransform';
 import { X } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { getTasksForJob } from '../../utils/taskHelpers';
@@ -55,6 +56,8 @@ export interface JobDetailsPanelProps {
   onEditJob?: () => void;
   /** Job IDs that are late (past workshop exit date) */
   lateJobIds?: Set<string>;
+  /** Split configurations for expanding split tasks into sub-rows */
+  splitConfigs?: Map<string, SplitConfig>;
 }
 
 /** Format workshop exit date as DD/MM/YYYY a HHhMM */
@@ -101,6 +104,7 @@ export function JobDetailsPanel({
   onReturnChange,
   onEditJob,
   lateJobIds,
+  splitConfigs,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -188,6 +192,7 @@ export function JobDetailsPanel({
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
         onToggleComplete={onToggleComplete}
+        splitConfigs={splitConfigs}
       />
     </div>
   );
