@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, TopNavBar, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
+import { useTheme } from './contexts/ThemeContext';
+import { ZOOM_LEVELS } from './utils/zoom';
+import { Save } from 'lucide-react';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -34,11 +37,14 @@ import {
   PICK_CURSOR_OFFSET_Y,
 } from './pick';
 import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory, ProposedAssignment } from '@flux/types';
+import { getDeadlineDate } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
+import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
+import { FluxPage } from './pages/FluxPage';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -137,7 +143,7 @@ interface KeyboardContext {
 
 function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (e.key === 'Alt') {
-    e.preventDefault();
+    // Don't preventDefault — it can interfere with Alt+<key> combos on some platforms
     ctx.setIsAltPressed(true);
     return true;
   }
@@ -145,15 +151,13 @@ function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
 }
 
 function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): boolean {
-  if (e.altKey && e.code === 'KeyQ') {
+  if (isAltLetter(e, 'q')) {
     e.preventDefault();
-    if (ctx.selectedJobId) {
-      const wasActive = ctx.isQuickPlacementMode;
-      ctx.setIsQuickPlacementMode((prev) => !prev);
-      ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-      if (wasActive) {
-        ctx.setSelectedJobId(null);
-      }
+    const wasActive = ctx.isQuickPlacementMode;
+    ctx.setIsQuickPlacementMode((prev) => !prev);
+    ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+    if (wasActive) {
+      ctx.setSelectedJobId(null);
     }
     return true;
   }
@@ -256,9 +260,8 @@ function handleDisplayModeToggle(
   e: KeyboardEvent,
   setDisplayMode: (updater: (prev: 'produit' | 'tirage') => 'produit' | 'tirage') => void,
 ): boolean {
-  if (e.key !== 'a' && e.key !== 'A') return false;
-  const target = e.target as HTMLElement;
-  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return false;
+  if (!isAltLetter(e, 'a')) return false;
+  e.preventDefault();
   setDisplayMode((prev) => (prev === 'produit' ? 'tirage' : 'produit'));
   return true;
 }
@@ -342,6 +345,7 @@ function AppContent() {
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
+  const { theme } = useTheme();
 
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
@@ -372,7 +376,7 @@ function AppContent() {
     window.history.replaceState(null, '', newUrl);
   }, []);
 
-  // v0.3.46: Use deferred value for grid to keep sidebar responsive during selection
+  // Deferred value for grid: tile isSelected logic can lag, visual highlight is handled by CSS selector
   const deferredSelectedJobId = useDeferredValue(selectedJobId);
 
   // v0.3.54: Pick & Place state
@@ -422,6 +426,7 @@ function AppContent() {
   // v0.4.38: JCF modal state derived from URL
   // Modal opens when URL is /job/new
   const isJcfModalOpen = location.pathname === '/job/new';
+  const isJcfFromFlux = isJcfModalOpen && (location.state as { from?: string } | null)?.from?.startsWith('/flux');
   // Remember which job was selected before JCF opened, so we can restore on close
   const preJcfSelectedJobIdRef = useRef<string | null>(null);
   // v0.4.7: JCF form state (lifted from JcfJobHeader)
@@ -454,6 +459,12 @@ function AppContent() {
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
   // Schedule save/load modal
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
+
+  // Command Center (global — provided by RootLayout)
+  const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
+
+  // Sidebar visibility toggle (Alt+B)
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   // v0.4.33: Save job via API (v0.5.4: migrated to RTK Query mutation)
   // v0.5.13b: Supports both create and update modes
@@ -1033,10 +1044,15 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pixelsPerHour]); // handleGridScroll is stable, pixelsPerHour triggers recalc
 
+  // Late job IDs for state-based tile coloring
+  const lateJobIds = useMemo(
+    () => new Set(snapshot.lateJobs.map((lj) => lj.jobId)),
+    [snapshot.lateJobs],
+  );
+
   // Get ordered job IDs for navigation (matching JobsList display order)
   // Problems first (late, then conflicts), then normal jobs
   const orderedJobIds = useMemo(() => {
-    const lateJobIds = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
     const conflictJobIds = new Set<string>();
     snapshot.conflicts.forEach((c) => {
       const task = snapshot.tasks.find((t) => t.id === c.taskId);
@@ -1087,6 +1103,46 @@ function AppContent() {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Detect AZERTY vs QWERTY from unmodified keypresses
+      detectKeyboardLayout(e);
+
+      // Command palette is open — let it handle its own keys
+      if (isCommandPaletteOpen) return;
+
+      // Alt+E: edit selected job
+      if (isAltLetter(e, 'e') && selectedJobId) {
+        e.preventDefault();
+        handleEditJob();
+        return;
+      }
+
+      // Alt+B: toggle sidebar visibility
+      if (isAltLetter(e, 'b')) {
+        e.preventDefault();
+        setIsSidebarVisible(prev => !prev);
+        return;
+      }
+
+      // Ctrl+Plus: zoom in
+      if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+        if (idx < ZOOM_LEVELS.length - 1) {
+          handleZoomChange(ZOOM_LEVELS[idx + 1].pixelsPerHour);
+        }
+        return;
+      }
+
+      // Ctrl+Minus: zoom out
+      if (e.ctrlKey && e.key === '-') {
+        e.preventDefault();
+        const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+        if (idx > 0) {
+          handleZoomChange(ZOOM_LEVELS[idx - 1].pixelsPerHour);
+        }
+        return;
+      }
+
       // Each handler returns true if it handled the event
       if (handleAltKey(e, ctx)) return;
       // v0.3.54: Handle ESC to cancel pick (priority over quick placement)
@@ -1143,7 +1199,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -1711,19 +1767,17 @@ function AppContent() {
     }
   }, [compactStation, showToast]);
 
-  // Toggle Quick Placement (for TopNavBar button)
+  // Toggle Quick Placement
   const handleToggleQuickPlacement = useCallback(() => {
-    if (selectedJobId) {
-      setIsQuickPlacementMode((prev) => {
-        if (prev) {
-          // Turning off: clear job selection to remove tile muting
-          setSelectedJobId(null);
-        }
-        return !prev;
-      });
-      setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-    }
-  }, [selectedJobId, setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
+    setIsQuickPlacementMode((prev) => {
+      if (prev) {
+        // Turning off: clear job selection to remove tile muting
+        setSelectedJobId(null);
+      }
+      return !prev;
+    });
+    setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
+  }, [setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
 
   // v0.3.54: Handle pick from sidebar (unscheduled task)
   // v0.3.55: Added scroll to target column and save scroll position
@@ -2032,52 +2086,139 @@ function AppContent() {
     }
   }, [snapshot.stations, snapshot.assignments, compactStation, showToast]);
 
+  // Compute footer mode from app state
+  const footerMode = useMemo(() => {
+    if (isPicking) return 'picking' as const;
+    if (isQuickPlacementMode) return 'quickPlacement' as const;
+    if (isJcfModalOpen) return 'jcfModal' as const;
+    if (selectedJobId) return 'jobSelected' as const;
+    return 'default' as const;
+  }, [isPicking, isQuickPlacementMode, isJcfModalOpen, selectedJobId]);
+
+  // Scheduler-specific commands — registered into the global Command Center
+  const schedulerCommands = useCommands({
+    selectedJobId,
+    isQuickPlacementMode,
+    onJumpToToday: useCallback(() => {
+      if (gridRef.current) {
+        const now = new Date();
+        const diffMs = now.getTime() - gridStartDate.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+        const y = diffHours * pixelsPerHour;
+        gridRef.current.scrollToY(y - 200, 'smooth');
+      }
+    }, [gridStartDate, pixelsPerHour]),
+    onJumpToDeparture: useCallback(() => {
+      if (gridRef.current && selectedJob?.workshopExitDate) {
+        const deadline = getDeadlineDate(selectedJob.workshopExitDate);
+        const y = timeToYPosition(deadline, START_HOUR, pixelsPerHour, gridStartDate);
+        gridRef.current.scrollToY(y - 200, 'smooth');
+      }
+    }, [selectedJob, pixelsPerHour, gridStartDate]),
+    onPrevJob: useCallback(() => {
+      if (!selectedJobId || orderedJobIds.length === 0) return;
+      const idx = orderedJobIds.indexOf(selectedJobId);
+      if (idx > 0) setSelectedJobId(orderedJobIds[idx - 1]);
+    }, [selectedJobId, orderedJobIds, setSelectedJobId]),
+    onNextJob: useCallback(() => {
+      if (!selectedJobId || orderedJobIds.length === 0) return;
+      const idx = orderedJobIds.indexOf(selectedJobId);
+      if (idx < orderedJobIds.length - 1) setSelectedJobId(orderedJobIds[idx + 1]);
+    }, [selectedJobId, orderedJobIds, setSelectedJobId]),
+    onNavigateScheduler: useCallback(() => navigate('/'), [navigate]),
+    onNavigateFlux: useCallback(() => navigate('/flux'), [navigate]),
+    onToggleQuickPlacement: useCallback(() => {
+      if (!selectedJobId) return;
+      setIsQuickPlacementMode(prev => !prev);
+    }, [selectedJobId]),
+    onEditJob: handleEditJob,
+    onNewJob: useCallback(() => {
+      navigate('/job/new');
+    }, [navigate]),
+    onSearchJobs: useCallback(() => {
+      navigate('/flux');
+    }, [navigate]),
+    onToggleDisplayMode: useCallback(() => {
+      setDisplayMode(prev => prev === 'produit' ? 'tirage' : 'produit');
+    }, [setDisplayMode]),
+    onToggleSidebar: useCallback(() => {
+      setIsSidebarVisible(prev => !prev);
+    }, []),
+    onCompactTimeline: handleCompactTimeline,
+    onZoomIn: useCallback(() => {
+      const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+      if (idx < ZOOM_LEVELS.length - 1) {
+        handleZoomChange(ZOOM_LEVELS[idx + 1].pixelsPerHour);
+      }
+    }, [pixelsPerHour, handleZoomChange]),
+    onZoomOut: useCallback(() => {
+      const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+      if (idx > 0) {
+        handleZoomChange(ZOOM_LEVELS[idx - 1].pixelsPerHour);
+      }
+    }, [pixelsPerHour, handleZoomChange]),
+    onOpenSaveLoad: useCallback(() => {
+      setIsSaveLoadOpen(true);
+    }, []),
+  });
+
+  // Register scheduler-specific commands into the global Command Center
+  useEffect(() => {
+    registerPageCommands(schedulerCommands);
+    return () => unregisterPageCommands();
+  }, [schedulerCommands, registerPageCommands, unregisterPageCommands]);
+
+  // Register jobs for Command Palette search
+  useEffect(() => {
+    registerJobs(
+      snapshot.jobs.map(j => ({ id: j.id, reference: j.reference, client: j.client, description: j.description })),
+      (jobId) => setSelectedJobId(jobId),
+    );
+    return () => unregisterJobs();
+  }, [snapshot.jobs, setSelectedJobId, registerJobs, unregisterJobs]);
+
   // v0.5.1: Show loading spinner during initial fetch (real API mode only)
   // In mock mode, data is always instantly available, so we skip the loading state
   // This check is placed after all hooks to comply with Rules of Hooks
   const isMockMode = shouldUseMockMode();
-  if (isLoading && !isMockMode) {
+  if (isLoading && !isMockMode && !isJcfFromFlux) {
     return <LoadingSpinner message="Chargement des données..." />;
   }
 
   // v0.5.7: Show maintenance page for 503 Service Unavailable
-  if (isServiceUnavailable) {
+  if (isServiceUnavailable && !isJcfFromFlux) {
     return <MaintenanceState onRetry={refetch} />;
   }
 
   // v0.5.1: Show error state with retry button if fetch failed
-  if (isError) {
+  if (isError && !isJcfFromFlux) {
     return <ErrorState error={error} onRetry={refetch} />;
   }
 
   return (
     <>
+      {isJcfFromFlux ? (
+        <div inert="" className="flex-1 flex flex-col overflow-hidden">
+          <FluxPage backdrop />
+        </div>
+      ) : (
       <div className="flex-1 flex overflow-hidden">
-        <JobsList
-          jobs={snapshot.jobs}
-          tasks={snapshot.tasks}
-          elements={snapshot.elements}
-          assignments={snapshot.assignments}
-          lateJobs={snapshot.lateJobs}
-          conflicts={snapshot.conflicts}
-          selectedJobId={selectedJobId}
-          onSelectJob={setSelectedJobId}
-          onAddJob={handleOpenJcf}
-        />
+        {isSidebarVisible && (
+          <div>
+            <JobsList
+              jobs={snapshot.jobs}
+              tasks={snapshot.tasks}
+              elements={snapshot.elements}
+              assignments={snapshot.assignments}
+              lateJobs={snapshot.lateJobs}
+              conflicts={snapshot.conflicts}
+              selectedJobId={selectedJobId}
+              onSelectJob={setSelectedJobId}
+              onAddJob={handleOpenJcf}
+            />
+          </div>
+        )}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Navigation Bar - spans width from DateStrip onward */}
-          <TopNavBar
-            isQuickPlacementMode={isQuickPlacementMode}
-            onToggleQuickPlacement={handleToggleQuickPlacement}
-            canEnableQuickPlacement={selectedJobId !== null}
-            pixelsPerHour={pixelsPerHour}
-            onZoomChange={handleZoomChange}
-            onCompactTimeline={handleCompactTimeline}
-            isCompacting={isCompactingTimeline}
-            displayMode={displayMode}
-            onOpenSaveLoad={() => setIsSaveLoadOpen(true)}
-          />
-
           {/* Content area */}
           <div className="flex-1 flex overflow-hidden">
         <JobDetailsPanel
@@ -2102,8 +2243,12 @@ function AppContent() {
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}
           onEditJob={handleEditJob}
-          onDeleteJob={handleDeleteJob}
+          lateJobIds={lateJobIds}
         />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mode banner — shows active mode (quick placement / picking) */}
+          <ModeBanner mode={isPicking ? 'picking' : isQuickPlacementMode ? 'quickPlacement' : null} />
+          <div className="flex-1 flex overflow-hidden">
         <DateStrip
           startDate={gridStartDate}
           onDateClick={handleDateClick}
@@ -2130,9 +2275,9 @@ function AppContent() {
           startDate={gridStartDate}
           totalDays={DAY_COUNT}
           onSelectJob={setSelectedJobId}
+          onDeselect={() => setSelectedJobId(null)}
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
-          onRecallAssignment={handleRecallAssignment}
           onToggleComplete={handleToggleComplete}
           isQuickPlacementMode={isQuickPlacementMode}
           stationsWithAvailableTasks={stationsWithAvailableTasks}
@@ -2163,10 +2308,23 @@ function AppContent() {
           onPickFromGrid={handlePickFromGrid}
           onContextMenu={handleContextMenuOpen}
           displayMode={displayMode}
+          lateJobIds={lateJobIds}
+          quickPlacementGhostLabel={selectedJob?.reference}
+          quickPlacementGhostHeight={quickPlacementTask ? ((quickPlacementTask.duration.setupMinutes + quickPlacementTask.duration.runMinutes) / 60) * pixelsPerHour : undefined}
         />
+          </div>
+          </div>
           </div>
         </div>
       </div>
+      )}
+
+      {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
+      {selectedJobId && (
+        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: 0 0 0 2px ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; }`}</style>
+      )}
+
+      <ShortcutFooter mode={footerMode} />
 
       {/* v0.3.54: Pick preview - ghost tile during pick */}
       <PickPreview
@@ -2190,6 +2348,7 @@ function AppContent() {
           onToggleComplete={handleContextMenuToggleComplete}
           onSwapUp={handleContextMenuMoveUp}
           onSwapDown={handleContextMenuMoveDown}
+          onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
           onClose={handleContextMenuClose}
         />
       )}
@@ -2272,11 +2431,22 @@ function AppContent() {
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
 
+      {/* Save/Load FAB — stacked above Command Center FAB */}
+      <button
+        onClick={() => setIsSaveLoadOpen(true)}
+        className="fixed bottom-[88px] right-6 z-40 w-12 h-12 rounded-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 shadow-lg transition-all flex items-center justify-center"
+        aria-label="Sauvegardes"
+        data-testid="save-load-fab"
+      >
+        <Save size={20} />
+      </button>
+
       {/* Schedule save/load modal */}
       <ScheduleSaveLoadModal
         isOpen={isSaveLoadOpen}
         onClose={() => setIsSaveLoadOpen(false)}
       />
+
     </>
   );
 }

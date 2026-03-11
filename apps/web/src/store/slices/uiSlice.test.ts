@@ -22,7 +22,7 @@ import {
   resetUiState,
   type UiState,
 } from './uiSlice';
-import { DEFAULT_PIXELS_PER_HOUR } from '../../components/TopNavBar/constants';
+import { DEFAULT_PIXELS_PER_HOUR } from '../../utils/zoom';
 
 describe('uiSlice', () => {
   const initialState: UiState = {

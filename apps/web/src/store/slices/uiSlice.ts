@@ -15,7 +15,7 @@
  */
 
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { DEFAULT_PIXELS_PER_HOUR } from '../../components/TopNavBar/constants';
+import { DEFAULT_PIXELS_PER_HOUR } from '../../utils/zoom';
 
 // ============================================================================
 // Types

@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shortcut Nudge Playground — Flux Scheduler</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-hover: rgb(44, 44, 44);
+    --flux-active: rgb(52, 52, 52);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-tertiary: rgb(161, 161, 161);
+    --flux-text-muted: rgb(128, 128, 128);
+    --ctrl-bg: rgb(20, 20, 20);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Controls Panel ── */
+  .controls {
+    width: 340px;
+    min-width: 340px;
+    background: var(--ctrl-bg);
+    border-right: 1px solid var(--flux-border);
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .controls::-webkit-scrollbar { width: 6px; }
+  .controls::-webkit-scrollbar-track { background: transparent; }
+  .controls::-webkit-scrollbar-thumb { background: var(--flux-border); border-radius: 3px; }
+
+  .controls h1 { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; color: var(--flux-text-primary); margin-bottom: 2px; }
+  .controls h2 { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--flux-text-muted); margin-bottom: 6px; padding-top: 4px; border-top: 1px solid var(--flux-border); }
+  .control-group { display: flex; flex-direction: column; gap: 5px; }
+
+  label { font-size: 11px; color: var(--flux-text-tertiary); display: flex; justify-content: space-between; align-items: center; }
+  label .val { font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 10px; color: var(--flux-text-muted); background: var(--flux-elevated); padding: 1px 5px; border-radius: 3px; }
+
+  input[type="range"] { -webkit-appearance: none; width: 100%; height: 4px; background: var(--flux-elevated); border-radius: 2px; outline: none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--flux-text-tertiary); border-radius: 50%; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb:hover { background: var(--flux-text-primary); }
+
+  input[type="text"] { font-size: 11px; font-family: "SF Mono", "JetBrains Mono", monospace; background: var(--flux-elevated); color: var(--flux-text-secondary); border: 1px solid var(--flux-border); border-radius: 4px; padding: 4px 8px; outline: none; width: 100%; }
+  input[type="text"]:focus { border-color: var(--flux-border-light); }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--flux-text-tertiary); }
+  .toggle { position: relative; width: 34px; height: 18px; cursor: pointer; flex-shrink: 0; }
+  .toggle input { display: none; }
+  .toggle span { position: absolute; inset: 0; background: var(--flux-elevated); border-radius: 9px; transition: background 0.2s; }
+  .toggle span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--flux-text-muted); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+  .toggle input:checked + span { background: #34d399; }
+  .toggle input:checked + span::after { transform: translateX(16px); background: white; }
+
+  .radio-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+  .radio-pills input { display: none; }
+  .radio-pills label { font-size: 10px; padding: 3px 8px; border-radius: 4px; background: var(--flux-elevated); color: var(--flux-text-tertiary); cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }
+  .radio-pills input:checked + label { background: var(--flux-hover); color: var(--flux-text-primary); border-color: var(--flux-border-light); }
+
+  .presets { display: flex; gap: 4px; flex-wrap: wrap; }
+  .preset-btn { font-size: 10px; padding: 4px 10px; border-radius: 4px; background: var(--flux-elevated); color: var(--flux-text-tertiary); border: 1px solid var(--flux-border); cursor: pointer; transition: all 0.15s; }
+  .preset-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); border-color: var(--flux-border-light); }
+  .preset-btn.active { background: var(--flux-active); color: var(--flux-text-primary); border-color: var(--flux-text-muted); }
+
+  .swatch-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .swatch { width: 24px; height: 24px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: var(--flux-text-primary); }
+
+  /* ── Main Area ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .preview-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+  .mock-shell { margin: 24px; border-radius: 8px; border: 1px solid var(--flux-border); overflow: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .mock-titlebar { height: 36px; background: var(--flux-surface); border-bottom: 1px solid var(--flux-border); display: flex; align-items: center; padding: 0 12px; gap: 8px; flex-shrink: 0; }
+  .mock-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--flux-elevated); }
+  .mock-titlebar-text { font-size: 11px; color: var(--flux-text-muted); margin-left: 8px; }
+
+  .mock-body { flex: 1; display: flex; min-height: 0; position: relative; }
+  .mock-sidebar { width: 180px; background: var(--flux-surface); border-right: 1px solid var(--flux-border); padding: 12px; flex-shrink: 0; }
+  .mock-sidebar-item { height: 8px; background: var(--flux-elevated); border-radius: 3px; margin-bottom: 6px; }
+  .mock-sidebar-item:nth-child(2) { width: 70%; }
+  .mock-sidebar-item:nth-child(3) { width: 85%; }
+  .mock-sidebar-item:nth-child(4) { width: 60%; }
+
+  .mock-content { flex: 1; display: flex; flex-direction: column; background: var(--flux-base); position: relative; }
+  .mock-grid { flex: 1; padding: 12px; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(4, 32px); gap: 4px; align-content: start; }
+  .mock-grid-header { background: var(--flux-surface); border-radius: 3px; display: flex; align-items: center; padding: 0 8px; }
+  .mock-grid-header span { font-size: 9px; color: var(--flux-text-muted); letter-spacing: 0.05em; text-transform: uppercase; }
+  .mock-grid-cell { background: var(--flux-surface); border-radius: 3px; border: 1px solid var(--flux-border); }
+  .mock-tile { background: #2a5a3a; border-radius: 3px; border: 1px solid #34d399; display: flex; align-items: center; padding: 0 6px; font-size: 8px; color: var(--flux-text-secondary); cursor: pointer; transition: all 0.15s; }
+  .mock-tile:hover { background: #356e48; border-color: #4ade80; }
+  .mock-tile.selected { outline: 2px solid #60a5fa; outline-offset: -1px; }
+
+  .mock-footer { height: 32px; background: var(--flux-surface); border-top: 1px solid var(--flux-border); display: flex; align-items: center; padding: 0 12px; gap: 12px; flex-shrink: 0; }
+  .mock-footer-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--flux-text-muted); }
+  .mock-footer-kbd { font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 8px; padding: 1px 4px; border-radius: 3px; background: var(--flux-elevated); border: 1px solid var(--flux-border); color: var(--flux-text-tertiary); }
+
+  .mock-toolbar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--flux-border); }
+  .mock-action-btn { font-size: 10px; padding: 4px 10px; border-radius: 4px; background: var(--flux-elevated); color: var(--flux-text-tertiary); border: 1px solid var(--flux-border); cursor: pointer; transition: all 0.15s; }
+  .mock-action-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); border-color: var(--flux-border-light); }
+
+  /* ── Nudge container ── */
+  #nudge-container {
+    position: absolute;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  /* ── Nudge animations ── */
+  @keyframes nudge-slide-up {
+    from { transform: translateY(20px) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  @keyframes nudge-fade-in {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes nudge-pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    60% { transform: scale(1.08); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes nudge-drop {
+    0% { transform: translateY(-30px) scale(0.9); opacity: 0; }
+    70% { transform: translateY(4px) scale(1.02); }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  @keyframes nudge-fade-out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.92); }
+  }
+  @keyframes kbd-shine {
+    0% { background-position: -100% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* ── Prompt Output ── */
+  .prompt-area { border-top: 1px solid var(--flux-border); background: var(--ctrl-bg); padding: 16px 24px; flex-shrink: 0; }
+  .prompt-area .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .prompt-area .header span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--flux-text-muted); font-weight: 600; }
+  .prompt-btns { display: flex; gap: 6px; }
+  .copy-btn { font-size: 11px; padding: 4px 12px; border-radius: 4px; background: var(--flux-elevated); color: var(--flux-text-secondary); border: 1px solid var(--flux-border); cursor: pointer; transition: all 0.15s; }
+  .copy-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  #prompt-output { font-size: 12px; line-height: 1.6; color: var(--flux-text-secondary); font-family: "SF Mono", "JetBrains Mono", monospace; white-space: pre-wrap; max-height: 140px; overflow-y: auto; }
+
+  .example-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .example-btn { font-size: 9px; padding: 3px 7px; border-radius: 4px; background: var(--flux-elevated); color: var(--flux-text-muted); border: 1px solid var(--flux-border); cursor: pointer; transition: all 0.15s; }
+  .example-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .example-btn.active { background: var(--flux-active); color: var(--flux-text-primary); border-color: var(--flux-text-muted); }
+</style>
+</head>
+<body>
+
+<!-- Controls -->
+<div class="controls">
+  <h1>Shortcut Nudge Playground</h1>
+  <p style="font-size:11px; color:var(--flux-text-muted); margin-top:-6px;">Bold pill badge for shortcut hints</p>
+
+  <!-- Presets -->
+  <div class="control-group">
+    <h2>Presets</h2>
+    <div class="presets">
+      <button class="preset-btn active" onclick="applyPreset('bold-dark', this)">Bold Dark</button>
+      <button class="preset-btn" onclick="applyPreset('frosted', this)">Frosted</button>
+      <button class="preset-btn" onclick="applyPreset('neon', this)">Neon</button>
+      <button class="preset-btn" onclick="applyPreset('soft-light', this)">Soft Light</button>
+      <button class="preset-btn" onclick="applyPreset('cinema', this)">Cinema</button>
+    </div>
+  </div>
+
+  <!-- Example -->
+  <div class="control-group">
+    <h2>Example Action</h2>
+    <div class="example-row">
+      <button class="example-btn active" data-example="edit" onclick="pickExample('edit', this)">Edit</button>
+      <button class="example-btn" data-example="quick" onclick="pickExample('quick', this)">Quick Place</button>
+      <button class="example-btn" data-example="home" onclick="pickExample('home', this)">Today</button>
+      <button class="example-btn" data-example="sidebar" onclick="pickExample('sidebar', this)">Sidebar</button>
+      <button class="example-btn" data-example="display" onclick="pickExample('display', this)">Display</button>
+    </div>
+  </div>
+
+  <!-- Position -->
+  <div class="control-group">
+    <h2>Position</h2>
+    <div class="radio-pills">
+      <input type="radio" name="position" id="pos-bc" value="bottom-center" checked>
+      <label for="pos-bc">Bottom Center</label>
+      <input type="radio" name="position" id="pos-bl" value="bottom-left">
+      <label for="pos-bl">Bottom Left</label>
+      <input type="radio" name="position" id="pos-br" value="bottom-right">
+      <label for="pos-br">Bottom Right</label>
+      <input type="radio" name="position" id="pos-tc" value="top-center">
+      <label for="pos-tc">Top Center</label>
+    </div>
+  </div>
+
+  <!-- Animation -->
+  <div class="control-group">
+    <h2>Animation</h2>
+    <div class="radio-pills">
+      <input type="radio" name="animation" id="anim-pop" value="pop" checked>
+      <label for="anim-pop">Pop</label>
+      <input type="radio" name="animation" id="anim-slide" value="slide-up">
+      <label for="anim-slide">Slide Up</label>
+      <input type="radio" name="animation" id="anim-drop" value="drop">
+      <label for="anim-drop">Drop</label>
+      <input type="radio" name="animation" id="anim-fade" value="fade-in">
+      <label for="anim-fade">Fade</label>
+    </div>
+    <label>Duration <span class="val" id="duration-val">2.5s</span></label>
+    <input type="range" id="duration" min="1" max="5" value="2.5" step="0.5">
+  </div>
+
+  <!-- Pill Style -->
+  <div class="control-group">
+    <h2>Pill Style</h2>
+    <label>Pill padding H <span class="val" id="padH-val">28px</span></label>
+    <input type="range" id="padH" min="12" max="48" value="28" step="2">
+
+    <label>Pill padding V <span class="val" id="padV-val">14px</span></label>
+    <input type="range" id="padV" min="6" max="28" value="14" step="2">
+
+    <label>Font size <span class="val" id="fontSize-val">16px</span></label>
+    <input type="range" id="fontSize" min="12" max="24" value="16" step="1">
+
+    <label>Backdrop opacity <span class="val" id="bgOpacity-val">80%</span></label>
+    <input type="range" id="bgOpacity" min="30" max="100" value="80" step="5">
+
+    <label>Blur <span class="val" id="blur-val">20px</span></label>
+    <input type="range" id="blur" min="0" max="40" value="20" step="2">
+  </div>
+
+  <!-- Color -->
+  <div class="control-group">
+    <h2>Color Tint</h2>
+    <div class="swatch-row" id="swatches"></div>
+    <label style="margin-top:4px;">Tint strength <span class="val" id="tintStrength-val">15%</span></label>
+    <input type="range" id="tintStrength" min="0" max="50" value="15" step="5">
+  </div>
+
+  <!-- Kbd Style -->
+  <div class="control-group">
+    <h2>Key Cap Style</h2>
+    <div class="radio-pills">
+      <input type="radio" name="keyStyle" id="key-bold3d" value="bold3d" checked>
+      <label for="key-bold3d">Bold 3D</label>
+      <input type="radio" name="keyStyle" id="key-glass" value="glass">
+      <label for="key-glass">Glass</label>
+      <input type="radio" name="keyStyle" id="key-solid" value="solid">
+      <label for="key-solid">Solid</label>
+      <input type="radio" name="keyStyle" id="key-outline" value="outline">
+      <label for="key-outline">Outline</label>
+    </div>
+    <label>Key size boost <span class="val" id="keyBoost-val">+4px</span></label>
+    <input type="range" id="keyBoost" min="0" max="10" value="4" step="1">
+  </div>
+
+  <!-- Label Text -->
+  <div class="control-group">
+    <h2>Label</h2>
+    <div class="radio-pills">
+      <input type="radio" name="labelStyle" id="lbl-action" value="action" checked>
+      <label for="lbl-action">Action text</label>
+      <input type="radio" name="labelStyle" id="lbl-tip" value="tip">
+      <label for="lbl-tip">Tip: prefix</label>
+      <input type="radio" name="labelStyle" id="lbl-next" value="next">
+      <label for="lbl-next">Next time:</label>
+      <input type="radio" name="labelStyle" id="lbl-none" value="none">
+      <label for="lbl-none">Keys only</label>
+    </div>
+  </div>
+
+  <!-- Shadow -->
+  <div class="control-group">
+    <h2>Shadow & Glow</h2>
+    <div class="radio-pills">
+      <input type="radio" name="shadow" id="shadow-heavy" value="heavy" checked>
+      <label for="shadow-heavy">Heavy</label>
+      <input type="radio" name="shadow" id="shadow-glow" value="glow">
+      <label for="shadow-glow">Color Glow</label>
+      <input type="radio" name="shadow" id="shadow-medium" value="medium">
+      <label for="shadow-medium">Medium</label>
+      <input type="radio" name="shadow" id="shadow-none" value="none">
+      <label for="shadow-none">None</label>
+    </div>
+  </div>
+
+  <!-- Border -->
+  <div class="control-group">
+    <h2>Border</h2>
+    <div class="radio-pills">
+      <input type="radio" name="border" id="border-subtle" value="subtle" checked>
+      <label for="border-subtle">Subtle</label>
+      <input type="radio" name="border" id="border-none" value="none">
+      <label for="border-none">None</label>
+      <input type="radio" name="border" id="border-accent" value="accent">
+      <label for="border-accent">Accent Glow</label>
+    </div>
+  </div>
+</div>
+
+<!-- Main area -->
+<div class="main">
+  <div class="preview-area">
+    <div class="mock-shell">
+      <div class="mock-titlebar">
+        <div class="mock-dot"></div>
+        <div class="mock-dot"></div>
+        <div class="mock-dot"></div>
+        <span class="mock-titlebar-text">Flux Scheduler — 2026-03-10</span>
+      </div>
+      <div class="mock-body">
+        <div class="mock-sidebar">
+          <div class="mock-sidebar-item" style="width:90%"></div>
+          <div class="mock-sidebar-item"></div>
+          <div class="mock-sidebar-item"></div>
+          <div class="mock-sidebar-item"></div>
+          <div style="height:12px"></div>
+          <div class="mock-sidebar-item" style="width:50%"></div>
+          <div class="mock-sidebar-item" style="width:80%"></div>
+          <div class="mock-sidebar-item" style="width:65%"></div>
+        </div>
+        <div class="mock-content" id="mock-content">
+          <div class="mock-toolbar">
+            <button class="mock-action-btn" onclick="triggerFromAction('edit')">Edit Job</button>
+            <button class="mock-action-btn" onclick="triggerFromAction('quick')">Quick Place</button>
+            <button class="mock-action-btn" onclick="triggerFromAction('sidebar')">Toggle Sidebar</button>
+            <button class="mock-action-btn" onclick="triggerFromAction('display')">Switch Display</button>
+          </div>
+          <div class="mock-grid">
+            <div class="mock-grid-header"><span>Offset</span></div>
+            <div class="mock-grid-header"><span>KBA 105</span></div>
+            <div class="mock-grid-header"><span>Heidelberg</span></div>
+            <div class="mock-grid-header"><span>SM 74</span></div>
+            <div class="mock-grid-header"><span>Finishing</span></div>
+            <div class="mock-tile selected">JOB-4021</div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-tile">JOB-4018</div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-tile">JOB-4015</div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-tile">JOB-4019</div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div>
+            <div class="mock-tile">JOB-4022</div>
+          </div>
+          <div class="mock-footer">
+            <div class="mock-footer-item"><span class="mock-footer-kbd">Alt+E</span> Edit</div>
+            <div class="mock-footer-item"><span class="mock-footer-kbd">Alt+Q</span> Quick Place</div>
+            <div class="mock-footer-item"><span class="mock-footer-kbd">Home</span> Today</div>
+            <div class="mock-footer-item"><span class="mock-footer-kbd">Alt+K</span> Commands</div>
+          </div>
+          <div id="nudge-container"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prompt-area">
+    <div class="header">
+      <span>Generated Prompt</span>
+      <div class="prompt-btns">
+        <button class="copy-btn" id="copyCssBtn" onclick="copyCss()">Copy CSS</button>
+        <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy Prompt</button>
+      </div>
+    </div>
+    <div id="prompt-output"></div>
+  </div>
+</div>
+
+<script>
+const EXAMPLES = {
+  edit:    { shortcut: 'Alt+E', action: 'edit', keys: ['Alt', 'E'] },
+  quick:   { shortcut: 'Alt+Q', action: 'quick placement', keys: ['Alt', 'Q'] },
+  home:    { shortcut: 'Home',  action: 'jump to today', keys: ['Home'] },
+  sidebar: { shortcut: 'Alt+B', action: 'toggle sidebar', keys: ['Alt', 'B'] },
+  display: { shortcut: 'Alt+A', action: 'switch display', keys: ['Alt', 'A'] },
+};
+
+const SWATCHES = [
+  { name: 'Neutral', hex: '#888888' },
+  { name: 'Emerald', hex: '#34d399' },
+  { name: 'Cyan',    hex: '#22d3ee' },
+  { name: 'Blue',    hex: '#60a5fa' },
+  { name: 'Violet',  hex: '#a78bfa' },
+  { name: 'Pink',    hex: '#f472b6' },
+  { name: 'Amber',   hex: '#fbbf24' },
+  { name: 'Orange',  hex: '#fb923c' },
+];
+
+const DEFAULTS = {
+  position: 'bottom-center',
+  animation: 'pop',
+  duration: 2.5,
+  padH: 28,
+  padV: 14,
+  fontSize: 16,
+  bgOpacity: 80,
+  blur: 20,
+  tintHex: '#888888',
+  tintStrength: 15,
+  keyStyle: 'bold3d',
+  keyBoost: 4,
+  labelStyle: 'action',
+  shadow: 'heavy',
+  border: 'subtle',
+  example: 'edit',
+};
+
+const PRESETS = {
+  'bold-dark': { ...DEFAULTS },
+  'frosted': {
+    ...DEFAULTS, bgOpacity: 55, blur: 30, tintHex: '#22d3ee', tintStrength: 20,
+    keyStyle: 'glass', shadow: 'medium', border: 'subtle', animation: 'slide-up',
+    padH: 32, padV: 16, fontSize: 17,
+  },
+  'neon': {
+    ...DEFAULTS, bgOpacity: 70, blur: 16, tintHex: '#34d399', tintStrength: 30,
+    keyStyle: 'solid', shadow: 'glow', border: 'accent', animation: 'pop',
+    padH: 30, padV: 14, fontSize: 16,
+  },
+  'soft-light': {
+    ...DEFAULTS, bgOpacity: 90, blur: 12, tintHex: '#888888', tintStrength: 0,
+    keyStyle: 'bold3d', shadow: 'heavy', border: 'none', animation: 'drop',
+    padH: 24, padV: 12, fontSize: 15,
+  },
+  'cinema': {
+    ...DEFAULTS, bgOpacity: 65, blur: 24, tintHex: '#a78bfa', tintStrength: 15,
+    keyStyle: 'glass', shadow: 'glow', border: 'accent', animation: 'pop',
+    padH: 36, padV: 18, fontSize: 18, labelStyle: 'tip',
+  },
+};
+
+const state = { ...DEFAULTS };
+let nudgeTimeout = null;
+let fadeTimeout = null;
+
+function hexToRGB(hex) {
+  return {
+    r: parseInt(hex.slice(1,3), 16),
+    g: parseInt(hex.slice(3,5), 16),
+    b: parseInt(hex.slice(5,7), 16),
+  };
+}
+
+// Build swatches
+function buildSwatches() {
+  document.getElementById('swatches').innerHTML = SWATCHES.map(s =>
+    `<div class="swatch${s.hex === state.tintHex ? ' active' : ''}" style="background:${s.hex}" title="${s.name}" data-hex="${s.hex}" onclick="pickSwatch(this,'${s.hex}')"></div>`
+  ).join('');
+}
+
+function pickSwatch(el, hex) {
+  state.tintHex = hex;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  updateAll();
+}
+
+// ── Build the pill ──
+function buildNudgeHtml() {
+  const ex = EXAMPLES[state.example];
+  const tint = hexToRGB(state.tintHex);
+  const ts = state.tintStrength / 100;
+
+  // Background: dark base mixed with tint
+  const bgR = Math.round(24 + tint.r * ts);
+  const bgG = Math.round(24 + tint.g * ts);
+  const bgB = Math.round(24 + tint.b * ts);
+  const bgA = state.bgOpacity / 100;
+  const bg = `rgba(${bgR}, ${bgG}, ${bgB}, ${bgA})`;
+
+  // Text colors
+  const textMain = ts > 0.1
+    ? `rgba(${Math.min(180 + tint.r * ts * 0.5, 255)|0}, ${Math.min(180 + tint.g * ts * 0.5, 255)|0}, ${Math.min(180 + tint.b * ts * 0.5, 255)|0}, 0.95)`
+    : 'rgba(240, 240, 240, 0.95)';
+  const textMuted = ts > 0.1
+    ? `rgba(${Math.min(120 + tint.r * ts * 0.4, 220)|0}, ${Math.min(120 + tint.g * ts * 0.4, 220)|0}, ${Math.min(120 + tint.b * ts * 0.4, 220)|0}, 0.7)`
+    : 'rgba(180, 180, 180, 0.7)';
+  const accentColor = state.tintHex === '#888888' ? '#ffffff' : state.tintHex;
+
+  // Shadow
+  const shadows = {
+    none: 'none',
+    medium: `0 8px 32px rgba(0,0,0,0.4)`,
+    heavy: `0 12px 48px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3)`,
+    glow: `0 8px 32px rgba(0,0,0,0.4), 0 0 40px rgba(${tint.r},${tint.g},${tint.b},0.25)`,
+  };
+
+  // Border
+  const borders = {
+    none: 'none',
+    subtle: `1px solid rgba(255,255,255,0.1)`,
+    accent: `1px solid rgba(${tint.r},${tint.g},${tint.b},0.4)`,
+  };
+
+  // Kbd styles
+  const kfs = state.fontSize + state.keyBoost;
+  const kbdStyles = {
+    bold3d: `font-family:"SF Mono","JetBrains Mono",monospace; font-size:${kfs}px; font-weight:700; padding:4px 10px; min-width:${kfs + 16}px; text-align:center; border-radius:6px; background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.18); box-shadow:0 2px 0 0 rgba(0,0,0,0.5), inset 0 1px 0 0 rgba(255,255,255,0.1); line-height:1.2; display:inline-block;`,
+    glass: `font-family:"SF Mono","JetBrains Mono",monospace; font-size:${kfs}px; font-weight:700; padding:4px 10px; min-width:${kfs + 16}px; text-align:center; border-radius:6px; background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.95); border:1px solid rgba(255,255,255,0.12); backdrop-filter:blur(4px); line-height:1.2; display:inline-block;`,
+    solid: `font-family:"SF Mono","JetBrains Mono",monospace; font-size:${kfs}px; font-weight:700; padding:4px 10px; min-width:${kfs + 16}px; text-align:center; border-radius:6px; background:rgba(${tint.r},${tint.g},${tint.b},0.25); color:${accentColor}; border:1px solid rgba(${tint.r},${tint.g},${tint.b},0.35); line-height:1.2; display:inline-block;`,
+    outline: `font-family:"SF Mono","JetBrains Mono",monospace; font-size:${kfs}px; font-weight:700; padding:4px 10px; min-width:${kfs + 16}px; text-align:center; border-radius:6px; background:transparent; color:#fff; border:2px solid rgba(255,255,255,0.3); line-height:1.2; display:inline-block;`,
+  };
+
+  // Build key caps HTML
+  const keysHtml = ex.keys.map(k =>
+    `<span style="${kbdStyles[state.keyStyle]}">${k}</span>`
+  ).join(`<span style="color:${textMuted}; font-size:${state.fontSize - 2}px; font-weight:600; margin:0 2px;">+</span>`);
+
+  // Label
+  const actionText = ex.action;
+  let labelHtml = '';
+  if (state.labelStyle === 'action') {
+    labelHtml = `<span style="color:${textMuted}; font-weight:500;">${actionText}</span>`;
+  } else if (state.labelStyle === 'tip') {
+    labelHtml = `<span style="color:${textMuted}; font-weight:500;">Tip &mdash; use</span>${keysHtml}<span style="color:${textMuted}; font-weight:500;">to ${actionText}</span>`;
+    // Return early — different layout for "tip" style
+    const pill = buildPillWrap(bg, shadows[state.shadow], borders[state.border], labelHtml);
+    return pill;
+  } else if (state.labelStyle === 'next') {
+    labelHtml = `<span style="color:${textMuted}; font-weight:500;">Next time, press</span>${keysHtml}`;
+    const pill = buildPillWrap(bg, shadows[state.shadow], borders[state.border], labelHtml);
+    return pill;
+  } else {
+    // keys only — no label
+    const pill = buildPillWrap(bg, shadows[state.shadow], borders[state.border], keysHtml);
+    return pill;
+  }
+
+  // Default layout: [keys] [action]
+  const inner = `${keysHtml}<span style="margin: 0 4px;"></span>${labelHtml}`;
+  return buildPillWrap(bg, shadows[state.shadow], borders[state.border], inner);
+}
+
+function buildPillWrap(bg, shadow, border, inner) {
+  const backdrop = state.blur > 0 ? `backdrop-filter:blur(${state.blur}px); -webkit-backdrop-filter:blur(${state.blur}px);` : '';
+  const style = [
+    `background:${bg}`,
+    `padding:${state.padV}px ${state.padH}px`,
+    `border-radius:999px`,
+    `font-size:${state.fontSize}px`,
+    `font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif`,
+    shadow !== 'none' ? `box-shadow:${shadow}` : '',
+    border !== 'none' ? `border:${border}` : '',
+    backdrop,
+    `display:inline-flex`,
+    `align-items:center`,
+    `gap:8px`,
+    `white-space:nowrap`,
+    `pointer-events:auto`,
+  ].filter(Boolean).join(';');
+
+  return `<div class="nudge-toast" style="${style}">${inner}</div>`;
+}
+
+// ── Position ──
+function positionContainer() {
+  const c = document.getElementById('nudge-container');
+  c.style.top = c.style.bottom = c.style.left = c.style.right = '';
+  c.style.transform = '';
+
+  const footerH = 44;
+  switch (state.position) {
+    case 'bottom-center':
+      c.style.bottom = footerH + 'px';
+      c.style.left = '50%';
+      c.style.transform = 'translateX(-50%)';
+      break;
+    case 'bottom-left':
+      c.style.bottom = footerH + 'px';
+      c.style.left = '16px';
+      break;
+    case 'bottom-right':
+      c.style.bottom = footerH + 'px';
+      c.style.right = '16px';
+      break;
+    case 'top-center':
+      c.style.top = '52px';
+      c.style.left = '50%';
+      c.style.transform = 'translateX(-50%)';
+      break;
+  }
+}
+
+// ── Show / hide nudge ──
+function showNudge() {
+  clearTimeout(nudgeTimeout);
+  clearTimeout(fadeTimeout);
+
+  const container = document.getElementById('nudge-container');
+  positionContainer();
+  container.innerHTML = buildNudgeHtml();
+
+  const toast = container.querySelector('.nudge-toast');
+  if (!toast) return;
+
+  toast.style.animation = `nudge-${state.animation} 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)`;
+
+  nudgeTimeout = setTimeout(() => {
+    toast.style.animation = `nudge-fade-out 0.4s ease-in forwards`;
+    fadeTimeout = setTimeout(() => container.innerHTML = '', 400);
+  }, state.duration * 1000);
+}
+
+function triggerFromAction(id) {
+  pickExample(id, document.querySelector(`.example-btn[data-example="${id}"]`));
+}
+
+function pickExample(id, btn) {
+  state.example = id;
+  document.querySelectorAll('.example-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  showNudge();
+}
+
+// ── Controls ──
+function bindControls() {
+  ['position', 'animation', 'keyStyle', 'labelStyle', 'shadow', 'border'].forEach(name => {
+    document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+      el.addEventListener('change', () => { state[name] = el.value; updateAll(); });
+    });
+  });
+
+  ['duration', 'padH', 'padV', 'fontSize', 'bgOpacity', 'blur', 'tintStrength', 'keyBoost'].forEach(id => {
+    document.getElementById(id).addEventListener('input', e => {
+      state[id] = parseFloat(e.target.value);
+      updateAll();
+    });
+  });
+}
+
+function syncControls() {
+  ['position', 'animation', 'keyStyle', 'labelStyle', 'shadow', 'border'].forEach(name => {
+    const el = document.querySelector(`input[name="${name}"][value="${state[name]}"]`);
+    if (el) el.checked = true;
+  });
+  ['duration', 'padH', 'padV', 'fontSize', 'bgOpacity', 'blur', 'tintStrength', 'keyBoost'].forEach(id => {
+    document.getElementById(id).value = state[id];
+  });
+  buildSwatches();
+}
+
+function applyPreset(name, btn) {
+  Object.assign(state, PRESETS[name]);
+  syncControls();
+  updateAll();
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function updateLabels() {
+  document.getElementById('duration-val').textContent = state.duration + 's';
+  document.getElementById('padH-val').textContent = state.padH + 'px';
+  document.getElementById('padV-val').textContent = state.padV + 'px';
+  document.getElementById('fontSize-val').textContent = state.fontSize + 'px';
+  document.getElementById('bgOpacity-val').textContent = state.bgOpacity + '%';
+  document.getElementById('blur-val').textContent = state.blur + 'px';
+  document.getElementById('tintStrength-val').textContent = state.tintStrength + '%';
+  document.getElementById('keyBoost-val').textContent = '+' + state.keyBoost + 'px';
+}
+
+function updatePrompt() {
+  const parts = [];
+  parts.push(`Implement a bold pill-shaped shortcut nudge for the Flux Scheduler.`);
+  parts.push(`Appears when users click an action that has a keyboard shortcut.`);
+  parts.push('');
+  parts.push(`Style: large semi-opaque rounded pill (border-radius: 999px).`);
+  parts.push(`Padding: ${state.padV}px ${state.padH}px. Font: ${state.fontSize}px.`);
+  parts.push(`Background: dark surface at ${state.bgOpacity}% opacity${state.blur > 0 ? `, backdrop-filter blur(${state.blur}px)` : ''}.`);
+
+  if (state.tintStrength > 0 && state.tintHex !== '#888888') {
+    parts.push(`Color tint: ${state.tintHex} at ${state.tintStrength}% strength mixed into the background.`);
+  }
+
+  const keyDescs = { bold3d: 'bold 3D kbd caps with bottom shadow', glass: 'frosted glass keys', solid: 'solid tinted keys', outline: 'outlined keys' };
+  parts.push(`Key caps: ${keyDescs[state.keyStyle]}, ${state.fontSize + state.keyBoost}px (${state.keyBoost}px larger than text).`);
+
+  const labelDescs = { action: '"Alt+E edit" — keys followed by action name', tip: '"Tip — use Alt+E to edit" — full sentence', next: '"Next time, press Alt+E" — coaching phrasing', none: 'keys only, no text label' };
+  parts.push(`Label format: ${labelDescs[state.labelStyle]}.`);
+
+  const posDescs = { 'bottom-center': 'bottom-center above footer', 'bottom-left': 'bottom-left above footer', 'bottom-right': 'bottom-right above footer', 'top-center': 'top-center below toolbar' };
+  parts.push(`Position: ${posDescs[state.position]}.`);
+
+  const animDescs = { pop: 'pop in with scale bounce', 'slide-up': 'slide up from below', drop: 'drop from above with bounce', 'fade-in': 'gentle fade and scale' };
+  parts.push(`Animation: ${animDescs[state.animation]} (0.35s spring). Exit: fade + shrink (0.4s).`);
+  parts.push(`Duration: ${state.duration}s then auto-dismiss.`);
+
+  if (state.shadow !== 'heavy') parts.push(`Shadow: ${state.shadow}.`);
+  if (state.border !== 'subtle') parts.push(`Border: ${state.border}.`);
+
+  document.getElementById('prompt-output').textContent = parts.join('\n');
+}
+
+function generateCss() {
+  const tint = hexToRGB(state.tintHex);
+  const ts = state.tintStrength / 100;
+  const bgR = Math.round(24 + tint.r * ts);
+  const bgG = Math.round(24 + tint.g * ts);
+  const bgB = Math.round(24 + tint.b * ts);
+
+  return `.shortcut-nudge {
+  position: fixed;
+  z-index: 9999;
+  border-radius: 999px;
+  padding: ${state.padV}px ${state.padH}px;
+  font-size: ${state.fontSize}px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: rgba(${bgR}, ${bgG}, ${bgB}, ${state.bgOpacity / 100});
+  ${state.blur > 0 ? `backdrop-filter: blur(${state.blur}px);\n  -webkit-backdrop-filter: blur(${state.blur}px);` : ''}
+  ${state.shadow === 'heavy' ? 'box-shadow: 0 12px 48px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.3);' : state.shadow === 'glow' ? `box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 40px rgba(${tint.r},${tint.g},${tint.b},0.25);` : state.shadow === 'medium' ? 'box-shadow: 0 8px 32px rgba(0,0,0,0.4);' : ''}
+  ${state.border === 'subtle' ? 'border: 1px solid rgba(255,255,255,0.1);' : state.border === 'accent' ? `border: 1px solid rgba(${tint.r},${tint.g},${tint.b},0.4);` : ''}
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  animation: nudge-${state.animation} 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.shortcut-nudge kbd {
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  font-size: ${state.fontSize + state.keyBoost}px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  line-height: 1.2;
+  display: inline-block;
+}
+
+@keyframes nudge-${state.animation} {
+  ${state.animation === 'pop' ? '0% { transform: scale(0.5); opacity: 0; }\n  60% { transform: scale(1.08); }\n  100% { transform: scale(1); opacity: 1; }' :
+    state.animation === 'slide-up' ? 'from { transform: translateY(20px) scale(0.95); opacity: 0; }\n  to { transform: translateY(0) scale(1); opacity: 1; }' :
+    state.animation === 'drop' ? '0% { transform: translateY(-30px) scale(0.9); opacity: 0; }\n  70% { transform: translateY(4px) scale(1.02); }\n  100% { transform: translateY(0) scale(1); opacity: 1; }' :
+    'from { opacity: 0; transform: scale(0.9); }\n  to { opacity: 1; transform: scale(1); }'}
+}
+
+@keyframes nudge-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.92); }
+}`;
+}
+
+function updateAll() {
+  updateLabels();
+  showNudge();
+  updatePrompt();
+}
+
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('prompt-output').textContent).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy Prompt', 1500);
+  });
+}
+function copyCss() {
+  navigator.clipboard.writeText(generateCss()).then(() => {
+    const btn = document.getElementById('copyCssBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy CSS', 1500);
+  });
+}
+
+// Init
+buildSwatches();
+bindControls();
+updateAll();
+</script>
+</body>
+</html>

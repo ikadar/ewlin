@@ -3,7 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { Tile } from './Tile';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
-import { hexToTailwindColor, getColorClasses, getJobColorClasses } from './colorUtils';
+import { getStateColorClasses, computeTileState } from './colorUtils';
+import type { TileState } from './colorUtils';
 import type { TaskAssignment, InternalTask, Job } from '@flux/types';
 
 // Mock data
@@ -53,79 +54,70 @@ const mockAssignment: TaskAssignment = {
 };
 
 describe('colorUtils', () => {
-  describe('hexToTailwindColor', () => {
-    it('maps known hex colors correctly', () => {
-      expect(hexToTailwindColor('#8B5CF6')).toBe('purple');
-      expect(hexToTailwindColor('#F43F5E')).toBe('rose');
-      expect(hexToTailwindColor('#EAB308')).toBe('yellow');
-      expect(hexToTailwindColor('#14B8A6')).toBe('teal');
-      expect(hexToTailwindColor('#22C55E')).toBe('green');
-      expect(hexToTailwindColor('#06B6D4')).toBe('cyan');
-      expect(hexToTailwindColor('#3B82F6')).toBe('blue');
-      expect(hexToTailwindColor('#EC4899')).toBe('pink');
+  describe('computeTileState', () => {
+    it('returns late when isLate (highest priority)', () => {
+      expect(computeTileState(true, true, true, true)).toBe('late');
     });
 
-    it('is case insensitive', () => {
-      expect(hexToTailwindColor('#8b5cf6')).toBe('purple');
-      expect(hexToTailwindColor('#8B5CF6')).toBe('purple');
+    it('returns conflict when hasConflict and not late', () => {
+      expect(computeTileState(false, true, true, true)).toBe('conflict');
     });
 
-    it('returns purple as fallback for unknown colors', () => {
-      expect(hexToTailwindColor('#000000')).toBe('purple');
-      expect(hexToTailwindColor('#FFFFFF')).toBe('purple');
+    it('returns blocked when isBlocked and no higher priority', () => {
+      expect(computeTileState(false, false, true, true)).toBe('blocked');
+    });
+
+    it('returns completed when isCompleted and no higher priority', () => {
+      expect(computeTileState(false, false, false, true)).toBe('completed');
+    });
+
+    it('returns default when no flags set', () => {
+      expect(computeTileState(false, false, false, false)).toBe('default');
     });
   });
 
-  describe('getColorClasses', () => {
-    it('returns correct classes for purple', () => {
-      const classes = getColorClasses('purple');
-      expect(classes.border).toBe('border-l-purple-500');
-      expect(classes.setupBg).toBe('bg-purple-900/40');
-      expect(classes.setupBorder).toBe('border-purple-700/30');
-      expect(classes.runBg).toBe('bg-purple-950/35');
-      expect(classes.text).toBe('text-purple-300');
-    });
+  describe('getStateColorClasses', () => {
+    const states: TileState[] = ['default', 'completed', 'conflict', 'late', 'blocked'];
 
-    it('returns correct classes for all colors', () => {
-      const colors = [
-        'purple',
-        'violet',
-        'rose',
-        'red',
-        'yellow',
-        'amber',
-        'orange',
-        'teal',
-        'green',
-        'emerald',
-        'lime',
-        'cyan',
-        'sky',
-        'blue',
-        'indigo',
-        'pink',
-        'fuchsia',
-      ] as const;
-
-      colors.forEach((color) => {
-        const classes = getColorClasses(color);
-        expect(classes.border).toContain(color);
-        expect(classes.setupBg).toContain(color);
-        expect(classes.runBg).toContain(color);
-        expect(classes.text).toContain(color);
+    it('returns classes for all 5 states', () => {
+      states.forEach((state) => {
+        const classes = getStateColorClasses(state);
+        expect(classes.border).toBeTruthy();
+        expect(classes.setupBg).toBeTruthy();
+        expect(classes.setupBorder).toBeTruthy();
+        expect(classes.runBg).toBeTruthy();
+        expect(classes.text).toBeTruthy();
       });
     });
-  });
 
-  describe('getJobColorClasses', () => {
-    it('combines hex to tailwind mapping with class lookup', () => {
-      const classes = getJobColorClasses('#8B5CF6');
-      expect(classes.border).toBe('border-l-purple-500');
+    it('returns blue classes for default state', () => {
+      const classes = getStateColorClasses('default');
+      expect(classes.border).toBe('border-l-blue-500');
+      expect(classes.text).toBe('text-blue-300');
     });
 
-    it('handles unknown hex colors with fallback', () => {
-      const classes = getJobColorClasses('#123456');
-      expect(classes.border).toBe('border-l-purple-500');
+    it('returns green classes for completed state', () => {
+      const classes = getStateColorClasses('completed');
+      expect(classes.border).toBe('border-l-green-500');
+      expect(classes.text).toBe('text-green-300');
+    });
+
+    it('returns amber classes for conflict state', () => {
+      const classes = getStateColorClasses('conflict');
+      expect(classes.border).toBe('border-l-amber-500');
+      expect(classes.text).toBe('text-amber-300');
+    });
+
+    it('returns red classes for late state', () => {
+      const classes = getStateColorClasses('late');
+      expect(classes.border).toBe('border-l-red-500');
+      expect(classes.text).toBe('text-red-300');
+    });
+
+    it('returns zinc classes for blocked state', () => {
+      const classes = getStateColorClasses('blocked');
+      expect(classes.border).toBe('border-l-zinc-500');
+      expect(classes.text).toBe('text-zinc-400');
     });
   });
 });
@@ -248,23 +240,14 @@ describe('Tile', () => {
     expect(screen.queryByTestId('tile-incomplete-icon')).not.toBeInTheDocument();
   });
 
-  it('applies selection styling when selected', () => {
-    render(<Tile {...defaultProps} isSelected={true} />);
+  it('has data-job-id attribute for CSS selection highlighting', () => {
+    render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    // Selection now uses box-shadow glow effect with job color at 60% opacity
-    expect(tile).toHaveStyle({ boxShadow: '0 0 12px 4px #8B5CF699' });
+    expect(tile).toHaveAttribute('data-job-id', 'job-1');
   });
 
-  it('does not apply selection styling when not selected', () => {
-    render(<Tile {...defaultProps} isSelected={false} />);
-
-    const tile = screen.getByTestId('tile-assignment-1');
-    // No box-shadow glow when not selected
-    expect(tile.style.boxShadow).toBeFalsy();
-  });
-
-  it('calls onSelect with job id when clicked', () => {
+  it('calls onSelect with job id when clicked (non-selected tile)', () => {
     const onSelect = vi.fn();
     render(<Tile {...defaultProps} onSelect={onSelect} />);
 
@@ -272,12 +255,25 @@ describe('Tile', () => {
     expect(onSelect).toHaveBeenCalledWith('job-1');
   });
 
-  it('calls onRecall with assignment id when double-clicked', () => {
-    const onRecall = vi.fn();
-    render(<Tile {...defaultProps} onRecall={onRecall} />);
+  it('calls onPickFromGrid when clicking an already-selected non-completed tile', () => {
+    const onPickFromGrid = vi.fn();
+    render(<Tile {...defaultProps} isSelected={true} onPickFromGrid={onPickFromGrid} />);
 
-    fireEvent.doubleClick(screen.getByTestId('tile-assignment-1'));
-    expect(onRecall).toHaveBeenCalledWith('assignment-1');
+    fireEvent.click(screen.getByTestId('tile-assignment-1'));
+    expect(onPickFromGrid).toHaveBeenCalledWith(mockTask, mockJob, 'assignment-1');
+  });
+
+  it('calls onSelect when clicking a selected but completed tile', () => {
+    const onSelect = vi.fn();
+    const onPickFromGrid = vi.fn();
+    const completedAssignment: TaskAssignment = { ...mockAssignment, isCompleted: true };
+    render(
+      <Tile {...defaultProps} assignment={completedAssignment} isSelected={true} onSelect={onSelect} onPickFromGrid={onPickFromGrid} />
+    );
+
+    fireEvent.click(screen.getByTestId('tile-assignment-1'));
+    expect(onSelect).toHaveBeenCalledWith('job-1');
+    expect(onPickFromGrid).not.toHaveBeenCalled();
   });
 
   it('shows swap buttons on hover (via group class)', () => {
@@ -357,8 +353,6 @@ describe('Tile', () => {
 
     // Original ratio: 30 setup / 90 total = 1/3
     // Stretched total height: 1280px
-    // Setup height: 1280 * (30/90) = 426.67px ≈ 426.6666...px
-    // Run height: 1280 * (60/90) = 853.33px ≈ 853.3333...px
     const setupHeight = parseFloat(setupSection.style.height);
     const runHeight = parseFloat(runSection.style.height);
 
@@ -373,11 +367,39 @@ describe('Tile', () => {
     expect(tile).toHaveStyle({ top: '200px' });
   });
 
-  it('applies job color to border', () => {
+  it('applies default (blue) color when no tileState specified', () => {
     render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    expect(tile).toHaveClass('border-l-purple-500');
+    expect(tile).toHaveClass('border-l-blue-500');
+  });
+
+  it('applies late (red) color for late tileState', () => {
+    render(<Tile {...defaultProps} tileState="late" />);
+
+    const tile = screen.getByTestId('tile-assignment-1');
+    expect(tile).toHaveClass('border-l-red-500');
+  });
+
+  it('applies conflict (amber) color for conflict tileState', () => {
+    render(<Tile {...defaultProps} tileState="conflict" />);
+
+    const tile = screen.getByTestId('tile-assignment-1');
+    expect(tile).toHaveClass('border-l-amber-500');
+  });
+
+  it('applies completed (green) color for completed tileState', () => {
+    render(<Tile {...defaultProps} tileState="completed" />);
+
+    const tile = screen.getByTestId('tile-assignment-1');
+    expect(tile).toHaveClass('border-l-green-500');
+  });
+
+  it('applies blocked (zinc) color for blocked tileState', () => {
+    render(<Tile {...defaultProps} tileState="blocked" />);
+
+    const tile = screen.getByTestId('tile-assignment-1');
+    expect(tile).toHaveClass('border-l-zinc-500');
   });
 
   it('handles keyboard Enter for selection', () => {
@@ -422,39 +444,13 @@ describe('Tile', () => {
     expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
   });
 
-  describe('muting during selection', () => {
-    it('has muted styles when selectedJobId differs from job.id', () => {
-      render(<Tile {...defaultProps} selectedJobId="other-job" />);
+  it('has transition classes for smooth animation', () => {
+    render(<Tile {...defaultProps} />);
 
-      const tile = screen.getByTestId('tile-assignment-1');
-      expect(tile).toHaveStyle({ filter: 'saturate(0.2)', opacity: '0.6' });
-    });
-
-    it('has normal styles when selectedJobId matches job.id', () => {
-      render(<Tile {...defaultProps} selectedJobId="job-1" />);
-
-      const tile = screen.getByTestId('tile-assignment-1');
-      expect(tile).not.toHaveStyle({ filter: 'saturate(0.2)' });
-      expect(tile).not.toHaveStyle({ opacity: '0.6' });
-    });
-
-    it('has normal styles when selectedJobId is undefined (no selection)', () => {
-      render(<Tile {...defaultProps} />);
-
-      const tile = screen.getByTestId('tile-assignment-1');
-      expect(tile).not.toHaveStyle({ filter: 'saturate(0.2)' });
-      expect(tile).not.toHaveStyle({ opacity: '0.6' });
-    });
-
-    it('has transition classes for smooth muting animation', () => {
-      render(<Tile {...defaultProps} />);
-
-      const tile = screen.getByTestId('tile-assignment-1');
-      // Also includes box-shadow for selection glow transition
-      expect(tile).toHaveClass('transition-[filter,opacity,box-shadow]');
-      expect(tile).toHaveClass('duration-150');
-      expect(tile).toHaveClass('ease-out');
-    });
+    const tile = screen.getByTestId('tile-assignment-1');
+    expect(tile).toHaveClass('transition-[filter,opacity,box-shadow]');
+    expect(tile).toHaveClass('duration-150');
+    expect(tile).toHaveClass('ease-out');
   });
 
   describe('completion toggle (v0.3.33)', () => {

@@ -19,9 +19,9 @@ const SETTINGS_ITEMS = [
  */
 export function SettingsSubmenu() {
   return (
-    <div className="w-72 shrink-0 bg-zinc-900/30 border-r border-white/5 overflow-y-auto">
+    <div className="w-72 shrink-0 bg-flux-surface border-r border-flux-border overflow-y-auto">
       <div className="p-3">
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider px-2 mb-2">
+        <p className="text-xs font-medium text-flux-text-tertiary uppercase tracking-wider px-2 mb-2">
           Settings
         </p>
         <nav className="flex flex-col gap-1">
@@ -32,8 +32,8 @@ export function SettingsSubmenu() {
               className={({ isActive }) =>
                 `px-3 py-2 rounded-md text-sm transition-colors ${
                   isActive
-                    ? 'bg-white/10 text-white'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-flux-hover text-white'
+                    : 'text-flux-text-secondary hover:text-white hover:bg-flux-surface'
                 }`
               }
             >

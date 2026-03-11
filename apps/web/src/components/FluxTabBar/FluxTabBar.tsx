@@ -20,7 +20,7 @@ export const FluxTabBar = memo(function FluxTabBar({
 }: FluxTabBarProps) {
   return (
     <div
-      className="flex items-end justify-between border-b border-flux-border bg-flux-elevated px-4"
+      className="flex items-end border-b border-flux-border bg-flux-elevated px-4"
       data-testid="flux-tab-bar"
     >
       {/* Tabs */}
@@ -53,22 +53,6 @@ export const FluxTabBar = memo(function FluxTabBar({
         })}
       </div>
 
-      {/* Keyboard hint bar */}
-      <div
-        className="flex items-center gap-1 text-sm text-gray-500 shrink-0 pb-2"
-        aria-hidden="true"
-        data-testid="flux-keyboard-hints"
-      >
-        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">Alt</kbd>
-        <span>+</span>
-        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">↔</kbd>
-        <span>onglets</span>
-        <span className="mx-1 text-gray-600">|</span>
-        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">Alt</kbd>
-        <span>+</span>
-        <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-600 rounded text-sm font-mono">F</kbd>
-        <span>rechercher</span>
-      </div>
     </div>
   );
 });

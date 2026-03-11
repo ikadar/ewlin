@@ -89,7 +89,7 @@ export function PrerequisiteDropdown<T extends string>({
           <Listbox.Button
             ref={buttonRef}
             title={tooltipText}
-            className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 cursor-pointer ${getPillBgColor(value)}`}
+            className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 cursor-pointer ${getPillBgColor(value)}`}
             data-testid={`${testIdPrefix}-${type}-dropdown`}
             onClick={handleButtonClick}
           >

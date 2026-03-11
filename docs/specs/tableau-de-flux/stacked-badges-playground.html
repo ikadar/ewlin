@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Element Badges — Badge + Dots Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --dark-base: rgb(15 15 15);
+    --dark-surface: rgb(26 26 26);
+    --dark-elevated: rgb(36 36 36);
+    --dark-hover: rgb(44 44 44);
+    --dark-active: rgb(52 52 52);
+    --dark-border: rgb(42 42 42);
+    --dark-border-light: rgb(58 58 58);
+    --text-primary: rgb(245 245 245);
+    --text-secondary: rgb(209 209 209);
+    --text-tertiary: rgb(161 161 161);
+    --text-muted: rgb(128 128 128);
+    --c-green: rgb(74 222 128);
+    --c-yellow: rgb(250 204 21);
+    --c-red: rgb(248 113 113);
+    --c-gray: rgb(128 128 128);
+  }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--dark-base);
+    color: var(--text-primary);
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: 1fr auto;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    grid-row: 1 / -1; background: var(--dark-surface);
+    border-right: 1px solid var(--dark-border);
+    padding: 20px 16px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .controls h1 { font-size: 14px; font-weight: 600; }
+  .controls h1 small { font-weight: 400; color: var(--text-muted); font-size: 11px; display: block; margin-top: 2px; }
+  .control-group { display: flex; flex-direction: column; gap: 8px; }
+  .control-group label {
+    font-size: 10px; font-weight: 600; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .divider { height: 1px; background: var(--dark-border); }
+
+  .variant-grid { display: flex; flex-direction: column; gap: 4px; }
+  .variant-btn {
+    background: var(--dark-elevated); border: 1px solid var(--dark-border);
+    color: var(--text-secondary); padding: 7px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-family: inherit; text-align: left;
+    transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+  }
+  .variant-btn:hover { background: var(--dark-hover); }
+  .variant-btn.active {
+    background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.35);
+    color: rgb(165 180 252);
+  }
+  .variant-btn .vk {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    background: var(--dark-active); padding: 2px 5px; border-radius: 3px;
+    min-width: 18px; text-align: center;
+  }
+  .variant-btn.active .vk { background: rgba(99,102,241,0.25); }
+  .variant-btn .vdesc { font-size: 10px; color: var(--text-muted); }
+
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  .slider-row span.sl-label { font-size: 11px; color: var(--text-secondary); min-width: 80px; }
+  .slider-row input[type="range"] { flex: 1; accent-color: rgb(99 102 241); height: 4px; }
+  .slider-val {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); min-width: 38px; text-align: right;
+  }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .toggle-row span { font-size: 12px; color: var(--text-secondary); }
+  .toggle {
+    width: 34px; height: 18px; background: var(--dark-active); border-radius: 9px;
+    cursor: pointer; position: relative; transition: background 0.2s; border: none;
+  }
+  .toggle::after {
+    content: ''; position: absolute; width: 12px; height: 12px;
+    background: var(--text-muted); border-radius: 50%; top: 3px; left: 3px; transition: all 0.2s;
+  }
+  .toggle.on { background: rgba(99,102,241,0.4); }
+  .toggle.on::after { left: 19px; background: rgb(165 180 252); }
+
+  .sl-hint {
+    font-size: 10px; color: var(--text-muted); line-height: 1.4;
+    margin-top: -4px; padding-left: 2px;
+  }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; }
+  .preset-btn {
+    background: var(--dark-elevated); border: 1px solid var(--dark-border);
+    color: var(--text-muted); padding: 4px 8px; border-radius: 4px;
+    cursor: pointer; font-size: 10px; font-family: inherit; transition: all 0.15s;
+  }
+  .preset-btn:hover { color: var(--text-secondary); border-color: var(--dark-border-light); }
+
+  /* ── Preview ── */
+  .preview-area {
+    padding: 24px; overflow: auto;
+    display: flex; flex-direction: column; gap: 28px;
+  }
+  .section-title {
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;
+  }
+
+  /* ── Demo zone ── */
+  .demo-zone {
+    background: var(--dark-elevated); border: 1px solid var(--dark-border);
+    border-radius: 8px; padding: 40px 32px;
+    display: flex; align-items: center; gap: 48px;
+    min-height: 120px; position: relative;
+  }
+  .demo-cell {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  }
+  .demo-label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;
+  }
+
+  /* ── Mini table ── */
+  .mini-table { border-collapse: collapse; width: 100%; max-width: 1000px; }
+  .mini-table th {
+    padding: 6px 8px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-align: left;
+    border-bottom: 1px solid var(--dark-border);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .mini-table td { vertical-align: middle; padding: 0; text-align: left; position: relative; }
+  .mini-table td.td-text {
+    padding: 0 8px; white-space: nowrap; font-size: 12px;
+    color: var(--text-secondary); text-align: left;
+  }
+  .mini-table td.td-text.mono {
+    font-family: 'JetBrains Mono', monospace; font-weight: 500;
+    color: var(--text-primary); font-size: 11px;
+  }
+  .mini-table td.td-badge {
+    height: 2.25rem; position: relative;
+    text-align: left; vertical-align: middle; line-height: 0; padding-left: 8px;
+  }
+  .mini-table tbody tr {
+    border-bottom: 1px solid var(--dark-border);
+    transition: background 0.1s;
+  }
+  .mini-table tbody tr:hover { background: var(--dark-hover); }
+  .mini-table tbody tr.parent-row { height: 2.25rem; }
+  .mini-table tbody tr.parent-row.multi { cursor: pointer; }
+  .mini-table tbody tr.sub-row {
+    height: 2rem; border-top: 1px dashed var(--dark-border-light);
+    background: var(--dark-surface);
+  }
+  .mini-table tbody tr.sub-row td.td-text { color: var(--text-muted); font-size: 11px; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 4px; border-radius: 4px; border: 1px solid transparent;
+    font-size: 11px; font-weight: 500; white-space: nowrap; line-height: 1.4;
+    vertical-align: middle;
+  }
+  .badge-filled.badge-green  { background: rgb(33 49 39); color: var(--c-green); }
+  .badge-filled.badge-yellow { background: rgb(55 44 32); color: var(--c-yellow); }
+  .badge-filled.badge-red    { background: rgb(59 34 34); color: var(--c-red); }
+  .badge-filled.badge-gray   { background: rgb(46 48 52); color: var(--c-gray); }
+
+  .badge-outline.badge-green  { background: var(--dark-elevated); color: var(--c-green); border-color: rgba(74,222,128,0.4); }
+  .badge-outline.badge-yellow { background: var(--dark-elevated); color: var(--c-yellow); border-color: rgba(250,204,21,0.4); }
+  .badge-outline.badge-red    { background: var(--dark-elevated); color: var(--c-red); border-color: rgba(248,113,113,0.4); }
+  .badge-outline.badge-gray   { background: var(--dark-elevated); color: var(--c-gray); border-color: rgba(128,128,128,0.4); }
+
+  .badge-outline-tint.badge-green  { background: rgb(30 40 34); color: var(--c-green); border-color: rgba(74,222,128,0.35); }
+  .badge-outline-tint.badge-yellow { background: rgb(42 38 30); color: var(--c-yellow); border-color: rgba(250,204,21,0.35); }
+  .badge-outline-tint.badge-red    { background: rgb(45 30 30); color: var(--c-red); border-color: rgba(248,113,113,0.35); }
+  .badge-outline-tint.badge-gray   { background: rgb(40 40 42); color: var(--c-gray); border-color: rgba(128,128,128,0.3); }
+
+  /* ── Dot (pastille) ── */
+  .dot {
+    display: inline-block; vertical-align: middle;
+  }
+  .dot-green  { background: var(--c-green); }
+  .dot-yellow { background: var(--c-yellow); }
+  .dot-red    { background: var(--c-red); }
+  .dot-gray   { background: var(--c-gray); }
+
+  /* ── Multi cell wrapper ── */
+  .multi-cell {
+    display: inline-flex; align-items: center;
+    vertical-align: middle; cursor: pointer;
+  }
+
+  /* ── Prompt ── */
+  .prompt-area {
+    background: var(--dark-surface); border-top: 1px solid var(--dark-border);
+    padding: 16px 24px; display: flex; align-items: flex-start; gap: 12px;
+  }
+  .prompt-text {
+    flex: 1; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap;
+  }
+  .copy-btn {
+    background: var(--dark-elevated); border: 1px solid var(--dark-border);
+    color: var(--text-secondary); padding: 6px 12px; border-radius: 5px;
+    cursor: pointer; font-size: 11px; font-family: inherit; white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: var(--dark-hover); color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Multi-Element Badges<small>Badge principal + pastilles de couleur</small></h1>
+
+  <div class="control-group">
+    <label>Presets</label>
+    <div class="presets" id="presets"></div>
+  </div>
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <label>Mode d'affichage fermé</label>
+    <div class="variant-grid" id="display-modes"></div>
+    <div class="sl-hint">Comment les multi-éléments apparaissent quand les sous-lignes sont repliées</div>
+  </div>
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <label>Style du badge texte</label>
+    <div class="variant-grid" id="badge-styles"></div>
+  </div>
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <label>Pastilles</label>
+    <div class="slider-row">
+      <span class="sl-label">Taille</span>
+      <input type="range" id="sl-dot-size" min="4" max="12" step="1" value="6">
+      <span class="slider-val" id="sl-dot-size-val">6px</span>
+    </div>
+    <div class="slider-row">
+      <span class="sl-label">Espacement</span>
+      <input type="range" id="sl-dot-gap" min="1" max="6" step="1" value="2">
+      <span class="slider-val" id="sl-dot-gap-val">2px</span>
+    </div>
+    <div class="slider-row">
+      <span class="sl-label">Arrondi</span>
+      <input type="range" id="sl-dot-radius" min="0" max="50" step="5" value="25">
+      <span class="slider-val" id="sl-dot-radius-val">25%</span>
+    </div>
+    <div class="sl-hint">0% = carré · 50% = rond</div>
+    <div class="slider-row">
+      <span class="sl-label">Écart badge↔pastilles</span>
+      <input type="range" id="sl-badge-gap" min="2" max="10" step="1" value="4">
+      <span class="slider-val" id="sl-badge-gap-val">4px</span>
+    </div>
+    <div class="sl-hint">Espace entre le badge texte et les pastilles (mode Badge + pastilles)</div>
+  </div>
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <label>Animation de dépliage</label>
+    <div class="slider-row">
+      <span class="sl-label">Durée</span>
+      <input type="range" id="sl-duration" min="0" max="2000" step="10" value="200">
+      <span class="slider-val" id="sl-duration-val">200ms</span>
+    </div>
+    <div class="sl-hint">Durée de l'animation d'apparition des sous-lignes (0 = instantané)</div>
+    <div class="slider-row">
+      <span class="sl-label">Délai entre lignes</span>
+      <input type="range" id="sl-stagger" min="0" max="500" step="10" value="50">
+      <span class="slider-val" id="sl-stagger-val">50ms</span>
+    </div>
+    <div class="sl-hint">Décalage temporel entre chaque sous-ligne (0 = toutes en même temps)</div>
+  </div>
+</div>
+
+<div class="preview-area">
+  <div>
+    <div class="section-title">Aperçu isolé — cellule BAT d'un job 3 éléments</div>
+    <div class="demo-zone" id="demo-zone"></div>
+  </div>
+  <div>
+    <div class="section-title">Contexte tableau — cliquez sur une ligne multi-élément pour déplier</div>
+    <table class="mini-table" id="table-preview"></table>
+  </div>
+</div>
+
+<div class="prompt-area">
+  <div class="prompt-text" id="prompt-output"></div>
+  <button class="copy-btn" id="copy-btn">Copy</button>
+</div>
+
+<script>
+// ── Data ──
+const COLORS = {
+  green:  { css: 'var(--c-green)',  raw: 'rgb(74 222 128)' },
+  yellow: { css: 'var(--c-yellow)', raw: 'rgb(250 204 21)' },
+  red:    { css: 'var(--c-red)',    raw: 'rgb(248 113 113)' },
+  gray:   { css: 'var(--c-gray)',   raw: 'rgb(128 128 128)' },
+};
+
+const PRIORITY = { red: 0, yellow: 1, gray: 2, green: 3 };
+
+const JOBS = [
+  {
+    id: '00042', client: 'Ducros', titre: 'Brochure A4 16p',
+    multi: false,
+    bat: { label: 'OK', color: 'green' },
+    papier: { label: 'Stock', color: 'green' },
+    formes: { label: 'n.a.', color: 'gray' },
+    plaques: { label: 'Prêtes', color: 'green' },
+  },
+  {
+    id: '00091', client: 'Lefèvre & Fils', titre: 'Boîtes carton 350g',
+    multi: true,
+    elements: [
+      { name: 'Couverture',
+        bat: { label: 'Envoyé', color: 'yellow' }, papier: { label: 'Reçus', color: 'yellow' },
+        formes: { label: 'n.a.', color: 'gray' }, plaques: { label: 'n.a.', color: 'gray' } },
+      { name: 'Intérieur',
+        bat: { label: 'Att.fich', color: 'red' }, papier: { label: 'À cder', color: 'red' },
+        formes: { label: 'Cdée', color: 'yellow' }, plaques: { label: 'À faire', color: 'red' } },
+    ],
+  },
+  {
+    id: '00078', client: 'BioVert', titre: 'Étuis pliants gamme 2026',
+    multi: true,
+    elements: [
+      { name: 'Étui A',
+        bat: { label: 'OK', color: 'green' }, papier: { label: 'Stock', color: 'green' },
+        formes: { label: 'Stock', color: 'green' }, plaques: { label: 'Prêtes', color: 'green' } },
+      { name: 'Étui B',
+        bat: { label: 'Envoyé', color: 'yellow' }, papier: { label: 'Cdé', color: 'yellow' },
+        formes: { label: 'n.a.', color: 'gray' }, plaques: { label: 'À faire', color: 'red' } },
+      { name: 'Étui C',
+        bat: { label: 'Att.fich', color: 'red' }, papier: { label: 'À cder', color: 'red' },
+        formes: { label: 'À cder', color: 'red' }, plaques: { label: 'À faire', color: 'red' } },
+    ],
+  },
+  {
+    id: '00103', client: 'Pharma Plus', titre: 'Notice 6 volets',
+    multi: false,
+    bat: { label: 'Envoyé', color: 'yellow' },
+    papier: { label: 'Livré', color: 'green' },
+    formes: { label: 'Livrée', color: 'green' },
+    plaques: { label: 'Prêtes', color: 'green' },
+  },
+];
+
+const DISPLAY_MODES = [
+  { key: 'badge-dots', name: 'Badge + pastilles',  desc: 'Badge du pire état + pastilles colorées pour les autres' },
+  { key: 'dots-only',  name: 'Pastilles seules',    desc: 'Uniquement des pastilles colorées, une par élément' },
+];
+
+const BADGE_STYLES = [
+  { key: 'filled',       name: 'Filled',        desc: 'Fond opaque teinté' },
+  { key: 'outline',      name: 'Outline',       desc: 'Fond neutre + bordure colorée' },
+  { key: 'outline-tint', name: 'Outline + tint', desc: 'Fond teinté + bordure colorée' },
+];
+
+const PRESETS = [
+  { name: 'Badge + carrés',   mode: 'badge-dots', badgeStyle: 'filled',       dotSize: 6, dotGap: 2, dotRadius: 25, badgeGap: 4, duration: 200, stagger: 50 },
+  { name: 'Badge + ronds',    mode: 'badge-dots', badgeStyle: 'outline-tint', dotSize: 7, dotGap: 3, dotRadius: 50, badgeGap: 5, duration: 200, stagger: 50 },
+  { name: 'Pastilles carrées', mode: 'dots-only', badgeStyle: 'filled',       dotSize: 8, dotGap: 2, dotRadius: 20, badgeGap: 4, duration: 200, stagger: 50 },
+  { name: 'Pastilles rondes',  mode: 'dots-only', badgeStyle: 'filled',       dotSize: 8, dotGap: 3, dotRadius: 50, badgeGap: 4, duration: 200, stagger: 50 },
+  { name: 'Mini dots',         mode: 'dots-only', badgeStyle: 'filled',       dotSize: 5, dotGap: 2, dotRadius: 50, badgeGap: 4, duration: 150, stagger: 30 },
+];
+
+const DEFAULTS = { mode: 'badge-dots', badgeStyle: 'filled', dotSize: 6, dotGap: 2, dotRadius: 25, badgeGap: 4, duration: 200, stagger: 50 };
+const state = { ...DEFAULTS };
+const expandedJobs = {};
+
+// ── Helpers ──
+function getWorst(elements, colKey) {
+  let worst = null, worstP = 999;
+  elements.forEach(el => {
+    const p = PRIORITY[el[colKey].color] ?? 3;
+    if (p < worstP) { worstP = p; worst = el[colKey]; }
+  });
+  return worst;
+}
+
+function makeBadge(data) {
+  const b = document.createElement('span');
+  b.className = `badge badge-${state.badgeStyle} badge-${data.color}`;
+  b.textContent = data.label;
+  return b;
+}
+
+function makeDot(color) {
+  const d = document.createElement('span');
+  d.className = `dot dot-${color}`;
+  d.style.width = state.dotSize + 'px';
+  d.style.height = state.dotSize + 'px';
+  d.style.borderRadius = state.dotRadius + '%';
+  return d;
+}
+
+function buildMultiCell(elements, colKey, onClick) {
+  const wrap = document.createElement('span');
+  wrap.className = 'multi-cell';
+  wrap.onclick = (e) => { e.stopPropagation(); if (onClick) onClick(); };
+
+  if (state.mode === 'badge-dots') {
+    // Find worst element
+    let worstIdx = 0, worstP = 999;
+    elements.forEach((el, i) => {
+      const p = PRIORITY[el[colKey].color] ?? 3;
+      if (p < worstP) { worstP = p; worstIdx = i; }
+    });
+
+    // Badge for worst
+    wrap.appendChild(makeBadge(elements[worstIdx][colKey]));
+
+    // Dots for the rest
+    if (elements.length > 1) {
+      const dotsWrap = document.createElement('span');
+      dotsWrap.style.display = 'inline-flex';
+      dotsWrap.style.alignItems = 'center';
+      dotsWrap.style.gap = state.dotGap + 'px';
+      dotsWrap.style.marginLeft = state.badgeGap + 'px';
+
+      elements.forEach((el, i) => {
+        if (i === worstIdx) return;
+        dotsWrap.appendChild(makeDot(el[colKey].color));
+      });
+      wrap.appendChild(dotsWrap);
+    }
+  } else {
+    // Dots only
+    const dotsWrap = document.createElement('span');
+    dotsWrap.style.display = 'inline-flex';
+    dotsWrap.style.alignItems = 'center';
+    dotsWrap.style.gap = state.dotGap + 'px';
+
+    elements.forEach(el => {
+      dotsWrap.appendChild(makeDot(el[colKey].color));
+    });
+    wrap.appendChild(dotsWrap);
+  }
+
+  return wrap;
+}
+
+// ── Demo ──
+function renderDemo() {
+  const zone = document.getElementById('demo-zone');
+  zone.innerHTML = '';
+
+  const demoElements = [
+    { demo: { label: 'Att.fich', color: 'red' } },
+    { demo: { label: 'Envoyé',  color: 'yellow' } },
+    { demo: { label: 'OK',      color: 'green' } },
+  ];
+
+  // Mode A
+  const cellA = document.createElement('div');
+  cellA.className = 'demo-cell';
+  const labelA = document.createElement('div');
+  labelA.className = 'demo-label';
+  labelA.textContent = state.mode === 'badge-dots' ? 'Mode actif' : 'Badge + pastilles';
+  cellA.appendChild(labelA);
+
+  const wrapA = document.createElement('div');
+  wrapA.style.cssText = 'padding: 8px 12px; background: var(--dark-base); border-radius: 6px; border: 1px solid var(--dark-border);';
+  const savedMode = state.mode;
+  state.mode = 'badge-dots';
+  wrapA.appendChild(buildMultiCell(demoElements, 'demo', null));
+  state.mode = savedMode;
+  cellA.appendChild(wrapA);
+  zone.appendChild(cellA);
+
+  // Mode B
+  const cellB = document.createElement('div');
+  cellB.className = 'demo-cell';
+  const labelB = document.createElement('div');
+  labelB.className = 'demo-label';
+  labelB.textContent = state.mode === 'dots-only' ? 'Mode actif' : 'Pastilles seules';
+  cellB.appendChild(labelB);
+
+  const wrapB = document.createElement('div');
+  wrapB.style.cssText = 'padding: 8px 12px; background: var(--dark-base); border-radius: 6px; border: 1px solid var(--dark-border);';
+  state.mode = 'dots-only';
+  wrapB.appendChild(buildMultiCell(demoElements, 'demo', null));
+  state.mode = savedMode;
+  cellB.appendChild(wrapB);
+  zone.appendChild(cellB);
+
+  // Legend
+  const legend = document.createElement('div');
+  legend.style.cssText = 'font-size:11px; color:var(--text-muted); line-height:1.8;';
+  legend.innerHTML = `
+    <div>3 éléments : <span style="color:var(--c-red)">●</span> rouge (bloquant)
+    <span style="color:var(--c-yellow)">●</span> jaune (en cours)
+    <span style="color:var(--c-green)">●</span> vert (OK)</div>
+    <div style="margin-top:4px;font-size:10px;color:var(--text-tertiary)">Le badge montre le pire état</div>
+  `;
+  zone.appendChild(legend);
+}
+
+// ── Table ──
+const COLS = ['bat', 'papier', 'formes', 'plaques'];
+const COL_LABELS = ['BAT', 'Papier', 'Formes', 'Plaques'];
+
+function renderTable() {
+  const table = document.getElementById('table-preview');
+  table.innerHTML = `<thead><tr>
+    <th style="width:55px">Job</th>
+    <th style="width:110px">Client</th>
+    <th style="width:160px">Désignation</th>
+    ${COL_LABELS.map(c => `<th style="width:100px;padding-left:8px">${c}</th>`).join('')}
+  </tr></thead>`;
+
+  const tbody = document.createElement('tbody');
+
+  JOBS.forEach(job => {
+    const tr = document.createElement('tr');
+    tr.className = 'parent-row' + (job.multi ? ' multi' : '');
+    tr.dataset.job = job.id;
+
+    tr.innerHTML = `
+      <td class="td-text mono">${job.id}</td>
+      <td class="td-text">${job.client}</td>
+      <td class="td-text">${job.titre}</td>
+    `;
+
+    COLS.forEach(colKey => {
+      const td = document.createElement('td');
+      td.className = 'td-badge';
+
+      if (job.multi) {
+        td.appendChild(buildMultiCell(job.elements, colKey, () => toggleJob(job.id)));
+      } else {
+        td.appendChild(makeBadge(job[colKey]));
+      }
+
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+}
+
+function toggleJob(jobId) {
+  const job = JOBS.find(j => j.id === jobId);
+  if (!job || !job.multi) return;
+
+  const wasExpanded = !!expandedJobs[jobId];
+  const parentRow = document.querySelector(`tr[data-job="${jobId}"]`);
+  if (!parentRow) return;
+  const tbody = parentRow.parentElement;
+
+  if (!wasExpanded) {
+    expandedJobs[jobId] = true;
+
+    // Replace multi-cells with empty (badges gone, sub-rows take over)
+    const badgeTds = parentRow.querySelectorAll('td.td-badge');
+    badgeTds.forEach(td => { td.innerHTML = ''; });
+
+    // Insert sub-rows
+    const dur = state.duration;
+    let insertAfter = parentRow;
+
+    job.elements.forEach((el, elIdx) => {
+      const subTr = document.createElement('tr');
+      subTr.className = 'sub-row';
+      subTr.dataset.parentJob = jobId;
+
+      subTr.innerHTML = `
+        <td class="td-text mono"></td>
+        <td class="td-text"></td>
+        <td class="td-text"><span style="padding-left:12px;font-size:11px;">↳ ${el.name}</span></td>
+      `;
+
+      const delay = elIdx * state.stagger;
+
+      COLS.forEach(colKey => {
+        const td = document.createElement('td');
+        td.className = 'td-badge';
+        const b = makeBadge(el[colKey]);
+
+        if (dur > 0) {
+          b.style.opacity = '0';
+          b.style.transform = 'translateY(-6px)';
+          b.style.transition = `all ${dur}ms cubic-bezier(0.25,1,0.5,1) ${delay}ms`;
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            b.style.opacity = '1';
+            b.style.transform = 'translateY(0)';
+          }));
+        }
+
+        td.appendChild(b);
+        subTr.appendChild(td);
+      });
+
+      // Animate name too
+      if (dur > 0) {
+        const nameSpan = subTr.querySelector('span');
+        if (nameSpan) {
+          nameSpan.style.display = 'inline-block';
+          nameSpan.style.opacity = '0';
+          nameSpan.style.transform = 'translateY(-6px)';
+          nameSpan.style.transition = `all ${dur}ms cubic-bezier(0.25,1,0.5,1) ${delay}ms`;
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            nameSpan.style.opacity = '1';
+            nameSpan.style.transform = 'translateY(0)';
+          }));
+        }
+      }
+
+      insertAfter.after(subTr);
+      insertAfter = subTr;
+    });
+
+  } else {
+    expandedJobs[jobId] = false;
+
+    // Remove sub-rows
+    tbody.querySelectorAll(`tr[data-parent-job="${jobId}"]`).forEach(r => r.remove());
+
+    // Restore multi-cells
+    const badgeTds = parentRow.querySelectorAll('td.td-badge');
+    badgeTds.forEach((td, ci) => {
+      td.innerHTML = '';
+      td.appendChild(buildMultiCell(job.elements, COLS[ci], () => toggleJob(job.id)));
+    });
+  }
+}
+
+// ── Prompt ──
+function updatePrompt() {
+  const lines = [];
+  lines.push(`Implémente l'affichage multi-éléments pour le tableau de flux.`);
+  lines.push('');
+
+  if (state.mode === 'badge-dots') {
+    lines.push(`Mode "Badge + pastilles" : le badge texte du pire état (rouge > jaune > gris > vert) est affiché normalement, les autres éléments sont résumés par des pastilles colorées à droite.`);
+  } else {
+    lines.push(`Mode "Pastilles seules" : chaque élément est représenté par une pastille colorée, pas de badge texte.`);
+  }
+
+  lines.push('');
+  lines.push(`Pastilles : ${state.dotSize}×${state.dotSize}px, border-radius ${state.dotRadius}%, espacement ${state.dotGap}px.`);
+  if (state.mode === 'badge-dots') {
+    lines.push(`Écart badge↔pastilles : ${state.badgeGap}px.`);
+    lines.push(`Style badge : ${state.badgeStyle === 'filled' ? 'fond opaque teinté' : state.badgeStyle === 'outline' ? 'fond neutre + bordure colorée' : 'fond teinté + bordure colorée'}.`);
+  }
+
+  lines.push('');
+  lines.push(`Couleurs des pastilles : rouge (bloquant), jaune (en cours), vert (OK/terminé), gris (n.a.).`);
+  lines.push('');
+  lines.push(`Au clic sur la cellule multi-élément, les sous-lignes se déplient avec chaque badge détaillé.`);
+  if (state.duration > 0) {
+    lines.push(`Animation : glissement + fondu, durée ${state.duration}ms, délai entre lignes ${state.stagger}ms.`);
+  } else {
+    lines.push(`Pas d'animation (instantané).`);
+  }
+
+  document.getElementById('prompt-output').textContent = lines.join('\n');
+}
+
+function updateAll() {
+  // Collapse all before re-render
+  Object.keys(expandedJobs).forEach(k => { expandedJobs[k] = false; });
+  renderDemo();
+  renderTable();
+  updatePrompt();
+}
+
+// ── Controls init ──
+function initControls() {
+  const mGrid = document.getElementById('display-modes');
+  DISPLAY_MODES.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'variant-btn';
+    btn.innerHTML = `<span class="vk">${m.key === 'badge-dots' ? 'B+' : '••'}</span><span><span>${m.name}</span><br><span class="vdesc">${m.desc}</span></span>`;
+    btn.onclick = () => { state.mode = m.key; syncControls(); updateAll(); };
+    mGrid.appendChild(btn);
+  });
+
+  const bGrid = document.getElementById('badge-styles');
+  BADGE_STYLES.forEach(bs => {
+    const btn = document.createElement('button');
+    btn.className = 'variant-btn';
+    btn.innerHTML = `<span class="vk">${bs.key[0].toUpperCase()}</span><span><span>${bs.name}</span><br><span class="vdesc">${bs.desc}</span></span>`;
+    btn.onclick = () => { state.badgeStyle = bs.key; syncControls(); updateAll(); };
+    bGrid.appendChild(btn);
+  });
+
+  const sliders = [
+    { id: 'sl-dot-size', key: 'dotSize', suffix: 'px' },
+    { id: 'sl-dot-gap', key: 'dotGap', suffix: 'px' },
+    { id: 'sl-dot-radius', key: 'dotRadius', suffix: '%' },
+    { id: 'sl-badge-gap', key: 'badgeGap', suffix: 'px' },
+    { id: 'sl-duration', key: 'duration', suffix: 'ms' },
+    { id: 'sl-stagger', key: 'stagger', suffix: 'ms' },
+  ];
+
+  sliders.forEach(s => {
+    document.getElementById(s.id).oninput = function() {
+      state[s.key] = parseFloat(this.value);
+      document.getElementById(s.id + '-val').textContent = state[s.key] + s.suffix;
+      updateAll();
+    };
+  });
+
+  const pContainer = document.getElementById('presets');
+  PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = p.name;
+    btn.onclick = () => {
+      Object.keys(p).forEach(k => { if (k !== 'name') state[k] = p[k]; });
+      syncControls(); updateAll();
+    };
+    pContainer.appendChild(btn);
+  });
+
+  document.getElementById('copy-btn').onclick = () => {
+    navigator.clipboard.writeText(document.getElementById('prompt-output').textContent);
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  };
+}
+
+function syncControls() {
+  document.querySelectorAll('#display-modes .variant-btn').forEach((b, i) => b.classList.toggle('active', DISPLAY_MODES[i].key === state.mode));
+  document.querySelectorAll('#badge-styles .variant-btn').forEach((b, i) => b.classList.toggle('active', BADGE_STYLES[i].key === state.badgeStyle));
+  document.getElementById('sl-dot-size').value = state.dotSize;
+  document.getElementById('sl-dot-size-val').textContent = state.dotSize + 'px';
+  document.getElementById('sl-dot-gap').value = state.dotGap;
+  document.getElementById('sl-dot-gap-val').textContent = state.dotGap + 'px';
+  document.getElementById('sl-dot-radius').value = state.dotRadius;
+  document.getElementById('sl-dot-radius-val').textContent = state.dotRadius + '%';
+  document.getElementById('sl-badge-gap').value = state.badgeGap;
+  document.getElementById('sl-badge-gap-val').textContent = state.badgeGap + 'px';
+  document.getElementById('sl-duration').value = state.duration;
+  document.getElementById('sl-duration-val').textContent = state.duration + 'ms';
+  document.getElementById('sl-stagger').value = state.stagger;
+  document.getElementById('sl-stagger-val').textContent = state.stagger + 'ms';
+}
+
+initControls();
+syncControls();
+updateAll();
+</script>
+</body>
+</html>

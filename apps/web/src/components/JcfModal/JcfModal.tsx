@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { X, Save } from 'lucide-react';
+import { KBD_CLASS } from '../ShortcutFooter/kbdStyles';
 
 export interface JcfModalProps {
   /** Whether the modal is open */
@@ -144,22 +145,30 @@ export function JcfModal({
             </div>
           )}
           {/* Keyboard hints row */}
-          <div className="px-[13px] py-[5px] border-b border-zinc-800/50 flex items-center gap-[13px] text-sm text-zinc-500">
-            <span className="flex items-center gap-[3px]">
-              <kbd className="bg-zinc-800 px-[5px] py-[2px] rounded-[3px] text-zinc-400">Tab</kbd> Champ suivant
+          <div className="px-[13px] py-[5px] border-b border-zinc-800/50 flex items-center gap-5">
+            <span className="flex items-center gap-2">
+              <kbd className={KBD_CLASS}>Tab</kbd>
+              <span className="text-zinc-500 text-[11px]">Champ suivant</span>
             </span>
-            <span className="flex items-center gap-[3px]">
-              <kbd className="bg-zinc-800 px-[3px] py-[2px] rounded-[3px] text-zinc-400">⌥</kbd>
-              <kbd className="bg-zinc-800 px-[3px] py-[2px] rounded-[3px] text-zinc-400">←↑↓→</kbd> Naviguer tableau
+            <span className="flex items-center gap-2">
+              <span className="flex items-center gap-1">
+                <kbd className={KBD_CLASS}>⌥</kbd>
+                <span className="text-zinc-500 text-xs font-mono">+</span>
+                <kbd className={KBD_CLASS}>←↑↓→</kbd>
+              </span>
+              <span className="text-zinc-500 text-[11px]">Naviguer tableau</span>
             </span>
-            <span className="flex items-center gap-[3px]">
-              <kbd className="bg-zinc-800 px-[3px] py-[2px] rounded-[3px] text-zinc-400">↑↓</kbd> Liste
+            <span className="flex items-center gap-2">
+              <kbd className={KBD_CLASS}>↑↓</kbd>
+              <span className="text-zinc-500 text-[11px]">Liste</span>
             </span>
-            <span className="flex items-center gap-[3px]">
-              <kbd className="bg-zinc-800 px-[5px] py-[2px] rounded-[3px] text-zinc-400">⌘S</kbd> Sauvegarder
+            <span className="flex items-center gap-2">
+              <kbd className={KBD_CLASS}>⌘S</kbd>
+              <span className="text-zinc-500 text-[11px]">Sauvegarder</span>
             </span>
-            <span className="flex items-center gap-[3px]">
-              <kbd className="bg-zinc-800 px-[5px] py-[2px] rounded-[3px] text-zinc-400">Esc</kbd> Fermer
+            <span className="flex items-center gap-2">
+              <kbd className={KBD_CLASS}>Esc</kbd>
+              <span className="text-zinc-500 text-[11px]">Fermer</span>
             </span>
           </div>
           {/* Action buttons row */}

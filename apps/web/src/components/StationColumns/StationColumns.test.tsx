@@ -181,7 +181,7 @@ describe('StationColumn', () => {
     render(<StationColumn station={mockStation} dayOfWeek={1} />);
 
     const column = screen.getByTestId('station-column-station-1');
-    expect(column).toHaveClass('bg-[#0a0a0a]');
+    expect(column).toHaveClass('bg-zinc-950');
   });
 
   it('has transition classes for smooth animations', () => {
@@ -363,7 +363,7 @@ describe('StationColumns', () => {
     expect(container).toHaveClass('flex');
     expect(container).toHaveClass('gap-3');
     expect(container).toHaveClass('px-3');
-    expect(container).toHaveClass('bg-[#050505]');
+    expect(container).toHaveClass('bg-zinc-950');
   });
 
   it('renders empty when no stations', () => {

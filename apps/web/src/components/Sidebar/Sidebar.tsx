@@ -1,7 +1,9 @@
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { CalendarDays, TowerControl, Settings, User, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { selectCurrentUser, selectIsAuthenticated, logout } from '../../store/slices/authSlice';
 import { shouldUseMockMode } from '../../store/api/baseApi';
@@ -15,6 +17,7 @@ import { shouldUseMockMode } from '../../store/api/baseApi';
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector(selectCurrentUser);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -23,7 +26,9 @@ export function Sidebar() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isSettings = location.pathname.startsWith('/settings');
-  const isFlux = location.pathname.startsWith('/flux');
+  const fromRoute = (location.state as { from?: string } | null)?.from;
+  const isJcfFromFlux = location.pathname === '/job/new' && fromRoute?.startsWith('/flux');
+  const isFlux = location.pathname.startsWith('/flux') || isJcfFromFlux;
   const isScheduler = !isSettings && !isFlux;
 
   // Close menu on outside click
@@ -88,6 +93,18 @@ export function Sidebar() {
             isActive={isSettings}
             onClick={() => navigate('/settings/stations')}
             testId="sidebar-settings-button"
+          />
+          <SidebarButton
+            icon={User}
+            label="User"
+            isDisabled
+            testId="sidebar-user-button"
+          />
+          <SidebarButton
+            icon={theme === 'dark' ? Sun : Moon}
+            label={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            onClick={toggleTheme}
+            testId="sidebar-theme-toggle"
           />
           {isMock || !isAuthenticated ? (
             <SidebarButton

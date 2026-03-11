@@ -136,7 +136,7 @@ describe('JobDetailsPanel', () => {
     expect(container.querySelector('[class]')).toBeNull();
   });
 
-  it('renders when job is selected', () => {
+  it('renders compact info header when job is selected', () => {
     render(
       <JobDetailsPanel
         job={mockJob}
@@ -146,11 +146,12 @@ describe('JobDetailsPanel', () => {
         stations={mockStations}
       />
     );
-    expect(screen.getByText('12345')).toBeInTheDocument();
-    expect(screen.getByText('Autosphere')).toBeInTheDocument();
+    // Compact header: "12345 – Autosphere" on line 1
+    expect(screen.getByText(/12345/)).toBeInTheDocument();
+    expect(screen.getByText(/Autosphere/)).toBeInTheDocument();
   });
 
-  it('displays all job info fields', () => {
+  it('displays description and departure date', () => {
     render(
       <JobDetailsPanel
         job={mockJob}
@@ -160,10 +161,8 @@ describe('JobDetailsPanel', () => {
         stations={mockStations}
       />
     );
-    expect(screen.getByText('Code')).toBeInTheDocument();
-    expect(screen.getByText('Client')).toBeInTheDocument();
-    expect(screen.getByText('Intitulé')).toBeInTheDocument();
-    expect(screen.getByText('Départ')).toBeInTheDocument();
+    expect(screen.getByText('Brochures Autosphère accueil')).toBeInTheDocument();
+    expect(screen.getByText(/Dep\./)).toBeInTheDocument();
   });
 
   it('displays task tiles', () => {
@@ -235,7 +234,7 @@ describe('TaskTile', () => {
       <TaskTile
         task={task}
         job={mockJob}
-        jobColor={mockJob.color}
+        tileState="unplaced"
         station={mockStations[1]}
       />
     );
@@ -249,7 +248,7 @@ describe('TaskTile', () => {
       <TaskTile
         task={task}
         job={mockJob}
-        jobColor={mockJob.color}
+        tileState="default"
         assignment={mockAssignments[0]}
         station={mockStations[0]}
       />
@@ -264,31 +263,31 @@ describe('TaskTile', () => {
     const task = mockTasks[1];
     const onPick = vi.fn();
     render(
-      <TaskTile task={task} job={mockJob} jobColor={mockJob.color} station={mockStations[1]} onPick={onPick} />
+      <TaskTile task={task} job={mockJob} tileState="unplaced" station={mockStations[1]} onPick={onPick} />
     );
     const tile = screen.getByTestId(`task-tile-${task.id}`);
     expect(tile).toHaveClass('cursor-pointer');
   });
 
-  it('has dark styling for scheduled tasks', () => {
+  it('has state-based styling for scheduled tasks', () => {
     const task = mockTasks[0];
     render(
       <TaskTile
         task={task}
         job={mockJob}
-        jobColor={mockJob.color}
+        tileState="default"
         assignment={mockAssignments[0]}
         station={mockStations[0]}
       />
     );
     const tile = screen.getByTestId(`task-tile-${task.id}`);
-    expect(tile).toHaveClass('bg-slate-800/40');
+    expect(tile).toHaveClass('bg-transparent');
   });
 
   it('has select-none class for unscheduled tasks', () => {
     const task = mockTasks[1];
     render(
-      <TaskTile task={task} job={mockJob} jobColor={mockJob.color} station={mockStations[1]} />
+      <TaskTile task={task} job={mockJob} tileState="unplaced" station={mockStations[1]} />
     );
     const tile = screen.getByTestId(`task-tile-${task.id}`);
     expect(tile).toHaveClass('select-none');

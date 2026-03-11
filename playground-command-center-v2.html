@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Center v2 — Shortcut Reference + Command Dropdown</title>
+<style>
+  :root {
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface-2: #27272a;
+    --surface-3: #3f3f46;
+    --border: #3f3f46;
+    --border-subtle: #27272a;
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --text-dim: #71717a;
+    --blue: #3b82f6;
+    --blue-hover: #60a5fa;
+    --blue-dim: #1e3a5f;
+    --emerald: #10b981;
+    --emerald-dim: #064e3b;
+    --amber: #f59e0b;
+    --amber-dim: #78350f;
+    --red: #ef4444;
+    --red-dim: #7f1d1d;
+    --purple: #a855f7;
+    --purple-dim: #581c87;
+    --cyan: #06b6d4;
+    --cyan-dim: #164e63;
+    font-size: 13px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── TOP BAR ─── */
+  .top-bar {
+    height: 44px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0;
+  }
+  .top-bar h1 { font-size: 13px; font-weight: 600; }
+  .top-bar .badge {
+    font-size: 9px; padding: 2px 8px; border-radius: 99px;
+    background: var(--blue-dim); color: var(--blue);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .top-bar .hint { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+
+  /* ─── LAYOUT ─── */
+  .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* ─── LEFT PANEL ─── */
+  .left-panel {
+    width: 280px;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--surface);
+    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  }
+  .left-panel h2 {
+    font-size: 10px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.8px; padding: 14px 14px 8px;
+  }
+  .variant-item {
+    padding: 10px 14px; cursor: pointer;
+    border-left: 3px solid transparent; transition: all 0.15s;
+  }
+  .variant-item:hover { background: var(--surface-2); }
+  .variant-item.active { background: var(--bg); border-left-color: var(--blue); }
+  .variant-item .v-title { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+  .variant-item .v-desc { font-size: 10px; color: var(--text-dim); line-height: 1.4; }
+  .variant-sep { height: 1px; background: var(--border-subtle); margin: 4px 14px; }
+
+  .expert-notes {
+    padding: 14px; border-top: 1px solid var(--border-subtle); margin-top: auto;
+  }
+  .expert-notes h3 {
+    font-size: 10px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;
+  }
+  .note-card {
+    background: var(--bg); border: 1px solid var(--border-subtle);
+    border-radius: 6px; padding: 10px; margin-bottom: 8px;
+  }
+  .note-card .note-author {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.4px; margin-bottom: 4px;
+  }
+  .note-card p { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ─── PREVIEW (CENTER) ─── */
+  .preview-area {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 30px; overflow-y: auto;
+    background: repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(255,255,255,0.015) 19px, rgba(255,255,255,0.015) 20px);
+  }
+
+  /* ─── KBD ─── */
+  .kbd {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; padding: 2px 6px; border-radius: 4px; font-size: 10px;
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    color: var(--text-muted);
+    background: linear-gradient(180deg, #2a2a2e 0%, #1e1e22 100%);
+    border: 1px solid #404044; border-bottom-width: 2px;
+    line-height: 14px; white-space: nowrap;
+  }
+  .kbd-combo { display: inline-flex; align-items: center; gap: 3px; }
+  .kbd-plus { font-size: 9px; color: var(--text-dim); font-family: monospace; }
+  .kbd-then { font-size: 10px; color: var(--text-dim); margin: 0 4px; }
+
+  /* ═══ COMMAND CENTER SHELL ═══ */
+  .cc-shell {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    overflow: hidden;
+    display: none;
+    position: relative;
+  }
+  .cc-shell.active { display: block; width: 70vw; max-width: 800px; }
+
+  /* Search bar */
+  .cc-search {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; gap: 10px;
+    position: relative;
+    z-index: 20;
+    background: var(--surface);
+  }
+  .cc-search .search-icon { color: var(--text-dim); font-size: 14px; flex-shrink: 0; }
+  .cc-search input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 13px; font-family: inherit;
+  }
+  .cc-search input::placeholder { color: var(--text-dim); }
+  .cc-search .search-hint { font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
+
+  /* ─── DROPDOWN (appears on typing) ─── */
+  .cc-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--blue);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    z-index: 30;
+    max-height: 280px;
+    overflow-y: auto;
+    display: none;
+    border-radius: 0 0 12px 12px;
+  }
+  .cc-dropdown.open { display: block; }
+  .dd-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; cursor: pointer; transition: background 0.08s;
+  }
+  .dd-row:hover, .dd-row.dd-active { background: var(--surface-2); }
+  .dd-row .dd-icon {
+    width: 22px; height: 22px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; flex-shrink: 0;
+  }
+  .dd-row .dd-label { flex: 1; font-size: 12px; color: var(--text); }
+  .dd-row .dd-label mark {
+    background: var(--amber); color: var(--bg); border-radius: 2px; padding: 0 1px;
+  }
+  .dd-row .dd-cat {
+    font-size: 9px; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: 0.4px; margin-right: 4px;
+  }
+  .dd-row .dd-keys { flex-shrink: 0; }
+  .dd-empty {
+    padding: 20px 16px; text-align: center;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .dd-footer {
+    padding: 6px 14px; border-top: 1px solid var(--border-subtle);
+    display: flex; gap: 10px; font-size: 10px; color: var(--text-dim);
+  }
+
+  /* ─── SHORTCUT ZONES (static background) ─── */
+  .cc-zones {
+    padding: 8px;
+    position: relative;
+    z-index: 1;
+    transition: opacity 0.2s;
+  }
+  .cc-zones.dimmed { opacity: 0.3; pointer-events: none; }
+
+  .cc-grid-2col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+  }
+  .cc-grid-3col {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;
+  }
+
+  .cc-zone {
+    background: transparent; border-radius: 8px;
+    padding: 10px 12px; border: 1px solid transparent;
+  }
+  .cc-zone-title {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.8px; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+    color: var(--text-dim) !important;
+  }
+  .zone-dot {
+    width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+  }
+  .sc-row {
+    display: flex; align-items: center; gap: 6px; padding: 3px 0;
+  }
+  .sc-row .sc-label { flex: 1; font-size: 11px; color: var(--text-dim); }
+  .sc-row .sc-keys { margin-left: auto; flex-shrink: 0; }
+
+  /* footer */
+  .cc-footer {
+    padding: 8px 14px; border-top: 1px solid var(--border-subtle);
+    display: flex; align-items: center; gap: 12px;
+    font-size: 10px; color: var(--text-dim);
+    background: var(--surface);
+    position: relative; z-index: 2;
+  }
+  .cc-footer .foot-sep { color: var(--border); }
+
+  /* ─── MASONRY VARIANT ─── */
+  .cc-masonry {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    padding: 10px; align-items: start;
+  }
+  .cc-masonry .cc-zone { padding: 12px 14px; }
+  .cc-masonry .cc-zone-title {
+    font-size: 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px;
+    color: var(--text-dim) !important;
+  }
+
+  /* ─── CONTROLS (RIGHT) ─── */
+  .controls-panel {
+    width: 240px; border-left: 1px solid var(--border-subtle);
+    background: var(--surface); padding: 14px; overflow-y: auto; flex-shrink: 0;
+  }
+  .controls-panel h3 {
+    font-size: 10px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;
+  }
+  .control-group {
+    margin-bottom: 14px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .control-group:last-child { border-bottom: none; }
+  .control-label { font-size: 11px; color: var(--text-muted); margin-bottom: 5px; display: block; }
+  .control-select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border-subtle);
+    border-radius: 6px; padding: 5px 8px; color: var(--text);
+    font-size: 11px; font-family: inherit; outline: none; cursor: pointer;
+  }
+  .control-toggle {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 5px; cursor: pointer;
+  }
+  .control-toggle input { accent-color: var(--blue); }
+  .control-toggle label { font-size: 11px; color: var(--text-muted); cursor: pointer; }
+  .control-range { width: 100%; accent-color: var(--blue); margin-top: 3px; }
+  .control-val { font-size: 10px; color: var(--text-dim); text-align: right; margin-top: 2px; }
+
+  .behavior-label {
+    font-size: 10px; color: var(--text-dim); margin-top: 8px;
+    padding: 8px; background: var(--bg); border-radius: 6px;
+    border: 1px solid var(--border-subtle); line-height: 1.5;
+  }
+  .behavior-label strong { color: var(--text-muted); }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>Command Center v2</h1>
+  <span class="badge">Reference + Dropdown</span>
+  <span class="hint">Zones stay static — typing opens a filtered dropdown on top</span>
+</div>
+
+<div class="main-layout">
+
+  <!-- LEFT -->
+  <div class="left-panel">
+    <h2>Layout Variants</h2>
+    <div class="variant-item active" onclick="showVariant(1)" data-v="1">
+      <div class="v-title">V1 — 2-Column Zones</div>
+      <div class="v-desc">6 category cards in 2 columns. Dropdown overlays when typing. Clean and balanced.</div>
+    </div>
+    <div class="variant-item" onclick="showVariant(2)" data-v="2">
+      <div class="v-title">V2 — 3-Column Dense</div>
+      <div class="v-desc">Maximum shortcut density. 3 narrow columns. Best for large sets.</div>
+    </div>
+    <div class="variant-sep"></div>
+    <div class="variant-item" onclick="showVariant(3)" data-v="3">
+      <div class="v-title">V3 — Masonry Cards</div>
+      <div class="v-desc">Variable-height zones with subtle borders. Premium feel, natural sizing.</div>
+    </div>
+    <div class="variant-item" onclick="showVariant(4)" data-v="4">
+      <div class="v-title">V4 — 2-Col + Context</div>
+      <div class="v-desc">Context header (selected job) above zones. Dropdown still overlays on type.</div>
+    </div>
+
+    <div class="expert-notes">
+      <h3>Expert Notes</h3>
+      <div class="note-card">
+        <div class="note-author" style="color:var(--blue)">Sophia — UX</div>
+        <p>This is the right model. The zones are a <strong>passive reference</strong> — always there, always the same. The dropdown is the <strong>active interaction</strong>. Two layers, two purposes.</p>
+      </div>
+      <div class="note-card">
+        <div class="note-author" style="color:var(--emerald)">Marcus — Keyboard</div>
+        <p>Love it. Alt+K opens the center, I glance at the zones to remember a shortcut, or I type to execute. Zero friction. The zones teach me, the dropdown serves me.</p>
+      </div>
+      <div class="note-card">
+        <div class="note-author" style="color:var(--purple)">Lea — Design</div>
+        <p>Key detail: dim the zones slightly when the dropdown opens. Focus the eye on the dropdown without hiding the reference. The blue top-border on the dropdown is the visual separator.</p>
+      </div>
+      <div class="note-card">
+        <div class="note-author" style="color:var(--amber)">Jean-Pierre — Print</div>
+        <p>The operator opens the center, sees "ah yes, Alt+Q for placement", closes it and uses the shortcut directly. Next time, muscle memory. The zones are training wheels that never go away.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: PREVIEW -->
+  <div class="preview-area">
+
+    <!-- V1: 2-Column -->
+    <div class="cc-shell active" id="v1">
+      <div class="cc-search">
+        <span class="search-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="15" x2="15" y2="9"/></svg></span>
+        <input type="text" placeholder="Saisissez une commande..." id="v1-search" oninput="onSearch(1)" onfocus="onSearchFocus(1)" onblur="onSearchBlur(1)">
+        <span class="search-hint"><span class="kbd">Alt+K</span></span>
+        <div class="cc-dropdown" id="v1-dropdown"></div>
+      </div>
+      <div class="cc-zones" id="v1-zones">
+        <div class="cc-grid-2col" id="v1-grid"></div>
+      </div>
+      <div class="cc-footer">
+        <span><span class="kbd">&#x2191;&#x2193;</span> navigate</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">&#x23CE;</span> execute</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">Esc</span> close</span>
+      </div>
+    </div>
+
+    <!-- V2: 3-Column -->
+    <div class="cc-shell" id="v2">
+      <div class="cc-search">
+        <span class="search-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="15" x2="15" y2="9"/></svg></span>
+        <input type="text" placeholder="Saisissez une commande..." id="v2-search" oninput="onSearch(2)" onfocus="onSearchFocus(2)" onblur="onSearchBlur(2)">
+        <span class="search-hint"><span class="kbd">Alt+K</span></span>
+        <div class="cc-dropdown" id="v2-dropdown"></div>
+      </div>
+      <div class="cc-zones" id="v2-zones">
+        <div class="cc-grid-3col" id="v2-grid"></div>
+      </div>
+      <div class="cc-footer">
+        <span><span class="kbd">&#x2191;&#x2193;</span> navigate</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">&#x23CE;</span> execute</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">Esc</span> close</span>
+      </div>
+    </div>
+
+    <!-- V3: Masonry -->
+    <div class="cc-shell" id="v3">
+      <div class="cc-search">
+        <span class="search-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="15" x2="15" y2="9"/></svg></span>
+        <input type="text" placeholder="Saisissez une commande..." id="v3-search" oninput="onSearch(3)" onfocus="onSearchFocus(3)" onblur="onSearchBlur(3)">
+        <span class="search-hint"><span class="kbd">Alt+K</span></span>
+        <div class="cc-dropdown" id="v3-dropdown"></div>
+      </div>
+      <div class="cc-zones" id="v3-zones">
+        <div class="cc-masonry" id="v3-grid"></div>
+      </div>
+      <div class="cc-footer">
+        <span><span class="kbd">&#x2191;&#x2193;</span> navigate</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">&#x23CE;</span> execute</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">Esc</span> close</span>
+      </div>
+    </div>
+
+    <!-- V4: 2-Col + Context -->
+    <div class="cc-shell" id="v4">
+      <div class="cc-context-bar" style="padding:10px 14px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;background:var(--bg)">
+        <div style="width:28px;height:28px;border-radius:6px;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">&#x1F4CB;</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:600">#24185 — Acme Corp</div>
+          <div style="font-size:10px;color:var(--text-dim)">Brochure A4 · 3/5 tasks · Depart Mar 15</div>
+        </div>
+        <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--emerald-dim);color:var(--emerald);font-weight:600;text-transform:uppercase">In Progress</span>
+      </div>
+      <div class="cc-search">
+        <span class="search-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="15" x2="15" y2="9"/></svg></span>
+        <input type="text" placeholder="Saisissez une commande..." id="v4-search" oninput="onSearch(4)" onfocus="onSearchFocus(4)" onblur="onSearchBlur(4)">
+        <span class="search-hint"><span class="kbd">Alt+K</span></span>
+        <div class="cc-dropdown" id="v4-dropdown"></div>
+      </div>
+      <div class="cc-zones" id="v4-zones">
+        <div class="cc-grid-2col" id="v4-grid"></div>
+      </div>
+      <div class="cc-footer">
+        <span><span class="kbd">&#x2191;&#x2193;</span> navigate</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">&#x23CE;</span> execute</span>
+        <span class="foot-sep">|</span>
+        <span><span class="kbd">Esc</span> close</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: CONTROLS -->
+  <div class="controls-panel">
+    <h3>Controls</h3>
+
+
+    <div class="control-group">
+      <label class="control-label">Zone Columns</label>
+      <select class="control-select" id="ctrl-cols" onchange="updateCols()">
+        <option value="2" selected>2 columns</option>
+        <option value="3">3 columns</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Options</label>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-dim-zones" checked onchange="updateDimBehavior()">
+        <label for="ctrl-dim-zones">Dim zones when dropdown open</label>
+      </div>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-highlight" checked>
+        <label for="ctrl-highlight">Highlight matches in dropdown</label>
+      </div>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-show-cat" checked onchange="refreshDropdowns()">
+        <label for="ctrl-show-cat">Show category in dropdown</label>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Dropdown Max Height</label>
+      <input type="range" class="control-range" id="ctrl-dd-height" min="150" max="400" value="280" oninput="updateDDHeight()">
+      <div class="control-val" id="ctrl-dd-height-val">280px</div>
+    </div>
+
+    <h3 style="margin-top:8px">Behavior</h3>
+    <div class="behavior-label">
+      <strong>Empty field:</strong> Zones visible, no dropdown.<br>
+      <strong>Typing:</strong> Dropdown opens with filtered results. Zones stay unchanged behind (dimmed).<br>
+      <strong>Esc / clear:</strong> Dropdown closes, zones return to full opacity.<br>
+      <strong>Execute:</strong> Click or Enter runs the command and closes.
+    </div>
+
+    <button onclick="copyPrompt()" style="
+      margin-top: 14px; width: 100%; padding: 8px 12px;
+      background: var(--blue); color: white; border: none;
+      border-radius: 6px; font-size: 11px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    ">Copy Implementation Prompt</button>
+    <div id="copy-feedback" style="font-size:10px;color:var(--emerald);text-align:center;margin-top:4px;opacity:0;transition:opacity 0.3s"></div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ───
+const ZONES = [
+  {
+    id: 'navigation', title: 'Navigation',
+    color: 'var(--blue)', colorDim: 'var(--blue-dim)',
+    shortcuts: [
+      { label: "Aller a aujourd'hui", keys: ['Home'], kw: 'today scroll', icon: '&#x1F4C5;' },
+      { label: 'Aller au depart', keys: ['Alt', 'D'], kw: 'departure deadline', icon: '&#x1F69B;' },
+      { label: 'Job precedent', keys: ['Alt', '&#x2191;'], kw: 'previous up', icon: '&#x2191;' },
+      { label: 'Job suivant', keys: ['Alt', '&#x2193;'], kw: 'next down', icon: '&#x2193;' },
+      { label: 'Aller au Planning', keys: ['&#x2014;'], kw: 'scheduler grid', icon: '&#x1F5D3;' },
+      { label: 'Aller au Flux', keys: ['&#x2014;'], kw: 'flux dashboard', icon: '&#x1F4CA;' },
+    ]
+  },
+  {
+    id: 'actions', title: 'Actions',
+    color: 'var(--emerald)', colorDim: 'var(--emerald-dim)',
+    shortcuts: [
+      { label: 'Placement rapide', keys: ['Alt', 'Q'], kw: 'quick place assign', icon: '&#x26A1;' },
+      { label: 'Modifier le job', keys: ['Alt', 'E'], kw: 'edit job form', icon: '&#x270F;' },
+      { label: 'Nouveau job', keys: ['Alt', 'N'], kw: 'new create add', icon: '&#x2795;' },
+      { label: 'Rechercher des jobs', keys: ['Alt', 'F'], kw: 'search find filter', icon: '&#x1F50D;' },
+    ]
+  },
+  {
+    id: 'display', title: 'Affichage',
+    color: 'var(--purple)', colorDim: 'var(--purple-dim)',
+    shortcuts: [
+      { label: 'PRODUIT / TIRAGE', keys: ['Alt', 'A'], kw: 'display mode toggle', icon: '&#x1F441;' },
+      { label: 'Panneau lateral', keys: ['Alt', 'B'], kw: 'sidebar panel hide', icon: '&#x25E7;' },
+    ]
+  },
+  {
+    id: 'grid', title: 'Grille',
+    color: 'var(--amber)', colorDim: 'var(--amber-dim)',
+    shortcuts: [
+      { label: 'Jour suivant', keys: ['PgDn'], kw: 'page down scroll next', icon: '&#x23EC;' },
+      { label: 'Jour precedent', keys: ['PgUp'], kw: 'page up scroll prev', icon: '&#x23EB;' },
+      { label: 'Zoom +', keys: ['Ctrl', '+'], kw: 'zoom in enlarge', icon: '&#x1F50E;' },
+      { label: 'Zoom -', keys: ['Ctrl', '-'], kw: 'zoom out reduce', icon: '&#x1F50D;' },
+    ]
+  },
+  {
+    id: 'job-context', title: 'Job selectionne',
+    color: 'var(--cyan)', colorDim: 'var(--cyan-dim)',
+    shortcuts: [
+      { label: 'Placer ce job', keys: ['Alt', 'Q'], kw: 'place quick', icon: '&#x26A1;' },
+      { label: 'Voir le depart', keys: ['Alt', 'D'], kw: 'departure', icon: '&#x1F69B;' },
+      { label: 'Modifier ce job', keys: ['Alt', 'E'], kw: 'edit form', icon: '&#x270F;' },
+      { label: 'Tache terminee', keys: ['Space'], kw: 'complete done', icon: '&#x2713;' },
+    ]
+  },
+  {
+    id: 'compaction', title: 'Compaction',
+    color: 'var(--text-dim)', colorDim: 'var(--surface-2)',
+    shortcuts: [
+      { label: 'Compacter 4h', keys: ['Alt+C', '1'], kw: 'compact timeline global 4h', icon: '&#x23F1;' },
+      { label: 'Compacter 8h', keys: ['Alt+C', '2'], kw: 'compact timeline global 8h', icon: '&#x23F1;' },
+      { label: 'Compacter 24h', keys: ['Alt+C', '3'], kw: 'compact timeline global 24h', icon: '&#x23F1;' },
+      { label: 'Compacter 48h', keys: ['Alt+C', '4'], kw: 'compact timeline global 48h', icon: '&#x23F1;' },
+      { label: 'Compacter 72h', keys: ['Alt+C', '5'], kw: 'compact timeline global 72h', icon: '&#x23F1;' },
+    ]
+  },
+  {
+    id: 'system', title: 'Systeme',
+    color: 'var(--red)', colorDim: 'var(--red-dim)',
+    shortcuts: [
+      { label: 'Command Center', keys: ['Alt', 'K'], kw: 'palette commands', icon: '&#x2318;' },
+      { label: 'Tous les raccourcis', keys: ['?'], kw: 'help shortcuts', icon: '&#x2328;' },
+      { label: 'Sauvegarder', keys: ['Ctrl', 'S'], kw: 'save schedule', icon: '&#x1F4BE;' },
+    ]
+  },
+];
+
+// Flat list for dropdown
+const ALL_COMMANDS = ZONES.flatMap(z =>
+  z.shortcuts.map(sc => ({ ...sc, zone: z.title, zoneColor: z.color, zoneColorDim: z.colorDim }))
+);
+
+// ─── RENDER ───
+function renderKbd(keys) {
+  // Detect chord: if any key contains '+', it's a combo key (e.g. "Alt+C")
+  // Render each combo key as grouped kbds, separate chord steps with "then" arrow
+  // A key is a chord combo if it contains '+' AND has more than one character on each side (e.g. "Alt+C")
+  const isCombo = (k) => k.includes('+') && k.length > 1 && k !== '+';
+  const parts = keys.map(k => {
+    if (isCombo(k)) {
+      const sub = k.split('+');
+      return sub.map(s => `<span class="kbd">${s}</span>`).join('<span class="kbd-plus">+</span>');
+    }
+    return `<span class="kbd">${k}</span>`;
+  });
+  // If multiple parts and first is a combo, it's a chord sequence
+  if (keys.length > 1 && isCombo(keys[0])) {
+    return `<span class="kbd-combo">${parts.join('<span class="kbd-plus">+</span>')}</span>`;
+  }
+  return `<span class="kbd-combo">${parts.join('<span class="kbd-plus">+</span>')}</span>`;
+}
+
+function renderZoneDot(color) {
+  return '';
+}
+
+function buildZoneHTML(zone) {
+  return `
+    <div class="cc-zone">
+      <div class="cc-zone-title">
+        ${renderZoneDot(zone.color)}
+        ${zone.title}
+      </div>
+      ${zone.shortcuts.map(sc => `
+        <div class="sc-row">
+          <span class="sc-label">${sc.label}</span>
+          <span class="sc-keys">${renderKbd(sc.keys)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function buildGrid(containerId) {
+  document.getElementById(containerId).innerHTML = ZONES.map(buildZoneHTML).join('');
+}
+
+function rebuildAll() {
+  buildGrid('v1-grid');
+  buildGrid('v2-grid');
+  buildGrid('v3-grid');
+  buildGrid('v4-grid');
+}
+
+// ─── DROPDOWN ───
+function highlightText(text, query) {
+  if (!query || !document.getElementById('ctrl-highlight')?.checked) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return text.slice(0, idx) + '<mark>' + text.slice(idx, idx + query.length) + '</mark>' + text.slice(idx + query.length);
+}
+
+function renderDropdown(v, query) {
+  const dropdown = document.getElementById(`v${v}-dropdown`);
+  const zones = document.getElementById(`v${v}-zones`);
+  const dimEnabled = document.getElementById('ctrl-dim-zones')?.checked;
+  const showCat = document.getElementById('ctrl-show-cat')?.checked;
+
+  if (!query.trim()) {
+    dropdown.classList.remove('open');
+    zones.classList.remove('dimmed');
+    return;
+  }
+
+  const q = query.toLowerCase();
+  const matches = ALL_COMMANDS.filter(cmd =>
+    cmd.label.toLowerCase().includes(q) ||
+    cmd.kw.toLowerCase().includes(q) ||
+    cmd.zone.toLowerCase().includes(q)
+  );
+
+  dropdown.classList.add('open');
+  if (dimEnabled) zones.classList.add('dimmed');
+
+  if (matches.length === 0) {
+    dropdown.innerHTML = `<div class="dd-empty">No matching commands for "${query}"</div>`;
+    return;
+  }
+
+  dropdown.innerHTML = matches.map((cmd, i) => `
+    <div class="dd-row${i === 0 ? ' dd-active' : ''}" data-idx="${i}">
+      <span class="dd-label">${highlightText(cmd.label, query)}</span>
+      ${showCat ? `<span class="dd-cat">${cmd.zone}</span>` : ''}
+      <span class="dd-keys">${renderKbd(cmd.keys)}</span>
+    </div>
+  `).join('') + `
+    <div class="dd-footer">
+      <span>${matches.length} result${matches.length > 1 ? 's' : ''}</span>
+      <span style="margin-left:auto"><span class="kbd">&#x2191;&#x2193;</span> select <span class="kbd">&#x23CE;</span> execute</span>
+    </div>
+  `;
+}
+
+function refreshDropdowns() {
+  for (let v = 1; v <= 4; v++) {
+    const input = document.getElementById(`v${v}-search`);
+    if (input?.value) renderDropdown(v, input.value);
+  }
+}
+
+// ─── EVENTS ───
+function onSearch(v) {
+  const query = document.getElementById(`v${v}-search`).value;
+  renderDropdown(v, query);
+}
+
+function onSearchFocus(v) {
+  const query = document.getElementById(`v${v}-search`).value;
+  if (query) renderDropdown(v, query);
+}
+
+function onSearchBlur(v) {
+  // Small delay to allow click on dropdown row
+  setTimeout(() => {
+    // Don't close if still has text (user might be clicking dropdown)
+  }, 200);
+}
+
+// Keyboard nav in dropdown
+document.addEventListener('keydown', (e) => {
+  const v = currentVariant;
+  const dropdown = document.getElementById(`v${v}-dropdown`);
+  if (!dropdown?.classList.contains('open')) {
+    if (e.key === 'Escape') {
+      const input = document.getElementById(`v${v}-search`);
+      if (input) { input.value = ''; onSearch(v); }
+    }
+    return;
+  }
+
+  const rows = dropdown.querySelectorAll('.dd-row');
+  const activeIdx = [...rows].findIndex(r => r.classList.contains('dd-active'));
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    rows[activeIdx]?.classList.remove('dd-active');
+    const next = Math.min(activeIdx + 1, rows.length - 1);
+    rows[next]?.classList.add('dd-active');
+    rows[next]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    rows[activeIdx]?.classList.remove('dd-active');
+    const prev = Math.max(activeIdx - 1, 0);
+    rows[prev]?.classList.add('dd-active');
+    rows[prev]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    const input = document.getElementById(`v${v}-search`);
+    input.value = '';
+    onSearch(v);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    // Would execute the command
+    const active = dropdown.querySelector('.dd-active .dd-label');
+    if (active) {
+      active.style.color = 'var(--emerald)';
+      setTimeout(() => { active.style.color = ''; }, 400);
+    }
+  }
+});
+
+// ─── VARIANT SWITCHING ───
+let currentVariant = 1;
+
+function showVariant(n) {
+  currentVariant = n;
+  document.querySelectorAll('.cc-shell').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.variant-item').forEach(v => v.classList.remove('active'));
+  document.getElementById(`v${n}`)?.classList.add('active');
+  document.querySelector(`[data-v="${n}"]`)?.classList.add('active');
+
+  // Reset
+  const input = document.getElementById(`v${n}-search`);
+  if (input) { input.value = ''; }
+  document.getElementById(`v${n}-dropdown`)?.classList.remove('open');
+  document.getElementById(`v${n}-zones`)?.classList.remove('dimmed');
+
+  updateWidth();
+  setTimeout(() => input?.focus(), 50);
+}
+
+// ─── CONTROLS ───
+function updateWidth() {}
+
+function updateCols() {
+  const cols = document.getElementById('ctrl-cols').value;
+  document.querySelectorAll('.cc-grid-2col').forEach(g => {
+    g.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  });
+}
+
+function updateDimBehavior() {
+  // Re-render active dropdown if any
+  for (let v = 1; v <= 4; v++) {
+    const input = document.getElementById(`v${v}-search`);
+    if (input?.value) renderDropdown(v, input.value);
+    else document.getElementById(`v${v}-zones`)?.classList.remove('dimmed');
+  }
+}
+
+function updateDDHeight() {
+  const h = document.getElementById('ctrl-dd-height').value;
+  document.getElementById('ctrl-dd-height-val').textContent = h + 'px';
+  document.querySelectorAll('.cc-dropdown').forEach(dd => {
+    dd.style.maxHeight = h + 'px';
+  });
+}
+
+// ─── PROMPT ───
+function copyPrompt() {
+  const zonesSpec = ZONES.map(z => {
+    const rows = z.shortcuts.map(sc => `  - "${sc.label}" → ${sc.keys.join(' + ')}`).join('\n');
+    return `### ${z.title}\n${rows}`;
+  }).join('\n\n');
+
+  const prompt = `# Command Center — Implementation Spec
+
+## Concept
+Two-layer UI: a **static shortcut reference card** (always visible) with a **filtered command dropdown** that appears on typing.
+
+## Trigger
+- Keyboard: Alt+K
+- FAB button: bottom-right, SquareSlash lucide icon
+
+## Layout
+- Width: 70vw, max-width: 800px
+- Centered modal with backdrop overlay
+- Top: search field with SquareSlash icon, placeholder "Saisissez une commande..."
+- Body: multi-column grid (2 columns) of shortcut zones
+- Footer: keyboard hints (↑↓ navigate, ⏎ execute, Esc close)
+
+## Shortcut Zones (static reference)
+- Background: transparent (no card backgrounds)
+- Zone titles: monochrome (zinc-500), uppercase, small, no color dots, no icons
+- Each zone lists its shortcuts as: label + keycap badges
+- Zones are always visible and never filtered — they are a passive reference
+
+${zonesSpec}
+
+## Command Dropdown (active layer)
+- Appears ONLY when the user types in the search field
+- Overlays on top of the zones, anchored below the search bar
+- Blue top-border separates it from the search field
+- Zones behind are dimmed (opacity 0.3) but remain visible
+- Filters all commands by label and keywords (case-insensitive)
+- Each row shows: label (with match highlight) + category badge + keycap shortcut
+- No icons in dropdown rows
+- Keyboard navigation: ↑↓ to select, Enter to execute, Esc to clear/close
+- First result is auto-selected
+- Footer shows result count and keyboard hints
+
+## Behavior
+1. Alt+K opens the Command Center — zones fully visible, search field focused
+2. User can glance at zones to remember a shortcut, then close and use it directly
+3. OR user types to search — dropdown opens, zones dim, filtered results appear
+4. Esc or clearing the field: dropdown closes, zones return to full opacity
+5. Enter or click on a dropdown row: execute the command, close the modal
+
+## Chord Shortcuts
+- Compaction uses chord pattern: Alt+C then 1/2/3/4/5 for timeline horizons
+- Rendered with + separator between all keys: Alt + C + 1
+
+## Styling
+- Dark theme: zinc-900 surface, zinc-800 borders
+- 3D keycap rendering for keyboard shortcuts (gradient, border-bottom depth)
+- 13px base font size
+- No emojis, no colored zone titles, no zone background cards
+`;
+
+  navigator.clipboard.writeText(prompt).then(() => {
+    const fb = document.getElementById('copy-feedback');
+    fb.textContent = 'Copied to clipboard!';
+    fb.style.opacity = '1';
+    setTimeout(() => { fb.style.opacity = '0'; }, 2000);
+  });
+}
+
+// ─── INIT ───
+rebuildAll();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Square, CheckSquare, ChevronUp, ChevronDown } from 'lucide-react';
+import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2 } from 'lucide-react';
 
 export interface TileContextMenuProps {
   /** Menu position X coordinate (from cursor) */
@@ -21,6 +21,8 @@ export interface TileContextMenuProps {
   onSwapUp: () => void;
   /** Callback for "Move down" action */
   onSwapDown: () => void;
+  /** Callback for "Recall" action (unassign) */
+  onRecall: () => void;
   /** Callback to close the menu */
   onClose: () => void;
 }
@@ -79,6 +81,7 @@ export function TileContextMenu({
   onToggleComplete,
   onSwapUp,
   onSwapDown,
+  onRecall,
   onClose,
 }: TileContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -178,6 +181,13 @@ export function TileContextMenu({
     }
   };
 
+  const handleRecall = () => {
+    if (!isCompleted) {
+      onRecall();
+      onClose();
+    }
+  };
+
   return createPortal(
     <div
       ref={menuRef}
@@ -197,6 +207,13 @@ export function TileContextMenu({
         label={isCompleted ? 'Marquer non terminé' : 'Marquer terminé'}
         onClick={handleToggleComplete}
         testId="context-menu-toggle-complete"
+      />
+      <MenuItem
+        icon={<Undo2 className="w-4 h-4" />}
+        label="Rappeler (désassigner)"
+        onClick={handleRecall}
+        disabled={isCompleted}
+        testId="context-menu-recall"
       />
       <Separator />
       <MenuItem

@@ -41,9 +41,6 @@ export const FluxToolbar = memo(function FluxToolbar({
         >
           <Plus className="w-4 h-4" strokeWidth={2} />
           Nouveau job
-          <kbd className="ml-1 px-1.5 py-0.5 bg-blue-700 border border-blue-600 rounded-[0.25rem] text-sm font-mono text-white">
-            Alt+N
-          </kbd>
         </button>
       </div>
 

@@ -4,13 +4,13 @@ import { isInternalTask, getDeadlineDate } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
-import { Tile, compareSimilarity } from '../Tile';
+import { Tile, compareSimilarity, computeTileState } from '../Tile';
 import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { getJobIdForTask } from '../../utils/taskHelpers';
-import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
+import { isElementBlocked, getPrerequisiteBlockingInfo, hasDieCuttingAction, hasOffsetAction } from '../../utils';
 import { getTirageLabel } from '../../utils/tileLabelResolver';
 
 /** Handle for programmatic grid scrolling */
@@ -58,8 +58,8 @@ export interface SchedulingGridProps {
   pixelsPerHour?: number;
   /** Callback when a tile is clicked (select job) */
   onSelectJob?: (jobId: string) => void;
-  /** Callback when a tile is double-clicked (recall) */
-  onRecallAssignment?: (assignmentId: string) => void;
+  /** Callback when clicking the grid background (deselect) */
+  onDeselect?: () => void;
   /** Callback when swap up is clicked */
   onSwapUp?: (assignmentId: string) => void;
   /** Callback when swap down is clicked */
@@ -133,6 +133,12 @@ export interface SchedulingGridProps {
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
   /** Current display mode (Produit or Tirage) — affects column widths */
   displayMode?: 'produit' | 'tirage';
+  /** Set of job IDs that are late (for state-based tile coloring) */
+  lateJobIds?: Set<string>;
+  /** Ghost preview label for quick placement (job reference) */
+  quickPlacementGhostLabel?: string;
+  /** Ghost preview height in pixels for quick placement */
+  quickPlacementGhostHeight?: number;
 }
 
 /**
@@ -154,7 +160,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       startDate,
       pixelsPerHour = PIXELS_PER_HOUR,
       onSelectJob,
-      onRecallAssignment,
+      onDeselect,
       onSwapUp,
       onSwapDown,
       onToggleComplete,
@@ -192,6 +198,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       // v0.3.58: Context menu props
       onContextMenu,
       displayMode,
+      lateJobIds,
+      quickPlacementGhostLabel,
+      quickPlacementGhostHeight,
     },
     ref
   ) {
@@ -458,7 +467,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           </div>
 
           {/* Station columns area */}
-          <div className="flex gap-3 px-3 bg-[#050505] relative">
+          <div className={`flex gap-3 px-3 bg-zinc-950 relative ${isQuickPlacementMode ? 'ring-2 ring-inset ring-emerald-500/60' : ''}`}>
             {/* Now line spanning all station columns */}
             <div
               className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
@@ -549,6 +558,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onPickClick={onPickClick}
                   displayMode={displayMode}
                   category={category}
+                  ghostPreviewLabel={isHoveredForQuickPlacement ? quickPlacementGhostLabel : undefined}
+                  ghostPreviewHeight={isHoveredForQuickPlacement ? quickPlacementGhostHeight : undefined}
+                  onDeselect={onDeselect}
                 >
                   {stationAssignments.map((assignment, index) => {
                     const task = taskMap.get(assignment.taskId);
@@ -560,8 +572,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
                     // v0.4.32b: Get element for blocking status
                     const element = elements.find((e) => e.id === task.elementId);
-                    const blocked = element ? isElementBlocked(element) : false;
-                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element) : undefined;
+                    const hasOffset = element ? hasOffsetAction(element, tasks, stations, categories) : false;
+                    const hasDieCutting = element ? hasDieCuttingAction(element, tasks, stations) : false;
+                    const blockOpts = { hasOffset, hasDieCutting };
+                    const blocked = element ? isElementBlocked(element, blockOpts) : false;
+                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element, blockOpts) : undefined;
 
                     // Calculate top position from assignment.scheduledStart
                     // Use multi-day calculation when startDate is provided (REQ-14)
@@ -602,6 +617,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         : '';
                     const tileLabel = rawTirageLabel || undefined;
 
+                    // Compute tile state for state-based coloring
+                    const isJobLate = lateJobIds?.has(job.id) ?? false;
+                    const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < now;
+                    const isLate = isJobLate || isTaskOverdue;
+                    const hasConflict = conflictTaskIds.has(task.id);
+                    const tileState = computeTileState(isLate, hasConflict, blocked, assignment.isCompleted);
+
                     return (
                       <Tile
                         key={assignment.id}
@@ -615,12 +637,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         showSwapDown={showSwapDown}
                         similarityResults={similarityResults}
                         onSelect={onSelectJob}
-                        onRecall={onRecallAssignment}
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
                         onToggleComplete={onToggleComplete}
-                        selectedJobId={selectedJobId ?? undefined}
-                        hasConflict={conflictTaskIds.has(task.id)}
+                        hasConflict={hasConflict}
+                        tileState={tileState}
                         pixelsPerHour={pixelsPerHour}
                         isPicked={pickedAssignmentId === assignment.id}
                         onPickFromGrid={onPickFromGrid}

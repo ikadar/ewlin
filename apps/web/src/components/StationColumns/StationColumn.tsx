@@ -70,6 +70,12 @@ export interface StationColumnProps {
   displayMode?: 'produit' | 'tirage';
   /** Station category (for columnWidth lookup) */
   category?: StationCategory;
+  /** Ghost preview label for quick placement (job reference) */
+  ghostPreviewLabel?: string;
+  /** Ghost preview height in pixels for quick placement */
+  ghostPreviewHeight?: number;
+  /** Callback when clicking the column background (deselect) */
+  onDeselect?: () => void;
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -127,6 +133,9 @@ export const StationColumn = memo(function StationColumn({
   onPickClick,
   displayMode: _displayMode,
   category,
+  ghostPreviewLabel,
+  ghostPreviewHeight,
+  onDeselect,
 }: StationColumnProps) {
   // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
@@ -251,10 +260,16 @@ export const StationColumn = memo(function StationColumn({
       return;
     }
     // Quick placement mode
-    if (!isQuickPlacementMode || !hasAvailableTask || !onQuickPlacementClick) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = e.clientY - rect.top;
-    onQuickPlacementClick(station.id, relativeY);
+    if (isQuickPlacementMode && hasAvailableTask && onQuickPlacementClick) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+      onQuickPlacementClick(station.id, relativeY);
+      return;
+    }
+    // Background click → deselect (only if click was directly on column, not on a tile)
+    if (e.target === e.currentTarget) {
+      onDeselect?.();
+    }
   };
 
   // Cursor style for quick placement mode
@@ -270,7 +285,7 @@ export const StationColumn = memo(function StationColumn({
   return (
     <div
       ref={columnRef}
-      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-[#0a0a0a] relative transition-[filter,opacity,box-shadow] duration-150 ease-out outline-none ${getHighlightClass()} ${getCursorClass()}`}
+      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-zinc-950 relative transition-[filter,opacity,box-shadow] duration-150 ease-out outline-none ${getHighlightClass()} ${getCursorClass()}`}
       style={{ ...(customWidth !== null ? { width: `${customWidth}px` } : {}), height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
       onMouseMove={handleMouseMove}
@@ -339,6 +354,16 @@ export const StationColumn = memo(function StationColumn({
       {/* Quick Placement Indicator */}
       {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && (
         <PlacementIndicator y={placementIndicatorY} isVisible={true} />
+      )}
+
+      {/* Ghost preview tile during quick placement */}
+      {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && ghostPreviewLabel && (
+        <div
+          className="absolute left-1 right-1 rounded border-l-4 border-l-blue-500 bg-blue-500/10 opacity-50 pointer-events-none z-20 overflow-hidden"
+          style={{ top: `${placementIndicatorY}px`, height: `${Math.max(ghostPreviewHeight ?? 12, 12)}px` }}
+        >
+          <span className="text-[9px] text-blue-300/70 px-1.5 py-0.5 truncate block">{ghostPreviewLabel}</span>
+        </div>
       )}
 
       {/* REQ-10: Precedence Constraint Lines (during quick placement or pick) */}

@@ -21,7 +21,8 @@ const STATE_COLOR: Record<string, string> = {
 };
 
 // Background color for stroke (to create separation between overlapping dots)
-const BG_COLOR = 'rgb(36 36 36)'; // flux-elevated
+// Uses CSS variable so it adapts to light/dark mode
+const BG_COLOR = 'var(--color-flux-elevated)';
 
 /**
  * Stacked overlapping dots for collapsed multi-element station cells.

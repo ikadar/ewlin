@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Scheduler — Tile Color Strategy Comparison</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    font-size: 13px;
+    --base: rgb(15 15 15);
+    --surface: rgb(26 26 26);
+    --elevated: rgb(36 36 36);
+    --hover: rgb(44 44 44);
+    --border: rgb(42 42 42);
+    --border-light: rgb(58 58 58);
+    --text-primary: rgb(245 245 245);
+    --text-secondary: rgb(209 209 209);
+    --text-tertiary: rgb(161 161 161);
+    --text-muted: rgb(128 128 128);
+  }
+
+  body {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    background: var(--base);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+  header .subtitle { color: var(--text-tertiary); font-size: 12px; }
+
+  .content { padding: 32px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── Tabs ────────────────────────────────────────────── */
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 32px;
+    width: fit-content;
+  }
+
+  .tab-btn {
+    padding: 8px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tab-btn:hover { color: var(--text-secondary); }
+  .tab-btn.active { background: var(--elevated); color: var(--text-primary); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Section ────────────────────────────────────────── */
+  .section {
+    margin-bottom: 40px;
+  }
+
+  .section h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .section p {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-bottom: 16px;
+    line-height: 1.6;
+    max-width: 700px;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+
+  .tag-req { background: rgba(139,92,246,0.2); color: #A78BFA; }
+  .tag-new { background: rgba(34,197,94,0.2); color: #86EFAC; }
+  .tag-old { background: rgba(161,161,161,0.15); color: var(--text-muted); }
+
+  /* ── Station column ─────────────────────────────────── */
+  .station {
+    width: 230px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .station-hdr {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .station-body {
+    position: relative;
+  }
+
+  /* ── Tile (shared) ──────────────────────────────────── */
+  .tile {
+    position: relative;
+    border-left: 4px solid;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: filter 0.15s, opacity 0.15s, box-shadow 0.15s, brightness 0.15s;
+  }
+
+  .tile:hover { filter: brightness(1.15); }
+  .tile.dashed { border-left-style: dashed; }
+
+  .tile-setup {
+    padding: 4px 10px;
+    border-bottom: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tile-run {
+    padding: 0 10px;
+  }
+
+  .tile-run.with-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  .tile-label {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tile-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 9px;
+    line-height: 1;
+  }
+
+  .tile-icon.done {
+    background: rgba(16,185,129,0.2);
+    border-color: #10B981;
+    color: #10B981;
+  }
+
+  .tile-icon.empty {
+    border-color: #52525B;
+    color: transparent;
+  }
+
+  .tile.muted {
+    filter: saturate(0.2);
+    opacity: 0.6;
+  }
+
+  .tile.muted:hover {
+    filter: saturate(0.2) brightness(1.1);
+    opacity: 0.7;
+  }
+
+  /* Selection styles — 4 alternatives */
+  .tile.sel-luminance {
+    filter: brightness(1.5);
+    z-index: 2;
+  }
+
+  .tile.sel-border {
+    border-left-color: white !important;
+    border-left-width: 5px;
+    z-index: 2;
+  }
+
+  .tile.sel-glow {
+    box-shadow: 0 0 8px 2px rgba(255,255,255,0.25);
+    z-index: 2;
+  }
+
+  .tile.sel-lift {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.12);
+    transform: scale(1.03);
+    z-index: 2;
+  }
+
+  .tile.sel-pulse {
+    animation: sel-pulse 2s ease-in-out infinite;
+    z-index: 2;
+  }
+
+  @keyframes sel-pulse {
+    0%, 100% { background-color: rgba(255,255,255,0.0); }
+    50% { background-color: rgba(255,255,255,0.08); }
+  }
+
+  .tile.sel-pulse-bright {
+    filter: brightness(1.35);
+    animation: sel-pulse-bright 2s ease-in-out infinite;
+    z-index: 2;
+  }
+
+  @keyframes sel-pulse-bright {
+    0%, 100% { background-color: rgba(255,255,255,0.0); }
+    50% { background-color: rgba(255,255,255,0.07); }
+  }
+
+  /* Placeholder */
+  .tile-placeholder {
+    border: 2px dashed #71717A;
+    background: rgba(63,63,70,0.3);
+    border-radius: 4px;
+    animation: pulse-op 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-op {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
+
+  /* Similarity */
+  .sim-badge {
+    position: absolute;
+    right: 10px;
+    top: -9px;
+    display: flex;
+    gap: 3px;
+    z-index: 3;
+  }
+
+  .sim-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .sim-dot.match { background: #34D399; }
+  .sim-dot.diff  { background: #FB923C; }
+
+  /* ── Comparison layout ──────────────────────────────── */
+  .compare {
+    display: flex;
+    gap: 48px;
+    align-items: flex-start;
+  }
+
+  .compare-col {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .compare-col h3 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .flex-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .tile-card {
+    width: 230px;
+  }
+
+  .tile-card .caption {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  /* ── Legend ──────────────────────────────────────────── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 20px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .legend-chip {
+    width: 18px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* ── Annotation ─────────────────────────────────────── */
+  .annotation {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 280px;
+    padding-top: 12px;
+  }
+
+  .annotation strong { color: var(--text-primary); }
+  .annotation em { color: #A78BFA; font-style: normal; font-weight: 500; }
+
+  /* ── Verdict box ────────────────────────────────────── */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-top: 8px;
+  }
+
+  .verdict h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .verdict table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .verdict th {
+    text-align: left;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-tertiary);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .verdict td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+
+  .verdict td:first-child { color: var(--text-primary); }
+  .win { color: #34D399 !important; }
+  .lose { color: #F87171 !important; }
+  .neutral { color: var(--text-muted) !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tile Color Strategy Comparison</h1>
+  <span class="subtitle">Current (per-job color) vs Proposed (state-based color)</span>
+</header>
+
+<div class="content">
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="side-by-side">Side by Side</button>
+    <button class="tab-btn" data-tab="states">All States</button>
+    <button class="tab-btn" data-tab="scenario">Full Scenario</button>
+    <button class="tab-btn" data-tab="verdict">Verdict</button>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ -->
+  <!-- TAB 1: Side by Side                                  -->
+  <!-- ════════════════════════════════════════════════════ -->
+  <div class="tab-panel active" id="tab-side-by-side">
+
+    <div class="section">
+      <h2>Station View Comparison</h2>
+      <p>Same data, same station, same tile order. Left uses per-job colors (current). Right uses uniform neutral with state-based color (proposed).</p>
+
+      <div class="compare" id="sideByStation"></div>
+    </div>
+
+    <div class="section">
+      <h2>Job Focus / Selection <span class="tag tag-req">REQ-01</span></h2>
+      <p>When an operator selects a job, they need to find all its tiles across stations. Compare how each system handles this.</p>
+
+      <div class="compare" id="sideByFocus"></div>
+    </div>
+
+    <div class="section">
+      <h2>Conflict Visibility <span class="tag tag-req">REQ-12</span></h2>
+      <p>A precedence conflict needs to be immediately obvious. Compare amber glow on colored tiles vs amber tint on neutral tiles.</p>
+
+      <div class="compare" id="sideByConflict"></div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ -->
+  <!-- TAB 2: All States                                    -->
+  <!-- ════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-states">
+
+    <div class="section">
+      <h2>New System — State Legend</h2>
+      <div class="legend" id="newLegend"></div>
+    </div>
+
+    <div class="section">
+      <h2>Default Color Variant</h2>
+      <p>Pick the default tile hue. State colors (amber, red, green) are warm — a cool default creates natural contrast.</p>
+      <div style="display:flex;gap:6px;margin-bottom:16px;">
+        <button class="tab-btn active" data-default="blue" onclick="switchDefault('blue')">Blue</button>
+        <button class="tab-btn" data-default="violet" onclick="switchDefault('violet')">Violet</button>
+        <button class="tab-btn" data-default="slate" onclick="switchDefault('slate')">Slate (neutral)</button>
+      </div>
+      <div class="flex-row" id="allStates"></div>
+    </div>
+
+    <div class="section">
+      <h2>Selection Style Comparison <span class="tag tag-req">REQ-01</span></h2>
+      <p>Four alternatives for indicating the selected job's tiles. Each shown on a default tile, then on a conflict tile to verify it doesn't mask state color.</p>
+
+      <h3 style="font-size:12px;color:var(--text-tertiary);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.4px;">A) Luminance boost</h3>
+      <p style="max-width:500px;">The tile brightens — feels "active." Cheap, clean, no extra elements. Risk: may wash out state color on light states.</p>
+      <div class="flex-row" id="selLuminance"></div>
+
+      <h3 style="font-size:12px;color:var(--text-tertiary);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.4px;">B) White left border</h3>
+      <p style="max-width:500px;">The left border turns bright white, widened to 5px. Leverages existing visual language (border = tile identity). Minimal, precise.</p>
+      <div class="flex-row" id="selBorder"></div>
+
+      <h3 style="font-size:12px;color:var(--text-tertiary);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.4px;">C) Soft neutral glow</h3>
+      <p style="max-width:500px;">Subtle white glow, much softer than the old outline. Feels warm and intentional, doesn't look like a focus ring.</p>
+      <div class="flex-row" id="selGlow"></div>
+
+      <h3 style="font-size:12px;color:var(--text-tertiary);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.4px;">D) Elevated lift</h3>
+      <p style="max-width:500px;">Tile lifts slightly (scale + shadow). Physical metaphor — "picked up." Risk: may cause layout jitter in tight grids.</p>
+      <div class="flex-row" id="selLift"></div>
+
+      <h3 style="font-size:12px;color:var(--text-tertiary);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.4px;">E) Pulsating background</h3>
+      <p style="max-width:500px;">A gentle white pulse breathes through the tile. Draws the eye through motion rather than static contrast. Subtle enough not to distract, but unmissable on a still grid.</p>
+      <div class="flex-row" id="selPulse"></div>
+
+      <h3 style="font-size:12px;color:var(--text-tertiary);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.4px;">F) Pulse + Luminance</h3>
+      <p style="max-width:500px;">Combines both: the tile is permanently brighter (establishes selection at a glance) and pulses gently (catches peripheral vision). Double signal — static + motion.</p>
+      <div class="flex-row" id="selPulseBright"></div>
+    </div>
+
+    <div class="section">
+      <h2>Combined States</h2>
+      <p>States can overlap — a tile can be both selected and conflicting, or completed and selected. The system handles combinations cleanly.</p>
+      <div class="flex-row" id="combinedStates"></div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ -->
+  <!-- TAB 3: Full Scenario                                 -->
+  <!-- ════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-scenario">
+
+    <div class="section">
+      <h2>Realistic Schedule — New System</h2>
+      <p>A morning schedule across 4 stations with mixed states. Scan the grid: problems jump out immediately via color, without needing to decode per-job hues.</p>
+
+      <div class="flex-row" id="scenarioGrid" style="gap:12px;align-items:stretch;"></div>
+    </div>
+
+    <div class="section">
+      <h2>Same Schedule — Old System</h2>
+      <p>Same data rendered with per-job colors. Notice how the state information (conflict, late, blocked) is harder to spot amid the rainbow.</p>
+
+      <div class="flex-row" id="scenarioGridOld" style="gap:12px;align-items:stretch;"></div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ -->
+  <!-- TAB 4: Verdict                                       -->
+  <!-- ════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-verdict">
+
+    <div class="section">
+      <h2>Design Decision Summary</h2>
+      <div class="verdict" id="verdictBox"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// Color definitions
+// ══════════════════════════════════════════════════════════
+
+// Old system: per-job colors
+const OLD = {
+  purple:  { hex:'#8B5CF6', setup:'rgba(88,28,246,0.15)',  sBorder:'rgba(126,34,206,0.2)',  run:'rgba(88,28,246,0.10)',  text:'#C4B5FD', border:'#8B5CF6' },
+  blue:    { hex:'#3B82F6', setup:'rgba(59,130,246,0.15)', sBorder:'rgba(37,99,235,0.2)',   run:'rgba(59,130,246,0.10)', text:'#93C5FD', border:'#3B82F6' },
+  rose:    { hex:'#F43F5E', setup:'rgba(244,63,94,0.15)',  sBorder:'rgba(225,29,72,0.2)',   run:'rgba(244,63,94,0.10)', text:'#FDA4AF', border:'#F43F5E' },
+  teal:    { hex:'#14B8A6', setup:'rgba(20,184,166,0.15)', sBorder:'rgba(13,148,136,0.2)',  run:'rgba(20,184,166,0.10)',text:'#5EEAD4', border:'#14B8A6' },
+  orange:  { hex:'#F97316', setup:'rgba(249,115,22,0.15)', sBorder:'rgba(234,88,12,0.2)',   run:'rgba(249,115,22,0.10)',text:'#FDBA74', border:'#F97316' },
+  green:   { hex:'#22C55E', setup:'rgba(34,197,94,0.15)',  sBorder:'rgba(22,163,74,0.2)',   run:'rgba(34,197,94,0.10)', text:'#86EFAC', border:'#22C55E' },
+  indigo:  { hex:'#6366F1', setup:'rgba(99,102,241,0.15)', sBorder:'rgba(79,70,229,0.2)',   run:'rgba(99,102,241,0.10)',text:'#A5B4FC', border:'#6366F1' },
+  cyan:    { hex:'#06B6D4', setup:'rgba(6,182,212,0.15)',  sBorder:'rgba(8,145,178,0.2)',   run:'rgba(6,182,212,0.10)', text:'#67E8F9', border:'#06B6D4' },
+};
+
+// New system: state-based colors
+const NEW_STATES = {
+  default:   { setup:'rgba(59,130,246,0.14)', sBorder:'rgba(59,130,246,0.18)', run:'rgba(59,130,246,0.09)', text:'#93C5FD', border:'#3B82F6' },
+  completed: { setup:'rgba(34,197,94,0.18)',   sBorder:'rgba(34,197,94,0.15)',   run:'rgba(34,197,94,0.10)',   text:'#86EFAC', border:'#22C55E' },
+  conflict:  { setup:'rgba(245,158,11,0.20)',  sBorder:'rgba(245,158,11,0.15)',  run:'rgba(245,158,11,0.12)', text:'#FCD34D', border:'#F59E0B' },
+  late:      { setup:'rgba(239,68,68,0.20)',   sBorder:'rgba(239,68,68,0.15)',   run:'rgba(239,68,68,0.12)',  text:'#FCA5A5', border:'#EF4444' },
+  blocked:   { setup:'rgba(161,161,161,0.06)', sBorder:'rgba(161,161,161,0.08)', run:'rgba(161,161,161,0.04)', text:'#A1A1AA', border:'#71717A' },
+};
+
+const DEFAULT_VARIANTS = {
+  blue:   { setup:'rgba(59,130,246,0.14)',  sBorder:'rgba(59,130,246,0.18)',  run:'rgba(59,130,246,0.09)',  text:'#93C5FD', border:'#3B82F6' },
+  violet: { setup:'rgba(139,92,246,0.14)',  sBorder:'rgba(139,92,246,0.18)',  run:'rgba(139,92,246,0.09)',  text:'#C4B5FD', border:'#8B5CF6' },
+  slate:  { setup:'rgba(161,161,161,0.14)', sBorder:'rgba(161,161,161,0.18)', run:'rgba(161,161,161,0.09)', text:'#E4E4E7', border:'#A1A1AA' },
+};
+
+function switchDefault(variant) {
+  const v = DEFAULT_VARIANTS[variant];
+  NEW_STATES.default = v;
+  // Update button states
+  document.querySelectorAll('[data-default]').forEach(b => {
+    b.classList.toggle('active', b.dataset.default === variant);
+  });
+  // Rebuild affected sections
+  buildNewLegend();
+  buildAllStates();
+  buildSelectionComparison();
+  buildCombinedStates();
+  buildSideByStation();
+  buildSideByFocus();
+  buildSideByConflict();
+  buildScenario();
+}
+
+const JOBS = [
+  { ref:'JOB-1042', client:'Dupont SA' },
+  { ref:'JOB-2187', client:'Martin & Fils' },
+  { ref:'JOB-3099', client:'Leclerc Impr.' },
+  { ref:'JOB-4511', client:'BioLabel Co' },
+  { ref:'JOB-5678', client:'Graphipak' },
+  { ref:'JOB-6234', client:'Carton Express' },
+];
+
+// ══════════════════════════════════════════════════════════
+// Tile builders
+// ══════════════════════════════════════════════════════════
+
+function buildOldTile(colorName, opts = {}) {
+  const c = OLD[colorName] || OLD.purple;
+  return _buildTile(c, { ...opts, system: 'old', jobHex: c.hex });
+}
+
+function buildNewTile(state = 'default', opts = {}) {
+  const c = NEW_STATES[state] || NEW_STATES.default;
+  return _buildTile(c, { ...opts, system: 'new', state });
+}
+
+function _buildTile(c, opts) {
+  const {
+    setupMin = 12, runMin = 35,
+    selected = false, conflict = false, completed = false,
+    blocked = false, muted = false, late = false,
+    ref = 'JOB-1042', client = 'Dupont SA',
+    system = 'new', state = 'default', jobHex = '#8B5CF6',
+    similarity = null,
+    selStyle = 'luminance', // luminance | border | glow | lift
+  } = opts;
+
+  const pxH = 80;
+  const total = setupMin + runMin;
+  const totalH = (total / 60) * pxH;
+  const setupH = total > 0 ? totalH * (setupMin / total) : 0;
+  const runH = totalH - setupH;
+
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  tile.style.borderColor = c.border;
+  tile.style.height = totalH + 'px';
+
+  if (blocked) tile.classList.add('dashed');
+  if (muted) tile.classList.add('muted');
+
+  // Glow / outline
+  if (system === 'old') {
+    if (conflict) {
+      tile.style.boxShadow = '0 0 12px 4px #F59E0B99';
+    } else if (selected) {
+      tile.style.boxShadow = `0 0 12px 4px ${jobHex}99`;
+    }
+  } else {
+    if (selected) {
+      tile.classList.add('sel-' + selStyle);
+    }
+  }
+
+  // Similarity dots
+  if (similarity && similarity.length > 0) {
+    const badge = document.createElement('div');
+    badge.className = 'sim-badge';
+    similarity.forEach(s => {
+      const dot = document.createElement('div');
+      dot.className = 'sim-dot ' + (s.matched ? 'match' : 'diff');
+      badge.appendChild(dot);
+    });
+    tile.appendChild(badge);
+  }
+
+  // No state badges — color alone conveys state
+
+  // Completed gradient
+  const cGrad = completed
+    ? 'linear-gradient(to right, rgba(34,197,94,0.5) 0%, rgba(34,197,94,0.15) 50%, transparent 100%)'
+    : '';
+
+  // Setup
+  if (setupMin > 0) {
+    const setup = document.createElement('div');
+    setup.className = 'tile-setup';
+    setup.style.background = c.setup;
+    setup.style.borderColor = c.sBorder;
+    setup.style.height = setupH + 'px';
+    if (cGrad) setup.style.backgroundImage = cGrad;
+
+    const icon = document.createElement('div');
+    icon.className = 'tile-icon ' + (completed ? 'done' : 'empty');
+    if (completed) icon.textContent = '\u2713';
+    setup.appendChild(icon);
+
+    const label = document.createElement('span');
+    label.className = 'tile-label';
+    label.style.color = c.text;
+    label.textContent = `${ref} \u00B7 ${client}`;
+    setup.appendChild(label);
+
+    tile.appendChild(setup);
+  }
+
+  // Run
+  const run = document.createElement('div');
+  run.className = 'tile-run' + (setupMin === 0 ? ' with-label' : '');
+  run.style.background = c.run;
+  run.style.height = (setupMin > 0 ? runH : totalH) + 'px';
+  if (cGrad) run.style.backgroundImage = cGrad;
+
+  if (setupMin === 0) {
+    const icon = document.createElement('div');
+    icon.className = 'tile-icon ' + (completed ? 'done' : 'empty');
+    if (completed) icon.textContent = '\u2713';
+    run.appendChild(icon);
+
+    const label = document.createElement('span');
+    label.className = 'tile-label';
+    label.style.color = c.text;
+    label.textContent = `${ref} \u00B7 ${client}`;
+    run.appendChild(label);
+  }
+
+  tile.appendChild(run);
+  return tile;
+}
+
+function wrap(el, caption) {
+  const w = document.createElement('div');
+  w.className = 'tile-card';
+  w.appendChild(el);
+  if (caption) {
+    const c = document.createElement('div');
+    c.className = 'caption';
+    c.textContent = caption;
+    w.appendChild(c);
+  }
+  return w;
+}
+
+function makeStation(name, tiles) {
+  const s = document.createElement('div');
+  s.className = 'station';
+  const h = document.createElement('div');
+  h.className = 'station-hdr';
+  h.textContent = name;
+  s.appendChild(h);
+  const b = document.createElement('div');
+  b.className = 'station-body';
+  tiles.forEach(t => { t.style.position = 'relative'; b.appendChild(t); });
+  s.appendChild(b);
+  return s;
+}
+
+// ══════════════════════════════════════════════════════════
+// TAB 1: Side by Side
+// ══════════════════════════════════════════════════════════
+
+function buildSideByStation() {
+  const el = document.getElementById('sideByStation');
+  el.innerHTML = '';
+
+  // Old system station
+  const oldCol = document.createElement('div');
+  oldCol.className = 'compare-col';
+  oldCol.innerHTML = '<h3><span class="tag tag-old">CURRENT</span> Per-job color</h3>';
+
+  const oldTiles = [
+    buildOldTile('blue',   { ref:'JOB-2187', client:'Martin & Fils', setupMin:10, runMin:30 }),
+    buildOldTile('rose',   { ref:'JOB-3099', client:'Leclerc Impr.', setupMin:15, runMin:25, completed:true }),
+    buildOldTile('teal',   { ref:'JOB-4511', client:'BioLabel Co',   setupMin:8,  runMin:40, conflict:true }),
+    buildOldTile('blue',   { ref:'JOB-2187', client:'Martin & Fils', setupMin:12, runMin:20 }),
+    buildOldTile('orange', { ref:'JOB-5678', client:'Graphipak',     setupMin:0,  runMin:25, blocked:true }),
+  ];
+  oldCol.appendChild(makeStation('KBA-106', oldTiles));
+
+  // New system station
+  const newCol = document.createElement('div');
+  newCol.className = 'compare-col';
+  newCol.innerHTML = '<h3><span class="tag tag-new">PROPOSED</span> State-based color</h3>';
+
+  const newTiles = [
+    buildNewTile('default',   { ref:'JOB-2187', client:'Martin & Fils', setupMin:10, runMin:30 }),
+    buildNewTile('completed', { ref:'JOB-3099', client:'Leclerc Impr.', setupMin:15, runMin:25, completed:true }),
+    buildNewTile('conflict',  { ref:'JOB-4511', client:'BioLabel Co',   setupMin:8,  runMin:40 }),
+    buildNewTile('default',   { ref:'JOB-2187', client:'Martin & Fils', setupMin:12, runMin:20 }),
+    buildNewTile('blocked',   { ref:'JOB-5678', client:'Graphipak',     setupMin:0,  runMin:25, blocked:true }),
+  ];
+  newCol.appendChild(makeStation('KBA-106', newTiles));
+
+  // Annotation
+  const ann = document.createElement('div');
+  ann.className = 'annotation';
+  ann.innerHTML = `
+    <strong>Key difference:</strong><br><br>
+    In the old system, the amber glow on the teal tile competes with the tile's own color. The blocked orange tile's dashed border is subtle.<br><br>
+    In the new system, the <em>conflict tile</em> is unmistakably amber. The <em>blocked tile</em> is visually dimmed with a dashed border. States are self-evident.
+  `;
+  newCol.appendChild(ann);
+
+  el.appendChild(oldCol);
+  el.appendChild(newCol);
+}
+
+function buildSideByFocus() {
+  const el = document.getElementById('sideByFocus');
+  el.innerHTML = '';
+
+  // Old: glow + mute
+  const oldCol = document.createElement('div');
+  oldCol.className = 'compare-col';
+  oldCol.innerHTML = '<h3><span class="tag tag-old">CURRENT</span> Glow + mute others</h3>';
+
+  const oldTiles = [
+    buildOldTile('blue', { ref:'JOB-2187', client:'Martin & Fils', selected:true,  setupMin:10, runMin:30 }),
+    buildOldTile('rose', { ref:'JOB-3099', client:'Leclerc Impr.', muted:true,     setupMin:15, runMin:25 }),
+    buildOldTile('blue', { ref:'JOB-2187', client:'Martin & Fils', selected:true,  setupMin:8,  runMin:35 }),
+    buildOldTile('teal', { ref:'JOB-4511', client:'BioLabel Co',   muted:true,     setupMin:12, runMin:28 }),
+  ];
+  oldCol.appendChild(makeStation('Heidelberg XL-75', oldTiles));
+
+  const oldAnn = document.createElement('div');
+  oldAnn.className = 'annotation';
+  oldAnn.innerHTML = `Muted tiles lose all visual information. You can't see if a muted tile is conflicting or late &mdash; it's just gray.`;
+  oldCol.appendChild(oldAnn);
+
+  // New: outline, no muting
+  const newCol = document.createElement('div');
+  newCol.className = 'compare-col';
+  newCol.innerHTML = '<h3><span class="tag tag-new">PROPOSED</span> Crisp outline, keep state</h3>';
+
+  const newTiles = [
+    buildNewTile('default',  { ref:'JOB-2187', client:'Martin & Fils', selected:true, selStyle:'luminance', setupMin:10, runMin:30 }),
+    buildNewTile('conflict', { ref:'JOB-3099', client:'Leclerc Impr.', setupMin:15, runMin:25 }),
+    buildNewTile('default',  { ref:'JOB-2187', client:'Martin & Fils', selected:true, selStyle:'luminance', setupMin:8,  runMin:35 }),
+    buildNewTile('late',     { ref:'JOB-4511', client:'BioLabel Co',   setupMin:12, runMin:28 }),
+  ];
+  newCol.appendChild(makeStation('Heidelberg XL-75', newTiles));
+
+  const newAnn = document.createElement('div');
+  newAnn.className = 'annotation';
+  newAnn.innerHTML = `Selected tiles brighten (luminance boost). Other tiles keep their state color &mdash; you can still see conflicts and lateness while focusing on a job. See the <em>All States</em> tab for alternative selection styles.`;
+  newCol.appendChild(newAnn);
+
+  el.appendChild(oldCol);
+  el.appendChild(newCol);
+}
+
+function buildSideByConflict() {
+  const el = document.getElementById('sideByConflict');
+  el.innerHTML = '';
+
+  const colors = ['orange', 'teal', 'rose', 'blue'];
+  const states = ['default', 'default', 'default', 'default'];
+
+  // Old
+  const oldCol = document.createElement('div');
+  oldCol.className = 'compare-col';
+  oldCol.innerHTML = '<h3><span class="tag tag-old">CURRENT</span> Amber glow on colored tile</h3>';
+
+  const oldRow = document.createElement('div');
+  oldRow.className = 'flex-row';
+  colors.forEach(c => {
+    const t = buildOldTile(c, { conflict:true, ref:'JOB-X', client:'Test', setupMin:10, runMin:25 });
+    oldRow.appendChild(wrap(t, `${c} + conflict glow`));
+  });
+  oldCol.appendChild(oldRow);
+
+  const oldAnn = document.createElement('div');
+  oldAnn.className = 'annotation';
+  oldAnn.style.paddingTop = '8px';
+  oldAnn.innerHTML = `The amber glow is hardest to see on <strong>orange</strong> and <strong>teal</strong> tiles. On orange, it's nearly invisible.`;
+  oldCol.appendChild(oldAnn);
+
+  // New
+  const newCol = document.createElement('div');
+  newCol.className = 'compare-col';
+  newCol.innerHTML = '<h3><span class="tag tag-new">PROPOSED</span> Amber tile (uniform)</h3>';
+
+  const newRow = document.createElement('div');
+  newRow.className = 'flex-row';
+  for (let i = 0; i < 4; i++) {
+    const t = buildNewTile('conflict', { ref:'JOB-X', client:'Test', setupMin:10, runMin:25 });
+    newRow.appendChild(wrap(t, 'conflict state'));
+  }
+  newCol.appendChild(newRow);
+
+  const newAnn = document.createElement('div');
+  newAnn.className = 'annotation';
+  newAnn.style.paddingTop = '8px';
+  newAnn.innerHTML = `Every conflict tile looks identical &mdash; <strong>always amber, always obvious</strong>. No guessing, no color interference.`;
+  newCol.appendChild(newAnn);
+
+  el.appendChild(oldCol);
+  el.appendChild(newCol);
+}
+
+// ══════════════════════════════════════════════════════════
+// TAB 2: All States
+// ══════════════════════════════════════════════════════════
+
+function buildNewLegend() {
+  const el = document.getElementById('newLegend');
+  el.innerHTML = '';
+  const items = [
+    { color: NEW_STATES.default.border,   label: 'Default (ready to run)' },
+    { color: NEW_STATES.completed.border,  label: 'Completed' },
+    { color: NEW_STATES.conflict.border,   label: 'Conflict (precedence)' },
+    { color: NEW_STATES.late.border,       label: 'Late (deadline risk)' },
+    { color: NEW_STATES.blocked.border,    label: 'Blocked (prerequisites)', dashed: true },
+    { color: 'white',                      label: 'Selected job (see comparison below)', outline: true },
+  ];
+  items.forEach(it => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const chip = document.createElement('div');
+    chip.className = 'legend-chip';
+    if (it.outline) {
+      chip.style.border = '2px solid white';
+      chip.style.background = 'transparent';
+    } else if (it.dashed) {
+      chip.style.borderLeft = `3px dashed ${it.color}`;
+      chip.style.background = NEW_STATES.blocked.setup;
+    } else {
+      chip.style.borderLeft = `3px solid ${it.color}`;
+      chip.style.background = it.color + '22';
+    }
+    item.appendChild(chip);
+    const text = document.createElement('span');
+    text.textContent = it.label;
+    item.appendChild(text);
+    el.appendChild(item);
+  });
+}
+
+function buildAllStates() {
+  const el = document.getElementById('allStates');
+  el.innerHTML = '';
+
+  const states = [
+    { state:'default',   label:'Default',                    opts:{ ref:'JOB-2187', client:'Martin & Fils' } },
+    { state:'completed', label:'Completed',                  opts:{ ref:'JOB-1042', client:'Dupont SA', completed:true } },
+    { state:'conflict',  label:'Conflict (precedence)',      opts:{ ref:'JOB-3099', client:'Leclerc Impr.' } },
+    { state:'late',      label:'Late (deadline risk)',        opts:{ ref:'JOB-4511', client:'BioLabel Co' } },
+    { state:'blocked',   label:'Blocked (prerequisites)',    opts:{ ref:'JOB-5678', client:'Graphipak', blocked:true } },
+  ];
+
+  states.forEach(s => {
+    const t = buildNewTile(s.state, { setupMin:12, runMin:35, ...s.opts });
+    el.appendChild(wrap(t, s.label));
+  });
+}
+
+function buildSelectionComparison() {
+  const styles = [
+    { id:'selLuminance', style:'luminance' },
+    { id:'selBorder',    style:'border' },
+    { id:'selGlow',      style:'glow' },
+    { id:'selLift',      style:'lift' },
+    { id:'selPulse',     style:'pulse' },
+    { id:'selPulseBright', style:'pulse-bright' },
+  ];
+
+  const tileVariants = [
+    { state:'default',   label:'Default',  opts:{ ref:'JOB-2187', client:'Martin & Fils' } },
+    { state:'conflict',  label:'Conflict',  opts:{ ref:'JOB-3099', client:'Leclerc Impr.' } },
+    { state:'late',      label:'Late',       opts:{ ref:'JOB-4511', client:'BioLabel Co' } },
+    { state:'completed', label:'Completed',  opts:{ ref:'JOB-1042', client:'Dupont SA', completed:true } },
+    { state:'blocked',   label:'Blocked',    opts:{ ref:'JOB-5678', client:'Graphipak', blocked:true } },
+  ];
+
+  styles.forEach(s => {
+    const el = document.getElementById(s.id);
+    el.innerHTML = '';
+    tileVariants.forEach(v => {
+      const t = buildNewTile(v.state, { setupMin:12, runMin:35, selected:true, selStyle:s.style, ...v.opts });
+      el.appendChild(wrap(t, v.label + ' + selected'));
+    });
+  });
+}
+
+function buildCombinedStates() {
+  const el = document.getElementById('combinedStates');
+  el.innerHTML = '';
+
+  // Use luminance as the default for now (will be decided after comparison)
+  const combos = [
+    { state:'conflict',  label:'Selected + Conflict',  opts:{ selected:true, selStyle:'luminance', ref:'JOB-3099', client:'Leclerc Impr.' } },
+    { state:'late',      label:'Selected + Late',       opts:{ selected:true, selStyle:'luminance', ref:'JOB-4511', client:'BioLabel Co' } },
+    { state:'completed', label:'Selected + Completed',  opts:{ selected:true, selStyle:'luminance', completed:true, ref:'JOB-1042', client:'Dupont SA' } },
+    { state:'blocked',   label:'Selected + Blocked',    opts:{ selected:true, selStyle:'luminance', blocked:true, ref:'JOB-5678', client:'Graphipak' } },
+  ];
+
+  combos.forEach(s => {
+    const t = buildNewTile(s.state, { setupMin:12, runMin:35, ...s.opts });
+    el.appendChild(wrap(t, s.label));
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// TAB 3: Full Scenario
+// ══════════════════════════════════════════════════════════
+
+const SCENARIO = [
+  {
+    name: 'KBA-106',
+    tiles: [
+      { job:0, state:'completed', old:'blue',   completed:true, s:10, r:30 },
+      { job:1, state:'default',   old:'rose',   s:15, r:25 },
+      { job:2, state:'conflict',  old:'teal',   conflict:true, s:8, r:40 },
+      { job:0, state:'default',   old:'blue',   s:12, r:20 },
+      { job:3, state:'late',      old:'orange',  s:10, r:35 },
+    ]
+  },
+  {
+    name: 'Heidelberg XL-75',
+    tiles: [
+      { job:1, state:'default',   old:'rose',   s:12, r:28, sim:[{matched:true},{matched:true}] },
+      { job:1, state:'default',   old:'rose',   s:10, r:35, sim:[{matched:true},{matched:false}] },
+      { job:4, state:'blocked',   old:'indigo',  blocked:true, s:15, r:30 },
+      { job:2, state:'default',   old:'teal',   s:8,  r:25 },
+    ]
+  },
+  {
+    name: 'Komori LS-40',
+    tiles: [
+      { job:3, state:'default',   old:'orange',  s:12, r:32 },
+      { job:5, state:'completed', old:'green',   completed:true, s:10, r:28 },
+      { job:0, state:'default',   old:'blue',   s:15, r:25 },
+      { job:4, state:'conflict',  old:'indigo',  conflict:true, s:8, r:38 },
+    ]
+  },
+  {
+    name: 'MAN Roland',
+    tiles: [
+      { job:2, state:'late',      old:'teal',   s:10, r:30 },
+      { job:5, state:'default',   old:'green',   s:12, r:35 },
+      { job:3, state:'completed', old:'orange',  completed:true, s:8, r:25 },
+      { job:1, state:'blocked',   old:'rose',    blocked:true, s:15, r:28 },
+    ]
+  },
+];
+
+function buildScenario() {
+  const newGrid = document.getElementById('scenarioGrid');
+  const oldGrid = document.getElementById('scenarioGridOld');
+  newGrid.innerHTML = '';
+  oldGrid.innerHTML = '';
+
+  SCENARIO.forEach(station => {
+    // New
+    const newTiles = station.tiles.map(t => {
+      const tile = buildNewTile(t.state, {
+        ref: JOBS[t.job].ref,
+        client: JOBS[t.job].client,
+        setupMin: t.s,
+        runMin: t.r,
+        completed: t.completed || false,
+        blocked: t.blocked || false,
+        similarity: t.sim || null,
+      });
+      tile.style.position = 'relative';
+      return tile;
+    });
+    newGrid.appendChild(makeStation(station.name, newTiles));
+
+    // Old
+    const oldTiles = station.tiles.map(t => {
+      const tile = buildOldTile(t.old, {
+        ref: JOBS[t.job].ref,
+        client: JOBS[t.job].client,
+        setupMin: t.s,
+        runMin: t.r,
+        completed: t.completed || false,
+        conflict: t.conflict || false,
+        blocked: t.blocked || false,
+        similarity: t.sim || null,
+      });
+      tile.style.position = 'relative';
+      return tile;
+    });
+    oldGrid.appendChild(makeStation(station.name, oldTiles));
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// TAB 4: Verdict
+// ══════════════════════════════════════════════════════════
+
+function buildVerdict() {
+  const el = document.getElementById('verdictBox');
+  el.innerHTML = `
+    <h3>Comparison Matrix</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Criterion</th>
+          <th>Per-Job Color (Current)</th>
+          <th>State-Based (Proposed)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Conflict visibility</td>
+          <td class="lose">Amber glow competes with tile color</td>
+          <td class="win">Entire tile turns amber — unmissable</td>
+        </tr>
+        <tr>
+          <td>Lateness visibility</td>
+          <td class="lose">No dedicated visual (Late Jobs panel only)</td>
+          <td class="win">Red tile — visible in grid context</td>
+        </tr>
+        <tr>
+          <td>Completion clarity</td>
+          <td class="lose">Green overlay ambiguous on green/teal jobs</td>
+          <td class="win">Green is always completion, no ambiguity</td>
+        </tr>
+        <tr>
+          <td>Blocked tile urgency</td>
+          <td class="lose">Subtle dashed border only</td>
+          <td class="win">Dimmed + dashed + lock badge</td>
+        </tr>
+        <tr>
+          <td>Job identification</td>
+          <td class="win">Color groups tiles by job</td>
+          <td class="neutral">Text label only (sufficient — ref + client)</td>
+        </tr>
+        <tr>
+          <td>Job focus (REQ-01)</td>
+          <td class="neutral">Glow + mute (destroys state info)</td>
+          <td class="win">Outline (preserves all state info)</td>
+        </tr>
+        <tr>
+          <td>Color-blind safety</td>
+          <td class="lose">17 hues, many indistinguishable</td>
+          <td class="win">5 distinct states, icons as backup</td>
+        </tr>
+        <tr>
+          <td>Cognitive load</td>
+          <td class="lose">Color is decorative — must decode glows/borders</td>
+          <td class="win">Color = action needed. Scan, don't decode.</td>
+        </tr>
+        <tr>
+          <td>Learning curve</td>
+          <td class="neutral">Colors feel intuitive but mislead</td>
+          <td class="win">5 states to learn — all meaningful</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top:20px;padding:16px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;">
+      <strong style="color:#86EFAC;">Recommendation:</strong>
+      <span style="color:var(--text-secondary);line-height:1.6">
+        Adopt state-based coloring. The only trade-off is losing color-based job grouping, which is adequately replaced by the white outline + text labels. Every other dimension improves — especially the critical ones: conflict visibility, accessibility, and cognitive load.
+      </span>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+// Tabs
+// ══════════════════════════════════════════════════════════
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════
+
+buildSideByStation();
+buildSideByFocus();
+buildSideByConflict();
+buildNewLegend();
+buildAllStates();
+buildSelectionComparison();
+buildCombinedStates();
+buildScenario();
+buildVerdict();
+</script>
+</body>
+</html>

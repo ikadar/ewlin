@@ -184,7 +184,7 @@ export const PrerequisiteTooltip = memo(function PrerequisiteTooltip({
       data-testid="prerequisite-tooltip"
     >
       {/* Tooltip content */}
-      <div className="bg-slate-800 text-white text-xs rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
+      <div className="flux-tooltip whitespace-nowrap">
         {items.map((item) => (
           <div key={item.key} className="flex items-center gap-2">
             {/* Icon: warning for blocking, check for ready */}
@@ -194,13 +194,13 @@ export const PrerequisiteTooltip = memo(function PrerequisiteTooltip({
             {/* Label, status, and optional date */}
             <span>
               {item.label}: {item.statusLabel}
-              {item.date && <span className="ml-1 text-slate-400">{item.date}</span>}
+              {item.date && <span className="ml-1 text-[var(--tt-muted)]">{item.date}</span>}
             </span>
           </div>
         ))}
       </div>
       {/* Arrow pointing down */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800" />
+      <div className="flux-tooltip-arrow absolute left-1/2 -translate-x-1/2 top-full" />
     </div>
   );
 });

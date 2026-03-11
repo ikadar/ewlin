@@ -2,6 +2,7 @@ import { useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
+import { JcfTransporteurSelect } from './JcfTransporteurSelect';
 import type { Suggestion } from '../JcfAutocomplete';
 import type { JcfTemplate } from '@flux/types';
 import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery, useGetShippersQuery } from '../../store';
@@ -298,23 +299,13 @@ export function JcfJobHeader({
         {/* Transporteur */}
         {onShipperIdChange && (
           <div className="w-[156px]">
-            <label htmlFor="jcf-transporteur" className={labelClass}>
-              Transporteur
-            </label>
-            <select
-              id="jcf-transporteur"
+            <label className={labelClass}>Transporteur</label>
+            <JcfTransporteurSelect
+              shippers={shippers}
               value={shipperId ?? ''}
-              onChange={(e) => onShipperIdChange(e.target.value)}
-              className={inputBaseClass}
-              data-testid="jcf-field-transporteur"
-            >
-              <option value="">Aucun</option>
-              {shippers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              onChange={onShipperIdChange}
+              inputBaseClass={inputBaseClass}
+            />
           </div>
         )}
 

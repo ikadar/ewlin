@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ShortcutFooter } from '@/components/ShortcutFooter/ShortcutFooter';
+import { detectKeyboardLayout, isAltLetter } from '@/utils/keyboardLayout';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
@@ -23,7 +25,7 @@ import { sortFluxJobs, type SortColumn, type SortDirection } from '@/components/
  * v0.5.16: Tab filtering, full-text search, URL persistence, keyboard shortcuts.
  * v0.5.17: Prerequisite listbox, expand/collapse, delete confirmation, edit navigation.
  */
-export function FluxPage() {
+export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -199,26 +201,29 @@ export function FluxPage() {
 
   // ── Keyboard shortcuts (spec 3.4) ────────────────────────────────────────
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!e.altKey) return;
+    // When rendered as a backdrop behind JCF modal, suppress all keyboard shortcuts
+    if (backdrop) return;
 
-      // Use e.code (physical key) instead of e.key to avoid macOS Option key
-      // remapping (e.g. Alt+F → e.key='ƒ' on macOS, but e.code='KeyF' always).
+    const handler = (e: KeyboardEvent) => {
+      detectKeyboardLayout(e);
+
+      if (isAltLetter(e, 'f')) {
+        e.preventDefault();
+        if (document.activeElement === searchInputRef.current) {
+          searchInputRef.current?.select();
+        } else {
+          searchInputRef.current?.focus();
+        }
+        return;
+      }
+      if (isAltLetter(e, 'n')) {
+        e.preventDefault();
+        navigate('/job/new', { state: { from: location.pathname } });
+        return;
+      }
+
+      if (!e.altKey) return;
       switch (e.code) {
-        case 'KeyF': {
-          e.preventDefault();
-          if (document.activeElement === searchInputRef.current) {
-            searchInputRef.current?.select();
-          } else {
-            searchInputRef.current?.focus();
-          }
-          break;
-        }
-        case 'KeyN': {
-          e.preventDefault();
-          navigate('/job/new', { state: { from: location.pathname } });
-          break;
-        }
         case 'ArrowRight': {
           e.preventDefault();
           const currentIndex = TAB_IDS.indexOf(activeTab);
@@ -238,7 +243,7 @@ export function FluxPage() {
 
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [activeTab, navigate, location.pathname]);
+  }, [activeTab, navigate, location.pathname, backdrop]);
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (isLoading) {
@@ -310,6 +315,8 @@ export function FluxPage() {
           onConfirm={handleConfirmDelete}
         />
       )}
+
+      <ShortcutFooter mode="flux" />
     </div>
   );
 }

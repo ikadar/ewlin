@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { Task, TaskAssignment } from '@flux/types';
 import { AlertCircle, Shuffle } from 'lucide-react';
-import { ProgressSegments } from './ProgressSegments';
+import { ProgressDots } from './ProgressDots';
 
 export type JobProblemType = 'late' | 'conflict' | null;
 
@@ -104,9 +104,9 @@ export const JobCard = memo(function JobCard({
         {description}
       </div>
 
-      {/* Footer: progress segments (left) + badge (right) */}
+      {/* Footer: progress dots (left) + badge (right) */}
       <div className="flex items-center justify-between">
-        <ProgressSegments tasks={tasks} assignments={assignments} />
+        <ProgressDots tasks={tasks} assignments={assignments} />
         {problemType === 'late' && (
           <span className="text-xs font-medium text-red-400">En retard</span>
         )}

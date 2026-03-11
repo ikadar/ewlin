@@ -107,7 +107,7 @@ export function PrerequisiteStatus({
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap" data-testid="prerequisite-status">
+    <div className="flex items-center gap-1 flex-wrap" data-testid="prerequisite-status">
       {/* Paper status dropdown */}
       <PrerequisiteDropdown
         label="Papier"

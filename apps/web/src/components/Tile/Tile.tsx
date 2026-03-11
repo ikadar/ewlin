@@ -1,13 +1,15 @@
-import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import { memo } from 'react';
 import { Circle, CircleCheck } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { TileTooltip } from './TileTooltip';
-import { getJobColorClasses } from './colorUtils';
+import { getStateColorClasses } from './colorUtils';
+import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
+import { useTooltipDelay } from '../../hooks';
 
 export interface TileProps {
   /** Task assignment data */
@@ -20,8 +22,6 @@ export interface TileProps {
   top: number;
   /** Callback when tile is clicked (select job) */
   onSelect?: (jobId: string) => void;
-  /** Callback when tile is double-clicked (recall) */
-  onRecall?: (assignmentId: string) => void;
   /** Callback when swap up is clicked */
   onSwapUp?: (assignmentId: string) => void;
   /** Callback when swap down is clicked */
@@ -34,8 +34,6 @@ export interface TileProps {
   isSelected?: boolean;
   /** Similarity comparison results with previous tile (if any) */
   similarityResults?: SimilarityResult[];
-  /** ID of the currently selected job (for muting non-selected jobs - REQ-01) */
-  selectedJobId?: string;
   /** Whether this tile has a conflict (precedence violation - REQ-12) */
   hasConflict?: boolean;
   /** Callback when completion icon is clicked */
@@ -60,6 +58,8 @@ export interface TileProps {
   displayMode?: 'produit' | 'tirage';
   /** Pre-computed Tirage label string (full label including prefix). Empty → Produit fallback. */
   tirageLabel?: string;
+  /** State-based tile color */
+  tileState?: TileState;
 }
 
 /**
@@ -71,7 +71,7 @@ function minutesToPixels(minutes: number, pixelsPerHour: number = PIXELS_PER_HOU
 
 /**
  * Tile - Visual representation of a scheduled task assignment.
- * Shows job color, setup/run sections, completion status, and swap buttons.
+ * Shows state-based color, setup/run sections, completion status, and swap buttons.
  * Draggable within its station column for repositioning.
  * v0.3.46: Memoized to prevent unnecessary re-renders during drag.
  */
@@ -81,14 +81,12 @@ export const Tile = memo(function Tile({
   job,
   top,
   onSelect,
-  onRecall,
   onSwapUp,
   onSwapDown,
   showSwapUp = true,
   showSwapDown = true,
   isSelected = false,
   similarityResults,
-  selectedJobId,
   hasConflict = false,
   onToggleComplete,
   pixelsPerHour = PIXELS_PER_HOUR,
@@ -101,35 +99,10 @@ export const Tile = memo(function Tile({
   element,
   displayMode,
   tirageLabel,
+  tileState = 'default',
 }: TileProps) {
-  // v0.4.32b: Tooltip visibility state with 2-second hover delay
-  const [showTooltip, setShowTooltip] = useState(false);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Clear timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Fázis D: Handle mouse enter - start 500ms timer for tooltip (all tiles)
-  const handleMouseEnter = useCallback(() => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setShowTooltip(true);
-    }, 500);
-  }, []);
-
-  // v0.4.32b: Handle mouse leave - cancel timer and hide tooltip
-  const handleMouseLeave = useCallback(() => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setShowTooltip(false);
-  }, []);
+  // Unified tooltip delay (500ms show, 0ms hide)
+  const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
   const { setupMinutes, runMinutes } = task.duration;
   const originalTotalMinutes = setupMinutes + runMinutes;
 
@@ -146,40 +119,23 @@ export const Tile = memo(function Tile({
   const setupHeight = totalHeight * setupRatio;
   const runHeight = totalHeight * (1 - setupRatio);
 
-  // Get color classes
-  const colorClasses = getJobColorClasses(job.color);
+  // Get state-based color classes
+  const colorClasses = getStateColorClasses(tileState);
 
   // Completion state
   const isCompleted = assignment.isCompleted;
 
-  // Muting state: tile is muted when a job is selected (REQ-01)
-  const isMutedBySelection = selectedJobId !== undefined && selectedJobId !== job.id;
-  const isMuted = isMutedBySelection;
-
-  // Completed gradient style
-  const completedGradient = isCompleted
-    ? 'linear-gradient(to right, rgba(34,197,94,0.6) 0%, rgba(34,197,94,0.2) 50%, transparent 100%)'
-    : undefined;
-
-  // Handle click - v0.3.57: Pick for reschedule or select job
+  // Handle click - "Select Then Act": click to select, click selected tile to pick
   const handleClick = () => {
-    // If picking is active, this tile might be the target for placement (handled by StationColumn)
-    // Don't start a new pick from a tile while picking is active
     if (isPickingActive) return;
 
-    // If not completed, pick for reschedule
-    if (!isCompleted && onPickFromGrid) {
+    if (isSelected && !isCompleted && onPickFromGrid) {
+      // Already-selected job's tile → pick for repositioning
       onPickFromGrid(task, job, assignment.id);
-      return;
+    } else {
+      // Select (or switch to) this job
+      onSelect?.(job.id);
     }
-
-    // Otherwise just select the job
-    onSelect?.(job.id);
-  };
-
-  // Handle double click (recall)
-  const handleDoubleClick = () => {
-    onRecall?.(assignment.id);
   };
 
   // Handle swap
@@ -207,41 +163,20 @@ export const Tile = memo(function Tile({
   // Determine if we have setup time to show
   const hasSetup = setupMinutes > 0;
 
-  // REQ-12: Conflict glow (amber) overrides selection glow (job color)
-  // Selected state styling - glow effect using job color at 60% opacity
-  const getGlowStyle = () => {
-    if (hasConflict) {
-      // Amber glow for conflict tiles (overrides selection glow)
-      return { boxShadow: '0 0 12px 4px #F59E0B99' }; // amber-500 at ~60% opacity
-    }
-    if (isSelected) {
-      // Job color glow for selected tiles
-      return { boxShadow: `0 0 12px 4px ${job.color}99` }; // 99 hex = ~60% opacity
-    }
-    return undefined;
-  };
-  const glowStyle = getGlowStyle();
+  // Selection outline is handled by CSS selector on [data-job-id] (instant, no re-render needed)
 
-  // Muting style: desaturate and reduce opacity for other jobs during selection
-  // v0.3.57: During pick, non-picked tiles remain clickable but placement goes to StationColumn
-  const getMutingStyle = () => {
-    // v0.3.57: During active pick, disable pointer events on non-picked tiles
-    // so clicks pass through to StationColumn for placement
-    if (isPickingActive && !isPicked) {
-      if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6, pointerEvents: 'none' as const };
-      return { pointerEvents: 'none' as const };
-    }
-    // When just muted by selection: visual muting only, keep clickable
-    if (isMuted) return { filter: 'saturate(0.2)', opacity: 0.6 };
-    return undefined;
-  };
-  const mutingStyle = getMutingStyle();
+  // During pick mode, disable pointer events on non-picked tiles
+  const pickStyle = isPickingActive && !isPicked
+    ? { pointerEvents: 'none' as const }
+    : undefined;
 
   // v0.4.32b: Blocked tiles show dashed border
   const borderStyleClass = isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
 
-  // v0.3.57: Cursor is pointer for pickable tiles (not completed)
-  const cursorClass = !isCompleted && onPickFromGrid ? 'cursor-pointer' : 'cursor-default';
+  // Cursor: grab for selected pickable tiles, pointer for all others
+  const cursorClass = isSelected && !isCompleted && onPickFromGrid
+    ? 'cursor-grab'
+    : 'cursor-pointer';
 
   // v0.3.57: Pulsating placeholder shown at original position when tile is picked
   if (isPicked) {
@@ -263,14 +198,13 @@ export const Tile = memo(function Tile({
         height: `${totalHeight}px`,
         left: 0,
         right: 0,
-        ...glowStyle,
-        ...mutingStyle,
+        ...pickStyle,
       }}
       onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      data-job-id={job.id}
       data-testid={`tile-${assignment.id}`}
       data-scheduled-start={assignment.scheduledStart}
       data-scheduled-end={assignment.scheduledEnd}
@@ -289,76 +223,51 @@ export const Tile = memo(function Tile({
         <SimilarityIndicators results={similarityResults} />
       )}
 
-      {/* Setup section (if has setup time) - contains the label */}
+      {/* Setup section (if has setup time) - background only */}
       {hasSetup && (
         <div
-          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder} pt-0.5 px-2`}
+          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder}`}
           style={{
             top: 0,
             height: `${setupHeight}px`,
-            backgroundImage: completedGradient,
           }}
           data-testid="tile-setup-section"
-        >
-          {/* Content: completion icon + reference + client */}
-          <div className="flex items-center gap-2">
-            {isCompleted ? (
-              <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-completed-icon"
-              />
-            ) : (
-              <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-incomplete-icon"
-              />
-            )}
-            <span
-              className={`${colorClasses.text} font-medium truncate min-w-0`}
-              data-testid="tile-content"
-            >
-              {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
-            </span>
-          </div>
-        </div>
+        />
       )}
 
-      {/* Run section */}
+      {/* Run section - background only */}
       <div
-        className={`absolute left-0 right-0 ${colorClasses.runBg} ${!hasSetup ? 'pt-0.5 px-2' : ''}`}
+        className={`absolute left-0 right-0 ${colorClasses.runBg}`}
         style={{
           top: hasSetup ? `${setupHeight}px` : 0,
           height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
-          backgroundImage: completedGradient,
         }}
         data-testid="tile-run-section"
-      >
-        {/* Content only if no setup section */}
-        {!hasSetup && (
-          <div className="flex items-center gap-2">
-            {isCompleted ? (
-              <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-completed-icon"
-              />
-            ) : (
-              <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-incomplete-icon"
-              />
-            )}
-            <span
-              className={`${colorClasses.text} font-medium truncate min-w-0`}
-              data-testid="tile-content"
-            >
-              {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
-            </span>
-          </div>
-        )}
+      />
+
+      {/* Label overlay spanning both sections */}
+      <div className="absolute inset-0 z-10 pt-0.5 px-2 pointer-events-none overflow-hidden">
+        <div className="flex items-start gap-2">
+          {isCompleted ? (
+            <CircleCheck
+              className="w-4 h-4 text-emerald-500 shrink-0 pointer-events-auto cursor-pointer hover:text-emerald-400 transition-colors"
+              onClick={handleToggleComplete}
+              data-testid="tile-completed-icon"
+            />
+          ) : (
+            <Circle
+              className="w-4 h-4 text-zinc-600 shrink-0 pointer-events-auto cursor-pointer hover:text-zinc-400 transition-colors"
+              onClick={handleToggleComplete}
+              data-testid="tile-incomplete-icon"
+            />
+          )}
+          <span
+            className={`${colorClasses.text} font-medium break-words min-w-0 leading-tight`}
+            data-testid="tile-content"
+          >
+            {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
+          </span>
+        </div>
       </div>
 
       {/* Swap buttons (visible on hover) */}
@@ -414,7 +323,8 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.isBlocked !== next.isBlocked ||
     prev.blockingInfo !== next.blockingInfo ||
     prev.displayMode !== next.displayMode ||
-    prev.tirageLabel !== next.tirageLabel
+    prev.tirageLabel !== next.tirageLabel ||
+    prev.tileState !== next.tileState
   );
 }
 
@@ -425,7 +335,6 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
 function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
   return (
     prev.onSelect !== next.onSelect ||
-    prev.onRecall !== next.onRecall ||
     prev.onSwapUp !== next.onSwapUp ||
     prev.onSwapDown !== next.onSwapDown ||
     prev.onToggleComplete !== next.onToggleComplete ||
@@ -436,17 +345,8 @@ function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
 
 /**
  * Custom comparison function for memo to prevent unnecessary re-renders.
- * v0.3.46: Initial implementation
- * v0.3.57: Updated for pick instead of drag
- * v0.4.32b: Added blocking state
- * v0.4.39: Refactored to reduce cognitive complexity
  */
 function arePropsEqual(prevProps: TileProps, nextProps: TileProps): boolean {
-  // For selectedJobId, compare the computed mute state, not raw values
-  const prevMutedBySelection = prevProps.selectedJobId !== undefined && prevProps.selectedJobId !== prevProps.job.id;
-  const nextMutedBySelection = nextProps.selectedJobId !== undefined && nextProps.selectedJobId !== nextProps.job.id;
-
-  if (prevMutedBySelection !== nextMutedBySelection) return false;
   if (haveDataPropsChanged(prevProps, nextProps)) return false;
   if (haveStatePropsChanged(prevProps, nextProps)) return false;
   if (haveCallbackPropsChanged(prevProps, nextProps)) return false;

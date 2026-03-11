@@ -1,0 +1,2136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Center — Design Playground</title>
+<style>
+  :root {
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface-2: #27272a;
+    --surface-3: #3f3f46;
+    --border: #3f3f46;
+    --border-subtle: #27272a;
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --text-dim: #71717a;
+    --blue: #3b82f6;
+    --blue-hover: #60a5fa;
+    --blue-dim: #1e3a5f;
+    --emerald: #10b981;
+    --emerald-dim: #064e3b;
+    --amber: #f59e0b;
+    --amber-dim: #78350f;
+    --red: #ef4444;
+    --red-dim: #7f1d1d;
+    --purple: #a855f7;
+    --purple-dim: #581c87;
+    --radius: 8px;
+    --radius-lg: 12px;
+    font-size: 13px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── TOP BAR ─── */
+  .top-bar {
+    height: 48px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .top-bar h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+  .top-bar .badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: var(--blue-dim);
+    color: var(--blue);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ─── MAIN LAYOUT ─── */
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ─── EXPERT PANEL (LEFT) ─── */
+  .expert-panel {
+    width: 380px;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .expert-panel-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .expert-panel-header h2 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 12px;
+  }
+  .expert-tabs {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .expert-tab {
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .expert-tab:hover { background: var(--surface-2); color: var(--text); }
+  .expert-tab.active {
+    background: var(--blue-dim);
+    border-color: var(--blue);
+    color: var(--blue-hover);
+  }
+  .expert-tab .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .expert-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .expert-card {
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .expert-card .name {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .expert-card .role {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .expert-card p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .expert-card .verdict {
+    font-size: 11px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  .verdict.pro { background: var(--emerald-dim); color: var(--emerald); border: 1px solid #065f4620; }
+  .verdict.con { background: var(--red-dim); color: #fca5a5; border: 1px solid #7f1d1d20; }
+  .verdict.neutral { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+  .verdict.suggestion { background: var(--purple-dim); color: #c4b5fd; border: 1px solid #581c8720; }
+
+  .debate-thread {
+    display: none;
+  }
+  .debate-thread.active {
+    display: block;
+  }
+
+  /* ─── PREVIEW AREA (CENTER) ─── */
+  .preview-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Proposal selector */
+  .proposal-bar {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .proposal-bar label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-right: 8px;
+    font-weight: 600;
+  }
+  .proposal-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+  .proposal-btn:hover { background: var(--surface-2); color: var(--text); }
+  .proposal-btn.active {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: white;
+  }
+
+  /* Preview canvas */
+  .preview-canvas {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    position: relative;
+    overflow-y: auto;
+  }
+
+  /* Simulated app background */
+  .app-sim {
+    width: 100%;
+    max-width: 900px;
+    height: 560px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+  }
+  .app-sim-nav {
+    height: 36px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .app-sim-nav .dot-group { display: flex; gap: 4px; }
+  .app-sim-nav .dot-group span {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block;
+  }
+  .app-sim-nav .title {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-left: 8px;
+  }
+  .app-sim-content {
+    display: flex;
+    height: calc(100% - 36px);
+  }
+  .app-sim-sidebar {
+    width: 180px;
+    background: var(--surface);
+    border-right: 1px solid var(--border-subtle);
+    padding: 8px;
+  }
+  .app-sim-sidebar .fake-item {
+    height: 28px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    background: var(--surface-2);
+    opacity: 0.5;
+  }
+  .app-sim-grid {
+    flex: 1;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: 60px repeat(4, 1fr);
+    grid-template-rows: 24px repeat(8, 1fr);
+    gap: 2px;
+  }
+  .app-sim-grid .cell {
+    background: var(--surface);
+    border-radius: 3px;
+    opacity: 0.3;
+  }
+  .app-sim-grid .header {
+    opacity: 0.6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: var(--text-dim);
+  }
+
+  /* ─── OVERLAY CONTAINER ─── */
+  .overlay-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 60px;
+    z-index: 10;
+  }
+  .overlay-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    border-radius: var(--radius-lg);
+  }
+
+  /* ═══ PROPOSAL A: Current Palette ═══ */
+  .palette-a {
+    position: relative;
+    width: 440px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .palette-a .search-bar {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .palette-a .search-bar .icon { color: var(--text-dim); font-size: 14px; }
+  .palette-a .search-bar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .palette-a .search-bar input::placeholder { color: var(--text-dim); }
+  .palette-a .cmd-list { max-height: 320px; overflow-y: auto; padding: 4px 0; }
+  .palette-a .cmd-cat {
+    padding: 8px 12px 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .palette-a .cmd-row {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    margin: 1px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .palette-a .cmd-row:hover, .palette-a .cmd-row.active { background: var(--surface-2); }
+  .palette-a .cmd-row .cmd-icon {
+    width: 20px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-right: 10px;
+  }
+  .palette-a .cmd-row .cmd-label {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .palette-a .cmd-row .cmd-shortcut {
+    display: flex;
+    gap: 3px;
+  }
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: 'SF Mono', 'Cascadia Code', monospace;
+    color: var(--text-muted);
+    background: linear-gradient(to bottom, var(--surface-2), var(--surface-3));
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    line-height: 16px;
+  }
+
+  /* ═══ PROPOSAL B: Multi-Mode Palette ═══ */
+  .palette-b {
+    position: relative;
+    width: 500px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .palette-b .mode-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 4px;
+  }
+  .palette-b .mode-tab {
+    padding: 8px 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .palette-b .mode-tab:hover { color: var(--text-muted); }
+  .palette-b .mode-tab.active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+  .palette-b .mode-tab .prefix {
+    font-family: 'SF Mono', monospace;
+    font-size: 10px;
+    opacity: 0.6;
+  }
+  .palette-b .search-bar {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .palette-b .search-bar .mode-prefix {
+    font-family: 'SF Mono', monospace;
+    font-size: 14px;
+    color: var(--blue);
+    font-weight: 600;
+  }
+  .palette-b .search-bar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .palette-b .search-bar input::placeholder { color: var(--text-dim); }
+  .palette-b .cmd-list { max-height: 300px; overflow-y: auto; padding: 4px 0; }
+  .palette-b .result-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    margin: 1px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    gap: 10px;
+    transition: background 0.1s;
+  }
+  .palette-b .result-row:hover, .palette-b .result-row.active { background: var(--surface-2); }
+  .palette-b .result-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .palette-b .result-info { flex: 1; }
+  .palette-b .result-title { font-size: 12px; color: var(--text); }
+  .palette-b .result-meta { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+  .palette-b .result-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* ═══ PROPOSAL C: Command Center Hub ═══ */
+  .palette-c {
+    position: relative;
+    width: 640px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .palette-c .hub-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .palette-c .hub-header input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 8px 14px;
+    outline: none;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .palette-c .hub-header input::placeholder { color: var(--text-dim); }
+  .palette-c .hub-body {
+    display: flex;
+    height: 340px;
+  }
+  .palette-c .hub-stats {
+    width: 180px;
+    border-right: 1px solid var(--border-subtle);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .palette-c .stat-card {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-subtle);
+  }
+  .palette-c .stat-card .stat-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .palette-c .stat-card .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .palette-c .stat-card .stat-sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .palette-c .hub-commands {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .palette-c .cmd-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 6px 8px;
+  }
+  .palette-c .cmd-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .palette-c .cmd-tile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .palette-c .cmd-tile:hover { background: var(--surface-2); }
+  .palette-c .cmd-tile .tile-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .palette-c .cmd-tile .tile-label {
+    font-size: 11px;
+    color: var(--text);
+  }
+  .palette-c .cmd-tile .tile-shortcut {
+    margin-left: auto;
+  }
+  .palette-c .hub-context {
+    width: 180px;
+    border-left: 1px solid var(--border-subtle);
+    padding: 12px;
+  }
+  .palette-c .context-title {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .palette-c .context-job {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px solid var(--border-subtle);
+    margin-bottom: 8px;
+  }
+  .palette-c .context-job .job-id {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+  }
+  .palette-c .context-job .job-client {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .palette-c .context-job .job-status {
+    font-size: 10px;
+    margin-top: 6px;
+  }
+  .palette-c .recent-title {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .palette-c .recent-item {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 4px 0;
+    cursor: pointer;
+  }
+  .palette-c .recent-item:hover { color: var(--text); }
+
+  /* ═══ PROPOSAL D: Contextual Action Sheet ═══ */
+  .palette-d {
+    position: relative;
+    width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .palette-d .context-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .palette-d .context-header .ctx-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--blue-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .palette-d .context-header .ctx-info { flex: 1; }
+  .palette-d .context-header .ctx-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .palette-d .context-header .ctx-subtitle {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .palette-d .action-group {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .palette-d .action-group:last-child { border-bottom: none; }
+  .palette-d .action-group-title {
+    padding: 8px 14px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .palette-d .action-row {
+    display: flex;
+    align-items: center;
+    padding: 9px 14px;
+    margin: 1px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    gap: 10px;
+    transition: all 0.1s;
+  }
+  .palette-d .action-row:hover { background: var(--surface-2); }
+  .palette-d .action-row .action-icon {
+    width: 22px;
+    text-align: center;
+    font-size: 13px;
+  }
+  .palette-d .action-row .action-label {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .palette-d .action-row .action-desc {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .palette-d .quick-search {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .palette-d .quick-search:hover { background: var(--surface-2); }
+
+  /* ═══ PROPOSAL E: Radial Quick Menu ═══ */
+  .palette-e-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .radial-menu {
+    position: relative;
+    width: 280px;
+    height: 280px;
+  }
+  .radial-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+    z-index: 2;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .radial-center:hover { transform: translate(-50%, -50%) scale(1.1); }
+  .radial-item {
+    position: absolute;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .radial-item:hover {
+    transform: scale(1.15);
+    background: var(--surface-2);
+    border-color: var(--blue);
+  }
+  .radial-item .r-icon { font-size: 16px; margin-bottom: 2px; }
+  .radial-item .r-label {
+    font-size: 7px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+  .radial-tooltip {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+  .radial-tooltip .r-hint {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ─── CONTROLS PANEL (RIGHT) ─── */
+  .controls-panel {
+    width: 260px;
+    border-left: 1px solid var(--border-subtle);
+    background: var(--surface);
+    padding: 16px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .controls-panel h3 {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 12px;
+  }
+  .control-group {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .control-group:last-child { border-bottom: none; }
+  .control-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .control-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-size: 11px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+  }
+  .control-select:focus { border-color: var(--blue); }
+  .control-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+  }
+  .control-toggle input[type="checkbox"] {
+    accent-color: var(--blue);
+  }
+  .control-toggle label {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .control-range {
+    width: 100%;
+    accent-color: var(--blue);
+    margin-top: 4px;
+  }
+  .control-val {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  .score-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .score-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    width: 70px;
+    flex-shrink: 0;
+  }
+  .score-track {
+    flex: 1;
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .score-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .score-val {
+    font-size: 10px;
+    color: var(--text-muted);
+    width: 20px;
+    text-align: right;
+  }
+
+  /* Proposal description */
+  .proposal-desc {
+    padding: 12px 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .proposal-desc h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .proposal-desc p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* Hidden proposals */
+  .proposal-view { display: none; }
+  .proposal-view.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* FAB preview in app sim */
+  .sim-fab {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.4);
+    cursor: pointer;
+    z-index: 5;
+    transition: transform 0.2s;
+  }
+  .sim-fab:hover { transform: scale(1.1); }
+
+  .consensus-box {
+    background: var(--bg);
+    border: 1px solid var(--blue-dim);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-top: 12px;
+  }
+  .consensus-box h4 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .consensus-box p {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .consensus-box ul {
+    margin: 6px 0;
+    padding-left: 16px;
+  }
+  .consensus-box li {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 3px;
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <h1>Command Center — Design Playground</h1>
+  <span class="badge">Interactive</span>
+  <span style="flex:1"></span>
+  <span style="font-size:11px;color:var(--text-dim)">Flux Scheduler</span>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main-layout">
+
+  <!-- LEFT: EXPERT PANEL -->
+  <div class="expert-panel">
+    <div class="expert-panel-header">
+      <h2>Expert Panel</h2>
+      <div class="expert-tabs">
+        <button class="expert-tab active" onclick="showExpert('ux')" data-expert="ux">
+          <span class="dot" style="background:var(--blue)"></span> UX Architect
+        </button>
+        <button class="expert-tab" onclick="showExpert('keyboard')" data-expert="keyboard">
+          <span class="dot" style="background:var(--emerald)"></span> Power User
+        </button>
+        <button class="expert-tab" onclick="showExpert('visual')" data-expert="visual">
+          <span class="dot" style="background:var(--purple)"></span> Visual Designer
+        </button>
+        <button class="expert-tab" onclick="showExpert('domain')" data-expert="domain">
+          <span class="dot" style="background:var(--amber)"></span> Print Expert
+        </button>
+        <button class="expert-tab" onclick="showExpert('consensus')" data-expert="consensus">
+          <span class="dot" style="background:var(--red)"></span> Consensus
+        </button>
+      </div>
+    </div>
+    <div class="expert-content">
+
+      <!-- UX ARCHITECT -->
+      <div class="debate-thread active" id="debate-ux">
+        <div class="expert-card">
+          <div class="name" style="color:var(--blue)">Sophia — UX Architect</div>
+          <div class="role">Information Architecture & Interaction Design</div>
+          <p>The current command palette (A) follows a proven pattern — VS Code, Spotlight, Raycast have validated it. But for a <strong>domain-specific scheduling app</strong>, we need to consider whether generic patterns truly serve our users.</p>
+          <p>Print shop operators are <strong>task-oriented</strong>, not command-oriented. They think "I need to check Job #24185" not "I need to use the navigate command." This distinction matters.</p>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--blue)">On Proposal A (Current)</div>
+          <div class="verdict pro">✓ Familiar pattern, zero learning curve for tech-savvy users. Clean, fast, minimal cognitive load. Good enough for ~15 commands.</div>
+          <div class="verdict con">✗ No context awareness — same commands whether you have a job selected or not. No status information. Doesn't scale well beyond 20 commands.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--blue)">On Proposal B (Multi-Mode)</div>
+          <div class="verdict pro">✓ Prefix-driven modes (#job, @station, :settings) give the palette real power. Searching for Job #24185 should show the job directly, not just a "Go to" command.</div>
+          <div class="verdict con">✗ Cognitive overhead — operators must learn which prefix to use. Tabs add visual clutter. Risk of over-engineering the simple case.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--blue)">On Proposal C (Hub)</div>
+          <div class="verdict neutral">◊ The 3-column layout provides rich context but may feel heavy for a quick action. Best suited as a dedicated view (not modal overlay). Consider: is this a command center or a dashboard?</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--blue)">On Proposal D (Contextual)</div>
+          <div class="verdict pro">✓ This is my favorite. Context-aware actions reduce cognitive load — show what's relevant NOW. "Job #24185 selected → here are your options." This matches how operators think.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--blue)">On Proposal E (Radial)</div>
+          <div class="verdict con">✗ Novel but risky in a professional tool. Operators need predictability. Motor precision requirement is too high for fast-paced production environments.</div>
+        </div>
+      </div>
+
+      <!-- POWER USER -->
+      <div class="debate-thread" id="debate-keyboard">
+        <div class="expert-card">
+          <div class="name" style="color:var(--emerald)">Marcus — Keyboard Power User</div>
+          <div class="role">Efficiency & Keyboard-First Workflows</div>
+          <p>Speed is everything. The best command center is the one I <strong>don't have to open</strong>. Direct shortcuts should handle 80% of actions. The palette is for the remaining 20% — rare commands and discovery.</p>
+          <p>Current shortcut coverage (Alt+Q, Alt+D, Alt+N, etc.) is already good. The question is: does the command center add value beyond what shortcuts already provide?</p>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--emerald)">On Proposal A (Current)</div>
+          <div class="verdict pro">✓ Fast to open (Alt+K), fast to search, fast to execute. Three keystrokes max: Alt+K → type → Enter. This is the gold standard for speed. The recent commands section means frequent actions are instant.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--emerald)">On Proposal B (Multi-Mode)</div>
+          <div class="verdict pro">✓ The prefix system (#, @, >) is extremely powerful for keyboard users. Once muscle memory kicks in, "Alt+K → #24185" to jump to a job is faster than any UI. But the tabs at top MUST be keyboard-accessible (Tab/Shift+Tab to switch modes).</div>
+          <div class="verdict neutral">◊ Critical requirement: if I type digits, auto-switch to job mode. If I type ">", switch to command mode. The mode should be inferred, not forced.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--emerald)">On Proposal C (Hub)</div>
+          <div class="verdict con">✗ Too much visual noise for a quick action. My hand leaves the keyboard to read stats I don't care about. A command center should be <strong>in → execute → out</strong> in under 2 seconds.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--emerald)">On Proposal D (Contextual)</div>
+          <div class="verdict neutral">◊ Context-awareness is nice but can be confusing — "where did my Navigate to Today command go?" Answer: it's still there but deprioritized. Predictability matters for keyboard users. The command list must remain stable.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--emerald)">On Proposal E (Radial)</div>
+          <div class="verdict con">✗ Absolutely not for keyboard-first users. This is a mouse-only pattern. Hard no.</div>
+        </div>
+      </div>
+
+      <!-- VISUAL DESIGNER -->
+      <div class="debate-thread" id="debate-visual">
+        <div class="expert-card">
+          <div class="name" style="color:var(--purple)">Léa — Visual Designer</div>
+          <div class="role">Visual Hierarchy, Brand & Aesthetics</div>
+          <p>The command center is a <strong>signature interaction</strong> — it's the first thing power users discover, and it shapes their perception of the app's sophistication. It should feel <strong>premium, precise, and intentional</strong>.</p>
+          <p>Current dark zinc palette is excellent. The 3D keycap rendering on shortcuts is a beautiful detail. Whatever we choose must maintain this level of craft.</p>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--purple)">On Proposal A (Current)</div>
+          <div class="verdict pro">✓ Clean, minimal, sophisticated. The zinc-900 surface with subtle borders feels premium. The category headers with uppercase tracking give it structure. It's a proven aesthetic that works.</div>
+          <div class="verdict neutral">◊ Missing: icons next to commands would improve scanability. The command list feels text-heavy. Consider adding subtle lucide icons (already in the data model but not rendered).</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--purple)">On Proposal B (Multi-Mode)</div>
+          <div class="verdict pro">✓ The mode tabs with colored prefixes create visual identity per mode. The richer result rows (icon + title + meta) feel more polished than plain text rows. The mode prefix in the search bar (> or # in blue) is a nice touch.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--purple)">On Proposal C (Hub)</div>
+          <div class="verdict suggestion">✦ The 3-column layout looks impressive but the stat cards compete for attention with commands. If we go this route, the stats need to be extremely subdued — almost ghost-like — so they inform without distracting.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--purple)">On Proposal D (Contextual)</div>
+          <div class="verdict pro">✓ The context header (job icon + name) creates a visual anchor. Grouped actions with subtle separators feel organized. The "Search for more" footer creates a nice escape hatch visual.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--purple)">On Proposal E (Radial)</div>
+          <div class="verdict suggestion">✦ Visually stunning but impractical. Could work as a <strong>right-click context mini-menu</strong> for 4-5 quick actions, not as the main command center. Think: radial for tiles, palette for everything else.</div>
+        </div>
+      </div>
+
+      <!-- DOMAIN EXPERT -->
+      <div class="debate-thread" id="debate-domain">
+        <div class="expert-card">
+          <div class="name" style="color:var(--amber)">Jean-Pierre — Print Production Expert</div>
+          <div class="role">Domain Knowledge & Operator Workflow</div>
+          <p>Operators deal with <strong>urgency</strong>. A client calls about Job #24185 — they need to find it instantly. A press breaks down — they need to see which jobs are affected. The command center must solve <strong>real production problems</strong>.</p>
+          <p>Key scenarios the command center should address:</p>
+          <p>1. "Where is Job #24185?" → Instant lookup<br>
+             2. "What's scheduled on Heidelberg today?" → Station query<br>
+             3. "Which jobs have deadlines this week?" → Deadline awareness<br>
+             4. "Switch this job to Quick Placement" → Action shortcut</p>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--amber)">On Proposal A (Current)</div>
+          <div class="verdict neutral">◊ Handles scenario 1 (job lookup via digit entry) and 4 (action shortcuts) well. But scenarios 2 and 3 require features that don't exist yet. The palette is a starting point, not a destination.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--amber)">On Proposal B (Multi-Mode)</div>
+          <div class="verdict pro">✓ This is the operator's dream. #24185 → jump to job. @Heidelberg → show station schedule. Typing "deadline" or "urgent" → filter by status. Each mode maps to a real production question. This is how operators think.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--amber)">On Proposal C (Hub)</div>
+          <div class="verdict pro">✓ The stats panel showing "12 jobs today, 3 late, 85% capacity" would be incredibly valuable during morning planning. But it should be a persistent widget, not buried in the command center. Don't mix dashboarding with commanding.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--amber)">On Proposal D (Contextual)</div>
+          <div class="verdict pro">✓ When an operator right-clicks or opens the palette with a job selected, showing "Mark complete", "Move to Quick Placement", "Jump to departure" as the TOP actions is exactly right. Context saves time.</div>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--amber)">On Proposal E (Radial)</div>
+          <div class="verdict con">✗ Production floors have mice with limited precision. Fingers may be inked. Not suitable.</div>
+        </div>
+      </div>
+
+      <!-- CONSENSUS -->
+      <div class="debate-thread" id="debate-consensus">
+        <div class="consensus-box">
+          <h4>Consensus Recommendation</h4>
+          <p>After debate, the panel converges on a <strong>hybrid approach: A + B + D</strong></p>
+          <ul>
+            <li><strong>Base:</strong> Keep the clean palette (A) as the foundation — search input + categorized list</li>
+            <li><strong>Add multi-mode search (B):</strong> Digits → job lookup, @ → station, plain text → commands. Inferred, not forced (no tabs needed)</li>
+            <li><strong>Add context header (D):</strong> When a job is selected, show it at the top with contextual quick actions before the main command list</li>
+            <li><strong>Add icons:</strong> Render the existing lucide icons (already in Command data model) for visual scanability</li>
+            <li><strong>Keep stats out:</strong> Dashboard data belongs in a dashboard, not the command palette</li>
+            <li><strong>Reject radial:</strong> Not suitable for production environment</li>
+          </ul>
+          <p style="margin-top:10px;font-weight:600;color:var(--blue);">Result: "Smart Palette" — a context-aware, multi-mode command palette that looks minimal but behaves intelligently.</p>
+        </div>
+
+        <div class="expert-card" style="margin-top:12px">
+          <div class="name" style="color:var(--text-muted)">Implementation Priority</div>
+          <p><strong>Phase 1:</strong> Add icons to current palette (quick win, already in data model)<br>
+             <strong>Phase 2:</strong> Smart search modes (digits→job, @→station) with inline preview<br>
+             <strong>Phase 3:</strong> Context header when job is selected<br>
+             <strong>Phase 4:</strong> Extended search results (jobs, stations, deadlines)</p>
+        </div>
+
+        <div class="expert-card">
+          <div class="name" style="color:var(--text-muted)">Open Questions for Discussion</div>
+          <p>1. Should the palette width increase (440→500px) to accommodate richer content?<br>
+             2. How many recent commands to show? (currently 3, maybe 5?)<br>
+             3. Should job search results show inline mini-preview (client, status)?<br>
+             4. Trigger: keep FAB + Alt+K, or also support Cmd+K?<br>
+             5. Animation: should the palette slide in or fade in?</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: PREVIEW AREA -->
+  <div class="preview-area">
+    <div class="proposal-bar">
+      <label>Proposal</label>
+      <button class="proposal-btn active" onclick="showProposal('a')">A · Current</button>
+      <button class="proposal-btn" onclick="showProposal('b')">B · Multi-Mode</button>
+      <button class="proposal-btn" onclick="showProposal('c')">C · Hub</button>
+      <button class="proposal-btn" onclick="showProposal('d')">D · Contextual</button>
+      <button class="proposal-btn" onclick="showProposal('e')">E · Radial</button>
+      <button class="proposal-btn" onclick="showProposal('hybrid')">★ Hybrid</button>
+    </div>
+
+    <!-- PROPOSAL A -->
+    <div class="proposal-view active" id="view-a">
+      <div class="proposal-desc">
+        <h3>A — Classic Command Palette</h3>
+        <p>Current implementation. Search-first with categorized commands. Proven VS Code / Spotlight pattern. Clean and minimal.</p>
+      </div>
+      <div class="preview-canvas">
+        <div class="app-sim">
+          <div class="app-sim-nav">
+            <div class="dot-group">
+              <span style="background:#ef4444"></span>
+              <span style="background:#f59e0b"></span>
+              <span style="background:#22c55e"></span>
+            </div>
+            <span class="title">Flux Scheduler — Planning</span>
+          </div>
+          <div class="app-sim-content">
+            <div class="app-sim-sidebar">
+              <div class="fake-item" style="height:22px;opacity:0.7;background:var(--blue-dim)"></div>
+              <div class="fake-item"></div>
+              <div class="fake-item" style="width:80%"></div>
+              <div class="fake-item"></div>
+              <div class="fake-item" style="width:60%"></div>
+              <div class="fake-item"></div>
+            </div>
+            <div class="app-sim-grid">
+              <div class="cell header"></div>
+              <div class="cell header">HD 102</div>
+              <div class="cell header">SM 74</div>
+              <div class="cell header">Massicot</div>
+              <div class="cell header">Plieuse</div>
+              <div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--purple-dim);opacity:0.6"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+          </div>
+          <div class="overlay-container">
+            <div class="overlay-backdrop"></div>
+            <div class="palette-a">
+              <div class="search-bar">
+                <span class="icon">⌘</span>
+                <input type="text" placeholder="Tapez une commande ou recherchez..." readonly>
+              </div>
+              <div class="cmd-list">
+                <div class="cmd-cat">Récents</div>
+                <div class="cmd-row active">
+                  <span class="cmd-icon">⚡</span>
+                  <span class="cmd-label">Mode placement rapide</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">Q</span></span>
+                </div>
+                <div class="cmd-cat">Navigation</div>
+                <div class="cmd-row">
+                  <span class="cmd-icon">📅</span>
+                  <span class="cmd-label">Aller à aujourd'hui</span>
+                  <span class="cmd-shortcut"><span class="kbd">Home</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon">🚛</span>
+                  <span class="cmd-label">Aller au départ</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">D</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon">↑</span>
+                  <span class="cmd-label">Job précédent</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">↑</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon">↓</span>
+                  <span class="cmd-label">Job suivant</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">↓</span></span>
+                </div>
+                <div class="cmd-cat">Actions</div>
+                <div class="cmd-row">
+                  <span class="cmd-icon">✏️</span>
+                  <span class="cmd-label">Modifier le job</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">E</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon">➕</span>
+                  <span class="cmd-label">Nouveau job</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">N</span></span>
+                </div>
+                <div class="cmd-cat">Affichage</div>
+                <div class="cmd-row">
+                  <span class="cmd-icon">👁</span>
+                  <span class="cmd-label">Basculer PRODUIT/TIRAGE</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">A</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sim-fab" style="display:none">⌘</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSAL B -->
+    <div class="proposal-view" id="view-b">
+      <div class="proposal-desc">
+        <h3>B — Multi-Mode Palette</h3>
+        <p>Prefix-driven modes: <code>></code> commands, <code>#</code> job search, <code>@</code> station lookup. Inspired by Raycast/Alfred. Rich result rows with metadata.</p>
+      </div>
+      <div class="preview-canvas">
+        <div class="app-sim">
+          <div class="app-sim-nav">
+            <div class="dot-group">
+              <span style="background:#ef4444"></span>
+              <span style="background:#f59e0b"></span>
+              <span style="background:#22c55e"></span>
+            </div>
+            <span class="title">Flux Scheduler — Planning</span>
+          </div>
+          <div class="app-sim-content">
+            <div class="app-sim-sidebar">
+              <div class="fake-item" style="height:22px;opacity:0.7;background:var(--blue-dim)"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:80%"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:60%"></div>
+            </div>
+            <div class="app-sim-grid">
+              <div class="cell header"></div><div class="cell header">HD 102</div><div class="cell header">SM 74</div><div class="cell header">Massicot</div><div class="cell header">Plieuse</div>
+              <div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--purple-dim);opacity:0.6"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+          </div>
+          <div class="overlay-container">
+            <div class="overlay-backdrop"></div>
+            <div class="palette-b" id="palette-b">
+              <div class="mode-tabs">
+                <div class="mode-tab" onclick="setBMode('cmd')"><span class="prefix">></span> Commands</div>
+                <div class="mode-tab active" onclick="setBMode('job')"><span class="prefix">#</span> Jobs</div>
+                <div class="mode-tab" onclick="setBMode('station')"><span class="prefix">@</span> Stations</div>
+              </div>
+              <div class="search-bar">
+                <span class="mode-prefix">#</span>
+                <input type="text" placeholder="Search jobs by ID, client, or status..." value="241" readonly>
+              </div>
+              <div class="cmd-list" id="b-results">
+                <div class="result-row active">
+                  <div class="result-icon" style="background:var(--blue-dim);color:var(--blue)">📋</div>
+                  <div class="result-info">
+                    <div class="result-title">Job #24185 — Acme Corp</div>
+                    <div class="result-meta">Brochure A4 · 5 tasks · Departure: Mar 15</div>
+                  </div>
+                  <span class="result-badge" style="background:var(--emerald-dim);color:var(--emerald)">In Progress</span>
+                </div>
+                <div class="result-row">
+                  <div class="result-icon" style="background:var(--amber-dim);color:var(--amber)">📋</div>
+                  <div class="result-info">
+                    <div class="result-title">Job #24192 — Dupont SA</div>
+                    <div class="result-meta">Flyer 15x21 · 3 tasks · Departure: Mar 12</div>
+                  </div>
+                  <span class="result-badge" style="background:var(--amber-dim);color:var(--amber)">Urgent</span>
+                </div>
+                <div class="result-row">
+                  <div class="result-icon" style="background:var(--surface-2);color:var(--text-dim)">📋</div>
+                  <div class="result-info">
+                    <div class="result-title">Job #24110 — Martin & Fils</div>
+                    <div class="result-meta">Catalogue 48p · 8 tasks · Departure: Mar 20</div>
+                  </div>
+                  <span class="result-badge" style="background:var(--surface-2);color:var(--text-dim)">Planned</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSAL C -->
+    <div class="proposal-view" id="view-c">
+      <div class="proposal-desc">
+        <h3>C — Command Center Hub</h3>
+        <p>Three-column layout: stats (left), commands (center), context (right). Combines dashboard data with command access. Information-rich overlay.</p>
+      </div>
+      <div class="preview-canvas">
+        <div class="app-sim">
+          <div class="app-sim-nav">
+            <div class="dot-group">
+              <span style="background:#ef4444"></span>
+              <span style="background:#f59e0b"></span>
+              <span style="background:#22c55e"></span>
+            </div>
+            <span class="title">Flux Scheduler — Planning</span>
+          </div>
+          <div class="app-sim-content">
+            <div class="app-sim-sidebar">
+              <div class="fake-item" style="height:22px;opacity:0.7;background:var(--blue-dim)"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:80%"></div>
+            </div>
+            <div class="app-sim-grid">
+              <div class="cell header"></div><div class="cell header">HD 102</div><div class="cell header">SM 74</div><div class="cell header">Massicot</div><div class="cell header">Plieuse</div>
+              <div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--purple-dim);opacity:0.6"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+          </div>
+          <div class="overlay-container">
+            <div class="overlay-backdrop"></div>
+            <div class="palette-c">
+              <div class="hub-header">
+                <input type="text" placeholder="Search commands, jobs, stations..." readonly>
+                <span class="kbd" style="font-size:11px">Esc</span>
+              </div>
+              <div class="hub-body">
+                <div class="hub-stats">
+                  <div class="stat-card">
+                    <div class="stat-label">Today's Jobs</div>
+                    <div class="stat-value" style="color:var(--blue)">12</div>
+                    <div class="stat-sub">3 urgent</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">Late</div>
+                    <div class="stat-value" style="color:var(--red)">2</div>
+                    <div class="stat-sub">overdue tasks</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">Capacity</div>
+                    <div class="stat-value" style="color:var(--emerald)">85%</div>
+                    <div class="stat-sub">6/7 stations active</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-label">This Week</div>
+                    <div class="stat-value" style="color:var(--amber)">28</div>
+                    <div class="stat-sub">departures</div>
+                  </div>
+                </div>
+                <div class="hub-commands">
+                  <div class="cmd-section-title">Quick Actions</div>
+                  <div class="cmd-grid">
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--emerald-dim);color:var(--emerald)">⚡</div>
+                      <span class="tile-label">Quick Place</span>
+                      <span class="tile-shortcut"><span class="kbd">Alt+Q</span></span>
+                    </div>
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--blue-dim);color:var(--blue)">➕</div>
+                      <span class="tile-label">New Job</span>
+                      <span class="tile-shortcut"><span class="kbd">Alt+N</span></span>
+                    </div>
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--purple-dim);color:var(--purple)">✏️</div>
+                      <span class="tile-label">Edit Job</span>
+                      <span class="tile-shortcut"><span class="kbd">Alt+E</span></span>
+                    </div>
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--amber-dim);color:var(--amber)">🔍</div>
+                      <span class="tile-label">Search</span>
+                      <span class="tile-shortcut"><span class="kbd">Alt+F</span></span>
+                    </div>
+                  </div>
+                  <div class="cmd-section-title">Navigation</div>
+                  <div class="cmd-grid">
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--surface-2);color:var(--text-muted)">📅</div>
+                      <span class="tile-label">Go to Today</span>
+                      <span class="tile-shortcut"><span class="kbd">Home</span></span>
+                    </div>
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--surface-2);color:var(--text-muted)">🚛</div>
+                      <span class="tile-label">Departure</span>
+                      <span class="tile-shortcut"><span class="kbd">Alt+D</span></span>
+                    </div>
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--surface-2);color:var(--text-muted)">📊</div>
+                      <span class="tile-label">Scheduler</span>
+                    </div>
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--surface-2);color:var(--text-muted)">📈</div>
+                      <span class="tile-label">Flux</span>
+                    </div>
+                  </div>
+                  <div class="cmd-section-title">Display</div>
+                  <div class="cmd-grid">
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--surface-2);color:var(--text-muted)">👁</div>
+                      <span class="tile-label">PRODUIT/TIRAGE</span>
+                      <span class="tile-shortcut"><span class="kbd">Alt+A</span></span>
+                    </div>
+                    <div class="cmd-tile">
+                      <div class="tile-icon" style="background:var(--surface-2);color:var(--text-muted)">◧</div>
+                      <span class="tile-label">Toggle Sidebar</span>
+                      <span class="tile-shortcut"><span class="kbd">Alt+B</span></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="hub-context">
+                  <div class="context-title">Selected Job</div>
+                  <div class="context-job">
+                    <div class="job-id">#24185</div>
+                    <div class="job-client">Acme Corp</div>
+                    <div class="job-status" style="color:var(--emerald)">● In Progress — 3/5 tasks</div>
+                  </div>
+                  <div class="recent-title">Recent Actions</div>
+                  <div class="recent-item">→ Quick Place #24185</div>
+                  <div class="recent-item">→ Edit Job #24192</div>
+                  <div class="recent-item">→ Toggle TIRAGE</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSAL D -->
+    <div class="proposal-view" id="view-d">
+      <div class="proposal-desc">
+        <h3>D — Contextual Action Sheet</h3>
+        <p>Actions adapt based on current context (selected job, active mode). Shows what's relevant now, with a search fallback for everything else.</p>
+      </div>
+      <div class="preview-canvas">
+        <div class="app-sim">
+          <div class="app-sim-nav">
+            <div class="dot-group">
+              <span style="background:#ef4444"></span>
+              <span style="background:#f59e0b"></span>
+              <span style="background:#22c55e"></span>
+            </div>
+            <span class="title">Flux Scheduler — Planning</span>
+          </div>
+          <div class="app-sim-content">
+            <div class="app-sim-sidebar">
+              <div class="fake-item" style="height:22px;opacity:0.7;background:var(--blue-dim)"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:80%"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:60%"></div>
+            </div>
+            <div class="app-sim-grid">
+              <div class="cell header"></div><div class="cell header">HD 102</div><div class="cell header">SM 74</div><div class="cell header">Massicot</div><div class="cell header">Plieuse</div>
+              <div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--purple-dim);opacity:0.6"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+          </div>
+          <div class="overlay-container">
+            <div class="overlay-backdrop"></div>
+            <div class="palette-d">
+              <div class="context-header">
+                <div class="ctx-icon">📋</div>
+                <div class="ctx-info">
+                  <div class="ctx-title">Job #24185 — Acme Corp</div>
+                  <div class="ctx-subtitle">Brochure A4 · In Progress · 3/5 tasks completed</div>
+                </div>
+              </div>
+              <div class="action-group">
+                <div class="action-group-title">This Job</div>
+                <div class="action-row" style="background:var(--surface-2)">
+                  <span class="action-icon">⚡</span>
+                  <span class="action-label">Quick Placement</span>
+                  <span class="action-desc"><span class="kbd">Alt+Q</span></span>
+                </div>
+                <div class="action-row">
+                  <span class="action-icon">🚛</span>
+                  <span class="action-label">Jump to Departure</span>
+                  <span class="action-desc"><span class="kbd">Alt+D</span></span>
+                </div>
+                <div class="action-row">
+                  <span class="action-icon">✏️</span>
+                  <span class="action-label">Edit Job</span>
+                  <span class="action-desc"><span class="kbd">Alt+E</span></span>
+                </div>
+                <div class="action-row">
+                  <span class="action-icon">✓</span>
+                  <span class="action-label">Mark Next Task Complete</span>
+                  <span class="action-desc">Task 4: Massicot</span>
+                </div>
+              </div>
+              <div class="action-group">
+                <div class="action-group-title">Navigation</div>
+                <div class="action-row">
+                  <span class="action-icon">↑</span>
+                  <span class="action-label">Previous Job</span>
+                  <span class="action-desc"><span class="kbd">Alt+↑</span></span>
+                </div>
+                <div class="action-row">
+                  <span class="action-icon">↓</span>
+                  <span class="action-label">Next Job</span>
+                  <span class="action-desc"><span class="kbd">Alt+↓</span></span>
+                </div>
+                <div class="action-row">
+                  <span class="action-icon">📅</span>
+                  <span class="action-label">Go to Today</span>
+                  <span class="action-desc"><span class="kbd">Home</span></span>
+                </div>
+              </div>
+              <div class="action-group">
+                <div class="action-group-title">Display</div>
+                <div class="action-row">
+                  <span class="action-icon">👁</span>
+                  <span class="action-label">Toggle PRODUIT/TIRAGE</span>
+                  <span class="action-desc"><span class="kbd">Alt+A</span></span>
+                </div>
+              </div>
+              <div class="quick-search">
+                <span>🔍</span> Search all commands...
+                <span style="margin-left:auto"><span class="kbd">↑↓</span> navigate <span class="kbd">⏎</span> select</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSAL E -->
+    <div class="proposal-view" id="view-e">
+      <div class="proposal-desc">
+        <h3>E — Radial Quick Menu</h3>
+        <p>Game-inspired radial menu for the most frequent 6-8 actions. Fast mouse access with visual appeal. Triggered by middle-click or long-press on FAB.</p>
+      </div>
+      <div class="preview-canvas">
+        <div class="app-sim">
+          <div class="app-sim-nav">
+            <div class="dot-group">
+              <span style="background:#ef4444"></span>
+              <span style="background:#f59e0b"></span>
+              <span style="background:#22c55e"></span>
+            </div>
+            <span class="title">Flux Scheduler — Planning</span>
+          </div>
+          <div class="app-sim-content">
+            <div class="app-sim-sidebar">
+              <div class="fake-item" style="height:22px;opacity:0.7;background:var(--blue-dim)"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:80%"></div>
+            </div>
+            <div class="app-sim-grid">
+              <div class="cell header"></div><div class="cell header">HD 102</div><div class="cell header">SM 74</div><div class="cell header">Massicot</div><div class="cell header">Plieuse</div>
+              <div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--purple-dim);opacity:0.6"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+          </div>
+          <div class="overlay-container">
+            <div class="overlay-backdrop"></div>
+            <div class="palette-e-container">
+              <div class="radial-menu">
+                <div class="radial-center">⌘</div>
+                <!-- Items positioned in a circle -->
+                <div class="radial-item" style="top:-10px;left:50%;transform:translateX(-50%)">
+                  <span class="r-icon">📅</span>
+                  <span class="r-label">Today</span>
+                </div>
+                <div class="radial-item" style="top:15px;right:-10px">
+                  <span class="r-icon">⚡</span>
+                  <span class="r-label">Place</span>
+                </div>
+                <div class="radial-item" style="top:50%;right:-18px;transform:translateY(-50%)">
+                  <span class="r-icon">✏️</span>
+                  <span class="r-label">Edit</span>
+                </div>
+                <div class="radial-item" style="bottom:15px;right:-10px">
+                  <span class="r-icon">🔍</span>
+                  <span class="r-label">Search</span>
+                </div>
+                <div class="radial-item" style="bottom:-10px;left:50%;transform:translateX(-50%)">
+                  <span class="r-icon">➕</span>
+                  <span class="r-label">New</span>
+                </div>
+                <div class="radial-item" style="bottom:15px;left:-10px">
+                  <span class="r-icon">👁</span>
+                  <span class="r-label">Display</span>
+                </div>
+                <div class="radial-item" style="top:50%;left:-18px;transform:translateY(-50%)">
+                  <span class="r-icon">🚛</span>
+                  <span class="r-label">Depart</span>
+                </div>
+                <div class="radial-item" style="top:15px;left:-10px">
+                  <span class="r-icon">📊</span>
+                  <span class="r-label">Flux</span>
+                </div>
+              </div>
+              <div class="radial-tooltip">
+                Hover an action to preview · Click to execute
+                <div class="r-hint">Middle-click or long-press FAB to open</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HYBRID PROPOSAL -->
+    <div class="proposal-view" id="view-hybrid">
+      <div class="proposal-desc">
+        <h3>★ Hybrid — Smart Palette (Consensus Recommendation)</h3>
+        <p>Clean palette base (A) + smart search modes (B) + context header when job selected (D). Minimal look, intelligent behavior. Icons for scanability.</p>
+      </div>
+      <div class="preview-canvas">
+        <div class="app-sim">
+          <div class="app-sim-nav">
+            <div class="dot-group">
+              <span style="background:#ef4444"></span>
+              <span style="background:#f59e0b"></span>
+              <span style="background:#22c55e"></span>
+            </div>
+            <span class="title">Flux Scheduler — Planning</span>
+          </div>
+          <div class="app-sim-content">
+            <div class="app-sim-sidebar">
+              <div class="fake-item" style="height:22px;opacity:0.7;background:var(--blue-dim)"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:80%"></div>
+              <div class="fake-item"></div><div class="fake-item" style="width:60%"></div>
+            </div>
+            <div class="app-sim-grid">
+              <div class="cell header"></div><div class="cell header">HD 102</div><div class="cell header">SM 74</div><div class="cell header">Massicot</div><div class="cell header">Plieuse</div>
+              <div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--purple-dim);opacity:0.6"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--amber-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--blue-dim);opacity:0.6"></div><div class="cell"></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell" style="background:var(--emerald-dim);opacity:0.6"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+          </div>
+          <div class="overlay-container">
+            <div class="overlay-backdrop"></div>
+            <div class="palette-a" style="width:480px" id="hybrid-palette">
+              <!-- Context header (from D) -->
+              <div id="hybrid-context" style="padding:10px 14px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;background:var(--bg)">
+                <div style="width:28px;height:28px;border-radius:6px;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">📋</div>
+                <div style="flex:1">
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">#24185 — Acme Corp</div>
+                  <div style="font-size:10px;color:var(--text-dim)">Brochure A4 · 3/5 tasks · Depart Mar 15</div>
+                </div>
+                <span class="result-badge" style="background:var(--emerald-dim);color:var(--emerald);font-size:9px;padding:2px 6px;border-radius:4px">In Progress</span>
+              </div>
+              <div class="search-bar">
+                <span class="icon" style="color:var(--text-dim);font-size:13px">⌘</span>
+                <input type="text" placeholder="Command, #job, @station..." readonly id="hybrid-input">
+                <span style="font-size:10px;color:var(--text-dim)"><span class="kbd">Alt+K</span></span>
+              </div>
+              <div class="cmd-list" id="hybrid-list">
+                <!-- Contextual actions first -->
+                <div class="cmd-cat" style="color:var(--blue)">This Job</div>
+                <div class="cmd-row active">
+                  <span class="cmd-icon" style="font-size:12px">⚡</span>
+                  <span class="cmd-label">Quick Placement</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">Q</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">🚛</span>
+                  <span class="cmd-label">Jump to Departure</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">D</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">✏️</span>
+                  <span class="cmd-label">Edit Job</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">E</span></span>
+                </div>
+                <div class="cmd-cat">Navigation</div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">📅</span>
+                  <span class="cmd-label">Go to Today</span>
+                  <span class="cmd-shortcut"><span class="kbd">Home</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">↑</span>
+                  <span class="cmd-label">Previous Job</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">↑</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">↓</span>
+                  <span class="cmd-label">Next Job</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">↓</span></span>
+                </div>
+                <div class="cmd-cat">Actions</div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">➕</span>
+                  <span class="cmd-label">New Job</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">N</span></span>
+                </div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">🔍</span>
+                  <span class="cmd-label">Search Jobs</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">F</span></span>
+                </div>
+                <div class="cmd-cat">Display</div>
+                <div class="cmd-row">
+                  <span class="cmd-icon" style="font-size:12px">👁</span>
+                  <span class="cmd-label">Toggle PRODUIT/TIRAGE</span>
+                  <span class="cmd-shortcut"><span class="kbd">Alt</span><span class="kbd">A</span></span>
+                </div>
+                <!-- Search hint at bottom -->
+                <div style="padding:8px 12px;border-top:1px solid var(--border-subtle);font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:6px;margin-top:4px">
+                  <span>💡</span> Type <span class="kbd">#</span> for jobs · <span class="kbd">@</span> for stations · or just type to search
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: CONTROLS PANEL -->
+  <div class="controls-panel">
+    <h3>Controls</h3>
+
+    <div class="control-group">
+      <label class="control-label">Context Mode</label>
+      <select class="control-select" id="ctrl-context" onchange="updateControls()">
+        <option value="job-selected">Job Selected (#24185)</option>
+        <option value="no-selection">No Selection</option>
+        <option value="quick-placement">Quick Placement Active</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Palette Width</label>
+      <input type="range" class="control-range" id="ctrl-width" min="380" max="600" value="480" oninput="updateControls()">
+      <div class="control-val" id="ctrl-width-val">480px</div>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Options</label>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-icons" checked onchange="updateControls()">
+        <label for="ctrl-icons">Show command icons</label>
+      </div>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-context-header" checked onchange="updateControls()">
+        <label for="ctrl-context-header">Context header (job info)</label>
+      </div>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-hints" checked onchange="updateControls()">
+        <label for="ctrl-hints">Search mode hints</label>
+      </div>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-contextual-group" checked onchange="updateControls()">
+        <label for="ctrl-contextual-group">"This Job" action group</label>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Max Recent Commands</label>
+      <select class="control-select" id="ctrl-recent" onchange="updateControls()">
+        <option value="0">None</option>
+        <option value="3" selected>3 (current)</option>
+        <option value="5">5</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Trigger</label>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-fab" checked onchange="updateControls()">
+        <label for="ctrl-fab">FAB button (bottom-right)</label>
+      </div>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-altk" checked onchange="updateControls()">
+        <label for="ctrl-altk">Alt+K shortcut</label>
+      </div>
+      <div class="control-toggle">
+        <input type="checkbox" id="ctrl-cmdk" onchange="updateControls()">
+        <label for="ctrl-cmdk">Cmd+K (macOS convention)</label>
+      </div>
+    </div>
+
+    <h3 style="margin-top:16px">Scores</h3>
+    <div id="scores-container">
+      <!-- Filled by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── PROPOSAL SWITCHING ───
+  let currentProposal = 'a';
+
+  function showProposal(id) {
+    currentProposal = id;
+    document.querySelectorAll('.proposal-view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.proposal-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('view-' + id)?.classList.add('active');
+    event.target.classList.add('active');
+    updateScores();
+  }
+
+  // ─── EXPERT SWITCHING ───
+  function showExpert(id) {
+    document.querySelectorAll('.debate-thread').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.expert-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('debate-' + id)?.classList.add('active');
+    document.querySelector(`[data-expert="${id}"]`)?.classList.add('active');
+  }
+
+  // ─── MODE B SWITCHING ───
+  function setBMode(mode) {
+    const tabs = document.querySelectorAll('#palette-b .mode-tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    event.target.closest('.mode-tab').classList.add('active');
+
+    const prefix = document.querySelector('#palette-b .mode-prefix');
+    const input = document.querySelector('#palette-b .search-bar input');
+    const results = document.getElementById('b-results');
+
+    if (mode === 'cmd') {
+      prefix.textContent = '>';
+      input.placeholder = 'Search commands...';
+      input.value = '';
+      results.innerHTML = `
+        <div class="result-row active">
+          <div class="result-icon" style="background:var(--emerald-dim);color:var(--emerald)">⚡</div>
+          <div class="result-info">
+            <div class="result-title">Quick Placement Mode</div>
+            <div class="result-meta">Toggle fast task placement</div>
+          </div>
+          <span style="font-size:10px"><span class="kbd">Alt+Q</span></span>
+        </div>
+        <div class="result-row">
+          <div class="result-icon" style="background:var(--blue-dim);color:var(--blue)">➕</div>
+          <div class="result-info">
+            <div class="result-title">New Job</div>
+            <div class="result-meta">Create a new print job</div>
+          </div>
+          <span style="font-size:10px"><span class="kbd">Alt+N</span></span>
+        </div>
+        <div class="result-row">
+          <div class="result-icon" style="background:var(--surface-2);color:var(--text-muted)">👁</div>
+          <div class="result-info">
+            <div class="result-title">Toggle PRODUIT/TIRAGE</div>
+            <div class="result-meta">Switch tile display mode</div>
+          </div>
+          <span style="font-size:10px"><span class="kbd">Alt+A</span></span>
+        </div>
+      `;
+    } else if (mode === 'job') {
+      prefix.textContent = '#';
+      input.placeholder = 'Search jobs by ID, client, or status...';
+      input.value = '241';
+      results.innerHTML = `
+        <div class="result-row active">
+          <div class="result-icon" style="background:var(--blue-dim);color:var(--blue)">📋</div>
+          <div class="result-info">
+            <div class="result-title">Job #24185 — Acme Corp</div>
+            <div class="result-meta">Brochure A4 · 5 tasks · Departure: Mar 15</div>
+          </div>
+          <span class="result-badge" style="background:var(--emerald-dim);color:var(--emerald)">In Progress</span>
+        </div>
+        <div class="result-row">
+          <div class="result-icon" style="background:var(--amber-dim);color:var(--amber)">📋</div>
+          <div class="result-info">
+            <div class="result-title">Job #24192 — Dupont SA</div>
+            <div class="result-meta">Flyer 15x21 · 3 tasks · Departure: Mar 12</div>
+          </div>
+          <span class="result-badge" style="background:var(--amber-dim);color:var(--amber)">Urgent</span>
+        </div>
+        <div class="result-row">
+          <div class="result-icon" style="background:var(--surface-2);color:var(--text-dim)">📋</div>
+          <div class="result-info">
+            <div class="result-title">Job #24110 — Martin & Fils</div>
+            <div class="result-meta">Catalogue 48p · 8 tasks · Departure: Mar 20</div>
+          </div>
+          <span class="result-badge" style="background:var(--surface-2);color:var(--text-dim)">Planned</span>
+        </div>
+      `;
+    } else if (mode === 'station') {
+      prefix.textContent = '@';
+      input.placeholder = 'Search stations...';
+      input.value = 'heid';
+      results.innerHTML = `
+        <div class="result-row active">
+          <div class="result-icon" style="background:var(--purple-dim);color:var(--purple)">🏭</div>
+          <div class="result-info">
+            <div class="result-title">Heidelberg CD 102</div>
+            <div class="result-meta">Presse Offset · 4 tasks today · 92% capacity</div>
+          </div>
+          <span class="result-badge" style="background:var(--emerald-dim);color:var(--emerald)">Active</span>
+        </div>
+        <div class="result-row">
+          <div class="result-icon" style="background:var(--purple-dim);color:var(--purple)">🏭</div>
+          <div class="result-info">
+            <div class="result-title">Heidelberg SM 74</div>
+            <div class="result-meta">Presse Offset · 2 tasks today · 65% capacity</div>
+          </div>
+          <span class="result-badge" style="background:var(--emerald-dim);color:var(--emerald)">Active</span>
+        </div>
+      `;
+    }
+  }
+
+  // ─── CONTROLS ───
+  function updateControls() {
+    const width = document.getElementById('ctrl-width').value;
+    document.getElementById('ctrl-width-val').textContent = width + 'px';
+
+    // Apply to hybrid palette
+    const hp = document.getElementById('hybrid-palette');
+    if (hp) hp.style.width = width + 'px';
+
+    // Context header
+    const ctxHeader = document.getElementById('hybrid-context');
+    const ctxMode = document.getElementById('ctrl-context').value;
+    const showCtxHeader = document.getElementById('ctrl-context-header').checked;
+
+    if (ctxHeader) {
+      ctxHeader.style.display = (showCtxHeader && ctxMode === 'job-selected') ? 'flex' : 'none';
+    }
+
+    // Icons
+    const showIcons = document.getElementById('ctrl-icons').checked;
+    document.querySelectorAll('#hybrid-list .cmd-icon').forEach(icon => {
+      icon.style.display = showIcons ? 'inline' : 'none';
+    });
+
+    // Hints
+    const showHints = document.getElementById('ctrl-hints').checked;
+    const hintEl = document.querySelector('#hybrid-list > div:last-child');
+    if (hintEl && hintEl.textContent.includes('Type')) {
+      hintEl.style.display = showHints ? 'flex' : 'none';
+    }
+
+    // Contextual group
+    const showCtxGroup = document.getElementById('ctrl-contextual-group').checked;
+    const ctxGroup = document.querySelector('#hybrid-list .cmd-cat');
+    if (ctxGroup && ctxGroup.textContent === 'This Job') {
+      const items = [];
+      let el = ctxGroup.nextElementSibling;
+      while (el && !el.classList.contains('cmd-cat')) {
+        items.push(el);
+        el = el.nextElementSibling;
+      }
+      const show = showCtxGroup && ctxMode === 'job-selected';
+      ctxGroup.style.display = show ? 'block' : 'none';
+      items.forEach(item => item.style.display = show ? 'flex' : 'none');
+    }
+
+    updateScores();
+  }
+
+  // ─── SCORES ───
+  const proposalScores = {
+    a: { speed: 9, discoverability: 6, context: 3, visual: 7, domain: 5 },
+    b: { speed: 8, discoverability: 9, context: 6, visual: 8, domain: 9 },
+    c: { speed: 5, discoverability: 8, context: 8, visual: 9, domain: 7 },
+    d: { speed: 7, discoverability: 7, context: 10, visual: 8, domain: 8 },
+    e: { speed: 6, discoverability: 4, context: 3, visual: 10, domain: 2 },
+    hybrid: { speed: 8, discoverability: 8, context: 9, visual: 8, domain: 8 },
+  };
+
+  const scoreColors = {
+    speed: 'var(--emerald)',
+    discoverability: 'var(--blue)',
+    context: 'var(--purple)',
+    visual: 'var(--amber)',
+    domain: 'var(--red)',
+  };
+
+  const scoreLabels = {
+    speed: 'Speed',
+    discoverability: 'Discovery',
+    context: 'Context',
+    visual: 'Visual',
+    domain: 'Domain Fit',
+  };
+
+  function updateScores() {
+    const container = document.getElementById('scores-container');
+    const scores = proposalScores[currentProposal] || proposalScores.a;
+    container.innerHTML = Object.entries(scores).map(([key, val]) => `
+      <div class="score-bar">
+        <span class="score-label">${scoreLabels[key]}</span>
+        <div class="score-track">
+          <div class="score-fill" style="width:${val * 10}%;background:${scoreColors[key]}"></div>
+        </div>
+        <span class="score-val">${val}</span>
+      </div>
+    `).join('');
+  }
+
+  // Init
+  updateScores();
+</script>
+</body>
+</html>

@@ -27,6 +27,8 @@ export interface TaskListProps {
   pickedTaskId?: string | null;
   /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
   conflictTaskIds?: Set<string>;
+  /** Job IDs that are late (past workshop exit date) */
+  lateJobIds?: Set<string>;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
@@ -59,6 +61,7 @@ export function TaskList({
   activeTaskId,
   pickedTaskId,
   conflictTaskIds,
+  lateJobIds,
   onJumpToTask,
   onRecallTask,
   onPick,
@@ -85,7 +88,7 @@ export function TaskList({
 
   if (tasks.length === 0) {
     return (
-      <div className="p-3 flex-grow bg-zinc-900/30">
+      <div className="p-3 flex-grow bg-transparent">
         <div className="text-zinc-500 text-sm text-center py-4">
           Aucune tâche
         </div>
@@ -213,18 +216,32 @@ export function TaskList({
       // One-way shipping: last outsourced task of a job ships directly to client
       const isLastTask = task.type === 'Outsourced' && isLastTaskOfJob(task.id, elements, tasks);
 
+      // Compute tile state for state-based coloring
+      const isScheduled = !!assignment;
+      const isCompleted = assignment?.isCompleted ?? false;
+      const isJobLate = lateJobIds?.has(job.id) ?? false;
+      const isTaskOverdue = isScheduled && !isCompleted && new Date(assignment!.scheduledEnd) < new Date();
+      const isLate = isJobLate || isTaskOverdue;
+      const hasConflictFlag = conflictTaskIds?.has(task.id) ?? false;
+
+      let tileState: 'unplaced' | 'default' | 'completed' | 'late' | 'conflict';
+      if (!isScheduled) tileState = 'unplaced';
+      else if (isCompleted) tileState = 'completed';
+      else if (isLate) tileState = 'late';
+      else if (hasConflictFlag) tileState = 'conflict';
+      else tileState = 'default';
+
       return (
         <div key={task.id}>
           {showDryTimeLabel && <DryTimeLabel />}
           <TaskTile
             task={task}
             job={job}
-            jobColor={job.color}
+            tileState={tileState}
             assignment={assignment}
             station={station}
             isActivePlacement={activeTaskId === task.id}
             isPicked={pickedTaskId === task.id}
-            hasConflict={conflictTaskIds?.has(task.id)}
             onJumpToTask={onJumpToTask}
             onRecallTask={onRecallTask}
             onPick={!assignment ? onPick : undefined}
@@ -234,7 +251,7 @@ export function TaskList({
             onWorkDaysChange={onWorkDaysChange}
             onDepartureChange={onDepartureChange}
             onReturnChange={onReturnChange}
-            isCompleted={assignment?.isCompleted ?? false}
+            isCompleted={isCompleted}
             onToggleComplete={onToggleComplete}
           />
         </div>
@@ -251,7 +268,7 @@ export function TaskList({
     .sort((a, b) => job.elementIds.indexOf(a.id) - job.elementIds.indexOf(b.id));
 
   return (
-    <div className="p-3 overflow-y-auto flex-grow bg-zinc-900/30">
+    <div className="p-3 overflow-y-auto flex-grow bg-transparent">
       {jobElements.map((element) => {
         // Get tasks for this element
         const elementTasks = element.taskIds

@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModeBanner Playground — Flux Scheduler</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-hover: rgb(44, 44, 44);
+    --flux-active: rgb(52, 52, 52);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-tertiary: rgb(161, 161, 161);
+    --flux-text-muted: rgb(128, 128, 128);
+    --ctrl-bg: rgb(20, 20, 20);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Controls Panel ── */
+  .controls {
+    width: 340px;
+    min-width: 340px;
+    background: var(--ctrl-bg);
+    border-right: 1px solid var(--flux-border);
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .controls::-webkit-scrollbar { width: 6px; }
+  .controls::-webkit-scrollbar-track { background: transparent; }
+  .controls::-webkit-scrollbar-thumb { background: var(--flux-border); border-radius: 3px; }
+
+  .controls h1 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--flux-text-primary);
+    margin-bottom: 2px;
+  }
+
+  .controls h2 {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--flux-text-muted);
+    margin-bottom: 6px;
+    padding-top: 4px;
+    border-top: 1px solid var(--flux-border);
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 5px; }
+
+  label {
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  label .val {
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    background: var(--flux-elevated);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--flux-elevated);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--flux-text-tertiary);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    background: var(--flux-text-primary);
+  }
+
+  /* Color input */
+  input[type="color"] {
+    -webkit-appearance: none;
+    border: 1px solid var(--flux-border);
+    border-radius: 4px;
+    width: 28px; height: 22px;
+    cursor: pointer;
+    background: transparent;
+    padding: 0;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .color-row label { flex: 1; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+  }
+
+  .toggle {
+    position: relative;
+    width: 34px; height: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle input { display: none; }
+  .toggle span {
+    position: absolute;
+    inset: 0;
+    background: var(--flux-elevated);
+    border-radius: 9px;
+    transition: background 0.2s;
+  }
+  .toggle span::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: var(--flux-text-muted);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle input:checked + span { background: #34d399; }
+  .toggle input:checked + span::after {
+    transform: translateX(16px);
+    background: white;
+  }
+
+  /* Radio pills */
+  .radio-pills {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .radio-pills input { display: none; }
+  .radio-pills label {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--flux-elevated);
+    color: var(--flux-text-tertiary);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+  .radio-pills input:checked + label {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+    border-color: var(--flux-border-light);
+  }
+
+  /* Presets */
+  .presets {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .preset-btn {
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--flux-elevated);
+    color: var(--flux-text-tertiary);
+    border: 1px solid var(--flux-border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+    border-color: var(--flux-border-light);
+  }
+  .preset-btn.active {
+    background: var(--flux-active);
+    color: var(--flux-text-primary);
+    border-color: var(--flux-text-muted);
+  }
+
+  /* Color swatches */
+  .swatch-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .swatch {
+    width: 24px; height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: var(--flux-text-primary); }
+
+  /* Collapsible */
+  .collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .collapsible-header h2 { cursor: pointer; flex: 1; }
+  .collapsible-arrow {
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    transition: transform 0.2s;
+  }
+  .collapsible-body { overflow: hidden; transition: max-height 0.25s ease; }
+  .collapsible-body.collapsed { max-height: 0 !important; }
+
+  /* ── Main Area ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .preview-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Mock app shell */
+  .mock-shell {
+    margin: 24px;
+    border-radius: 8px;
+    border: 1px solid var(--flux-border);
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .mock-titlebar {
+    height: 36px;
+    background: var(--flux-surface);
+    border-bottom: 1px solid var(--flux-border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .mock-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--flux-elevated);
+  }
+  .mock-titlebar-text {
+    font-size: 11px;
+    color: var(--flux-text-muted);
+    margin-left: 8px;
+  }
+
+  .mock-sidebar-and-content {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  .mock-sidebar {
+    width: 200px;
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    padding: 12px;
+    flex-shrink: 0;
+  }
+  .mock-sidebar-item {
+    height: 8px;
+    background: var(--flux-elevated);
+    border-radius: 3px;
+    margin-bottom: 6px;
+  }
+  .mock-sidebar-item:nth-child(2) { width: 70%; }
+  .mock-sidebar-item:nth-child(3) { width: 85%; }
+  .mock-sidebar-item:nth-child(4) { width: 60%; }
+
+  .mock-content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--flux-base);
+    min-height: 0;
+  }
+
+  #banner-container {
+    flex-shrink: 0;
+    position: relative;
+    overflow: visible;
+  }
+
+  .mock-grid {
+    flex: 1;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(3, 32px);
+    gap: 4px;
+    align-content: start;
+  }
+  .mock-grid-header {
+    background: var(--flux-surface);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+  }
+  .mock-grid-header span {
+    font-size: 9px;
+    color: var(--flux-text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .mock-grid-cell {
+    background: var(--flux-surface);
+    border-radius: 3px;
+    border: 1px solid var(--flux-border);
+  }
+
+  /* ── Prompt Output ── */
+  .prompt-area {
+    border-top: 1px solid var(--flux-border);
+    background: var(--ctrl-bg);
+    padding: 16px 24px;
+    flex-shrink: 0;
+  }
+  .prompt-area .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .prompt-area .header span {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--flux-text-muted);
+    font-weight: 600;
+  }
+  .copy-btn {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    background: var(--flux-elevated);
+    color: var(--flux-text-secondary);
+    border: 1px solid var(--flux-border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+  }
+  #prompt-output {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--flux-text-secondary);
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+    white-space: pre-wrap;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  /* ── Banner animations (CSS keyframes injected dynamically) ── */
+  @keyframes banner-slide-down {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes banner-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: var(--pulse-min, 0.6); }
+  }
+  /* glow-pulse keyframes are injected dynamically via <style> tag */
+  @keyframes banner-gradient-roll {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+  @keyframes banner-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+  }
+
+  .banner-animated { animation: banner-slide-down 0.25s ease-out; }
+
+  .esc-badge {
+    font-size: 9px;
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    margin-left: auto;
+  }
+
+  .mode-icon { flex-shrink: 0; }
+
+  /* Replay button */
+  .replay-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.15s;
+    z-index: 10;
+  }
+  .replay-btn:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+  }
+</style>
+</head>
+<body>
+
+<!-- Controls -->
+<div class="controls">
+  <h1>ModeBanner Playground</h1>
+  <p style="font-size:11px; color:var(--flux-text-muted); margin-top:-6px;">Design the mode indicator banner</p>
+
+  <!-- Presets -->
+  <div class="control-group">
+    <h2>Presets</h2>
+    <div class="presets">
+      <button class="preset-btn active" onclick="applyPreset('current', this)">Current</button>
+      <button class="preset-btn" onclick="applyPreset('minimal', this)">Minimal</button>
+      <button class="preset-btn" onclick="applyPreset('prominent', this)">Prominent</button>
+      <button class="preset-btn" onclick="applyPreset('floating', this)">Floating</button>
+      <button class="preset-btn" onclick="applyPreset('neon', this)">Neon</button>
+      <button class="preset-btn" onclick="applyPreset('aurora', this)">Aurora</button>
+      <button class="preset-btn" onclick="applyPreset('subtle-pulse', this)">Subtle Pulse</button>
+    </div>
+  </div>
+
+  <!-- Mode -->
+  <div class="control-group">
+    <h2>Mode</h2>
+    <div class="radio-pills">
+      <input type="radio" name="mode" id="mode-qp" value="quickPlacement" checked>
+      <label for="mode-qp">Quick Placement</label>
+      <input type="radio" name="mode" id="mode-pick" value="picking">
+      <label for="mode-pick">Pick & Place</label>
+      <input type="radio" name="mode" id="mode-edit" value="editing">
+      <label for="mode-edit">Editing</label>
+    </div>
+  </div>
+
+  <!-- Style variant -->
+  <div class="control-group">
+    <h2>Style Variant</h2>
+    <div class="radio-pills">
+      <input type="radio" name="variant" id="var-border" value="left-border" checked>
+      <label for="var-border">Left Border</label>
+      <input type="radio" name="variant" id="var-bar" value="full-width-bar">
+      <label for="var-bar">Full Bar</label>
+      <input type="radio" name="variant" id="var-pill" value="pill">
+      <label for="var-pill">Pill</label>
+      <input type="radio" name="variant" id="var-gradient" value="gradient-edge">
+      <label for="var-gradient">Gradient Edge</label>
+    </div>
+  </div>
+
+  <!-- Color -->
+  <div class="control-group">
+    <h2>Color</h2>
+    <div style="font-size:10px; color:var(--flux-text-muted); margin-bottom:4px;">Quick pick or use custom</div>
+    <div class="swatch-row" id="swatches"></div>
+    <div class="color-row" style="margin-top:6px;">
+      <label>Custom accent</label>
+      <input type="color" id="customColor" value="#34d399">
+    </div>
+    <label>Hue shift <span class="val" id="hueShift-val">0°</span></label>
+    <input type="range" id="hueShift" min="-30" max="30" value="0" step="1">
+    <label>Saturation <span class="val" id="saturation-val">100%</span></label>
+    <input type="range" id="saturation" min="20" max="100" value="100" step="5">
+  </div>
+
+  <!-- Dimensions -->
+  <div class="control-group">
+    <h2>Dimensions</h2>
+    <label>Height <span class="val" id="height-val">32px</span></label>
+    <input type="range" id="height" min="24" max="48" value="32" step="2">
+
+    <label>Font size <span class="val" id="fontSize-val">12px</span></label>
+    <input type="range" id="fontSize" min="10" max="13" value="12" step="1">
+
+    <label>Border thickness <span class="val" id="borderWidth-val">4px</span></label>
+    <input type="range" id="borderWidth" min="2" max="6" value="4" step="1">
+  </div>
+
+  <!-- Background -->
+  <div class="control-group">
+    <h2>Background</h2>
+    <label>Accent bg opacity <span class="val" id="accentOpacity-val">25%</span></label>
+    <input type="range" id="accentOpacity" min="5" max="60" value="25" step="5">
+  </div>
+
+  <!-- Animation -->
+  <div class="control-group">
+    <h2>Animation</h2>
+    <div class="toggle-row">
+      Entrance (slide down)
+      <label class="toggle"><input type="checkbox" id="animate"><span></span></label>
+    </div>
+
+    <div style="height:4px;"></div>
+    <div style="font-size:10px; color:var(--flux-text-muted); margin-bottom:2px;">Ambient animation</div>
+    <div class="radio-pills">
+      <input type="radio" name="ambientAnim" id="anim-none" value="none" checked>
+      <label for="anim-none">None</label>
+      <input type="radio" name="ambientAnim" id="anim-pulse" value="pulse">
+      <label for="anim-pulse">Pulse</label>
+      <input type="radio" name="ambientAnim" id="anim-gradient-roll" value="gradient-roll">
+      <label for="anim-gradient-roll">Rolling Gradient</label>
+      <input type="radio" name="ambientAnim" id="anim-shimmer" value="shimmer">
+      <label for="anim-shimmer">Shimmer</label>
+      <input type="radio" name="ambientAnim" id="anim-glow" value="glow-pulse">
+      <label for="anim-glow">Glow Pulse</label>
+    </div>
+
+    <label>Animation speed <span class="val" id="animSpeed-val">3s</span></label>
+    <input type="range" id="animSpeed" min="1" max="8" value="3" step="0.5">
+
+    <label>Pulse intensity <span class="val" id="pulseIntensity-val">40%</span></label>
+    <input type="range" id="pulseIntensity" min="10" max="70" value="40" step="5">
+  </div>
+
+  <!-- Glow -->
+  <div class="control-group">
+    <h2>Glow</h2>
+    <div class="toggle-row">
+      Bottom glow
+      <label class="toggle"><input type="checkbox" id="bottomGlow"><span></span></label>
+    </div>
+    <label>Glow size <span class="val" id="glowSize-val">8px</span></label>
+    <input type="range" id="glowSize" min="2" max="24" value="8" step="1">
+    <label>Glow opacity <span class="val" id="glowOpacity-val">30%</span></label>
+    <input type="range" id="glowOpacity" min="10" max="80" value="30" step="5">
+  </div>
+
+  <!-- Features -->
+  <div class="control-group">
+    <h2>Features</h2>
+    <div class="toggle-row">
+      Show icon
+      <label class="toggle"><input type="checkbox" id="showIcon"><span></span></label>
+    </div>
+    <div class="toggle-row">
+      Show ESC badge
+      <label class="toggle"><input type="checkbox" id="showEsc" checked><span></span></label>
+    </div>
+    <div class="toggle-row">
+      Separator line below
+      <label class="toggle"><input type="checkbox" id="bottomBorder"><span></span></label>
+    </div>
+  </div>
+</div>
+
+<!-- Main area -->
+<div class="main">
+  <div class="preview-area" style="position:relative;">
+    <button class="replay-btn" onclick="replayAnimation()" title="Replay animation">&#8635;</button>
+    <div class="mock-shell">
+      <div class="mock-titlebar">
+        <div class="mock-dot"></div>
+        <div class="mock-dot"></div>
+        <div class="mock-dot"></div>
+        <span class="mock-titlebar-text">Flux Scheduler — 2026-03-10</span>
+      </div>
+      <div class="mock-sidebar-and-content">
+        <div class="mock-sidebar">
+          <div class="mock-sidebar-item" style="width:90%"></div>
+          <div class="mock-sidebar-item"></div>
+          <div class="mock-sidebar-item"></div>
+          <div class="mock-sidebar-item"></div>
+          <div style="height:12px"></div>
+          <div class="mock-sidebar-item" style="width:50%"></div>
+          <div class="mock-sidebar-item" style="width:80%"></div>
+          <div class="mock-sidebar-item" style="width:65%"></div>
+        </div>
+        <div class="mock-content-area">
+          <div id="banner-container"></div>
+          <div class="mock-grid">
+            <div class="mock-grid-header"><span>Station A</span></div>
+            <div class="mock-grid-header"><span>Station B</span></div>
+            <div class="mock-grid-header"><span>Station C</span></div>
+            <div class="mock-grid-header"><span>Station D</span></div>
+            <div class="mock-grid-header"><span>Station E</span></div>
+            <div class="mock-grid-cell"></div><div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div><div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div><div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div><div class="mock-grid-cell"></div>
+            <div class="mock-grid-cell"></div><div class="mock-grid-cell"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prompt-area">
+    <div class="header">
+      <span>Generated Prompt</span>
+      <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+    </div>
+    <div id="prompt-output"></div>
+  </div>
+</div>
+
+<script>
+// ── Mode definitions ──
+const MODE_DEFAULTS = {
+  quickPlacement: {
+    label: 'Quick Placement',
+    hint: 'Click to place · Esc to exit',
+    hex: '#34d399', // emerald-400
+    colorName: 'emerald',
+    iconSvg: `<svg class="mode-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  },
+  picking: {
+    label: 'Pick & Place',
+    hint: 'Click to place · Esc to cancel',
+    hex: '#fbbf24', // amber-400
+    colorName: 'amber',
+    iconSvg: `<svg class="mode-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>`,
+  },
+  editing: {
+    label: 'Editing',
+    hint: 'Modify properties · Esc to finish',
+    hex: '#60a5fa', // blue-400
+    colorName: 'blue',
+    iconSvg: `<svg class="mode-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`,
+  },
+};
+
+// Color swatches
+const SWATCHES = [
+  { name: 'Emerald',  hex: '#34d399' },
+  { name: 'Green',    hex: '#4ade80' },
+  { name: 'Teal',     hex: '#2dd4bf' },
+  { name: 'Cyan',     hex: '#22d3ee' },
+  { name: 'Sky',      hex: '#38bdf8' },
+  { name: 'Blue',     hex: '#60a5fa' },
+  { name: 'Indigo',   hex: '#818cf8' },
+  { name: 'Violet',   hex: '#a78bfa' },
+  { name: 'Purple',   hex: '#c084fc' },
+  { name: 'Pink',     hex: '#f472b6' },
+  { name: 'Rose',     hex: '#fb7185' },
+  { name: 'Red',      hex: '#f87171' },
+  { name: 'Orange',   hex: '#fb923c' },
+  { name: 'Amber',    hex: '#fbbf24' },
+  { name: 'Yellow',   hex: '#facc15' },
+  { name: 'Lime',     hex: '#a3e635' },
+];
+
+const DEFAULTS = {
+  mode: 'quickPlacement',
+  variant: 'left-border',
+  height: 32,
+  fontSize: 12,
+  borderWidth: 4,
+  accentOpacity: 25,
+  accentHex: '#34d399',
+  hueShift: 0,
+  saturation: 100,
+  showIcon: false,
+  showEsc: true,
+  animate: false,
+  ambientAnim: 'none',
+  animSpeed: 3,
+  pulseIntensity: 40,
+  bottomGlow: false,
+  glowSize: 8,
+  glowOpacity: 30,
+  bottomBorder: false,
+};
+
+const PRESETS = {
+  current: {
+    ...DEFAULTS,
+    showEsc: false,
+  },
+  minimal: {
+    ...DEFAULTS, height: 26, fontSize: 10, borderWidth: 2, accentOpacity: 12,
+    showEsc: true, animate: true,
+  },
+  prominent: {
+    ...DEFAULTS, variant: 'full-width-bar', height: 36, accentOpacity: 40,
+    showIcon: true, showEsc: true, animate: true, bottomBorder: true,
+  },
+  floating: {
+    ...DEFAULTS, variant: 'pill', height: 34, fontSize: 11, accentOpacity: 35,
+    showIcon: true, showEsc: true, animate: true,
+  },
+  neon: {
+    ...DEFAULTS, variant: 'full-width-bar', height: 32, accentOpacity: 15,
+    showIcon: true, showEsc: true, animate: true,
+    bottomGlow: true, glowSize: 12, glowOpacity: 50,
+    ambientAnim: 'glow-pulse', animSpeed: 2.5, pulseIntensity: 50,
+  },
+  aurora: {
+    ...DEFAULTS, variant: 'gradient-edge', height: 34, accentOpacity: 35,
+    showIcon: true, showEsc: true, animate: true,
+    ambientAnim: 'gradient-roll', animSpeed: 4, pulseIntensity: 40,
+  },
+  'subtle-pulse': {
+    ...DEFAULTS, variant: 'left-border', height: 30, accentOpacity: 20,
+    showEsc: true, animate: true,
+    ambientAnim: 'pulse', animSpeed: 3, pulseIntensity: 30,
+  },
+};
+
+const state = { ...DEFAULTS };
+
+// ── Utility: hex to HSL ──
+function hexToHSL(hex) {
+  let r = parseInt(hex.slice(1,3), 16) / 255;
+  let g = parseInt(hex.slice(3,5), 16) / 255;
+  let b = parseInt(hex.slice(5,7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch(max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function getAccentHSL() {
+  const base = hexToHSL(state.accentHex);
+  return {
+    h: (base.h + state.hueShift + 360) % 360,
+    s: Math.round(base.s * (state.saturation / 100)),
+    l: base.l,
+  };
+}
+
+function hsl(c, a) {
+  if (a !== undefined) return `hsla(${c.h}, ${c.s}%, ${c.l}%, ${a})`;
+  return `hsl(${c.h}, ${c.s}%, ${c.l}%)`;
+}
+
+function hslBg(c, a) {
+  // Use the accent color directly at low opacity — on a near-black bg this
+  // produces a clearly visible colored tint (like Tailwind bg-emerald-500/20)
+  return `hsla(${c.h}, ${c.s}%, ${c.l}%, ${a})`;
+}
+
+// ── Swatches ──
+function buildSwatches() {
+  const container = document.getElementById('swatches');
+  container.innerHTML = SWATCHES.map(s =>
+    `<div class="swatch${s.hex === state.accentHex ? ' active' : ''}" style="background:${s.hex}" title="${s.name}" data-hex="${s.hex}" onclick="pickSwatch(this, '${s.hex}')"></div>`
+  ).join('');
+}
+
+function pickSwatch(el, hex) {
+  state.accentHex = hex;
+  document.getElementById('customColor').value = hex;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  updateAll();
+}
+
+// ── Bind controls ──
+function bindControls() {
+  document.querySelectorAll('input[name="mode"]').forEach(el =>
+    el.addEventListener('change', () => {
+      state.mode = el.value;
+      // Update accent color to mode default
+      state.accentHex = MODE_DEFAULTS[state.mode].hex;
+      document.getElementById('customColor').value = state.accentHex;
+      buildSwatches();
+      updateAll();
+    })
+  );
+  document.querySelectorAll('input[name="variant"]').forEach(el =>
+    el.addEventListener('change', () => { state.variant = el.value; updateAll(); })
+  );
+  document.querySelectorAll('input[name="ambientAnim"]').forEach(el =>
+    el.addEventListener('change', () => { state.ambientAnim = el.value; updateAll(); })
+  );
+
+  const sliders = ['height', 'fontSize', 'borderWidth', 'accentOpacity', 'hueShift', 'saturation', 'animSpeed', 'pulseIntensity', 'glowSize', 'glowOpacity'];
+  sliders.forEach(id => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      state[id] = parseFloat(e.target.value);
+      updateAll();
+    });
+  });
+
+  ['showIcon', 'showEsc', 'animate', 'bottomGlow', 'bottomBorder'].forEach(id => {
+    document.getElementById(id).addEventListener('change', (e) => {
+      state[id] = e.target.checked;
+      updateAll();
+    });
+  });
+
+  document.getElementById('customColor').addEventListener('input', (e) => {
+    state.accentHex = e.target.value;
+    document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('active', s.dataset.hex === state.accentHex));
+    updateAll();
+  });
+}
+
+function syncControls() {
+  document.querySelector(`input[name="mode"][value="${state.mode}"]`).checked = true;
+  document.querySelector(`input[name="variant"][value="${state.variant}"]`).checked = true;
+  document.querySelector(`input[name="ambientAnim"][value="${state.ambientAnim}"]`).checked = true;
+  document.getElementById('height').value = state.height;
+  document.getElementById('fontSize').value = state.fontSize;
+  document.getElementById('borderWidth').value = state.borderWidth;
+  document.getElementById('accentOpacity').value = state.accentOpacity;
+  document.getElementById('hueShift').value = state.hueShift;
+  document.getElementById('saturation').value = state.saturation;
+  document.getElementById('animSpeed').value = state.animSpeed;
+  document.getElementById('pulseIntensity').value = state.pulseIntensity;
+  document.getElementById('glowSize').value = state.glowSize;
+  document.getElementById('glowOpacity').value = state.glowOpacity;
+  document.getElementById('showIcon').checked = state.showIcon;
+  document.getElementById('showEsc').checked = state.showEsc;
+  document.getElementById('animate').checked = state.animate;
+  document.getElementById('bottomGlow').checked = state.bottomGlow;
+  document.getElementById('bottomBorder').checked = state.bottomBorder;
+  document.getElementById('customColor').value = state.accentHex;
+  buildSwatches();
+}
+
+function applyPreset(name, btn) {
+  Object.assign(state, PRESETS[name]);
+  syncControls();
+  updateAll();
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function replayAnimation() {
+  const container = document.getElementById('banner-container');
+  const banner = container.firstElementChild;
+  if (!banner) return;
+  // Force re-trigger entrance animation
+  banner.style.animation = 'none';
+  banner.offsetHeight; // reflow
+  renderPreview();
+}
+
+// ── Dynamic glow-pulse keyframes ──
+let glowStyleTag = document.createElement('style');
+glowStyleTag.id = 'dynamic-glow-keyframes';
+document.head.appendChild(glowStyleTag);
+
+function updateGlowKeyframes(c) {
+  const gs = state.glowSize;
+  const gsMax = Math.round(gs * 2.5);
+  const glowColor = hsl(c, state.glowOpacity / 100);
+  glowStyleTag.textContent = `
+    @keyframes banner-glow-pulse {
+      0%, 100% { box-shadow: 0 2px ${gs}px ${glowColor}; }
+      50% { box-shadow: 0 4px ${gsMax}px ${glowColor}; }
+    }
+  `;
+}
+
+// ── Render ──
+function renderPreview() {
+  const container = document.getElementById('banner-container');
+  const m = MODE_DEFAULTS[state.mode];
+  const c = getAccentHSL();
+  const op = state.accentOpacity / 100;
+
+  // Update value labels
+  document.getElementById('height-val').textContent = state.height + 'px';
+  document.getElementById('fontSize-val').textContent = state.fontSize + 'px';
+  document.getElementById('borderWidth-val').textContent = state.borderWidth + 'px';
+  document.getElementById('accentOpacity-val').textContent = state.accentOpacity + '%';
+  document.getElementById('hueShift-val').textContent = state.hueShift + '°';
+  document.getElementById('saturation-val').textContent = state.saturation + '%';
+  document.getElementById('animSpeed-val').textContent = state.animSpeed + 's';
+  document.getElementById('pulseIntensity-val').textContent = state.pulseIntensity + '%';
+  document.getElementById('glowSize-val').textContent = state.glowSize + 'px';
+  document.getElementById('glowOpacity-val').textContent = state.glowOpacity + '%';
+
+  // Update dynamic keyframes
+  updateGlowKeyframes(c);
+
+  const iconHtml = state.showIcon
+    ? `<span style="color:${hsl(c, 0.9)}; display:flex; flex-shrink:0;">${m.iconSvg}</span>`
+    : '';
+  const escHtml = state.showEsc
+    ? `<span class="esc-badge" style="border-color:${hsl(c, 0.3)}; color:${hsl(c, 0.7)}; background:${hsl(c, 0.08)};">ESC</span>`
+    : '';
+
+  const speed = state.animSpeed;
+  const intensity = state.pulseIntensity / 100;
+
+  // ── Collect style properties into an object to avoid string concat issues ──
+  const styles = {
+    position: 'relative',
+    height: state.height + 'px',
+    'font-size': state.fontSize + 'px',
+    display: 'flex',
+    'align-items': 'center',
+    gap: '8px',
+    padding: '0 12px',
+  };
+
+  // Background
+  if (state.ambientAnim === 'gradient-roll') {
+    const c2 = { ...c, h: (c.h + 30) % 360 };
+    const c3 = { ...c, h: (c.h - 20 + 360) % 360 };
+    styles.background = `linear-gradient(90deg, ${hslBg(c, op)}, ${hslBg(c2, op * 0.8)}, ${hslBg(c3, op * 0.6)}, ${hslBg(c, op)})`;
+    styles['background-size'] = '200% 100%';
+  } else {
+    styles.background = hslBg(c, op);
+  }
+
+  // Animations (build array, join with comma)
+  const anims = [];
+  if (state.animate) anims.push('banner-slide-down 0.25s ease-out');
+  if (state.ambientAnim === 'pulse') anims.push(`banner-pulse ${speed}s ease-in-out infinite`);
+  if (state.ambientAnim === 'glow-pulse') anims.push(`banner-glow-pulse ${speed}s ease-in-out infinite`);
+  if (state.ambientAnim === 'gradient-roll') anims.push(`banner-gradient-roll ${speed}s linear infinite`);
+  if (anims.length) styles.animation = anims.join(', ');
+
+  // Pulse CSS var
+  if (state.ambientAnim === 'pulse') styles['--pulse-min'] = String(1 - intensity);
+
+  // Static glow
+  if (state.bottomGlow && state.ambientAnim !== 'glow-pulse') {
+    styles['box-shadow'] = `0 ${Math.round(state.glowSize / 2)}px ${state.glowSize}px ${hsl(c, state.glowOpacity / 100)}`;
+  }
+
+  // Bottom border
+  if (state.bottomBorder) styles['border-bottom'] = `1px solid ${hsl(c, 0.15)}`;
+
+  // Shimmer overlay
+  const shimmerOverlay = state.ambientAnim === 'shimmer'
+    ? `<div style="position:absolute; inset:0; overflow:hidden; pointer-events:none; border-radius:inherit;">
+        <div style="position:absolute; top:0; left:0; width:50%; height:100%; background:linear-gradient(90deg, transparent, ${hsl(c, intensity * 0.3)}, transparent); animation: banner-shimmer ${speed}s ease-in-out infinite;"></div>
+       </div>`
+    : '';
+
+  const labelSpan = `<span style="font-weight:700; letter-spacing:0.03em; color:${hsl(c, 0.9)};">${m.label}</span>`;
+  const hintSpan = `<span style="color:${hsl(c, 0.5)}; font-size:${Math.max(state.fontSize - 1, 9)}px;">${m.hint}</span>`;
+
+  // Convert styles object to inline style string
+  function toStyle(obj) {
+    return Object.entries(obj).map(([k, v]) => `${k}:${v}`).join(';');
+  }
+
+  let html = '';
+
+  if (state.variant === 'left-border') {
+    styles.padding = '0 12px';
+    styles['border-left'] = `${state.borderWidth}px solid ${hsl(c)}`;
+    html = `<div style="${toStyle(styles)}">
+      ${shimmerOverlay}${iconHtml}${labelSpan}${hintSpan}${escHtml}
+    </div>`;
+  }
+  else if (state.variant === 'full-width-bar') {
+    styles.padding = '0 16px';
+    html = `<div style="${toStyle(styles)}">
+      ${shimmerOverlay}${iconHtml}${labelSpan}${hintSpan}${escHtml}
+    </div>`;
+  }
+  else if (state.variant === 'pill') {
+    const pillH = state.height - 6;
+    // Outer wrapper (no animation, just centering)
+    const wrapStyle = `height:${state.height}px; display:flex; align-items:center; justify-content:center;`;
+    // Inner pill gets all the styles
+    styles.height = pillH + 'px';
+    styles.display = 'inline-flex';
+    styles.gap = '6px';
+    styles.padding = '0 14px';
+    styles['border-radius'] = '999px';
+    styles.border = `1px solid ${hsl(c, 0.25)}`;
+    html = `<div style="${wrapStyle}">
+      <div style="${toStyle(styles)}">
+        ${shimmerOverlay}${iconHtml}${labelSpan}${hintSpan}
+        ${state.showEsc ? `<span class="esc-badge" style="border-color:${hsl(c, 0.3)}; color:${hsl(c, 0.7)}; background:${hsl(c, 0.08)}; border-radius:999px; margin-left:4px;">ESC</span>` : ''}
+      </div>
+    </div>`;
+  }
+  else if (state.variant === 'gradient-edge') {
+    styles.padding = '0 16px';
+    if (state.ambientAnim === 'gradient-roll') {
+      const c2 = { ...c, h: (c.h + 30) % 360 };
+      styles.background = `linear-gradient(90deg, ${hslBg(c, op)}, ${hslBg(c2, op * 0.6)}, transparent, ${hslBg(c, op * 0.3)})`;
+      styles['background-size'] = '200% 100%';
+    } else {
+      styles.background = `linear-gradient(90deg, ${hslBg(c, op)} 0%, ${hslBg(c, op * 0.3)} 50%, transparent 100%)`;
+    }
+    html = `<div style="${toStyle(styles)}">
+      ${shimmerOverlay}${iconHtml}${labelSpan}${hintSpan}${escHtml}
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function updatePrompt() {
+  const m = MODE_DEFAULTS[state.mode];
+  const c = getAccentHSL();
+  const parts = [];
+
+  // Variant
+  const variantDescs = {
+    'left-border': `a left-border accent style (${state.borderWidth}px colored left border with tinted background)`,
+    'full-width-bar': `a full-width colored bar with tinted background`,
+    'pill': `a centered floating pill/badge with fully rounded corners`,
+    'gradient-edge': `a gradient-edge style that fades the accent from left to transparent`,
+  };
+  parts.push(`Use ${variantDescs[state.variant]}.`);
+
+  // Color
+  const baseHSL = hexToHSL(state.accentHex);
+  parts.push(`Accent color: ${state.accentHex} (HSL ${c.h}/${c.s}%/${c.l}%).`);
+  if (state.hueShift !== 0) parts.push(`Hue shifted by ${state.hueShift}° from base.`);
+  if (state.saturation !== 100) parts.push(`Saturation scaled to ${state.saturation}%.`);
+
+  // Dimensions
+  if (state.height !== 32) parts.push(`Height: ${state.height}px.`);
+  if (state.fontSize !== 12) parts.push(`Font size: ${state.fontSize}px.`);
+  if (state.variant === 'left-border' && state.borderWidth !== 4) parts.push(`Left border: ${state.borderWidth}px.`);
+
+  // Background
+  if (state.accentOpacity !== 25) {
+    const desc = state.accentOpacity <= 15 ? 'very subtle' : state.accentOpacity <= 30 ? 'moderate' : 'strong';
+    parts.push(`Background tint at ${state.accentOpacity}% (${desc}).`);
+  }
+
+  // Animation
+  if (state.animate) parts.push(`Slide-down entrance animation (0.25s ease-out).`);
+  if (state.ambientAnim !== 'none') {
+    const animDescs = {
+      'pulse': `Pulsating opacity animation (${state.animSpeed}s cycle, fades to ${100 - state.pulseIntensity}% opacity).`,
+      'gradient-roll': `Rolling gradient background animation (${state.animSpeed}s cycle, shifts hue ±30° across the banner).`,
+      'shimmer': `Shimmer highlight sweeping across (${state.animSpeed}s cycle, ${state.pulseIntensity}% intensity).`,
+      'glow-pulse': `Pulsating outer glow (${state.animSpeed}s cycle, ${state.glowSize}px to ${Math.round(state.glowSize * 2.5)}px, ${state.glowOpacity}% opacity).`,
+    };
+    parts.push(animDescs[state.ambientAnim]);
+  }
+
+  // Glow
+  if (state.bottomGlow && state.ambientAnim !== 'glow-pulse') {
+    parts.push(`Static bottom glow: ${state.glowSize}px spread at ${state.glowOpacity}% opacity.`);
+  }
+
+  // Features
+  if (state.showIcon) parts.push(`Include a contextual icon before the label.`);
+  if (state.showEsc) parts.push(`Show a styled "ESC" keyboard shortcut badge (right-aligned).`);
+  if (state.bottomBorder) parts.push(`Subtle separator line below the banner.`);
+
+  parts.push('');
+  parts.push(`Mode colors: emerald (#34d399) for Quick Placement, amber (#fbbf24) for Pick & Place, blue (#60a5fa) for Editing.`);
+
+  const output = document.getElementById('prompt-output');
+  output.textContent = parts.join('\n');
+}
+
+function updateAll() {
+  renderPreview();
+  updatePrompt();
+}
+
+// ── Init ──
+buildSwatches();
+bindControls();
+updateAll();
+
+// ── Copy ──
+function copyPrompt() {
+  const text = document.getElementById('prompt-output').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+</script>
+
+</body>
+</html>

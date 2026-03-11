@@ -58,9 +58,9 @@ interface FluxTableProps {
   onStationClick?: (taskId: string) => void;
 }
 
-// Frozen zone shadow styles (spec 3.6)
-const LEFT_SHADOW = { boxShadow: '4px 0 8px -2px rgba(0,0,0,0.3)' } as const;
-const RIGHT_SHADOW = { boxShadow: '-4px 0 8px -2px rgba(0,0,0,0.3)' } as const;
+// Frozen zone shadow styles (spec 3.6) — uses CSS variable for theme adaptability
+const LEFT_SHADOW = { boxShadow: '4px 0 8px -2px var(--flux-frozen-shadow)' } as const;
+const RIGHT_SHADOW = { boxShadow: '-4px 0 8px -2px var(--flux-frozen-shadow)' } as const;
 
 // Shared sticky cell classes for left-frozen columns
 const stickyCell = 'sticky z-20 bg-flux-elevated group-hover:bg-flux-hover';

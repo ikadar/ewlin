@@ -1,6 +1,6 @@
 /**
  * PlacementIndicator - Visual indicator for Quick Placement Mode.
- * Shows a glowing white line at the placement position.
+ * Shows a glowing line at the placement position.
  */
 
 export interface PlacementIndicatorProps {
@@ -11,7 +11,7 @@ export interface PlacementIndicatorProps {
 }
 
 /**
- * A glowing white line that indicates where a tile will be placed.
+ * A glowing line that indicates where a tile will be placed.
  * Used in Quick Placement Mode to show the snap position.
  */
 export function PlacementIndicator({ y, isVisible }: PlacementIndicatorProps) {
@@ -19,10 +19,10 @@ export function PlacementIndicator({ y, isVisible }: PlacementIndicatorProps) {
 
   return (
     <div
-      className="absolute left-0 right-0 h-1 bg-white z-30 pointer-events-none"
+      className="absolute left-0 right-0 h-1 bg-blue-400 z-30 pointer-events-none"
       style={{
         top: `${y}px`,
-        boxShadow: '0 0 12px rgba(255, 255, 255, 0.8)',
+        boxShadow: '0 0 12px rgba(96, 165, 250, 0.8)',
       }}
       data-testid="placement-indicator"
     />

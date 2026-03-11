@@ -133,15 +133,15 @@ function FeuilleFormatFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
-        <h2 className="text-zinc-100 font-medium mb-4">
+      <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+        <h2 className="text-flux-text-primary font-medium mb-4">
           {initial ? 'Modifier le format' : 'Nouveau format'}
         </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Format */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">
+            <label className="block text-sm text-flux-text-secondary mb-1">
               Format <span className="text-red-400">*</span>
             </label>
             <input
@@ -153,10 +153,10 @@ function FeuilleFormatFormModal({
               list="feuille-format-suggestions"
               onChange={(e) => handleFormatChange(e.target.value)}
               onBlur={handleFormatBlur}
-              className={`w-full px-3 py-2 bg-zinc-900 border rounded font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none transition-colors ${
+              className={`w-full px-3 py-2 bg-flux-base border rounded font-mono text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none transition-colors ${
                 formatError || (!isFormatValid && format.trim())
                   ? 'border-red-500 focus:border-red-400'
-                  : 'border-zinc-600 focus:border-zinc-400'
+                  : 'border-flux-border-light focus:border-flux-text-secondary'
               }`}
               placeholder="Ex: 50x70"
             />
@@ -174,7 +174,7 @@ function FeuilleFormatFormModal({
 
           {/* Poses */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-2">
+            <label className="block text-sm text-flux-text-secondary mb-2">
               Poses <span className="text-red-400">*</span>
             </label>
 
@@ -190,7 +190,7 @@ function FeuilleFormatFormModal({
                     className={`px-2.5 py-1 text-xs font-mono rounded transition-colors ${
                       active
                         ? 'bg-blue-600 text-white border border-blue-500'
-                        : 'bg-zinc-700 text-zinc-400 border border-zinc-600 hover:border-zinc-500 hover:text-zinc-300'
+                        : 'bg-flux-active text-flux-text-secondary border border-flux-border-light hover:border-flux-border-light hover:text-flux-text-secondary'
                     }`}
                   >
                     {pose}
@@ -201,17 +201,17 @@ function FeuilleFormatFormModal({
 
             {/* Active poses (non-standard or to remove) */}
             {poses.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3 p-2 bg-zinc-900/50 rounded border border-zinc-700">
+              <div className="flex flex-wrap gap-1.5 mb-3 p-2 bg-flux-base/50 rounded border border-flux-border-light">
                 {poses.map((pose) => (
                   <span
                     key={pose}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono bg-zinc-700 text-zinc-200 rounded"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono bg-flux-active text-flux-text-primary rounded"
                   >
                     {pose}
                     <button
                       type="button"
                       onClick={() => removePose(pose)}
-                      className="text-zinc-500 hover:text-red-400 transition-colors"
+                      className="text-flux-text-tertiary hover:text-red-400 transition-colors"
                       title="Retirer"
                     >
                       <X size={10} />
@@ -234,8 +234,8 @@ function FeuilleFormatFormModal({
                   value={customPoseInput}
                   onChange={(e) => { setCustomPoseInput(e.target.value); setCustomPoseError(null); }}
                   onKeyDown={handleCustomPoseKeyDown}
-                  className={`w-full px-3 py-1.5 bg-zinc-900 border rounded text-sm font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none transition-colors ${
-                    customPoseError ? 'border-red-500' : 'border-zinc-600 focus:border-zinc-400'
+                  className={`w-full px-3 py-1.5 bg-flux-base border rounded text-sm font-mono text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none transition-colors ${
+                    customPoseError ? 'border-red-500' : 'border-flux-border-light focus:border-flux-text-secondary'
                   }`}
                   placeholder="Valeur personnalisée"
                 />
@@ -246,7 +246,7 @@ function FeuilleFormatFormModal({
               <button
                 type="button"
                 onClick={addCustomPose}
-                className="px-2.5 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 bg-zinc-700 hover:bg-zinc-600 rounded transition-colors"
+                className="px-2.5 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded transition-colors"
                 title="Ajouter"
               >
                 <Plus size={14} />
@@ -262,14 +262,14 @@ function FeuilleFormatFormModal({
             <button
               type="button"
               onClick={onCancel}
-              className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 bg-zinc-700 hover:bg-zinc-600 rounded transition-colors"
+              className="px-3 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isSaving || !canSave}
-              className="px-3 py-1.5 text-sm font-medium text-zinc-100 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+              className="px-3 py-1.5 text-sm font-medium text-flux-text-primary bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
             >
               {isSaving ? 'Enregistrement...' : 'Enregistrer'}
             </button>
@@ -376,23 +376,23 @@ export function FeuilleFormatsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 flex flex-col">
+    <div className="min-h-screen bg-flux-base flex flex-col">
       {/* Header */}
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-flux-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100 transition-colors"
+            className="flex items-center gap-2 text-flux-text-secondary hover:text-flux-text-primary transition-colors"
             title="Retour (Esc)"
           >
             <ArrowLeft size={20} />
             <span>Retour</span>
           </button>
-          <h1 className="text-xl font-semibold text-zinc-100">Formats feuille (Impositions)</h1>
+          <h1 className="text-xl font-semibold text-flux-text-primary">Formats feuille (Impositions)</h1>
         </div>
         <button
           onClick={() => { setSaveError(null); setIsCreating(true); }}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-100 bg-blue-600 hover:bg-blue-500 rounded transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-flux-text-primary bg-blue-600 hover:bg-blue-500 rounded transition-colors"
         >
           <Plus size={16} />
           Nouveau format
@@ -402,7 +402,7 @@ export function FeuilleFormatsPage() {
       {/* Content */}
       <main className="flex-1 p-6">
         {isLoading && (
-          <div className="text-center text-zinc-500 mt-20">Chargement...</div>
+          <div className="text-center text-flux-text-tertiary mt-20">Chargement...</div>
         )}
 
         {error && (
@@ -417,7 +417,7 @@ export function FeuilleFormatsPage() {
             <div className="mb-4 flex items-center gap-4">
               <div className="relative flex-1 max-w-md">
                 <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-flux-text-tertiary"
                   aria-hidden="true"
                 />
                 <input
@@ -427,10 +427,10 @@ export function FeuilleFormatsPage() {
                   aria-label="Rechercher un format"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                  className="w-full pl-10 pr-4 py-2 bg-flux-hover border border-flux-border-light rounded-lg text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-border-light"
                 />
               </div>
-              <span className="text-zinc-500 text-sm">
+              <span className="text-flux-text-tertiary text-sm">
                 {filteredFormats.length} format
                 {filteredFormats.length !== 1 ? 's' : ''}
                 {searchQuery && ` / ${formats.length}`}
@@ -438,10 +438,10 @@ export function FeuilleFormatsPage() {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto">
+            <div className="bg-flux-elevated rounded-lg border border-flux-border overflow-hidden">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-400">
+                <thead className="bg-flux-hover">
+                  <tr className="bg-flux-hover border-b border-flux-border text-flux-text-secondary">
                     <th className="text-left px-4 py-3 font-medium">Format</th>
                     <th className="text-left px-4 py-3 font-medium">Poses</th>
                     <th className="text-left px-4 py-3 font-medium">Créé le</th>
@@ -451,7 +451,7 @@ export function FeuilleFormatsPage() {
                 <tbody>
                   {filteredFormats.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="text-center text-zinc-600 py-12">
+                      <td colSpan={4} className="text-center text-flux-text-muted py-12">
                         Aucun format trouvé
                       </td>
                     </tr>
@@ -459,29 +459,29 @@ export function FeuilleFormatsPage() {
                   {filteredFormats.map((fmt) => (
                     <tr
                       key={fmt.id}
-                      className="border-b border-zinc-800/60 hover:bg-zinc-800/40 transition-colors"
+                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
                     >
-                      <td className="px-4 py-3 text-zinc-100 font-medium font-mono">
+                      <td className="px-4 py-3 text-flux-text-primary font-medium font-mono">
                         {fmt.format}
                       </td>
-                      <td className="px-4 py-3 text-zinc-400 font-mono text-xs">
+                      <td className="px-4 py-3 text-flux-text-secondary font-mono text-xs">
                         {[...fmt.poses].sort((a, b) => a - b).join(' · ')}
                       </td>
-                      <td className="px-4 py-3 text-zinc-400">
+                      <td className="px-4 py-3 text-flux-text-secondary">
                         {new Date(fmt.createdAt).toLocaleDateString('fr-FR')}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setSaveError(null); setEditingFormat(fmt); }}
-                            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-colors"
+                            className="p-1.5 text-flux-text-tertiary hover:text-flux-text-primary transition-colors"
                             title="Modifier"
                           >
                             <Pencil size={15} />
                           </button>
                           <button
                             onClick={() => { setDeleteError(null); setDeletingFormat(fmt); }}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
+                            className="p-1.5 text-flux-text-tertiary hover:text-red-400 transition-colors"
                             title="Supprimer"
                           >
                             <Trash2 size={15} />
@@ -524,11 +524,11 @@ export function FeuilleFormatsPage() {
       {/* Delete confirmation */}
       {deletingFormat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h2 className="text-zinc-100 font-medium mb-2">Supprimer le format</h2>
-            <p className="text-sm text-zinc-400 mb-4">
+          <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h2 className="text-flux-text-primary font-medium mb-2">Supprimer le format</h2>
+            <p className="text-sm text-flux-text-secondary mb-4">
               Supprimer{' '}
-              <span className="font-medium text-zinc-200 font-mono">{deletingFormat.format}</span> ?
+              <span className="font-medium text-flux-text-primary font-mono">{deletingFormat.format}</span> ?
               Cette action est irréversible.
             </p>
             {deleteError && (
@@ -537,7 +537,7 @@ export function FeuilleFormatsPage() {
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => { setDeletingFormat(null); setDeleteError(null); }}
-                className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 bg-zinc-700 hover:bg-zinc-600 rounded transition-colors"
+                className="px-3 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded transition-colors"
               >
                 Annuler
               </button>

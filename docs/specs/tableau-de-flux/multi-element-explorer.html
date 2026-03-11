@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Element Explorer — Représentation & Dépliage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --dark-base: rgb(15 15 15);
+    --dark-surface: rgb(26 26 26);
+    --dark-elevated: rgb(36 36 36);
+    --dark-hover: rgb(44 44 44);
+    --dark-active: rgb(52 52 52);
+    --dark-border: rgb(42 42 42);
+    --dark-border-light: rgb(58 58 58);
+    --text-primary: rgb(245 245 245);
+    --text-secondary: rgb(209 209 209);
+    --text-tertiary: rgb(161 161 161);
+    --text-muted: rgb(128 128 128);
+    --c-green: rgb(74 222 128);
+    --c-yellow: rgb(250 204 21);
+    --c-red: rgb(248 113 113);
+    --c-gray: rgb(128 128 128);
+    --c-accent: rgb(129 140 248);
+    --c-accent-dim: rgba(99 102 241 / 0.25);
+    --bg-green: rgb(33 49 39);
+    --bg-yellow: rgb(55 44 32);
+    --bg-red: rgb(59 34 34);
+    --bg-gray: rgb(46 48 52);
+  }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--dark-base);
+    color: var(--text-primary);
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: 1fr auto;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    grid-row: 1 / -1; background: var(--dark-surface);
+    border-right: 1px solid var(--dark-border);
+    padding: 20px 16px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .controls h1 { font-size: 14px; font-weight: 600; }
+  .controls h1 small { font-weight: 400; color: var(--text-muted); font-size: 11px; display: block; margin-top: 2px; }
+  .control-group { display: flex; flex-direction: column; gap: 8px; }
+  .control-group > label {
+    font-size: 10px; font-weight: 600; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .divider { height: 1px; background: var(--dark-border); }
+
+  .variant-grid { display: flex; flex-direction: column; gap: 4px; }
+  .variant-btn {
+    background: var(--dark-elevated); border: 1px solid var(--dark-border);
+    color: var(--text-secondary); padding: 7px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-family: inherit; text-align: left;
+    transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+  }
+  .variant-btn:hover { background: var(--dark-hover); }
+  .variant-btn.active {
+    background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.35);
+    color: rgb(165 180 252);
+  }
+  .variant-btn .vk {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    background: var(--dark-active); padding: 2px 5px; border-radius: 3px;
+    min-width: 18px; text-align: center; flex-shrink: 0;
+  }
+  .variant-btn.active .vk { background: rgba(99,102,241,0.25); }
+  .variant-btn .vdesc { font-size: 10px; color: var(--text-muted); }
+
+  .sl-hint {
+    font-size: 10px; color: var(--text-muted); line-height: 1.4;
+    margin-top: -4px; padding-left: 2px;
+  }
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  .slider-row span.sl-label { font-size: 11px; color: var(--text-secondary); min-width: 80px; }
+  .slider-row input[type="range"] { flex: 1; accent-color: rgb(99 102 241); height: 4px; }
+  .slider-val {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); min-width: 38px; text-align: right;
+  }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; }
+  .preset-btn {
+    background: var(--dark-elevated); border: 1px solid var(--dark-border);
+    color: var(--text-muted); padding: 4px 8px; border-radius: 4px;
+    cursor: pointer; font-size: 10px; font-family: inherit; transition: all 0.15s;
+  }
+  .preset-btn:hover { color: var(--text-secondary); border-color: var(--dark-border-light); }
+
+  /* ── Preview ── */
+  .preview-area {
+    padding: 24px; overflow: auto;
+    display: flex; flex-direction: column; gap: 28px;
+  }
+  .section-title {
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;
+  }
+
+  /* ── Table ── */
+  .flux-table { border-collapse: collapse; width: 100%; }
+  .flux-table th {
+    padding: 6px 8px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-align: left;
+    border-bottom: 1px solid var(--dark-border);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .flux-table td {
+    vertical-align: middle; padding: 0; text-align: left;
+    position: relative; height: 2.25rem;
+  }
+  .flux-table td.td-text {
+    padding: 0 8px; white-space: nowrap; font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .flux-table td.td-text.mono {
+    font-family: 'JetBrains Mono', monospace; font-weight: 500;
+    color: var(--text-primary); font-size: 11px;
+  }
+  .flux-table td.td-badge {
+    padding-left: 8px; line-height: 0;
+  }
+  .flux-table tbody tr {
+    border-bottom: 1px solid var(--dark-border);
+    transition: background 0.1s;
+  }
+  .flux-table tbody tr:hover { background: var(--dark-hover); }
+
+  /* ── Multi-row indicator ── */
+  .flux-table tbody tr.row-multi { cursor: pointer; }
+  .flux-table tbody tr.row-multi td:first-child {
+    border-left: 3px solid var(--c-accent-dim);
+  }
+  .flux-table tbody tr.row-multi.expanded td:first-child {
+    border-left-color: var(--c-accent);
+  }
+
+  /* ── Sub rows ── */
+  .flux-table tbody tr.sub-row {
+    height: 2rem;
+    background: var(--dark-surface);
+    border-bottom: 1px solid var(--dark-border);
+  }
+  .flux-table tbody tr.sub-row td:first-child {
+    border-left: 3px solid var(--c-accent);
+  }
+  .flux-table tbody tr.sub-row td.td-text { color: var(--text-muted); font-size: 11px; }
+  .flux-table tbody tr.sub-row:last-of-type td:first-child {
+    border-left-color: var(--c-accent);
+  }
+
+  /* ── Expand toggle ── */
+  .expand-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 1px solid var(--dark-border-light);
+    background: transparent; color: var(--text-muted);
+    cursor: pointer; font-size: 11px; font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1; padding: 0;
+    transition: all 0.12s;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .expand-toggle:hover {
+    background: var(--dark-active); color: var(--text-secondary);
+    border-color: var(--c-accent);
+  }
+  .row-multi.expanded .expand-toggle {
+    background: var(--c-accent-dim); border-color: var(--c-accent);
+    color: var(--c-accent);
+  }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 4px; border-radius: 4px; border: 1px solid transparent;
+    font-size: 11px; font-weight: 500; white-space: nowrap; line-height: 1.4;
+    vertical-align: middle;
+  }
+  .badge.bg-green  { background: var(--bg-green);  color: var(--c-green); }
+  .badge.bg-yellow { background: var(--bg-yellow); color: var(--c-yellow); }
+  .badge.bg-red    { background: var(--bg-red);    color: var(--c-red); }
+  .badge.bg-gray   { background: var(--bg-gray);   color: var(--c-gray); }
+
+  /* ── Segment bar ── */
+  .seg-bar {
+    display: inline-flex; height: 6px; border-radius: 3px; overflow: hidden;
+    vertical-align: middle;
+  }
+  .seg-bar .seg { flex: 1; }
+  .seg-bar .seg.sc-green  { background: var(--c-green); }
+  .seg-bar .seg.sc-yellow { background: var(--c-yellow); }
+  .seg-bar .seg.sc-red    { background: var(--c-red); }
+  .seg-bar .seg.sc-gray   { background: var(--c-gray); opacity: 0.5; }
+
+  /* ── Pipeline dots ── */
+  .pipeline {
+    display: inline-flex; align-items: center; vertical-align: middle;
+  }
+  .pipeline .pip-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 7px; font-weight: 600; color: var(--dark-base);
+  }
+  .pipeline .pip-dot.pc-green  { background: var(--c-green); }
+  .pipeline .pip-dot.pc-yellow { background: var(--c-yellow); }
+  .pipeline .pip-dot.pc-red    { background: var(--c-red); }
+  .pipeline .pip-dot.pc-gray   { background: var(--c-gray); }
+  .pipeline .pip-line {
+    width: 4px; height: 1.5px; background: var(--dark-border-light); flex-shrink: 0;
+  }
+
+  /* ── Gutter marks ── */
+  .gutter-wrap {
+    display: inline-flex; align-items: center; gap: 5px; vertical-align: middle;
+  }
+  .gutter-marks {
+    display: inline-flex; flex-direction: column; gap: 1px;
+  }
+  .gutter-marks .gm {
+    width: 10px; height: 3px; border-radius: 1px;
+  }
+  .gutter-marks .gm.gc-green  { background: var(--c-green); }
+  .gutter-marks .gm.gc-yellow { background: var(--c-yellow); }
+  .gutter-marks .gm.gc-red    { background: var(--c-red); }
+  .gutter-marks .gm.gc-gray   { background: var(--c-gray); opacity: 0.5; }
+
+  /* ── Fraction badge ── */
+  .frac-badge {
+    display: inline-flex; align-items: center; overflow: hidden;
+    border-radius: 4px; vertical-align: middle; height: 20px;
+    position: relative;
+  }
+  .frac-badge .frac-seg { flex: 1; height: 100%; }
+  .frac-badge .frac-seg.fc-green  { background: var(--bg-green); }
+  .frac-badge .frac-seg.fc-yellow { background: var(--bg-yellow); }
+  .frac-badge .frac-seg.fc-red    { background: var(--bg-red); }
+  .frac-badge .frac-seg.fc-gray   { background: var(--bg-gray); }
+  .frac-badge .frac-label {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: var(--text-primary);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  }
+  .frac-badge .frac-accent {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  }
+  .frac-badge .frac-accent.fa-green  { background: var(--c-green); }
+  .frac-badge .frac-accent.fa-yellow { background: var(--c-yellow); }
+  .frac-badge .frac-accent.fa-red    { background: var(--c-red); }
+  .frac-badge .frac-accent.fa-gray   { background: var(--c-gray); }
+
+  /* ── Badge + dots ── */
+  .badge-dots-wrap {
+    display: inline-flex; align-items: center; gap: 4px; vertical-align: middle;
+  }
+  .badge-dots-wrap .bd-dots {
+    display: inline-flex; align-items: center; gap: 2px;
+  }
+  .badge-dots-wrap .bd-dot {
+    width: 6px; height: 6px; border-radius: 2px;
+  }
+  .badge-dots-wrap .bd-dot.dc-green  { background: var(--c-green); }
+  .badge-dots-wrap .bd-dot.dc-yellow { background: var(--c-yellow); }
+  .badge-dots-wrap .bd-dot.dc-red    { background: var(--c-red); }
+  .badge-dots-wrap .bd-dot.dc-gray   { background: var(--c-gray); opacity: 0.5; }
+
+  /* ── Element pill (count) ── */
+  .el-count {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 10px; color: var(--text-muted); vertical-align: middle;
+    margin-left: 4px;
+  }
+  .el-count .el-icon {
+    font-size: 9px; opacity: 0.5;
+  }
+
+  /* ── Prompt ── */
+  .prompt-area {
+    background: var(--dark-surface); border-top: 1px solid var(--dark-border);
+    padding: 16px 24px; display: flex; align-items: flex-start; gap: 12px;
+  }
+  .prompt-text {
+    flex: 1; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap;
+  }
+  .copy-btn {
+    background: var(--dark-elevated); border: 1px solid var(--dark-border);
+    color: var(--text-secondary); padding: 6px 12px; border-radius: 5px;
+    cursor: pointer; font-size: 11px; font-family: inherit; white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: var(--dark-hover); color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Multi-Element Explorer<small>Représentation fermée & dépliage</small></h1>
+
+  <div class="control-group">
+    <label>Presets</label>
+    <div class="presets" id="presets"></div>
+  </div>
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <label>Représentation fermée</label>
+    <div class="variant-grid" id="modes"></div>
+    <div class="sl-hint">Comment les colonnes de statut apparaissent pour un job multi-élément</div>
+  </div>
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <label>Animation</label>
+    <div class="slider-row">
+      <span class="sl-label">Durée</span>
+      <input type="range" id="sl-duration" min="0" max="2000" step="10" value="200">
+      <span class="slider-val" id="sl-duration-val">200ms</span>
+    </div>
+    <div class="sl-hint">0 = instantané · jusqu'à 2s pour observer</div>
+    <div class="slider-row">
+      <span class="sl-label">Délai entre lignes</span>
+      <input type="range" id="sl-stagger" min="0" max="500" step="10" value="50">
+      <span class="slider-val" id="sl-stagger-val">50ms</span>
+    </div>
+    <div class="sl-hint">Décalage entre chaque sous-ligne (0 = toutes en même temps)</div>
+  </div>
+</div>
+
+<div class="preview-area">
+  <div>
+    <div class="section-title">Cliquez sur une ligne multi-élément pour déplier · la barre bleue à gauche indique les jobs dépliables</div>
+    <table class="flux-table" id="table-preview"></table>
+  </div>
+</div>
+
+<div class="prompt-area">
+  <div class="prompt-text" id="prompt-output"></div>
+  <button class="copy-btn" id="copy-btn">Copy</button>
+</div>
+
+<script>
+// ── Data ──
+const PRIORITY = { red: 0, yellow: 1, gray: 2, green: 3 };
+const COLS = ['bat', 'papier', 'formes', 'plaques'];
+const COL_LABELS = ['BAT', 'Papier', 'Formes', 'Plaques'];
+
+const JOBS = [
+  {
+    id: '00042', client: 'Ducros', titre: 'Brochure A4 16p',
+    multi: false,
+    bat: { label: 'OK', color: 'green' }, papier: { label: 'Stock', color: 'green' },
+    formes: { label: 'n.a.', color: 'gray' }, plaques: { label: 'Prêtes', color: 'green' },
+  },
+  {
+    id: '00091', client: 'Lefèvre & Fils', titre: 'Boîtes carton 350g',
+    multi: true,
+    elements: [
+      { name: 'Couverture', initial: 'C',
+        bat: { label: 'Envoyé', color: 'yellow' }, papier: { label: 'Reçus', color: 'yellow' },
+        formes: { label: 'n.a.', color: 'gray' }, plaques: { label: 'n.a.', color: 'gray' } },
+      { name: 'Intérieur', initial: 'I',
+        bat: { label: 'Att.fich', color: 'red' }, papier: { label: 'À cder', color: 'red' },
+        formes: { label: 'Cdée', color: 'yellow' }, plaques: { label: 'À faire', color: 'red' } },
+    ],
+  },
+  {
+    id: '00078', client: 'BioVert', titre: 'Étuis pliants gamme 2026',
+    multi: true,
+    elements: [
+      { name: 'Étui A', initial: 'A',
+        bat: { label: 'OK', color: 'green' }, papier: { label: 'Stock', color: 'green' },
+        formes: { label: 'Stock', color: 'green' }, plaques: { label: 'Prêtes', color: 'green' } },
+      { name: 'Étui B', initial: 'B',
+        bat: { label: 'Envoyé', color: 'yellow' }, papier: { label: 'Cdé', color: 'yellow' },
+        formes: { label: 'n.a.', color: 'gray' }, plaques: { label: 'À faire', color: 'red' } },
+      { name: 'Étui C', initial: 'C',
+        bat: { label: 'Att.fich', color: 'red' }, papier: { label: 'À cder', color: 'red' },
+        formes: { label: 'À cder', color: 'red' }, plaques: { label: 'À faire', color: 'red' } },
+    ],
+  },
+  {
+    id: '00055', client: 'MédiaPress', titre: 'Magazine trimestriel',
+    multi: false,
+    bat: { label: 'OK', color: 'green' }, papier: { label: 'Livré', color: 'green' },
+    formes: { label: 'Livrée', color: 'green' }, plaques: { label: 'Prêtes', color: 'green' },
+  },
+  {
+    id: '00103', client: 'Pharma Plus', titre: 'Notice 6 volets',
+    multi: false,
+    bat: { label: 'Envoyé', color: 'yellow' }, papier: { label: 'Livré', color: 'green' },
+    formes: { label: 'Livrée', color: 'green' }, plaques: { label: 'Prêtes', color: 'green' },
+  },
+];
+
+const MODES = [
+  { key: 'seg-bar',     name: 'Barre segmentée',     desc: 'Barre colorée par élément + label du pire état', vk: '━━' },
+  { key: 'pipeline',    name: 'Pipeline dots',        desc: 'Cercles reliés par une ligne, comme un pipeline CI', vk: '●─●' },
+  { key: 'gutter',      name: 'Gutter marks',         desc: 'Tirets colorés empilés (façon IDE) + texte agrégé', vk: '▮' },
+  { key: 'fraction',    name: 'Badge fraction',       desc: 'Badge à fond segmenté + ratio textuel', vk: '▓' },
+  { key: 'badge-dots',  name: 'Badge + pastilles',    desc: 'Badge du pire état + pastilles des autres éléments', vk: '■·' },
+];
+
+const PRESETS = [
+  { name: 'Barre',     mode: 'seg-bar',    duration: 200, stagger: 50 },
+  { name: 'Pipeline',  mode: 'pipeline',   duration: 250, stagger: 60 },
+  { name: 'Gutter',    mode: 'gutter',     duration: 200, stagger: 50 },
+  { name: 'Fraction',  mode: 'fraction',   duration: 200, stagger: 50 },
+  { name: 'Badge+dots',mode: 'badge-dots', duration: 200, stagger: 40 },
+];
+
+const DEFAULTS = { mode: 'seg-bar', duration: 200, stagger: 50 };
+const state = { ...DEFAULTS };
+const expanded = {};
+
+// ── Helpers ──
+function getWorst(elements, col) {
+  let w = null, wp = 999;
+  elements.forEach(el => { const p = PRIORITY[el[col].color]; if (p < wp) { wp = p; w = el[col]; } });
+  return w;
+}
+function countByColor(elements, col) {
+  const c = { green: 0, yellow: 0, red: 0, gray: 0 };
+  elements.forEach(el => c[el[col].color]++);
+  return c;
+}
+
+// ── Cell renderers ──
+function renderBadge(data) {
+  const s = document.createElement('span');
+  s.className = `badge bg-${data.color}`;
+  s.textContent = data.label;
+  return s;
+}
+
+function renderMultiCell(job, col) {
+  const els = job.elements;
+  const worst = getWorst(els, col);
+
+  if (state.mode === 'seg-bar') {
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;flex-direction:column;gap:3px;vertical-align:middle;';
+    // Label
+    const lbl = document.createElement('span');
+    lbl.style.cssText = `font-size:10px;font-weight:500;color:var(--c-${worst.color});line-height:1;`;
+    lbl.textContent = worst.label;
+    wrap.appendChild(lbl);
+    // Bar
+    const bar = document.createElement('span');
+    bar.className = 'seg-bar';
+    bar.style.width = Math.min(els.length * 24, 72) + 'px';
+    els.forEach(el => {
+      const seg = document.createElement('span');
+      seg.className = `seg sc-${el[col].color}`;
+      bar.appendChild(seg);
+    });
+    wrap.appendChild(bar);
+    return wrap;
+  }
+
+  if (state.mode === 'pipeline') {
+    const wrap = document.createElement('span');
+    wrap.className = 'pipeline';
+    els.forEach((el, i) => {
+      if (i > 0) {
+        const line = document.createElement('span');
+        line.className = 'pip-line';
+        wrap.appendChild(line);
+      }
+      const dot = document.createElement('span');
+      dot.className = `pip-dot pc-${el[col].color}`;
+      dot.textContent = el.initial;
+      wrap.appendChild(dot);
+    });
+    return wrap;
+  }
+
+  if (state.mode === 'gutter') {
+    const wrap = document.createElement('span');
+    wrap.className = 'gutter-wrap';
+    const marks = document.createElement('span');
+    marks.className = 'gutter-marks';
+    els.forEach(el => {
+      const m = document.createElement('span');
+      m.className = `gm gc-${el[col].color}`;
+      marks.appendChild(m);
+    });
+    wrap.appendChild(marks);
+    const lbl = document.createElement('span');
+    lbl.style.cssText = `font-size:10px;font-weight:500;color:var(--c-${worst.color});line-height:1;`;
+    lbl.textContent = worst.label;
+    wrap.appendChild(lbl);
+    return wrap;
+  }
+
+  if (state.mode === 'fraction') {
+    const cnt = countByColor(els, col);
+    const ok = cnt.green;
+    const total = els.length;
+    const frac = document.createElement('span');
+    frac.className = 'frac-badge';
+    frac.style.width = Math.min(els.length * 22, 66) + 'px';
+    // Segments
+    els.forEach(el => {
+      const seg = document.createElement('span');
+      seg.className = `frac-seg fc-${el[col].color}`;
+      frac.appendChild(seg);
+    });
+    // Accent bar left
+    const acc = document.createElement('span');
+    acc.className = `frac-accent fa-${worst.color}`;
+    frac.appendChild(acc);
+    // Label
+    const lbl = document.createElement('span');
+    lbl.className = 'frac-label';
+    lbl.textContent = `${ok}/${total}`;
+    frac.appendChild(lbl);
+    return frac;
+  }
+
+  if (state.mode === 'badge-dots') {
+    const wrap = document.createElement('span');
+    wrap.className = 'badge-dots-wrap';
+    // Worst badge
+    let worstIdx = 0, wp = 999;
+    els.forEach((el, i) => { const p = PRIORITY[el[col].color]; if (p < wp) { wp = p; worstIdx = i; } });
+    wrap.appendChild(renderBadge(els[worstIdx][col]));
+    // Dots for others
+    if (els.length > 1) {
+      const dots = document.createElement('span');
+      dots.className = 'bd-dots';
+      els.forEach((el, i) => {
+        if (i === worstIdx) return;
+        const d = document.createElement('span');
+        d.className = `bd-dot dc-${el[col].color}`;
+        dots.appendChild(d);
+      });
+      wrap.appendChild(dots);
+    }
+    return wrap;
+  }
+}
+
+// ── Table ──
+function renderTable() {
+  const table = document.getElementById('table-preview');
+  table.innerHTML = `<thead><tr>
+    <th style="width:60px;padding-left:11px">Job</th>
+    <th style="width:120px">Client</th>
+    <th style="width:200px">Désignation</th>
+    ${COL_LABELS.map(c => `<th style="width:100px;padding-left:8px">${c}</th>`).join('')}
+  </tr></thead>`;
+
+  const tbody = document.createElement('tbody');
+
+  JOBS.forEach(job => {
+    const isExp = !!expanded[job.id];
+    const tr = document.createElement('tr');
+    tr.dataset.job = job.id;
+
+    if (job.multi) {
+      tr.className = 'row-multi' + (isExp ? ' expanded' : '');
+    }
+
+    // Text cells
+    const toggle = job.multi
+      ? `<button class="expand-toggle">${isExp ? '−' : '+'}</button>`
+      : `<span style="display:inline-block;width:14px;margin-right:4px"></span>`;
+    const elCount = job.multi ? `<span class="el-count"><span class="el-icon">⫞</span>${job.elements.length}</span>` : '';
+    tr.innerHTML = `
+      <td class="td-text mono">${toggle}${job.id}</td>
+      <td class="td-text">${job.client}</td>
+      <td class="td-text">${job.titre}${elCount}</td>
+    `;
+
+    // Badge cells
+    COLS.forEach(col => {
+      const td = document.createElement('td');
+      td.className = 'td-badge';
+
+      if (job.multi && !isExp) {
+        td.appendChild(renderMultiCell(job, col));
+      } else if (job.multi && isExp) {
+        // Empty when expanded — sub-rows carry the info
+      } else {
+        td.appendChild(renderBadge(job[col]));
+      }
+
+      tr.appendChild(td);
+    });
+
+    if (job.multi) {
+      tr.onclick = () => toggleJob(job.id);
+    }
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+}
+
+function toggleJob(jobId) {
+  const job = JOBS.find(j => j.id === jobId);
+  if (!job || !job.multi) return;
+
+  const wasExp = !!expanded[jobId];
+  const parentRow = document.querySelector(`tr[data-job="${jobId}"]`);
+  if (!parentRow) return;
+  const tbody = parentRow.parentElement;
+
+  if (!wasExp) {
+    expanded[jobId] = true;
+    parentRow.classList.add('expanded');
+
+    // Update toggle button
+    const btn = parentRow.querySelector('.expand-toggle');
+    if (btn) btn.textContent = '−';
+
+    // Clear badge cells
+    parentRow.querySelectorAll('td.td-badge').forEach(td => { td.innerHTML = ''; });
+
+    // Insert sub-rows
+    const dur = state.duration;
+    let insertAfter = parentRow;
+
+    job.elements.forEach((el, idx) => {
+      const sub = document.createElement('tr');
+      sub.className = 'sub-row';
+      sub.dataset.parentJob = jobId;
+
+      sub.innerHTML = `
+        <td class="td-text mono"></td>
+        <td class="td-text"></td>
+        <td class="td-text"><span style="padding-left:12px;font-size:11px;">↳ ${el.name}</span></td>
+      `;
+
+      const delay = idx * state.stagger;
+
+      COLS.forEach(col => {
+        const td = document.createElement('td');
+        td.className = 'td-badge';
+        const b = renderBadge(el[col]);
+
+        if (dur > 0) {
+          b.style.opacity = '0';
+          b.style.transform = 'translateY(-6px)';
+          b.style.transition = `all ${dur}ms cubic-bezier(0.25,1,0.5,1) ${delay}ms`;
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            b.style.opacity = '1';
+            b.style.transform = 'none';
+          }));
+        }
+
+        td.appendChild(b);
+        sub.appendChild(td);
+      });
+
+      // Animate name
+      if (dur > 0) {
+        const nm = sub.querySelector('span');
+        if (nm) {
+          nm.style.display = 'inline-block';
+          nm.style.opacity = '0';
+          nm.style.transform = 'translateY(-6px)';
+          nm.style.transition = `all ${dur}ms cubic-bezier(0.25,1,0.5,1) ${delay}ms`;
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            nm.style.opacity = '1';
+            nm.style.transform = 'none';
+          }));
+        }
+      }
+
+      insertAfter.after(sub);
+      insertAfter = sub;
+    });
+
+  } else {
+    expanded[jobId] = false;
+    parentRow.classList.remove('expanded');
+
+    // Update toggle button
+    const btn = parentRow.querySelector('.expand-toggle');
+    if (btn) btn.textContent = '+';
+
+    // Remove sub-rows
+    tbody.querySelectorAll(`tr[data-parent-job="${jobId}"]`).forEach(r => r.remove());
+
+    // Restore multi cells
+    parentRow.querySelectorAll('td.td-badge').forEach((td, ci) => {
+      td.innerHTML = '';
+      td.appendChild(renderMultiCell(job, COLS[ci]));
+    });
+  }
+}
+
+// ── Prompt ──
+function updatePrompt() {
+  const m = MODES.find(x => x.key === state.mode);
+  const lines = [];
+  lines.push(`Implémente l'affichage multi-éléments dans le tableau de flux.`);
+  lines.push('');
+  lines.push(`Représentation fermée : "${m.name}"`);
+
+  if (state.mode === 'seg-bar') {
+    lines.push(`- Barre horizontale segmentée (6px de haut, border-radius 3px) divisée en N segments colorés (un par élément)`);
+    lines.push(`- Au-dessus de la barre : label texte du pire état dans sa couleur`);
+  } else if (state.mode === 'pipeline') {
+    lines.push(`- N cercles de 10px reliés par une fine ligne (1.5px), chaque cercle coloré selon l'état`);
+    lines.push(`- L'initiale de l'élément (C, I, A…) est affichée dans chaque cercle en 7px`);
+  } else if (state.mode === 'gutter') {
+    lines.push(`- Colonne de petits rectangles colorés (10×3px) empilés verticalement, comme les marqueurs d'erreur dans un IDE`);
+    lines.push(`- À droite des marqueurs : label texte du pire état`);
+  } else if (state.mode === 'fraction') {
+    lines.push(`- Badge unique à fond segmenté verticalement (une tranche par élément, chacune colorée)`);
+    lines.push(`- Ratio "OK/total" en texte superposé + bande latérale gauche (3px) dans la couleur du pire état`);
+  } else if (state.mode === 'badge-dots') {
+    lines.push(`- Badge texte du pire état (style filled) + pastilles 6×6px des autres éléments à droite`);
+  }
+
+  lines.push('');
+  lines.push(`Dépliage : barre bleue verticale (3px) à gauche des lignes multi-éléments (affordance passive).`);
+  lines.push(`Toute la ligne est cliquable. Au clic, les sous-lignes apparaissent avec la barre bleue comme connecteur visuel.`);
+  lines.push(`Compteur discret "(N)" à côté du titre du job.`);
+
+  if (state.duration > 0) {
+    lines.push(`Animation : glissement + fondu, ${state.duration}ms, délai ${state.stagger}ms entre sous-lignes.`);
+  } else {
+    lines.push(`Pas d'animation (instantané).`);
+  }
+
+  document.getElementById('prompt-output').textContent = lines.join('\n');
+}
+
+function updateAll() {
+  Object.keys(expanded).forEach(k => delete expanded[k]);
+  renderTable();
+  updatePrompt();
+}
+
+// ── Controls ──
+function initControls() {
+  const mGrid = document.getElementById('modes');
+  MODES.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'variant-btn';
+    btn.innerHTML = `<span class="vk">${m.vk}</span><span><span>${m.name}</span><br><span class="vdesc">${m.desc}</span></span>`;
+    btn.onclick = () => { state.mode = m.key; syncControls(); updateAll(); };
+    mGrid.appendChild(btn);
+  });
+
+  document.getElementById('sl-duration').oninput = function() {
+    state.duration = parseInt(this.value);
+    document.getElementById('sl-duration-val').textContent = state.duration + 'ms';
+    updatePrompt();
+  };
+  document.getElementById('sl-stagger').oninput = function() {
+    state.stagger = parseInt(this.value);
+    document.getElementById('sl-stagger-val').textContent = state.stagger + 'ms';
+    updatePrompt();
+  };
+
+  const pCont = document.getElementById('presets');
+  PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = p.name;
+    btn.onclick = () => {
+      Object.keys(p).forEach(k => { if (k !== 'name') state[k] = p[k]; });
+      syncControls(); updateAll();
+    };
+    pCont.appendChild(btn);
+  });
+
+  document.getElementById('copy-btn').onclick = () => {
+    navigator.clipboard.writeText(document.getElementById('prompt-output').textContent);
+    const b = document.getElementById('copy-btn');
+    b.textContent = 'Copied!';
+    setTimeout(() => b.textContent = 'Copy', 1500);
+  };
+}
+
+function syncControls() {
+  document.querySelectorAll('#modes .variant-btn').forEach((b, i) => b.classList.toggle('active', MODES[i].key === state.mode));
+  document.getElementById('sl-duration').value = state.duration;
+  document.getElementById('sl-duration-val').textContent = state.duration + 'ms';
+  document.getElementById('sl-stagger').value = state.stagger;
+  document.getElementById('sl-stagger-val').textContent = state.stagger + 'ms';
+}
+
+initControls();
+syncControls();
+updateAll();
+</script>
+</body>
+</html>

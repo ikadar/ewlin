@@ -49,6 +49,7 @@ export {
   isFormeReady,
   getPrerequisiteBlockingInfo,
   hasDieCuttingAction,
+  hasOffsetAction,
   PAPER_READY_STATES,
   BAT_READY_STATES,
   PLATES_READY_STATES,
