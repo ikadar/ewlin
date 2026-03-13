@@ -1012,14 +1012,22 @@ const handleClearJobAssignments: MockRouteHandler = async (args: FetchArgs) => {
 
   const jobTaskIds = new Set(job.taskIds);
 
-  // Find assignments that belong to this job
+  // Find clearable assignments (exclude completed and in-progress)
+  const now = new Date().toISOString();
   const jobAssignmentTaskIds = currentSnapshot.assignments
     .filter((a: TaskAssignment) => jobTaskIds.has(a.taskId))
+    .filter((a: TaskAssignment) => !a.isCompleted)
+    .filter((a: TaskAssignment) => {
+      if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+      return true;
+    })
     .map((a: TaskAssignment) => a.taskId);
+
+  const clearableTaskIds = new Set(jobAssignmentTaskIds);
 
   // For each task being unassigned, check for outsourced cascade removals
   let remainingAssignments = currentSnapshot.assignments.filter(
-    (a: TaskAssignment) => !jobTaskIds.has(a.taskId)
+    (a: TaskAssignment) => !clearableTaskIds.has(a.taskId)
   );
 
   const outsourcedToRemove = new Set<string>();

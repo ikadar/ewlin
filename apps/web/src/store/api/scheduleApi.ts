@@ -282,7 +282,13 @@ export const scheduleApi = createApi({
 
         const patchResult = dispatch(
           scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
-            draft.assignments = draft.assignments.filter((a) => !jobTaskIds.has(a.taskId));
+            const now = new Date().toISOString();
+            draft.assignments = draft.assignments.filter((a) => {
+              if (!jobTaskIds.has(a.taskId)) return true;
+              if (a.isCompleted) return true;
+              if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return true;
+              return false;
+            });
           })
         );
 
