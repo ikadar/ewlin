@@ -1701,7 +1701,8 @@ function AppContent() {
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
              !(c.type === 'PrecedenceConflict' && isAltPressed) &&
-             !(c.type === 'ApprovalGateConflict')
+             !(c.type === 'ApprovalGateConflict') &&
+             !(c.type === 'DeadlineConflict')
     );
 
     if (blockingConflicts.length > 0) {
@@ -1893,12 +1894,13 @@ function AppContent() {
     // so PrecedenceConflict is always blocking (unless Alt-bypassed).
     // StationConflict IS blocking in pick mode (means overlap with another task).
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'ApprovalGateConflict')
+      (c) => !(c.type === 'ApprovalGateConflict') &&
+             !(c.type === 'DeadlineConflict')
     );
 
     // Check if only warning (non-blocking) conflicts exist
     const hasWarningOnly = blockingConflicts.length === 0 &&
-      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict');
+      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict');
 
     // Determine ring state
     let ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
@@ -1906,8 +1908,8 @@ function AppContent() {
     if (validationResult.valid) {
       ringState = 'valid';
     } else if (blockingConflicts.length === 0) {
-      ringState = validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict') ? 'warning' : 'valid';
-    } else if (isAltPressed && validationResult.conflicts.some((c) => c.type === 'PrecedenceConflict')) {
+      ringState = validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict') ? 'warning' : 'valid';
+    } else if (isAltPressed && blockingConflicts.length > 0) {
       ringState = 'bypass';
     } else {
       ringState = 'invalid';
@@ -1960,12 +1962,14 @@ function AppContent() {
     // StationConflict is NOT blocking (push-down) UNLESS the existing tile is completed
     // PrecedenceConflict with suggestedStart is NOT blocking (can be placed at suggested time)
     // ApprovalGateConflict is NOT blocking (all gates are warning-only)
+    // DeadlineConflict is NOT blocking (user can place after deadline)
     const blockingConflicts = validationResult.conflicts.filter(
       (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
-             !(c.type === 'ApprovalGateConflict')
+             !(c.type === 'ApprovalGateConflict') &&
+             !(c.type === 'DeadlineConflict')
     );
 
     if (blockingConflicts.length > 0 && !isAltPressed) {
