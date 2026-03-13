@@ -40,6 +40,7 @@ export interface UseCommandsOptions {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onOpenSaveLoad?: () => void;
+  onClearJobAssignments?: () => void;
 }
 
 const RECENT_KEY = 'flux-recent-commands';
@@ -114,6 +115,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
       { label: 'Voir le depart', keys: ['Alt', 'D'] },
       { label: 'Modifier ce job', keys: ['Alt', 'E'] },
       { label: 'Tache terminee', keys: ['Space'] },
+      { label: 'Clear all tiles', keys: ['Alt', 'Z'] },
     ],
   },
   {
@@ -156,6 +158,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onZoomIn,
     onZoomOut,
     onOpenSaveLoad,
+    onClearJobAssignments,
   } = options;
 
   return useMemo(() => {
@@ -198,6 +201,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     if (onEditJob) {
       commands.push({ id: 'edit-job', label: 'Modifier le job', category: 'Actions', shortcut: 'Alt+E', keywords: 'edit modifier job formulaire', icon: 'pencil', action: onEditJob });
     }
+    if (onClearJobAssignments) {
+      commands.push({ id: 'clear-job-tiles', label: 'Clear all tiles', category: 'Job selectionne', shortcut: 'Alt+Z', keywords: 'clear remove tiles unschedule recall', icon: 'trash-2', action: onClearJobAssignments });
+    }
 
     // Scheduler-specific: Affichage
     if (onToggleDisplayMode) {
@@ -222,5 +228,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

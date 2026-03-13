@@ -992,6 +992,61 @@ const handleUpdateJob = async (
 };
 
 // ============================================================================
+// Clear Job Assignments Handler
+// ============================================================================
+
+/**
+ * DELETE /jobs/:jobId/assignments - Clear all tile assignments for a job
+ */
+const handleClearJobAssignments: MockRouteHandler = async (args: FetchArgs) => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)\/assignments$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const job = currentSnapshot.jobs.find((j: Job) => j.id === jobId);
+  if (!job) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const jobTaskIds = new Set(job.taskIds);
+
+  // Find assignments that belong to this job
+  const jobAssignmentTaskIds = currentSnapshot.assignments
+    .filter((a: TaskAssignment) => jobTaskIds.has(a.taskId))
+    .map((a: TaskAssignment) => a.taskId);
+
+  // For each task being unassigned, check for outsourced cascade removals
+  let remainingAssignments = currentSnapshot.assignments.filter(
+    (a: TaskAssignment) => !jobTaskIds.has(a.taskId)
+  );
+
+  const outsourcedToRemove = new Set<string>();
+  for (const taskId of jobAssignmentTaskIds) {
+    const toRemove = getOutsourcedTasksToRemoveOnUnassign(
+      currentSnapshot,
+      taskId,
+      remainingAssignments
+    );
+    for (const id of toRemove) {
+      outsourcedToRemove.add(id);
+    }
+  }
+
+  remainingAssignments = remainingAssignments.filter(
+    (a: TaskAssignment) => !outsourcedToRemove.has(a.taskId)
+  );
+
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    assignments: remainingAssignments,
+  }));
+
+  return { data: { unassignedCount: jobAssignmentTaskIds.length } };
+};
+
+// ============================================================================
 // Delete Job Handler
 // ============================================================================
 
@@ -2732,6 +2787,7 @@ const routes: MockRoute[] = [
   { method: 'GET', pattern: /^\/jobs\/lookup-by-reference/, handler: handleLookupByReference },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
   { method: 'PUT', pattern: /^\/jobs\/[^/]+$/, handler: handleUpdateJob },
+  { method: 'DELETE', pattern: /^\/jobs\/[^/]+\/assignments$/, handler: handleClearJobAssignments },
   { method: 'DELETE', pattern: /^\/jobs\/[^/]+$/, handler: handleDeleteJob },
 
   // Elements

@@ -19,7 +19,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -339,6 +339,7 @@ function AppContent() {
   const [createJob] = useCreateJobMutation();
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
+  const [clearJobAssignments] = useClearJobAssignmentsMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
@@ -1092,6 +1093,17 @@ function AppContent() {
     return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
   }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
 
+  // Handle clear all tiles for selected job (ALT+Z)
+  const handleClearJobAssignments = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      const result = await clearJobAssignments(selectedJobId).unwrap();
+      showToast(`${result.unassignedCount} tile(s) cleared`);
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [selectedJobId, clearJobAssignments, showToast]);
+
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const ctx: KeyboardContext = {
@@ -1120,6 +1132,13 @@ function AppContent() {
       if (isAltLetter(e, 'e') && selectedJobId) {
         e.preventDefault();
         handleEditJob();
+        return;
+      }
+
+      // Alt+Z: clear all tiles for selected job
+      if (isAltLetter(e, 'z') && selectedJobId) {
+        e.preventDefault();
+        handleClearJobAssignments();
         return;
       }
 
@@ -1206,7 +1225,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -2171,6 +2190,7 @@ function AppContent() {
     onOpenSaveLoad: useCallback(() => {
       setIsSaveLoadOpen(true);
     }, []),
+    onClearJobAssignments: handleClearJobAssignments,
   });
 
   // Register scheduler-specific commands into the global Command Center

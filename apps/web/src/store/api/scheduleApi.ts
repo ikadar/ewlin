@@ -252,6 +252,49 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Clear all tile assignments for a job.
+     *
+     * Mock mode: Removes all assignments for the job's tasks
+     * Real mode: DELETE /jobs/{id}/assignments
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    clearJobAssignments: builder.mutation<{ unassignedCount: number }, string>({
+      query: (jobId) => ({
+        url: `/jobs/${jobId}/assignments`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted(jobId, { dispatch, queryFulfilled, getState }) {
+        const state = getState() as { scheduleApi: { queries: Record<string, { data?: ScheduleSnapshot }> } };
+        const snapshotQuery = Object.values(state.scheduleApi.queries).find(
+          (q) => q?.data && 'assignments' in q.data
+        );
+        const snapshot = snapshotQuery?.data as ScheduleSnapshot | undefined;
+
+        if (!snapshot) return;
+
+        // Collect all task IDs for this job
+        const job = snapshot.jobs.find((j) => j.id === jobId);
+        if (!job) return;
+
+        const jobTaskIds = new Set(job.taskIds);
+
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            draft.assignments = draft.assignments.filter((a) => !jobTaskIds.has(a.taskId));
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    /**
      * Delete a job and all related data (elements, tasks, assignments).
      *
      * Mock mode: Removes job, elements, tasks, assignments from snapshot
@@ -590,6 +633,7 @@ export const {
   useCreateJobMutation,
   useUpdateJobMutation,
   useDeleteJobMutation,
+  useClearJobAssignmentsMutation,
   useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
