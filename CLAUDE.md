@@ -1,99 +1,99 @@
 # Flux Print Shop Scheduling System
 
-This is the monorepo for the Flux Scheduler, a print shop scheduling system.
+Ez egy nyomdaipari ütemező rendszer (Flux Scheduler) monorepo-ja.
 
-## Language
-
-**All communication, code, commit messages, documentation, and comments MUST be in English. Never use Hungarian.**
-
-## Project structure
+## Projekt struktúra
 
 ```
 ewlin/
 ├── services/php-api/     # PHP/Symfony backend (git submodule)
-├── packages/types/       # @flux/types TypeScript package (git submodule)
+├── packages/types/       # @flux/types TypeScript csomag (git submodule)
 ├── packages/validator/   # @flux/schedule-validator (git submodule)
 ├── apps/web/             # React frontend
-└── docs/                 # Documentation
+└── docs/                 # Dokumentáció
     ├── roadmap/          # Release roadmap
-    ├── releases/         # Release documents
-    ├── architecture/     # ADRs, strategies
-    └── domain-model/     # Business rules, vocabulary
+    ├── releases/         # Release dokumentumok
+    ├── architecture/     # ADR-ek, stratégiák
+    └── domain-model/     # Üzleti szabályok, vocabulary
 ```
+
+## Language
+
+Always communicate with the user in English. Code, commit messages, and documentation are also in English.
 
 ## Release workflow
 
-When asked to implement a release, **always** follow this workflow:
+Amikor release implementálást kérek, **mindig** kövesd ezt a workflow-t:
 
-### 1. Prepare release document
-- Check if it exists: `docs/releases/v{VERSION}-{name}.md`
-- If not, create one based on `docs/releases/_TEMPLATE.md`
-- Fill in: scope, prerequisites, feature checklist, testing requirements
+### 1. Release dokumentum elkészítése
+- Ellenőrizd, hogy létezik-e: `docs/releases/v{VERSION}-{name}.md`
+- Ha nem, készítsd el a `docs/releases/_TEMPLATE.md` alapján
+- Töltsd ki: scope, prerequisites, feature checklist, testing requirements
 
-### 2. Request approval
-- Present the release document
-- **WAIT** for the user's explicit approval before proceeding
+### 2. Jóváhagyás kérése
+- Mutasd be a release dokumentumot
+- **VÁRD MEG** a user explicit jóváhagyását mielőtt továbblépnél
 
-### 3. Implementation
-- Use TodoWrite to track tasks
-- Follow the feature checklist
-- Write unit and integration tests
-- Run PHPStan (level 8)
-- Run all tests
+### 3. Implementálás
+- Használj TodoWrite-ot a feladatok követésére
+- Kövesd a feature checklist-et
+- Írj unit és integration teszteket
+- Futtass PHPStan-t (level 8)
+- Futtass minden tesztet
 
-### 4. Request approval
-- Present the implementation summary
-- Test results, PHPStan results
-- **WAIT** for the user's explicit approval
+### 4. Jóváhagyás kérése
+- Mutasd be az implementáció összefoglalóját
+- Teszteredmények, PHPStan eredmények
+- **VÁRD MEG** a user explicit jóváhagyását
 
-### 5. Update documents
-- `docs/roadmap/release-roadmap.md` - mark as ✅
-- `docs/releases/v{VERSION}-*.md` - status: Released, checkboxes ✅
-- `services/php-api/CHANGELOG.md` - add new version
+### 5. Dokumentumok aktualizálása
+- `docs/roadmap/release-roadmap.md` - jelöld ✅-ként
+- `docs/releases/v{VERSION}-*.md` - státusz: Released, checkboxok ✅
+- `services/php-api/CHANGELOG.md` - új verzió hozzáadása
 
-### 6. Git operations (PHP API - PR workflow)
+### 6. Git műveletek (PHP API - PR workflow)
 
-**IMPORTANT: Always merge via PR, NEVER commit directly to main!**
+**FONTOS: Mindig PR-on keresztül merge-elj, SOHA ne commitolj közvetlenül main-re!**
 
 ```bash
 # PHP API repo (services/php-api/)
 
-# 1. Create feature branch
+# 1. Feature branch létrehozása
 git checkout -b feature/v{VERSION}-{kebab-case-name}
 
-# 2. Commit and push
+# 2. Commit és push
 git add -A
 git commit -m "feat: {Short description}"
 git push -u origin feature/v{VERSION}-{kebab-case-name}
 
-# 3. Create PR
+# 3. PR létrehozása
 gh pr create --title "v{VERSION} - {Title}" --body "..."
 
-# 4. WAIT for CI GREEN STATUS and PR MERGE!
+# 4. VÁRD MEG a CI ZÖLD STÁTUSZT és a PR MERGE-ÖT!
 
-# 5. After merge: checkout main and pull
+# 5. Merge után: checkout main és pull
 git checkout main
 git pull origin main
 
-# 6. Create tag and release
+# 6. Tag és release létrehozása
 git tag -a v{VERSION} -m "v{VERSION} - {Title}"
 git push origin v{VERSION}
 gh release create v{VERSION} --title "v{VERSION} - {Title}" --notes "..."
 ```
 
-### 7. Git operations (Monorepo - documentation)
+### 7. Git műveletek (Monorepo - dokumentáció)
 ```bash
-# Monorepo (ewlin/) - this can go directly to main
+# Monorepo (ewlin/) - ez mehet közvetlenül main-re
 git add docs/ services/php-api
 git commit -m "docs: Update for v{VERSION} release"
 git push origin main
 ```
 
-### 8. CI verification
-- Check GitHub Actions status
-- If failed, fix and repeat git operations
+### 8. CI ellenőrzés
+- Ellenőrizd a GitHub Actions státuszát
+- Ha fail, javítsd és ismételd a git műveleteket
 
-## Commit message format
+## Commit üzenet formátum
 
 ```
 v{VERSION} - {Short Title}
@@ -112,37 +112,31 @@ Technical:
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
-## Important files
+## Fontos fájlok
 
-| File | Description |
-|------|-------------|
-| `docs/roadmap/release-roadmap.md` | Full release roadmap |
-| `docs/releases/_TEMPLATE.md` | Release document template |
-| `docs/architecture/git-release-strategy.md` | Git/version strategy |
-| `docs/domain-model/business-rules.md` | Business rules (BR-*) |
+| Fájl | Leírás |
+|------|--------|
+| `docs/roadmap/release-roadmap.md` | Teljes release roadmap |
+| `docs/releases/_TEMPLATE.md` | Release dokumentum sablon |
+| `docs/architecture/git-release-strategy.md` | Git/verzió stratégia |
+| `docs/domain-model/business-rules.md` | Üzleti szabályok (BR-*) |
 
-## Implementation plans
+## PHP API specifikus
 
-When given a multi-section implementation plan, **implement ALL sections completely**. Never silently skip sections (e.g. skipping backend while doing frontend). If a section cannot be implemented, explicitly flag it and ask for guidance before moving on.
-
-**After writing database migrations, always run them immediately** (`php bin/console doctrine:migrations:migrate --no-interaction`). A migration that exists but hasn't been applied will crash the app at runtime.
-
-## PHP API specifics
-
-- **PHPStan level 8** is mandatory
-- **PHPUnit** tests are mandatory
+- **PHPStan level 8** kötelező
+- **PHPUnit** tesztek kötelezőek
 - Symfony 7 + Doctrine ORM
-- OpenAPI documentation (Swagger UI: /api/doc)
+- OpenAPI dokumentáció (Swagger UI: /api/doc)
 
-## Playwright tests — STRICT RULES
+## Playwright tesztek — SZIGORÚ SZABÁLYOK
 
-### 1. NEVER run Playwright tests without permission
-- Playwright tests (`npx playwright test`, `npx playwright show-trace`, etc.) may **ONLY be run if the user gives EXPLICIT, clear permission.**
-- "Fix the tests" — this is NOT permission to run them.
-- If you need test results, **ask the user** to run them and provide the output.
+### 1. SOHA ne futtass Playwright tesztet engedély nélkül
+- Playwright tesztet (`npx playwright test`, `npx playwright show-trace`, stb.) **CSAK akkor futtathatsz, ha a user EXPLICIT, egyértelmű engedélyt ad.**
+- "Javítsd meg a teszteket" — ez NEM engedély a futtatásra.
+- Ha teszteredményre van szükséged, **kérdezd meg a usert**, hogy futtassa és adja át az outputot.
 
-### 2. ALWAYS read the actual error output FIRST
-- Before making any changes to failing tests, **read the actual error message**.
-- The `test-results/` directory has `error-context.md` for each failing test — read it.
-- Read the test output provided by the user (terminal, file) before forming a diagnosis.
-- **Working from assumptions is forbidden.** Every change must be based on a concrete, read error message.
+### 2. MINDIG olvasd el az actual error output-ot ELŐSZÖR
+- Mielőtt bármilyen változtatást csinálsz failing teszteknél, **olvasd el a tényleges hibaüzenetet**.
+- A `test-results/` könyvtárban minden failing teszthez van `error-context.md` — olvasd el.
+- A user által átadott test output-ot (terminál, fájl) olvasd el, mielőtt diagnózist állítasz fel.
+- **Feltevések alapján dolgozni tilos.** Minden változtatásnak konkrét, olvasott hibaüzeneten kell alapulnia.

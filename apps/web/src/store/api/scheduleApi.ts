@@ -671,6 +671,22 @@ export const scheduleApi = createApi({
       },
     }),
 
+    /**
+     * Auto-place all unscheduled tasks for a job using server-side ASAP algorithm.
+     *
+     * Mock mode: mockBaseQuery handles this via handleAutoPlace
+     * Real mode: POST /jobs/{jobId}/auto-place
+     *
+     * No optimistic update — waits for server response then refetches snapshot.
+     */
+    autoPlaceJob: builder.mutation<{ placedCount: number }, string>({
+      query: (jobId) => ({
+        url: `/jobs/${jobId}/auto-place`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
     // ========================================================================
     // Saved Schedules
     // ========================================================================
@@ -728,6 +744,7 @@ export const {
   useCompactStationMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,
+  useAutoPlaceJobMutation,
   useGetSavedSchedulesQuery,
   useSaveScheduleMutation,
   useLoadScheduleMutation,

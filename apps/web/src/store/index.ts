@@ -127,6 +127,7 @@ export {
   useCompactStationMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,
+  useAutoPlaceJobMutation,
   useGetSavedSchedulesQuery,
   useSaveScheduleMutation,
   useLoadScheduleMutation,

@@ -19,7 +19,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -343,6 +343,7 @@ function AppContent() {
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
   const [clearJobAssignments] = useClearJobAssignmentsMutation();
+  const [autoPlaceJob] = useAutoPlaceJobMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
@@ -1122,11 +1123,26 @@ function AppContent() {
     if (!selectedJobId) return;
     try {
       const result = await clearJobAssignments(selectedJobId).unwrap();
-      showToast(`${result.unassignedCount} tile(s) cleared`);
+      showToast(`${result.unassignedCount} tile(s) cleared`, 'success');
     } catch (error) {
       showToast(getErrorMessage(error));
     }
   }, [selectedJobId, clearJobAssignments, showToast]);
+
+  // Handle ASAP auto-placement for selected job (ALT+P S)
+  const handleAsapPlacement = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      const result = await autoPlaceJob(selectedJobId).unwrap();
+      if (result.placedCount === 0) {
+        showToast('No unscheduled tiles to place', 'info');
+      } else {
+        showToast(`${result.placedCount} tile(s) placed ASAP`, 'success');
+      }
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [selectedJobId, autoPlaceJob, showToast]);
 
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
@@ -2294,6 +2310,7 @@ function AppContent() {
       setIsSaveLoadOpen(true);
     }, []),
     onClearJobAssignments: handleClearJobAssignments,
+    onAsapPlacement: handleAsapPlacement,
   });
 
   // Register scheduler-specific commands into the global Command Center
