@@ -772,6 +772,14 @@ const handleCreateJob = async (
     }
   }
 
+  // Resolve requiredJobReferences to IDs
+  let resolvedRequiredJobIds: string[] = [];
+  if (body.requiredJobReferences && body.requiredJobReferences.length > 0) {
+    resolvedRequiredJobIds = body.requiredJobReferences
+      .map((ref) => currentSnapshot.jobs.find((j) => j.reference === ref)?.id)
+      .filter((id): id is string => id !== undefined);
+  }
+
   // Create job
   const job: Job = {
     id: jobId,
@@ -784,6 +792,7 @@ const handleCreateJob = async (
     fullyScheduled: false,
     color: jobColor,
     comments: [],
+    requiredJobIds: resolvedRequiredJobIds,
     elementIds,
     taskIds: allTaskIds,
     createdAt: now,
@@ -933,6 +942,14 @@ const handleUpdateJob = async (
     }
   }
 
+  // Resolve requiredJobReferences to IDs
+  let resolvedRequiredJobIds: string[] | undefined;
+  if (body.requiredJobReferences !== undefined) {
+    resolvedRequiredJobIds = body.requiredJobReferences
+      .map((ref) => currentSnapshot.jobs.find((j) => j.reference === ref)?.id)
+      .filter((id): id is string => id !== undefined);
+  }
+
   // Merge metadata (only provided fields)
   const updatedJob: Job = {
     ...existingJob,
@@ -941,6 +958,7 @@ const handleUpdateJob = async (
     ...(body.description !== undefined && { description: body.description }),
     ...(body.workshopExitDate !== undefined && { workshopExitDate: body.workshopExitDate }),
     ...(body.quantity !== undefined && { quantity: body.quantity }),
+    ...(resolvedRequiredJobIds !== undefined && { requiredJobIds: resolvedRequiredJobIds }),
     elementIds: newElementIds,
     taskIds: newTaskIds,
     updatedAt: now,

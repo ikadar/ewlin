@@ -43,6 +43,8 @@ export interface CreateJobRequest {
   shipperId?: string;
   status: 'draft' | 'planned' | 'in_progress' | 'delayed' | 'completed' | 'cancelled';
   elements: CreateJobElementRequest[];
+  /** Job references that this job depends on */
+  requiredJobReferences?: string[];
 }
 
 /**
@@ -154,7 +156,13 @@ export function transformJcfToRequest(
   elements: JcfElement[],
   quantity?: string,
   shipperId?: string,
+  requiredJobs?: string,
 ): CreateJobRequest {
+  // Parse required jobs: "JOB-001, JOB-002" → ["JOB-001", "JOB-002"]
+  const requiredJobReferences = requiredJobs
+    ? requiredJobs.split(',').map((s) => s.trim()).filter(Boolean)
+    : undefined;
+
   return {
     reference: jobId,
     client,
@@ -164,6 +172,7 @@ export function transformJcfToRequest(
     elements: elements.map(transformJcfElementToRequest),
     ...(quantity ? { quantity: parseInt(quantity, 10) } : {}),
     ...(shipperId ? { shipperId } : {}),
+    ...(requiredJobReferences && requiredJobReferences.length > 0 ? { requiredJobReferences } : {}),
   };
 }
 

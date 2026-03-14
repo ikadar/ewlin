@@ -278,6 +278,80 @@ function getCrossElementSuccessors(snapshot: ScheduleSnapshot, task: Task): Task
 }
 
 // ============================================================================
+// Cross-job predecessor / successor
+// ============================================================================
+
+/**
+ * If task is the first in its element, the element is a root element
+ * (no element-level predecessors), and the job has requiredJobIds,
+ * return the last task of each element in each required job.
+ */
+function getCrossJobPredecessors(snapshot: ScheduleSnapshot, task: Task): Task[] {
+  const element = findElement(snapshot, task.elementId);
+  if (!element) return [];
+
+  const elementTasks = getElementTasks(element.id, snapshot.tasks);
+  if (elementTasks.length === 0 || elementTasks[0].id !== task.id) {
+    return []; // Not the first task
+  }
+
+  // Only root elements (no element-level predecessors)
+  if (element.prerequisiteElementIds && element.prerequisiteElementIds.length > 0) {
+    return [];
+  }
+
+  const job = snapshot.jobs.find((j) => j.id === element.jobId);
+  if (!job?.requiredJobIds || job.requiredJobIds.length === 0) {
+    return [];
+  }
+
+  const predecessors: Task[] = [];
+  for (const requiredJobId of job.requiredJobIds) {
+    const reqElements = snapshot.elements.filter((e) => e.jobId === requiredJobId);
+    for (const reqElement of reqElements) {
+      const reqTasks = getElementTasks(reqElement.id, snapshot.tasks);
+      if (reqTasks.length > 0) {
+        predecessors.push(reqTasks[reqTasks.length - 1]);
+      }
+    }
+  }
+  return predecessors;
+}
+
+/**
+ * If task is the last in its element, check if any other job
+ * lists this task's job in its requiredJobIds. Return the first task
+ * of each root element in each dependent job.
+ */
+function getCrossJobSuccessors(snapshot: ScheduleSnapshot, task: Task): Task[] {
+  const element = findElement(snapshot, task.elementId);
+  if (!element) return [];
+
+  const elementTasks = getElementTasks(element.id, snapshot.tasks);
+  if (elementTasks.length === 0 || elementTasks[elementTasks.length - 1].id !== task.id) {
+    return []; // Not the last task
+  }
+
+  const dependentJobs = snapshot.jobs.filter(
+    (j) => j.requiredJobIds && j.requiredJobIds.includes(element.jobId)
+  );
+
+  const successors: Task[] = [];
+  for (const depJob of dependentJobs) {
+    const depElements = snapshot.elements.filter(
+      (e) => e.jobId === depJob.id && (!e.prerequisiteElementIds || e.prerequisiteElementIds.length === 0)
+    );
+    for (const depElement of depElements) {
+      const depTasks = getElementTasks(depElement.id, snapshot.tasks);
+      if (depTasks.length > 0) {
+        successors.push(depTasks[0]);
+      }
+    }
+  }
+  return successors;
+}
+
+// ============================================================================
 // Shared: earliest start from a single predecessor
 // ============================================================================
 
@@ -365,6 +439,18 @@ export function getPredecessorConstraint(
     const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
     if (crossAssignment) {
       const earliest = getEarliestStartFromPredecessor(crossAssignment, snapshot, task);
+      if (!latestEarliestStart || earliest > latestEarliestStart) {
+        latestEarliestStart = earliest;
+      }
+    }
+  }
+
+  // 3. Cross-job predecessors
+  const crossJobPreds = getCrossJobPredecessors(snapshot, task);
+  for (const crossJobPred of crossJobPreds) {
+    const crossJobAssignment = findAssignmentByTaskId(snapshot, crossJobPred.id);
+    if (crossJobAssignment) {
+      const earliest = getEarliestStartFromPredecessor(crossJobAssignment, snapshot, task);
       if (!latestEarliestStart || earliest > latestEarliestStart) {
         latestEarliestStart = earliest;
       }
@@ -478,6 +564,18 @@ export function getSuccessorConstraint(
     }
   }
 
+  // 3. Cross-job successors
+  const crossJobSuccs = getCrossJobSuccessors(snapshot, task);
+  for (const crossJobSucc of crossJobSuccs) {
+    const crossJobAssignment = findAssignmentByTaskId(snapshot, crossJobSucc.id);
+    if (crossJobAssignment) {
+      const ls = calcLatestStart(task, crossJobSucc, crossJobAssignment);
+      if (!earliestLatestStart || ls < earliestLatestStart) {
+        earliestLatestStart = ls;
+      }
+    }
+  }
+
   if (!earliestLatestStart) return null;
 
   return timeToYPosition(earliestLatestStart, startHour, pixelsPerHour, gridStartDate);
@@ -514,6 +612,15 @@ export function getDryingTimeInfo(
     const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
     if (crossAssignment && !crossAssignment.isOutsourced && isPrintingStation(snapshot, crossAssignment.targetId)) {
       printingPredecessors.push(crossAssignment);
+    }
+  }
+
+  // Cross-job predecessors
+  const crossJobPreds = getCrossJobPredecessors(snapshot, task);
+  for (const crossJobPred of crossJobPreds) {
+    const crossJobAssignment = findAssignmentByTaskId(snapshot, crossJobPred.id);
+    if (crossJobAssignment && !crossJobAssignment.isOutsourced && isPrintingStation(snapshot, crossJobAssignment.targetId)) {
+      printingPredecessors.push(crossJobAssignment);
     }
   }
 
@@ -571,6 +678,17 @@ export function getOutsourcingTimeInfo(
       const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
       if (crossAssignment && crossAssignment.isOutsourced) {
         outsourcedPredecessors.push({ assignment: crossAssignment, task: crossPred });
+      }
+    }
+  }
+
+  // Cross-job predecessors
+  const crossJobPreds = getCrossJobPredecessors(snapshot, task);
+  for (const crossJobPred of crossJobPreds) {
+    if (isOutsourcedTask(crossJobPred)) {
+      const crossJobAssignment = findAssignmentByTaskId(snapshot, crossJobPred.id);
+      if (crossJobAssignment && crossJobAssignment.isOutsourced) {
+        outsourcedPredecessors.push({ assignment: crossJobAssignment, task: crossJobPred });
       }
     }
   }

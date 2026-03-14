@@ -447,6 +447,7 @@ function AppContent() {
   const [jcfIntitule, setJcfIntitule] = useState('');
   const [jcfQuantity, setJcfQuantity] = useState('');
   const [jcfShipperId, setJcfShipperId] = useState('');
+  const [jcfRequiredJobs, setJcfRequiredJobs] = useState('');
   const [jcfDeadline, setJcfDeadline] = useState('');
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
@@ -505,6 +506,9 @@ function AppContent() {
             elements: jcfElements.map(transformJcfElementToRequest),
             ...(jcfQuantity ? { quantity: parseInt(jcfQuantity, 10) } : {}),
             shipperId: jcfShipperId || null,
+            requiredJobReferences: jcfRequiredJobs
+              ? jcfRequiredJobs.split(',').map((s) => s.trim()).filter(Boolean)
+              : [],
           },
         }).unwrap();
       } else {
@@ -517,6 +521,7 @@ function AppContent() {
           jcfElements,
           jcfQuantity,
           jcfShipperId || undefined,
+          jcfRequiredJobs || undefined,
         );
         await createJob(request).unwrap();
       }
@@ -533,6 +538,7 @@ function AppContent() {
       setJcfIntitule('');
       setJcfQuantity('');
       setJcfShipperId('');
+      setJcfRequiredJobs('');
       setJcfDeadline('');
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
       setSequenceWorkflows([]); // v0.4.31: Reset workflow on save
@@ -545,7 +551,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, jcfShipperId, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -793,11 +799,17 @@ function AppContent() {
       setJcfElements(mappedElements);
     }
 
+    const requiredJobRefs = (job.requiredJobIds ?? [])
+      .map((id) => snapshot.jobs.find((j) => j.id === id)?.reference)
+      .filter((ref): ref is string => ref !== undefined)
+      .join(', ');
+    setJcfRequiredJobs(requiredJobRefs);
+
     setIsEditMode(true);
     setEditingJobId(job.id);
     setSequenceWorkflows([]);
     setJcfSaveError(null);
-  }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers]);
+  }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, snapshot.jobs]);
 
   // v0.5.13b: Handler for "Modifier" button in Job Details Panel (scheduler view)
   const handleEditJob = useCallback(() => {
@@ -2369,6 +2381,8 @@ function AppContent() {
           shippedJobIds={shippedJobIds}
           onSplitTask={handlePanelSplitTask}
           onFuseTask={handlePanelFuseTask}
+          allJobs={snapshot.jobs}
+          onSelectJob={setSelectedJobId}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Mode banner — shows active mode (quick placement / picking) */}
@@ -2522,6 +2536,9 @@ function AppContent() {
           onShipperIdChange={setJcfShipperId}
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
+          requiredJobs={jcfRequiredJobs}
+          onRequiredJobsChange={setJcfRequiredJobs}
+          jobSuggestions={snapshot?.jobs.map((j) => ({ reference: j.reference, client: j.client })) ?? []}
         />
         {/* v0.4.9: Elements Table */}
         <div className="mt-[13px]">

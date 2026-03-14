@@ -27,6 +27,11 @@ export interface JcfJobHeaderProps {
   onShipperIdChange?: (value: string) => void;
   deadline: string;
   onDeadlineChange: (value: string) => void;
+  /** Required job references (comma-separated) */
+  requiredJobs?: string;
+  onRequiredJobsChange?: (value: string) => void;
+  /** Available job suggestions for the required jobs autocomplete */
+  jobSuggestions?: Array<{ reference: string; client: string }>;
 }
 
 /**
@@ -54,6 +59,9 @@ export function JcfJobHeader({
   onShipperIdChange,
   deadline,
   onDeadlineChange,
+  requiredJobs,
+  onRequiredJobsChange,
+  jobSuggestions,
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
   const nativeDateRef = useRef<HTMLInputElement>(null);
@@ -181,6 +189,21 @@ export function JcfJobHeader({
     },
     [onTemplateChange, onTemplateSelect]
   );
+
+  // --- Required Jobs autocomplete ---
+
+  const requiredJobSuggestions: Suggestion[] = useMemo(() => {
+    if (!jobSuggestions) return [];
+    // Parse already-selected references
+    const selected = (requiredJobs ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    return jobSuggestions
+      .filter((j) => j.reference !== jobId && !selected.includes(j.reference))
+      .map((j) => ({ label: `${j.reference} - ${j.client}`, value: j.reference }));
+  }, [jobSuggestions, requiredJobs, jobId]);
 
   // --- Deadline ---
 
@@ -343,6 +366,23 @@ export function JcfJobHeader({
             />
           </div>
         </div>
+
+        {/* Required Jobs (prerequisites) */}
+        {onRequiredJobsChange && (
+          <div className="w-[234px]">
+            <label htmlFor="jcf-required-jobs" className={labelClass}>
+              Prérequis
+            </label>
+            <JcfAutocomplete
+              id="jcf-required-jobs"
+              value={requiredJobs ?? ''}
+              onChange={onRequiredJobsChange}
+              suggestions={requiredJobSuggestions}
+              inputClassName={inputBaseClass}
+              placeholder="ex: JOB-001,JOB-002"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

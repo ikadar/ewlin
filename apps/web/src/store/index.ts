@@ -273,6 +273,7 @@ export {
   setIsTemplateSaving,
   setIsJcfSaving,
   setJcfSaveError,
+  setJcfRequiredJobs,
   resetJcfForm,
 } from './slices/jcfSlice';
 

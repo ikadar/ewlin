@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
 import { X } from 'lucide-react';
 import { TaskList } from './TaskList';
@@ -63,6 +63,10 @@ export interface JobDetailsPanelProps {
   onSplitTask?: (taskId: string, x: number, y: number) => void;
   /** Callback when fuse is requested (taskId) */
   onFuseTask?: (taskId: string) => void;
+  /** All jobs in snapshot (for dependency display) */
+  allJobs?: Job[];
+  /** Callback when a dependency job chip is clicked */
+  onSelectJob?: (jobId: string) => void;
 }
 
 /** Format workshop exit date as DD/MM/YYYY a HHhMM */
@@ -112,6 +116,8 @@ export function JobDetailsPanel({
   shippedJobIds,
   onSplitTask,
   onFuseTask,
+  allJobs,
+  onSelectJob,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -193,6 +199,21 @@ export function JobDetailsPanel({
     ? () => onDateClick(new Date(job.workshopExitDate))
     : undefined;
 
+  // Dependencies: required jobs and dependent jobs
+  const requiredJobs = useMemo(() => {
+    if (!allJobs || !job.requiredJobIds || job.requiredJobIds.length === 0) return [];
+    return job.requiredJobIds
+      .map((id) => allJobs.find((j) => j.id === id))
+      .filter((j): j is Job => j !== undefined);
+  }, [allJobs, job.requiredJobIds]);
+
+  const dependentJobs = useMemo(() => {
+    if (!allJobs) return [];
+    return allJobs.filter(
+      (j) => j.requiredJobIds && j.requiredJobIds.includes(job.id)
+    );
+  }, [allJobs, job.id]);
+
   return (
     <div className="w-80 shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col" data-testid="job-details-panel">
       {/* Compact info header */}
@@ -233,6 +254,32 @@ export function JobDetailsPanel({
             >
               Modifier
             </button>
+          </div>
+        )}
+
+        {/* Dependencies section */}
+        {requiredJobs.length > 0 && (
+          <div className="pt-1.5" data-testid="job-dependencies">
+            <div className="text-xs text-zinc-500 mb-1">Prérequis:</div>
+            <div className="flex flex-wrap gap-1">
+              {requiredJobs.map((rj) => (
+                <button
+                  key={rj.id}
+                  onClick={() => onSelectJob?.(rj.id)}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-purple-900/30 border border-purple-700/30 text-purple-300 hover:bg-purple-900/50 transition-colors truncate max-w-[140px]"
+                  title={`${rj.reference} - ${rj.client}`}
+                >
+                  {rj.reference}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {dependentJobs.length > 0 && (
+          <div className="pt-1" data-testid="job-dependents">
+            <div className="text-xs text-zinc-500">
+              Requis par: {dependentJobs.map((j) => j.reference).join(', ')}
+            </div>
           </div>
         )}
 

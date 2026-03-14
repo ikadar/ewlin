@@ -40,6 +40,7 @@ import { createOutsourcingPrecedenceFixture } from './fixtures/outsourcing-prece
 import { createOutsourcingDragFixture } from './fixtures/outsourcing-drag';
 import { createLouisPhase1Fixture } from './fixtures/louis-phase-1';
 import { createDeadlinePlacementFixture } from './fixtures/deadline-placement';
+import { createJobPrecedenceFixture } from './fixtures/job-precedence';
 
 // Re-export createBasicFixture for direct usage
 export { createBasicFixture };
@@ -48,7 +49,7 @@ export { createBasicFixture };
 // Fixture Registry
 // ============================================================================
 
-export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay' | 'element-precedence' | 'scale-harmonization' | 'blocking-visual' | 'forme-date-tracking' | 'pick-reschedule' | 'outsourcing-mini-form' | 'outsourcing-precedence' | 'outsourcing-drag' | 'louis-phase-1' | 'deadline-placement';
+export type FixtureName = 'test' | 'push-down' | 'precedence' | 'approval-gates' | 'swap' | 'sidebar-drag' | 'alt-bypass' | 'drag-snapping' | 'ui-bug-fixes' | 'layout-redesign' | 'datestrip-redesign' | 'precedence-visualization' | 'virtual-scroll' | 'datestrip-markers' | 'zoom-snapping' | 'drying-time' | 'validation-messages' | 'precedence-working-hours' | 'pick-place' | 'context-menu' | 'fixed-tile-height' | 'unavailability-overlay' | 'element-precedence' | 'scale-harmonization' | 'blocking-visual' | 'forme-date-tracking' | 'pick-reschedule' | 'outsourcing-mini-form' | 'outsourcing-precedence' | 'outsourcing-drag' | 'louis-phase-1' | 'deadline-placement' | 'job-precedence';
 
 export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'test': createBasicFixture,
@@ -83,6 +84,7 @@ export const fixtureRegistry: Record<FixtureName, () => ScheduleSnapshot> = {
   'outsourcing-drag': createOutsourcingDragFixture,
   'louis-phase-1': createLouisPhase1Fixture,
   'deadline-placement': createDeadlinePlacementFixture,
+  'job-precedence': createJobPrecedenceFixture,
 };
 
 /**
