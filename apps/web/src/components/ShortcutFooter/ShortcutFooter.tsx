@@ -36,6 +36,7 @@ const MODE_CONFIGS: Record<FooterMode, ModeConfig> = {
       { keys: ['Alt', 'Q'], label: 'Place' },
       { keys: ['Alt', 'D'], label: 'Departure' },
       { keys: ['Alt', '\u2191', '\u2193'], label: 'Navigate' },
+      { keys: ['Alt+P', 'S'], label: 'ASAP' },
       { keys: ['Alt', 'Z'], label: 'Clear tiles' },
       { keys: ['Alt', 'K'], label: 'Commands' },
     ],

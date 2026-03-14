@@ -41,6 +41,7 @@ export interface UseCommandsOptions {
   onZoomOut?: () => void;
   onOpenSaveLoad?: () => void;
   onClearJobAssignments?: () => void;
+  onAsapPlacement?: () => void;
 }
 
 const RECENT_KEY = 'flux-recent-commands';
@@ -115,6 +116,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
       { label: 'Voir le depart', keys: ['Alt', 'D'] },
       { label: 'Modifier ce job', keys: ['Alt', 'E'] },
       { label: 'Tache terminee', keys: ['Space'] },
+      { label: 'Auto-place ASAP', keys: ['Alt+P', 'S'] },
       { label: 'Clear all tiles', keys: ['Alt', 'Z'] },
     ],
   },
@@ -159,6 +161,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onZoomOut,
     onOpenSaveLoad,
     onClearJobAssignments,
+    onAsapPlacement,
   } = options;
 
   return useMemo(() => {
@@ -204,6 +207,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     if (onClearJobAssignments) {
       commands.push({ id: 'clear-job-tiles', label: 'Clear all tiles', category: 'Job selectionne', shortcut: 'Alt+Z', keywords: 'clear remove tiles unschedule recall', icon: 'trash-2', action: onClearJobAssignments });
     }
+    if (onAsapPlacement) {
+      commands.push({ id: 'asap-placement', label: 'Auto-place ASAP', category: 'Job selectionne', shortcut: 'Alt+P S', keywords: 'asap auto place schedule earliest soon precedence', icon: 'fast-forward', action: onAsapPlacement });
+    }
 
     // Scheduler-specific: Affichage
     if (onToggleDisplayMode) {
@@ -228,5 +234,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onAsapPlacement, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }
