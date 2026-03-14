@@ -125,6 +125,8 @@ export {
   useUnassignTaskMutation,
   useToggleCompletionMutation,
   useCompactStationMutation,
+  useSplitTaskMutation,
+  useFuseTaskMutation,
   useGetSavedSchedulesQuery,
   useSaveScheduleMutation,
   useLoadScheduleMutation,

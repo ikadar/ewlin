@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
 import { X } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { JobDetailContextMenu } from './JobDetailContextMenu';
@@ -59,6 +59,10 @@ export interface JobDetailsPanelProps {
   lateJobIds?: Set<string>;
   /** Job IDs that are shipped (highest priority tile coloring) */
   shippedJobIds?: Set<string>;
+  /** Callback when split is requested (taskId, x, y) */
+  onSplitTask?: (taskId: string, x: number, y: number) => void;
+  /** Callback when fuse is requested (taskId) */
+  onFuseTask?: (taskId: string) => void;
 }
 
 /** Format workshop exit date as DD/MM/YYYY a HHhMM */
@@ -106,6 +110,8 @@ export function JobDetailsPanel({
   onEditJob,
   lateJobIds,
   shippedJobIds,
+  onSplitTask,
+  onFuseTask,
 }: JobDetailsPanelProps) {
   // Don't render if no job selected
   if (!job) {
@@ -123,18 +129,29 @@ export function JobDetailsPanel({
   const jobAssignments = assignments.filter((a) => jobTaskIds.has(a.taskId));
 
   // Context menu state
+  // For unassigned tasks, assignmentId is actually the taskId (no assignment exists)
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     assignmentId: string;
     isCompleted: boolean;
+    taskId?: string;
+    isUnassigned?: boolean;
   } | null>(null);
 
   const handleTileContextMenu = useCallback(
     (x: number, y: number, assignmentId: string, isCompleted: boolean) => {
-      setContextMenu({ x, y, assignmentId, isCompleted });
+      // Check if this is an unassigned task (assignmentId is actually a taskId)
+      const isAssignment = jobAssignments.some((a) => a.id === assignmentId);
+      if (isAssignment) {
+        const assignment = jobAssignments.find((a) => a.id === assignmentId);
+        setContextMenu({ x, y, assignmentId, isCompleted, taskId: assignment?.taskId });
+      } else {
+        // assignmentId is actually a taskId for unassigned tasks
+        setContextMenu({ x, y, assignmentId, isCompleted: false, taskId: assignmentId, isUnassigned: true });
+      }
     },
-    []
+    [jobAssignments]
   );
 
   const handleContextMenuClose = useCallback(() => {
@@ -152,6 +169,24 @@ export function JobDetailsPanel({
       onToggleComplete(contextMenu.assignmentId);
     }
   }, [contextMenu, onToggleComplete]);
+
+  const handleContextMenuSplit = useCallback(() => {
+    if (contextMenu && contextMenu.taskId && onSplitTask) {
+      onSplitTask(contextMenu.taskId, contextMenu.x, contextMenu.y);
+    }
+  }, [contextMenu, onSplitTask]);
+
+  const handleContextMenuFuse = useCallback(() => {
+    if (contextMenu && contextMenu.taskId && onFuseTask) {
+      onFuseTask(contextMenu.taskId);
+    }
+  }, [contextMenu, onFuseTask]);
+
+  // Determine if the context menu task is a split task
+  const contextMenuTaskObj = contextMenu?.taskId
+    ? jobTasks.find((t) => t.id === contextMenu.taskId) as InternalTask | undefined
+    : null;
+  const isContextMenuSplit = contextMenuTaskObj?.type === 'Internal' && !!contextMenuTaskObj.splitGroupId;
 
   // REQ-02: Handle departure date click
   const handleDateClick = onDateClick
@@ -235,6 +270,10 @@ export function JobDetailsPanel({
           isCompleted={contextMenu.isCompleted}
           onToggleComplete={handleContextMenuToggleComplete}
           onRecall={handleContextMenuRecall}
+          onSplit={onSplitTask ? handleContextMenuSplit : undefined}
+          onFuse={onFuseTask ? handleContextMenuFuse : undefined}
+          isSplit={isContextMenuSplit}
+          isUnassigned={contextMenu.isUnassigned}
           onClose={handleContextMenuClose}
         />
       )}

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Circle, CircleCheck } from 'lucide-react';
+import { Circle, CircleCheck, Scissors } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
@@ -267,6 +267,14 @@ export const Tile = memo(function Tile({
           >
             {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
           </span>
+          {task.splitGroupId && (
+            <>
+              <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
+              <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1.5 py-px font-semibold">
+                {(task.splitIndex ?? 0) + 1}/{task.splitTotal ?? 1}
+              </span>
+            </>
+          )}
         </div>
       </div>
 

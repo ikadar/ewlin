@@ -75,3 +75,5 @@ export {
 export type { OutsourcingParams } from './outsourcingCalculation';
 export { recalculatePrecedenceConflicts, updateSnapshotConflicts } from './conflictRecalculation';
 export { cn } from './cn';
+export { applySplitToSnapshot, applyFuseToSnapshot } from './splitFuse';
+export type { SplitParams, SplitResult, FuseParams, FuseResult } from './splitFuse';

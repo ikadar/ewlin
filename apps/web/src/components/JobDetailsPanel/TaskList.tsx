@@ -1,4 +1,4 @@
-import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
 import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { isLastTaskOfJob } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
@@ -217,7 +217,12 @@ export function TaskList({
           ?? (index === 0 ? getCrossElementPredecessorEnd(element) : undefined));
 
       // Check if previous task is a printing task (for dry time label)
-      const showDryTimeLabel = prevTask && isPrintingTask(prevTask);
+      // Skip dry time between parts of the same split group (still same print run)
+      const sameGroup = prevTask
+        && task.type === 'Internal' && prevTask.type === 'Internal'
+        && (task as InternalTask).splitGroupId != null
+        && (task as InternalTask).splitGroupId === (prevTask as InternalTask).splitGroupId;
+      const showDryTimeLabel = prevTask && isPrintingTask(prevTask) && !sameGroup;
 
       // One-way shipping: last outsourced task of a job ships directly to client
       const isLastTask = task.type === 'Outsourced' && isLastTaskOfJob(task.id, elements, tasks);
@@ -261,7 +266,7 @@ export function TaskList({
             onReturnChange={onReturnChange}
             isCompleted={isCompleted}
             onToggleComplete={onToggleComplete}
-            onContextMenu={assignment ? onContextMenu : undefined}
+            onContextMenu={onContextMenu}
           />
         </div>
       );

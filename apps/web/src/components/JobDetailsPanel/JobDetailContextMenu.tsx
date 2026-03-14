@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Square, CheckSquare, Undo2 } from 'lucide-react';
+import { Square, CheckSquare, Undo2, Scissors, Merge } from 'lucide-react';
 
 export interface JobDetailContextMenuProps {
   x: number;
@@ -8,6 +8,11 @@ export interface JobDetailContextMenuProps {
   isCompleted: boolean;
   onToggleComplete: () => void;
   onRecall: () => void;
+  onSplit?: () => void;
+  onFuse?: () => void;
+  isSplit?: boolean;
+  /** Whether this is an unassigned task (hides recall/completion) */
+  isUnassigned?: boolean;
   onClose: () => void;
 }
 
@@ -46,6 +51,10 @@ export function JobDetailContextMenu({
   isCompleted,
   onToggleComplete,
   onRecall,
+  onSplit,
+  onFuse,
+  isSplit = false,
+  isUnassigned = false,
   onClose,
 }: JobDetailContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -125,6 +134,16 @@ export function JobDetailContextMenu({
     }
   };
 
+  const handleSplit = () => {
+    onSplit?.();
+    onClose();
+  };
+
+  const handleFuse = () => {
+    onFuse?.();
+    onClose();
+  };
+
   return createPortal(
     <div
       ref={menuRef}
@@ -133,19 +152,39 @@ export function JobDetailContextMenu({
       data-testid="job-detail-context-menu"
       role="menu"
     >
-      <MenuItem
-        icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-        label={isCompleted ? 'Marquer à faire' : 'Marquer terminée'}
-        onClick={handleToggleComplete}
-        testId="job-detail-context-toggle-complete"
-      />
-      <MenuItem
-        icon={<Undo2 className="w-4 h-4" />}
-        label="Rappeler (désassigner)"
-        onClick={handleRecall}
-        disabled={isCompleted}
-        testId="job-detail-context-recall"
-      />
+      {!isUnassigned && (
+        <>
+          <MenuItem
+            icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+            label={isCompleted ? 'Marquer à faire' : 'Marquer terminée'}
+            onClick={handleToggleComplete}
+            testId="job-detail-context-toggle-complete"
+          />
+          <MenuItem
+            icon={<Undo2 className="w-4 h-4" />}
+            label="Rappeler (désassigner)"
+            onClick={handleRecall}
+            disabled={isCompleted}
+            testId="job-detail-context-recall"
+          />
+        </>
+      )}
+      {onSplit && !isCompleted && (
+        <MenuItem
+          icon={<Scissors className="w-4 h-4" />}
+          label={isSplit ? 'Diviser encore' : 'Diviser'}
+          onClick={handleSplit}
+          testId="job-detail-context-split"
+        />
+      )}
+      {isSplit && onFuse && (
+        <MenuItem
+          icon={<Merge className="w-4 h-4" />}
+          label="Fusionner"
+          onClick={handleFuse}
+          testId="job-detail-context-fuse"
+        />
+      )}
     </div>,
     document.body
   );

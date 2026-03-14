@@ -19,7 +19,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -45,6 +45,7 @@ import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
 import { FluxPage } from './pages/FluxPage';
+import { SplitTaskPopover } from './components/SplitTaskPopover';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -336,6 +337,8 @@ function AppContent() {
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
   const [compactStation] = useCompactStationMutation();
+  const [splitTask] = useSplitTaskMutation();
+  const [fuseTask] = useFuseTaskMutation();
   const [createJob] = useCreateJobMutation();
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
@@ -422,6 +425,15 @@ function AppContent() {
     y: number;
     assignmentId: string;
     isCompleted: boolean;
+  } | null>(null);
+
+  // Split task popover state
+  const [splitPopover, setSplitPopover] = useState<{
+    x: number;
+    y: number;
+    taskId: string;
+    task: InternalTask;
+    stationName: string;
   } | null>(null);
 
   // v0.4.38: JCF modal state derived from URL
@@ -1579,6 +1591,85 @@ function AppContent() {
     };
   }, [contextMenu, snapshot.assignments]);
 
+  // Derive whether the context menu task is a split task
+  const contextMenuTask = useMemo(() => {
+    if (!contextMenu) return null;
+    // For grid context menu, assignmentId is the assignment ID
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (assignment) {
+      return snapshot.tasks.find((t) => t.id === assignment.taskId) as InternalTask | undefined ?? null;
+    }
+    return null;
+  }, [contextMenu, snapshot.assignments, snapshot.tasks]);
+
+  const isContextMenuTaskSplit = contextMenuTask?.type === 'Internal' && !!contextMenuTask.splitGroupId;
+
+  // Handle context menu "Split" action — open the split popover
+  const handleContextMenuSplit = useCallback(() => {
+    if (!contextMenu) return;
+    // Find the task from the context menu's assignment
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
+    const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
+    if (!task || task.type !== 'Internal') return;
+    const internalTask = task as InternalTask;
+    const station = snapshot.stations.find((s) => s.id === internalTask.stationId);
+    setSplitPopover({
+      x: contextMenu.x,
+      y: contextMenu.y,
+      taskId: internalTask.id,
+      task: internalTask,
+      stationName: station?.name ?? 'Unknown',
+    });
+  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.stations]);
+
+  // Handle context menu "Fuse" action
+  const handleContextMenuFuse = useCallback(async () => {
+    if (!contextMenu) return;
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
+    try {
+      await fuseTask(assignment.taskId).unwrap();
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [contextMenu, snapshot.assignments, fuseTask, showToast]);
+
+  // Handle split confirm from popover
+  const handleSplitConfirm = useCallback(async (ratio: number) => {
+    if (!splitPopover) return;
+    try {
+      await splitTask({ taskId: splitPopover.taskId, body: { ratio } }).unwrap();
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+    setSplitPopover(null);
+  }, [splitPopover, splitTask, showToast]);
+
+  // Handle split from JobDetailsPanel (both assigned and unassigned tasks)
+  const handlePanelSplitTask = useCallback((taskId: string, x: number, y: number) => {
+    const task = snapshot.tasks.find((t) => t.id === taskId);
+    if (!task || task.type !== 'Internal') return;
+    const internalTask = task as InternalTask;
+    const station = snapshot.stations.find((s) => s.id === internalTask.stationId);
+    setSplitPopover({
+      x,
+      y,
+      taskId: internalTask.id,
+      task: internalTask,
+      stationName: station?.name ?? 'Unknown',
+    });
+  }, [snapshot.tasks, snapshot.stations]);
+
+  // Handle fuse from JobDetailsPanel
+  const handlePanelFuseTask = useCallback(async (taskId: string) => {
+    try {
+      await fuseTask(taskId).unwrap();
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [fuseTask, showToast]);
+
   // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
   // In backward scheduling, we always show the last task as the one to place
   const lastUnscheduledTask = useMemo(() => {
@@ -2276,6 +2367,8 @@ function AppContent() {
           onEditJob={handleEditJob}
           lateJobIds={lateJobIds}
           shippedJobIds={shippedJobIds}
+          onSplitTask={handlePanelSplitTask}
+          onFuseTask={handlePanelFuseTask}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Mode banner — shows active mode (quick placement / picking) */}
@@ -2382,7 +2475,22 @@ function AppContent() {
           onSwapUp={handleContextMenuMoveUp}
           onSwapDown={handleContextMenuMoveDown}
           onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
+          onSplit={handleContextMenuSplit}
+          onFuse={handleContextMenuFuse}
+          isSplit={isContextMenuTaskSplit}
           onClose={handleContextMenuClose}
+        />
+      )}
+
+      {/* Split task popover */}
+      {splitPopover && (
+        <SplitTaskPopover
+          x={splitPopover.x}
+          y={splitPopover.y}
+          task={splitPopover.task}
+          stationName={splitPopover.stationName}
+          onConfirm={handleSplitConfirm}
+          onCancel={() => setSplitPopover(null)}
         />
       )}
 

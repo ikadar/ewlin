@@ -10,7 +10,7 @@
  * Cross-element: prerequisiteElementIds define finish-to-start dependencies.
  */
 
-import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element, OutsourcedTask, OutsourcedProvider } from '@flux/types';
+import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element, OutsourcedTask, OutsourcedProvider, InternalTask } from '@flux/types';
 import { isOutsourcedTask, DRY_TIME_MS } from '@flux/types';
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
@@ -282,13 +282,27 @@ function getCrossElementSuccessors(snapshot: ScheduleSnapshot, task: Task): Task
 // ============================================================================
 
 /**
+ * Check if two tasks belong to the same split group.
+ */
+function areSameSplitGroup(taskA: Task | undefined, taskB: Task | undefined): boolean {
+  if (!taskA || !taskB) return false;
+  if (taskA.type !== 'Internal' || taskB.type !== 'Internal') return false;
+  const groupA = (taskA as InternalTask).splitGroupId;
+  return !!groupA && groupA === (taskB as InternalTask).splitGroupId;
+}
+
+/**
  * Calculate the earliest start Date from a single predecessor assignment.
  * Handles dry time for printing stations + working hours snapping.
  * v0.5.12: Handles outsourced predecessors with manual return override.
+ *
+ * @param successorTask Optional successor task — when provided, dry time is
+ *   skipped if predecessor and successor belong to the same split group.
  */
 function getEarliestStartFromPredecessor(
   predecessorAssignment: TaskAssignment,
-  snapshot: ScheduleSnapshot
+  snapshot: ScheduleSnapshot,
+  successorTask?: Task
 ): Date {
   // v0.5.12: Handle outsourced predecessor with potential manual return
   if (predecessorAssignment.isOutsourced) {
@@ -307,7 +321,11 @@ function getEarliestStartFromPredecessor(
   const predecessorEnd = parseTimestamp(predecessorAssignment.scheduledEnd);
 
   if (isPrintingStation(snapshot, predecessorAssignment.targetId)) {
-    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+    // Skip dry time between parts of the same split group
+    const predecessorTask = findTaskById(snapshot, predecessorAssignment.taskId);
+    if (!areSameSplitGroup(predecessorTask, successorTask)) {
+      return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+    }
   }
 
   return predecessorEnd;
@@ -337,16 +355,16 @@ export function getPredecessorConstraint(
   if (predecessor) {
     const predAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
     if (predAssignment) {
-      latestEarliestStart = getEarliestStartFromPredecessor(predAssignment, snapshot);
+      latestEarliestStart = getEarliestStartFromPredecessor(predAssignment, snapshot, task);
     }
   }
 
-  // 2. Cross-element predecessors
+  // 2. Cross-element predecessors (never same split group — different elements)
   const crossPreds = getCrossElementPredecessors(snapshot, task);
   for (const crossPred of crossPreds) {
     const crossAssignment = findAssignmentByTaskId(snapshot, crossPred.id);
     if (crossAssignment) {
-      const earliest = getEarliestStartFromPredecessor(crossAssignment, snapshot);
+      const earliest = getEarliestStartFromPredecessor(crossAssignment, snapshot, task);
       if (!latestEarliestStart || earliest > latestEarliestStart) {
         latestEarliestStart = earliest;
       }
@@ -424,7 +442,8 @@ export function getSuccessorConstraint(
     const taskDurationMs = taskDurationMinutes * 60 * 1000;
 
     let dryTimeMs = 0;
-    if (currentTask.type === 'Internal' && isPrintingStation(snapshot, currentTask.stationId)) {
+    if (currentTask.type === 'Internal' && isPrintingStation(snapshot, currentTask.stationId)
+        && !areSameSplitGroup(currentTask, successorTask)) {
       dryTimeMs = DRY_TIME_MS;
     }
 
@@ -480,9 +499,9 @@ export function getDryingTimeInfo(
   // Collect all predecessor assignments that are printing stations
   const printingPredecessors: TaskAssignment[] = [];
 
-  // Intra-element predecessor
+  // Intra-element predecessor (skip if same split group — no drying between split parts)
   const predecessor = getPredecessorTask(snapshot, task);
-  if (predecessor) {
+  if (predecessor && !areSameSplitGroup(predecessor, task)) {
     const predAssignment = findAssignmentByTaskId(snapshot, predecessor.id);
     if (predAssignment && !predAssignment.isOutsourced && isPrintingStation(snapshot, predAssignment.targetId)) {
       printingPredecessors.push(predAssignment);

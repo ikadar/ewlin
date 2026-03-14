@@ -26,6 +26,9 @@ import type {
   CompactStationResponse,
   ClientSuggestionsResponse,
   ReferenceLookupResponse,
+  SplitTaskRequest,
+  SplitTaskResponse,
+  FuseTaskResponse,
   InternalTask,
   TaskAssignment,
   PaperStatus,
@@ -35,6 +38,8 @@ import type {
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
+import { generateId } from '@/utils/generateId';
+import { applySplitToSnapshot, applyFuseToSnapshot } from '@/utils/splitFuse';
 
 /**
  * Response from getSavedSchedules query.
@@ -591,6 +596,81 @@ export const scheduleApi = createApi({
       invalidatesTags: ['Snapshot'],
     }),
 
+    /**
+     * Split an internal task into two parts.
+     *
+     * Mock mode: mockBaseQuery handles this via handleSplitTask
+     * Real mode: POST /tasks/{taskId}/split
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    splitTask: builder.mutation<
+      SplitTaskResponse,
+      { taskId: string; body: SplitTaskRequest }
+    >({
+      query: ({ taskId, body }) => ({
+        url: `/tasks/${taskId}/split`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted({ taskId, body }, { dispatch, queryFulfilled }) {
+        const partAId = generateId();
+        const partBId = generateId();
+        const now = new Date().toISOString();
+
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            applySplitToSnapshot(draft, {
+              taskId,
+              ratio: body.ratio,
+              partAId,
+              partBId,
+              now,
+            });
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    /**
+     * Fuse (merge) all parts of a split task back into one.
+     *
+     * Mock mode: mockBaseQuery handles this via handleFuseTask
+     * Real mode: POST /tasks/{taskId}/fuse
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    fuseTask: builder.mutation<FuseTaskResponse, string>({
+      query: (taskId) => ({
+        url: `/tasks/${taskId}/fuse`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted(taskId, { dispatch, queryFulfilled }) {
+        const restoredId = generateId();
+        const now = new Date().toISOString();
+
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            applyFuseToSnapshot(draft, { taskId, restoredId, now });
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
     // ========================================================================
     // Saved Schedules
     // ========================================================================
@@ -646,6 +726,8 @@ export const {
   useUnassignTaskMutation,
   useToggleCompletionMutation,
   useCompactStationMutation,
+  useSplitTaskMutation,
+  useFuseTaskMutation,
   useGetSavedSchedulesQuery,
   useSaveScheduleMutation,
   useLoadScheduleMutation,

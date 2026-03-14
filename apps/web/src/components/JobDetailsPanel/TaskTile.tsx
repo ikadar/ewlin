@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask } from '@flux/types';
-import { Circle, CircleCheck } from 'lucide-react';
+import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask, InternalTask } from '@flux/types';
+import { Circle, CircleCheck, Scissors } from 'lucide-react';
 import { useTooltipDelay } from '../../hooks';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 
@@ -248,6 +248,14 @@ export function TaskTile({
                 />
               )}
               <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>{displayName}</span>
+              {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
+                <>
+                  <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
+                  <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1 py-px font-semibold shrink-0">
+                    {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
+                  </span>
+                </>
+              )}
             </div>
             <span className="text-zinc-500 shrink-0">
               {formatScheduledTime(assignment.scheduledStart)}
@@ -272,6 +280,15 @@ export function TaskTile({
   }
 
   // Unplaced task - no completion circle, duration on right
+  // Handle right-click on unplaced task for split
+  const handleUnplacedContextMenu = (e: React.MouseEvent) => {
+    if (onContextMenu) {
+      e.preventDefault();
+      // For unplaced tasks, pass task.id as assignmentId (no assignment exists)
+      onContextMenu(e.clientX, e.clientY, task.id, false);
+    }
+  };
+
   // Handle click for pick & place
   const handleClick = (e: React.MouseEvent) => {
     if (onPick) {
@@ -290,9 +307,19 @@ export function TaskTile({
 
   const content = (
     <div className="flex items-center justify-between gap-2">
-      <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>
-        {displayName}
-      </span>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>
+          {displayName}
+        </span>
+        {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
+          <>
+            <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
+            <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1 py-px font-semibold shrink-0">
+              {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
+            </span>
+          </>
+        )}
+      </div>
       <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
     </div>
   );
@@ -306,6 +333,7 @@ export function TaskTile({
         style={tileInlineStyle}
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
+        onContextMenu={handleUnplacedContextMenu}
       >
         {content}
       </button>
@@ -318,6 +346,7 @@ export function TaskTile({
       className={baseClassName}
       style={tileInlineStyle}
       data-testid={`task-tile-${task.id}`}
+      onContextMenu={handleUnplacedContextMenu}
     >
       {content}
     </div>

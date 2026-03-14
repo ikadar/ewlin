@@ -121,6 +121,12 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 | `docs/architecture/git-release-strategy.md` | Git/version strategy |
 | `docs/domain-model/business-rules.md` | Business rules (BR-*) |
 
+## Implementation plans
+
+When given a multi-section implementation plan, **implement ALL sections completely**. Never silently skip sections (e.g. skipping backend while doing frontend). If a section cannot be implemented, explicitly flag it and ask for guidance before moving on.
+
+**After writing database migrations, always run them immediately** (`php bin/console doctrine:migrations:migrate --no-interaction`). A migration that exists but hasn't been applied will crash the app at runtime.
+
 ## PHP API specifics
 
 - **PHPStan level 8** is mandatory

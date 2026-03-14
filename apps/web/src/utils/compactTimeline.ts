@@ -64,11 +64,13 @@ function findPredecessorTask(task: Task, allTasks: Task[], elements: Element[]):
 /**
  * Get the end time of a single task, considering any updates made during compaction.
  * Includes drying time if the task is at a printing station.
+ * Skips drying time when the successor is in the same split group.
  */
 function getTaskEndTime(
   task: Task,
   snapshot: ScheduleSnapshot,
-  updatedEndTimes: Map<string, Date>
+  updatedEndTimes: Map<string, Date>,
+  successorTask?: Task
 ): Date | null {
   const assignment = snapshot.assignments.find((a) => a.taskId === task.id);
   if (!assignment) return null;
@@ -76,7 +78,13 @@ function getTaskEndTime(
   const updatedEnd = updatedEndTimes.get(task.id);
   const endTime = updatedEnd ?? new Date(assignment.scheduledEnd);
 
-  if (isPrintingStation(snapshot, assignment.targetId)) {
+  // Skip dry time between parts of the same split group
+  const sameGroup = successorTask
+    && task.type === 'Internal' && successorTask.type === 'Internal'
+    && (task as InternalTask).splitGroupId != null
+    && (task as InternalTask).splitGroupId === (successorTask as InternalTask).splitGroupId;
+
+  if (isPrintingStation(snapshot, assignment.targetId) && !sameGroup) {
     return new Date(endTime.getTime() + DRY_TIME_MS);
   }
 
@@ -97,7 +105,7 @@ function getPredecessorEndTime(
   // Intra-element predecessor (same element, sequenceOrder - 1)
   const intraElementPred = findPredecessorTask(task, snapshot.tasks, snapshot.elements);
   if (intraElementPred) {
-    return getTaskEndTime(intraElementPred, snapshot, updatedEndTimes);
+    return getTaskEndTime(intraElementPred, snapshot, updatedEndTimes, task);
   }
 
   // Cross-element predecessors (first task of element → check prerequisiteElementIds)

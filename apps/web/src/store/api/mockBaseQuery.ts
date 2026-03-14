@@ -41,6 +41,7 @@ import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { FLUX_STATIC_JOBS } from '../../mock/fluxStaticData';
 import { getTemplates as mockGetTemplates, createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
+import { applySplitToSnapshot, applyFuseToSnapshot } from '../../utils/splitFuse';
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
 import { isLastTaskOfJob } from '../../utils/taskHelpers';
 import { normalizeError, createNotFoundError } from './errorNormalization';
@@ -1236,10 +1237,17 @@ function getCompactPredecessorEnd(
     ?? new Date(predecessorAssignment.scheduledEnd);
 
   // Add drying time if predecessor is at a printing (offset) station
-  const predStation = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
-  const category = snapshot.categories.find((c) => c.id === predStation?.categoryId);
-  if (category?.name.toLowerCase().includes('offset')) {
-    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+  // Skip dry time between parts of the same split group
+  const sameGroup = task.type === 'Internal' && predecessorTask.type === 'Internal'
+    && (task as InternalTask).splitGroupId != null
+    && (task as InternalTask).splitGroupId === (predecessorTask as InternalTask).splitGroupId;
+
+  if (!sameGroup) {
+    const predStation = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
+    const category = snapshot.categories.find((c) => c.id === predStation?.categoryId);
+    if (category?.name.toLowerCase().includes('offset')) {
+      return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
+    }
   }
 
   return predecessorEnd;
@@ -2780,6 +2788,88 @@ const handleDeleteSavedSchedule: MockRouteHandler = async (args: FetchArgs) => {
   return { data: null };
 };
 
+// ============================================================================
+// Split / Fuse Task Handlers
+// ============================================================================
+
+const handleSplitTask: MockRouteHandler = async (args: FetchArgs) => {
+  const taskId = extractPathParam(args.url, /^\/tasks\/([^/]+)\/split$/);
+  if (!taskId) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing task ID' } } };
+  }
+
+  const body = args.body as { ratio: number } | undefined;
+  const ratio = body?.ratio ?? 0.5;
+  if (ratio < 0.05 || ratio > 0.95) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Ratio must be between 0.05 and 0.95' } } };
+  }
+
+  const snapshot = getSnapshot();
+  const task = snapshot.tasks.find((t) => t.id === taskId);
+  if (!task || task.type !== 'Internal') {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Internal task not found' } } };
+  }
+
+  const partAId = generateId();
+  const partBId = generateId();
+  const now = new Date().toISOString();
+
+  let splitGroupId = '';
+  updateSnapshot((draft) => {
+    const result = applySplitToSnapshot(draft, { taskId, ratio, partAId, partBId, now });
+    if (result) {
+      splitGroupId = result.splitGroupId;
+    }
+  });
+
+  return {
+    data: {
+      partIds: [partAId, partBId],
+      splitGroupId,
+    },
+  };
+};
+
+const handleFuseTask: MockRouteHandler = async (args: FetchArgs) => {
+  const taskId = extractPathParam(args.url, /^\/tasks\/([^/]+)\/fuse$/);
+  if (!taskId) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing task ID' } } };
+  }
+
+  const snapshot = getSnapshot();
+  const task = snapshot.tasks.find((t) => t.id === taskId) as InternalTask | undefined;
+  if (!task || task.type !== 'Internal' || !task.splitGroupId) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Split task not found' } } };
+  }
+
+  const splitGroupId = task.splitGroupId;
+  const groupMembers = snapshot.tasks.filter(
+    (t) => t.type === 'Internal' && (t as InternalTask).splitGroupId === splitGroupId
+  ) as InternalTask[];
+
+  if (groupMembers.length < 2) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Task is not split' } } };
+  }
+
+  const restoredId = generateId();
+  const now = new Date().toISOString();
+
+  let originalRunMinutes = 0;
+  updateSnapshot((draft) => {
+    const result = applyFuseToSnapshot(draft, { taskId, restoredId, now });
+    if (result) {
+      originalRunMinutes = result.originalRunMinutes;
+    }
+  });
+
+  return {
+    data: {
+      taskId: restoredId,
+      runMinutes: originalRunMinutes,
+    },
+  };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
@@ -2857,6 +2947,10 @@ const routes: MockRoute[] = [
 
   // Task completion
   { method: 'PUT', pattern: /^\/tasks\/[^/]+\/completion$/, handler: handleToggleCompletion },
+
+  // Task split/fuse
+  { method: 'POST', pattern: /^\/tasks\/[^/]+\/split$/, handler: handleSplitTask },
+  { method: 'POST', pattern: /^\/tasks\/[^/]+\/fuse$/,  handler: handleFuseTask },
 
   // Saved Schedules (load must come before generic ID route)
   { method: 'GET',    pattern: /^\/saved-schedules$/,              handler: handleGetSavedSchedules },
