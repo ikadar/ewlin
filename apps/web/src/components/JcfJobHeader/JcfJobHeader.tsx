@@ -3,6 +3,7 @@ import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import { JcfTransporteurSelect } from './JcfTransporteurSelect';
+import { JcfJobPrecedencesAutocomplete } from '../JcfJobPrecedencesAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
 import type { JcfTemplate } from '@flux/types';
 import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery, useGetShippersQuery } from '../../store';
@@ -373,7 +374,7 @@ export function JcfJobHeader({
             <label htmlFor="jcf-required-jobs" className={labelClass}>
               Prérequis
             </label>
-            <JcfAutocomplete
+            <JcfJobPrecedencesAutocomplete
               id="jcf-required-jobs"
               value={requiredJobs ?? ''}
               onChange={onRequiredJobsChange}
