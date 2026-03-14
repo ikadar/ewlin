@@ -5,6 +5,7 @@
 
 import type { InternalTask, Station, DaySchedule } from '@flux/types';
 import { getTotalMinutes } from '@flux/types';
+import { subtractWorkingTime } from './workingTime';
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
   'sunday',
@@ -142,6 +143,32 @@ export function calculateEndTime(
   }
 
   return currentDate.toISOString();
+}
+
+/**
+ * Calculate the scheduled start time for an internal task given a desired end time.
+ * Reverse of calculateEndTime(). Uses subtractWorkingTime to walk backward.
+ *
+ * @param task - The internal task
+ * @param scheduledEnd - ISO timestamp of desired end
+ * @param station - The station (optional, for operating hours stretching)
+ * @returns ISO timestamp of scheduled start
+ */
+export function calculateStartTime(
+  task: InternalTask,
+  scheduledEnd: string,
+  station?: Station
+): string {
+  const endDate = new Date(scheduledEnd);
+  const totalMinutes = getTotalMinutes(task.duration);
+  const durationMs = totalMinutes * 60 * 1000;
+
+  if (!station) {
+    return new Date(endDate.getTime() - durationMs).toISOString();
+  }
+
+  const startDate = subtractWorkingTime(endDate, durationMs, station);
+  return startDate.toISOString();
 }
 
 /**

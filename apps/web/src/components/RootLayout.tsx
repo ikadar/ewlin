@@ -51,7 +51,7 @@ function RootLayoutInner() {
       if (chordPendingRef.current === 'placement') {
         chordPendingRef.current = null;
         if (chordTimeoutRef.current) { clearTimeout(chordTimeoutRef.current); chordTimeoutRef.current = null; }
-        const map: Record<number, string> = { 83: 'asap-placement' }; // 83 = S
+        const map: Record<number, string> = { 83: 'asap-placement', 76: 'alap-placement' }; // 83 = S, 76 = L
         const cmdId = map[e.keyCode];
         if (cmdId) {
           e.preventDefault();
@@ -93,7 +93,7 @@ function RootLayoutInner() {
       // Alt+P: chord prefix for placement (when available), else navigate to scheduler
       if (isAltLetter(e, 'p')) {
         e.preventDefault();
-        if (allCommands.some(c => c.id === 'asap-placement')) {
+        if (allCommands.some(c => c.id === 'asap-placement' || c.id === 'alap-placement')) {
           chordPendingRef.current = 'placement';
           if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
           chordTimeoutRef.current = setTimeout(() => {

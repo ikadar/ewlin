@@ -45,6 +45,7 @@ import { applySplitToSnapshot, applyFuseToSnapshot } from '../../utils/splitFuse
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
 import { isLastTaskOfJob } from '../../utils/taskHelpers';
 import { computeAsapPlacements } from '../../utils/asapPlacement';
+import { computeAlapPlacements } from '../../utils/alapPlacement';
 import { normalizeError, createNotFoundError } from './errorNormalization';
 
 // ============================================================================
@@ -1165,6 +1166,85 @@ const handleAutoPlace: MockRouteHandler = async (args: FetchArgs) => {
     }
 
     return { ...snapshot, assignments: finalAssignments };
+  });
+
+  return { data: { placedCount: result.placements.length } };
+};
+
+// ============================================================================
+// Auto-Place Job ALAP Handler
+// ============================================================================
+
+/**
+ * POST /jobs/:jobId/auto-place-alap - ALAP auto-placement for all unscheduled tasks
+ */
+const handleAutoPlaceAlap: MockRouteHandler = async (args: FetchArgs) => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)\/auto-place-alap$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const job = currentSnapshot.jobs.find((j: Job) => j.id === jobId);
+  if (!job) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const result = computeAlapPlacements(jobId, currentSnapshot);
+
+  if (result.placements.length === 0) {
+    return { data: { placedCount: 0 } };
+  }
+
+  // Apply placements to snapshot
+  updateSnapshot((snapshot) => {
+    const updatedAssignments = [...snapshot.assignments];
+
+    for (const p of result.placements) {
+      const task = snapshot.tasks.find((t: Task) => t.id === p.taskId);
+      let scheduledEnd: string;
+
+      if (task && 'stationId' in task) {
+        const station = snapshot.stations.find((s: Station) => s.id === p.targetId);
+        scheduledEnd = calculateEndTime(task as InternalTask, p.scheduledStart, station);
+      } else if (task && 'providerId' in task) {
+        const outsourcedTask = task as OutsourcedTask;
+        const provider = snapshot.providers?.find(pr => pr.id === outsourcedTask.providerId);
+        if (provider) {
+          const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
+          const dates = calculateOutsourcingDates(p.scheduledStart, {
+            workDays: outsourcedTask.duration.openDays,
+            latestDepartureTime: provider.latestDepartureTime,
+            receptionTime: provider.receptionTime,
+            transitDays: provider.transitDays,
+            oneWay,
+          });
+          scheduledEnd = dates ? dates.return.toISOString() : p.scheduledStart;
+        } else {
+          scheduledEnd = p.scheduledStart;
+        }
+      } else {
+        scheduledEnd = p.scheduledStart;
+      }
+
+      const now = new Date().toISOString();
+      updatedAssignments.push({
+        id: generateId(),
+        taskId: p.taskId,
+        targetId: p.targetId,
+        isOutsourced: p.isOutsourced,
+        scheduledStart: p.scheduledStart,
+        scheduledEnd,
+        isCompleted: false,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // ALAP places ALL outsourced tasks backward explicitly — no autoAssignSuccessors
+    // (which uses forward/ASAP logic and would create lateness).
+    return { ...snapshot, assignments: updatedAssignments };
   });
 
   return { data: { placedCount: result.placements.length } };
@@ -3000,6 +3080,7 @@ const routes: MockRoute[] = [
   { method: 'GET', pattern: /^\/jobs\/lookup-by-reference/, handler: handleLookupByReference },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
   { method: 'PUT', pattern: /^\/jobs\/[^/]+$/, handler: handleUpdateJob },
+  { method: 'POST', pattern: /^\/jobs\/[^/]+\/auto-place-alap$/, handler: handleAutoPlaceAlap },
   { method: 'POST', pattern: /^\/jobs\/[^/]+\/auto-place$/, handler: handleAutoPlace },
   { method: 'DELETE', pattern: /^\/jobs\/[^/]+\/assignments$/, handler: handleClearJobAssignments },
   { method: 'DELETE', pattern: /^\/jobs\/[^/]+$/, handler: handleDeleteJob },

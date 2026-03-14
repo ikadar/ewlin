@@ -128,6 +128,7 @@ export {
   useSplitTaskMutation,
   useFuseTaskMutation,
   useAutoPlaceJobMutation,
+  useAutoPlaceJobAlapMutation,
   useGetSavedSchedulesQuery,
   useSaveScheduleMutation,
   useLoadScheduleMutation,

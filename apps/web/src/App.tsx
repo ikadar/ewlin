@@ -19,7 +19,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -344,6 +344,7 @@ function AppContent() {
   const [deleteJob] = useDeleteJobMutation();
   const [clearJobAssignments] = useClearJobAssignmentsMutation();
   const [autoPlaceJob] = useAutoPlaceJobMutation();
+  const [autoPlaceJobAlap] = useAutoPlaceJobAlapMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
@@ -1143,6 +1144,21 @@ function AppContent() {
       showToast(getErrorMessage(error));
     }
   }, [selectedJobId, autoPlaceJob, showToast]);
+
+  // Handle ALAP auto-placement for selected job (ALT+P L)
+  const handleAlapPlacement = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      const result = await autoPlaceJobAlap(selectedJobId).unwrap();
+      if (result.placedCount === 0) {
+        showToast('No unscheduled tiles to place', 'info');
+      } else {
+        showToast(`${result.placedCount} tile(s) placed ALAP`, 'success');
+      }
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [selectedJobId, autoPlaceJobAlap, showToast]);
 
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
@@ -2311,6 +2327,7 @@ function AppContent() {
     }, []),
     onClearJobAssignments: handleClearJobAssignments,
     onAsapPlacement: handleAsapPlacement,
+    onAlapPlacement: handleAlapPlacement,
   });
 
   // Register scheduler-specific commands into the global Command Center

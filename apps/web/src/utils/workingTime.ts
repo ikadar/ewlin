@@ -281,6 +281,38 @@ export function subtractWorkingTime(
 }
 
 /**
+ * Snap a time to the previous available working time end.
+ * If the time is already within working hours, returns the same time.
+ * If not, returns the end of the previous working slot (same day or previous working day).
+ *
+ * Mirror of snapToNextWorkingTime() — used for ALAP backward placement.
+ */
+export function snapToPreviousWorkingTime(time: Date, station: Station): Date {
+  // If already within working hours, return as-is
+  if (isWithinWorkingHours(time, station)) {
+    return new Date(time);
+  }
+
+  const daySchedule = getDayScheduleForDate(time, station);
+
+  // If day is operating, find the latest slot that ends before current time
+  if (daySchedule.isOperating && daySchedule.slots.length > 0) {
+    const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+
+    // Reverse iterate to find the latest slot ending before our time
+    for (let i = daySchedule.slots.length - 1; i >= 0; i--) {
+      const slot = daySchedule.slots[i];
+      if (slot.end <= timeStr) {
+        return parseTimeToDate(slot.end, time);
+      }
+    }
+  }
+
+  // No usable slots today, go to previous working day end
+  return getPreviousWorkingDayEnd(time, station);
+}
+
+/**
  * Check if a time falls within working hours of a station.
  */
 export function isWithinWorkingHours(time: Date, station: Station): boolean {

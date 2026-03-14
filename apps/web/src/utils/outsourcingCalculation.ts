@@ -9,7 +9,7 @@
  * - Return: departure + transitDays (outbound) + workDays + transitDays (return)
  */
 
-import { addBusinessDays } from './businessDays';
+import { addBusinessDays, subtractBusinessDays, getPreviousBusinessDay, isBusinessDay } from './businessDays';
 
 /**
  * Parameters for outsourcing calculations.
@@ -141,6 +141,65 @@ export function calculateOutsourcingDates(
 
   return {
     departure,
+    return: returnDate,
+  };
+}
+
+/**
+ * Calculate outsourcing dates backward from a ceiling (for ALAP placement).
+ *
+ * Given a ceiling (latest acceptable return time), works backward:
+ * 1. Find the latest return date at receptionTime that fits within the ceiling
+ * 2. Subtract transit + work + transit business days to find departure
+ * 3. Set departure time to latestDepartureTime
+ *
+ * @param ceiling - Latest acceptable end time (ISO string or Date)
+ * @param params - Outsourcing parameters
+ * @returns Object with departure and return dates, or null if invalid
+ */
+export function calculateOutsourcingDatesBackward(
+  ceiling: Date | string,
+  params: OutsourcingParams & { oneWay?: boolean }
+): { departure: Date; return: Date } | null {
+  const ceilingDate = typeof ceiling === 'string' ? new Date(ceiling) : new Date(ceiling);
+
+  const { hours: recHours, minutes: recMinutes } = parseTime(params.receptionTime);
+
+  // Find the latest business day where date-at-receptionTime <= ceiling
+  let returnDate: Date;
+
+  if (isBusinessDay(ceilingDate)) {
+    const sameDayAtReception = new Date(ceilingDate);
+    sameDayAtReception.setHours(recHours, recMinutes, 0, 0);
+    if (sameDayAtReception.getTime() <= ceilingDate.getTime()) {
+      // Reception time fits on the ceiling day
+      returnDate = sameDayAtReception;
+    } else {
+      // Reception time is after the ceiling time → must use previous business day
+      const prev = new Date(ceilingDate);
+      prev.setDate(prev.getDate() - 1);
+      returnDate = getPreviousBusinessDay(prev);
+      returnDate.setHours(recHours, recMinutes, 0, 0);
+    }
+  } else {
+    // Ceiling is on a weekend → rewind to previous business day
+    returnDate = getPreviousBusinessDay(ceilingDate);
+    returnDate.setHours(recHours, recMinutes, 0, 0);
+  }
+
+  // Calculate departure: subtract total business days
+  const { workDays, transitDays, oneWay } = params;
+  const totalDays = oneWay
+    ? transitDays + workDays
+    : transitDays + workDays + transitDays;
+
+  const departureDate = subtractBusinessDays(returnDate, totalDays);
+
+  const { hours: depHours, minutes: depMinutes } = parseTime(params.latestDepartureTime);
+  departureDate.setHours(depHours, depMinutes, 0, 0);
+
+  return {
+    departure: departureDate,
     return: returnDate,
   };
 }
