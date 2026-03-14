@@ -43,6 +43,8 @@ export interface TaskTileProps {
   isCompleted?: boolean;
   /** Callback to toggle completion state */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when right-clicking a scheduled tile (context menu) */
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
 }
 
 /** Visual style config per tile state */
@@ -114,6 +116,7 @@ export function TaskTile({
   isLastTaskOfJob: isLastTask,
   isCompleted = false,
   onToggleComplete,
+  onContextMenu,
 }: TaskTileProps) {
   // v0.5.11: Outsourced tasks render as mini-form
   if (task.type === 'Outsourced') {
@@ -210,6 +213,13 @@ export function TaskTile({
       }
     };
 
+    const handleContextMenu = (e: React.MouseEvent) => {
+      if (onContextMenu && assignment) {
+        e.preventDefault();
+        onContextMenu(e.clientX, e.clientY, assignment.id, isCompleted);
+      }
+    };
+
     return (
       <>
         <button
@@ -220,6 +230,7 @@ export function TaskTile({
           data-testid={`task-tile-${task.id}`}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
+          onContextMenu={handleContextMenu}
           onMouseEnter={handleTipEnter}
           onMouseLeave={tipLeave}
         >

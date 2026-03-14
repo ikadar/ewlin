@@ -47,6 +47,8 @@ export interface TaskListProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Callback when completion icon is clicked (assignmentId) */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when right-clicking a scheduled tile (context menu) */
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
 }
 
 /**
@@ -73,6 +75,7 @@ export function TaskList({
   onDepartureChange,
   onReturnChange,
   onToggleComplete,
+  onContextMenu,
 }: TaskListProps) {
   // Create lookup maps for efficient access
   const assignmentByTaskId = new Map(
@@ -258,6 +261,7 @@ export function TaskList({
             onReturnChange={onReturnChange}
             isCompleted={isCompleted}
             onToggleComplete={onToggleComplete}
+            onContextMenu={assignment ? onContextMenu : undefined}
           />
         </div>
       );

@@ -1,6 +1,8 @@
+import { useState, useCallback } from 'react';
 import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
 import { X } from 'lucide-react';
 import { TaskList } from './TaskList';
+import { JobDetailContextMenu } from './JobDetailContextMenu';
 import { getTasksForJob } from '../../utils/taskHelpers';
 
 /** Payload for element prerequisite status updates */
@@ -120,6 +122,37 @@ export function JobDetailsPanel({
   const jobTaskIds = new Set(jobTasks.map((t) => t.id));
   const jobAssignments = assignments.filter((a) => jobTaskIds.has(a.taskId));
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    assignmentId: string;
+    isCompleted: boolean;
+  } | null>(null);
+
+  const handleTileContextMenu = useCallback(
+    (x: number, y: number, assignmentId: string, isCompleted: boolean) => {
+      setContextMenu({ x, y, assignmentId, isCompleted });
+    },
+    []
+  );
+
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const handleContextMenuRecall = useCallback(() => {
+    if (contextMenu && onRecallTask) {
+      onRecallTask(contextMenu.assignmentId);
+    }
+  }, [contextMenu, onRecallTask]);
+
+  const handleContextMenuToggleComplete = useCallback(() => {
+    if (contextMenu && onToggleComplete) {
+      onToggleComplete(contextMenu.assignmentId);
+    }
+  }, [contextMenu, onToggleComplete]);
+
   // REQ-02: Handle departure date click
   const handleDateClick = onDateClick
     ? () => onDateClick(new Date(job.workshopExitDate))
@@ -192,7 +225,19 @@ export function JobDetailsPanel({
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
         onToggleComplete={onToggleComplete}
+        onContextMenu={handleTileContextMenu}
       />
+
+      {contextMenu && (
+        <JobDetailContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          isCompleted={contextMenu.isCompleted}
+          onToggleComplete={handleContextMenuToggleComplete}
+          onRecall={handleContextMenuRecall}
+          onClose={handleContextMenuClose}
+        />
+      )}
     </div>
   );
 }
