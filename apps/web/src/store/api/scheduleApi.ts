@@ -679,7 +679,7 @@ export const scheduleApi = createApi({
      *
      * No optimistic update — waits for server response then refetches snapshot.
      */
-    autoPlaceJob: builder.mutation<{ placedCount: number }, string>({
+    autoPlaceJob: builder.mutation<{ placedCount: number; computeMs?: number }, string>({
       query: (jobId) => ({
         url: `/jobs/${jobId}/auto-place`,
         method: 'POST',
@@ -695,7 +695,7 @@ export const scheduleApi = createApi({
      *
      * No optimistic update — waits for server response then refetches snapshot.
      */
-    autoPlaceJobAlap: builder.mutation<{ placedCount: number }, string>({
+    autoPlaceJobAlap: builder.mutation<{ placedCount: number; computeMs?: number }, string>({
       query: (jobId) => ({
         url: `/jobs/${jobId}/auto-place-alap`,
         method: 'POST',

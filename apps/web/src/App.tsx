@@ -1138,7 +1138,8 @@ function AppContent() {
       if (result.placedCount === 0) {
         showToast('No unscheduled tiles to place', 'info');
       } else {
-        showToast(`${result.placedCount} tile(s) placed ASAP`, 'success');
+        const timing = result.computeMs != null ? ` in ${result.computeMs}ms` : '';
+        showToast(`${result.placedCount} tile(s) placed ASAP${timing}`, 'success');
       }
     } catch (error) {
       showToast(getErrorMessage(error));
@@ -1153,7 +1154,8 @@ function AppContent() {
       if (result.placedCount === 0) {
         showToast('No unscheduled tiles to place', 'info');
       } else {
-        showToast(`${result.placedCount} tile(s) placed ALAP`, 'success');
+        const timing = result.computeMs != null ? ` in ${result.computeMs}ms` : '';
+        showToast(`${result.placedCount} tile(s) placed ALAP${timing}`, 'success');
       }
     } catch (error) {
       showToast(getErrorMessage(error));

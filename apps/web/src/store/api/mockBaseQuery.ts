@@ -1094,10 +1094,12 @@ const handleAutoPlace: MockRouteHandler = async (args: FetchArgs) => {
     return { error: createNotFoundError('Job not found') };
   }
 
+  const t0 = performance.now();
   const result = computeAsapPlacements(jobId, currentSnapshot);
+  const computeMs = Math.round(performance.now() - t0);
 
   if (result.placements.length === 0) {
-    return { data: { placedCount: 0 } };
+    return { data: { placedCount: 0, computeMs } };
   }
 
   // Apply placements to snapshot
@@ -1168,7 +1170,7 @@ const handleAutoPlace: MockRouteHandler = async (args: FetchArgs) => {
     return { ...snapshot, assignments: finalAssignments };
   });
 
-  return { data: { placedCount: result.placements.length } };
+  return { data: { placedCount: result.placements.length, computeMs } };
 };
 
 // ============================================================================
@@ -1190,10 +1192,12 @@ const handleAutoPlaceAlap: MockRouteHandler = async (args: FetchArgs) => {
     return { error: createNotFoundError('Job not found') };
   }
 
+  const t0 = performance.now();
   const result = computeAlapPlacements(jobId, currentSnapshot);
+  const computeMs = Math.round(performance.now() - t0);
 
   if (result.placements.length === 0) {
-    return { data: { placedCount: 0 } };
+    return { data: { placedCount: 0, computeMs } };
   }
 
   // Apply placements to snapshot
@@ -1247,7 +1251,7 @@ const handleAutoPlaceAlap: MockRouteHandler = async (args: FetchArgs) => {
     return { ...snapshot, assignments: updatedAssignments };
   });
 
-  return { data: { placedCount: result.placements.length } };
+  return { data: { placedCount: result.placements.length, computeMs } };
 };
 
 // ============================================================================
