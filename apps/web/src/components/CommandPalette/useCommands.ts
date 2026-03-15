@@ -120,8 +120,8 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
       { label: 'Tache terminee', keys: ['Space'] },
       { label: 'Auto-place ASAP', keys: ['Alt+P', 'S'] },
       { label: 'Auto-place ALAP', keys: ['Alt+P', 'L'] },
-      { label: 'Clear all tiles', keys: ['Alt', 'Z'] },
-      { label: 'Clear all tiles (global)', keys: ['Ctrl', 'Alt', 'Z'] },
+      { label: 'Effacer toutes les tuiles', keys: ['Alt', 'Z'] },
+      { label: 'Effacer toutes les tuiles (global)', keys: ['Ctrl', 'Alt', 'Z'] },
     ],
   },
   {
@@ -211,10 +211,10 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       commands.push({ id: 'edit-job', label: 'Modifier le job', category: 'Actions', shortcut: 'Alt+E', keywords: 'edit modifier job formulaire', icon: 'pencil', action: onEditJob });
     }
     if (onClearJobAssignments) {
-      commands.push({ id: 'clear-job-tiles', label: 'Clear all tiles', category: 'Job selectionne', shortcut: 'Alt+Z', keywords: 'clear remove tiles unschedule recall', icon: 'trash-2', action: onClearJobAssignments });
+      commands.push({ id: 'clear-job-tiles', label: 'Effacer toutes les tuiles', category: 'Job selectionne', shortcut: 'Alt+Z', keywords: 'effacer supprimer tuiles désplanifier rappeler clear remove tiles unschedule recall', icon: 'trash-2', action: onClearJobAssignments });
     }
     if (onClearAllAssignments) {
-      commands.push({ id: 'clear-all-tiles', label: 'Clear all tiles (global)', category: 'Actions', shortcut: 'Ctrl+Alt+Z', keywords: 'clear all unschedule mass recall global reset', icon: 'trash-2', action: onClearAllAssignments });
+      commands.push({ id: 'clear-all-tiles', label: 'Effacer toutes les tuiles (global)', category: 'Actions', shortcut: 'Ctrl+Alt+Z', keywords: 'effacer tout désplanifier masse rappeler global réinitialiser clear all unschedule mass recall global reset', icon: 'trash-2', action: onClearAllAssignments });
     }
     if (onAsapPlacement) {
       commands.push({ id: 'asap-placement', label: 'Auto-place ASAP', category: 'Job selectionne', shortcut: 'Alt+P S', keywords: 'asap auto place schedule earliest soon precedence', icon: 'fast-forward', action: onAsapPlacement });

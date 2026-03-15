@@ -1091,7 +1091,7 @@ function AppContent() {
     if (!selectedJobId) return;
     try {
       const result = await clearJobAssignments(selectedJobId).unwrap();
-      showToast(`${result.unassignedCount} tile(s) cleared`, 'success');
+      showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
     } catch (error) {
       showToast(getErrorMessage(error));
     }
@@ -1113,7 +1113,7 @@ function AppContent() {
     setMassUnscheduleConfirm(null);
     try {
       const result = await clearAllAssignments().unwrap();
-      showToast(`${result.unassignedCount} tile(s) cleared`, 'success');
+      showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
     } catch (error) {
       showToast(getErrorMessage(error));
     }
@@ -1131,10 +1131,10 @@ function AppContent() {
     try {
       const result = await autoPlaceJob(selectedJobId).unwrap();
       if (result.placedCount === 0) {
-        showToast('No unscheduled tiles to place', 'info');
+        showToast('Aucune tuile non planifiée à placer', 'info');
       } else {
-        const timing = result.computeMs != null ? ` in ${result.computeMs}ms` : '';
-        showToast(`${result.placedCount} tile(s) placed ASAP${timing}`, 'success');
+        const timing = result.computeMs != null ? ` en ${result.computeMs}ms` : '';
+        showToast(`${result.placedCount} tuile(s) placée(s) ASAP${timing}`, 'success');
       }
     } catch (error) {
       showToast(getErrorMessage(error));
@@ -1147,10 +1147,10 @@ function AppContent() {
     try {
       const result = await autoPlaceJobAlap(selectedJobId).unwrap();
       if (result.placedCount === 0) {
-        showToast('No unscheduled tiles to place', 'info');
+        showToast('Aucune tuile non planifiée à placer', 'info');
       } else {
-        const timing = result.computeMs != null ? ` in ${result.computeMs}ms` : '';
-        showToast(`${result.placedCount} tile(s) placed ALAP${timing}`, 'success');
+        const timing = result.computeMs != null ? ` en ${result.computeMs}ms` : '';
+        showToast(`${result.placedCount} tuile(s) placée(s) ALAP${timing}`, 'success');
       }
     } catch (error) {
       showToast(getErrorMessage(error));
@@ -2650,20 +2650,20 @@ function AppContent() {
                style={{ minWidth: '22rem' }}
                onClick={e => e.stopPropagation()}>
             <h2 className="text-flux-text-primary font-semibold mb-2">
-              Clear all tiles?
+              Effacer toutes les tuiles ?
             </h2>
             <p className="text-flux-text-secondary mb-6" style={{ fontSize: '13px' }}>
-              {massUnscheduleConfirm.count} tile(s) will be unscheduled.
-              Completed and in-progress tiles will be kept.
+              {massUnscheduleConfirm.count} tuile(s) seront désplanifiée(s).
+              Les tuiles terminées et en cours seront conservées.
             </p>
             <div className="flex justify-end gap-3">
               <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
                       onClick={() => setMassUnscheduleConfirm(null)}>
-                Cancel
+                Annuler
               </button>
               <button className="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
                       onClick={handleMassUnscheduleConfirm}>
-                Clear all
+                Tout effacer
               </button>
             </div>
           </div>
