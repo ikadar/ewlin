@@ -46,6 +46,7 @@ import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
 import { FluxPage } from './pages/FluxPage';
 import { SplitTaskPopover } from './components/SplitTaskPopover';
+import { AutoPlaceAllModal } from './components/AutoPlaceAllModal/AutoPlaceAllModal';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -478,6 +479,8 @@ function AppContent() {
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
   // Mass unschedule confirmation dialog
   const [massUnscheduleConfirm, setMassUnscheduleConfirm] = useState<{ count: number } | null>(null);
+  // General auto-place all modal
+  const [isAutoPlaceAllOpen, setIsAutoPlaceAllOpen] = useState(false);
 
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
@@ -1157,6 +1160,9 @@ function AppContent() {
     }
   }, [selectedJobId, autoPlaceJobAlap, showToast]);
 
+  // Handle auto-place all (CTRL+ALT+P)
+  const handleAutoPlaceAll = useCallback(() => setIsAutoPlaceAllOpen(true), []);
+
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const ctx: KeyboardContext = {
@@ -1192,6 +1198,13 @@ function AppContent() {
       if (isCtrlAltLetter(e, 'z')) {
         e.preventDefault();
         triggerMassUnschedule();
+        return;
+      }
+
+      // Ctrl+Alt+P: auto-place all unscheduled tiles
+      if (isCtrlAltLetter(e, 'p')) {
+        e.preventDefault();
+        handleAutoPlaceAll();
         return;
       }
 
@@ -2336,6 +2349,7 @@ function AppContent() {
     onClearAllAssignments: triggerMassUnschedule,
     onAsapPlacement: handleAsapPlacement,
     onAlapPlacement: handleAlapPlacement,
+    onAutoPlaceAll: handleAutoPlaceAll,
   });
 
   // Register scheduler-specific commands into the global Command Center
@@ -2669,6 +2683,12 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {/* Auto-place all modal */}
+      <AutoPlaceAllModal
+        isOpen={isAutoPlaceAllOpen}
+        onClose={() => setIsAutoPlaceAllOpen(false)}
+      />
 
       {/* Schedule save/load modal */}
       <ScheduleSaveLoadModal
