@@ -1075,6 +1075,38 @@ const handleClearJobAssignments: MockRouteHandler = async (args: FetchArgs) => {
   return { data: { unassignedCount: jobAssignmentTaskIds.length } };
 };
 
+/**
+ * DELETE /schedule/assignments - Clear all clearable tile assignments globally
+ */
+const handleClearAllAssignments: MockRouteHandler = async () => {
+  const currentSnapshot = getSnapshot();
+  const now = new Date().toISOString();
+
+  const clearableTaskIds = new Set(
+    currentSnapshot.assignments
+      .filter((a: TaskAssignment) => !a.isCompleted)
+      .filter((a: TaskAssignment) => !(a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)))
+      .map((a: TaskAssignment) => a.taskId)
+  );
+
+  let remainingAssignments = currentSnapshot.assignments.filter(
+    (a: TaskAssignment) => !clearableTaskIds.has(a.taskId)
+  );
+
+  // Outsourced cascade removal
+  const outsourcedToRemove = new Set<string>();
+  for (const taskId of clearableTaskIds) {
+    const toRemove = getOutsourcedTasksToRemoveOnUnassign(currentSnapshot, taskId, remainingAssignments);
+    for (const id of toRemove) outsourcedToRemove.add(id);
+  }
+  remainingAssignments = remainingAssignments.filter(
+    (a: TaskAssignment) => !outsourcedToRemove.has(a.taskId)
+  );
+
+  updateSnapshot((snapshot) => ({ ...snapshot, assignments: remainingAssignments }));
+  return { data: { unassignedCount: clearableTaskIds.size } };
+};
+
 // ============================================================================
 // Auto-Place Job Handler
 // ============================================================================
@@ -3087,6 +3119,7 @@ const routes: MockRoute[] = [
   { method: 'POST', pattern: /^\/jobs\/[^/]+\/auto-place-alap$/, handler: handleAutoPlaceAlap },
   { method: 'POST', pattern: /^\/jobs\/[^/]+\/auto-place$/, handler: handleAutoPlace },
   { method: 'DELETE', pattern: /^\/jobs\/[^/]+\/assignments$/, handler: handleClearJobAssignments },
+  { method: 'DELETE', pattern: /^\/schedule\/assignments$/, handler: handleClearAllAssignments },
   { method: 'DELETE', pattern: /^\/jobs\/[^/]+$/, handler: handleDeleteJob },
 
   // Elements

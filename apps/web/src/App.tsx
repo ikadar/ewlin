@@ -19,7 +19,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -43,7 +43,7 @@ import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
-import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
+import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
 import { FluxPage } from './pages/FluxPage';
 import { SplitTaskPopover } from './components/SplitTaskPopover';
 
@@ -343,6 +343,7 @@ function AppContent() {
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
   const [clearJobAssignments] = useClearJobAssignmentsMutation();
+  const [clearAllAssignments] = useClearAllAssignmentsMutation();
   const [autoPlaceJob] = useAutoPlaceJobMutation();
   const [autoPlaceJobAlap] = useAutoPlaceJobAlapMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
@@ -475,6 +476,8 @@ function AppContent() {
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
   // Schedule save/load modal
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
+  // Mass unschedule confirmation dialog
+  const [massUnscheduleConfirm, setMassUnscheduleConfirm] = useState<{ count: number } | null>(null);
 
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
@@ -1130,6 +1133,34 @@ function AppContent() {
     }
   }, [selectedJobId, clearJobAssignments, showToast]);
 
+  // Count clearable tiles for mass unschedule confirmation
+  const getClearableCount = useCallback(() => {
+    if (!snapshotData) return 0;
+    const now = new Date().toISOString();
+    return snapshotData.assignments.filter((a) => {
+      if (a.isCompleted) return false;
+      if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+      return true;
+    }).length;
+  }, [snapshotData]);
+
+  // Handle mass unschedule all tiles (CTRL+ALT+Z)
+  const handleMassUnscheduleConfirm = useCallback(async () => {
+    setMassUnscheduleConfirm(null);
+    try {
+      const result = await clearAllAssignments().unwrap();
+      showToast(`${result.unassignedCount} tile(s) cleared`, 'success');
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [clearAllAssignments, showToast]);
+
+  // Trigger mass unschedule confirmation dialog
+  const triggerMassUnschedule = useCallback(() => {
+    const count = getClearableCount();
+    if (count > 0) setMassUnscheduleConfirm({ count });
+  }, [getClearableCount]);
+
   // Handle ASAP auto-placement for selected job (ALT+P S)
   const handleAsapPlacement = useCallback(async () => {
     if (!selectedJobId) return;
@@ -1190,6 +1221,13 @@ function AppContent() {
       if (isAltLetter(e, 'e') && selectedJobId) {
         e.preventDefault();
         handleEditJob();
+        return;
+      }
+
+      // Ctrl+Alt+Z: mass unschedule all clearable tiles
+      if (isCtrlAltLetter(e, 'z')) {
+        e.preventDefault();
+        triggerMassUnschedule();
         return;
       }
 
@@ -1283,7 +1321,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, triggerMassUnschedule]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -2328,6 +2366,7 @@ function AppContent() {
       setIsSaveLoadOpen(true);
     }, []),
     onClearJobAssignments: handleClearJobAssignments,
+    onClearAllAssignments: triggerMassUnschedule,
     onAsapPlacement: handleAsapPlacement,
     onAlapPlacement: handleAlapPlacement,
   });
@@ -2634,6 +2673,35 @@ function AppContent() {
       >
         <Save size={20} />
       </button>
+
+      {/* Mass unschedule confirmation dialog */}
+      {massUnscheduleConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+             style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+             onClick={() => setMassUnscheduleConfirm(null)}>
+          <div className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
+               style={{ minWidth: '22rem' }}
+               onClick={e => e.stopPropagation()}>
+            <h2 className="text-flux-text-primary font-semibold mb-2">
+              Clear all tiles?
+            </h2>
+            <p className="text-flux-text-secondary mb-6" style={{ fontSize: '13px' }}>
+              {massUnscheduleConfirm.count} tile(s) will be unscheduled.
+              Completed and in-progress tiles will be kept.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
+                      onClick={() => setMassUnscheduleConfirm(null)}>
+                Cancel
+              </button>
+              <button className="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
+                      onClick={handleMassUnscheduleConfirm}>
+                Clear all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Schedule save/load modal */}
       <ScheduleSaveLoadModal

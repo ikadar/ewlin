@@ -306,6 +306,32 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Clear all clearable tile assignments globally (across all jobs).
+     *
+     * Mock mode: Removes all non-completed, non-in-progress assignments
+     * Real mode: DELETE /schedule/assignments
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    clearAllAssignments: builder.mutation<{ unassignedCount: number }, void>({
+      query: () => ({ url: '/schedule/assignments', method: 'DELETE' }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const now = new Date().toISOString();
+            draft.assignments = draft.assignments.filter((a) => {
+              if (a.isCompleted) return true;
+              if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return true;
+              return false;
+            });
+          })
+        );
+        try { await queryFulfilled; } catch { patchResult.undo(); }
+      },
+    }),
+
+    /**
      * Delete a job and all related data (elements, tasks, assignments).
      *
      * Mock mode: Removes job, elements, tasks, assignments from snapshot
@@ -752,6 +778,7 @@ export const {
   useUpdateJobMutation,
   useDeleteJobMutation,
   useClearJobAssignmentsMutation,
+  useClearAllAssignmentsMutation,
   useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,

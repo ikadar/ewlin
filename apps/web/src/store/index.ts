@@ -119,6 +119,7 @@ export {
   useUpdateJobMutation,
   useDeleteJobMutation,
   useClearJobAssignmentsMutation,
+  useClearAllAssignmentsMutation,
   useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
