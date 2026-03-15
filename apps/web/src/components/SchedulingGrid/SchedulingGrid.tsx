@@ -1,6 +1,6 @@
 import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element } from '@flux/types';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
-import { isInternalTask, getDeadlineDate } from '@flux/types';
+import { isInternalTask, getDeadlineDate, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
@@ -9,8 +9,7 @@ import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef }
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
-import { getJobIdForTask } from '../../utils/taskHelpers';
-import { isElementBlocked, getPrerequisiteBlockingInfo, hasDieCuttingAction, hasOffsetAction } from '../../utils';
+import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import { getTirageLabel } from '../../utils/tileLabelResolver';
 
 /** Handle for programmatic grid scrolling */
@@ -31,6 +30,23 @@ export interface SchedulingGridHandle {
   getViewportWidth: () => number;
   /** Scroll to both X and Y positions at once */
   scrollTo: (x: number, y: number, behavior?: ScrollBehavior) => void;
+}
+
+interface CachedTileData {
+  jobId: string;
+  element: Element | undefined;
+  task: Task;
+  job: Job;
+  top: number;
+  showSwapUp: boolean;
+  showSwapDown: boolean;
+  similarityResults: ReturnType<typeof compareSimilarity> | undefined;
+  hasConflict: boolean;
+  tileState: ReturnType<typeof computeTileState>;
+  blocked: boolean;
+  blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined;
+  tirageLabel: string | undefined;
+  pixelsPerHour: number;
 }
 
 export interface SchedulingGridProps {
@@ -329,6 +345,62 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     );
   }, [stations, categoryMap]);
 
+  // Step 1a: Element lookup by ID
+  const elementMap = useMemo(
+    () => new Map(elements.map((e) => [e.id, e])),
+    [elements]
+  );
+
+  // Step 1b: Elements grouped by job ID
+  const elementsByJobId = useMemo(() => {
+    const map = new Map<string, Element[]>();
+    for (const e of elements) {
+      const list = map.get(e.jobId) ?? [];
+      list.push(e);
+      map.set(e.jobId, list);
+    }
+    return map;
+  }, [elements]);
+
+  // Step 1c: Station lookup + pre-compute blocking info per element
+  const stationMap = useMemo(
+    () => new Map(stations.map((s) => [s.id, s])),
+    [stations]
+  );
+
+  const elementBlockingCache = useMemo(() => {
+    const cache = new Map<string, { hasOffset: boolean; hasDieCutting: boolean; blocked: boolean; blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined }>();
+    for (const element of elements) {
+      const hasOffset = element.taskIds.some((taskId) => {
+        const task = taskMap.get(taskId);
+        if (!task || task.type !== 'Internal') return false;
+        const station = stationMap.get(task.stationId);
+        if (!station) return false;
+        return categoryMap.get(station.categoryId)?.name.toLowerCase().includes('offset') ?? false;
+      });
+      const hasDieCutting = element.taskIds.some((taskId) => {
+        const task = taskMap.get(taskId);
+        if (!task) return false;
+        if (task.type === 'Internal') {
+          const station = stationMap.get(task.stationId);
+          return station?.categoryId === DIE_CUTTING_CATEGORY_ID;
+        }
+        if (task.type === 'Outsourced') {
+          return DIE_CUTTING_KEYWORDS.some((kw) => task.actionType?.toLowerCase().includes(kw));
+        }
+        return false;
+      });
+      const blockOpts = { hasOffset, hasDieCutting };
+      cache.set(element.id, {
+        hasOffset,
+        hasDieCutting,
+        blocked: isElementBlocked(element, blockOpts),
+        blockingInfo: getPrerequisiteBlockingInfo(element, blockOpts),
+      });
+    }
+    return cache;
+  }, [elements, taskMap, stationMap, categoryMap]);
+
   // REQ-18: Calculate group capacity info for each station
   const groupCapacityMap = useMemo((): Map<string, GroupCapacityInfo> => {
     if (groups.length === 0) return new Map();
@@ -388,6 +460,75 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
     return grouped;
   }, [assignments, stations, startDate, virtualScroll.visibleRange]);
+
+  // Step 1d: Pre-compute per-tile render data (independent of selectedJobId)
+  const tileDataCache = useMemo(() => {
+    const cache = new Map<string, CachedTileData>();
+    const currentNow = now;
+
+    for (const [stationId, stationAssignments] of assignmentsByStation) {
+      const station = stationMap.get(stationId);
+      const category = station ? categoryMap.get(station.categoryId) : undefined;
+      const criteria = category?.similarityCriteria || [];
+
+      stationAssignments.forEach((assignment, index) => {
+        const task = taskMap.get(assignment.taskId);
+        if (!task) return;
+        const element = elementMap.get(task.elementId);
+        const jobId = element?.jobId;
+        const job = jobId ? jobMap.get(jobId) : undefined;
+        if (!job || !isInternalTask(task)) return;
+
+        const blocking = element ? elementBlockingCache.get(element.id) : undefined;
+        const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate);
+
+        // Swap buttons
+        const isCurrentCompleted = assignment.isCompleted;
+        const adjacentUp = index > 0 ? stationAssignments[index - 1] : null;
+        const adjacentDown = index < stationAssignments.length - 1 ? stationAssignments[index + 1] : null;
+        const showSwapUp = !isCurrentCompleted && index > 0 && !adjacentUp?.isCompleted;
+        const showSwapDown = !isCurrentCompleted && index < stationAssignments.length - 1 && !adjacentDown?.isCompleted;
+
+        // Similarity
+        let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
+        if (index > 0 && criteria.length > 0 && element?.spec) {
+          const prevTask = taskMap.get(stationAssignments[index - 1].taskId);
+          const prevElement = prevTask ? elementMap.get(prevTask.elementId) : undefined;
+          if (prevElement?.spec) {
+            similarityResults = compareSimilarity(prevElement.spec, element.spec, criteria);
+          }
+        }
+
+        // Tirage label
+        const jobElements = elementsByJobId.get(job.id) ?? [];
+        const rawTirageLabel = category && element
+          ? getTirageLabel(category.name, element, job, jobElements, taskMap, assemblyStationIds)
+          : '';
+
+        // Tile state
+        const isJobShipped = shippedJobIds?.has(job.id) ?? false;
+        const isJobLate = lateJobIds?.has(job.id) ?? false;
+        const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < currentNow;
+        const isLate = isJobLate || isTaskOverdue;
+        const hasConflict = conflictTaskIds.has(task.id);
+        const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocking?.blocked ?? false, assignment.isCompleted);
+
+        cache.set(assignment.id, {
+          jobId: job.id, element, task, job, top,
+          showSwapUp, showSwapDown, similarityResults,
+          hasConflict, tileState,
+          blocked: blocking?.blocked ?? false,
+          blockingInfo: blocking?.blockingInfo,
+          tirageLabel: rawTirageLabel || undefined,
+          pixelsPerHour,
+        });
+      });
+    }
+    return cache;
+  }, [assignmentsByStation, taskMap, jobMap, elementMap, elementBlockingCache,
+      elementsByJobId, stationMap, categoryMap, assemblyStationIds,
+      startHour, pixelsPerHour, startDate, shippedJobIds, lateJobIds,
+      conflictTaskIds, now]);
 
   // Calculate departure marker position (if selected job has workshopExitDate)
   // Multi-day: show marker regardless of day (REQ-15)
@@ -491,7 +632,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
             {stations.map((station) => {
               const stationAssignments = assignmentsByStation.get(station.id) || [];
               const category = categoryMap.get(station.categoryId);
-              const criteria = category?.similarityCriteria || [];
 
               // v0.3.57: Column collapse removed (was only for drag & drop)
               const isCollapsed = false;
@@ -565,96 +705,36 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   ghostPreviewHeight={isHoveredForQuickPlacement ? quickPlacementGhostHeight : undefined}
                   onDeselect={onDeselect}
                 >
-                  {stationAssignments.map((assignment, index) => {
-                    const task = taskMap.get(assignment.taskId);
-                    const jobId = task ? getJobIdForTask(task, elements) : null;
-                    const job = jobId ? jobMap.get(jobId) : null;
-
-                    // Skip if we don't have the task/job data or if task is not internal
-                    if (!task || !job || !isInternalTask(task)) return null;
-
-                    // v0.4.32b: Get element for blocking status
-                    const element = elements.find((e) => e.id === task.elementId);
-                    const hasOffset = element ? hasOffsetAction(element, tasks, stations, categories) : false;
-                    const hasDieCutting = element ? hasDieCuttingAction(element, tasks, stations) : false;
-                    const blockOpts = { hasOffset, hasDieCutting };
-                    const blocked = element ? isElementBlocked(element, blockOpts) : false;
-                    const blockingInfo = element ? getPrerequisiteBlockingInfo(element, blockOpts) : undefined;
-
-                    // Calculate top position from assignment.scheduledStart
-                    // Use multi-day calculation when startDate is provided (REQ-14)
-                    const startTime = new Date(assignment.scheduledStart);
-                    const top = timeToYPosition(startTime, startHour, pixelsPerHour, startDate);
-
-                    // Determine swap button visibility (completed tiles cannot be swapped)
-                    const isCurrentCompleted = assignment.isCompleted;
-                    const adjacentUp = index > 0 ? stationAssignments[index - 1] : null;
-                    const adjacentDown = index < stationAssignments.length - 1 ? stationAssignments[index + 1] : null;
-                    const showSwapUp = !isCurrentCompleted && index > 0 && !adjacentUp?.isCompleted;
-                    const showSwapDown = !isCurrentCompleted && index < stationAssignments.length - 1 && !adjacentDown?.isCompleted;
-
-                    // Calculate similarity results with previous tile (if any)
-                    // Compares element specs (papier, format, impression) between consecutive tasks
-                    let similarityResults = undefined;
-                    if (index > 0 && criteria.length > 0 && element?.spec) {
-                      const prevAssignment = stationAssignments[index - 1];
-                      const prevTask = taskMap.get(prevAssignment.taskId);
-                      const prevElement = prevTask ? elements.find((e) => e.id === prevTask.elementId) : null;
-                      if (prevElement?.spec) {
-                        similarityResults = compareSimilarity(prevElement.spec, element.spec, criteria);
-                      }
-                    }
-
-                    // Compute Tirage label for this tile
-                    const jobElements = elements.filter((e) => e.jobId === job.id);
-                    const rawTirageLabel =
-                      category && element
-                        ? getTirageLabel(
-                            category.name,
-                            element,
-                            job,
-                            jobElements,
-                            taskMap,
-                            assemblyStationIds,
-                          )
-                        : '';
-                    const tileLabel = rawTirageLabel || undefined;
-
-                    // Compute tile state for state-based coloring
-                    const isJobShipped = shippedJobIds?.has(job.id) ?? false;
-                    const isJobLate = lateJobIds?.has(job.id) ?? false;
-                    const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < now;
-                    const isLate = isJobLate || isTaskOverdue;
-                    const hasConflict = conflictTaskIds.has(task.id);
-                    const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocked, assignment.isCompleted);
-
+                  {stationAssignments.map((assignment) => {
+                    const cached = tileDataCache.get(assignment.id);
+                    if (!cached) return null;
                     return (
                       <Tile
                         key={assignment.id}
                         assignment={assignment}
-                        task={task}
-                        job={job}
-                        element={element}
-                        top={top}
-                        isSelected={selectedJobId === job.id}
-                        showSwapUp={showSwapUp}
-                        showSwapDown={showSwapDown}
-                        similarityResults={similarityResults}
+                        task={cached.task}
+                        job={cached.job}
+                        element={cached.element}
+                        top={cached.top}
+                        isSelected={selectedJobId === cached.jobId}
+                        showSwapUp={cached.showSwapUp}
+                        showSwapDown={cached.showSwapDown}
+                        similarityResults={cached.similarityResults}
                         onSelect={onSelectJob}
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
                         onToggleComplete={onToggleComplete}
-                        hasConflict={hasConflict}
-                        tileState={tileState}
-                        pixelsPerHour={pixelsPerHour}
+                        hasConflict={cached.hasConflict}
+                        tileState={cached.tileState}
+                        pixelsPerHour={cached.pixelsPerHour}
                         isPicked={pickedAssignmentId === assignment.id}
                         onPickFromGrid={onPickFromGrid}
                         isPickingActive={isPicking}
                         onContextMenu={onContextMenu}
-                        isBlocked={blocked}
-                        blockingInfo={blockingInfo}
+                        isBlocked={cached.blocked}
+                        blockingInfo={cached.blockingInfo}
                         displayMode={displayMode}
-                        tirageLabel={tileLabel}
+                        tirageLabel={cached.tirageLabel}
                       />
                     );
                   })}

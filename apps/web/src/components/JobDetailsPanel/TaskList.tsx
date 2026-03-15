@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
 import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { isLastTaskOfJob } from '../../utils/taskHelpers';
@@ -77,20 +78,13 @@ export function TaskList({
   onToggleComplete,
   onContextMenu,
 }: TaskListProps) {
-  // Create lookup maps for efficient access
-  const assignmentByTaskId = new Map(
-    assignments.map((a) => [a.taskId, a])
-  );
-  const stationById = new Map(
-    stations.map((s) => [s.id, s])
-  );
-  const taskById = new Map(
-    tasks.map((t) => [t.id, t])
-  );
-  // v0.5.11: Provider lookup map
-  const providerById = new Map(
-    providers.map((p) => [p.id, p])
-  );
+  // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
+  const { assignmentByTaskId, stationById, taskById, providerById } = useMemo(() => ({
+    assignmentByTaskId: new Map(assignments.map((a) => [a.taskId, a])),
+    stationById: new Map(stations.map((s) => [s.id, s])),
+    taskById: new Map(tasks.map((t) => [t.id, t])),
+    providerById: new Map(providers.map((p) => [p.id, p])),
+  }), [assignments, stations, tasks, providers]);
 
   if (tasks.length === 0) {
     return (

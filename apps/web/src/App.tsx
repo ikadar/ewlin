@@ -911,27 +911,6 @@ function AppContent() {
     return new Date(selectedJob.workshopExitDate);
   }, [selectedJob?.workshopExitDate]);
 
-  // REQ-16: Calculate scheduled days for selected job
-  const scheduledDays = useMemo(() => {
-    if (!selectedJobId) return new Set<string>();
-
-    const days = new Set<string>();
-    const jobTaskIds = new Set(
-      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements)
-        .map((t) => t.id)
-    );
-
-    snapshot.assignments
-      .filter((a) => jobTaskIds.has(a.taskId))
-      .forEach((a) => {
-        const date = new Date(a.scheduledStart);
-        const dateKey = date.toISOString().split('T')[0];
-        days.add(dateKey);
-      });
-
-    return days;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
-
   // Conflict task IDs for sidebar highlighting + DateStrip markers
   // Only PrecedenceConflict and GroupCapacityConflict trigger amber glow —
   // other types (ApprovalGateConflict, DeadlineConflict, etc.) have their own indicators.
@@ -946,77 +925,62 @@ function AppContent() {
     return ids;
   }, [snapshot.conflicts]);
 
-  // v0.3.47: Task markers per day for DateStrip
-  // Groups tasks by date and determines their status (completed, late, conflict, scheduled)
-  const taskMarkersPerDay = useMemo((): Map<string, TaskMarker[]> => {
-    const markers = new Map<string, TaskMarker[]>();
-    if (!selectedJobId) return markers;
+  // REQ-16 + v0.3.47: Consolidated schedule data for selected job (single-pass)
+  // Computes scheduledDays, taskMarkersPerDay, and earliestTaskDate in one scan.
+  const { scheduledDays, taskMarkersPerDay, earliestTaskDate } = useMemo(() => {
+    const emptyResult = {
+      scheduledDays: new Set<string>(),
+      taskMarkersPerDay: new Map<string, TaskMarker[]>(),
+      earliestTaskDate: null as Date | null,
+    };
+    if (!selectedJobId) return emptyResult;
 
     const now = new Date();
-
-    // Get all tasks for the selected job
-    const jobTasks = getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements);
-    const taskIds = new Set(jobTasks.map((t) => t.id));
-
-    // Process assignments for selected job
-    snapshot.assignments
-      .filter((a) => taskIds.has(a.taskId))
-      .forEach((assignment) => {
-        const scheduledStart = new Date(assignment.scheduledStart);
-        const scheduledEnd = new Date(assignment.scheduledEnd);
-        // Use local date for dateKey (to match DateStrip's local calendar display)
-        const year = scheduledStart.getFullYear();
-        const month = String(scheduledStart.getMonth() + 1).padStart(2, '0');
-        const day = String(scheduledStart.getDate()).padStart(2, '0');
-        const dateKey = `${year}-${month}-${day}`;
-
-        // Extract start hour within the day (0-24, fractional)
-        const startHour = scheduledStart.getHours() + scheduledStart.getMinutes() / 60;
-
-        // Determine task marker status
-        let status: TaskMarker['status'] = 'scheduled';
-        if (assignment.isCompleted) {
-          status = 'completed';
-        } else if (conflictTaskIds.has(assignment.taskId)) {
-          status = 'conflict';
-        } else if (scheduledEnd < now) {
-          status = 'late';
-        }
-
-        const marker: TaskMarker = {
-          taskId: assignment.taskId,
-          status,
-          startHour,
-        };
-
-        const existing = markers.get(dateKey) ?? [];
-        existing.push(marker);
-        markers.set(dateKey, existing);
-      });
-
-    return markers;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
-
-  // v0.3.47: Earliest task date for timeline (first scheduled task)
-  const earliestTaskDate = useMemo((): Date | null => {
-    if (!selectedJobId) return null;
-
     const jobTaskIds = new Set(
       getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
 
+    const days = new Set<string>();
+    const markers = new Map<string, TaskMarker[]>();
     let earliest: Date | null = null;
-    snapshot.assignments
-      .filter((a) => jobTaskIds.has(a.taskId))
-      .forEach((a) => {
-        const startDate = new Date(a.scheduledStart);
-        if (!earliest || startDate < earliest) {
-          earliest = startDate;
-        }
-      });
 
-    return earliest;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
+    for (const a of snapshot.assignments) {
+      if (!jobTaskIds.has(a.taskId)) continue;
+
+      const scheduledStart = new Date(a.scheduledStart);
+      const scheduledEnd = new Date(a.scheduledEnd);
+
+      // taskMarkersPerDay (local date key to match DateStrip's local calendar)
+      const year = scheduledStart.getFullYear();
+      const month = String(scheduledStart.getMonth() + 1).padStart(2, '0');
+      const day = String(scheduledStart.getDate()).padStart(2, '0');
+      const markerDateKey = `${year}-${month}-${day}`;
+
+      // scheduledDays (local date key to match DateStrip's formatDateKey)
+      days.add(markerDateKey);
+      const startHour = scheduledStart.getHours() + scheduledStart.getMinutes() / 60;
+
+      let status: TaskMarker['status'] = 'scheduled';
+      if (a.isCompleted) {
+        status = 'completed';
+      } else if (conflictTaskIds.has(a.taskId)) {
+        status = 'conflict';
+      } else if (scheduledEnd < now) {
+        status = 'late';
+      }
+
+      const existing = markers.get(markerDateKey) ?? [];
+      existing.push({ taskId: a.taskId, status, startHour });
+      markers.set(markerDateKey, existing);
+
+      // earliestTaskDate
+      if (!earliest || scheduledStart < earliest) {
+        earliest = scheduledStart;
+      }
+    }
+
+    return { scheduledDays: days, taskMarkersPerDay: markers, earliestTaskDate: earliest };
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
 
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(new Date());
@@ -1342,6 +1306,9 @@ function AppContent() {
       console.error(`Swap ${direction} failed:`, err);
     }
   }, [snapshot.assignments, rescheduleTask]);
+
+  // Handle grid background click (deselect job)
+  const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {
@@ -2489,7 +2456,7 @@ function AppContent() {
           startDate={gridStartDate}
           totalDays={DAY_COUNT}
           onSelectJob={setSelectedJobId}
-          onDeselect={() => setSelectedJobId(null)}
+          onDeselect={handleDeselect}
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
           onToggleComplete={handleToggleComplete}

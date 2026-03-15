@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask, InternalTask } from '@flux/types';
 import { Circle, CircleCheck, Scissors } from 'lucide-react';
 import { useTooltipDelay } from '../../hooks';
@@ -97,7 +97,7 @@ const TILE_STYLES: Record<TileState, {
  * Outsourced tasks:
  *   - Always show mini-form (not schedulable, just configurable)
  */
-export function TaskTile({
+export const TaskTile = memo(function TaskTile({
   task,
   job,
   tileState,
@@ -351,4 +351,4 @@ export function TaskTile({
       {content}
     </div>
   );
-}
+});

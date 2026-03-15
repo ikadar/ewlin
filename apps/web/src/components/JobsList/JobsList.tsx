@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
 import { JobsListHeader } from './JobsListHeader';
 import { ProblemsSection } from './ProblemsSection';
@@ -151,6 +151,14 @@ export function JobsList({
     return `${day}/${month} 14:00`;
   };
 
+  // Step 2a: Stable toggle callback using ref to avoid inline closures per card
+  const selectedJobIdRef = useRef(selectedJobId);
+  useEffect(() => { selectedJobIdRef.current = selectedJobId; });
+
+  const handleJobToggle = useCallback((jobId: string) => {
+    onSelectJob?.(selectedJobIdRef.current === jobId ? null : jobId);
+  }, [onSelectJob]);
+
   const renderJobCard = (job: Job) => {
     const jobTasks = tasksByJob.get(job.id) || [];
     const jobAssignments = assignmentsByJob.get(job.id) || [];
@@ -167,7 +175,7 @@ export function JobsList({
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
         problemType={getProblemType(job.id)}
         isSelected={selectedJobId === job.id}
-        onClick={() => onSelectJob?.(selectedJobId === job.id ? null : job.id)}
+        onClick={handleJobToggle}
       />
     );
   };

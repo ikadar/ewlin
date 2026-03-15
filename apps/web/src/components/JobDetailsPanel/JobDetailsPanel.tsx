@@ -119,20 +119,16 @@ export function JobDetailsPanel({
   allJobs,
   onSelectJob,
 }: JobDetailsPanelProps) {
-  // Don't render if no job selected
-  if (!job) {
-    return null;
-  }
-
-  // Filter tasks for this job
-  const jobTasks = getTasksForJob(job.id, tasks, elements);
-
-  // Filter elements for this job
-  const jobElements = elements.filter((e) => job.elementIds.includes(e.id));
-
-  // Filter assignments for this job's tasks
-  const jobTaskIds = new Set(jobTasks.map((t) => t.id));
-  const jobAssignments = assignments.filter((a) => jobTaskIds.has(a.taskId));
+  // Memoize data filtering for this job
+  const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
+  const { jobTasks, jobElements, jobAssignments } = useMemo(() => {
+    if (!job) return emptyJobData;
+    const jt = getTasksForJob(job.id, tasks, elements);
+    const je = elements.filter((e) => job.elementIds.includes(e.id));
+    const jtIds = new Set(jt.map((t) => t.id));
+    const ja = assignments.filter((a) => jtIds.has(a.taskId));
+    return { jobTasks: jt, jobElements: je, jobAssignments: ja };
+  }, [job, tasks, elements, assignments]);
 
   // Context menu state
   // For unassigned tasks, assignmentId is actually the taskId (no assignment exists)
@@ -188,6 +184,26 @@ export function JobDetailsPanel({
     }
   }, [contextMenu, onFuseTask]);
 
+  // Dependencies: required jobs and dependent jobs
+  const requiredJobs = useMemo(() => {
+    if (!allJobs || !job?.requiredJobIds || job.requiredJobIds.length === 0) return [];
+    return job.requiredJobIds
+      .map((id) => allJobs.find((j) => j.id === id))
+      .filter((j): j is Job => j !== undefined);
+  }, [allJobs, job?.requiredJobIds]);
+
+  const dependentJobs = useMemo(() => {
+    if (!allJobs || !job) return [];
+    return allJobs.filter(
+      (j) => j.requiredJobIds && j.requiredJobIds.includes(job.id)
+    );
+  }, [allJobs, job?.id]);
+
+  // Don't render if no job selected
+  if (!job) {
+    return null;
+  }
+
   // Determine if the context menu task is a split task
   const contextMenuTaskObj = contextMenu?.taskId
     ? jobTasks.find((t) => t.id === contextMenu.taskId) as InternalTask | undefined
@@ -198,21 +214,6 @@ export function JobDetailsPanel({
   const handleDateClick = onDateClick
     ? () => onDateClick(new Date(job.workshopExitDate))
     : undefined;
-
-  // Dependencies: required jobs and dependent jobs
-  const requiredJobs = useMemo(() => {
-    if (!allJobs || !job.requiredJobIds || job.requiredJobIds.length === 0) return [];
-    return job.requiredJobIds
-      .map((id) => allJobs.find((j) => j.id === id))
-      .filter((j): j is Job => j !== undefined);
-  }, [allJobs, job.requiredJobIds]);
-
-  const dependentJobs = useMemo(() => {
-    if (!allJobs) return [];
-    return allJobs.filter(
-      (j) => j.requiredJobIds && j.requiredJobIds.includes(job.id)
-    );
-  }, [allJobs, job.id]);
 
   return (
     <div className="w-80 shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col" data-testid="job-details-panel">
