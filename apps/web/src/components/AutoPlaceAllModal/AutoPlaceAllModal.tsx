@@ -1,21 +1,46 @@
-import { useEffect } from 'react';
-import { useAutoPlaceAllStream } from '../../hooks/useAutoPlaceAllStream';
+import { useEffect, useState } from 'react';
+import { useAutoPlaceAllStream, type PlacementStrategy } from '../../hooks/useAutoPlaceAllStream';
 
 interface AutoPlaceAllModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const STRATEGY_OPTIONS: { value: PlacementStrategy; label: string; description: string }[] = [
+  {
+    value: 'edd',
+    label: 'EDD — Earliest Due Date',
+    description: 'Priorité aux jobs dont la deadline est la plus proche.',
+  },
+  {
+    value: 'cr',
+    label: 'CR — Critical Ratio',
+    description: 'Ratio temps restant / charge de travail. Tient compte du volume.',
+  },
+  {
+    value: 'dynamic_cr',
+    label: 'CR Dynamique',
+    description: 'CR recalculé après chaque job placé. Plus précis pour les stations partagées.',
+  },
+];
+
+const STRATEGY_DISPLAY: Record<string, string> = {
+  edd: 'EDD',
+  cr: 'CR',
+  dynamic_cr: 'CR Dynamique',
+};
+
 /**
  * Modal for global auto-placement (CTRL+ALT+P).
  *
  * Three states:
- * 1. Confirm — "Auto-place all unscheduled tiles?" + Cancel/Start
+ * 1. Confirm — Strategy selector + "Auto-place all?" + Cancel/Start
  * 2. Running — Progress bar + current job reference + running total
  * 3. Complete — Summary "X tiles placed across Y jobs in Zms" + Close
  */
 export function AutoPlaceAllModal({ isOpen, onClose }: AutoPlaceAllModalProps) {
   const { start, cancel, progress, isRunning, error } = useAutoPlaceAllStream();
+  const [strategy, setStrategy] = useState<PlacementStrategy>('edd');
 
   // Reset on open
   useEffect(() => {
@@ -45,22 +70,55 @@ export function AutoPlaceAllModal({ isOpen, onClose }: AutoPlaceAllModalProps) {
            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
            onClick={handleClose}>
         <div className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
-             style={{ minWidth: '22rem' }}
+             style={{ minWidth: '26rem', maxWidth: '32rem' }}
              onClick={e => e.stopPropagation()}>
           <h2 className="text-flux-text-primary font-semibold mb-2">
             Placer toutes les tuiles non planifiées ?
           </h2>
-          <p className="text-flux-text-secondary mb-6" style={{ fontSize: '13px' }}>
+          <p className="text-flux-text-secondary mb-4" style={{ fontSize: '13px' }}>
             Toutes les tâches non planifiées de tous les jobs seront placées
-            avec l'algorithme EDD + ASAP. Les jobs avec des deadlines plus proches sont prioritaires.
+            automatiquement. Les dépendances inter-jobs sont toujours respectées.
           </p>
+
+          {/* Strategy selector */}
+          <div className="mb-5">
+            <label className="block text-flux-text-secondary text-xs font-medium mb-2 uppercase tracking-wide">
+              Stratégie de priorité
+            </label>
+            <div className="space-y-2">
+              {STRATEGY_OPTIONS.map(opt => (
+                <label
+                  key={opt.value}
+                  className={`flex items-start gap-3 p-2.5 rounded border cursor-pointer transition-colors ${
+                    strategy === opt.value
+                      ? 'border-blue-600 bg-blue-600/10'
+                      : 'border-flux-border hover:border-flux-border-hover'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="strategy"
+                    value={opt.value}
+                    checked={strategy === opt.value}
+                    onChange={() => setStrategy(opt.value)}
+                    className="mt-0.5 accent-blue-600"
+                  />
+                  <div>
+                    <div className="text-flux-text-primary text-sm font-medium">{opt.label}</div>
+                    <div className="text-flux-text-secondary" style={{ fontSize: '12px' }}>{opt.description}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div className="flex justify-end gap-3">
             <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
                     onClick={handleClose}>
               Annuler
             </button>
             <button className="px-4 py-2 rounded text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium transition-colors"
-                    onClick={start}>
+                    onClick={() => start(strategy)}>
               Démarrer
             </button>
           </div>
@@ -70,6 +128,8 @@ export function AutoPlaceAllModal({ isOpen, onClose }: AutoPlaceAllModalProps) {
   }
 
   // State 2: Running / State 3: Complete / Error
+  const usedStrategy = progress?.strategy || strategy;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -100,10 +160,15 @@ export function AutoPlaceAllModal({ isOpen, onClose }: AutoPlaceAllModalProps) {
             </>
           )}
           {isComplete && progress && (
-            <p>
-              {progress.totalPlacedCount} tuile(s) placée(s) sur {progress.totalJobs} job(s)
-              {progress.computeMs != null && ` en ${progress.computeMs}ms`}
-            </p>
+            <>
+              <p>
+                {progress.totalPlacedCount} tuile(s) placée(s) sur {progress.totalJobs} job(s)
+                {progress.computeMs != null && ` en ${progress.computeMs}ms`}
+              </p>
+              <p className="text-flux-text-tertiary mt-1">
+                Stratégie : {STRATEGY_DISPLAY[usedStrategy] || usedStrategy}
+              </p>
+            </>
           )}
         </div>
 

@@ -6,13 +6,28 @@ The scheduler currently supports auto-placement per single job (ASAP/ALAP via `A
 
 ## Algorithm Design
 
-### Why EDD + ASAP?
+### Ordering Strategies
 
-This is a variant of the **Job Shop Scheduling Problem** (JSSP). Since JSSP is NP-hard, we use a **greedy heuristic**:
+This is a variant of the **Job Shop Scheduling Problem** (JSSP). Since JSSP is NP-hard, we use **greedy heuristics** with three ordering strategies:
 
-- **Earliest Due Date (EDD)** ordering: jobs with tightest deadlines get placed first, giving them priority on contested stations
-- **ASAP placement**: each job's tasks are placed at the earliest possible slot, maximizing the chance of meeting deadlines
-- **Topological ordering** of cross-job dependencies (`requiredJobIds`) takes precedence over EDD — a dependency must be placed before its dependents regardless of deadline
+#### EDD — Earliest Due Date (Alpha)
+- Jobs sorted by `workshopExitDate ASC` — tightest deadlines placed first
+- Simple and effective when all jobs have similar workloads
+- **ASAP placement**: each job's tasks placed at earliest possible slot
+
+#### CR — Critical Ratio (Beta)
+- `CR = (time until deadline) / (remaining processing time)`
+- More sophisticated than EDD: accounts for remaining work, not just deadline
+- A job with 2 days until deadline and 1 day of work (CR=2) is less critical than a job with 3 days until deadline and 2.5 days of work (CR=1.2)
+- Internal tasks: `setupMinutes + runMinutes`; outsourced tasks: `durationOpenDays × 480 min`
+
+#### Dynamic CR (Beta)
+- CR recalculated after each job placement
+- After placing job A, `effectiveNow` advances to the latest end time of A's assignments
+- Remaining ready jobs re-sorted by CR with updated time reference
+- Captures how urgency shifts as earlier jobs consume station capacity and calendar time
+
+All strategies respect **topological ordering** of cross-job dependencies (`requiredJobIds`) — a dependency is always placed before its dependents.
 
 ### Precedence Correctness Guarantee
 
@@ -27,7 +42,10 @@ The algorithm is precedence-safe by construction:
 ```
 1. Load all non-cancelled jobs with unscheduled tasks
 2. Build cross-job dependency graph from requiredJobIds
-3. Topological sort (Kahn's) with EDD tie-breaking within each level
+3. Topological sort (Kahn's) with strategy tie-breaking:
+   - EDD: workshopExitDate ASC
+   - CR: criticalRatio ASC (lowest = most critical)
+   - Dynamic CR: CR re-evaluated after each job
 4. Build ONE global PlacementContext (all stations, all existing assignments)
 5. For each job in order:
    a. Topologically sort elements (reuse existing Kahn's logic)
@@ -37,13 +55,14 @@ The algorithm is precedence-safe by construction:
       - Place via findEarliestGap (internal) or outsourced logic
       - Add to schedule + update context
    c. Yield progress event (SSE)
+   d. [Dynamic CR only] Advance effectiveNow, re-sort ready queue
 6. Single flush() at end (atomic)
 7. Yield completion event
 ```
 
 ## Implementation
 
-### Phase 1: Backend — Extract shared placement logic
+### Phase 1: Backend — Extract shared placement logic ✅
 
 **File: `services/php-api/src/Service/PlacementTrait.php`** (CREATE)
 
@@ -60,80 +79,58 @@ Requires using class to provide: `$schedulingHelper`, `$endTimeCalculator`, `$bu
 
 Replace private methods with `use PlacementTrait`. Keep `autoPlace()` and `buildContext()` as-is. The `topologicalSort()` method becomes `topologicalSortElements()` from the trait.
 
-### Phase 2: Backend — GeneralAutoPlaceService
+### Phase 2: Backend — GeneralAutoPlaceService ✅
 
 **File: `services/php-api/src/ValueObject/GeneralAutoPlaceProgress.php`** (CREATE)
 
-```php
-class GeneralAutoPlaceProgress {
-    public function __construct(
-        public readonly string $type,           // 'progress' | 'complete'
-        public readonly int $jobIndex,
-        public readonly int $totalJobs,
-        public readonly string $jobReference,
-        public readonly int $jobPlacedCount,
-        public readonly int $totalPlacedCount,
-        public readonly ?int $computeMs = null,
-    ) {}
-}
-```
+Progress VO with `strategy` field added in beta.
 
 **File: `services/php-api/src/Service/GeneralAutoPlaceService.php`** (CREATE)
 
-Dependencies (inject same as AsapPlacementService):
-- `SchedulingHelper`, `EndTimeCalculatorInterface`, `ScheduleRepository`
-- `StationRepository`, `StationCategoryRepository`, `OutsourcedProviderRepository`
-- `JobRepository`, `EntityManagerInterface`, `BusinessCalendar`, `LoggerInterface`
-- `businessTimezone` parameter
+Uses `PlacementTrait`. Accepts `PlacementStrategy` enum parameter. Key methods:
+- `autoPlaceAll(PlacementStrategy)` — dispatches to sequential or dynamic CR path
+- `placeJobTasks(Job)` — extracted shared logic for placing one job's tasks
+- `topologicalSortJobs(jobs, strategy)` — Kahn's with strategy-specific comparator
+- `autoPlaceAllDynamicCr(jobs)` — incremental Kahn's with CR re-evaluation
+- `computeCriticalRatio(Job)` — CR = (deadline - now) / remainingMinutes
+- `computeRemainingProcessingMinutes(Job)` — sum of unscheduled task durations
 
-Uses `PlacementTrait` for placement methods.
+**File: `services/php-api/src/Enum/PlacementStrategy.php`** (CREATE — Beta)
 
-Key method:
 ```php
-/** @return \Generator<int, GeneralAutoPlaceProgress> */
-public function autoPlaceAll(): \Generator
+enum PlacementStrategy: string {
+    case EDD = 'edd';
+    case CR = 'cr';
+    case DYNAMIC_CR = 'dynamic_cr';
+}
 ```
-
-Steps:
-1. `$schedule = $this->scheduleRepository->getCurrentSchedule()`
-2. `$jobs = $this->jobRepository->findNonCancelledWithUnscheduledTasks()` — new repo method
-3. `$orderedJobs = $this->topologicalSortJobsByEdd($jobs)` — Kahn's + EDD
-4. `$context = $this->buildGlobalContext($orderedJobs, $schedule)` — all stations + assignments
-5. Loop jobs, reuse trait methods, yield progress after each job
-6. Single `flush()`, yield completion
-
-**`buildGlobalContext()`**: Similar to `AsapPlacementService::buildContext()` but collects stationIds from ALL jobs' tasks, and indexes ALL existing assignments.
-
-**`topologicalSortJobsByEdd()`**: Kahn's algorithm on job dependency graph. Within each topological level, sort by `workshopExitDate ASC` (nulls last).
 
 **File: `services/php-api/src/Repository/JobRepository.php`** (MODIFY)
 
-Add method: `findNonCancelledWithUnscheduledTasks(): Job[]` — returns all non-cancelled jobs. The service will filter for unscheduled tasks using the schedule object.
+Added method: `findNonCancelled(): Job[]` — returns all non-cancelled jobs with eager-loaded elements/tasks.
 
-### Phase 3: Backend — Controller endpoint
+### Phase 3: Backend — Controller endpoint ✅
 
 **File: `services/php-api/src/Controller/Api/V1/ScheduleController.php`** (MODIFY)
 
-Add endpoint in existing `ScheduleController` (route prefix `/api/v1/schedule`):
-
 ```
-POST /api/v1/schedule/auto-place-all
+POST /api/v1/schedule/auto-place-all?strategy=edd|cr|dynamic_cr
 Content-Type: text/event-stream
 ```
 
-Uses Symfony `StreamedResponse` with:
-- `set_time_limit(300)` for safety (5 min max)
-- `ob_implicit_flush(true)` + `flush()` after each event
-- Headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`
-- Iterates generator from `GeneralAutoPlaceService::autoPlaceAll()`
+Accepts optional `strategy` query parameter (defaults to `edd`). Passes `PlacementStrategy` enum to service.
 
 ### Phase 4: Frontend — SSE stream hook ✅
 
-**File: `apps/web/src/hooks/useAutoPlaceAllStream.ts`** (CREATE) — DONE
+**File: `apps/web/src/hooks/useAutoPlaceAllStream.ts`** (CREATE)
+
+Exports `PlacementStrategy` type. `start(strategy)` appends `?strategy=` to POST URL.
 
 ### Phase 5: Frontend — Modal component ✅
 
-**File: `apps/web/src/components/AutoPlaceAllModal/AutoPlaceAllModal.tsx`** (CREATE) — DONE
+**File: `apps/web/src/components/AutoPlaceAllModal/AutoPlaceAllModal.tsx`** (CREATE)
+
+Confirm dialog includes strategy radio selector (EDD / CR / CR Dynamique). Completion summary shows which strategy was used.
 
 ### Phase 6: Frontend — Wire into App.tsx ✅
 
@@ -144,16 +141,17 @@ Uses Symfony `StreamedResponse` with:
 
 | # | File | Action | Status |
 |---|------|--------|--------|
-| 1 | `services/php-api/src/Service/PlacementTrait.php` | CREATE | TODO |
-| 2 | `services/php-api/src/Service/AsapPlacementService.php` | MODIFY | TODO |
-| 3 | `services/php-api/src/ValueObject/GeneralAutoPlaceProgress.php` | CREATE | TODO |
-| 4 | `services/php-api/src/Service/GeneralAutoPlaceService.php` | CREATE | TODO |
-| 5 | `services/php-api/src/Repository/JobRepository.php` | MODIFY | TODO |
-| 6 | `services/php-api/src/Controller/Api/V1/ScheduleController.php` | MODIFY | TODO |
-| 7 | `apps/web/src/hooks/useAutoPlaceAllStream.ts` | CREATE | DONE |
-| 8 | `apps/web/src/components/AutoPlaceAllModal/AutoPlaceAllModal.tsx` | CREATE | DONE |
-| 9 | `apps/web/src/App.tsx` | MODIFY | DONE |
-| 10 | `apps/web/src/components/CommandPalette/useCommands.ts` | MODIFY | DONE |
+| 1 | `services/php-api/src/Service/PlacementTrait.php` | CREATE | ✅ DONE |
+| 2 | `services/php-api/src/Service/AsapPlacementService.php` | MODIFY | ✅ DONE |
+| 3 | `services/php-api/src/ValueObject/GeneralAutoPlaceProgress.php` | CREATE | ✅ DONE |
+| 4 | `services/php-api/src/Service/GeneralAutoPlaceService.php` | CREATE | ✅ DONE |
+| 5 | `services/php-api/src/Repository/JobRepository.php` | MODIFY | ✅ DONE |
+| 6 | `services/php-api/src/Controller/Api/V1/ScheduleController.php` | MODIFY | ✅ DONE |
+| 7 | `apps/web/src/hooks/useAutoPlaceAllStream.ts` | CREATE | ✅ DONE |
+| 8 | `apps/web/src/components/AutoPlaceAllModal/AutoPlaceAllModal.tsx` | CREATE | ✅ DONE |
+| 9 | `apps/web/src/App.tsx` | MODIFY | ✅ DONE |
+| 10 | `apps/web/src/components/CommandPalette/useCommands.ts` | MODIFY | ✅ DONE |
+| 11 | `services/php-api/src/Enum/PlacementStrategy.php` | CREATE (Beta) | ✅ DONE |
 
 ## Key Reuse Points
 
@@ -167,19 +165,13 @@ Uses Symfony `StreamedResponse` with:
 
 ## Future Extensibility
 
-The architecture cleanly separates **job priority ordering** from **placement mechanics**. The ordering logic lives in a single method (`topologicalSortJobsByEdd`), making it trivial to swap strategies later:
-
-### Critical Ratio (CR)
-`CR = (time until deadline) / (remaining processing time)`. More sophisticated than EDD because it accounts for remaining work, not just the deadline. **Implementation**: replace the EDD comparator with a CR comparator in `topologicalSortJobsByEdd()`. Requires computing total remaining processing time per job (sum of unscheduled tasks' durations).
-
-### Dynamic CR
-Recalculates CR after each job is placed, since placing job A on shared stations changes available capacity for job B. **Implementation**: replace the static sorted list with a priority queue (`SplPriorityQueue`) that re-evaluates CR after each job placement.
-
 ### FBI (Forward-Backward Improvement)
 Two-pass global optimization:
-1. **Forward pass (ASAP)**: place all jobs earliest possible (our alpha algorithm)
+1. **Forward pass (ASAP)**: place all jobs earliest possible (current algorithm)
 2. **Backward pass (ALAP)**: starting from the latest completion time, push jobs back to free early capacity
 3. **Iterate** until no improvement
+
+Requires ALAP placement logic (reverse of current ASAP). `SchedulingHelper::getPrecedenceCeiling()` already exists for the backward pass.
 
 ## Verification
 
@@ -188,7 +180,8 @@ Two-pass global optimization:
 3. **Manual E2E test**:
    - Create several jobs with cross-job dependencies and varying deadlines
    - Unschedule all tiles (CTRL+ALT+Z)
-   - Trigger CTRL+ALT+P → modal appears → progress bar fills → summary shown
-   - Verify: no precedence conflicts, earlier-deadline jobs placed first
+   - Trigger CTRL+ALT+P → modal appears with strategy selector
+   - Test each strategy: EDD, CR, Dynamic CR
+   - Verify: no precedence conflicts, strategy-appropriate ordering
    - Verify: snapshot refreshes after completion
-4. **Edge cases**: No unscheduled tasks (0 placed), single job, circular dependency detection
+4. **Edge cases**: No unscheduled tasks (0 placed), single job, circular dependency detection, jobs with no deadline (CR → lowest priority)

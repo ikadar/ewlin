@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { selectAuthToken, scheduleApi } from '../store';
 
+export type PlacementStrategy = 'edd' | 'cr' | 'dynamic_cr';
+
 export interface AutoPlaceProgress {
   type: 'progress' | 'complete' | 'error';
   jobIndex: number;
@@ -10,6 +12,7 @@ export interface AutoPlaceProgress {
   jobPlacedCount: number;
   totalPlacedCount: number;
   computeMs?: number;
+  strategy?: string;
   message?: string;
 }
 
@@ -27,7 +30,7 @@ export function useAutoPlaceAllStream() {
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (strategy: PlacementStrategy = 'edd') => {
     if (isRunning) return;
 
     setIsRunning(true);
@@ -40,7 +43,7 @@ export function useAutoPlaceAllStream() {
     try {
       // Build the URL using the same base as the rest of the API
       const apiUrl = import.meta.env.VITE_API_URL || '/api/v1';
-      const url = `${apiUrl}/schedule/auto-place-all`;
+      const url = `${apiUrl}/schedule/auto-place-all?strategy=${strategy}`;
 
       const response = await fetch(url, {
         method: 'POST',
