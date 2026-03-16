@@ -187,7 +187,8 @@ Implementation details:
    - Create several jobs with cross-job dependencies and varying deadlines
    - Unschedule all tiles (CTRL+ALT+Z)
    - Trigger CTRL+ALT+P → modal appears with strategy selector
-   - Test each strategy: EDD, CR, Dynamic CR
+   - Test each strategy: EDD, CR, Dynamic CR, FBI
    - Verify: no precedence conflicts, strategy-appropriate ordering
    - Verify: snapshot refreshes after completion
-4. **Edge cases**: No unscheduled tasks (0 placed), single job, circular dependency detection, jobs with no deadline (CR → lowest priority)
+   - FBI: verify tasks are repositioned later in the backward pass
+4. **Edge cases**: No unscheduled tasks (0 placed), single job, circular dependency detection
