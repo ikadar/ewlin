@@ -45,14 +45,15 @@ const STRATEGY_DISPLAY: Record<string, string> = {
  * 3. Complete — Summary "X tiles placed across Y jobs in Zms" + Close
  */
 export function AutoPlaceAllModal({ isOpen, onClose }: AutoPlaceAllModalProps) {
-  const { start, cancel, progress, isRunning, error } = useAutoPlaceAllStream();
+  const { start, cancel, reset, progress, isRunning, error } = useAutoPlaceAllStream();
   const [strategy, setStrategy] = useState<PlacementStrategy>('edd');
 
-  // Reset on open
+  // Reset hook state each time modal opens so previous results don't linger
   useEffect(() => {
-    if (!isOpen) return;
-    // Fresh state each time modal opens — hook resets on start()
-  }, [isOpen]);
+    if (isOpen) {
+      reset();
+    }
+  }, [isOpen, reset]);
 
   if (!isOpen) return null;
 

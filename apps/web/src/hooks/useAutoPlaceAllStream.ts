@@ -113,5 +113,10 @@ export function useAutoPlaceAllStream() {
     abortRef.current?.abort();
   }, []);
 
-  return { start, cancel, progress, isRunning, error };
+  const reset = useCallback(() => {
+    setProgress(null);
+    setError(null);
+  }, []);
+
+  return { start, cancel, reset, progress, isRunning, error };
 }
