@@ -12,6 +12,7 @@ import { MaintenanceState } from './components/MaintenanceState';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
+import { AutoPlaceModal } from './components/AutoPlaceModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
@@ -26,7 +27,7 @@ import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
-import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
+import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
 import type { CompactHorizon } from './utils';
@@ -478,6 +479,8 @@ function AppContent() {
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
   // Mass unschedule confirmation dialog
   const [massUnscheduleConfirm, setMassUnscheduleConfirm] = useState<{ count: number } | null>(null);
+  // Auto-place V1 modal
+  const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
 
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
@@ -773,7 +776,7 @@ function AppContent() {
         // Reconstruct sequence DSL from tasks (JCF format)
         const elementTasks = snapshot.tasks
           .filter((t) => t.elementId === el.id)
-          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+          .sort(compareTaskOrder);
         const sequenceParts = elementTasks.map((t) => {
           if (t.type === 'Internal') {
             const posteName = (stationNameMap.get(t.stationId) ?? t.stationId).replace(/\s+/g, '');
@@ -1157,6 +1160,16 @@ function AppContent() {
     }
   }, [selectedJobId, autoPlaceJobAlap, showToast]);
 
+  // Handle global auto-place V1 (Ctrl+Alt+P)
+  const handleAutoPlaceAll = useCallback(() => {
+    setIsAutoPlaceOpen(true);
+  }, []);
+
+  const handleAutoPlaceComplete = useCallback(() => {
+    // Refetch snapshot when auto-place finishes
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [dispatch]);
+
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const ctx: KeyboardContext = {
@@ -1185,6 +1198,13 @@ function AppContent() {
       if (isAltLetter(e, 'e') && selectedJobId) {
         e.preventDefault();
         handleEditJob();
+        return;
+      }
+
+      // Ctrl+Alt+P: global auto-place V1
+      if (isCtrlAltLetter(e, 'p')) {
+        e.preventDefault();
+        handleAutoPlaceAll();
         return;
       }
 
@@ -1285,7 +1305,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, triggerMassUnschedule]);
+  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, triggerMassUnschedule, handleAutoPlaceAll]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -1997,7 +2017,7 @@ function AppContent() {
     const elementTasks = element.taskIds
       .map((id) => taskById.get(id))
       .filter((t): t is Task => t !== undefined)
-      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      .sort(compareTaskOrder);
     const lastTask = elementTasks[elementTasks.length - 1];
     if (!lastTask || lastTask.id !== task.id) return;
 
@@ -2336,6 +2356,7 @@ function AppContent() {
     onClearAllAssignments: triggerMassUnschedule,
     onAsapPlacement: handleAsapPlacement,
     onAlapPlacement: handleAlapPlacement,
+    onAutoPlaceAll: handleAutoPlaceAll,
   });
 
   // Register scheduler-specific commands into the global Command Center
@@ -2669,6 +2690,14 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {/* Auto-place V1 modal */}
+      <AutoPlaceModal
+        isOpen={isAutoPlaceOpen}
+        onClose={() => setIsAutoPlaceOpen(false)}
+        onComplete={handleAutoPlaceComplete}
+        apiBaseUrl="/api/v1"
+      />
 
       {/* Schedule save/load modal */}
       <ScheduleSaveLoadModal

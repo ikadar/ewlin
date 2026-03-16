@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import type { Task, TaskAssignment } from '@flux/types';
 import { isOutsourcedTask, isInternalTask } from '@flux/types';
+import { compareTaskOrder } from '../../utils/taskHelpers';
 import { formatScheduleDateTime } from '../../utils/dateFormat';
 import { useTooltipDelay } from '../../hooks';
 
@@ -105,7 +106,7 @@ export function ProgressDots({ tasks, assignments }: ProgressDotsProps) {
   const assignmentMap = new Map<string, TaskAssignment>();
   assignments.forEach((a) => assignmentMap.set(a.taskId, a));
 
-  const sortedTasks = [...tasks].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+  const sortedTasks = [...tasks].sort(compareTaskOrder);
 
   const handleEnter = useCallback((e: React.MouseEvent, task: Task, assignment: TaskAssignment | undefined, state: DotState) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();

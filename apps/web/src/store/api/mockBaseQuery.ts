@@ -43,7 +43,7 @@ import { getTemplates as mockGetTemplates, createTemplate as mockCreateTemplate,
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
 import { applySplitToSnapshot, applyFuseToSnapshot } from '../../utils/splitFuse';
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
-import { isLastTaskOfJob } from '../../utils/taskHelpers';
+import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { computeAsapPlacements } from '../../utils/asapPlacement';
 import { computeAlapPlacements } from '../../utils/alapPlacement';
 import { normalizeError, createNotFoundError } from './errorNormalization';
@@ -122,7 +122,7 @@ function autoAssignOutsourcedSuccessors(
       const prereqTasks = prereqElem.taskIds
         .map((id) => taskById.get(id))
         .filter((t): t is Task => t !== undefined)
-        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        .sort(compareTaskOrder);
       const lastTask = prereqTasks[prereqTasks.length - 1];
       if (!lastTask) { allScheduled = false; break; }
 
@@ -234,7 +234,7 @@ function getOutsourcedTasksToRemoveOnUnassign(
         const prereqTasks = prereqElem.taskIds
           .map((id) => taskById.get(id))
           .filter((t): t is Task => t !== undefined)
-          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+          .sort(compareTaskOrder);
         const lastTask = prereqTasks[prereqTasks.length - 1];
         if (!lastTask || !assignmentByTaskId.has(lastTask.id)) {
           allPrereqsScheduled = false;
@@ -1454,7 +1454,7 @@ function getCompactPredecessorEnd(
 ): Date | null {
   const elementTasks = snapshot.tasks
     .filter((t) => t.elementId === task.elementId)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    .sort(compareTaskOrder);
   const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
 
   if (taskIndex <= 0) return null;

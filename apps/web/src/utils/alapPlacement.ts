@@ -4,7 +4,7 @@ import { getSuggestedStartForPrecedence, isPrintingTask } from '@flux/schedule-v
 import { calculateEndTime, calculateStartTime } from './timeCalculations';
 import { calculateOutsourcingDates, calculateOutsourcingDatesBackward } from './outsourcingCalculation';
 import { computeAsapPlacements } from './asapPlacement';
-import { isLastTaskOfJob } from './taskHelpers';
+import { isLastTaskOfJob, compareTaskOrder } from './taskHelpers';
 import { snapToNextWorkingTime, snapToPreviousWorkingTime } from './workingTime';
 
 export interface AlapPlacementResult {
@@ -60,7 +60,7 @@ export function computeAlapPlacements(
   for (const element of sortedElements) {
     const elementTasks = jobTasks
       .filter(t => t.elementId === element.id)
-      .sort((a, b) => b.sequenceOrder - a.sequenceOrder);
+      .sort((a, b) => compareTaskOrder(b, a));
     orderedTasks.push(...elementTasks);
   }
 
@@ -238,7 +238,7 @@ function getSuggestedEndForPrecedenceCeiling(
   // 1. Intra-element successor
   const elementTasks = snapshot.tasks
     .filter(t => t.elementId === task.elementId)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    .sort(compareTaskOrder);
 
   const taskIndex = elementTasks.findIndex(t => t.id === task.id);
   if (taskIndex >= 0 && taskIndex < elementTasks.length - 1) {
@@ -257,7 +257,7 @@ function getSuggestedEndForPrecedenceCeiling(
     for (const depElement of dependentElements) {
       const depTasks = snapshot.tasks
         .filter(t => t.elementId === depElement.id)
-        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        .sort(compareTaskOrder);
       if (depTasks.length > 0) {
         const firstTask = depTasks[0];
         const assignment = snapshot.assignments.find(a => a.taskId === firstTask.id);
@@ -279,7 +279,7 @@ function getSuggestedEndForPrecedenceCeiling(
         for (const depElement of depElements) {
           const depTasks = snapshot.tasks
             .filter(t => t.elementId === depElement.id)
-            .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+            .sort(compareTaskOrder);
           if (depTasks.length > 0) {
             const firstTask = depTasks[0];
             const assignment = snapshot.assignments.find(a => a.taskId === firstTask.id);

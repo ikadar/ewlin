@@ -3,7 +3,7 @@ import { isInternalTask } from '@flux/types';
 import { getSuggestedStartForPrecedence } from '@flux/schedule-validator';
 import { calculateEndTime } from './timeCalculations';
 import { calculateOutsourcingDates } from './outsourcingCalculation';
-import { isLastTaskOfJob } from './taskHelpers';
+import { isLastTaskOfJob, compareTaskOrder } from './taskHelpers';
 import { snapToNextWorkingTime } from './workingTime';
 
 export interface AsapPlacementResult {
@@ -36,7 +36,7 @@ export function computeAsapPlacements(
   for (const element of sortedElements) {
     const elementTasks = jobTasks
       .filter(t => t.elementId === element.id)
-      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      .sort(compareTaskOrder);
     orderedTasks.push(...elementTasks);
   }
 

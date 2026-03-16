@@ -17,7 +17,7 @@ import type {
 import { isInternalTask, isOutsourcedTask } from '@flux/types';
 import { calculateEndTime } from '../../utils/timeCalculations';
 import { SNAP_INTERVAL_MINUTES } from '../../components/DragPreview';
-import { groupTasksByJob, getTasksForJob } from '../../utils/taskHelpers';
+import { groupTasksByJob, getTasksForJob, compareTaskOrder } from '../../utils/taskHelpers';
 
 // ============================================================================
 // Helper Functions
@@ -186,7 +186,7 @@ export function generateAssignments(options: AssignmentGeneratorOptions): Assign
   // Group and sort tasks by job
   const tasksByJobMap = groupTasksByJob(tasks, elements);
   for (const jobTasks of tasksByJobMap.values()) {
-    jobTasks.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    jobTasks.sort(compareTaskOrder);
   }
 
   // Process each job's tasks

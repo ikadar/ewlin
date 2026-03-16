@@ -44,6 +44,7 @@ export interface UseCommandsOptions {
   onClearAllAssignments?: () => void;
   onAsapPlacement?: () => void;
   onAlapPlacement?: () => void;
+  onAutoPlaceAll?: () => void;
 }
 
 const RECENT_KEY = 'flux-recent-commands';
@@ -168,6 +169,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onClearAllAssignments,
     onAsapPlacement,
     onAlapPlacement,
+    onAutoPlaceAll,
   } = options;
 
   return useMemo(() => {
@@ -222,6 +224,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     if (onAlapPlacement) {
       commands.push({ id: 'alap-placement', label: 'Auto-place ALAP', category: 'Job selectionne', shortcut: 'Alt+P L', keywords: 'alap latest deadline backward auto place', icon: 'rewind', action: onAlapPlacement });
     }
+    if (onAutoPlaceAll) {
+      commands.push({ id: 'auto-place-all', label: 'Auto-place all (V1)', category: 'Actions', shortcut: 'Ctrl+Alt+P', keywords: 'auto place all global fbi dynamic cr schedule everything', icon: 'zap', action: onAutoPlaceAll });
+    }
 
     // Scheduler-specific: Affichage
     if (onToggleDisplayMode) {
@@ -246,5 +251,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

@@ -1,6 +1,6 @@
 import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Element } from '@flux/types';
 import { DRY_TIME_MS } from '@flux/types';
-import { getJobIdForTask } from './taskHelpers';
+import { getJobIdForTask, compareTaskOrder } from './taskHelpers';
 import { isPrintingStation } from './precedenceConstraints';
 import { snapToNextWorkingTime } from './workingTime';
 import { COMPACT_HORIZONS } from '../constants';
@@ -47,18 +47,18 @@ function isWithinHorizon(assignment: TaskAssignment, now: Date, horizonMs: numbe
 }
 
 /**
- * Find the predecessor task for a given task (by sequenceOrder within the same job).
+ * Find the predecessor task for a given task (positional lookup in sorted element tasks).
  */
-function findPredecessorTask(task: Task, allTasks: Task[], elements: Element[]): Task | undefined {
-  if (task.sequenceOrder <= 0) return undefined;
+function findPredecessorTask(task: Task, allTasks: Task[], _elements: Element[]): Task | undefined {
+  const elementTasks = allTasks
+    .filter((t) => t.elementId === task.elementId)
+    .sort(compareTaskOrder);
 
-  const jobId = getJobIdForTask(task, elements);
-  if (!jobId) return undefined;
-
-  // Find tasks with same elementId (same job) and one lower sequenceOrder
-  return allTasks.find(
-    (t) => t.elementId === task.elementId && t.sequenceOrder === task.sequenceOrder - 1
-  );
+  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
+  if (taskIndex > 0) {
+    return elementTasks[taskIndex - 1];
+  }
+  return undefined;
 }
 
 /**
@@ -125,7 +125,7 @@ function getPredecessorEndTime(
     const prereqTasks = prereqElem.taskIds
       .map((id) => taskById.get(id))
       .filter((t): t is Task => t !== undefined)
-      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      .sort(compareTaskOrder);
     const lastTask = prereqTasks[prereqTasks.length - 1];
     if (!lastTask) continue;
 

@@ -5,7 +5,21 @@
  * Since Task only has elementId, these helpers provide convenient access to the job.
  */
 
-import type { Task, Element } from '@flux/types';
+import type { Task, Element, InternalTask } from '@flux/types';
+
+/**
+ * Compare two tasks by (sequenceOrder, splitIndex) for stable ordering.
+ *
+ * Split parts share the same sequenceOrder but differ by splitIndex.
+ * This comparator ensures Part A (splitIndex=0) sorts before Part B (splitIndex=1).
+ */
+export function compareTaskOrder(a: Task, b: Task): number {
+  const seqDiff = a.sequenceOrder - b.sequenceOrder;
+  if (seqDiff !== 0) return seqDiff;
+  const aIdx = a.type === 'Internal' ? ((a as InternalTask).splitIndex ?? 0) : 0;
+  const bIdx = b.type === 'Internal' ? ((b as InternalTask).splitIndex ?? 0) : 0;
+  return aIdx - bIdx;
+}
 
 /**
  * Get the jobId for a task by looking up its element.
@@ -78,7 +92,7 @@ export function getElementTasks(
 ): Task[] {
   return tasks
     .filter((t) => t.elementId === elementId)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    .sort(compareTaskOrder);
 }
 
 /**
@@ -113,7 +127,7 @@ export function isLastTaskOfJob(
   // Check: is this task the last in the element?
   const elementTasks = tasks
     .filter((t) => t.elementId === element.id)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    .sort(compareTaskOrder);
   const lastTask = elementTasks[elementTasks.length - 1];
   return lastTask?.id === taskId;
 }

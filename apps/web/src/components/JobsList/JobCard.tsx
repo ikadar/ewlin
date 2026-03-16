@@ -24,6 +24,8 @@ export interface JobCardProps {
   problemType?: JobProblemType;
   /** Whether the job is selected */
   isSelected?: boolean;
+  /** Buffer time label for fully-scheduled jobs (e.g., "+2j 4h") */
+  bufferLabel?: string;
   /** Click handler — receives job ID */
   onClick?: (jobId: string) => void;
 }
@@ -42,6 +44,7 @@ export const JobCard = memo(function JobCard({
   assignments,
   deadline,
   problemType,
+  bufferLabel,
   isSelected = false,
   onClick,
 }: JobCardProps) {
@@ -109,15 +112,22 @@ export const JobCard = memo(function JobCard({
         {description}
       </div>
 
-      {/* Footer: progress dots (left) + badge (right) */}
+      {/* Footer: progress dots (left) + badge/buffer (right) */}
       <div className="flex items-center justify-between">
         <ProgressDots tasks={tasks} assignments={assignments} />
-        {problemType === 'late' && (
-          <span className="text-xs font-medium text-red-400">En retard</span>
-        )}
-        {problemType === 'conflict' && (
-          <span className="text-xs font-medium text-amber-400">Conflit</span>
-        )}
+        <div className="flex items-center gap-2">
+          {problemType === 'late' && (
+            <span className="text-xs font-medium text-red-400">En retard</span>
+          )}
+          {problemType === 'conflict' && (
+            <span className="text-xs font-medium text-amber-400">Conflit</span>
+          )}
+          {bufferLabel && (
+            <span className={`text-xs font-medium ${bufferLabel.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
+              {bufferLabel}
+            </span>
+          )}
+        </div>
       </div>
     </button>
   );

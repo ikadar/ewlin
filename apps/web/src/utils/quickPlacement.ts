@@ -5,7 +5,7 @@
 
 import type { Task, Job, TaskAssignment, InternalTask, Element } from '@flux/types';
 import { isInternalTask } from '@flux/types';
-import { getTasksForJob } from './taskHelpers';
+import { getTasksForJob, compareTaskOrder } from './taskHelpers';
 
 /**
  * Get the last (bottom-most in task list) unscheduled internal task for a job.
@@ -37,7 +37,7 @@ export function getLastUnscheduledTask(
     const elementTasks = element.taskIds
       .map((id) => taskById.get(id))
       .filter((t): t is Task => t !== undefined)
-      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      .sort(compareTaskOrder);
 
     for (const task of elementTasks) {
       if (isInternalTask(task) && !assignedTaskIds.has(task.id)) {

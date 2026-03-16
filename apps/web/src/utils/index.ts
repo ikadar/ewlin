@@ -39,7 +39,7 @@ export { getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, ge
 export type { DryingTimeInfo, OutsourcingTimeInfo } from './precedenceConstraints';
 export { getValidationMessage, getPrimaryValidationMessage } from './validationMessages';
 export { addWorkingTime, subtractWorkingTime, getDayScheduleForDate, isWithinWorkingHours, snapToNextWorkingTime } from './workingTime';
-export { getJobIdForTask, createTaskToJobMap, getTasksForJob, groupTasksByJob } from './taskHelpers';
+export { getJobIdForTask, createTaskToJobMap, getTasksForJob, groupTasksByJob, compareTaskOrder } from './taskHelpers';
 export { mergeWithSession } from './mergeWithSession';
 export {
   isElementBlocked,

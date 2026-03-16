@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
 import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
-import { isLastTaskOfJob } from '../../utils/taskHelpers';
+import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
@@ -173,7 +173,7 @@ export function TaskList({
       const prereqTasks = prereqElem.taskIds
         .map((id) => taskById.get(id))
         .filter((t): t is Task => t !== undefined)
-        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        .sort(compareTaskOrder);
       const lastTask = prereqTasks[prereqTasks.length - 1];
       if (!lastTask) return undefined;
       const lastAssignment = assignmentByTaskId.get(lastTask.id);
@@ -189,7 +189,7 @@ export function TaskList({
    * Render task tiles for an element
    */
   const renderTaskTiles = (elementTasks: Task[], element: Element) => {
-    const sortedTasks = [...elementTasks].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    const sortedTasks = [...elementTasks].sort(compareTaskOrder);
 
     return sortedTasks.map((task, index) => {
       const assignment = assignmentByTaskId.get(task.id);
