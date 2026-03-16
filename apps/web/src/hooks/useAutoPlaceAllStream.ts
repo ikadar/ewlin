@@ -4,6 +4,16 @@ import { selectAuthToken, scheduleApi } from '../store';
 
 export type PlacementStrategy = 'edd' | 'cr' | 'dynamic_cr' | 'fbi';
 
+export interface PlacementScoreData {
+  lateJobCount: number;
+  totalJobCount: number;
+  totalLatenessMinutes: number;
+  maxLatenessMinutes: number;
+  makespanMinutes: number;
+  onTimeRate: number;
+  averageSlackMinutes: number;
+}
+
 export interface AutoPlaceProgress {
   type: 'progress' | 'complete' | 'error';
   jobIndex: number;
@@ -13,6 +23,7 @@ export interface AutoPlaceProgress {
   totalPlacedCount: number;
   computeMs?: number;
   strategy?: string;
+  score?: PlacementScoreData;
   message?: string;
 }
 

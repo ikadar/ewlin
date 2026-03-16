@@ -29,6 +29,15 @@ const STRATEGY_OPTIONS: { value: PlacementStrategy; label: string; description: 
   },
 ];
 
+function formatMinutes(minutes: number): string {
+  const abs = Math.abs(minutes);
+  if (abs < 60) return `${minutes}min`;
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  const sign = minutes < 0 ? '-' : '';
+  return m > 0 ? `${sign}${h}h${String(m).padStart(2, '0')}` : `${sign}${h}h`;
+}
+
 const STRATEGY_DISPLAY: Record<string, string> = {
   edd: 'EDD',
   cr: 'CR',
@@ -175,6 +184,42 @@ export function AutoPlaceAllModal({ isOpen, onClose }: AutoPlaceAllModalProps) {
               <p className="text-flux-text-tertiary mt-1">
                 Stratégie : {STRATEGY_DISPLAY[usedStrategy] || usedStrategy}
               </p>
+
+              {/* Placement quality score */}
+              {progress.score && (
+                <div className="mt-3 pt-3 border-t border-flux-border space-y-1.5">
+                  <div className="flex justify-between">
+                    <span>Taux de ponctualité</span>
+                    <span className={`font-medium ${progress.score.onTimeRate === 100 ? 'text-green-400' : progress.score.onTimeRate >= 80 ? 'text-yellow-400' : 'text-red-400'}`}>
+                      {progress.score.onTimeRate}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Jobs en retard</span>
+                    <span className={`font-medium ${progress.score.lateJobCount === 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {progress.score.lateJobCount} / {progress.score.totalJobCount}
+                    </span>
+                  </div>
+                  {progress.score.lateJobCount > 0 && (
+                    <div className="flex justify-between">
+                      <span>Retard max</span>
+                      <span className="font-medium text-red-400">
+                        {formatMinutes(progress.score.maxLatenessMinutes)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Makespan</span>
+                    <span className="font-medium text-flux-text-primary">{formatMinutes(progress.score.makespanMinutes)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Marge moyenne</span>
+                    <span className={`font-medium ${progress.score.averageSlackMinutes >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {progress.score.averageSlackMinutes >= 0 ? '+' : ''}{formatMinutes(progress.score.averageSlackMinutes)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
