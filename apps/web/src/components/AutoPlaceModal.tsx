@@ -247,15 +247,16 @@ export function AutoPlaceModal({ isOpen, onClose, onComplete, apiBaseUrl }: Auto
 // ============================================================================
 
 function RunningView({ progress, pct }: { progress: AutoPlaceProgress | null; pct: number }) {
-  const phaseLabel = progress?.phase === 'placement'
-    ? 'Initial placement'
-    : progress?.phase === 'fbi_backward'
-      ? 'FBI backward pass'
-      : progress?.phase === 'fbi_forward'
-        ? `FBI iteration #${progress?.fbiIteration ?? 1}`
-        : progress?.phase === 'auto_split'
-          ? 'Auto-split'
-          : 'Starting...';
+  const phaseLabels: Record<string, string> = {
+    placement: 'Initial placement',
+    fbi_backward: 'FBI backward pass',
+    fbi_forward: `FBI iteration #${progress?.fbiIteration ?? 1}`,
+    auto_split: 'Auto-split',
+    split_replace: 'Re-placing after split',
+    split_backward: 'Post-split backward pass',
+    split_forward: 'Post-split late jobs',
+  };
+  const phaseLabel = (progress?.phase && phaseLabels[progress.phase]) || 'Starting...';
 
   return (
     <>
