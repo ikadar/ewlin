@@ -22,12 +22,18 @@ const STRATEGY_OPTIONS: { value: PlacementStrategy; label: string; description: 
     label: 'CR Dynamique',
     description: 'CR recalculé après chaque job placé. Plus précis pour les stations partagées.',
   },
+  {
+    value: 'fbi',
+    label: 'FBI — Forward-Backward',
+    description: 'Placement ASAP puis repositionnement ALAP. Libère de la capacité en début de planning.',
+  },
 ];
 
 const STRATEGY_DISPLAY: Record<string, string> = {
   edd: 'EDD',
   cr: 'CR',
   dynamic_cr: 'CR Dynamique',
+  fbi: 'FBI',
 };
 
 /**

@@ -152,6 +152,7 @@ Confirm dialog includes strategy radio selector (EDD / CR / CR Dynamique). Compl
 | 9 | `apps/web/src/App.tsx` | MODIFY | ✅ DONE |
 | 10 | `apps/web/src/components/CommandPalette/useCommands.ts` | MODIFY | ✅ DONE |
 | 11 | `services/php-api/src/Enum/PlacementStrategy.php` | CREATE (Beta) | ✅ DONE |
+| 12 | `services/php-api/src/ValueObject/PlacementContext.php` | MODIFY (Beta) | ✅ DONE |
 
 ## Key Reuse Points
 
@@ -163,15 +164,20 @@ Confirm dialog includes strategy radio selector (EDD / CR / CR Dynamique). Compl
 - Kahn's algorithm — already in AsapPlacementService, reused for both elements and jobs
 - Mass-unschedule dialog pattern — UI template for modal
 
-## Future Extensibility
+### FBI — Forward-Backward Improvement (Beta)
 
-### FBI (Forward-Backward Improvement)
 Two-pass global optimization:
-1. **Forward pass (ASAP)**: place all jobs earliest possible (current algorithm)
-2. **Backward pass (ALAP)**: starting from the latest completion time, push jobs back to free early capacity
-3. **Iterate** until no improvement
+1. **Forward pass (ASAP)**: place all tasks at earliest possible slots using CR ordering
+2. **Backward pass (ALAP)**: process jobs in reverse topological order, reposition internal tasks as late as possible within their precedence window
+3. This frees early station capacity for the most critical (first-placed) jobs
 
-Requires ALAP placement logic (reverse of current ASAP). `SchedulingHelper::getPrecedenceCeiling()` already exists for the backward pass.
+Implementation details:
+- Forward pass uses CR ordering (most critical jobs placed first)
+- Backward pass uses `findLatestGap()`, `calculateStartFromEnd()`, `getPrecedenceCeiling()`
+- Only internal tasks are repositioned (outsourced tasks have fixed transit constraints)
+- Tasks are only moved later if the ALAP position is strictly after the ASAP position and not in the past
+- `PlacementContext::removeAssignment()` enables temporary removal during repositioning
+- Progress bar covers both passes: `totalJobs = numJobs × 2`
 
 ## Verification
 

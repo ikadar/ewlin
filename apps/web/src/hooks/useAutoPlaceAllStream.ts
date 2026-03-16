@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { selectAuthToken, scheduleApi } from '../store';
 
-export type PlacementStrategy = 'edd' | 'cr' | 'dynamic_cr';
+export type PlacementStrategy = 'edd' | 'cr' | 'dynamic_cr' | 'fbi';
 
 export interface AutoPlaceProgress {
   type: 'progress' | 'complete' | 'error';
