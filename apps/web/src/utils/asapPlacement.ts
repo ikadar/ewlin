@@ -4,7 +4,7 @@ import { getSuggestedStartForPrecedence } from '@flux/schedule-validator';
 import { calculateEndTime } from './timeCalculations';
 import { calculateOutsourcingDates } from './outsourcingCalculation';
 import { isLastTaskOfJob, compareTaskOrder } from './taskHelpers';
-import { snapToNextWorkingTime } from './workingTime';
+import { snapToNextWorkingTime, ceilToQuarterHour } from './workingTime';
 
 export interface AsapPlacementResult {
   placements: { taskId: string; targetId: string; isOutsourced: boolean; scheduledStart: string }[];
@@ -142,8 +142,13 @@ function placeInternalTask(
   const proposed = { taskId: task.id, targetId: task.stationId, isOutsourced: false, scheduledStart: now };
   const precedenceFloor = getSuggestedStartForPrecedence(proposed, snapshot);
   // Snap to station working hours — ensures we never propose a start outside operating hours
-  const candidateStart = snapToNextWorkingTime(
+  // Triple-snap: working hours → quarter-hour boundary → working hours (ceil may push past shift end)
+  const snappedToWork = snapToNextWorkingTime(
     new Date(laterOf(precedenceFloor ?? now, now)),
+    station,
+  );
+  const candidateStart = snapToNextWorkingTime(
+    ceilToQuarterHour(snappedToWork),
     station,
   ).toISOString();
 
@@ -213,8 +218,11 @@ function findEarliestGap(
       start = assignment.scheduledEnd;
       startMs = aEnd;
 
-      // Snap to station working hours if needed
-      const snapped = snapToNextWorkingTime(new Date(start), station);
+      // Triple-snap: working hours → quarter-hour → working hours
+      const snapped = snapToNextWorkingTime(
+        ceilToQuarterHour(snapToNextWorkingTime(new Date(start), station)),
+        station,
+      );
       start = snapped.toISOString();
       startMs = snapped.getTime();
     }

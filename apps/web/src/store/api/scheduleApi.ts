@@ -313,18 +313,29 @@ export const scheduleApi = createApi({
      *
      * Uses optimistic update for instant UI feedback.
      */
-    clearAllAssignments: builder.mutation<{ unassignedCount: number }, void>({
-      query: () => ({ url: '/schedule/assignments', method: 'DELETE' }),
+    clearAllAssignments: builder.mutation<
+      { unassignedCount: number },
+      { includeInProgress?: boolean; fuseSplits?: boolean } | void
+    >({
+      query: (opts) => {
+        const params = new URLSearchParams();
+        if (opts && opts.includeInProgress) params.set('includeInProgress', '1');
+        if (opts && opts.fuseSplits) params.set('fuseSplits', '1');
+        const qs = params.toString();
+        return { url: `/schedule/assignments${qs ? `?${qs}` : ''}`, method: 'DELETE' };
+      },
       invalidatesTags: ['Snapshot'],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      async onQueryStarted(opts, { dispatch, queryFulfilled }) {
+        const includeInProgress = opts?.includeInProgress ?? false;
         const patchResult = dispatch(
           scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
             const now = new Date().toISOString();
             draft.assignments = draft.assignments.filter((a) => {
               if (a.isCompleted) return true;
-              if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return true;
+              if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return true;
               return false;
             });
+            // Note: fuseSplits optimistic update is handled by snapshot refetch
           })
         );
         try { await queryFulfilled; } catch { patchResult.undo(); }

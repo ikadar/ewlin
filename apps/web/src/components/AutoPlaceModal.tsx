@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Loader2, CheckCircle2, AlertTriangle, Zap } from 'lucide-react';
+import { muteMercure, unmuteMercure } from '../hooks/mercureMute';
 
 // ============================================================================
 // Types
@@ -17,6 +18,7 @@ interface AutoPlaceProgress {
   lateCount?: number;
   totalLatenessMinutes?: number;
   splitsPerformed?: number;
+  stepsCompleted?: number;
   computeMs?: number;
   score?: {
     lateJobCount: number;
@@ -39,6 +41,45 @@ interface AutoPlaceModalProps {
 
 type ModalState = 'running' | 'complete' | 'error';
 
+interface PhaseLogEntry {
+  phase: string;
+  label: string;
+  detail?: string;
+  status: 'done' | 'active';
+}
+
+// ============================================================================
+// Phase log helpers
+// ============================================================================
+
+const PHASE_LABELS: Record<string, string> = {
+  placement: 'Initial placement',
+  fbi_backward: 'FBI backward pass',
+  fbi_forward: 'FBI forward pass',
+  auto_split: 'Auto-split',
+  split_replace: 'Re-placing after split',
+  split_backward: 'Post-split backward pass',
+  split_forward: 'Post-split late jobs',
+};
+
+function getPhaseDetail(phase: string, event: AutoPlaceProgress): string {
+  switch (phase) {
+    case 'placement':
+    case 'split_replace':
+      return `${event.totalPlacedCount} tiles`;
+    case 'fbi_backward':
+    case 'split_backward':
+      return `${event.totalJobs} jobs`;
+    case 'fbi_forward':
+    case 'split_forward':
+      return `${event.jobIndex}/${event.totalJobs} jobs`;
+    case 'auto_split':
+      return event.splitsPerformed ? `${event.splitsPerformed} splits` : 'processing…';
+    default:
+      return '';
+  }
+}
+
 // ============================================================================
 // Hook: useAutoPlaceSSE
 // ============================================================================
@@ -49,6 +90,10 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
   const [result, setResult] = useState<AutoPlaceProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const lastProgressRef = useRef<AutoPlaceProgress | null>(null);
+  const [logEntries, setLogEntries] = useState<PhaseLogEntry[]>([]);
+  const prevPhaseRef = useRef<string | null>(null);
+  const needsNewActiveRef = useRef(false);
 
   const start = useCallback(() => {
     // Abort any previous in-flight request
@@ -58,9 +103,96 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
     setProgress(null);
     setResult(null);
     setError(null);
+    setLogEntries([]);
+    prevPhaseRef.current = null;
+    needsNewActiveRef.current = false;
+
+    // Accumulate phase log entries from SSE events
+    function logEvent(event: AutoPlaceProgress) {
+      if (event.type === 'iteration') {
+        setLogEntries(prev => {
+          const entries = [...prev];
+          const lastActive = entries.findLastIndex(e => e.status === 'active');
+          if (lastActive >= 0) entries.splice(lastActive, 1);
+          entries.push({
+            phase: 'fbi_iteration',
+            label: `FBI iteration #${event.fbiIteration ?? 1}`,
+            detail: `${event.lateCount ?? 0} late, ${formatMinutes(event.totalLatenessMinutes ?? 0)}`,
+            status: 'done',
+          });
+          return entries;
+        });
+        needsNewActiveRef.current = true;
+        return;
+      }
+
+      if (event.type === 'split') {
+        setLogEntries(prev => {
+          const entries = [...prev];
+          const lastActive = entries.findLastIndex(e => e.status === 'active');
+          if (lastActive >= 0) entries.splice(lastActive, 1);
+          entries.push({
+            phase: 'split',
+            label: 'Auto-split',
+            detail: `${event.splitsPerformed ?? 0} splits performed`,
+            status: 'done',
+          });
+          return entries;
+        });
+        needsNewActiveRef.current = true;
+        return;
+      }
+
+      if (event.type === 'complete') {
+        setLogEntries(prev => prev.map(e =>
+          e.status === 'active' ? { ...e, status: 'done' as const } : e
+        ));
+        return;
+      }
+
+      // Regular progress — detect phase transitions
+      const currentPhase = event.phase;
+      const isNewPhase = currentPhase !== prevPhaseRef.current || needsNewActiveRef.current;
+
+      if (isNewPhase && currentPhase) {
+        prevPhaseRef.current = currentPhase;
+        needsNewActiveRef.current = false;
+        setLogEntries(prev => {
+          const entries = [...prev];
+          const lastActive = entries.findLastIndex(e => e.status === 'active');
+          if (lastActive >= 0) {
+            entries[lastActive] = { ...entries[lastActive], status: 'done' };
+          }
+          entries.push({
+            phase: currentPhase,
+            label: PHASE_LABELS[currentPhase] ?? currentPhase,
+            detail: getPhaseDetail(currentPhase, event),
+            status: 'active',
+          });
+          return entries;
+        });
+      } else {
+        setLogEntries(prev => {
+          const entries = [...prev];
+          const lastActive = entries.findLastIndex(e => e.status === 'active');
+          if (lastActive >= 0) {
+            entries[lastActive] = {
+              ...entries[lastActive],
+              detail: getPhaseDetail(entries[lastActive].phase, event),
+            };
+          }
+          return entries;
+        });
+      }
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // Suppress Mercure invalidations for the entire auto-place duration.
+    // Backend flushes trigger Mercure events that would cause full snapshot
+    // refetches, blocking the main thread and freezing the SSE stream.
+    muteMercure(10 * 60 * 1000);
 
     // Use fetch with ReadableStream for SSE (EventSource doesn't support POST)
     const token = sessionStorage.getItem('flux_auth_token');
@@ -87,7 +219,42 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+
+          if (done) {
+            // Flush TextDecoder internal state + drain remaining buffer
+            buffer += decoder.decode(new Uint8Array(), { stream: false });
+            if (buffer.trim()) {
+              for (const line of buffer.split('\n')) {
+                if (!line.startsWith('data: ')) continue;
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr) continue;
+                try {
+                  const event: AutoPlaceProgress = JSON.parse(jsonStr);
+                  if (event.type === 'error') {
+                    unmuteMercure();
+                    setError(event.message ?? 'Unknown error');
+                    setState('error');
+                    return;
+                  }
+                  logEvent(event);
+                  if (event.type === 'complete') {
+                    unmuteMercure();
+                    setResult(event);
+                    setState('complete');
+                    return;
+                  }
+                  setProgress(event);
+                  lastProgressRef.current = event;
+                } catch {
+                  // Skip malformed JSON
+                }
+              }
+            }
+            // Stream ended — treat as complete
+            unmuteMercure();
+            setState('complete');
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
@@ -102,12 +269,16 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
               const event: AutoPlaceProgress = JSON.parse(jsonStr);
 
               if (event.type === 'error') {
+                unmuteMercure();
                 setError(event.message ?? 'Unknown error');
                 setState('error');
                 return;
               }
 
+              logEvent(event);
+
               if (event.type === 'complete') {
+                unmuteMercure();
                 setResult(event);
                 setState('complete');
                 return;
@@ -115,6 +286,7 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
 
               // progress, iteration, split events
               setProgress(event);
+              lastProgressRef.current = event;
             } catch {
               // Skip malformed JSON
             }
@@ -122,6 +294,7 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
         }
       })
       .catch((err) => {
+        unmuteMercure();
         if (err.name === 'AbortError') return;
         setError(err.message ?? 'Connection failed');
         setState('error');
@@ -129,10 +302,11 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
   }, [apiBaseUrl]);
 
   const abort = useCallback(() => {
+    unmuteMercure();
     abortRef.current?.abort();
   }, []);
 
-  return { state, progress, result, error, start, abort };
+  return { state, progress, result, error, logEntries, start, abort, lastProgressRef };
 }
 
 // ============================================================================
@@ -146,12 +320,19 @@ function formatMinutes(minutes: number): string {
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }
 
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+}
+
 // ============================================================================
 // Component: AutoPlaceModal
 // ============================================================================
 
 export function AutoPlaceModal({ isOpen, onClose, onComplete, apiBaseUrl }: AutoPlaceModalProps) {
-  const { state, progress, result, error, start, abort } = useAutoPlaceSSE(apiBaseUrl);
+  const { state, progress, result, error, logEntries, start, abort, lastProgressRef } = useAutoPlaceSSE(apiBaseUrl);
 
   // Start the algorithm when modal opens
   useEffect(() => {
@@ -221,8 +402,9 @@ export function AutoPlaceModal({ isOpen, onClose, onComplete, apiBaseUrl }: Auto
 
         {/* Body */}
         <div className="px-5 py-4 space-y-4">
-          {state === 'running' && <RunningView progress={progress} pct={pct} />}
-          {state === 'complete' && result && <CompleteView result={result} />}
+          {state === 'running' && <RunningView progress={progress} pct={pct} logEntries={logEntries} />}
+          {state === 'complete' && result && <CompleteView result={result} logEntries={logEntries} />}
+          {state === 'complete' && !result && <IncompleteView lastProgress={lastProgressRef.current} logEntries={logEntries} />}
           {state === 'error' && <ErrorView error={error} />}
         </div>
 
@@ -246,30 +428,18 @@ export function AutoPlaceModal({ isOpen, onClose, onComplete, apiBaseUrl }: Auto
 // Sub-components
 // ============================================================================
 
-function RunningView({ progress, pct }: { progress: AutoPlaceProgress | null; pct: number }) {
-  const phaseLabels: Record<string, string> = {
-    placement: 'Initial placement',
-    fbi_backward: 'FBI backward pass',
-    fbi_forward: `FBI iteration #${progress?.fbiIteration ?? 1}`,
-    auto_split: 'Auto-split',
-    split_replace: 'Re-placing after split',
-    split_backward: 'Post-split backward pass',
-    split_forward: 'Post-split late jobs',
-  };
-  const phaseLabel = (progress?.phase && phaseLabels[progress.phase]) || 'Starting...';
+function RunningView({ progress, pct, logEntries }: { progress: AutoPlaceProgress | null; pct: number; logEntries: PhaseLogEntry[] }) {
+  const startTimeRef = useRef(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000)), 1000);
+    return () => clearInterval(iv);
+  }, []);
 
   return (
     <>
-      {/* Spinner + phase */}
-      <div className="flex items-center gap-3">
-        <Loader2 size={20} className="text-amber-400 animate-spin" />
-        <div>
-          <p className="text-flux-text-primary text-sm font-medium">{phaseLabel}</p>
-          {progress?.jobReference && (
-            <p className="text-flux-text-secondary text-xs mt-0.5">{progress.jobReference}</p>
-          )}
-        </div>
-      </div>
+      {/* Phase log */}
+      <PhaseLog entries={logEntries} />
 
       {/* Progress bar */}
       <div className="space-y-1">
@@ -285,28 +455,25 @@ function RunningView({ progress, pct }: { progress: AutoPlaceProgress | null; pc
         </div>
       </div>
 
-      {/* Running stats */}
+      {/* Compact running stats */}
       {progress && (
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-          <Stat label="Tiles placed" value={progress.totalPlacedCount} />
-          <Stat label="Late jobs" value={progress.lateCount ?? 0} warn={(progress.lateCount ?? 0) > 0} />
-          {(progress.fbiIteration ?? 0) > 0 && (
-            <Stat label="FBI iteration" value={progress.fbiIteration!} />
-          )}
-          {(progress.splitsPerformed ?? 0) > 0 && (
-            <Stat label="Splits" value={progress.splitsPerformed!} />
-          )}
+        <div className="flex items-center gap-4 text-xs text-flux-text-secondary">
+          <span>{progress.totalPlacedCount} tiles</span>
+          <span>{formatElapsed(elapsed)}</span>
         </div>
       )}
     </>
   );
 }
 
-function CompleteView({ result }: { result: AutoPlaceProgress }) {
+function CompleteView({ result, logEntries }: { result: AutoPlaceProgress; logEntries: PhaseLogEntry[] }) {
   const score = result.score;
 
   return (
     <>
+      {/* Phase log */}
+      <PhaseLog entries={logEntries} />
+
       {/* Success header */}
       <div className="flex items-center gap-3">
         <CheckCircle2 size={20} className="text-emerald-400" />
@@ -344,6 +511,68 @@ function CompleteView({ result }: { result: AutoPlaceProgress }) {
         )}
       </div>
     </>
+  );
+}
+
+function IncompleteView({ lastProgress, logEntries }: { lastProgress: AutoPlaceProgress | null; logEntries: PhaseLogEntry[] }) {
+  return (
+    <>
+      {/* Phase log */}
+      <PhaseLog entries={logEntries} />
+
+      <div className="flex items-center gap-3">
+        <AlertTriangle size={20} className="text-amber-400" />
+        <div>
+          <p className="text-flux-text-primary text-sm font-medium">
+            Placement finished with incomplete results
+          </p>
+          <p className="text-flux-text-secondary text-xs mt-0.5">
+            The server stream ended before sending a completion summary.
+          </p>
+        </div>
+      </div>
+
+      {lastProgress && (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+          <Stat label="Tiles placed" value={lastProgress.totalPlacedCount} />
+          <Stat label="Late jobs" value={lastProgress.lateCount ?? 0} warn={(lastProgress.lateCount ?? 0) > 0} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function PhaseLog({ entries }: { entries: PhaseLogEntry[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [entries.length]);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div
+      ref={scrollRef}
+      className="space-y-1.5 overflow-y-auto pr-1"
+      style={{ maxHeight: '12rem' }}
+    >
+      {entries.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs">
+          {entry.status === 'done' ? (
+            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+          ) : (
+            <Loader2 size={14} className="text-amber-400 animate-spin shrink-0" />
+          )}
+          <span className="text-flux-text-primary">{entry.label}</span>
+          {entry.detail && (
+            <span className="text-flux-text-secondary ml-auto whitespace-nowrap">{entry.detail}</span>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

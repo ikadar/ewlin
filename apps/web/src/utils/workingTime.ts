@@ -342,6 +342,26 @@ export function isWithinWorkingHours(time: Date, station: Station): boolean {
  * But work can only START during working hours. So if drying ends at 12:30 (during lunch),
  * the earliest a task can start is 13:00 (when lunch ends).
  */
+/** Round UP to the next 15-minute boundary (:00, :15, :30, :45). */
+export function ceilToQuarterHour(date: Date): Date {
+  const result = new Date(date);
+  const minutes = result.getMinutes();
+  const remainder = minutes % 15;
+  if (remainder > 0) {
+    result.setMinutes(minutes + (15 - remainder), 0, 0);
+  }
+  return result;
+}
+
+/** Round DOWN to the previous 15-minute boundary (:00, :15, :30, :45). */
+export function floorToQuarterHour(date: Date): Date {
+  const result = new Date(date);
+  const minutes = result.getMinutes();
+  const remainder = minutes % 15;
+  result.setMinutes(minutes - remainder, 0, 0);
+  return result;
+}
+
 export function snapToNextWorkingTime(time: Date, station: Station): Date {
   // If already within working hours, return as-is
   if (isWithinWorkingHours(time, station)) {

@@ -478,7 +478,11 @@ function AppContent() {
   // Schedule save/load modal
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
   // Mass unschedule confirmation dialog
-  const [massUnscheduleConfirm, setMassUnscheduleConfirm] = useState<{ count: number } | null>(null);
+  const [massUnscheduleConfirm, setMassUnscheduleConfirm] = useState<{
+    count: number;
+    includeInProgress: boolean;
+    fuseSplits: boolean;
+  } | null>(null);
   // Auto-place V1 modal
   const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
 
@@ -1101,31 +1105,33 @@ function AppContent() {
   }, [selectedJobId, clearJobAssignments, showToast]);
 
   // Count clearable tiles for mass unschedule confirmation
-  const getClearableCount = useCallback(() => {
+  const getClearableCount = useCallback((includeInProgress = false) => {
     if (!snapshotData) return 0;
     const now = new Date().toISOString();
     return snapshotData.assignments.filter((a) => {
       if (a.isCompleted) return false;
-      if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+      if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
       return true;
     }).length;
   }, [snapshotData]);
 
   // Handle mass unschedule all tiles (CTRL+ALT+Z)
   const handleMassUnscheduleConfirm = useCallback(async () => {
+    if (!massUnscheduleConfirm) return;
+    const { includeInProgress, fuseSplits } = massUnscheduleConfirm;
     setMassUnscheduleConfirm(null);
     try {
-      const result = await clearAllAssignments().unwrap();
+      const result = await clearAllAssignments({ includeInProgress, fuseSplits }).unwrap();
       showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [clearAllAssignments, showToast]);
+  }, [massUnscheduleConfirm, clearAllAssignments, showToast]);
 
   // Trigger mass unschedule confirmation dialog
   const triggerMassUnschedule = useCallback(() => {
     const count = getClearableCount();
-    if (count > 0) setMassUnscheduleConfirm({ count });
+    if (count > 0) setMassUnscheduleConfirm({ count, includeInProgress: false, fuseSplits: false });
   }, [getClearableCount]);
 
   // Handle ASAP auto-placement for selected job (ALT+P S)
@@ -2673,10 +2679,31 @@ function AppContent() {
             <h2 className="text-flux-text-primary font-semibold mb-2">
               Effacer toutes les tuiles ?
             </h2>
-            <p className="text-flux-text-secondary mb-6" style={{ fontSize: '13px' }}>
-              {massUnscheduleConfirm.count} tuile(s) seront désplanifiée(s).
-              Les tuiles terminées et en cours seront conservées.
+            <p className="text-flux-text-secondary mb-4" style={{ fontSize: '13px' }}>
+              {getClearableCount(massUnscheduleConfirm.includeInProgress)} tuile(s) seront désplanifiée(s).
+              {!massUnscheduleConfirm.includeInProgress && ' Les tuiles terminées et en cours seront conservées.'}
+              {massUnscheduleConfirm.includeInProgress && ' Les tuiles terminées seront conservées.'}
             </p>
+            <div className="flex flex-col gap-2 mb-6">
+              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={massUnscheduleConfirm.includeInProgress}
+                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, includeInProgress: e.target.checked } : prev)}
+                  className="accent-red-600"
+                />
+                Inclure les tuiles en cours (intersectent avec NOW)
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={massUnscheduleConfirm.fuseSplits}
+                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, fuseSplits: e.target.checked } : prev)}
+                  className="accent-red-600"
+                />
+                Fusionner les tuiles splittées
+              </label>
+            </div>
             <div className="flex justify-end gap-3">
               <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
                       onClick={() => setMassUnscheduleConfirm(null)}>

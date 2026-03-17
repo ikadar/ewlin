@@ -1,11 +1,11 @@
 import type { ScheduleSnapshot, TaskAssignment, Element, Task, InternalTask, OutsourcedTask, Station } from '@flux/types';
 import { isInternalTask, DRY_TIME_MINUTES } from '@flux/types';
-import { getSuggestedStartForPrecedence, isPrintingTask } from '@flux/schedule-validator';
+import { getSuggestedStartForPrecedence, isPrintingTask, areSameSplitGroup } from '@flux/schedule-validator';
 import { calculateEndTime, calculateStartTime } from './timeCalculations';
 import { calculateOutsourcingDates, calculateOutsourcingDatesBackward } from './outsourcingCalculation';
 import { computeAsapPlacements } from './asapPlacement';
 import { isLastTaskOfJob, compareTaskOrder } from './taskHelpers';
-import { snapToNextWorkingTime, snapToPreviousWorkingTime } from './workingTime';
+import { snapToNextWorkingTime, snapToPreviousWorkingTime, floorToQuarterHour } from './workingTime';
 
 export interface AlapPlacementResult {
   placements: { taskId: string; targetId: string; isOutsourced: boolean; scheduledStart: string }[];
@@ -131,8 +131,9 @@ function placeInternalTaskAlap(
   // Find latest gap on station
   const scheduledEnd = findLatestGap(task, station, snappedCeiling.toISOString(), snapshot);
 
-  // Calculate start from end
-  const scheduledStart = calculateStartTime(task, scheduledEnd, station);
+  // Calculate start from end, then floor to quarter-hour boundary
+  const rawStart = calculateStartTime(task, scheduledEnd, station);
+  const scheduledStart = floorToQuarterHour(new Date(rawStart)).toISOString();
 
   // If start is before now, skip (infeasible)
   if (new Date(scheduledStart).getTime() < new Date(now).getTime()) {
@@ -312,7 +313,13 @@ function getEffectiveSuccessorStart(
 ): Date {
   const start = new Date(successorAssignment.scheduledStart);
 
-  if (isInternalTask(currentTask) && isPrintingTask(snapshot, currentTask.id)) {
+  // Same split group: no dry time between split parts
+  const successorTask = snapshot.tasks.find(t => t.id === successorAssignment.taskId);
+  if (areSameSplitGroup(currentTask, successorTask)) {
+    return start;
+  }
+
+  if (isInternalTask(currentTask) && isPrintingTask(snapshot, (currentTask as InternalTask).stationId)) {
     return new Date(start.getTime() - DRY_TIME_MINUTES * 60 * 1000);
   }
 

@@ -1077,15 +1077,26 @@ const handleClearJobAssignments: MockRouteHandler = async (args: FetchArgs) => {
 
 /**
  * DELETE /schedule/assignments - Clear all clearable tile assignments globally
+ *
+ * Query params:
+ * - includeInProgress=1: also clear tiles intersecting with NOW
+ * - fuseSplits=1: fuse split tile groups back into single tasks after clearing
  */
-const handleClearAllAssignments: MockRouteHandler = async () => {
+const handleClearAllAssignments: MockRouteHandler = async (args: FetchArgs) => {
+  const url = new URL(args.url, 'http://localhost');
+  const includeInProgress = url.searchParams.get('includeInProgress') === '1';
+  const fuseSplits = url.searchParams.get('fuseSplits') === '1';
+
   const currentSnapshot = getSnapshot();
   const now = new Date().toISOString();
 
   const clearableTaskIds = new Set(
     currentSnapshot.assignments
       .filter((a: TaskAssignment) => !a.isCompleted)
-      .filter((a: TaskAssignment) => !(a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)))
+      .filter((a: TaskAssignment) => {
+        if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+        return true;
+      })
       .map((a: TaskAssignment) => a.taskId)
   );
 
@@ -1103,7 +1114,37 @@ const handleClearAllAssignments: MockRouteHandler = async () => {
     (a: TaskAssignment) => !outsourcedToRemove.has(a.taskId)
   );
 
-  updateSnapshot((snapshot) => ({ ...snapshot, assignments: remainingAssignments }));
+  updateSnapshot((snapshot) => {
+    const updated = { ...snapshot, assignments: remainingAssignments };
+
+    // Fuse split groups where ALL parts have been cleared
+    if (fuseSplits) {
+      const splitGroups = new Map<string, string[]>();
+      for (const task of updated.tasks) {
+        if (task.type === 'Internal') {
+          const it = task as InternalTask;
+          if (it.splitGroupId) {
+            const group = splitGroups.get(it.splitGroupId) || [];
+            group.push(it.id);
+            splitGroups.set(it.splitGroupId, group);
+          }
+        }
+      }
+      for (const [, memberIds] of splitGroups) {
+        // Only fuse if ALL members are unassigned (none remain in assignments)
+        const anyStillAssigned = memberIds.some((id) =>
+          updated.assignments.some((a: TaskAssignment) => a.taskId === id)
+        );
+        if (!anyStillAssigned) {
+          const restoredId = crypto.randomUUID();
+          applyFuseToSnapshot(updated as ScheduleSnapshot, { taskId: memberIds[0], restoredId, now });
+        }
+      }
+    }
+
+    return updated;
+  });
+
   return { data: { unassignedCount: clearableTaskIds.size } };
 };
 
@@ -3233,8 +3274,11 @@ export const mockBaseQuery: BaseQueryFn<
   const normalizedArgs = normalizeArgs(args);
   const { url, method } = normalizedArgs;
 
+  // Strip query string for route matching (handlers parse params from full URL)
+  const pathOnly = url.split('?')[0];
+
   // Find matching route
-  const route = routes.find((r) => r.method === method && r.pattern.test(url));
+  const route = routes.find((r) => r.method === method && r.pattern.test(pathOnly));
 
   if (!route) {
     return {
