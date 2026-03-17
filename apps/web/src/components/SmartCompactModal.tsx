@@ -3,11 +3,6 @@ import { X, Loader2, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react'
 import { muteMercure, unmuteMercure } from '../hooks/mercureMute';
 import { COMPACT_HORIZONS } from '../constants';
 import type { CompactHorizon } from '../constants';
-import type { ScheduleSnapshot, InternalTask, Station } from '@flux/types';
-import { runSmartCompact } from '../utils/smartCompaction';
-import type { SmartCompactResult, SmartCompactProgress } from '../utils/smartCompaction';
-import { calculateEndTime } from '../utils/timeCalculations';
-import { useBatchRescheduleMutation } from '../store';
 
 // ============================================================================
 // Types
@@ -17,7 +12,6 @@ interface SmartCompactModalProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: () => void;
-  snapshot: ScheduleSnapshot;
 }
 
 type ModalState = 'config' | 'running' | 'complete' | 'error';
@@ -29,30 +23,57 @@ interface PhaseLogEntry {
   status: 'done' | 'active';
 }
 
+/** Backend SSE event shape */
+interface SmartCompactEvent {
+  type: 'progress' | 'complete' | 'error';
+  phase: string;
+  stationName?: string;
+  stationIndex?: number;
+  totalStations?: number;
+  stepsCompleted?: number;
+  result?: SmartCompactResult;
+  message?: string;
+  computeMs?: number;
+}
+
+interface SmartCompactResult {
+  movedCount: number;
+  reorderedCount: number;
+  similarityBefore: number;
+  similarityAfter: number;
+  rollbackCount: number;
+  printingStationsOptimized: number;
+  downstreamStationsPropagated: number;
+  printfreeStationsReordered: number;
+  computeMs: number;
+}
+
 // ============================================================================
 // Phase log helpers
 // ============================================================================
 
 const PHASE_LABELS: Record<string, string> = {
-  analyze: 'Analyzing schedule',
-  reorder: 'Reordering station',
-  validate: 'Validating constraints',
-  apply: 'Applying changes',
+  'analyze': 'Analyzing schedule',
+  'reorder_printing': 'Optimizing printing station',
+  'propagate': 'Propagating downstream',
+  'reorder_printfree': 'Reordering independent station',
+  'validate': 'Validating constraints',
 };
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export function SmartCompactModal({ isOpen, onClose, onComplete, snapshot }: SmartCompactModalProps) {
+export function SmartCompactModal({ isOpen, onClose, onComplete }: SmartCompactModalProps) {
   const [state, setState] = useState<ModalState>('config');
   const [horizon, setHorizon] = useState<CompactHorizon>(24);
   const [logEntries, setLogEntries] = useState<PhaseLogEntry[]>([]);
   const [result, setResult] = useState<SmartCompactResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<SmartCompactProgress | null>(null);
-  const abortRef = useRef(false);
-  const [batchReschedule] = useBatchRescheduleMutation();
+  const [currentEvent, setCurrentEvent] = useState<SmartCompactEvent | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -62,110 +83,141 @@ export function SmartCompactModal({ isOpen, onClose, onComplete, snapshot }: Sma
       setLogEntries([]);
       setResult(null);
       setError(null);
-      setProgress(null);
-      abortRef.current = false;
+      setCurrentEvent(null);
+      abortRef.current = null;
     }
   }, [isOpen]);
+
+  const handleEvent = useCallback((event: SmartCompactEvent) => {
+    if (event.type === 'error') {
+      setError(event.message ?? 'Unknown error');
+      setState('error');
+      return;
+    }
+
+    if (event.type === 'complete') {
+      // Mark all active phases as done
+      setLogEntries((prev) => prev.map((e) =>
+        e.status === 'active' ? { ...e, status: 'done' as const } : e
+      ));
+
+      if (event.result) {
+        setResult(event.result);
+        setState('complete');
+        onComplete();
+      }
+      return;
+    }
+
+    // Progress event — update log and current event
+    setCurrentEvent(event);
+
+    setLogEntries((prev) => {
+      const entries = [...prev];
+      // Mark previous active as done
+      const lastActive = entries.findLastIndex((e) => e.status === 'active');
+      if (lastActive >= 0) {
+        entries[lastActive] = { ...entries[lastActive], status: 'done' };
+      }
+
+      const isStationPhase = (event.phase === 'reorder_printing' || event.phase === 'reorder_printfree') && event.stationName;
+      const label = isStationPhase
+        ? `${PHASE_LABELS[event.phase]}: ${event.stationName}`
+        : PHASE_LABELS[event.phase] ?? event.phase;
+
+      const detail = isStationPhase && event.totalStations
+        ? `${(event.stationIndex ?? 0) + 1}/${event.totalStations}`
+        : undefined;
+
+      entries.push({ phase: event.phase, label, detail, status: 'active' });
+      return entries;
+    });
+  }, [onComplete]);
 
   const handleStart = useCallback(async () => {
     setState('running');
     setLogEntries([]);
     setResult(null);
     setError(null);
-    abortRef.current = false;
+    setCurrentEvent(null);
 
-    // Mute Mercure during the operation
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     muteMercure(5 * 60 * 1000);
 
-    const calcEndTime = (task: InternalTask, start: string, station: Station | undefined) =>
-      calculateEndTime(task, start, station);
+    const token = sessionStorage.getItem('flux_auth_token');
+    const headers: Record<string, string> = {
+      'Accept': 'text/event-stream',
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
-    try {
-      const generator = runSmartCompact({
-        snapshot,
-        horizonHours: horizon,
-        calculateEndTime: calcEndTime,
-      });
-
-      let finalResult: SmartCompactResult | null = null;
-
-      for await (const event of generator) {
-        if (abortRef.current) break;
-
-        setProgress(event);
-
-        if (event.phase === 'complete' && event.result) {
-          // Mark all active phases as done
-          setLogEntries((prev) => prev.map((e) =>
-            e.status === 'active' ? { ...e, status: 'done' as const } : e
-          ));
-          finalResult = event.result;
-          continue;
+    fetch(`${apiBaseUrl}/schedule/smart-compact`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ horizonHours: horizon }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        // Phase transition
-        setLogEntries((prev) => {
-          const entries = [...prev];
-          // Mark previous active as done
-          const lastActive = entries.findLastIndex((e) => e.status === 'active');
-          if (lastActive >= 0) {
-            entries[lastActive] = { ...entries[lastActive], status: 'done' };
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('No response body');
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            buffer += decoder.decode(new Uint8Array(), { stream: false });
+            if (buffer.trim()) {
+              for (const line of buffer.split('\n')) {
+                if (!line.startsWith('data: ')) continue;
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr) continue;
+                try {
+                  handleEvent(JSON.parse(jsonStr) as SmartCompactEvent);
+                } catch { /* ignore malformed */ }
+              }
+            }
+            break;
           }
 
-          const label = event.phase === 'reorder' && event.stationName
-            ? `${PHASE_LABELS.reorder}: ${event.stationName}`
-            : PHASE_LABELS[event.phase] ?? event.phase;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
 
-          const detail = event.phase === 'reorder' && event.totalStations
-            ? `${(event.stationIndex ?? 0) + 1}/${event.totalStations}`
-            : undefined;
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+            try {
+              handleEvent(JSON.parse(jsonStr) as SmartCompactEvent);
+            } catch { /* ignore malformed */ }
+          }
+        }
 
-          entries.push({ phase: event.phase, label, detail, status: 'active' });
-          return entries;
-        });
-      }
-
-      unmuteMercure();
-
-      if (abortRef.current) return;
-
-      if (!finalResult) {
-        setError('Algorithm finished without producing results');
+        unmuteMercure();
+      })
+      .catch((err) => {
+        unmuteMercure();
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : 'Unknown error');
         setState('error');
-        return;
-      }
-
-      // Persist changes via batch-reschedule API
-      const movedAssignments = finalResult.snapshot.assignments.filter((newA) => {
-        const origA = snapshot.assignments.find((a) => a.taskId === newA.taskId);
-        return origA && origA.scheduledStart !== newA.scheduledStart;
       });
-
-      if (movedAssignments.length > 0) {
-        await batchReschedule({
-          assignments: movedAssignments.map((a) => ({
-            taskId: a.taskId,
-            scheduledStart: a.scheduledStart,
-            scheduledEnd: a.scheduledEnd,
-          })),
-        }).unwrap();
-      }
-
-      setResult(finalResult);
-      setState('complete');
-      onComplete();
-    } catch (err) {
-      unmuteMercure();
-      if (abortRef.current) return;
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      setState('error');
-    }
-  }, [snapshot, horizon, batchReschedule, onComplete]);
+  }, [horizon, handleEvent]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    abortRef.current = true;
+    abortRef.current?.abort();
     unmuteMercure();
     onClose();
   };
@@ -213,7 +265,7 @@ export function SmartCompactModal({ isOpen, onClose, onComplete, snapshot }: Sma
             <ConfigView horizon={horizon} onHorizonChange={setHorizon} />
           )}
           {state === 'running' && (
-            <RunningView logEntries={logEntries} progress={progress} />
+            <RunningView logEntries={logEntries} currentEvent={currentEvent} />
           )}
           {state === 'complete' && result && (
             <CompleteView result={result} logEntries={logEntries} />
@@ -270,7 +322,7 @@ function ConfigView({
     <>
       <p className="text-flux-text-secondary text-xs">
         Reorders tiles to group similar work together, reducing changeover time.
-        Respects all precedence rules and deadline constraints.
+        Optimizes printing stations first, then propagates to downstream stations.
       </p>
 
       <div className="space-y-2">
@@ -297,10 +349,10 @@ function ConfigView({
 
 function RunningView({
   logEntries,
-  progress,
+  currentEvent,
 }: {
   logEntries: PhaseLogEntry[];
-  progress: SmartCompactProgress | null;
+  currentEvent: SmartCompactEvent | null;
 }) {
   const startTimeRef = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
@@ -314,8 +366,8 @@ function RunningView({
   }, []);
 
   const pct =
-    progress?.totalStations && progress.stationIndex != null
-      ? Math.round(((progress.stationIndex + 1) / progress.totalStations) * 100)
+    currentEvent?.totalStations && currentEvent.stationIndex != null
+      ? Math.round(((currentEvent.stationIndex + 1) / currentEvent.totalStations) * 100)
       : 0;
 
   return (
@@ -323,11 +375,11 @@ function RunningView({
       <PhaseLog entries={logEntries} />
 
       {/* Progress bar */}
-      {progress?.totalStations && (
+      {currentEvent?.totalStations && (
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-flux-text-secondary">
             <span>
-              {(progress.stationIndex ?? 0) + 1} / {progress.totalStations} stations
+              {(currentEvent.stationIndex ?? 0) + 1} / {currentEvent.totalStations} stations
             </span>
             <span>{pct}%</span>
           </div>
@@ -376,8 +428,13 @@ function CompleteView({
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+        <Stat label="Printing stations optimized" value={result.printingStationsOptimized} />
+        <Stat label="Downstream propagated" value={result.downstreamStationsPropagated} />
         <Stat label="Tiles reordered" value={result.reorderedCount} />
         <Stat label="Tiles moved" value={result.movedCount} />
+        {result.printfreeStationsReordered > 0 && (
+          <Stat label="Independent stations" value={result.printfreeStationsReordered} />
+        )}
         {result.rollbackCount > 0 && (
           <Stat label="Rollbacks" value={result.rollbackCount} warn />
         )}

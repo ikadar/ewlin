@@ -18,15 +18,12 @@ export function timeToYPosition(
 
   // Multi-day calculation when startDate is provided
   if (startDate) {
-    // Calculate day offset from startDate
-    const startDay = new Date(startDate);
-    startDay.setHours(0, 0, 0, 0);
-    const timeDay = new Date(time);
-    timeDay.setHours(0, 0, 0, 0);
-    const daysDiff = Math.floor((timeDay.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
+    // Use UTC to avoid DST off-by-one: local midnight gaps differ across DST transitions
+    const startDayUtc = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const timeDayUtc = Date.UTC(time.getFullYear(), time.getMonth(), time.getDate());
+    const daysDiff = Math.round((timeDayUtc - startDayUtc) / (24 * 60 * 60 * 1000));
 
-    // Total hours from grid start
-    const totalHours = daysDiff * 24 + (hours - startHour) + minutes / 60;
+    const totalHours = daysDiff * 24 + hours + minutes / 60;
     return totalHours * pixelsPerHour;
   }
 

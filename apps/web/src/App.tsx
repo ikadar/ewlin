@@ -2742,7 +2742,6 @@ function AppContent() {
         isOpen={isSmartCompactOpen}
         onClose={() => setIsSmartCompactOpen(false)}
         onComplete={handleSmartCompactComplete}
-        snapshot={snapshot}
       />
 
       {/* Auto-place V1 modal */}
