@@ -220,26 +220,29 @@ body {
 
 /* Setup section inner bottom border (border-box keeps it inside the element height) */
 [data-testid="tile-setup-section"] {
-  border-bottom: 2px dotted black;
+  border-bottom: 1px dotted black;
 }
 
-/* 2. Subtle vertical gradient overlay on whole tile */
-[data-testid^="tile-"]::after {
+/* Run section inner bottom border */
+[data-testid="tile-run-section"] {
+  border-bottom: 3px solid black;
+}
+
+/* Left border notch on run section — breaks visual continuity between stacked tiles */
+[data-testid="tile-run-section"]::before {
   content: '';
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.03), transparent, rgba(0,0,0,0.03));
+  bottom: -3px;
+  left: -4px;
+  width: 4px;
+  height: 3px;
+  background: var(--color-flux-base);
+  z-index: 20;
 }
 
 /* ── Light mode tile separation adjustments ── */
 html.light [data-testid^="tile-"] {
   box-shadow: inset 0 0 0 1px rgba(30,14,42,0.06), inset 0 -1px 2px rgba(30,14,42,0.03);
-}
-
-html.light [data-testid^="tile-"]::after {
-  background: linear-gradient(to bottom, rgba(255,255,255,0.04), transparent, rgba(30,14,42,0.03));
 }
 
 /* Tile selection ring is applied via dynamic <style> tag on [data-job-id] selector (box-shadow) */
