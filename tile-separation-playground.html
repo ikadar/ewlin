@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tile Separation Explorer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #09090b;
+    color: #e4e4e7;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Controls Panel */
+  .controls {
+    width: 320px;
+    min-width: 320px;
+    background: #18181b;
+    border-right: 1px solid #27272a;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .controls h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fafafa;
+    margin-bottom: 4px;
+  }
+  .controls .subtitle {
+    font-size: 12px;
+    color: #71717a;
+    margin-bottom: 8px;
+  }
+  .control-group {
+    background: #1f1f23;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .control-group h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #a1a1aa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .control-row:last-child { margin-bottom: 0; }
+  .control-row label {
+    font-size: 13px;
+    color: #d4d4d8;
+    flex-shrink: 0;
+  }
+  .control-row .value {
+    font-size: 12px;
+    color: #71717a;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    min-width: 36px;
+    text-align: right;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: #3f3f46;
+    border-radius: 2px;
+    outline: none;
+    flex: 1;
+    margin: 0 10px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+  }
+
+  /* Toggle switch */
+  .toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: #3f3f46;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle .slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 2px;
+    top: 2px;
+    background: #fafafa;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked + .slider { background: #3b82f6; }
+  .toggle input:checked + .slider::before { transform: translateX(16px); }
+
+  /* Presets */
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .preset-btn {
+    font-size: 12px;
+    padding: 5px 10px;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { background: #3f3f46; color: #e4e4e7; }
+  .preset-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+
+  /* Preview Area */
+  .preview-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #27272a;
+    gap: 24px;
+  }
+  .preview-header .col-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .columns-container {
+    flex: 1;
+    display: flex;
+    gap: 32px;
+    padding: 24px;
+    overflow-y: auto;
+    justify-content: center;
+  }
+  .column-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .column-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Station Column */
+  .station-col {
+    width: 195px;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .station-header {
+    padding: 8px 12px;
+    background: #1f1f23;
+    border-bottom: 1px solid #27272a;
+    font-size: 12px;
+    font-weight: 600;
+    color: #a1a1aa;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .station-header .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #3b82f6;
+  }
+  .tiles-container {
+    position: relative;
+  }
+
+  /* Hour grid lines */
+  .hour-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #27272a;
+    z-index: 0;
+  }
+  .hour-label {
+    position: absolute;
+    left: -36px;
+    font-size: 10px;
+    color: #52525b;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    transform: translateY(-50%);
+  }
+
+  /* Tile */
+  .tile {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-left: 4px solid #3b82f6;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: none;
+    z-index: 1;
+  }
+  .tile-setup {
+    background: rgba(59,130,246,0.15);
+    border-bottom: 1px solid rgba(96,165,250,0.2);
+    position: relative;
+  }
+  .tile-run {
+    background: rgba(59,130,246,0.12);
+    flex: 1;
+    position: relative;
+  }
+  .tile-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 8px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .tile-ref {
+    font-size: 11px;
+    font-weight: 600;
+    color: #93c5fd;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tile-client {
+    font-size: 10px;
+    color: #60a5fa;
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Prompt output */
+  .prompt-section {
+    border-top: 1px solid #27272a;
+    padding: 16px 24px;
+    background: #18181b;
+  }
+  .prompt-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .prompt-output {
+    font-size: 13px;
+    color: #a1a1aa;
+    line-height: 1.5;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    background: #09090b;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 48px;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  .copy-btn {
+    margin-top: 8px;
+    font-size: 12px;
+    padding: 6px 14px;
+    background: #3b82f6;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: #2563eb; }
+  .copy-btn.copied { background: #22c55e; }
+</style>
+</head>
+<body>
+
+<!-- Controls -->
+<div class="controls">
+  <div>
+    <h1>Tile Separation Explorer</h1>
+    <div class="subtitle">Find the best visual separation for job tiles</div>
+  </div>
+
+  <!-- Presets -->
+  <div class="control-group">
+    <h3>Presets</h3>
+    <div class="presets">
+      <button class="preset-btn" onclick="applyPreset('none')">None</button>
+      <button class="preset-btn" onclick="applyPreset('subtle')">Subtle</button>
+      <button class="preset-btn" onclick="applyPreset('borders')">Borders</button>
+      <button class="preset-btn" onclick="applyPreset('alternating')">Alternating</button>
+      <button class="preset-btn" onclick="applyPreset('full')">Full</button>
+    </div>
+  </div>
+
+  <!-- Gap -->
+  <div class="control-group">
+    <h3>Gap</h3>
+    <div class="control-row">
+      <label>Tile gap</label>
+      <input type="range" id="gap" min="0" max="4" step="1" value="0" oninput="state.gap=+this.value;updateAll()">
+      <span class="value" id="gap-val">0px</span>
+    </div>
+  </div>
+
+  <!-- Bottom Border -->
+  <div class="control-group">
+    <h3>Bottom Border</h3>
+    <div class="control-row">
+      <label>Enable</label>
+      <label class="toggle"><input type="checkbox" id="border-toggle" onchange="state.borderEnabled=this.checked;updateAll()"><span class="slider"></span></label>
+    </div>
+    <div class="control-row">
+      <label>Opacity</label>
+      <input type="range" id="border-opacity" min="0.05" max="0.5" step="0.05" value="0.15" oninput="state.borderOpacity=+this.value;updateAll()">
+      <span class="value" id="border-opacity-val">0.15</span>
+    </div>
+    <div class="control-row">
+      <label>Color</label>
+      <div style="display:flex;gap:4px;">
+        <button class="preset-btn" style="padding:3px 8px;font-size:11px" onclick="state.borderColor='white';updateAll()" id="bc-white">White</button>
+        <button class="preset-btn" style="padding:3px 8px;font-size:11px" onclick="state.borderColor='blue';updateAll()" id="bc-blue">Blue</button>
+        <button class="preset-btn" style="padding:3px 8px;font-size:11px" onclick="state.borderColor='dark';updateAll()" id="bc-dark">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alternating Shades -->
+  <div class="control-group">
+    <h3>Alternating Shades</h3>
+    <div class="control-row">
+      <label>Enable</label>
+      <label class="toggle"><input type="checkbox" id="alt-toggle" onchange="state.altEnabled=this.checked;updateAll()"><span class="slider"></span></label>
+    </div>
+    <div class="control-row">
+      <label>Intensity</label>
+      <input type="range" id="alt-intensity" min="0.02" max="0.12" step="0.01" value="0.05" oninput="state.altIntensity=+this.value;updateAll()">
+      <span class="value" id="alt-intensity-val">0.05</span>
+    </div>
+  </div>
+
+  <!-- Inner Shadow -->
+  <div class="control-group">
+    <h3>Inner Shadow</h3>
+    <div class="control-row">
+      <label>Enable</label>
+      <label class="toggle"><input type="checkbox" id="shadow-toggle" onchange="state.shadowEnabled=this.checked;updateAll()"><span class="slider"></span></label>
+    </div>
+    <div class="control-row">
+      <label>Opacity</label>
+      <input type="range" id="shadow-opacity" min="0.05" max="0.4" step="0.05" value="0.1" oninput="state.shadowOpacity=+this.value;updateAll()">
+      <span class="value" id="shadow-opacity-val">0.10</span>
+    </div>
+  </div>
+
+  <!-- Left Accent Variation -->
+  <div class="control-group">
+    <h3>Left Accent Variation</h3>
+    <div class="control-row">
+      <label>Alternate colors</label>
+      <label class="toggle"><input type="checkbox" id="accent-toggle" onchange="state.accentAlt=this.checked;updateAll()"><span class="slider"></span></label>
+    </div>
+  </div>
+
+  <!-- Gradient Fade -->
+  <div class="control-group">
+    <h3>Edge Gradient</h3>
+    <div class="control-row">
+      <label>Enable</label>
+      <label class="toggle"><input type="checkbox" id="gradient-toggle" onchange="state.gradientEnabled=this.checked;updateAll()"><span class="slider"></span></label>
+    </div>
+    <div class="control-row">
+      <label>Intensity</label>
+      <input type="range" id="gradient-intensity" min="0.02" max="0.15" step="0.01" value="0.06" oninput="state.gradientIntensity=+this.value;updateAll()">
+      <span class="value" id="gradient-intensity-val">0.06</span>
+    </div>
+  </div>
+</div>
+
+<!-- Preview -->
+<div class="preview-area">
+  <div class="columns-container">
+    <div class="column-wrapper">
+      <div class="column-label">Current</div>
+      <div class="station-col">
+        <div class="station-header"><span class="dot"></span>Heidelberg XL-106</div>
+        <div class="tiles-container" id="current-tiles"></div>
+      </div>
+    </div>
+    <div class="column-wrapper">
+      <div class="column-label">Preview</div>
+      <div class="station-col">
+        <div class="station-header"><span class="dot"></span>Heidelberg XL-106</div>
+        <div class="tiles-container" id="preview-tiles"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt -->
+  <div class="prompt-section">
+    <div class="prompt-label">Implementation Prompt</div>
+    <div class="prompt-output" id="prompt-output">No changes selected — tiles appear as current.</div>
+    <button class="copy-btn" id="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
+  </div>
+</div>
+
+<script>
+  const JOBS = [
+    { ref: 'FL-2024-0142', client: 'Dupont & Fils', dur: 90, setup: 20 },
+    { ref: 'FL-2024-0143', client: 'MediaPrint GmbH', dur: 45, setup: 15 },
+    { ref: 'FL-2024-0144', client: 'Acme Corp', dur: 120, setup: 25 },
+    { ref: 'FL-2024-0145', client: 'BrightStar Ltd', dur: 30, setup: 10 },
+    { ref: 'FL-2024-0146', client: 'Novacom SA', dur: 60, setup: 15 },
+    { ref: 'FL-2024-0147', client: 'PrintWorks Inc', dur: 180, setup: 30 },
+    { ref: 'FL-2024-0148', client: 'Carta Studio', dur: 40, setup: 10 },
+    { ref: 'FL-2024-0149', client: 'EuroLabel AG', dur: 75, setup: 20 },
+  ];
+
+  const PX_PER_HOUR = 80;
+
+  const DEFAULTS = {
+    gap: 0,
+    borderEnabled: false, borderOpacity: 0.15, borderColor: 'white',
+    altEnabled: false, altIntensity: 0.05,
+    shadowEnabled: false, shadowOpacity: 0.1,
+    accentAlt: false,
+    gradientEnabled: false, gradientIntensity: 0.06,
+  };
+
+  const state = { ...DEFAULTS };
+
+  const PRESETS = {
+    none: { ...DEFAULTS },
+    subtle: { ...DEFAULTS, shadowEnabled: true, shadowOpacity: 0.1 },
+    borders: { ...DEFAULTS, borderEnabled: true, borderOpacity: 0.2, borderColor: 'white', gap: 1 },
+    alternating: { ...DEFAULTS, altEnabled: true, altIntensity: 0.06, shadowEnabled: true, shadowOpacity: 0.08 },
+    full: { ...DEFAULTS, gap: 1, borderEnabled: true, borderOpacity: 0.15, borderColor: 'dark', altEnabled: true, altIntensity: 0.05, shadowEnabled: true, shadowOpacity: 0.08 },
+  };
+
+  function applyPreset(name) {
+    Object.assign(state, PRESETS[name]);
+    syncControls();
+    updateAll();
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  }
+
+  function syncControls() {
+    document.getElementById('gap').value = state.gap;
+    document.getElementById('border-toggle').checked = state.borderEnabled;
+    document.getElementById('border-opacity').value = state.borderOpacity;
+    document.getElementById('alt-toggle').checked = state.altEnabled;
+    document.getElementById('alt-intensity').value = state.altIntensity;
+    document.getElementById('shadow-toggle').checked = state.shadowEnabled;
+    document.getElementById('shadow-opacity').value = state.shadowOpacity;
+    document.getElementById('accent-toggle').checked = state.accentAlt;
+    document.getElementById('gradient-toggle').checked = state.gradientEnabled;
+    document.getElementById('gradient-intensity').value = state.gradientIntensity;
+  }
+
+  function buildTiles(container, applyEffects) {
+    container.innerHTML = '';
+    let y = 0;
+    JOBS.forEach((job, i) => {
+      const h = (job.dur / 60) * PX_PER_HOUR;
+      const setupH = (job.setup / 60) * PX_PER_HOUR;
+      const runH = h - setupH;
+      const gap = applyEffects ? state.gap : 0;
+
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.style.top = y + 'px';
+      tile.style.height = h + 'px';
+
+      // Base colors
+      let baseOpacity = 0.12;
+      let setupOpacity = 0.15;
+      let leftColor = '#3b82f6';
+
+      if (applyEffects) {
+        // Alternating shades
+        if (state.altEnabled && i % 2 === 1) {
+          baseOpacity += state.altIntensity;
+          setupOpacity += state.altIntensity;
+        }
+
+        // Left accent variation
+        if (state.accentAlt && i % 2 === 1) {
+          leftColor = '#60a5fa';
+        }
+
+        // Bottom border
+        if (state.borderEnabled) {
+          let borderCol;
+          if (state.borderColor === 'white') borderCol = `rgba(255,255,255,${state.borderOpacity})`;
+          else if (state.borderColor === 'blue') borderCol = `rgba(96,165,250,${state.borderOpacity})`;
+          else borderCol = `rgba(0,0,0,${state.borderOpacity + 0.2})`;
+          tile.style.borderTop = `1px solid ${borderCol}`;
+          tile.style.borderBottom = `1px solid ${borderCol}`;
+        }
+
+        // Inner shadow
+        if (state.shadowEnabled) {
+          tile.style.boxShadow = `inset 0 0 0 1px rgba(0,0,0,${state.shadowOpacity}), inset 0 -1px 2px rgba(0,0,0,${state.shadowOpacity * 0.5})`;
+        }
+      }
+
+      tile.style.borderLeftColor = leftColor;
+
+      // Setup section
+      const setup = document.createElement('div');
+      setup.className = 'tile-setup';
+      setup.style.height = setupH + 'px';
+      setup.style.background = `rgba(59,130,246,${setupOpacity})`;
+
+      // Gradient overlay on setup
+      if (applyEffects && state.gradientEnabled) {
+        setup.style.background = `linear-gradient(to bottom, rgba(59,130,246,${setupOpacity + state.gradientIntensity}), rgba(59,130,246,${setupOpacity}))`;
+      }
+
+      // Run section
+      const run = document.createElement('div');
+      run.className = 'tile-run';
+      run.style.height = runH + 'px';
+      run.style.background = `rgba(59,130,246,${baseOpacity})`;
+
+      // Gradient overlay on run
+      if (applyEffects && state.gradientEnabled) {
+        run.style.background = `linear-gradient(to bottom, rgba(59,130,246,${baseOpacity}), rgba(59,130,246,${baseOpacity - state.gradientIntensity * 0.5}))`;
+      }
+
+      // Label
+      const label = document.createElement('div');
+      label.className = 'tile-label';
+      label.innerHTML = `<div class="tile-ref">${job.ref} · ${job.client}</div>`;
+
+      tile.appendChild(setup);
+      tile.appendChild(run);
+      tile.appendChild(label);
+      container.appendChild(tile);
+
+      y += h + gap;
+    });
+
+    container.style.height = y + 'px';
+  }
+
+  function updateValues() {
+    document.getElementById('gap-val').textContent = state.gap + 'px';
+    document.getElementById('border-opacity-val').textContent = state.borderOpacity.toFixed(2);
+    document.getElementById('alt-intensity-val').textContent = state.altIntensity.toFixed(2);
+    document.getElementById('shadow-opacity-val').textContent = state.shadowOpacity.toFixed(2);
+    document.getElementById('gradient-intensity-val').textContent = state.gradientIntensity.toFixed(2);
+  }
+
+  function updatePrompt() {
+    const parts = [];
+
+    if (state.gap > 0) parts.push(`a ${state.gap}px gap between tiles`);
+    if (state.borderEnabled) {
+      const colName = state.borderColor === 'white' ? 'white' : state.borderColor === 'blue' ? 'blue-400' : 'black';
+      parts.push(`top and bottom borders (1px solid ${colName} at ${(state.borderOpacity * 100).toFixed(0)}% opacity)`);
+    }
+    if (state.altEnabled) {
+      parts.push(`alternating shade intensity (even tiles +${(state.altIntensity * 100).toFixed(0)}% opacity boost)`);
+    }
+    if (state.shadowEnabled) {
+      parts.push(`an inset box-shadow (rgba(0,0,0,${state.shadowOpacity.toFixed(2)}))`);
+    }
+    if (state.accentAlt) {
+      parts.push(`alternating left border colors (#3b82f6 / #60a5fa)`);
+    }
+    if (state.gradientEnabled) {
+      parts.push(`a subtle vertical gradient on each tile section (±${(state.gradientIntensity * 100).toFixed(0)}% opacity fade)`);
+    }
+
+    const el = document.getElementById('prompt-output');
+    if (parts.length === 0) {
+      el.textContent = 'No changes selected — tiles appear as current.';
+    } else {
+      el.textContent = `Add visual separation to the scheduling grid tiles using: ${parts.join('; ')}. Apply these to the Tile component in apps/web/src/components/Tile/Tile.tsx. The tiles use Tailwind classes with a dark theme (zinc-900 background, blue-500 based tile colors at 12% opacity).`;
+    }
+  }
+
+  function copyPrompt() {
+    const text = document.getElementById('prompt-output').textContent;
+    navigator.clipboard.writeText(text);
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy Prompt'; btn.classList.remove('copied'); }, 1500);
+  }
+
+  function updateAll() {
+    updateValues();
+    buildTiles(document.getElementById('current-tiles'), false);
+    buildTiles(document.getElementById('preview-tiles'), true);
+    updatePrompt();
+  }
+
+  updateAll();
+</script>
+</body>
+</html>
