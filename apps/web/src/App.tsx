@@ -2539,7 +2539,7 @@ function AppContent() {
 
       {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
       {selectedJobId && (
-        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: inset 0 0 0 2px ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; }`}</style>
+        <style>{`[data-job-id="${selectedJobId}"]::after { content: ''; position: absolute; inset: 0; border: 2px solid ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; z-index: 5; pointer-events: none; }`}</style>
       )}
 
       <ShortcutFooter mode={footerMode} />
