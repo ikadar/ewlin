@@ -9,7 +9,6 @@
  * - Zoom state (pixelsPerHour)
  * - Context menu state
  * - Date focus state
- * - Compacting state
  *
  * @see docs/releases/v0.4.37-redux-rtk-query-setup.md
  */
@@ -62,10 +61,6 @@ export interface UiState {
   viewportStartHour: number;
   /** Viewport end hour (for DateStrip indicator) */
   viewportEndHour: number;
-  /** Station ID currently being compacted (null when not compacting) */
-  compactingStationId: string | null;
-  /** Whether global timeline compaction is in progress */
-  isCompactingTimeline: boolean;
 }
 
 // ============================================================================
@@ -88,8 +83,6 @@ const initialState: UiState = {
   focusedDate: null,
   viewportStartHour: 0,
   viewportEndHour: 8,
-  compactingStationId: null,
-  isCompactingTimeline: false,
 };
 
 // ============================================================================
@@ -155,14 +148,6 @@ const uiSlice = createSlice({
       state.viewportEndHour = action.payload.end;
     },
 
-    setCompactingStationId: (state, action: PayloadAction<string | null>) => {
-      state.compactingStationId = action.payload;
-    },
-
-    setIsCompactingTimeline: (state, action: PayloadAction<boolean>) => {
-      state.isCompactingTimeline = action.payload;
-    },
-
     resetUiState: () => initialState,
   },
 });
@@ -182,8 +167,6 @@ export const {
   clearContextMenu,
   setFocusedDate,
   setViewportHours,
-  setCompactingStationId,
-  setIsCompactingTimeline,
   resetUiState,
 } = uiSlice.actions;
 

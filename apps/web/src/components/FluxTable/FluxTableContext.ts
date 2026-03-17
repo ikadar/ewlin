@@ -37,6 +37,10 @@ export interface FluxTableContextValue {
   onToggleShipped?: (jobInternalId: string, shipped: boolean) => void;
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
+  /** Job IDs (internal UUIDs) that are late (from schedule snapshot). */
+  lateJobIds: Set<string>;
+  /** Job IDs (internal UUIDs) that have scheduling conflicts (excluding DeadlineConflict). */
+  conflictJobIds: Set<string>;
 }
 
 export const FluxTableContext = createContext<FluxTableContextValue | null>(null);

@@ -23,7 +23,6 @@ import type {
   AssignmentResponse,
   CompletionResponse,
   UnassignmentResponse,
-  CompactStationResponse,
   ClientSuggestionsResponse,
   ReferenceLookupResponse,
   SplitTaskRequest,
@@ -616,19 +615,18 @@ export const scheduleApi = createApi({
     }),
 
     /**
-     * Compact a station's assignments (remove gaps).
+     * Batch reschedule multiple task assignments atomically.
      *
-     * Mock mode: mockBaseQuery handles this via handleCompactStation
-     * Real mode: POST /stations/{stationId}/compact
-     *
-     * Uses optimistic update for instant UI feedback:
-     * - Immediately compacts assignments in cache
-     * - Automatically rolls back on error
+     * Used by smart compaction to persist all reordered assignments in a single request.
      */
-    compactStation: builder.mutation<CompactStationResponse, string>({
-      query: (stationId) => ({
-        url: `/stations/${stationId}/compact`,
+    batchReschedule: builder.mutation<
+      { updatedCount: number },
+      { assignments: Array<{ taskId: string; scheduledStart: string; scheduledEnd: string }> }
+    >({
+      query: (body) => ({
+        url: '/schedule/batch-reschedule',
         method: 'POST',
+        body,
       }),
       invalidatesTags: ['Snapshot'],
     }),
@@ -795,7 +793,7 @@ export const {
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
-  useCompactStationMutation,
+  useBatchRescheduleMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,
   useAutoPlaceJobMutation,

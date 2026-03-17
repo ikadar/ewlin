@@ -183,23 +183,27 @@ export function applyFuseToSnapshot(
   const insertAt = Math.min(firstIdx >= 0 ? firstIdx : draft.tasks.length, draft.tasks.length);
   draft.tasks.splice(insertAt, 0, restoredTask);
 
-  // Update element.taskIds
-  for (const element of draft.elements) {
+  // Update element.taskIds (immutable to work with frozen/Immer objects)
+  draft.elements = draft.elements.map((element) => {
     const firstMemberIdx = element.taskIds.findIndex((id) => memberIds.has(id));
     if (firstMemberIdx !== -1) {
-      element.taskIds = element.taskIds.filter((id) => !memberIds.has(id));
-      element.taskIds.splice(firstMemberIdx, 0, restoredId);
+      const newTaskIds = element.taskIds.filter((id) => !memberIds.has(id));
+      newTaskIds.splice(firstMemberIdx, 0, restoredId);
+      return { ...element, taskIds: newTaskIds };
     }
-  }
+    return element;
+  });
 
-  // Update job.taskIds
-  for (const job of draft.jobs) {
+  // Update job.taskIds (immutable to work with frozen/Immer objects)
+  draft.jobs = draft.jobs.map((job) => {
     const firstMemberIdx = job.taskIds.findIndex((id) => memberIds.has(id));
     if (firstMemberIdx !== -1) {
-      job.taskIds = job.taskIds.filter((id) => !memberIds.has(id));
-      job.taskIds.splice(firstMemberIdx, 0, restoredId);
+      const newTaskIds = job.taskIds.filter((id) => !memberIds.has(id));
+      newTaskIds.splice(firstMemberIdx, 0, restoredId);
+      return { ...job, taskIds: newTaskIds };
     }
-  }
+    return job;
+  });
 
   // Keep earliest assigned part's assignment, remove rest
   const assignedMembers = draft.assignments

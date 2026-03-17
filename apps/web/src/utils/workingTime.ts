@@ -362,6 +362,19 @@ export function floorToQuarterHour(date: Date): Date {
   return result;
 }
 
+/** Round to the NEAREST 15-minute boundary (:00, :15, :30, :45). */
+export function roundToNearestQuarterHour(date: Date): Date {
+  const result = new Date(date);
+  const minutes = result.getMinutes();
+  const remainder = minutes % 15;
+  if (remainder < 8) {
+    result.setMinutes(minutes - remainder, 0, 0);
+  } else {
+    result.setMinutes(minutes + (15 - remainder), 0, 0);
+  }
+  return result;
+}
+
 export function snapToNextWorkingTime(time: Date, station: Station): Date {
   // If already within working hours, return as-is
   if (isWithinWorkingHours(time, station)) {

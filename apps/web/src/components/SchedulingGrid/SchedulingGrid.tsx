@@ -107,10 +107,6 @@ export interface SchedulingGridProps {
   isAltPressed?: boolean;
   /** Quick placement precedence constraint Y positions */
   quickPlacementPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
-  /** Station ID currently being compacted (for loading state) */
-  compactingStationId?: string | null;
-  /** Callback when compact button is clicked */
-  onCompact?: (stationId: string) => void;
   /** Schedule conflicts for conflict visualization (REQ-12) */
   conflicts?: ScheduleConflict[];
   /** Station groups for capacity visualization (REQ-18) */
@@ -192,8 +188,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       quickPlacementValidation,
       isAltPressed = false,
       quickPlacementPrecedenceConstraints,
-      compactingStationId,
-      onCompact,
       conflicts = [],
       groups = [],
       onScroll,
@@ -571,9 +565,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isCollapsed = false;
               // Check if station has tiles
               const stationAssignments = assignmentsByStation.get(station.id) || [];
-              const hasTiles = stationAssignments.length > 0;
-              // Check if this station is being compacted
-              const isCompacting = compactingStationId === station.id;
               // REQ-18: Get group capacity info for this station
               const groupCapacity = groupCapacityMap.get(station.id);
               const headerCategory = categoryMap.get(station.categoryId);
@@ -582,9 +573,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   key={station.id}
                   station={station}
                   isCollapsed={isCollapsed}
-                  hasTiles={hasTiles}
-                  isCompacting={isCompacting}
-                  onCompact={onCompact}
                   groupCapacity={groupCapacity}
                   displayMode={displayMode}
                   category={headerCategory}

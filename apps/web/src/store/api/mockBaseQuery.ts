@@ -21,7 +21,6 @@ import type {
   AssignmentResponse,
   CompletionResponse,
   UnassignmentResponse,
-  CompactStationResponse,
   InternalTask,
   OutsourcedTask,
   Station,
@@ -36,7 +35,6 @@ import type {
   JcfTemplateCreateInput,
   JcfTemplateUpdateInput,
 } from '@flux/types';
-import { DRY_TIME_MS } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { FLUX_STATIC_JOBS } from '../../mock/fluxStaticData';
 import { getTemplates as mockGetTemplates, createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
@@ -259,7 +257,7 @@ function getOutsourcedTasksToRemoveOnUnassign(
  */
 const handleGetSnapshot = async (): Promise<{ data: ScheduleSnapshot }> => {
   const snapshot = getSnapshot();
-  return { data: snapshot };
+  return { data: structuredClone(snapshot) };
 };
 
 /**
@@ -1367,163 +1365,52 @@ const handleDeleteJob = async (
 // ============================================================================
 
 /**
- * POST /stations/:stationId/compact - Compact station assignments
+ * POST /schedule/batch-reschedule - Batch reschedule multiple assignments
  *
- * Removes gaps between tiles on a station by moving them as early as possible.
- * For each tile (earliest to latest), earliestStart = max(previousTileEnd,
- * predecessorEnd + optional drying time). First tile with no predecessor stays
- * in place. Respects precedence rules and drying time after offset printing.
- *
- * @see services/php-api/src/Service/CompactStationService.php
+ * Used by smart compaction to persist all reordered assignments in a single request.
  */
-const handleCompactStation = async (
+const handleBatchReschedule = async (
   args: FetchArgs
-): Promise<{ data: CompactStationResponse } | { error: FetchBaseQueryError }> => {
-  const stationId = extractPathParam(args.url, /\/stations\/([^/]+)\/compact/);
-  if (!stationId) {
-    return { error: createNotFoundError('Invalid station ID') };
+): Promise<{ data: { updatedCount: number } } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { assignments?: Array<{ taskId: string; scheduledStart: string; scheduledEnd: string }> } | undefined;
+  const assignments = body?.assignments;
+
+  if (!assignments || !Array.isArray(assignments)) {
+    return { error: createNotFoundError('Request body must contain an "assignments" array.') };
   }
 
   const currentSnapshot = getSnapshot();
-  const station = currentSnapshot.stations.find((s) => s.id === stationId);
-  if (!station) {
-    return { error: createNotFoundError('Station not found') };
+  const assignmentMap = new Map(currentSnapshot.assignments.map((a) => [a.taskId, a]));
+
+  let updatedCount = 0;
+  const updates = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
+
+  for (const item of assignments) {
+    if (!item.taskId || !item.scheduledStart || !item.scheduledEnd) continue;
+    const existing = assignmentMap.get(item.taskId);
+    if (!existing) continue;
+
+    updates.set(item.taskId, {
+      scheduledStart: item.scheduledStart,
+      scheduledEnd: item.scheduledEnd,
+    });
+    updatedCount++;
   }
 
-  // Get assignments for this station, sorted by start time
-  const stationAssignments = currentSnapshot.assignments
-    .filter((a) => a.targetId === stationId && !a.isOutsourced)
-    .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
-
-  if (stationAssignments.length === 0) {
-    return { data: { compactedCount: 0, assignments: [] } };
-  }
-
-  const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
-  const updatedEndTimes = new Map<string, Date>();
-  let compactedCount = 0;
-  let previousEndTime: Date | null = null;
-  const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
-
-  for (const assignment of stationAssignments) {
-    const task = taskMap.get(assignment.taskId);
-
-    // Calculate earliest valid start: max(previousTileEnd, predecessorEnd+dryTime)
-    let earliestStart: Date | null = null;
-
-    // Station constraint: previous tile on same station
-    if (previousEndTime !== null) {
-      earliestStart = previousEndTime;
-    }
-
-    // Precedence constraint: predecessor's end time (+ drying time if offset station)
-    if (task) {
-      const predecessorEnd = getCompactPredecessorEnd(task, currentSnapshot, updatedEndTimes);
-      if (predecessorEnd && (!earliestStart || predecessorEnd > earliestStart)) {
-        earliestStart = predecessorEnd;
-      }
-    }
-
-    // If no constraints (first tile with no predecessor), keep current position
-    if (earliestStart === null) {
-      earliestStart = new Date(assignment.scheduledStart);
-    }
-
-    // Calculate new end time
-    const newEnd: string = task?.type === 'Internal'
-      ? calculateEndTime(task as InternalTask, earliestStart.toISOString(), station)
-      : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
-
-    // Check if position actually changed
-    if (earliestStart.getTime() !== new Date(assignment.scheduledStart).getTime()) {
-      updatedAssignmentsMap.set(assignment.id, {
-        scheduledStart: earliestStart.toISOString(),
-        scheduledEnd: newEnd,
-      });
-      compactedCount++;
-    }
-
-    updatedEndTimes.set(assignment.taskId, new Date(newEnd));
-    previousEndTime = new Date(newEnd);
-  }
-
-  // Apply updates to snapshot
-  if (compactedCount > 0) {
+  if (updatedCount > 0) {
     updateSnapshot((snapshot) => ({
       ...snapshot,
-      assignments: snapshot.assignments.map((assignment) => {
-        const updated = updatedAssignmentsMap.get(assignment.id);
-        return updated
-          ? { ...assignment, scheduledStart: updated.scheduledStart, scheduledEnd: updated.scheduledEnd, updatedAt: new Date().toISOString() }
-          : assignment;
+      assignments: snapshot.assignments.map((a) => {
+        const update = updates.get(a.taskId);
+        return update
+          ? { ...a, scheduledStart: update.scheduledStart, scheduledEnd: update.scheduledEnd, updatedAt: new Date().toISOString() }
+          : a;
       }),
     }));
   }
 
-  // Build response
-  const responseAssignments: AssignmentResponse[] = stationAssignments.map((a) => {
-    const updated = updatedAssignmentsMap.get(a.id);
-    return {
-      taskId: a.taskId,
-      targetId: a.targetId,
-      isOutsourced: a.isOutsourced,
-      scheduledStart: updated?.scheduledStart ?? a.scheduledStart,
-      scheduledEnd: updated?.scheduledEnd ?? a.scheduledEnd,
-      isCompleted: a.isCompleted,
-      completedAt: a.completedAt,
-    };
-  });
-
-  return {
-    data: {
-      compactedCount,
-      assignments: responseAssignments,
-    },
-  };
+  return { data: { updatedCount } };
 };
-
-/**
- * Get the predecessor's effective end time for compaction.
- *
- * Returns the predecessor's scheduledEnd (or updated end if already compacted),
- * plus DRY_TIME_MS if the predecessor is at a printing (offset) station.
- */
-function getCompactPredecessorEnd(
-  task: Task,
-  snapshot: ScheduleSnapshot,
-  updatedEndTimes: Map<string, Date>,
-): Date | null {
-  const elementTasks = snapshot.tasks
-    .filter((t) => t.elementId === task.elementId)
-    .sort(compareTaskOrder);
-  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
-
-  if (taskIndex <= 0) return null;
-
-  const predecessorTask = elementTasks[taskIndex - 1];
-  const predecessorAssignment = snapshot.assignments.find((a) => a.taskId === predecessorTask.id);
-  if (!predecessorAssignment) return null;
-
-  // Use updated end time if predecessor was already compacted in this pass
-  const predecessorEnd = updatedEndTimes.get(predecessorTask.id)
-    ?? new Date(predecessorAssignment.scheduledEnd);
-
-  // Add drying time if predecessor is at a printing (offset) station
-  // Skip dry time between parts of the same split group
-  const sameGroup = task.type === 'Internal' && predecessorTask.type === 'Internal'
-    && (task as InternalTask).splitGroupId != null
-    && (task as InternalTask).splitGroupId === (predecessorTask as InternalTask).splitGroupId;
-
-  if (!sameGroup) {
-    const predStation = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
-    const category = snapshot.categories.find((c) => c.id === predStation?.categoryId);
-    if (category?.name.toLowerCase().includes('offset')) {
-      return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-    }
-  }
-
-  return predecessorEnd;
-}
 
 // ============================================================================
 // Route Configuration
@@ -3087,11 +2974,13 @@ const handleSplitTask: MockRouteHandler = async (args: FetchArgs) => {
   const now = new Date().toISOString();
 
   let splitGroupId = '';
-  updateSnapshot((draft) => {
-    const result = applySplitToSnapshot(draft, { taskId, ratio, partAId, partBId, now });
+  updateSnapshot((snapshot) => {
+    const updated = { ...snapshot };
+    const result = applySplitToSnapshot(updated, { taskId, ratio, partAId, partBId, now });
     if (result) {
       splitGroupId = result.splitGroupId;
     }
+    return updated;
   });
 
   return {
@@ -3127,11 +3016,13 @@ const handleFuseTask: MockRouteHandler = async (args: FetchArgs) => {
   const now = new Date().toISOString();
 
   let originalRunMinutes = 0;
-  updateSnapshot((draft) => {
-    const result = applyFuseToSnapshot(draft, { taskId, restoredId, now });
+  updateSnapshot((snapshot) => {
+    const updated = { ...snapshot };
+    const result = applyFuseToSnapshot(updated, { taskId, restoredId, now });
     if (result) {
       originalRunMinutes = result.originalRunMinutes;
     }
+    return updated;
   });
 
   return {
@@ -3206,14 +3097,14 @@ const routes: MockRoute[] = [
   { method: 'PUT',    pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleUpdateFeuilleFormat },
   { method: 'DELETE', pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleDeleteFeuilleFormat },
 
-  // Stations (management CRUD — must come before the compact handler)
+  // Stations (management CRUD)
   { method: 'GET',    pattern: /^\/stations$/,        handler: handleGetStations },
   { method: 'POST',   pattern: /^\/stations$/,         handler: handleCreateStation },
   { method: 'PUT',    pattern: /^\/stations\/[^/]+$/,  handler: handleUpdateStation },
   { method: 'DELETE', pattern: /^\/stations\/[^/]+$/,  handler: handleDeleteStation },
 
-  // Station operations
-  { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },
+  // Schedule operations
+  { method: 'POST', pattern: /^\/schedule\/batch-reschedule$/, handler: handleBatchReschedule },
 
   // Task assignments
   { method: 'POST', pattern: /^\/tasks\/[^/]+\/assign$/, handler: handleAssignTask },

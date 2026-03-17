@@ -131,10 +131,13 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
           const entries = [...prev];
           const lastActive = entries.findLastIndex(e => e.status === 'active');
           if (lastActive >= 0) entries.splice(lastActive, 1);
+          const detail = (event.splitsPerformed ?? 0) === 0 && event.message
+            ? event.message
+            : `${event.splitsPerformed ?? 0} splits performed`;
           entries.push({
             phase: 'split',
             label: 'Auto-split',
-            detail: `${event.splitsPerformed ?? 0} splits performed`,
+            detail,
             status: 'done',
           });
           return entries;

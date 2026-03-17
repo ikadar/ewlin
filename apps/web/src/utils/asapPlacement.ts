@@ -4,7 +4,7 @@ import { getSuggestedStartForPrecedence } from '@flux/schedule-validator';
 import { calculateEndTime } from './timeCalculations';
 import { calculateOutsourcingDates } from './outsourcingCalculation';
 import { isLastTaskOfJob, compareTaskOrder } from './taskHelpers';
-import { snapToNextWorkingTime, ceilToQuarterHour } from './workingTime';
+import { snapToNextWorkingTime, ceilToQuarterHour, roundToNearestQuarterHour } from './workingTime';
 
 export interface AsapPlacementResult {
   placements: { taskId: string; targetId: string; isOutsourced: boolean; scheduledStart: string }[];
@@ -53,7 +53,7 @@ export function computeAsapPlacements(
   const placements: AsapPlacementResult['placements'] = [];
   let skippedCount = 0;
 
-  const now = new Date().toISOString();
+  const now = roundToNearestQuarterHour(new Date()).toISOString();
 
   for (const task of unscheduledTasks) {
     if (isInternalTask(task)) {

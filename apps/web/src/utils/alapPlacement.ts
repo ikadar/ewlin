@@ -5,7 +5,7 @@ import { calculateEndTime, calculateStartTime } from './timeCalculations';
 import { calculateOutsourcingDates, calculateOutsourcingDatesBackward } from './outsourcingCalculation';
 import { computeAsapPlacements } from './asapPlacement';
 import { isLastTaskOfJob, compareTaskOrder } from './taskHelpers';
-import { snapToNextWorkingTime, snapToPreviousWorkingTime, floorToQuarterHour } from './workingTime';
+import { snapToNextWorkingTime, snapToPreviousWorkingTime, floorToQuarterHour, roundToNearestQuarterHour } from './workingTime';
 
 export interface AlapPlacementResult {
   placements: { taskId: string; targetId: string; isOutsourced: boolean; scheduledStart: string }[];
@@ -77,7 +77,7 @@ export function computeAlapPlacements(
   const placements: AlapPlacementResult['placements'] = [];
   let skippedCount = 0;
 
-  const now = new Date().toISOString();
+  const now = roundToNearestQuarterHour(new Date()).toISOString();
 
   for (const task of unscheduledTasks) {
     if (isInternalTask(task)) {

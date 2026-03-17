@@ -17,8 +17,6 @@ import {
   clearContextMenu,
   setFocusedDate,
   setViewportHours,
-  setCompactingStationId,
-  setIsCompactingTimeline,
   resetUiState,
   type UiState,
 } from './uiSlice';
@@ -41,8 +39,6 @@ describe('uiSlice', () => {
     focusedDate: null,
     viewportStartHour: 0,
     viewportEndHour: 8,
-    compactingStationId: null,
-    isCompactingTimeline: false,
   };
 
   describe('setSelectedJobId', () => {
@@ -172,24 +168,6 @@ describe('uiSlice', () => {
     });
   });
 
-  describe('compacting state', () => {
-    it('setCompactingStationId sets station ID', () => {
-      const state = uiReducer(initialState, setCompactingStationId('station-1'));
-      expect(state.compactingStationId).toBe('station-1');
-    });
-
-    it('setCompactingStationId clears station ID', () => {
-      const stateWithStation = { ...initialState, compactingStationId: 'station-1' };
-      const state = uiReducer(stateWithStation, setCompactingStationId(null));
-      expect(state.compactingStationId).toBeNull();
-    });
-
-    it('setIsCompactingTimeline sets compacting state', () => {
-      const state = uiReducer(initialState, setIsCompactingTimeline(true));
-      expect(state.isCompactingTimeline).toBe(true);
-    });
-  });
-
   describe('resetUiState', () => {
     it('resets all state to initial values', () => {
       const modifiedState: UiState = {
@@ -208,8 +186,6 @@ describe('uiSlice', () => {
         focusedDate: '2024-02-10T12:00:00Z',
         viewportStartHour: 10,
         viewportEndHour: 20,
-        compactingStationId: 'station-1',
-        isCompactingTimeline: true,
       };
 
       const state = uiReducer(modifiedState, resetUiState());

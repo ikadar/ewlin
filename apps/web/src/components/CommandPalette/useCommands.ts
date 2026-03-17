@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
-import type { CompactHorizon } from '../../utils';
 
 export interface Command {
   id: string;
   label: string;
-  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Compaction' | 'Jobs';
+  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Jobs';
   shortcut?: string;
   keywords?: string;
   icon?: string;
@@ -24,7 +23,7 @@ export interface UseCommandsOptions {
   onNavigateFlux: () => void;
   onNewJob: () => void;
   onSearchJobs: () => void;
-  onCompactTimeline: (horizon: CompactHorizon) => void;
+  onSmartCompact: () => void;
 
   // Scheduler-specific (optional — omitted when called from non-scheduler pages)
   selectedJobId?: string | null;
@@ -129,11 +128,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     id: 'compaction',
     title: 'Compaction',
     shortcuts: [
-      { label: 'Compacter 4h', keys: ['Alt+C', '1'] },
-      { label: 'Compacter 8h', keys: ['Alt+C', '2'] },
-      { label: 'Compacter 24h', keys: ['Alt+C', '3'] },
-      { label: 'Compacter 48h', keys: ['Alt+C', '4'] },
-      { label: 'Compacter 72h', keys: ['Alt+C', '5'] },
+      { label: 'Smart Compaction', keys: ['Ctrl', 'Alt', 'C'] },
     ],
   },
   {
@@ -153,7 +148,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onNavigateFlux,
     onNewJob,
     onSearchJobs,
-    onCompactTimeline,
+    onSmartCompact,
     onJumpToToday,
     onJumpToDeparture,
     onPrevJob,
@@ -182,12 +177,8 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       { id: 'new-job', label: 'Nouveau job', category: 'Actions', shortcut: 'Alt+N', keywords: 'create creer nouveau job', icon: 'plus', action: onNewJob },
       { id: 'search-jobs', label: 'Rechercher des jobs', category: 'Actions', shortcut: 'Alt+F', keywords: 'search chercher rechercher filtrer', icon: 'search', action: onSearchJobs },
 
-      // Compaction (shared)
-      { id: 'compact-4h', label: 'Compacter 4h', category: 'Compaction', shortcut: 'Alt+C 1', keywords: 'compact compacter timeline global 4h', action: () => onCompactTimeline(4) },
-      { id: 'compact-8h', label: 'Compacter 8h', category: 'Compaction', shortcut: 'Alt+C 2', keywords: 'compact compacter timeline global 8h', action: () => onCompactTimeline(8) },
-      { id: 'compact-24h', label: 'Compacter 24h', category: 'Compaction', shortcut: 'Alt+C 3', keywords: 'compact compacter timeline global 24h', action: () => onCompactTimeline(24) },
-      { id: 'compact-48h', label: 'Compacter 48h', category: 'Compaction', shortcut: 'Alt+C 4', keywords: 'compact compacter timeline global 48h', action: () => onCompactTimeline(48) },
-      { id: 'compact-72h', label: 'Compacter 72h', category: 'Compaction', shortcut: 'Alt+C 5', keywords: 'compact compacter timeline global 72h', action: () => onCompactTimeline(72) },
+      // Smart Compaction (shared)
+      { id: 'smart-compact', label: 'Smart Compaction', category: 'Actions', shortcut: 'Ctrl+Alt+C', keywords: 'compact smart similarity reorder optimize compacter', action: onSmartCompact },
 
     ];
 
@@ -251,5 +242,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

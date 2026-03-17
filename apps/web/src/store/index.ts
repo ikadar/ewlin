@@ -125,7 +125,7 @@ export {
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
-  useCompactStationMutation,
+  useBatchRescheduleMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,
   useAutoPlaceJobMutation,
@@ -255,8 +255,6 @@ export {
   clearContextMenu,
   setFocusedDate,
   setViewportHours,
-  setCompactingStationId,
-  setIsCompactingTimeline,
   resetUiState,
 } from './slices/uiSlice';
 

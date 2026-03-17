@@ -2,28 +2,13 @@ import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Ele
 import { DRY_TIME_MS } from '@flux/types';
 import { getJobIdForTask, compareTaskOrder } from './taskHelpers';
 import { isPrintingStation } from './precedenceConstraints';
-import { snapToNextWorkingTime } from './workingTime';
+import { snapToNextWorkingTime, roundToNearestQuarterHour } from './workingTime';
 import { COMPACT_HORIZONS } from '../constants';
 import type { CompactHorizon } from '../constants';
 
 export { COMPACT_HORIZONS };
 export type { CompactHorizon };
 
-/**
- * Round a date UP to the next 15-minute boundary.
- * e.g., 12:11 → 12:15, 12:00 → 12:00, 12:46 → 13:00
- */
-function snapToQuarterHour(date: Date): Date {
-  const snapped = new Date(date);
-  const minutes = snapped.getMinutes();
-  const remainder = minutes % 15;
-  if (remainder > 0) {
-    snapped.setMinutes(minutes + (15 - remainder), 0, 0);
-  } else {
-    snapped.setSeconds(0, 0);
-  }
-  return snapped;
-}
 
 /**
  * Check if a task is immobile (cannot be moved during compaction).
@@ -268,7 +253,7 @@ function processAssignment(ctx: ProcessAssignmentContext): ProcessAssignmentResu
  */
 export function compactTimeline(options: CompactTimelineOptions): CompactTimelineResult {
   const { snapshot, horizonHours, calculateEndTime: calculateEndTimeFn } = options;
-  const now = snapToQuarterHour(options.now ?? new Date());
+  const now = roundToNearestQuarterHour(options.now ?? new Date());
   const horizonMs = horizonHours * 60 * 60 * 1000;
 
   const taskMap = new Map(snapshot.tasks.map((t) => [t.id, t]));

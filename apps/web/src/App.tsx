@@ -3,7 +3,8 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
 import { useTheme } from './contexts/ThemeContext';
 import { ZOOM_LEVELS } from './utils/zoom';
-import { Save } from 'lucide-react';
+import { Save, ClipboardCopy } from 'lucide-react';
+import { buildDebugPayload } from './utils/debugExport';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -13,6 +14,7 @@ import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
 import { AutoPlaceModal } from './components/AutoPlaceModal';
+import { SmartCompactModal } from './components/SmartCompactModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
@@ -20,7 +22,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -30,7 +32,6 @@ import { fluxApi } from './store/api/fluxApi';
 import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
 import { useDropValidation } from './hooks/useDropValidation';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
-import type { CompactHorizon } from './utils';
 import {
   PickStateProvider,
   PickPreview,
@@ -337,7 +338,7 @@ function AppContent() {
   const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
-  const [compactStation] = useCompactStationMutation();
+
   const [splitTask] = useSplitTaskMutation();
   const [fuseTask] = useFuseTaskMutation();
   const [createJob] = useCreateJobMutation();
@@ -414,11 +415,8 @@ function AppContent() {
     debugConflicts: Array<{ type: string; message?: string }>;
   }>({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
 
-  // Compact station loading state
-  const [compactingStationId, setCompactingStationId] = useState<string | null>(null);
-
-  // Global timeline compact loading state (v0.3.35)
-  const [isCompactingTimeline, setIsCompactingTimeline] = useState(false);
+  // Smart compaction modal state
+  const [isSmartCompactOpen, setIsSmartCompactOpen] = useState(false);
 
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
@@ -1115,6 +1113,17 @@ function AppContent() {
     }).length;
   }, [snapshotData]);
 
+  // Debug export: copy full snapshot to clipboard
+  const handleDebugExport = useCallback(async () => {
+    try {
+      const payload = buildDebugPayload(snapshot);
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      showToast('Debug snapshot copied to clipboard', 'success');
+    } catch {
+      showToast('Failed to copy to clipboard', 'error');
+    }
+  }, [snapshot, showToast]);
+
   // Handle mass unschedule all tiles (CTRL+ALT+Z)
   const handleMassUnscheduleConfirm = useCallback(async () => {
     if (!massUnscheduleConfirm) return;
@@ -1123,10 +1132,39 @@ function AppContent() {
     try {
       const result = await clearAllAssignments({ includeInProgress, fuseSplits }).unwrap();
       showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
+
+      // Fuse split groups that are now fully unassigned
+      if (fuseSplits && snapshotData) {
+        const now = new Date().toISOString();
+        const splitGroups = new Map<string, string[]>();
+        for (const task of snapshotData.tasks) {
+          if (task.type === 'Internal') {
+            const it = task as InternalTask;
+            if (it.splitGroupId) {
+              const group = splitGroups.get(it.splitGroupId) || [];
+              group.push(it.id);
+              splitGroups.set(it.splitGroupId, group);
+            }
+          }
+        }
+        for (const [, memberIds] of splitGroups) {
+          const allCleared = memberIds.every((id) => {
+            const a = snapshotData.assignments.find((asn) => asn.taskId === id);
+            if (!a) return true;
+            if (a.isCompleted) return false;
+            if (!includeInProgress && a.scheduledStart <= now
+                && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+            return true;
+          });
+          if (allCleared) {
+            try { await fuseTask(memberIds[0]).unwrap(); } catch { /* skip */ }
+          }
+        }
+      }
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [massUnscheduleConfirm, clearAllAssignments, showToast]);
+  }, [massUnscheduleConfirm, clearAllAssignments, fuseTask, snapshotData, showToast]);
 
   // Trigger mass unschedule confirmation dialog
   const triggerMassUnschedule = useCallback(() => {
@@ -1204,6 +1242,13 @@ function AppContent() {
       if (isAltLetter(e, 'e') && selectedJobId) {
         e.preventDefault();
         handleEditJob();
+        return;
+      }
+
+      // Ctrl+Alt+C: smart compaction
+      if (isCtrlAltLetter(e, 'c')) {
+        e.preventDefault();
+        handleSmartCompact();
         return;
       }
 
@@ -1948,19 +1993,6 @@ function AppContent() {
     return stationIds;
   }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.elements, snapshot.assignments]);
 
-  // Handle station compact - remove gaps between tiles
-  // Respects precedence: tasks cannot start before their predecessor ends
-  // Works in both mock and API modes via RTK Query mutation
-  const handleCompact = useCallback(async (stationId: string) => {
-    setCompactingStationId(stationId);
-    try {
-      await compactStation(stationId).unwrap();
-    } catch (err) {
-      showToast(getErrorMessage(err), 'error');
-    } finally {
-      setCompactingStationId(null);
-    }
-  }, [compactStation, showToast]);
 
   // Toggle Quick Placement
   const handleToggleQuickPlacement = useCallback(() => {
@@ -2254,35 +2286,14 @@ function AppContent() {
     setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
   }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, assignTask, rescheduleTask, showToast]);
 
-  // Handle global timeline compaction (v0.3.35)
-  // Compacts each station that has assignments via the compact endpoint.
-  // Runs multiple passes to resolve cross-station dependencies: if a successor's
-  // station is compacted before its predecessor's station, the successor can only
-  // fully compact once the predecessor has been compacted in a previous pass.
-  const handleCompactTimeline = useCallback(async (_horizonHours: CompactHorizon) => {
-    setIsCompactingTimeline(true);
-    try {
-      const stationsWithAssignments = snapshot.stations.filter((s) =>
-        snapshot.assignments.some((a) => a.targetId === s.id && !a.isOutsourced)
-      );
-      // Multiple passes: each pass resolves one level of cross-station dependencies.
-      // $now advances between passes but only by seconds — negligible vs. hour-scale
-      // scheduling. Already-compacted tasks won't re-compact (earliestStart >= scheduledStart).
-      const MAX_PASSES = 5;
-      for (let pass = 0; pass < MAX_PASSES; pass++) {
-        let passCompacted = 0;
-        for (const station of stationsWithAssignments) {
-          const result = await compactStation(station.id).unwrap();
-          passCompacted += result.compactedCount;
-        }
-        if (passCompacted === 0) break;
-      }
-    } catch (err) {
-      showToast(getErrorMessage(err), 'error');
-    } finally {
-      setIsCompactingTimeline(false);
-    }
-  }, [snapshot.stations, snapshot.assignments, compactStation, showToast]);
+  // Smart compaction handler
+  const handleSmartCompact = useCallback(() => {
+    setIsSmartCompactOpen(true);
+  }, []);
+
+  const handleSmartCompactComplete = useCallback(() => {
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [dispatch]);
 
   // Compute footer mode from app state
   const footerMode = useMemo(() => {
@@ -2342,7 +2353,7 @@ function AppContent() {
     onToggleSidebar: useCallback(() => {
       setIsSidebarVisible(prev => !prev);
     }, []),
-    onCompactTimeline: handleCompactTimeline,
+    onSmartCompact: handleSmartCompact,
     onZoomIn: useCallback(() => {
       const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
       if (idx < ZOOM_LEVELS.length - 1) {
@@ -2497,8 +2508,6 @@ function AppContent() {
           quickPlacementValidation={quickPlacementValidation}
           isAltPressed={isAltPressed}
           quickPlacementPrecedenceConstraints={quickPlacementPrecedenceConstraints}
-          compactingStationId={compactingStationId}
-          onCompact={handleCompact}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
@@ -2530,7 +2539,7 @@ function AppContent() {
 
       {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
       {selectedJobId && (
-        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: 0 0 0 2px ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; }`}</style>
+        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: inset 0 0 0 2px ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; }`}</style>
       )}
 
       <ShortcutFooter mode={footerMode} />
@@ -2658,6 +2667,16 @@ function AppContent() {
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
 
+      {/* Debug Export FAB — copy snapshot to clipboard */}
+      <button
+        onClick={handleDebugExport}
+        className="fixed bottom-[136px] right-6 z-40 w-10 h-10 rounded-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 shadow-lg transition-all flex items-center justify-center opacity-50 hover:opacity-100"
+        aria-label="Copy debug snapshot to clipboard"
+        title="Copy debug snapshot to clipboard"
+      >
+        <ClipboardCopy size={16} />
+      </button>
+
       {/* Save/Load FAB — stacked above Command Center FAB */}
       <button
         onClick={() => setIsSaveLoadOpen(true)}
@@ -2717,6 +2736,14 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {/* Smart Compaction modal */}
+      <SmartCompactModal
+        isOpen={isSmartCompactOpen}
+        onClose={() => setIsSmartCompactOpen(false)}
+        onComplete={handleSmartCompactComplete}
+        snapshot={snapshot}
+      />
 
       {/* Auto-place V1 modal */}
       <AutoPlaceModal
