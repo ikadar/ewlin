@@ -2,7 +2,7 @@
  * Auth Slice
  *
  * Redux slice for authentication state management.
- * Persists token and user info to sessionStorage (tab-scoped).
+ * Persists token and user info to localStorage (shared across tabs).
  *
  * @see docs/architecture/authentication-plan.md
  */
@@ -34,14 +34,14 @@ export interface AuthState {
 }
 
 // ============================================================================
-// SessionStorage Keys
+// LocalStorage Keys
 // ============================================================================
 
 const TOKEN_KEY = 'flux_auth_token';
 const USER_KEY = 'flux_auth_user';
 
 // ============================================================================
-// Initial State (hydrate from sessionStorage)
+// Initial State (hydrate from localStorage)
 // ============================================================================
 
 function loadInitialState(): AuthState {
@@ -49,15 +49,15 @@ function loadInitialState(): AuthState {
     return { token: null, user: null };
   }
 
-  const token = sessionStorage.getItem(TOKEN_KEY);
-  const userJson = sessionStorage.getItem(USER_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  const userJson = localStorage.getItem(USER_KEY);
   let user: AuthUser | null = null;
 
   if (userJson) {
     try {
       user = JSON.parse(userJson) as AuthUser;
     } catch {
-      sessionStorage.removeItem(USER_KEY);
+      localStorage.removeItem(USER_KEY);
     }
   }
 
@@ -77,15 +77,15 @@ export const authSlice = createSlice({
     setCredentials: (state, action: PayloadAction<{ token: string; user: AuthUser }>) => {
       state.token = action.payload.token;
       state.user = action.payload.user;
-      sessionStorage.setItem(TOKEN_KEY, action.payload.token);
-      sessionStorage.setItem(USER_KEY, JSON.stringify(action.payload.user));
+      localStorage.setItem(TOKEN_KEY, action.payload.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(action.payload.user));
     },
 
     logout: (state) => {
       state.token = null;
       state.user = null;
-      sessionStorage.removeItem(TOKEN_KEY);
-      sessionStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
     },
   },
 });

@@ -53,6 +53,8 @@ rsync -avz --delete \
     --exclude='.gitignore' \
     --exclude='.gitmodules' \
     --exclude='.env.example' \
+    --exclude='.env.local' \
+    --exclude='compose.override.yaml' \
     ./ "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/"
 
 # 2. Run server-side deploy

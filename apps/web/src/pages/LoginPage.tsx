@@ -36,7 +36,7 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-flux-text-primary">Flux Scheduler</h1>
+          <h1 className="text-2xl font-semibold text-flux-text-primary">ORDO</h1>
           <p className="text-sm text-flux-text-muted mt-1">Connectez-vous pour continuer</p>
         </div>
 
