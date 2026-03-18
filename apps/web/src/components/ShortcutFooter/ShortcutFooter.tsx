@@ -27,6 +27,7 @@ const MODE_CONFIGS: Record<FooterMode, ModeConfig> = {
       { keys: ['Ctrl', '+', '-'], label: 'Zoom' },
       { keys: ['Alt', 'A'], label: 'Display' },
       { keys: ['Alt', 'K'], label: 'Commands' },
+      { keys: ['Ctrl+Alt', 'S'], label: 'Solver' },
     ],
   },
   jobSelected: {

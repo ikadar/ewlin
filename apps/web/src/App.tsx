@@ -15,6 +15,7 @@ import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
 import { AutoPlaceModal } from './components/AutoPlaceModal';
 import { SmartCompactModal } from './components/SmartCompactModal';
+import { SolverModal } from './components/SolverModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
@@ -483,6 +484,8 @@ function AppContent() {
   } | null>(null);
   // Auto-place V1 modal
   const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
+  // CP-SAT Solver modal
+  const [isSolverOpen, setIsSolverOpen] = useState(false);
 
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
@@ -1256,6 +1259,13 @@ function AppContent() {
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
         handleAutoPlaceAll();
+        return;
+      }
+
+      // Ctrl+Alt+S: CP-SAT solver
+      if (isCtrlAltLetter(e, 's')) {
+        e.preventDefault();
+        handleSolverOpen();
         return;
       }
 
@@ -2295,6 +2305,15 @@ function AppContent() {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
   }, [dispatch]);
 
+  // CP-SAT Solver handler
+  const handleSolverOpen = useCallback(() => {
+    setIsSolverOpen(true);
+  }, []);
+
+  const handleSolverComplete = useCallback(() => {
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [dispatch]);
+
   // Compute footer mode from app state
   const footerMode = useMemo(() => {
     if (isPicking) return 'picking' as const;
@@ -2750,6 +2769,13 @@ function AppContent() {
         onClose={() => setIsAutoPlaceOpen(false)}
         onComplete={handleAutoPlaceComplete}
         apiBaseUrl="/api/v1"
+      />
+
+      {/* CP-SAT Solver modal */}
+      <SolverModal
+        isOpen={isSolverOpen}
+        onClose={() => setIsSolverOpen(false)}
+        onComplete={handleSolverComplete}
       />
 
       {/* Schedule save/load modal */}
