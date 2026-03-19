@@ -1171,8 +1171,11 @@ function AppContent() {
 
   // Trigger mass unschedule confirmation dialog
   const triggerMassUnschedule = useCallback(() => {
-    const count = getClearableCount();
-    if (count > 0) setMassUnscheduleConfirm({ count, includeInProgress: false, fuseSplits: false });
+    // Open dialog if there are ANY non-completed tiles (with or without in-progress)
+    const countWithInProgress = getClearableCount(true);
+    if (countWithInProgress > 0) {
+      setMassUnscheduleConfirm({ count: getClearableCount(), includeInProgress: false, fuseSplits: false });
+    }
   }, [getClearableCount]);
 
   // Handle ASAP auto-placement for selected job (ALT+P S)

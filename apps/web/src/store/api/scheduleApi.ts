@@ -323,22 +323,9 @@ export const scheduleApi = createApi({
         const qs = params.toString();
         return { url: `/schedule/assignments${qs ? `?${qs}` : ''}`, method: 'DELETE' };
       },
+      // No optimistic update — let the refetch handle UI update to avoid
+      // flicker on in-progress tiles (client/server NOW can differ slightly)
       invalidatesTags: ['Snapshot'],
-      async onQueryStarted(opts, { dispatch, queryFulfilled }) {
-        const includeInProgress = opts?.includeInProgress ?? false;
-        const patchResult = dispatch(
-          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
-            const now = new Date().toISOString();
-            draft.assignments = draft.assignments.filter((a) => {
-              if (a.isCompleted) return true;
-              if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return true;
-              return false;
-            });
-            // Note: fuseSplits optimistic update is handled by snapshot refetch
-          })
-        );
-        try { await queryFulfilled; } catch { patchResult.undo(); }
-      },
     }),
 
     /**
