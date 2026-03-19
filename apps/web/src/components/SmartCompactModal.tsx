@@ -57,6 +57,7 @@ const PHASE_LABELS: Record<string, string> = {
   'reorder_printing': 'Optimizing printing station',
   'propagate': 'Propagating downstream',
   'reorder_printfree': 'Reordering independent station',
+  'compact': 'Compacting timeline',
   'validate': 'Validating constraints',
 };
 
