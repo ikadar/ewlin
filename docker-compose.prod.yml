@@ -35,7 +35,9 @@ services:
     environment:
       MERCURE_EXTRA_DIRECTIVES: |
         cors_origins ${CORS_ALLOW_ORIGIN}
-    ports: !reset []
+        anonymous
+    ports: !override
+      - "127.0.0.1:3001:3000"  # Localhost only — Apache proxies to this
     restart: unless-stopped
 
   # Redis disabled in prod — not actively used (cache.yaml and messenger are commented out)
