@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Loader2, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
+import { X, AlertTriangle, Sparkles } from 'lucide-react';
 import { muteMercure, unmuteMercure } from '../hooks/mercureMute';
 import { COMPACT_HORIZONS } from '../constants';
 import type { CompactHorizon } from '../constants';
@@ -53,12 +53,12 @@ interface SmartCompactResult {
 // ============================================================================
 
 const PHASE_LABELS: Record<string, string> = {
-  'analyze': 'Analyzing schedule',
-  'reorder_printing': 'Optimizing printing station',
-  'propagate': 'Propagating downstream',
-  'reorder_printfree': 'Reordering independent station',
-  'compact': 'Compacting timeline',
-  'validate': 'Validating constraints',
+  'analyze': 'Analyse du planning',
+  'reorder_printing': 'Optimisation poste impression',
+  'propagate': 'Propagation en aval',
+  'reorder_printfree': 'Réordonnancement poste indépendant',
+  'compact': 'Compactage du planning',
+  'validate': 'Validation des contraintes',
 };
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -247,7 +247,7 @@ export function SmartCompactModal({ isOpen, onClose, onComplete }: SmartCompactM
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-amber-400" />
             <h2 className="text-flux-text-primary font-semibold text-sm">
-              Smart Compaction
+              Compaction intelligente
             </h2>
           </div>
           {state !== 'running' && (
@@ -284,13 +284,13 @@ export function SmartCompactModal({ isOpen, onClose, onComplete }: SmartCompactM
                 onClick={handleClose}
                 className="px-4 py-2 rounded text-sm bg-zinc-700 hover:bg-zinc-600 text-white font-medium transition-colors"
               >
-                Cancel
+                Annuler
               </button>
               <button
                 onClick={handleStart}
                 className="px-4 py-2 rounded text-sm bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors"
               >
-                Start
+                Lancer
               </button>
             </>
           )}
@@ -299,7 +299,7 @@ export function SmartCompactModal({ isOpen, onClose, onComplete }: SmartCompactM
               onClick={handleClose}
               className="px-4 py-2 rounded text-sm bg-zinc-700 hover:bg-zinc-600 text-white font-medium transition-colors"
             >
-              Close
+              Fermer
             </button>
           )}
         </div>
@@ -322,12 +322,12 @@ function ConfigView({
   return (
     <>
       <p className="text-flux-text-secondary text-xs">
-        Reorders tiles to group similar work together, reducing changeover time.
-        Optimizes printing stations first, then propagates to downstream stations.
+        Regroupe les tuiles similaires pour réduire les temps de changement.
+        Optimise les postes d'impression, puis propage aux postes en aval.
       </p>
 
       <div className="space-y-2">
-        <p className="text-flux-text-primary text-xs font-medium">Time horizon</p>
+        <p className="text-flux-text-primary text-xs font-medium">Horizon temporel</p>
         <div className="flex gap-2">
           {COMPACT_HORIZONS.map((h) => (
             <button
@@ -380,7 +380,7 @@ function RunningView({
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-flux-text-secondary">
             <span>
-              {(currentEvent.stationIndex ?? 0) + 1} / {currentEvent.totalStations} stations
+              {(currentEvent.stationIndex ?? 0) + 1} / {currentEvent.totalStations} postes
             </span>
             <span>{pct}%</span>
           </div>
@@ -393,11 +393,18 @@ function RunningView({
         </div>
       )}
 
-      <div className="flex items-center gap-4 text-xs text-flux-text-secondary">
-        <span>{formatElapsed(elapsed)}</span>
-      </div>
+      {/* Compact running stats */}
+      <p className="text-xs text-flux-text-secondary">
+        {currentEvent?.stepsCompleted ?? 0} étapes · {formatElapsed(elapsed)}
+      </p>
     </>
   );
+}
+
+function clrDelta(before: number, after: number): string {
+  if (after > before) return 'text-emerald-400';
+  if (after === before) return 'text-amber-400';
+  return 'text-red-400';
 }
 
 function CompleteView({
@@ -411,38 +418,44 @@ function CompleteView({
     <>
       <PhaseLog entries={logEntries} />
 
-      {/* Success header */}
-      <div className="flex items-center gap-3">
-        <CheckCircle2 size={20} className="text-emerald-400" />
-        <p className="text-flux-text-primary text-sm font-medium">Compaction complete</p>
+      {/* Success line */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-emerald-400">✓</span>
+        <span className="text-flux-text-primary font-medium">Compaction terminée</span>
+        {result.computeMs != null && (
+          <span className="text-flux-text-tertiary">en {(result.computeMs / 1000).toFixed(1)}s</span>
+        )}
       </div>
 
-      {/* Similarity improvement */}
+      {/* Score card */}
       {(result.similarityBefore > 0 || result.similarityAfter > 0) && (
-        <div className="bg-zinc-900/50 rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-flux-text-primary">
-            {result.similarityBefore} → {result.similarityAfter}
-          </p>
-          <p className="text-xs text-flux-text-secondary mt-0.5">matched similarity pairs</p>
+        <div className="bg-zinc-900/50 rounded-lg overflow-hidden">
+          {/* Hero: similarity improvement */}
+          <div className="text-center py-4 px-4">
+            <p className={`text-3xl font-bold ${clrDelta(result.similarityBefore, result.similarityAfter)}`}>
+              {result.similarityBefore} → {result.similarityAfter}
+            </p>
+            <p className="text-xs text-flux-text-secondary mt-0.5">Paires de similarité</p>
+          </div>
+
+          {/* Detail rows */}
+          <div className="border-t border-flux-border px-4 py-3 space-y-1.5 text-xs">
+            <Stat label="Postes impression" value={result.printingStationsOptimized} />
+            <Stat label="Postes en aval" value={result.downstreamStationsPropagated} />
+            <Stat label="Tuiles réordonnées" value={result.reorderedCount} />
+            <Stat label="Tuiles déplacées" value={result.movedCount} />
+            {result.printfreeStationsReordered > 0 && (
+              <Stat label="Postes indépendants" value={result.printfreeStationsReordered} />
+            )}
+            {result.rollbackCount > 0 && (
+              <Stat label="Rollbacks" value={result.rollbackCount} warn />
+            )}
+            {result.rollbackCount === 0 && (
+              <Stat label="Sécurité deadline" value="Aucun job en retard" />
+            )}
+          </div>
         </div>
       )}
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
-        <Stat label="Printing stations optimized" value={result.printingStationsOptimized} />
-        <Stat label="Downstream propagated" value={result.downstreamStationsPropagated} />
-        <Stat label="Tiles reordered" value={result.reorderedCount} />
-        <Stat label="Tiles moved" value={result.movedCount} />
-        {result.printfreeStationsReordered > 0 && (
-          <Stat label="Independent stations" value={result.printfreeStationsReordered} />
-        )}
-        {result.rollbackCount > 0 && (
-          <Stat label="Rollbacks" value={result.rollbackCount} warn />
-        )}
-        {result.rollbackCount === 0 && (
-          <Stat label="Deadline safety" value="No jobs made late" />
-        )}
-      </div>
     </>
   );
 }
@@ -462,15 +475,14 @@ function PhaseLog({ entries }: { entries: PhaseLogEntry[] }) {
     <div
       ref={scrollRef}
       className="space-y-1.5 overflow-y-auto pr-1"
-      style={{ maxHeight: '12rem' }}
+      style={{ maxHeight: '5.5rem' }}
     >
       {entries.map((entry, i) => (
         <div key={i} className="flex items-center gap-2 text-xs">
-          {entry.status === 'done' ? (
-            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-          ) : (
-            <Loader2 size={14} className="text-amber-400 animate-spin shrink-0" />
-          )}
+          <span
+            className={`shrink-0 rounded-full ${entry.status === 'done' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}
+            style={{ width: 6, height: 6 }}
+          />
           <span className="text-flux-text-primary">{entry.label}</span>
           {entry.detail && (
             <span className="text-flux-text-secondary ml-auto whitespace-nowrap">{entry.detail}</span>
@@ -486,8 +498,8 @@ function ErrorView({ error }: { error: string | null }) {
     <div className="flex items-center gap-3">
       <AlertTriangle size={20} className="text-red-400" />
       <div>
-        <p className="text-flux-text-primary text-sm font-medium">Smart compaction failed</p>
-        <p className="text-flux-text-secondary text-xs mt-0.5">{error ?? 'Unknown error'}</p>
+        <p className="text-flux-text-primary text-sm font-medium">La compaction intelligente a échoué</p>
+        <p className="text-flux-text-secondary text-xs mt-0.5">{error ?? 'Erreur inconnue'}</p>
       </div>
     </div>
   );

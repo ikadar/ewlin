@@ -28,12 +28,10 @@ export interface UseCommandsOptions {
 
   // Scheduler-specific (optional — omitted when called from non-scheduler pages)
   selectedJobId?: string | null;
-  isQuickPlacementMode?: boolean;
   onJumpToToday?: () => void;
   onJumpToDeparture?: () => void;
   onPrevJob?: () => void;
   onNextJob?: () => void;
-  onToggleQuickPlacement?: () => void;
   onEditJob?: () => void;
   onToggleDisplayMode?: () => void;
   onToggleSidebar?: () => void;
@@ -87,7 +85,6 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     id: 'actions',
     title: 'Actions',
     shortcuts: [
-      { label: 'Placement rapide', keys: ['Alt', 'Q'] },
       { label: 'Modifier le job', keys: ['Alt', 'E'] },
       { label: 'Nouveau job', keys: ['Alt', 'N'] },
       { label: 'Rechercher des jobs', keys: ['Alt', 'F'] },
@@ -115,7 +112,6 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     id: 'job-context',
     title: 'Job selectionne',
     shortcuts: [
-      { label: 'Placer ce job', keys: ['Alt', 'Q'] },
       { label: 'Voir le depart', keys: ['Alt', 'D'] },
       { label: 'Modifier ce job', keys: ['Alt', 'E'] },
       { label: 'Tache terminee', keys: ['Space'] },
@@ -144,7 +140,6 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
 export function useCommands(options: UseCommandsOptions): Command[] {
   const {
     selectedJobId,
-    isQuickPlacementMode,
     onNavigateScheduler,
     onNavigateFlux,
     onNewJob,
@@ -155,7 +150,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onJumpToDeparture,
     onPrevJob,
     onNextJob,
-    onToggleQuickPlacement,
     onEditJob,
     onToggleDisplayMode,
     onToggleSidebar,
@@ -200,9 +194,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     }
 
     // Scheduler-specific: Actions
-    if (onToggleQuickPlacement) {
-      commands.push({ id: 'quick-placement', label: isQuickPlacementMode ? 'Quitter le placement rapide' : 'Mode placement rapide', category: 'Actions', shortcut: 'Alt+Q', keywords: 'place assign quick rapide placement', icon: 'zap', action: onToggleQuickPlacement });
-    }
     if (onEditJob) {
       commands.push({ id: 'edit-job', label: 'Modifier le job', category: 'Actions', shortcut: 'Alt+E', keywords: 'edit modifier job formulaire', icon: 'pencil', action: onEditJob });
     }
@@ -245,5 +236,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

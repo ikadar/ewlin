@@ -247,8 +247,6 @@ export type { AdminUserGroupResponse, AdminUserGroupInput } from './api/adminUse
 export {
   setSelectedJobId,
   setIsAltPressed,
-  setIsQuickPlacementMode,
-  setQuickPlacementHover,
   setPickValidation,
   setPixelsPerHour,
   setContextMenu,

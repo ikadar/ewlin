@@ -4,7 +4,6 @@
  * Manages UI state that was previously in App.tsx useState hooks:
  * - Selection state (selectedJobId)
  * - Keyboard state (isAltPressed)
- * - Quick Placement mode state
  * - Pick & Place validation state
  * - Zoom state (pixelsPerHour)
  * - Context menu state
@@ -19,12 +18,6 @@ import { DEFAULT_PIXELS_PER_HOUR } from '../../utils/zoom';
 // ============================================================================
 // Types
 // ============================================================================
-
-export interface QuickPlacementHover {
-  stationId: string | null;
-  y: number;
-  snappedY: number;
-}
 
 export interface PickValidation {
   scheduledStart: string | null;
@@ -45,10 +38,6 @@ export interface UiState {
   selectedJobId: string | null;
   /** Whether Alt key is pressed (for precedence bypass) */
   isAltPressed: boolean;
-  /** Quick Placement mode active */
-  isQuickPlacementMode: boolean;
-  /** Quick Placement hover state */
-  quickPlacementHover: QuickPlacementHover;
   /** Pick & Place validation state */
   pickValidation: PickValidation;
   /** Zoom level in pixels per hour */
@@ -70,8 +59,6 @@ export interface UiState {
 const initialState: UiState = {
   selectedJobId: null,
   isAltPressed: false,
-  isQuickPlacementMode: false,
-  quickPlacementHover: { stationId: null, y: 0, snappedY: 0 },
   pickValidation: {
     scheduledStart: null,
     ringState: 'none',
@@ -95,29 +82,10 @@ const uiSlice = createSlice({
   reducers: {
     setSelectedJobId: (state, action: PayloadAction<string | null>) => {
       state.selectedJobId = action.payload;
-      // Exit quick placement mode when job changes
-      if (action.payload !== state.selectedJobId) {
-        state.isQuickPlacementMode = false;
-        state.quickPlacementHover = { stationId: null, y: 0, snappedY: 0 };
-      }
     },
 
     setIsAltPressed: (state, action: PayloadAction<boolean>) => {
       state.isAltPressed = action.payload;
-    },
-
-    setIsQuickPlacementMode: (state, action: PayloadAction<boolean>) => {
-      state.isQuickPlacementMode = action.payload;
-      if (!action.payload) {
-        state.quickPlacementHover = { stationId: null, y: 0, snappedY: 0 };
-      }
-    },
-
-    setQuickPlacementHover: (
-      state,
-      action: PayloadAction<QuickPlacementHover>
-    ) => {
-      state.quickPlacementHover = action.payload;
     },
 
     setPickValidation: (state, action: PayloadAction<PickValidation>) => {
@@ -159,8 +127,6 @@ const uiSlice = createSlice({
 export const {
   setSelectedJobId,
   setIsAltPressed,
-  setIsQuickPlacementMode,
-  setQuickPlacementHover,
   setPickValidation,
   setPixelsPerHour,
   setContextMenu,

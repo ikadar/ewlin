@@ -2,7 +2,6 @@ import { type ReactNode, type MouseEvent, useRef, useMemo, memo } from 'react';
 import type { Station, DaySchedule, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
-import { PlacementIndicator } from '../PlacementIndicator';
 import { PrecedenceLines } from '../PrecedenceLines';
 import { DryingTimeIndicator } from '../DryingTimeIndicator';
 import { OutsourcingTimeIndicator } from '../OutsourcingTimeIndicator';
@@ -26,24 +25,6 @@ export interface StationColumnProps {
   children?: ReactNode;
   /** Whether this column is collapsed (v0.3.57: always false, kept for API compatibility) */
   isCollapsed?: boolean;
-  /** Whether a valid drop is being hovered over this column (quick placement) */
-  isValidDrop?: boolean;
-  /** Whether an invalid drop is being hovered over this column (quick placement) */
-  isInvalidDrop?: boolean;
-  /** Whether a precedence bypass (ALT) drop is being hovered over this column (quick placement) */
-  isQuickPlacementBypass?: boolean;
-  /** Whether quick placement mode is active */
-  isQuickPlacementMode?: boolean;
-  /** Whether there's an available task for this station in quick placement mode */
-  hasAvailableTask?: boolean;
-  /** Y position for placement indicator (snapped) */
-  placementIndicatorY?: number;
-  /** Callback when mouse moves in the column (for tracking position) */
-  onQuickPlacementMouseMove?: (stationId: string, y: number) => void;
-  /** Callback when mouse leaves the column */
-  onQuickPlacementMouseLeave?: () => void;
-  /** Callback when user clicks to place a task */
-  onQuickPlacementClick?: (stationId: string, y: number) => void;
   /** REQ-10: Precedence constraint Y positions for visualization */
   precedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** v0.3.51: Drying time visualization info during drag */
@@ -70,10 +51,6 @@ export interface StationColumnProps {
   displayMode?: 'produit' | 'tirage';
   /** Station category (for columnWidth lookup) */
   category?: StationCategory;
-  /** Ghost preview label for quick placement (job reference) */
-  ghostPreviewLabel?: string;
-  /** Ghost preview height in pixels for quick placement */
-  ghostPreviewHeight?: number;
   /** Callback when clicking the column background (deselect) */
   onDeselect?: () => void;
 }
@@ -110,15 +87,6 @@ export const StationColumn = memo(function StationColumn({
   gridStartDate,
   children,
   isCollapsed: _isCollapsed = false,
-  isValidDrop = false,
-  isInvalidDrop = false,
-  isQuickPlacementBypass = false,
-  isQuickPlacementMode = false,
-  hasAvailableTask = false,
-  placementIndicatorY,
-  onQuickPlacementMouseMove,
-  onQuickPlacementMouseLeave,
-  onQuickPlacementClick,
   precedenceConstraints,
   dryingTimeInfo,
   outsourcingTimeInfo,
@@ -133,8 +101,6 @@ export const StationColumn = memo(function StationColumn({
   onPickClick,
   displayMode: _displayMode,
   category,
-  ghostPreviewLabel,
-  ghostPreviewHeight,
   onDeselect,
 }: StationColumnProps) {
   // Ref for the column element
@@ -171,7 +137,7 @@ export const StationColumn = memo(function StationColumn({
     return lines;
   }, [visibleDayRange, pixelsPerHour, hoursToDisplay]);
 
-  // Determine highlight style based on pick/quick placement state
+  // Determine highlight style based on pick state
   const getHighlightClass = () => {
     // v0.3.54: Pick & Place ring states (highest priority during pick)
     if (isPicking && isPickTarget) {
@@ -195,60 +161,27 @@ export const StationColumn = memo(function StationColumn({
       return 'opacity-15 pointer-events-none';
     }
 
-    // Quick placement validation highlighting
-    if (isQuickPlacementBypass) {
-      // Precedence bypass (ALT held) - amber indicator
-      return 'ring-2 ring-amber-500 bg-amber-500/10';
-    }
-    if (isInvalidDrop) {
-      // Invalid drop zone - red indicator (blocking conflicts)
-      return 'ring-2 ring-red-500 bg-red-500/10';
-    }
-    if (isValidDrop) {
-      // Valid drop zone - green indicator
-      return 'ring-2 ring-green-500 bg-green-500/10';
-    }
-    // Quick Placement Mode highlighting
-    if (isQuickPlacementMode) {
-      if (hasAvailableTask) {
-        // Available column - green highlight
-        return 'ring-2 ring-green-500 bg-green-500/10';
-      } else {
-        // Unavailable column - subtle dimming
-        return 'opacity-50';
-      }
-    }
     return '';
   };
 
   // Custom width: explicit DB value takes priority, then category-based default, then CSS w-60.
   const customWidth = category?.columnWidth ?? (category ? getDefaultCategoryWidth(category.name) : null);
 
-  // Quick placement mode handlers
+  // Mouse handlers
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     // v0.3.54: Pick & Place mouse move handler
     if (isPicking && isPickTarget && onPickMouseMove) {
       const rect = e.currentTarget.getBoundingClientRect();
       const relativeY = e.clientY - rect.top;
       onPickMouseMove(station.id, e.clientX, e.clientY, relativeY);
-      return;
     }
-    // Quick placement mode
-    if (!isQuickPlacementMode || !onQuickPlacementMouseMove) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = e.clientY - rect.top;
-    onQuickPlacementMouseMove(station.id, relativeY);
   };
 
   const handleMouseLeave = () => {
     // v0.3.54: Pick & Place mouse leave handler
     if (isPicking && onPickMouseLeave) {
       onPickMouseLeave();
-      return;
     }
-    // Quick placement mode
-    if (!isQuickPlacementMode || !onQuickPlacementMouseLeave) return;
-    onQuickPlacementMouseLeave();
   };
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -259,33 +192,16 @@ export const StationColumn = memo(function StationColumn({
       onPickClick(station.id, e.clientX, e.clientY, relativeY);
       return;
     }
-    // Quick placement mode
-    if (isQuickPlacementMode && hasAvailableTask && onQuickPlacementClick) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const relativeY = e.clientY - rect.top;
-      onQuickPlacementClick(station.id, relativeY);
-      return;
-    }
     // Background click → deselect (only if click was directly on column, not on a tile)
     if (e.target === e.currentTarget) {
       onDeselect?.();
     }
   };
 
-  // Cursor style for quick placement mode
-  // v0.3.56: Pick mode cursor is now handled globally via body.pick-mode-active
-  const getCursorClass = () => {
-    // Pick mode: global cursor handles this via body.pick-mode-active
-    if (isPicking) return '';
-    // Quick placement mode
-    if (!isQuickPlacementMode) return '';
-    return hasAvailableTask ? 'cursor-pointer' : 'cursor-not-allowed';
-  };
-
   return (
     <div
       ref={columnRef}
-      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-zinc-950 relative transition-[filter,opacity,box-shadow] duration-150 ease-out outline-none ${getHighlightClass()} ${getCursorClass()}`}
+      className={`${customWidth === null ? 'w-60' : ''} shrink-0 bg-zinc-950 relative transition-[filter,opacity,box-shadow] duration-150 ease-out outline-none ${getHighlightClass()}`}
       style={{ ...(customWidth !== null ? { width: `${customWidth}px` } : {}), height: `${totalHeight}px` }}
       data-testid={`station-column-${station.id}`}
       onMouseMove={handleMouseMove}
@@ -351,27 +267,12 @@ export const StationColumn = memo(function StationColumn({
         />
       ))}
 
-      {/* Quick Placement Indicator */}
-      {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && (
-        <PlacementIndicator y={placementIndicatorY} isVisible={true} />
-      )}
-
-      {/* Ghost preview tile during quick placement */}
-      {isQuickPlacementMode && hasAvailableTask && placementIndicatorY !== undefined && ghostPreviewLabel && (
-        <div
-          className="absolute left-1 right-1 rounded border-l-4 border-l-blue-500 bg-blue-500/10 opacity-50 pointer-events-none z-20 overflow-hidden"
-          style={{ top: `${placementIndicatorY}px`, height: `${Math.max(ghostPreviewHeight ?? 12, 12)}px` }}
-        >
-          <span className="text-[9px] text-blue-300/70 px-1.5 py-0.5 truncate block">{ghostPreviewLabel}</span>
-        </div>
-      )}
-
-      {/* REQ-10: Precedence Constraint Lines (during quick placement or pick) */}
+      {/* REQ-10: Precedence Constraint Lines (during pick) */}
       {precedenceConstraints && (
         <PrecedenceLines
           earliestY={precedenceConstraints.earliestY}
           latestY={precedenceConstraints.latestY}
-          isVisible={(isQuickPlacementMode && hasAvailableTask) || (isPicking && isPickTarget)}
+          isVisible={isPicking && isPickTarget}
         />
       )}
 

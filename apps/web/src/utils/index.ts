@@ -5,12 +5,6 @@ export type { PushDownResult } from './pushDown';
 export { applySwap, findAdjacentAssignment } from './swap';
 export type { SwapDirection, SwapResult } from './swap';
 export {
-  getAvailableTaskForStation,
-  getLastUnscheduledTask,
-  canActivateQuickPlacement,
-  getStationsWithAvailableTasks,
-} from './quickPlacement';
-export {
   getOrderedJobIds,
   getPreviousJobId,
   getNextJobId,

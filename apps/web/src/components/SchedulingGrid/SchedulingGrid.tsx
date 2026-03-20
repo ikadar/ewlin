@@ -82,31 +82,8 @@ export interface SchedulingGridProps {
   onSwapDown?: (assignmentId: string) => void;
   /** Callback when completion icon is clicked */
   onToggleComplete?: (assignmentId: string) => void;
-  /** Whether quick placement mode is active */
-  isQuickPlacementMode?: boolean;
-  /** Station IDs that have available tasks for quick placement */
-  stationsWithAvailableTasks?: Set<string>;
-  /** Y position for placement indicator (snapped) */
-  quickPlacementIndicatorY?: number;
-  /** Station ID being hovered in quick placement mode */
-  quickPlacementHoverStationId?: string | null;
-  /** Callback when mouse moves in a station column during quick placement */
-  onQuickPlacementMouseMove?: (stationId: string, y: number) => void;
-  /** Callback when mouse leaves a station column during quick placement */
-  onQuickPlacementMouseLeave?: () => void;
-  /** Callback when user clicks to place a task in quick placement mode */
-  onQuickPlacementClick?: (stationId: string, y: number) => void;
-  /** Quick placement validation result (for green/red border) */
-  quickPlacementValidation?: {
-    isValid: boolean;
-    hasPrecedenceConflict: boolean;
-    suggestedStart: string | null;
-    hasWarningOnly: boolean;
-  };
-  /** Whether ALT key is pressed (for precedence bypass in quick placement) */
+  /** Whether ALT key is pressed (for precedence bypass) */
   isAltPressed?: boolean;
-  /** Quick placement precedence constraint Y positions */
-  quickPlacementPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
   /** Schedule conflicts for conflict visualization (REQ-12) */
   conflicts?: ScheduleConflict[];
   /** Station groups for capacity visualization (REQ-18) */
@@ -149,10 +126,6 @@ export interface SchedulingGridProps {
   lateJobIds?: Set<string>;
   /** Set of job IDs that are shipped (highest priority tile coloring) */
   shippedJobIds?: Set<string>;
-  /** Ghost preview label for quick placement (job reference) */
-  quickPlacementGhostLabel?: string;
-  /** Ghost preview height in pixels for quick placement */
-  quickPlacementGhostHeight?: number;
 }
 
 /**
@@ -178,16 +151,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onSwapUp,
       onSwapDown,
       onToggleComplete,
-      isQuickPlacementMode = false,
-      stationsWithAvailableTasks = new Set(),
-      quickPlacementIndicatorY,
-      quickPlacementHoverStationId,
-      onQuickPlacementMouseMove,
-      onQuickPlacementMouseLeave,
-      onQuickPlacementClick,
-      quickPlacementValidation,
       isAltPressed = false,
-      quickPlacementPrecedenceConstraints,
       conflicts = [],
       groups = [],
       onScroll,
@@ -212,8 +176,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       displayMode,
       lateJobIds,
       shippedJobIds,
-      quickPlacementGhostLabel,
-      quickPlacementGhostHeight,
     },
     ref
   ) {
@@ -599,7 +561,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           </div>
 
           {/* Station columns area */}
-          <div className={`flex gap-3 px-3 bg-zinc-950 relative ${isQuickPlacementMode ? 'ring-2 ring-inset ring-emerald-500/60' : ''}`}>
+          <div className="flex gap-3 px-3 bg-zinc-950 relative">
             {/* Now line spanning all station columns */}
             <div
               className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
@@ -624,33 +586,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               // v0.3.57: Column collapse removed (was only for drag & drop)
               const isCollapsed = false;
 
-              // Quick placement state for this column
-              const isHoveredForQuickPlacement = quickPlacementHoverStationId === station.id;
-              const hasAvailableTaskForQuickPlacement = stationsWithAvailableTasks.has(station.id);
-
-              // Quick placement validation
-              const isQuickPlacementValid = isHoveredForQuickPlacement &&
-                hasAvailableTaskForQuickPlacement &&
-                quickPlacementValidation?.isValid;
-              const isQuickPlacementBypass = isHoveredForQuickPlacement &&
-                hasAvailableTaskForQuickPlacement &&
-                !quickPlacementValidation?.isValid &&
-                quickPlacementValidation?.hasPrecedenceConflict &&
-                isAltPressed;
-              const isQuickPlacementInvalid = isHoveredForQuickPlacement &&
-                hasAvailableTaskForQuickPlacement &&
-                !quickPlacementValidation?.isValid &&
-                !isQuickPlacementBypass;
-
-              // Precedence constraints: show for quick placement or pick
+              // Precedence constraints: show for pick
               const isPickTarget = isPicking && pickTargetStationId === station.id;
-              const showQuickPlacementConstraints = isHoveredForQuickPlacement && hasAvailableTaskForQuickPlacement;
-              let effectivePrecedenceConstraints;
-              if (showQuickPlacementConstraints) {
-                effectivePrecedenceConstraints = quickPlacementPrecedenceConstraints;
-              } else if (isPickTarget) {
-                effectivePrecedenceConstraints = pickPrecedenceConstraints;
-              }
+              const effectivePrecedenceConstraints = isPickTarget ? pickPrecedenceConstraints : undefined;
 
               // v0.3.51: Drying time info - show only on the predecessor's station
               const effectiveDryingTimeInfo = pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined;
@@ -667,15 +605,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   pixelsPerHour={pixelsPerHour}
                   gridStartDate={startDate}
                   isCollapsed={isCollapsed}
-                  isValidDrop={isQuickPlacementValid}
-                  isInvalidDrop={isQuickPlacementInvalid}
-                  isQuickPlacementBypass={isQuickPlacementBypass}
-                  isQuickPlacementMode={isQuickPlacementMode}
-                  hasAvailableTask={hasAvailableTaskForQuickPlacement}
-                  placementIndicatorY={isHoveredForQuickPlacement ? quickPlacementIndicatorY : undefined}
-                  onQuickPlacementMouseMove={onQuickPlacementMouseMove}
-                  onQuickPlacementMouseLeave={onQuickPlacementMouseLeave}
-                  onQuickPlacementClick={onQuickPlacementClick}
                   precedenceConstraints={effectivePrecedenceConstraints}
                   dryingTimeInfo={effectiveDryingTimeInfo}
                   outsourcingTimeInfo={effectiveOutsourcingTimeInfo ?? undefined}
@@ -689,8 +618,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   onPickClick={onPickClick}
                   displayMode={displayMode}
                   category={category}
-                  ghostPreviewLabel={isHoveredForQuickPlacement ? quickPlacementGhostLabel : undefined}
-                  ghostPreviewHeight={isHoveredForQuickPlacement ? quickPlacementGhostHeight : undefined}
                   onDeselect={onDeselect}
                 >
                   {stationAssignments.map((assignment) => {

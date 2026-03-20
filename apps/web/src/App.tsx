@@ -16,7 +16,6 @@ import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
 import { AutoPlaceModal } from './components/AutoPlaceModal';
 import { SmartCompactModal } from './components/SmartCompactModal';
 import { ScheduleEvaluationModal } from './components/ScheduleEvaluationModal';
-import { SolverModal } from './components/SolverModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
@@ -31,8 +30,7 @@ import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
-import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
-import { useDropValidation } from './hooks/useDropValidation';
+import { applySwap, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
 import {
   PickStateProvider,
@@ -133,7 +131,6 @@ function getStationXOffset(
 
 interface KeyboardContext {
   selectedJobId: string | null;
-  isQuickPlacementMode: boolean;
   isJcfOpen: boolean;
   orderedJobIds: string[];
   selectedJob: Job | null;
@@ -142,38 +139,12 @@ interface KeyboardContext {
   gridStartDate: Date;
   setIsAltPressed: (v: boolean) => void;
   setSelectedJobId: (id: string | null) => void;
-  setIsQuickPlacementMode: (fn: (prev: boolean) => boolean) => void;
-  setQuickPlacementHover: (v: { stationId: string | null; y: number; snappedY: number }) => void;
 }
 
 function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (e.key === 'Alt') {
     // Don't preventDefault — it can interfere with Alt+<key> combos on some platforms
     ctx.setIsAltPressed(true);
-    return true;
-  }
-  return false;
-}
-
-function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): boolean {
-  if (isAltLetter(e, 'q')) {
-    e.preventDefault();
-    const wasActive = ctx.isQuickPlacementMode;
-    ctx.setIsQuickPlacementMode((prev) => !prev);
-    ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-    if (wasActive) {
-      ctx.setSelectedJobId(null);
-    }
-    return true;
-  }
-  return false;
-}
-
-function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boolean {
-  if (e.key === 'Escape' && ctx.isQuickPlacementMode) {
-    ctx.setIsQuickPlacementMode(() => false);
-    ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-    ctx.setSelectedJobId(null);
     return true;
   }
   return false;
@@ -398,14 +369,6 @@ function AppContent() {
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
 
-  // Quick Placement Mode state
-  const [isQuickPlacementMode, setIsQuickPlacementMode] = useState(false);
-  const [quickPlacementHover, setQuickPlacementHover] = useState<{
-    stationId: string | null;
-    y: number;
-    snappedY: number;
-  }>({ stationId: null, y: 0, snappedY: 0 });
-
   // Display mode state (Produit / Tirage)
   const [displayMode, setDisplayMode] = useState<'produit' | 'tirage'>('produit');
 
@@ -488,9 +451,6 @@ function AppContent() {
   } | null>(null);
   // Auto-place V1 modal
   const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
-  // CP-SAT Solver modal
-  const [isSolverOpen, setIsSolverOpen] = useState(false);
-
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
 
@@ -1228,7 +1188,6 @@ function AppContent() {
   useEffect(() => {
     const ctx: KeyboardContext = {
       selectedJobId,
-      isQuickPlacementMode,
       isJcfOpen: isJcfModalOpen,
       orderedJobIds,
       selectedJob,
@@ -1237,8 +1196,6 @@ function AppContent() {
       gridStartDate,
       setIsAltPressed,
       setSelectedJobId,
-      setIsQuickPlacementMode,
-      setQuickPlacementHover,
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1266,13 +1223,6 @@ function AppContent() {
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
         handleAutoPlaceAll();
-        return;
-      }
-
-      // Ctrl+Alt+S: CP-SAT solver
-      if (isCtrlAltLetter(e, 's')) {
-        e.preventDefault();
-        handleSolverOpen();
         return;
       }
 
@@ -1326,7 +1276,7 @@ function AppContent() {
 
       // Each handler returns true if it handled the event
       if (handleAltKey(e, ctx)) return;
-      // v0.3.54: Handle ESC to cancel pick (priority over quick placement)
+      // v0.3.54: Handle ESC to cancel pick
       // v0.3.55: Also restore scroll position for sidebar picks
       if (handleEscapePick(e, () => {
         // Restore scroll position for sidebar picks
@@ -1357,9 +1307,7 @@ function AppContent() {
           });
         }
       }, isPicking)) return;
-      if (handleQuickPlacementKeyboard(e, ctx)) return;
       if (handleDisplayModeToggle(e, setDisplayMode)) return;
-      if (handleEscapeQuickPlacement(e, ctx)) return;
       if (handleEscapeCloseJob(e, ctx)) return;
       if (handleJobNavigation(e, ctx)) return;
       if (handleJumpToDeparture(e, ctx)) return;
@@ -1380,7 +1328,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, triggerMassUnschedule, handleAutoPlaceAll]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, triggerMassUnschedule, handleAutoPlaceAll]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -1816,220 +1764,6 @@ function AppContent() {
     }
   }, [fuseTask, showToast]);
 
-  // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
-  // In backward scheduling, we always show the last task as the one to place
-  const lastUnscheduledTask = useMemo(() => {
-    if (!isQuickPlacementMode || !selectedJob) {
-      return null;
-    }
-    return getLastUnscheduledTask(selectedJob, snapshot.tasks, snapshot.elements, snapshot.assignments);
-  }, [isQuickPlacementMode, selectedJob, snapshot.tasks, snapshot.elements, snapshot.assignments]);
-
-  // Quick Placement: get the task for the hovered station (for validation)
-  const quickPlacementTask = useMemo(() => {
-    if (!isQuickPlacementMode || !selectedJob || !quickPlacementHover.stationId) {
-      return null;
-    }
-    return getAvailableTaskForStation(
-      selectedJob,
-      snapshot.tasks,
-      snapshot.elements,
-      snapshot.assignments,
-      quickPlacementHover.stationId
-    );
-  }, [isQuickPlacementMode, selectedJob, quickPlacementHover.stationId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
-
-  // Quick Placement: calculate scheduled start from Y position
-  const quickPlacementScheduledStart = useMemo(() => {
-    if (!quickPlacementHover.stationId || quickPlacementHover.snappedY === 0) {
-      return null;
-    }
-    const dropTime = yPositionToTime(quickPlacementHover.snappedY, START_HOUR, gridStartDate, pixelsPerHour);
-    return dropTime.toISOString();
-  }, [quickPlacementHover.stationId, quickPlacementHover.snappedY, gridStartDate, pixelsPerHour]);
-
-  // Quick Placement: validation using the same logic as drag
-  const quickPlacementValidation = useDropValidation({
-    snapshot,
-    task: quickPlacementTask,
-    targetStationId: quickPlacementHover.stationId,
-    scheduledStart: quickPlacementScheduledStart,
-    bypassPrecedence: isAltPressed,
-  });
-
-  // Quick Placement: precedence constraint Y positions
-  const quickPlacementPrecedenceConstraints = useMemo(() => {
-    if (!quickPlacementTask) {
-      return { earliestY: null, latestY: null };
-    }
-    const earliestY = getPredecessorConstraint(quickPlacementTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    const latestY = getSuccessorConstraint(quickPlacementTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    return { earliestY, latestY };
-  }, [quickPlacementTask, snapshot, pixelsPerHour, gridStartDate]);
-
-  // Quick Placement: auto-scroll grid to the target station and predecessor constraint line
-  useEffect(() => {
-    if (!isQuickPlacementMode || !lastUnscheduledTask || !gridRef.current) return;
-    if (lastUnscheduledTask.type !== 'Internal') return;
-
-    const stationIndex = snapshot.stations.findIndex((s) => s.id === lastUnscheduledTask.stationId);
-    if (stationIndex < 0) return;
-
-    // Horizontal: scroll to left edge of target station column
-    const { x: stationX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
-    const scrollX = Math.max(0, stationX);
-
-    // Vertical: scroll to predecessor constraint (purple line) if available, else successor (orange)
-    const earliestY = getPredecessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    const latestY = getSuccessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    const targetY = earliestY ?? latestY;
-
-    // Fallback: workshopExitDate (blue deadline line) when no precedence constraints
-    const deadlineY = selectedJob?.workshopExitDate
-      ? timeToYPosition(new Date(selectedJob.workshopExitDate), START_HOUR, pixelsPerHour, gridStartDate)
-      : null;
-
-    const scrollTargetY = targetY ?? deadlineY;
-
-    if (scrollTargetY !== null) {
-      const viewportHeight = gridRef.current.getViewportHeight();
-      // Constraint: viewport 30% | Deadline fallback: viewport 70% (bottom, since we place bottom-up)
-      const offset = targetY !== null ? 0.3 : 0.7;
-      const scrollY = Math.max(0, scrollTargetY - viewportHeight * offset);
-      gridRef.current.scrollTo(scrollX, scrollY, 'smooth');
-    } else {
-      gridRef.current.scrollToX(scrollX, 'smooth');
-    }
-  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, categoryMap, displayMode, pixelsPerHour, gridStartDate, selectedJob]);
-
-  // Quick Placement: handle mouse move in station column
-  // v0.3.48: Use pixelsPerHour for zoom-aware snapping
-  const handleQuickPlacementMouseMove = useCallback((stationId: string, y: number) => {
-    const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
-    setQuickPlacementHover({ stationId, y, snappedY });
-  }, [pixelsPerHour]);
-
-  // Quick Placement: handle mouse leave from station column
-  const handleQuickPlacementMouseLeave = useCallback(() => {
-    setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-  }, []);
-
-  // Quick Placement: handle click to place task
-  // v0.5.2: Now uses RTK Query mutation
-  const handleQuickPlacementClick = useCallback(async (stationId: string, y: number) => {
-    if (!selectedJob || !isQuickPlacementMode) return;
-
-    // Get the available task for this station
-    const taskToPlace = getAvailableTaskForStation(
-      selectedJob,
-      snapshot.tasks,
-      snapshot.elements,
-      snapshot.assignments,
-      stationId
-    );
-
-    if (!taskToPlace) {
-      console.log('No task available to place on this station');
-      return;
-    }
-
-    // Calculate the time from Y position (multi-day aware)
-    // v0.3.48: Use pixelsPerHour for zoom-aware snapping
-    const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
-    const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate, pixelsPerHour);
-    const scheduledStart = dropTime.toISOString();
-
-    // Client-side validation before API call
-    const proposedAssignment: ProposedAssignment = {
-      taskId: taskToPlace.id,
-      targetId: stationId,
-      isOutsourced: false,
-      scheduledStart,
-      bypassPrecedence: isAltPressed,
-    };
-    const validationResult = validateAssignment(proposedAssignment, snapshot);
-
-    // Check for blocking conflicts (same logic as drag & drop)
-    // StationConflict is non-blocking (push-down) UNLESS the existing tile is completed
-    const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
-             !(c.type === 'PrecedenceConflict' &&
-               c.details?.constraintType === 'predecessor' &&
-               validationResult.suggestedStart) &&
-             !(c.type === 'PrecedenceConflict' && isAltPressed) &&
-             !(c.type === 'ApprovalGateConflict') &&
-             !(c.type === 'DeadlineConflict')
-    );
-
-    if (blockingConflicts.length > 0) {
-      console.log('Quick placement blocked: validation failed', blockingConflicts);
-      return;
-    }
-
-    console.log('Quick placement creating assignment:', {
-      taskId: taskToPlace.id,
-      stationId,
-      scheduledStart,
-    });
-
-    const hasPrecedenceConflict = validationResult.conflicts.some(
-      (c) => c.type === 'PrecedenceConflict'
-    );
-
-    try {
-      const result = await assignTask({
-        taskId: taskToPlace.id,
-        body: {
-          targetId: stationId,
-          scheduledStart,
-          isOutsourced: false,
-          ...(isAltPressed && hasPrecedenceConflict ? { bypassPrecedence: true } : {}),
-        },
-      }).unwrap();
-
-      console.log('Quick placement assignment created:', result);
-      // Cache invalidation is automatic via invalidatesTags
-    } catch (error) {
-      console.error('Failed to create assignment:', error);
-      showToast(getErrorMessage(error));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, snapshot.elements, gridStartDate, pixelsPerHour, assignTask, showToast, isAltPressed]);
-
-  // Calculate which stations have available tasks (for quick placement cursor)
-  const stationsWithAvailableTasks = useMemo(() => {
-    if (!isQuickPlacementMode || !selectedJob) {
-      return new Set<string>();
-    }
-    const stationIds = new Set<string>();
-    snapshot.stations.forEach((station) => {
-      const task = getAvailableTaskForStation(
-        selectedJob,
-        snapshot.tasks,
-        snapshot.elements,
-        snapshot.assignments,
-        station.id
-      );
-      if (task) {
-        stationIds.add(station.id);
-      }
-    });
-    return stationIds;
-  }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.elements, snapshot.assignments]);
-
-
-  // Toggle Quick Placement
-  const handleToggleQuickPlacement = useCallback(() => {
-    setIsQuickPlacementMode((prev) => {
-      if (prev) {
-        // Turning off: clear job selection to remove tile muting
-        setSelectedJobId(null);
-      }
-      return !prev;
-    });
-    setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-  }, [setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
-
   // v0.3.54: Handle pick from sidebar (unscheduled task)
   // v0.3.55: Added scroll to target column and save scroll position
   // v0.4.29: Accept click coordinates for initial ghost position
@@ -2319,28 +2053,17 @@ function AppContent() {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
   }, [dispatch]);
 
-  // CP-SAT Solver handler
-  const handleSolverOpen = useCallback(() => {
-    setIsSolverOpen(true);
-  }, []);
-
-  const handleSolverComplete = useCallback(() => {
-    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-  }, [dispatch]);
-
   // Compute footer mode from app state
   const footerMode = useMemo(() => {
     if (isPicking) return 'picking' as const;
-    if (isQuickPlacementMode) return 'quickPlacement' as const;
     if (isJcfModalOpen) return 'jcfModal' as const;
     if (selectedJobId) return 'jobSelected' as const;
     return 'default' as const;
-  }, [isPicking, isQuickPlacementMode, isJcfModalOpen, selectedJobId]);
+  }, [isPicking, isJcfModalOpen, selectedJobId]);
 
   // Scheduler-specific commands — registered into the global Command Center
   const schedulerCommands = useCommands({
     selectedJobId,
-    isQuickPlacementMode,
     onJumpToToday: useCallback(() => {
       if (gridRef.current) {
         const now = new Date();
@@ -2369,10 +2092,6 @@ function AppContent() {
     }, [selectedJobId, orderedJobIds, setSelectedJobId]),
     onNavigateScheduler: useCallback(() => navigate('/'), [navigate]),
     onNavigateFlux: useCallback(() => navigate('/flux'), [navigate]),
-    onToggleQuickPlacement: useCallback(() => {
-      if (!selectedJobId) return;
-      setIsQuickPlacementMode(prev => !prev);
-    }, [selectedJobId]),
     onEditJob: handleEditJob,
     onNewJob: useCallback(() => {
       navigate('/job/new');
@@ -2477,7 +2196,7 @@ function AppContent() {
           stations={snapshot.stations}
           categories={snapshot.categories}
           providers={snapshot.providers}
-          activeTaskId={lastUnscheduledTask?.id}
+          activeTaskId={undefined}
           pickedTaskId={pickedTask?.id}
           conflictTaskIds={conflictTaskIds}
           onJumpToTask={handleJumpToTask}
@@ -2499,8 +2218,8 @@ function AppContent() {
           onSelectJob={setSelectedJobId}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mode banner — shows active mode (quick placement / picking) */}
-          <ModeBanner mode={isPicking ? 'picking' : isQuickPlacementMode ? 'quickPlacement' : null} />
+          {/* Mode banner — shows active mode (picking) */}
+          <ModeBanner mode={isPicking ? 'picking' : null} />
           <div className="flex-1 flex overflow-hidden">
         <DateStrip
           startDate={gridStartDate}
@@ -2532,16 +2251,7 @@ function AppContent() {
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
           onToggleComplete={handleToggleComplete}
-          isQuickPlacementMode={isQuickPlacementMode}
-          stationsWithAvailableTasks={stationsWithAvailableTasks}
-          quickPlacementIndicatorY={quickPlacementHover.snappedY}
-          quickPlacementHoverStationId={quickPlacementHover.stationId}
-          onQuickPlacementMouseMove={handleQuickPlacementMouseMove}
-          onQuickPlacementMouseLeave={handleQuickPlacementMouseLeave}
-          onQuickPlacementClick={handleQuickPlacementClick}
-          quickPlacementValidation={quickPlacementValidation}
           isAltPressed={isAltPressed}
-          quickPlacementPrecedenceConstraints={quickPlacementPrecedenceConstraints}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
@@ -2561,8 +2271,6 @@ function AppContent() {
           displayMode={displayMode}
           lateJobIds={lateJobIds}
           shippedJobIds={shippedJobIds}
-          quickPlacementGhostLabel={selectedJob?.reference}
-          quickPlacementGhostHeight={quickPlacementTask ? ((quickPlacementTask.duration.setupMinutes + quickPlacementTask.duration.runMinutes) / 60) * pixelsPerHour : undefined}
         />
           </div>
           </div>
@@ -2790,13 +2498,6 @@ function AppContent() {
         onClose={() => setIsAutoPlaceOpen(false)}
         onComplete={handleAutoPlaceComplete}
         apiBaseUrl="/api/v1"
-      />
-
-      {/* CP-SAT Solver modal */}
-      <SolverModal
-        isOpen={isSolverOpen}
-        onClose={() => setIsSolverOpen(false)}
-        onComplete={handleSolverComplete}
       />
 
       {/* Schedule save/load modal */}

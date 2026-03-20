@@ -9,8 +9,6 @@ import {
   uiReducer,
   setSelectedJobId,
   setIsAltPressed,
-  setIsQuickPlacementMode,
-  setQuickPlacementHover,
   setPickValidation,
   setPixelsPerHour,
   setContextMenu,
@@ -26,8 +24,6 @@ describe('uiSlice', () => {
   const initialState: UiState = {
     selectedJobId: null,
     isAltPressed: false,
-    isQuickPlacementMode: false,
-    quickPlacementHover: { stationId: null, y: 0, snappedY: 0 },
     pickValidation: {
       scheduledStart: null,
       ringState: 'none',
@@ -64,36 +60,6 @@ describe('uiSlice', () => {
       const stateWithAlt = { ...initialState, isAltPressed: true };
       const state = uiReducer(stateWithAlt, setIsAltPressed(false));
       expect(state.isAltPressed).toBe(false);
-    });
-  });
-
-  describe('setIsQuickPlacementMode', () => {
-    it('enables quick placement mode', () => {
-      const state = uiReducer(initialState, setIsQuickPlacementMode(true));
-      expect(state.isQuickPlacementMode).toBe(true);
-    });
-
-    it('disables quick placement mode and resets hover', () => {
-      const stateWithQP = {
-        ...initialState,
-        isQuickPlacementMode: true,
-        quickPlacementHover: { stationId: 'station-1', y: 100, snappedY: 96 },
-      };
-      const state = uiReducer(stateWithQP, setIsQuickPlacementMode(false));
-      expect(state.isQuickPlacementMode).toBe(false);
-      expect(state.quickPlacementHover).toEqual({
-        stationId: null,
-        y: 0,
-        snappedY: 0,
-      });
-    });
-  });
-
-  describe('setQuickPlacementHover', () => {
-    it('sets quick placement hover state', () => {
-      const hover = { stationId: 'station-1', y: 150, snappedY: 144 };
-      const state = uiReducer(initialState, setQuickPlacementHover(hover));
-      expect(state.quickPlacementHover).toEqual(hover);
     });
   });
 
@@ -173,8 +139,6 @@ describe('uiSlice', () => {
       const modifiedState: UiState = {
         selectedJobId: 'job-123',
         isAltPressed: true,
-        isQuickPlacementMode: true,
-        quickPlacementHover: { stationId: 'station-1', y: 100, snappedY: 96 },
         pickValidation: {
           scheduledStart: '2024-02-10T08:00:00Z',
           ringState: 'valid',

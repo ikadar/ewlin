@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Loader2, CheckCircle2, AlertTriangle, Zap } from 'lucide-react';
+import { X, AlertTriangle, Zap } from 'lucide-react';
 import { muteMercure, unmuteMercure } from '../hooks/mercureMute';
 
 // ============================================================================
@@ -53,31 +53,11 @@ interface PhaseLogEntry {
 // ============================================================================
 
 const PHASE_LABELS: Record<string, string> = {
-  placement: 'Initial placement',
-  fbi_backward: 'FBI backward pass',
-  fbi_forward: 'FBI forward pass',
-  auto_split: 'Auto-split',
-  split_replace: 'Re-placing after split',
-  split_backward: 'Post-split backward pass',
-  split_forward: 'Post-split late jobs',
+  placement: 'Placement initial',
 };
 
-function getPhaseDetail(phase: string, event: AutoPlaceProgress): string {
-  switch (phase) {
-    case 'placement':
-    case 'split_replace':
-      return `${event.totalPlacedCount} tiles`;
-    case 'fbi_backward':
-    case 'split_backward':
-      return `${event.totalJobs} jobs`;
-    case 'fbi_forward':
-    case 'split_forward':
-      return `${event.jobIndex}/${event.totalJobs} jobs`;
-    case 'auto_split':
-      return event.splitsPerformed ? `${event.splitsPerformed} splits` : 'processing…';
-    default:
-      return '';
-  }
+function getPhaseDetail(_phase: string, event: AutoPlaceProgress): string {
+  return `${event.totalPlacedCount} tuiles`;
 }
 
 // ============================================================================
@@ -115,9 +95,9 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
           const lastActive = entries.findLastIndex(e => e.status === 'active');
           if (lastActive >= 0) entries.splice(lastActive, 1);
           entries.push({
-            phase: 'fbi_iteration',
-            label: `FBI iteration #${event.fbiIteration ?? 1}`,
-            detail: `${event.lateCount ?? 0} late, ${formatMinutes(event.totalLatenessMinutes ?? 0)}`,
+            phase: 'iteration',
+            label: `Itération #${event.fbiIteration ?? 1}`,
+            detail: `${event.lateCount ?? 0} en retard`,
             status: 'done',
           });
           return entries;
@@ -126,23 +106,8 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
         return;
       }
 
+      // Suppress split events entirely
       if (event.type === 'split') {
-        setLogEntries(prev => {
-          const entries = [...prev];
-          const lastActive = entries.findLastIndex(e => e.status === 'active');
-          if (lastActive >= 0) entries.splice(lastActive, 1);
-          const detail = (event.splitsPerformed ?? 0) === 0 && event.message
-            ? event.message
-            : `${event.splitsPerformed ?? 0} splits performed`;
-          entries.push({
-            phase: 'split',
-            label: 'Auto-split',
-            detail,
-            status: 'done',
-          });
-          return entries;
-        });
-        needsNewActiveRef.current = true;
         return;
       }
 
@@ -153,11 +118,13 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
         return;
       }
 
-      // Regular progress — detect phase transitions
+      // Regular progress — only emit log entries for the 'placement' phase
       const currentPhase = event.phase;
+      if (currentPhase !== 'placement') return;
+
       const isNewPhase = currentPhase !== prevPhaseRef.current || needsNewActiveRef.current;
 
-      if (isNewPhase && currentPhase) {
+      if (isNewPhase) {
         prevPhaseRef.current = currentPhase;
         needsNewActiveRef.current = false;
         setLogEntries(prev => {
@@ -235,7 +202,7 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
                   const event: AutoPlaceProgress = JSON.parse(jsonStr);
                   if (event.type === 'error') {
                     unmuteMercure();
-                    setError(event.message ?? 'Unknown error');
+                    setError(event.message ?? 'Erreur inconnue');
                     setState('error');
                     return;
                   }
@@ -273,7 +240,7 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
 
               if (event.type === 'error') {
                 unmuteMercure();
-                setError(event.message ?? 'Unknown error');
+                setError(event.message ?? 'Erreur inconnue');
                 setState('error');
                 return;
               }
@@ -390,7 +357,7 @@ export function AutoPlaceModal({ isOpen, onClose, onComplete, apiBaseUrl }: Auto
           <div className="flex items-center gap-2">
             <Zap size={18} className="text-amber-400" />
             <h2 className="text-flux-text-primary font-semibold text-sm">
-              Auto-Placement V1
+              Placement automatique
             </h2>
           </div>
           {state !== 'running' && (
@@ -418,7 +385,7 @@ export function AutoPlaceModal({ isOpen, onClose, onComplete, apiBaseUrl }: Auto
               onClick={handleClose}
               className="px-4 py-2 rounded text-sm bg-zinc-700 hover:bg-zinc-600 text-white font-medium transition-colors"
             >
-              Close
+              Fermer
             </button>
           </div>
         )}
@@ -447,7 +414,7 @@ function RunningView({ progress, pct, logEntries }: { progress: AutoPlaceProgres
       {/* Progress bar */}
       <div className="space-y-1">
         <div className="flex justify-between text-xs text-flux-text-secondary">
-          <span>{progress ? `${progress.jobIndex} / ${progress.totalJobs} jobs` : 'Initializing...'}</span>
+          <span>{progress ? `${progress.jobIndex} / ${progress.totalJobs} jobs` : 'Initialisation…'}</span>
           <span>{pct}%</span>
         </div>
         <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -460,13 +427,18 @@ function RunningView({ progress, pct, logEntries }: { progress: AutoPlaceProgres
 
       {/* Compact running stats */}
       {progress && (
-        <div className="flex items-center gap-4 text-xs text-flux-text-secondary">
-          <span>{progress.totalPlacedCount} tiles</span>
-          <span>{formatElapsed(elapsed)}</span>
-        </div>
+        <p className="text-xs text-flux-text-secondary">
+          {progress.totalPlacedCount} tuiles · {formatElapsed(elapsed)}
+        </p>
       )}
     </>
   );
+}
+
+function clrPct(pct: number): string {
+  if (pct >= 85) return 'text-emerald-400';
+  if (pct >= 60) return 'text-amber-400';
+  return 'text-red-400';
 }
 
 function CompleteView({ result, logEntries }: { result: AutoPlaceProgress; logEntries: PhaseLogEntry[] }) {
@@ -477,42 +449,35 @@ function CompleteView({ result, logEntries }: { result: AutoPlaceProgress; logEn
       {/* Phase log */}
       <PhaseLog entries={logEntries} />
 
-      {/* Success header */}
-      <div className="flex items-center gap-3">
-        <CheckCircle2 size={20} className="text-emerald-400" />
-        <p className="text-flux-text-primary text-sm font-medium">Placement complete</p>
+      {/* Success line */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-emerald-400">✓</span>
+        <span className="text-flux-text-primary font-medium">Placement terminé</span>
+        {result.computeMs != null && (
+          <span className="text-flux-text-tertiary">en {(result.computeMs / 1000).toFixed(1)}s</span>
+        )}
       </div>
 
-      {/* Score summary */}
+      {/* Score card */}
       {score && (
-        <div className="bg-zinc-900/50 rounded-lg p-4 space-y-3">
-          {/* On-time rate — large */}
-          <div className="text-center">
-            <p className="text-3xl font-bold text-flux-text-primary">
-              {score.onTimeRate.toFixed(1)}%
+        <div className="bg-zinc-900/50 rounded-lg overflow-hidden">
+          {/* Hero: on-time rate */}
+          <div className="text-center py-4 px-4">
+            <p className={`text-3xl font-bold ${clrPct(score.onTimeRate)}`}>
+              {score.onTimeRate.toFixed(1)} %
             </p>
-            <p className="text-xs text-flux-text-secondary mt-0.5">on-time rate</p>
+            <p className="text-xs text-flux-text-secondary mt-0.5">Jobs à l'heure</p>
           </div>
 
-          {/* Grid of stats */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs pt-2 border-t border-flux-border">
-            <Stat label="Total jobs" value={score.totalJobCount} />
-            <Stat label="Late jobs" value={score.lateJobCount} warn={score.lateJobCount > 0} />
-            <Stat label="Total lateness" value={formatMinutes(score.totalLatenessMinutes)} warn={score.totalLatenessMinutes > 0} />
-            <Stat label="Max lateness" value={formatMinutes(score.maxLatenessMinutes)} warn={score.maxLatenessMinutes > 0} />
-            <Stat label="Makespan" value={formatMinutes(score.makespanMinutes)} />
-            <Stat label="Avg slack" value={formatMinutes(Math.abs(score.averageSlackMinutes))} warn={score.averageSlackMinutes < 0} />
+          {/* Detail rows */}
+          <div className="border-t border-flux-border px-4 py-3 space-y-1.5 text-xs">
+            <Stat label="En retard" value={`${score.lateJobCount} / ${score.totalJobCount}`} warn={score.lateJobCount > 0} />
+            <Stat label="Retard moy." value={score.lateJobCount > 0 ? formatMinutes(Math.round(score.totalLatenessMinutes / score.lateJobCount)) : '0h'} warn={score.lateJobCount > 0} />
+            <Stat label="Retard max" value={formatMinutes(score.maxLatenessMinutes)} warn={score.maxLatenessMinutes > 0} />
+            <Stat label="Tuiles placées" value={result.totalPlacedCount} />
           </div>
         </div>
       )}
-
-      {/* Tiles placed + compute time */}
-      <div className="grid grid-cols-2 gap-x-6 text-xs">
-        <Stat label="Tiles placed" value={result.totalPlacedCount} />
-        {result.computeMs != null && (
-          <Stat label="Compute time" value={`${result.computeMs}ms`} />
-        )}
-      </div>
     </>
   );
 }
@@ -527,18 +492,18 @@ function IncompleteView({ lastProgress, logEntries }: { lastProgress: AutoPlaceP
         <AlertTriangle size={20} className="text-amber-400" />
         <div>
           <p className="text-flux-text-primary text-sm font-medium">
-            Placement finished with incomplete results
+            Placement terminé avec des résultats incomplets
           </p>
           <p className="text-flux-text-secondary text-xs mt-0.5">
-            The server stream ended before sending a completion summary.
+            Le flux serveur s'est terminé avant l'envoi du résumé.
           </p>
         </div>
       </div>
 
       {lastProgress && (
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-          <Stat label="Tiles placed" value={lastProgress.totalPlacedCount} />
-          <Stat label="Late jobs" value={lastProgress.lateCount ?? 0} warn={(lastProgress.lateCount ?? 0) > 0} />
+          <Stat label="Tuiles placées" value={lastProgress.totalPlacedCount} />
+          <Stat label="En retard" value={lastProgress.lateCount ?? 0} warn={(lastProgress.lateCount ?? 0) > 0} />
         </div>
       )}
     </>
@@ -560,15 +525,14 @@ function PhaseLog({ entries }: { entries: PhaseLogEntry[] }) {
     <div
       ref={scrollRef}
       className="space-y-1.5 overflow-y-auto pr-1"
-      style={{ maxHeight: '12rem' }}
+      style={{ maxHeight: '5.5rem' }}
     >
       {entries.map((entry, i) => (
         <div key={i} className="flex items-center gap-2 text-xs">
-          {entry.status === 'done' ? (
-            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-          ) : (
-            <Loader2 size={14} className="text-amber-400 animate-spin shrink-0" />
-          )}
+          <span
+            className={`shrink-0 rounded-full ${entry.status === 'done' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}
+            style={{ width: 6, height: 6 }}
+          />
           <span className="text-flux-text-primary">{entry.label}</span>
           {entry.detail && (
             <span className="text-flux-text-secondary ml-auto whitespace-nowrap">{entry.detail}</span>
@@ -584,8 +548,8 @@ function ErrorView({ error }: { error: string | null }) {
     <div className="flex items-center gap-3">
       <AlertTriangle size={20} className="text-red-400" />
       <div>
-        <p className="text-flux-text-primary text-sm font-medium">Auto-placement failed</p>
-        <p className="text-flux-text-secondary text-xs mt-0.5">{error ?? 'Unknown error'}</p>
+        <p className="text-flux-text-primary text-sm font-medium">Le placement automatique a échoué</p>
+        <p className="text-flux-text-secondary text-xs mt-0.5">{error ?? 'Erreur inconnue'}</p>
       </div>
     </div>
   );

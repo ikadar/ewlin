@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto-Placement Modal — Design Proposals</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-page: #0a0a0f;
+    --bg-modal: #18181b;
+    --bg-card: rgba(255,255,255,0.02);
+    --border: rgba(255,255,255,0.08);
+    --text-primary: #e4e4e7;
+    --text-secondary: #a1a1aa;
+    --text-tertiary: #71717a;
+    --emerald: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --zinc-700: #3f3f46;
+    --zinc-800: #27272a;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Layout ───────────────────────────── */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    border-right: 1px solid var(--border);
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .preview-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    overflow-y: auto;
+  }
+
+  .prompt-area {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .prompt-text {
+    flex: 1;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    font-family: ui-monospace, 'SF Mono', monospace;
+    white-space: pre-wrap;
+  }
+
+  .copy-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--zinc-800);
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: var(--zinc-700); }
+
+  /* ── Sidebar controls ─────────────────── */
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+  }
+
+  .radio-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .radio-option:hover { background: rgba(255,255,255,0.03); }
+  .radio-option.active {
+    background: rgba(251,191,36,0.06);
+    border-color: rgba(251,191,36,0.2);
+  }
+  .radio-option input { display: none; }
+
+  .radio-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--text-tertiary);
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .radio-option.active .radio-dot { border-color: var(--amber); }
+  .radio-dot::after {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--amber);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .radio-option.active .radio-dot::after { opacity: 1; }
+
+  .radio-label-main { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .radio-label-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+
+  .toggle-group {
+    display: flex;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    transition: all 0.15s;
+  }
+  .toggle-btn.active {
+    background: rgba(251,191,36,0.1);
+    color: var(--amber);
+  }
+
+  .note {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-tertiary);
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Modal shell ──────────────────────── */
+  .modal {
+    background: var(--bg-modal);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+    width: 420px;
+    max-width: 100%;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .modal-header-icon { font-size: 16px; }
+
+  .modal-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px;
+    transition: color 0.15s;
+  }
+  .modal-close:hover { color: var(--text-primary); }
+
+  .modal-body { padding: 16px 20px; }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-close {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    background: var(--zinc-700);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-close:hover { background: #52525b; }
+
+  /* ── Shared inner styles ──────────────── */
+  .progress-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .progress-track {
+    width: 100%;
+    height: 6px;
+    background: var(--zinc-800);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--amber);
+    border-radius: 99px;
+    transition: width 0.3s ease;
+  }
+  .progress-fill.animated {
+    animation: shimmer 1.5s ease-in-out infinite;
+    background: linear-gradient(90deg, var(--amber) 0%, #f59e0b 50%, var(--amber) 100%);
+    background-size: 200% 100%;
+  }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  .running-stats {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .success-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .success-line .check { color: var(--emerald); }
+
+  .score-card {
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .score-hero {
+    text-align: center;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .score-hero-value {
+    font-size: 30px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-hero-unit {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+  }
+  .score-hero-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+  }
+
+  .score-rows { display: flex; flex-direction: column; gap: 6px; }
+
+  .score-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 11px;
+  }
+  .score-row-label { color: var(--text-secondary); }
+  .score-row-value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+  .score-row-value.warn { color: var(--amber); }
+  .score-row-value .unit { font-size: 10px; font-weight: 400; color: var(--text-tertiary); }
+
+  .space-y > * + * { margin-top: 14px; }
+
+  /* ── Proposal B: inline chips ─────────── */
+  .phase-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    font-size: 11px;
+  }
+  .phase-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-secondary);
+  }
+  .phase-chip .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .phase-chip .dot.done { background: var(--emerald); }
+  .phase-chip .dot.active { background: var(--amber); animation: pulse-dot 1.2s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .phase-chip .sep {
+    color: var(--text-tertiary);
+    margin-left: 2px;
+  }
+
+  /* ── Proposal C: condensed log ────────── */
+  .phase-log {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 88px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .phase-log::-webkit-scrollbar { width: 3px; }
+  .phase-log::-webkit-scrollbar-track { background: transparent; }
+  .phase-log::-webkit-scrollbar-thumb { background: var(--zinc-700); border-radius: 3px; }
+
+  .log-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .log-entry .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .log-entry .dot.done { background: var(--emerald); }
+  .log-entry .dot.active { background: var(--amber); animation: pulse-dot 1.2s ease-in-out infinite; }
+
+  .log-entry .label { color: var(--text-primary); flex: 1; }
+  .log-entry .detail { color: var(--text-tertiary); white-space: nowrap; margin-left: auto; }
+
+  /* ── Spinner ──────────────────────────── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--zinc-700);
+    border-top-color: var(--amber);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .compute-time {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<div class="sidebar">
+  <div>
+    <div class="section-label">Proposition</div>
+    <div class="radio-group" id="proposalGroup">
+      <label class="radio-option active" data-value="A">
+        <input type="radio" name="proposal" value="A" checked>
+        <span class="radio-dot"></span>
+        <div>
+          <div class="radio-label-main">A — Minimal</div>
+          <div class="radio-label-sub">Barre de progression seule</div>
+        </div>
+      </label>
+      <label class="radio-option" data-value="B">
+        <input type="radio" name="proposal" value="B">
+        <span class="radio-dot"></span>
+        <div>
+          <div class="radio-label-main">B — Étapes compactes</div>
+          <div class="radio-label-sub">Puces horizontales</div>
+        </div>
+      </label>
+      <label class="radio-option" data-value="C">
+        <input type="radio" name="proposal" value="C">
+        <span class="radio-dot"></span>
+        <div>
+          <div class="radio-label-main">C — Journal condensé</div>
+          <div class="radio-label-sub">Mini-log vertical</div>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-label">État</div>
+    <div class="toggle-group">
+      <button class="toggle-btn active" data-state="running">⟳ En cours</button>
+      <button class="toggle-btn" data-state="complete">✓ Terminé</button>
+    </div>
+  </div>
+
+  <div class="note">
+    Chaque proposition partage le même style de résultat (card hero) aligné sur la modale d'évaluation existante. La différence est dans l'affichage de la progression.
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<div class="main">
+  <div class="preview-area">
+    <div id="modalContainer"></div>
+  </div>
+
+  <div class="prompt-area">
+    <div class="prompt-text" id="promptText"></div>
+    <button class="copy-btn" id="copyBtn">Copier</button>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────
+const state = {
+  proposal: 'A',
+  modalState: 'running',
+};
+
+// ── Mock data ────────────────────────────
+const MOCK = {
+  running: {
+    jobIndex: 12,
+    totalJobs: 38,
+    totalPlacedCount: 42,
+    elapsed: '8s',
+    phases: [
+      { label: 'Placement initial', detail: '42 tuiles', status: 'done' },
+      { label: 'Itération #1', detail: '3 en retard', status: 'done' },
+      { label: 'Itération #2', detail: 'en cours…', status: 'active' },
+    ],
+  },
+  complete: {
+    onTimeRate: 84.2,
+    totalJobs: 38,
+    lateJobs: 6,
+    avgLateness: '4h',
+    maxLateness: '12h',
+    totalPlacedCount: 127,
+    computeMs: 2400,
+    phases: [
+      { label: 'Placement initial', detail: '127 tuiles', status: 'done' },
+      { label: 'Itération #1', detail: '8 en retard', status: 'done' },
+      { label: 'Itération #2', detail: '6 en retard', status: 'done' },
+      { label: 'Itération #3', detail: '6 en retard', status: 'done' },
+    ],
+  },
+};
+
+// ── Color helpers ────────────────────────
+function clrPct(v) {
+  if (v >= 85) return 'color: var(--emerald)';
+  if (v >= 60) return 'color: var(--amber)';
+  return 'color: var(--red)';
+}
+function clrLate(v) {
+  return v > 0 ? 'warn' : '';
+}
+function clrHours(v) {
+  return v !== '0h' && v !== '0' ? 'warn' : '';
+}
+
+// ── Render ───────────────────────────────
+function render() {
+  const container = document.getElementById('modalContainer');
+  const isRunning = state.modalState === 'running';
+  const d = isRunning ? MOCK.running : MOCK.complete;
+  const pct = isRunning ? Math.round((d.jobIndex / d.totalJobs) * 100) : 100;
+
+  let bodyHTML = '';
+
+  if (isRunning) {
+    bodyHTML = renderRunning(d, pct);
+  } else {
+    bodyHTML = renderComplete(d);
+  }
+
+  const showClose = !isRunning;
+
+  container.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <i data-lucide="zap" style="width:16px;height:16px;color:var(--amber)"></i>
+          <span class="modal-title">Placement automatique</span>
+        </div>
+        ${showClose ? '<button class="modal-close">✕</button>' : ''}
+      </div>
+      <div class="modal-body">
+        <div class="space-y">${bodyHTML}</div>
+      </div>
+      ${showClose ? `
+        <div class="modal-footer">
+          <button class="btn-close">Fermer</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderRunning(d, pct) {
+  let phaseHTML = '';
+
+  if (state.proposal === 'B') {
+    // Inline chips
+    const chips = d.phases.map((p, i) => {
+      const dotClass = p.status === 'done' ? 'done' : 'active';
+      const sep = i < d.phases.length - 1 ? '<span class="sep">·</span>' : '';
+      return `<span class="phase-chip"><span class="dot ${dotClass}"></span>${p.label}${sep}</span>`;
+    }).join('');
+    phaseHTML = `<div class="phase-chips">${chips}</div>`;
+  } else if (state.proposal === 'C') {
+    // Condensed vertical log
+    const entries = d.phases.map(p => {
+      const dotClass = p.status === 'done' ? 'done' : 'active';
+      return `<div class="log-entry">
+        <span class="dot ${dotClass}"></span>
+        <span class="label">${p.label}</span>
+        <span class="detail">${p.detail}</span>
+      </div>`;
+    }).join('');
+    phaseHTML = `<div class="phase-log">${entries}</div>`;
+  }
+  // Proposal A: no phase display
+
+  return `
+    ${phaseHTML}
+    <div class="progress-wrap">
+      <div class="progress-labels">
+        <span>${d.jobIndex} / ${d.totalJobs} jobs</span>
+        <span>${pct}%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill animated" style="width:${pct}%"></div>
+      </div>
+    </div>
+    <div class="running-stats">
+      <span class="spinner"></span>
+      <span>${d.totalPlacedCount} tuiles · ${d.elapsed}</span>
+    </div>
+  `;
+}
+
+function renderComplete(d) {
+  let phaseHTML = '';
+
+  if (state.proposal === 'C') {
+    const entries = d.phases.map(p => {
+      return `<div class="log-entry">
+        <span class="dot done"></span>
+        <span class="label">${p.label}</span>
+        <span class="detail">${p.detail}</span>
+      </div>`;
+    }).join('');
+    phaseHTML = `<div class="phase-log">${entries}</div>`;
+  }
+
+  const computeLabel = `en ${(d.computeMs / 1000).toFixed(1)}s`;
+
+  return `
+    ${phaseHTML}
+    <div class="success-line">
+      <span class="check">✓</span>
+      <span>Placement terminé</span>
+      <span class="compute-time">${computeLabel}</span>
+    </div>
+    <div class="score-card">
+      <div class="score-hero">
+        <div class="score-hero-value" style="${clrPct(d.onTimeRate)}">
+          ${d.onTimeRate.toFixed(1)}<span class="score-hero-unit"> %</span>
+        </div>
+        <div class="score-hero-label">Jobs à l'heure</div>
+      </div>
+      <div class="score-rows">
+        <div class="score-row">
+          <span class="score-row-label">En retard</span>
+          <span class="score-row-value ${clrLate(d.lateJobs)}">${d.lateJobs}<span class="unit"> / ${d.totalJobs}</span></span>
+        </div>
+        <div class="score-row">
+          <span class="score-row-label">Retard moy.</span>
+          <span class="score-row-value ${clrHours(d.avgLateness)}">${d.avgLateness}</span>
+        </div>
+        <div class="score-row">
+          <span class="score-row-label">Retard max</span>
+          <span class="score-row-value ${clrHours(d.maxLateness)}">${d.maxLateness}</span>
+        </div>
+        <div class="score-row">
+          <span class="score-row-label">Tuiles placées</span>
+          <span class="score-row-value">${d.totalPlacedCount}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Prompt output ────────────────────────
+function updatePrompt() {
+  const names = { A: 'Minimal', B: 'Compact avec étapes (puces horizontales)', C: 'Journal condensé (mini-log vertical)' };
+  const el = document.getElementById('promptText');
+
+  const lines = [
+    `Implémente la proposition ${state.proposal} — "${names[state.proposal]}" pour la modale AutoPlaceModal.`,
+    '',
+    'Changements :',
+    '— Tout le texte en français (titre "Placement automatique", bouton "Fermer", stats "En retard", "Retard moy.", "Retard max", "Tuiles placées", label hero "Jobs à l\'heure")',
+    '— Phase labels : "Placement initial", "Itération #N" (pas de détails techniques comme FBI/backward/forward/split)',
+    '— Vue terminée : carte score style évaluation (hero on-time % coloré + 4 lignes : en retard, retard moy, retard max, tuiles placées) + ligne "Placement terminé en Xs"',
+    '— Supprimer : makespan, avg slack, "tiles placed" et "compute time" séparés en bas',
+  ];
+
+  if (state.proposal === 'A') {
+    lines.push('— Vue en cours : barre de progression seule (pas de journal de phases), stats compactes "N tuiles · Xs"');
+  } else if (state.proposal === 'B') {
+    lines.push('— Vue en cours : puces horizontales inline (dot coloré + label, séparées par ·) au lieu du log vertical scrollable, puis barre de progression + stats');
+  } else {
+    lines.push('— Vue en cours : mini-log vertical condensé (max 4 lignes visibles, dots colorés au lieu d\'icônes, détail aligné à droite), puis barre + stats');
+    lines.push('— Vue terminée : le log reste visible au-dessus de la carte score');
+  }
+
+  el.textContent = lines.join('\n');
+}
+
+// ── Event binding ────────────────────────
+document.querySelectorAll('#proposalGroup .radio-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('#proposalGroup .radio-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    opt.querySelector('input').checked = true;
+    state.proposal = opt.dataset.value;
+    render();
+    updatePrompt();
+  });
+});
+
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.modalState = btn.dataset.state;
+    render();
+    updatePrompt();
+  });
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copié !';
+    setTimeout(() => { btn.textContent = 'Copier'; }, 1500);
+  });
+});
+
+// ── Init ─────────────────────────────────
+render();
+updatePrompt();
+
+// Re-create Lucide icons after each render
+const origRender = render;
+render = function() { origRender(); lucide.createIcons(); };
+render();
+</script>
+</body>
+</html>
