@@ -15,6 +15,7 @@ import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
 import { AutoPlaceModal } from './components/AutoPlaceModal';
 import { SmartCompactModal } from './components/SmartCompactModal';
+import { ScheduleEvaluationModal } from './components/ScheduleEvaluationModal';
 import { SolverModal } from './components/SolverModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
@@ -418,6 +419,9 @@ function AppContent() {
 
   // Smart compaction modal state
   const [isSmartCompactOpen, setIsSmartCompactOpen] = useState(false);
+
+  // Schedule evaluation modal state
+  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
 
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
@@ -1269,6 +1273,13 @@ function AppContent() {
       if (isCtrlAltLetter(e, 's')) {
         e.preventDefault();
         handleSolverOpen();
+        return;
+      }
+
+      // Ctrl+Alt+E: schedule evaluation
+      if (isCtrlAltLetter(e, 'e')) {
+        e.preventDefault();
+        setIsEvaluationOpen(true);
         return;
       }
 
@@ -2376,6 +2387,7 @@ function AppContent() {
       setIsSidebarVisible(prev => !prev);
     }, []),
     onSmartCompact: handleSmartCompact,
+    onEvaluateSchedule: useCallback(() => setIsEvaluationOpen(true), []),
     onZoomIn: useCallback(() => {
       const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
       if (idx < ZOOM_LEVELS.length - 1) {
@@ -2758,6 +2770,12 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {/* Schedule Evaluation modal */}
+      <ScheduleEvaluationModal
+        isOpen={isEvaluationOpen}
+        onClose={() => setIsEvaluationOpen(false)}
+      />
 
       {/* Smart Compaction modal */}
       <SmartCompactModal

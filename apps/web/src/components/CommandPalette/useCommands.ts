@@ -24,6 +24,7 @@ export interface UseCommandsOptions {
   onNewJob: () => void;
   onSearchJobs: () => void;
   onSmartCompact: () => void;
+  onEvaluateSchedule: () => void;
 
   // Scheduler-specific (optional — omitted when called from non-scheduler pages)
   selectedJobId?: string | null;
@@ -149,6 +150,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onNewJob,
     onSearchJobs,
     onSmartCompact,
+    onEvaluateSchedule,
     onJumpToToday,
     onJumpToDeparture,
     onPrevJob,
@@ -179,6 +181,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
       // Smart Compaction (shared)
       { id: 'smart-compact', label: 'Smart Compaction', category: 'Actions', shortcut: 'Ctrl+Alt+C', keywords: 'compact smart similarity reorder optimize compacter', action: onSmartCompact },
+      { id: 'evaluate-schedule', label: 'Évaluation du planning', category: 'Actions', shortcut: 'Ctrl+Alt+E', keywords: 'évaluation score calage délai retard evaluate scoring', icon: 'sparkles', action: onEvaluateSchedule },
 
     ];
 
@@ -242,5 +245,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }
