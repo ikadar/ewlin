@@ -225,7 +225,7 @@ export function JcfJobHeader({
   // Ensure date-only values get a time for datetime-local
   const deadlineNativeValue = parsedDeadline && !parsedDeadline.includes('T')
     ? `${parsedDeadline}T14:00`
-    : parsedDeadline;
+    : parsedDeadline || `${new Date().toISOString().slice(0, 10)}T14:00`;
 
   return (
     <div

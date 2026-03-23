@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { X, Save } from 'lucide-react';
 import { KBD_CLASS } from '../ShortcutFooter/kbdStyles';
 
@@ -42,17 +42,11 @@ export function JcfModal({
   error = null,
   saveLabel,
 }: JcfModalProps) {
-  const mouseDownTargetRef = useRef<EventTarget | null>(null);
-
-  const stableOnClose = useCallback(() => {
-    onClose();
-  }, [onClose]);
-
   const stableOnSave = useCallback(() => {
     onSave?.();
   }, [onSave]);
 
-  // Escape key closes modal; Cmd+S / Ctrl+S triggers save
+  // Cmd+S / Ctrl+S triggers save
   useEffect(() => {
     if (!isOpen) return;
 
@@ -63,42 +57,18 @@ export function JcfModal({
         return;
       }
 
-      if (e.key === 'Escape' && !e.defaultPrevented) {
-        stableOnClose();
-      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, stableOnClose, stableOnSave]);
+  }, [isOpen, stableOnSave]);
 
   if (!isOpen) return null;
-
-  // Track where mousedown started for backdrop click
-  const handleMouseDown = (e: React.MouseEvent) => {
-    mouseDownTargetRef.current = e.target;
-  };
-
-  // Only close if both mousedown AND mouseup were on the backdrop
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && mouseDownTargetRef.current === e.currentTarget) {
-      onClose();
-    }
-    mouseDownTargetRef.current = null;
-  };
 
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
       data-testid="jcf-modal-backdrop"
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
-      aria-label="Close modal"
     >
       <div
         className="w-[95vw] max-w-[2200px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
@@ -165,10 +135,6 @@ export function JcfModal({
             <span className="flex items-center gap-2">
               <kbd className={KBD_CLASS}>⌘S</kbd>
               <span className="text-zinc-500 text-[11px]">Sauvegarder</span>
-            </span>
-            <span className="flex items-center gap-2">
-              <kbd className={KBD_CLASS}>Esc</kbd>
-              <span className="text-zinc-500 text-[11px]">Fermer</span>
             </span>
           </div>
           {/* Action buttons row */}

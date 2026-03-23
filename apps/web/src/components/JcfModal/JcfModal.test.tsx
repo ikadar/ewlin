@@ -45,27 +45,19 @@ describe('JcfModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when Escape key is pressed', () => {
+    it('does not close when Escape key is pressed', () => {
       const onClose = vi.fn();
       render(<JcfModal isOpen={true} onClose={onClose} />);
       fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('calls onClose when backdrop is clicked (mousedown + mouseup on backdrop)', () => {
+    it('does not close when backdrop is clicked', () => {
       const onClose = vi.fn();
       render(<JcfModal isOpen={true} onClose={onClose} />);
       const backdrop = screen.getByTestId('jcf-modal-backdrop');
       fireEvent.mouseDown(backdrop, { target: backdrop });
       fireEvent.mouseUp(backdrop, { target: backdrop });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the dialog', () => {
-      const onClose = vi.fn();
-      render(<JcfModal isOpen={true} onClose={onClose} />);
-      const dialog = screen.getByTestId('jcf-modal-dialog');
-      fireEvent.click(dialog);
       expect(onClose).not.toHaveBeenCalled();
     });
   });
@@ -93,7 +85,7 @@ describe('JcfModal', () => {
       const footer = screen.getByTestId('jcf-modal-footer');
       expect(footer).toBeInTheDocument();
       expect(footer.textContent).toContain('Tab');
-      expect(footer.textContent).toContain('Esc');
+      expect(footer.textContent).not.toContain('Esc');
       expect(footer.textContent).toContain('⌘S');
     });
   });
