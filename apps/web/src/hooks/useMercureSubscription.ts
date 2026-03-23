@@ -5,7 +5,7 @@ import { fluxApi } from '../store/api/fluxApi';
 import { shouldUseMockMode } from '../store/api/baseApi';
 import { isMercureMuted } from './mercureMute';
 
-const MERCURE_URL = import.meta.env.VITE_MERCURE_URL ?? 'http://localhost:3000/.well-known/mercure';
+const MERCURE_URL = import.meta.env.VITE_MERCURE_URL ?? '/.well-known/mercure';
 
 export interface MercureSubscription {
   toastMessage: string | null;
@@ -39,7 +39,7 @@ export function useMercureSubscription(): MercureSubscription {
       return;
     }
 
-    const url = new URL(MERCURE_URL);
+    const url = new URL(MERCURE_URL, window.location.origin);
     url.searchParams.append('topic', 'schedule/updates');
 
     const eventSource = new EventSource(url);

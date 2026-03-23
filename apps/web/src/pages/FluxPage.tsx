@@ -6,7 +6,7 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
-import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useGetShippersQuery, useAppDispatch, fluxApi } from '@/store';
+import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
@@ -51,7 +51,31 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
   const [updateJobShipper] = useUpdateJobShipperMutation();
   const [toggleJobShipped] = useToggleJobShippedMutation();
+  const [deleteJob] = useDeleteJobMutation();
   const { data: shippers = [] } = useGetShippersQuery();
+  const { data: snapshot } = useGetSnapshotQuery();
+
+  // Late job IDs from schedule snapshot
+  const lateJobIds = useMemo(() => {
+    if (!snapshot) return new Set<string>();
+    return new Set(snapshot.lateJobs.map(lj => lj.jobId));
+  }, [snapshot]);
+
+  // Conflict job IDs derived from schedule snapshot (excluding DeadlineConflict — those are late, not conflicts)
+  const conflictJobIds = useMemo(() => {
+    if (!snapshot) return new Set<string>();
+    const ids = new Set<string>();
+    snapshot.conflicts
+      .filter(c => c.type !== 'DeadlineConflict')
+      .forEach(c => {
+        const task = snapshot.tasks.find(t => t.id === c.taskId);
+        if (task) {
+          const el = snapshot.elements.find(e => e.id === task.elementId);
+          if (el?.jobId) ids.add(el.jobId);
+        }
+      });
+    return ids;
+  }, [snapshot]);
 
   // ── Local UI state (not tied to server data) ──────────────────────────────
   const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
@@ -167,10 +191,18 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     setDeleteConfirmJobId(jobId);
   }, []);
 
-  /** Confirm deletion: remove job from RTK Query cache, clear expanded state. */
-  const handleConfirmDelete = useCallback(() => {
+  /** Confirm deletion: call API, optimistically remove from cache, revert on error. */
+  const handleConfirmDelete = useCallback(async () => {
     if (deleteConfirmJobId) {
-      dispatch(
+      const fluxJob = jobs.find(j => j.id === deleteConfirmJobId);
+      const internalId = fluxJob?.internalId;
+      if (!internalId) {
+        setDeleteConfirmJobId(null);
+        return;
+      }
+
+      // Optimistic cache removal (returns patchResult with .undo())
+      const patchResult = dispatch(
         fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
           const idx = draft.findIndex((j) => j.id === deleteConfirmJobId);
           if (idx !== -1) draft.splice(idx, 1);
@@ -182,9 +214,16 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
         return next;
       });
       setFocusedRowIndex(-1);
+
+      try {
+        await deleteJob(internalId).unwrap();
+      } catch {
+        patchResult.undo();
+        dispatch(setError({ status: 500, message: 'Erreur lors de la suppression du job.' }));
+      }
     }
     setDeleteConfirmJobId(null);
-  }, [deleteConfirmJobId, dispatch]);
+  }, [deleteConfirmJobId, dispatch, jobs, deleteJob]);
 
   /** Open the scheduler in a new tab scrolled to the clicked task (F9). */
   const handleStationClick = useCallback((taskId: string) => {
@@ -302,6 +341,8 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               shippers={shippers}
               onToggleShipped={handleToggleShipped}
               onStationClick={handleStationClick}
+              lateJobIds={lateJobIds}
+              conflictJobIds={conflictJobIds}
             />
             </div>
           </div>

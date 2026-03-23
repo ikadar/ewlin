@@ -1,0 +1,74 @@
+# Production overrides for LGI instance (lgi.replic-os.com)
+# Usage: docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod-lgi.yml up -d
+
+services:
+  nginx:
+    profiles:
+      - dev-only
+
+  php:
+    container_name: lgi-php
+    user: "1001:1001"
+    ports:
+      - "127.0.0.1:9003:9000"
+    volumes:
+      - ./docker/php/php-prod.ini:/usr/local/etc/php/php.ini:ro
+    environment:
+      - APP_ENV=prod
+      - APP_DEBUG=0
+    restart: unless-stopped
+    networks:
+      flux-network: null
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  validation-service:
+    container_name: lgi-validation-service
+    ports: !reset []
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      flux-network: null
+
+  mariadb:
+    container_name: lgi-mariadb
+    ports: !override
+      - "127.0.0.1:3309:3306"
+    volumes:
+      - lgi-mariadb-data:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      flux-network: null
+
+  mercure:
+    container_name: lgi-mercure
+    environment:
+      MERCURE_EXTRA_DIRECTIVES: |
+        cors_origins ${CORS_ALLOW_ORIGIN}
+        anonymous
+    ports: !override
+      - "127.0.0.1:3005:3000"
+    restart: unless-stopped
+    networks:
+      flux-network: null
+
+  redis:
+    profiles:
+      - dev-only
+
+  node:
+    profiles:
+      - dev-only
+
+networks:
+  flux-network:
+    name: lgi-network
+    driver: bridge
+
+volumes:
+  lgi-mariadb-data:
+    name: lgi-mariadb-data
+  flux-mariadb-data:
+    name: lgi-mariadb-data

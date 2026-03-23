@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split Tile — Flux Scheduler Playground</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #18181b; color: #d4d4d8; display: flex; overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  .sidebar { width: 320px; min-width: 320px; background: #0f0f11; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; overflow-y: auto; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .preview-area { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 32px; overflow-y: auto; }
+
+  /* ── Sidebar ── */
+  .sidebar-section { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .sidebar-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 10px; }
+  .sidebar h2 { font-size: 14px; font-weight: 600; color: #e4e4e7; margin-bottom: 4px; }
+  .sidebar p { font-size: 12px; color: #a1a1aa; line-height: 1.5; }
+  .sidebar .hint { font-size: 11px; color: #71717a; line-height: 1.4; margin-top: 8px; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .stat-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; }
+  .stat-label { font-size: 10px; color: #71717a; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-value { font-size: 18px; font-weight: 600; color: #e4e4e7; margin-top: 2px; }
+  .stat-value.warn { color: #f59e0b; }
+  .stat-sub { font-size: 10px; color: #52525b; margin-top: 2px; }
+
+  .btn-reset {
+    width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04); color: #a1a1aa; font-size: 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-reset:hover { background: rgba(255,255,255,0.08); color: #d4d4d8; }
+
+  .legend { margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #a1a1aa; margin-bottom: 6px; }
+  .legend-swatch { width: 24px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── Job Details Panel (preview) ── */
+  .panel {
+    width: 360px; background: #18181b; border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .panel-header {
+    padding: 12px 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .panel-ref { font-size: 13px; font-weight: 600; color: #e4e4e7; }
+  .panel-ref span { color: #71717a; font-weight: 400; }
+  .panel-desc { font-size: 11px; color: #71717a; margin-top: 2px; }
+  .panel-date { font-size: 11px; color: #3b82f6; margin-top: 4px; cursor: pointer; }
+  .panel-date:hover { text-decoration: underline; }
+
+  .task-list { padding: 10px; }
+  .element-label { font-size: 10px; font-weight: 600; color: #52525b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; margin-top: 10px; }
+  .element-label:first-child { margin-top: 0; }
+
+  /* ── Task Tile ── */
+  .tile {
+    height: 32px; display: flex; align-items: center; padding: 0 8px 0 10px;
+    border-radius: 4px; cursor: context-menu; user-select: none;
+    transition: filter 0.1s;
+    border-left: 4px solid #3b82f6;
+    background: rgba(59,130,246,0.12);
+  }
+  .tile:hover { filter: brightness(1.25); }
+  .tile.completed {
+    border-left-color: #22c55e;
+    background: rgba(34,197,94,0.09);
+    opacity: 0.5;
+  }
+
+  .tile-name { flex: 1; font-size: 12px; color: #93c5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.completed .tile-name { color: #86efac; }
+  .tile-dur { font-size: 11px; color: #71717a; white-space: nowrap; margin-left: 8px; }
+  .tile-part { font-size: 9px; color: #3b82f6; background: rgba(59,130,246,0.15); border-radius: 3px; padding: 1px 5px; margin-left: 6px; white-space: nowrap; font-weight: 600; }
+
+  .tile-split-icon { width: 12px; height: 12px; color: rgba(59,130,246,0.4); flex-shrink: 0; margin-left: 6px; }
+
+  /* Dry-time label */
+  .dry-label {
+    font-size: 10px; color: #52525b; padding: 2px 0 2px 14px; margin-bottom: 3px;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  /* ── Split Popover ── */
+  .split-popover {
+    position: fixed; z-index: 9000;
+    background: #27272a; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; padding: 14px; width: 340px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    animation: popIn 0.12s ease-out;
+  }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.96) translateY(-4px); } }
+
+  .modal-title {
+    font-size: 13px; font-weight: 600; color: #e4e4e7;
+    display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+  }
+  .modal-title svg { width: 16px; height: 16px; color: #60a5fa; }
+  .modal-subtitle {
+    font-size: 11px; color: #71717a; margin-bottom: 16px;
+  }
+
+  .split-preview {
+    display: flex; gap: 2px; margin-bottom: 6px; height: 56px; border-radius: 4px; overflow: hidden;
+  }
+  .split-half {
+    display: flex; flex-direction: column; border-radius: 3px; overflow: hidden; transition: flex 0.05s;
+  }
+  .split-half-setup {
+    background: rgba(59,130,246,0.18); flex-shrink: 0;
+    border-bottom: 1px solid rgba(96,165,250,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: rgba(147,197,253,0.9);
+  }
+  .split-half-run {
+    background: rgba(59,130,246,0.09); flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: rgba(147,197,253,0.7);
+  }
+  .split-half-labels {
+    display: flex; gap: 2px; margin-bottom: 14px;
+  }
+  .split-half-label {
+    font-size: 10px; color: #a1a1aa; text-align: center; margin-top: 4px;
+  }
+
+  /* Slider track */
+  .split-slider-wrap {
+    position: relative; height: 24px; margin: 0 0 16px; user-select: none;
+  }
+  .split-slider-track {
+    position: absolute; top: 10px; left: 0; right: 0; height: 4px;
+    background: rgba(255,255,255,0.06); border-radius: 2px;
+  }
+  .split-slider-fill {
+    position: absolute; top: 10px; left: 0; height: 4px;
+    background: rgba(59,130,246,0.4); border-radius: 2px;
+  }
+  .split-slider-thumb {
+    position: absolute; top: 4px; width: 16px; height: 16px;
+    background: #3b82f6; border-radius: 50%; cursor: ew-resize;
+    transform: translateX(-50%);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2), 0 2px 6px rgba(0,0,0,0.4);
+    transition: box-shadow 0.1s;
+  }
+  .split-slider-thumb:hover, .split-slider-thumb.dragging {
+    box-shadow: 0 0 0 5px rgba(59,130,246,0.3), 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  /* Action buttons */
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .modal-btn {
+    padding: 7px 16px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1); transition: all 0.1s;
+  }
+  .modal-btn-cancel { background: transparent; color: #a1a1aa; }
+  .modal-btn-cancel:hover { background: rgba(255,255,255,0.05); color: #d4d4d8; }
+  .modal-btn-confirm { background: rgba(59,130,246,0.2); color: #93c5fd; border-color: rgba(59,130,246,0.3); }
+  .modal-btn-confirm:hover { background: rgba(59,130,246,0.3); }
+
+  /* ── Context Menu ── */
+  .ctx-menu {
+    position: fixed; z-index: 9999;
+    background: #27272a; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 4px; min-width: 200px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    animation: ctxIn 0.1s ease-out;
+  }
+  @keyframes ctxIn { from { opacity: 0; transform: scale(0.95) translateY(-4px); } }
+  .ctx-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    font-size: 12px; color: #d4d4d8; border-radius: 5px; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .ctx-item:hover { background: rgba(255,255,255,0.07); }
+  .ctx-item svg { width: 15px; height: 15px; color: #a1a1aa; flex-shrink: 0; }
+  .ctx-sep { height: 1px; background: rgba(255,255,255,0.06); margin: 3px 6px; }
+  .ctx-item.highlight { color: #93c5fd; }
+  .ctx-item.highlight svg { color: #60a5fa; }
+
+  /* ── Log ── */
+  .log-entry { font-size: 11px; color: #71717a; font-family: 'SF Mono', 'Fira Code', monospace; margin-bottom: 3px; }
+  .log-entry .action { color: #60a5fa; }
+  .log-entry .fuse { color: #f59e0b; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-section">
+    <h2>Split Tile Feature</h2>
+    <p>Right-click any task tile to split it. Drag the slider to set the proportion between parts.</p>
+    <div class="hint">
+      <strong>Diviser:</strong> Right-click → Diviser opens a proportion slider.<br>
+      <strong>Fusionner:</strong> Right-click a split part → Fusionner merges all parts back.<br>
+      <strong>Multi-split:</strong> Split a part again to get 3+ parts.
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-title">Time Impact</div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Original</div>
+        <div class="stat-value" id="stat-original">—</div>
+        <div class="stat-sub">total time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">With Splits</div>
+        <div class="stat-value" id="stat-current">—</div>
+        <div class="stat-sub">total time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Setup Overhead</div>
+        <div class="stat-value warn" id="stat-overhead">—</div>
+        <div class="stat-sub">added setup time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Parts</div>
+        <div class="stat-value" id="stat-parts">—</div>
+        <div class="stat-sub">total tiles</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-title">Legend</div>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:rgba(59,130,246,0.12);border-left:3px solid #3b82f6;"></div>
+        Normal task tile
+      </div>
+      <div class="legend-item">
+        <svg class="w-3 h-3 text-blue-500/40 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+        Split part (scissors + badge)
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:rgba(34,197,94,0.09);border-left:3px solid #22c55e;"></div>
+        Completed task (no split)
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <button class="btn-reset" onclick="resetAll()">Reset to Original</button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-title">Action Log</div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="preview-area">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-ref">J-2024-047 <span>– Acme Corp</span></div>
+        <div class="panel-desc">Brochure A4 quadri</div>
+        <div class="panel-date">Dep. 20/03/2024 à 14h00</div>
+      </div>
+      <div class="task-list" id="task-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Context menu (hidden) -->
+<div class="ctx-menu" id="ctx-menu" style="display:none;"></div>
+
+<!-- Split modal (hidden) -->
+<div id="split-modal"></div>
+
+<script>
+// ── Icons (inline SVG) ──
+const ICONS = {
+  scissors: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>`,
+  merge: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6L12 2L16 6"/><path d="M12 2V10C12 14 8 18 4 20"/><path d="M12 10C12 14 16 18 20 20"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><polyline points="9 11 12 14 22 4"/></svg>`,
+  square: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>`,
+  undo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H12"/></svg>`,
+  link: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+};
+
+// ── Data ──
+const ORIGINAL_TASKS = [
+  { id: 't1', station: 'Heidelberg XL 106', label: 'Impression', setupMinutes: 20, runMinutes: 120 },
+  { id: 't2', station: 'Polar 115', label: 'Coupe', setupMinutes: 10, runMinutes: 45 },
+  { id: 't3', station: 'Stahl KH 66', label: 'Pliage', setupMinutes: 15, runMinutes: 60 },
+];
+
+let state = [];
+let logEntries = [];
+let activeSplitEditor = null; // { taskId, partIndex, ratio }
+
+function initState() {
+  state = ORIGINAL_TASKS.map(t => ({
+    id: t.id,
+    station: t.station,
+    label: t.label,
+    setupMinutes: t.setupMinutes,
+    originalRunMinutes: t.runMinutes,
+    parts: [{ runMinutes: t.runMinutes }],
+    completed: false,
+  }));
+}
+
+function resetAll() {
+  initState();
+  logEntries = [];
+  activeSplitEditor = null;
+  render();
+  addLog('reset', 'Reset to original state');
+}
+
+// ── Formatting ──
+function fmtDur(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}m`;
+  return `${h}h${m.toString().padStart(2, '0')}`;
+}
+
+function pct(n) { return Math.round(n * 100); }
+
+// ── Stats ──
+function calcStats() {
+  let originalTotal = 0, currentTotal = 0, totalParts = 0;
+  ORIGINAL_TASKS.forEach(t => { originalTotal += t.setupMinutes + t.runMinutes; });
+  state.forEach(task => {
+    totalParts += task.parts.length;
+    task.parts.forEach(p => { currentTotal += task.setupMinutes + p.runMinutes; });
+  });
+  const overhead = currentTotal - originalTotal;
+  document.getElementById('stat-original').textContent = fmtDur(originalTotal);
+  document.getElementById('stat-current').textContent = fmtDur(currentTotal);
+  document.getElementById('stat-overhead').textContent = overhead > 0 ? `+${fmtDur(overhead)}` : '—';
+  document.getElementById('stat-parts').textContent = totalParts;
+}
+
+// ── Log ──
+function addLog(type, msg) {
+  logEntries.unshift({ type, msg });
+  if (logEntries.length > 20) logEntries.pop();
+  renderLog();
+}
+function renderLog() {
+  const el = document.getElementById('log');
+  el.innerHTML = logEntries.map(e => {
+    const cls = e.type === 'split' ? 'action' : e.type === 'fuse' ? 'fuse' : '';
+    return `<div class="log-entry"><span class="${cls}">${e.msg}</span></div>`;
+  }).join('');
+}
+
+// ── Split Editor ──
+let splitPopoverPos = { x: 0, y: 0 };
+
+function openSplitEditor(taskId, partIndex) {
+  // Defer so the current click event doesn't immediately close the popover
+  setTimeout(() => {
+    activeSplitEditor = { taskId, partIndex, ratio: 0.5 };
+    render();
+  }, 0);
+}
+
+function cancelSplit() {
+  activeSplitEditor = null;
+  render();
+}
+
+function confirmSplit() {
+  if (!activeSplitEditor) return;
+  const { taskId, partIndex, ratio } = activeSplitEditor;
+  const task = state.find(t => t.id === taskId);
+  if (!task) return;
+
+  const part = task.parts[partIndex];
+  const runA = Math.max(1, Math.round(part.runMinutes * ratio));
+  const runB = Math.max(1, part.runMinutes - runA);
+
+  task.parts.splice(partIndex, 1, { runMinutes: runA }, { runMinutes: runB });
+
+  addLog('split', `Split ${task.station} → ${pct(ratio)}/${pct(1 - ratio)} (${fmtDur(runA)}/${fmtDur(runB)} run)`);
+  activeSplitEditor = null;
+  render();
+}
+
+function fuseTask(taskId) {
+  const task = state.find(t => t.id === taskId);
+  if (!task) return;
+  task.parts = [{ runMinutes: task.originalRunMinutes }];
+  addLog('fuse', `Fused ${task.station} → 1 tile`);
+  render();
+}
+
+function toggleComplete(taskId) {
+  const task = state.find(t => t.id === taskId);
+  if (!task) return;
+  task.completed = !task.completed;
+  render();
+}
+
+// ── Context Menu ──
+let activeCtx = false;
+
+function showCtx(e, taskId, partIndex, isSplit) {
+  e.preventDefault();
+  e.stopPropagation();
+  const task = state.find(t => t.id === taskId);
+  if (!task) return;
+
+  splitPopoverPos = { x: e.clientX, y: e.clientY };
+  const menu = document.getElementById('ctx-menu');
+  const completedIcon = task.completed ? ICONS.check : ICONS.square;
+  const completedLabel = task.completed ? 'Marquer à faire' : 'Marquer terminée';
+
+  let splitItem = '';
+  if (isSplit) {
+    splitItem += `
+      <div class="ctx-item highlight" onclick="fuseTask('${taskId}'); hideCtx();">
+        ${ICONS.merge} Fusionner
+      </div>`;
+    if (!task.completed) {
+      splitItem += `
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" onclick="openSplitEditor('${taskId}', ${partIndex}); hideCtx();">
+        ${ICONS.scissors} Diviser encore
+      </div>`;
+    }
+  } else if (!task.completed) {
+    splitItem = `
+      <div class="ctx-item" onclick="openSplitEditor('${taskId}', ${partIndex}); hideCtx();">
+        ${ICONS.scissors} Diviser
+      </div>
+    `;
+  }
+
+  menu.innerHTML = `
+    <div class="ctx-item" onclick="toggleComplete('${taskId}'); hideCtx();">
+      ${completedIcon} ${completedLabel}
+    </div>
+    <div class="ctx-item" onclick="hideCtx();">
+      ${ICONS.undo} Rappeler (désassigner)
+    </div>
+    ${splitItem ? '<div class="ctx-sep"></div>' + splitItem : ''}
+  `;
+
+  menu.style.display = 'block';
+  const rect = menu.getBoundingClientRect();
+  let x = e.clientX, y = e.clientY;
+  if (x + rect.width > window.innerWidth - 8) x = window.innerWidth - rect.width - 8;
+  if (y + rect.height > window.innerHeight - 8) y = window.innerHeight - rect.height - 8;
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  activeCtx = true;
+}
+
+function hideCtx() {
+  document.getElementById('ctx-menu').style.display = 'none';
+  activeCtx = false;
+}
+
+document.addEventListener('click', (e) => {
+  if (activeCtx) hideCtx();
+  if (activeSplitEditor) {
+    const pop = document.getElementById('split-popover');
+    if (pop && !pop.contains(e.target)) cancelSplit();
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideCtx(); if (activeSplitEditor) cancelSplit(); } });
+
+// ── Render modal ──
+function renderSplitModal() {
+  const container = document.getElementById('split-modal');
+  if (!activeSplitEditor) { container.innerHTML = ''; return; }
+
+  const { taskId, partIndex, ratio } = activeSplitEditor;
+  const task = state.find(t => t.id === taskId);
+  if (!task) { container.innerHTML = ''; return; }
+
+  const part = task.parts[partIndex];
+  const runA = Math.max(1, Math.round(part.runMinutes * ratio));
+  const runB = Math.max(1, part.runMinutes - runA);
+  const setup = task.setupMinutes;
+  const totalA = setup + runA;
+  const totalB = setup + runB;
+
+  container.innerHTML = `
+    <div class="split-popover" id="split-popover">
+      <div class="modal-title">${ICONS.scissors} Diviser la tâche</div>
+      <div class="modal-subtitle">${task.station} — ${task.label} · Run ${fmtDur(part.runMinutes)} · Setup ${fmtDur(setup)}</div>
+
+      <div class="split-preview">
+        <div class="split-half" style="flex:${runA}" id="split-half-a">
+          <div class="split-half-setup" style="flex:${setup}">${fmtDur(setup)}</div>
+          <div class="split-half-run" style="flex:${runA}">${fmtDur(runA)}</div>
+        </div>
+        <div class="split-half" style="flex:${runB}" id="split-half-b">
+          <div class="split-half-setup" style="flex:${setup}">${fmtDur(setup)}</div>
+          <div class="split-half-run" style="flex:${runB}">${fmtDur(runB)}</div>
+        </div>
+      </div>
+      <div class="split-half-labels">
+        <div class="split-half-label" style="flex:${runA}">Partie A — ${fmtDur(totalA)} total</div>
+        <div class="split-half-label" style="flex:${runB}">Partie B — ${fmtDur(totalB)} total</div>
+      </div>
+
+      <div class="split-slider-wrap" id="split-slider">
+        <div class="split-slider-track"></div>
+        <div class="split-slider-fill" style="width:${ratio * 100}%"></div>
+        <div class="split-slider-thumb" style="left:${ratio * 100}%" id="split-thumb"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-cancel" onclick="cancelSplit()">Annuler</button>
+        <button class="modal-btn modal-btn-confirm" onclick="confirmSplit()">Diviser</button>
+      </div>
+    </div>`;
+
+  // Position near the right-click origin, adjust to stay in viewport
+  const pop = document.getElementById('split-popover');
+  const rect = pop.getBoundingClientRect();
+  let x = splitPopoverPos.x;
+  let y = splitPopoverPos.y;
+  if (x + rect.width > window.innerWidth - 8) x = window.innerWidth - rect.width - 8;
+  if (y + rect.height > window.innerHeight - 8) y = window.innerHeight - rect.height - 8;
+  if (x < 8) x = 8;
+  if (y < 8) y = 8;
+  pop.style.left = x + 'px';
+  pop.style.top = y + 'px';
+
+  initSliderDrag();
+}
+
+// ── Render ──
+function render() {
+  const list = document.getElementById('task-list');
+  let html = '<div class="element-label">Element 1 — Brochure</div>';
+
+  state.forEach((task) => {
+    const isSplit = task.parts.length > 1;
+    const compClass = task.completed ? ' completed' : '';
+
+    if (isSplit) {
+      task.parts.forEach((part, pi) => {
+        const total = task.setupMinutes + part.runMinutes;
+        html += `
+          <div class="tile${compClass}" oncontextmenu="showCtx(event, '${task.id}', ${pi}, true)">
+            <div class="tile-name">${task.station}</div>
+            <svg class="tile-split-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+            <div class="tile-part">${pi + 1}/${task.parts.length}</div>
+            <div class="tile-dur">${fmtDur(total)}</div>
+          </div>`;
+      });
+    } else {
+      const total = task.setupMinutes + task.parts[0].runMinutes;
+      html += `
+        <div class="tile${compClass}" oncontextmenu="showCtx(event, '${task.id}', 0, false)">
+          <div class="tile-name">${task.station}</div>
+          <div class="tile-dur">${fmtDur(total)}</div>
+        </div>`;
+    }
+
+    if (task.id === 't1') {
+      html += `<div class="dry-label">⏱ Séchage 24h</div>`;
+    }
+  });
+
+  list.innerHTML = html;
+  calcStats();
+  renderSplitModal();
+}
+
+// ── Slider drag ──
+function initSliderDrag() {
+  const slider = document.getElementById('split-slider');
+  const thumb = document.getElementById('split-thumb');
+  if (!slider || !thumb) return;
+
+  let dragging = false;
+
+  function updateFromX(clientX) {
+    const rect = slider.getBoundingClientRect();
+    let ratio = (clientX - rect.left) / rect.width;
+    ratio = Math.max(0.05, Math.min(0.95, ratio));
+    // Snap to 5% increments
+    ratio = Math.round(ratio * 20) / 20;
+    activeSplitEditor.ratio = ratio;
+    updateSliderVisual(ratio);
+  }
+
+  function updateSliderVisual(ratio) {
+    const task = state.find(t => t.id === activeSplitEditor.taskId);
+    if (!task) return;
+    const part = task.parts[activeSplitEditor.partIndex];
+    const runA = Math.max(1, Math.round(part.runMinutes * ratio));
+    const runB = Math.max(1, part.runMinutes - runA);
+    const setup = task.setupMinutes;
+    const totalA = setup + runA;
+    const totalB = setup + runB;
+
+    // Update thumb + fill
+    thumb.style.left = `${ratio * 100}%`;
+    slider.querySelector('.split-slider-fill').style.width = `${ratio * 100}%`;
+
+    // Update preview blocks
+    const halfA = document.getElementById('split-half-a');
+    const halfB = document.getElementById('split-half-b');
+    if (halfA && halfB) {
+      halfA.style.flex = runA;
+      halfB.style.flex = runB;
+      halfA.querySelector('.split-half-setup').style.flex = setup;
+      halfA.querySelector('.split-half-run').style.flex = runA;
+      halfA.querySelector('.split-half-run').textContent = fmtDur(runA);
+      halfB.querySelector('.split-half-setup').style.flex = setup;
+      halfB.querySelector('.split-half-run').style.flex = runB;
+      halfB.querySelector('.split-half-run').textContent = fmtDur(runB);
+    }
+
+    // Update labels
+    const labels = document.getElementById('split-modal').querySelectorAll('.split-half-label');
+    if (labels.length >= 2) {
+      labels[0].style.flex = runA;
+      labels[0].textContent = `Partie A — ${fmtDur(totalA)} total`;
+      labels[1].style.flex = runB;
+      labels[1].textContent = `Partie B — ${fmtDur(totalB)} total`;
+    }
+  }
+
+  thumb.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    thumb.classList.add('dragging');
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    updateFromX(e.clientX);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (dragging) {
+      dragging = false;
+      thumb.classList.remove('dragging');
+    }
+  });
+
+  // Click on track to jump
+  slider.addEventListener('mousedown', (e) => {
+    if (e.target === thumb) return;
+    updateFromX(e.clientX);
+    dragging = true;
+    thumb.classList.add('dragging');
+  });
+}
+
+// ── Init ──
+initState();
+render();
+</script>
+</body>
+</html>

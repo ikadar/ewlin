@@ -19,7 +19,9 @@ COPY packages/validator/ packages/validator/
 
 # Frontend environment (build-time)
 ARG VITE_API_URL=/api/v1
+ARG VITE_MERCURE_URL=/.well-known/mercure
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_MERCURE_URL=$VITE_MERCURE_URL
 
 # Build (skip tsc type-check — Vite transpiles TS natively, type-check belongs in CI)
 RUN pnpm --filter @flux/types build \

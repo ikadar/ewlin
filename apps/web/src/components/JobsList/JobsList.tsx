@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
 import { JobsListHeader } from './JobsListHeader';
 import { ProblemsSection } from './ProblemsSection';
@@ -151,6 +151,38 @@ export function JobsList({
     return `${day}/${month} 14:00`;
   };
 
+  // Step 2a: Stable toggle callback using ref to avoid inline closures per card
+  const selectedJobIdRef = useRef(selectedJobId);
+  useEffect(() => { selectedJobIdRef.current = selectedJobId; });
+
+  const handleJobToggle = useCallback((jobId: string) => {
+    onSelectJob?.(selectedJobIdRef.current === jobId ? null : jobId);
+  }, [onSelectJob]);
+
+  const computeBufferLabel = (job: Job, jobTasks: Task[], jobAssignments: TaskAssignment[]): string | undefined => {
+    if (jobTasks.length === 0 || jobAssignments.length === 0 || !job.workshopExitDate) return undefined;
+    // Consider fully scheduled when every task has at least one assignment
+    const assignedTaskIds = new Set(jobAssignments.map(a => a.taskId));
+    const allTasksAssigned = jobTasks.every(t => assignedTaskIds.has(t.id));
+    if (!allTasksAssigned) return undefined;
+
+    const lastEnd = jobAssignments.reduce((max, a) => {
+      const end = new Date(a.scheduledEnd).getTime();
+      return end > max ? end : max;
+    }, 0);
+
+    const deadline = new Date(job.workshopExitDate).getTime();
+    const diffMs = deadline - lastEnd;
+    const sign = diffMs >= 0 ? '+' : '-';
+    const absDiffMs = Math.abs(diffMs);
+    const totalHours = Math.floor(absDiffMs / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+
+    if (days > 0) return `${sign}${days}j ${hours}h`;
+    return `${sign}${hours}h`;
+  };
+
   const renderJobCard = (job: Job) => {
     const jobTasks = tasksByJob.get(job.id) || [];
     const jobAssignments = assignmentsByJob.get(job.id) || [];
@@ -166,8 +198,9 @@ export function JobsList({
         assignments={jobAssignments}
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
         problemType={getProblemType(job.id)}
+        bufferLabel={computeBufferLabel(job, jobTasks, jobAssignments)}
         isSelected={selectedJobId === job.id}
-        onClick={() => onSelectJob?.(selectedJobId === job.id ? null : job.id)}
+        onClick={handleJobToggle}
       />
     );
   };

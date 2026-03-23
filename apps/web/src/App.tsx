@@ -3,7 +3,8 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
 import { useTheme } from './contexts/ThemeContext';
 import { ZOOM_LEVELS } from './utils/zoom';
-import { Save } from 'lucide-react';
+import { Save, ClipboardCopy } from 'lucide-react';
+import { buildDebugPayload } from './utils/debugExport';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -12,6 +13,9 @@ import { MaintenanceState } from './components/MaintenanceState';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
+import { AutoPlaceModal } from './components/AutoPlaceModal';
+import { SmartCompactModal } from './components/SmartCompactModal';
+import { ScheduleEvaluationModal } from './components/ScheduleEvaluationModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
@@ -19,17 +23,15 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useCompactStationMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useUpdateElementStatusMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
-import { applySwap, getAvailableTaskForStation, getLastUnscheduledTask, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask } from './utils';
-import { useDropValidation } from './hooks/useDropValidation';
+import { applySwap, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
-import type { CompactHorizon } from './utils';
 import {
   PickStateProvider,
   PickPreview,
@@ -43,8 +45,9 @@ import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
-import { detectKeyboardLayout, isAltLetter } from './utils/keyboardLayout';
+import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
 import { FluxPage } from './pages/FluxPage';
+import { SplitTaskPopover } from './components/SplitTaskPopover';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -128,7 +131,6 @@ function getStationXOffset(
 
 interface KeyboardContext {
   selectedJobId: string | null;
-  isQuickPlacementMode: boolean;
   isJcfOpen: boolean;
   orderedJobIds: string[];
   selectedJob: Job | null;
@@ -137,38 +139,12 @@ interface KeyboardContext {
   gridStartDate: Date;
   setIsAltPressed: (v: boolean) => void;
   setSelectedJobId: (id: string | null) => void;
-  setIsQuickPlacementMode: (fn: (prev: boolean) => boolean) => void;
-  setQuickPlacementHover: (v: { stationId: string | null; y: number; snappedY: number }) => void;
 }
 
 function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (e.key === 'Alt') {
     // Don't preventDefault — it can interfere with Alt+<key> combos on some platforms
     ctx.setIsAltPressed(true);
-    return true;
-  }
-  return false;
-}
-
-function handleQuickPlacementKeyboard(e: KeyboardEvent, ctx: KeyboardContext): boolean {
-  if (isAltLetter(e, 'q')) {
-    e.preventDefault();
-    const wasActive = ctx.isQuickPlacementMode;
-    ctx.setIsQuickPlacementMode((prev) => !prev);
-    ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-    if (wasActive) {
-      ctx.setSelectedJobId(null);
-    }
-    return true;
-  }
-  return false;
-}
-
-function handleEscapeQuickPlacement(e: KeyboardEvent, ctx: KeyboardContext): boolean {
-  if (e.key === 'Escape' && ctx.isQuickPlacementMode) {
-    ctx.setIsQuickPlacementMode(() => false);
-    ctx.setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-    ctx.setSelectedJobId(null);
     return true;
   }
   return false;
@@ -335,10 +311,16 @@ function AppContent() {
   const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
-  const [compactStation] = useCompactStationMutation();
+
+  const [splitTask] = useSplitTaskMutation();
+  const [fuseTask] = useFuseTaskMutation();
   const [createJob] = useCreateJobMutation();
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
+  const [clearJobAssignments] = useClearJobAssignmentsMutation();
+  const [clearAllAssignments] = useClearAllAssignmentsMutation();
+  const [autoPlaceJob] = useAutoPlaceJobMutation();
+  const [autoPlaceJobAlap] = useAutoPlaceJobAlapMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
@@ -387,14 +369,6 @@ function AppContent() {
   // Alt key state for precedence bypass
   const [isAltPressed, setIsAltPressed] = useState(false);
 
-  // Quick Placement Mode state
-  const [isQuickPlacementMode, setIsQuickPlacementMode] = useState(false);
-  const [quickPlacementHover, setQuickPlacementHover] = useState<{
-    stationId: string | null;
-    y: number;
-    snappedY: number;
-  }>({ stationId: null, y: 0, snappedY: 0 });
-
   // Display mode state (Produit / Tirage)
   const [displayMode, setDisplayMode] = useState<'produit' | 'tirage'>('produit');
 
@@ -406,11 +380,11 @@ function AppContent() {
     debugConflicts: Array<{ type: string; message?: string }>;
   }>({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
 
-  // Compact station loading state
-  const [compactingStationId, setCompactingStationId] = useState<string | null>(null);
+  // Smart compaction modal state
+  const [isSmartCompactOpen, setIsSmartCompactOpen] = useState(false);
 
-  // Global timeline compact loading state (v0.3.35)
-  const [isCompactingTimeline, setIsCompactingTimeline] = useState(false);
+  // Schedule evaluation modal state
+  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
 
   // Zoom state (v0.3.34)
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
@@ -421,6 +395,15 @@ function AppContent() {
     y: number;
     assignmentId: string;
     isCompleted: boolean;
+  } | null>(null);
+
+  // Split task popover state
+  const [splitPopover, setSplitPopover] = useState<{
+    x: number;
+    y: number;
+    taskId: string;
+    task: InternalTask;
+    stationName: string;
   } | null>(null);
 
   // v0.4.38: JCF modal state derived from URL
@@ -434,6 +417,7 @@ function AppContent() {
   const [jcfIntitule, setJcfIntitule] = useState('');
   const [jcfQuantity, setJcfQuantity] = useState('');
   const [jcfShipperId, setJcfShipperId] = useState('');
+  const [jcfRequiredJobs, setJcfRequiredJobs] = useState('');
   const [jcfDeadline, setJcfDeadline] = useState('');
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
@@ -459,7 +443,14 @@ function AppContent() {
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
   // Schedule save/load modal
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
-
+  // Mass unschedule confirmation dialog
+  const [massUnscheduleConfirm, setMassUnscheduleConfirm] = useState<{
+    count: number;
+    includeInProgress: boolean;
+    fuseSplits: boolean;
+  } | null>(null);
+  // Auto-place V1 modal
+  const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
 
@@ -492,6 +483,9 @@ function AppContent() {
             elements: jcfElements.map(transformJcfElementToRequest),
             ...(jcfQuantity ? { quantity: parseInt(jcfQuantity, 10) } : {}),
             shipperId: jcfShipperId || null,
+            requiredJobReferences: jcfRequiredJobs
+              ? jcfRequiredJobs.split(',').map((s) => s.trim()).filter(Boolean)
+              : [],
           },
         }).unwrap();
       } else {
@@ -504,6 +498,7 @@ function AppContent() {
           jcfElements,
           jcfQuantity,
           jcfShipperId || undefined,
+          jcfRequiredJobs || undefined,
         );
         await createJob(request).unwrap();
       }
@@ -520,6 +515,7 @@ function AppContent() {
       setJcfIntitule('');
       setJcfQuantity('');
       setJcfShipperId('');
+      setJcfRequiredJobs('');
       setJcfDeadline('');
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
       setSequenceWorkflows([]); // v0.4.31: Reset workflow on save
@@ -532,7 +528,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, jcfShipperId, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
+  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -749,7 +745,7 @@ function AppContent() {
         // Reconstruct sequence DSL from tasks (JCF format)
         const elementTasks = snapshot.tasks
           .filter((t) => t.elementId === el.id)
-          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+          .sort(compareTaskOrder);
         const sequenceParts = elementTasks.map((t) => {
           if (t.type === 'Internal') {
             const posteName = (stationNameMap.get(t.stationId) ?? t.stationId).replace(/\s+/g, '');
@@ -780,11 +776,17 @@ function AppContent() {
       setJcfElements(mappedElements);
     }
 
+    const requiredJobRefs = (job.requiredJobIds ?? [])
+      .map((id) => snapshot.jobs.find((j) => j.id === id)?.reference)
+      .filter((ref): ref is string => ref !== undefined)
+      .join(', ');
+    setJcfRequiredJobs(requiredJobRefs);
+
     setIsEditMode(true);
     setEditingJobId(job.id);
     setSequenceWorkflows([]);
     setJcfSaveError(null);
-  }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers]);
+  }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, snapshot.jobs]);
 
   // v0.5.13b: Handler for "Modifier" button in Job Details Panel (scheduler view)
   const handleEditJob = useCallback(() => {
@@ -881,27 +883,6 @@ function AppContent() {
     return new Date(selectedJob.workshopExitDate);
   }, [selectedJob?.workshopExitDate]);
 
-  // REQ-16: Calculate scheduled days for selected job
-  const scheduledDays = useMemo(() => {
-    if (!selectedJobId) return new Set<string>();
-
-    const days = new Set<string>();
-    const jobTaskIds = new Set(
-      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements)
-        .map((t) => t.id)
-    );
-
-    snapshot.assignments
-      .filter((a) => jobTaskIds.has(a.taskId))
-      .forEach((a) => {
-        const date = new Date(a.scheduledStart);
-        const dateKey = date.toISOString().split('T')[0];
-        days.add(dateKey);
-      });
-
-    return days;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
-
   // Conflict task IDs for sidebar highlighting + DateStrip markers
   // Only PrecedenceConflict and GroupCapacityConflict trigger amber glow —
   // other types (ApprovalGateConflict, DeadlineConflict, etc.) have their own indicators.
@@ -916,77 +897,62 @@ function AppContent() {
     return ids;
   }, [snapshot.conflicts]);
 
-  // v0.3.47: Task markers per day for DateStrip
-  // Groups tasks by date and determines their status (completed, late, conflict, scheduled)
-  const taskMarkersPerDay = useMemo((): Map<string, TaskMarker[]> => {
-    const markers = new Map<string, TaskMarker[]>();
-    if (!selectedJobId) return markers;
+  // REQ-16 + v0.3.47: Consolidated schedule data for selected job (single-pass)
+  // Computes scheduledDays, taskMarkersPerDay, and earliestTaskDate in one scan.
+  const { scheduledDays, taskMarkersPerDay, earliestTaskDate } = useMemo(() => {
+    const emptyResult = {
+      scheduledDays: new Set<string>(),
+      taskMarkersPerDay: new Map<string, TaskMarker[]>(),
+      earliestTaskDate: null as Date | null,
+    };
+    if (!selectedJobId) return emptyResult;
 
     const now = new Date();
-
-    // Get all tasks for the selected job
-    const jobTasks = getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements);
-    const taskIds = new Set(jobTasks.map((t) => t.id));
-
-    // Process assignments for selected job
-    snapshot.assignments
-      .filter((a) => taskIds.has(a.taskId))
-      .forEach((assignment) => {
-        const scheduledStart = new Date(assignment.scheduledStart);
-        const scheduledEnd = new Date(assignment.scheduledEnd);
-        // Use local date for dateKey (to match DateStrip's local calendar display)
-        const year = scheduledStart.getFullYear();
-        const month = String(scheduledStart.getMonth() + 1).padStart(2, '0');
-        const day = String(scheduledStart.getDate()).padStart(2, '0');
-        const dateKey = `${year}-${month}-${day}`;
-
-        // Extract start hour within the day (0-24, fractional)
-        const startHour = scheduledStart.getHours() + scheduledStart.getMinutes() / 60;
-
-        // Determine task marker status
-        let status: TaskMarker['status'] = 'scheduled';
-        if (assignment.isCompleted) {
-          status = 'completed';
-        } else if (conflictTaskIds.has(assignment.taskId)) {
-          status = 'conflict';
-        } else if (scheduledEnd < now) {
-          status = 'late';
-        }
-
-        const marker: TaskMarker = {
-          taskId: assignment.taskId,
-          status,
-          startHour,
-        };
-
-        const existing = markers.get(dateKey) ?? [];
-        existing.push(marker);
-        markers.set(dateKey, existing);
-      });
-
-    return markers;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
-
-  // v0.3.47: Earliest task date for timeline (first scheduled task)
-  const earliestTaskDate = useMemo((): Date | null => {
-    if (!selectedJobId) return null;
-
     const jobTaskIds = new Set(
       getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
 
+    const days = new Set<string>();
+    const markers = new Map<string, TaskMarker[]>();
     let earliest: Date | null = null;
-    snapshot.assignments
-      .filter((a) => jobTaskIds.has(a.taskId))
-      .forEach((a) => {
-        const startDate = new Date(a.scheduledStart);
-        if (!earliest || startDate < earliest) {
-          earliest = startDate;
-        }
-      });
 
-    return earliest;
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
+    for (const a of snapshot.assignments) {
+      if (!jobTaskIds.has(a.taskId)) continue;
+
+      const scheduledStart = new Date(a.scheduledStart);
+      const scheduledEnd = new Date(a.scheduledEnd);
+
+      // taskMarkersPerDay (local date key to match DateStrip's local calendar)
+      const year = scheduledStart.getFullYear();
+      const month = String(scheduledStart.getMonth() + 1).padStart(2, '0');
+      const day = String(scheduledStart.getDate()).padStart(2, '0');
+      const markerDateKey = `${year}-${month}-${day}`;
+
+      // scheduledDays (local date key to match DateStrip's formatDateKey)
+      days.add(markerDateKey);
+      const startHour = scheduledStart.getHours() + scheduledStart.getMinutes() / 60;
+
+      let status: TaskMarker['status'] = 'scheduled';
+      if (a.isCompleted) {
+        status = 'completed';
+      } else if (conflictTaskIds.has(a.taskId)) {
+        status = 'conflict';
+      } else if (scheduledEnd < now) {
+        status = 'late';
+      }
+
+      const existing = markers.get(markerDateKey) ?? [];
+      existing.push({ taskId: a.taskId, status, startHour });
+      markers.set(markerDateKey, existing);
+
+      // earliestTaskDate
+      if (!earliest || scheduledStart < earliest) {
+        earliest = scheduledStart;
+      }
+    }
+
+    return { scheduledDays: days, taskMarkersPerDay: markers, earliestTaskDate: earliest };
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
 
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(new Date());
@@ -1092,11 +1058,136 @@ function AppContent() {
     return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
   }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
 
+  // Handle clear all tiles for selected job (ALT+Z)
+  const handleClearJobAssignments = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      const result = await clearJobAssignments(selectedJobId).unwrap();
+      showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [selectedJobId, clearJobAssignments, showToast]);
+
+  // Count clearable tiles for mass unschedule confirmation
+  const getClearableCount = useCallback((includeInProgress = false) => {
+    if (!snapshotData) return 0;
+    const now = new Date().toISOString();
+    return snapshotData.assignments.filter((a) => {
+      if (a.isCompleted) return false;
+      if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+      return true;
+    }).length;
+  }, [snapshotData]);
+
+  // Debug export: copy full snapshot to clipboard
+  const handleDebugExport = useCallback(async () => {
+    try {
+      const payload = buildDebugPayload(snapshot);
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      showToast('Debug snapshot copied to clipboard', 'success');
+    } catch {
+      showToast('Failed to copy to clipboard', 'error');
+    }
+  }, [snapshot, showToast]);
+
+  // Handle mass unschedule all tiles (CTRL+ALT+Z)
+  const handleMassUnscheduleConfirm = useCallback(async () => {
+    if (!massUnscheduleConfirm) return;
+    const { includeInProgress, fuseSplits } = massUnscheduleConfirm;
+    setMassUnscheduleConfirm(null);
+    try {
+      const result = await clearAllAssignments({ includeInProgress, fuseSplits }).unwrap();
+      showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
+
+      // Fuse split groups that are now fully unassigned
+      if (fuseSplits && snapshotData) {
+        const now = new Date().toISOString();
+        const splitGroups = new Map<string, string[]>();
+        for (const task of snapshotData.tasks) {
+          if (task.type === 'Internal') {
+            const it = task as InternalTask;
+            if (it.splitGroupId) {
+              const group = splitGroups.get(it.splitGroupId) || [];
+              group.push(it.id);
+              splitGroups.set(it.splitGroupId, group);
+            }
+          }
+        }
+        for (const [, memberIds] of splitGroups) {
+          const allCleared = memberIds.every((id) => {
+            const a = snapshotData.assignments.find((asn) => asn.taskId === id);
+            if (!a) return true;
+            if (a.isCompleted) return false;
+            if (!includeInProgress && a.scheduledStart <= now
+                && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+            return true;
+          });
+          if (allCleared) {
+            try { await fuseTask(memberIds[0]).unwrap(); } catch { /* skip */ }
+          }
+        }
+      }
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [massUnscheduleConfirm, clearAllAssignments, fuseTask, snapshotData, showToast]);
+
+  // Trigger mass unschedule confirmation dialog
+  const triggerMassUnschedule = useCallback(() => {
+    // Open dialog if there are ANY non-completed tiles (with or without in-progress)
+    const countWithInProgress = getClearableCount(true);
+    if (countWithInProgress > 0) {
+      setMassUnscheduleConfirm({ count: getClearableCount(), includeInProgress: false, fuseSplits: false });
+    }
+  }, [getClearableCount]);
+
+  // Handle ASAP auto-placement for selected job (ALT+P S)
+  const handleAsapPlacement = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      const result = await autoPlaceJob(selectedJobId).unwrap();
+      if (result.placedCount === 0) {
+        showToast('Aucune tuile non planifiée à placer', 'info');
+      } else {
+        const timing = result.computeMs != null ? ` en ${result.computeMs}ms` : '';
+        showToast(`${result.placedCount} tuile(s) placée(s) ASAP${timing}`, 'success');
+      }
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [selectedJobId, autoPlaceJob, showToast]);
+
+  // Handle ALAP auto-placement for selected job (ALT+P L)
+  const handleAlapPlacement = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      const result = await autoPlaceJobAlap(selectedJobId).unwrap();
+      if (result.placedCount === 0) {
+        showToast('Aucune tuile non planifiée à placer', 'info');
+      } else {
+        const timing = result.computeMs != null ? ` en ${result.computeMs}ms` : '';
+        showToast(`${result.placedCount} tuile(s) placée(s) ALAP${timing}`, 'success');
+      }
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [selectedJobId, autoPlaceJobAlap, showToast]);
+
+  // Handle global auto-place V1 (Ctrl+Alt+P)
+  const handleAutoPlaceAll = useCallback(() => {
+    setIsAutoPlaceOpen(true);
+  }, []);
+
+  const handleAutoPlaceComplete = useCallback(() => {
+    // Refetch snapshot when auto-place finishes
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [dispatch]);
+
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const ctx: KeyboardContext = {
       selectedJobId,
-      isQuickPlacementMode,
       isJcfOpen: isJcfModalOpen,
       orderedJobIds,
       selectedJob,
@@ -1105,8 +1196,6 @@ function AppContent() {
       gridStartDate,
       setIsAltPressed,
       setSelectedJobId,
-      setIsQuickPlacementMode,
-      setQuickPlacementHover,
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1120,6 +1209,41 @@ function AppContent() {
       if (isAltLetter(e, 'e') && selectedJobId) {
         e.preventDefault();
         handleEditJob();
+        return;
+      }
+
+      // Ctrl+Alt+C: smart compaction
+      if (isCtrlAltLetter(e, 'c')) {
+        e.preventDefault();
+        handleSmartCompact();
+        return;
+      }
+
+      // Ctrl+Alt+P: global auto-place V1
+      if (isCtrlAltLetter(e, 'p')) {
+        e.preventDefault();
+        handleAutoPlaceAll();
+        return;
+      }
+
+      // Ctrl+Alt+E: schedule evaluation
+      if (isCtrlAltLetter(e, 'e')) {
+        e.preventDefault();
+        setIsEvaluationOpen(true);
+        return;
+      }
+
+      // Ctrl+Alt+Z: mass unschedule all clearable tiles
+      if (isCtrlAltLetter(e, 'z')) {
+        e.preventDefault();
+        triggerMassUnschedule();
+        return;
+      }
+
+      // Alt+Z: clear all tiles for selected job
+      if (isAltLetter(e, 'z') && selectedJobId) {
+        e.preventDefault();
+        handleClearJobAssignments();
         return;
       }
 
@@ -1152,7 +1276,7 @@ function AppContent() {
 
       // Each handler returns true if it handled the event
       if (handleAltKey(e, ctx)) return;
-      // v0.3.54: Handle ESC to cancel pick (priority over quick placement)
+      // v0.3.54: Handle ESC to cancel pick
       // v0.3.55: Also restore scroll position for sidebar picks
       if (handleEscapePick(e, () => {
         // Restore scroll position for sidebar picks
@@ -1183,9 +1307,7 @@ function AppContent() {
           });
         }
       }, isPicking)) return;
-      if (handleQuickPlacementKeyboard(e, ctx)) return;
       if (handleDisplayModeToggle(e, setDisplayMode)) return;
-      if (handleEscapeQuickPlacement(e, ctx)) return;
       if (handleEscapeCloseJob(e, ctx)) return;
       if (handleJobNavigation(e, ctx)) return;
       if (handleJumpToDeparture(e, ctx)) return;
@@ -1206,7 +1328,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isQuickPlacementMode, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, triggerMassUnschedule, handleAutoPlaceAll]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -1227,6 +1349,9 @@ function AppContent() {
       console.error(`Swap ${direction} failed:`, err);
     }
   }, [snapshot.assignments, rescheduleTask]);
+
+  // Handle grid background click (deselect job)
+  const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);
 
   // Handle swap up - exchange position with tile above
   const handleSwapUp = useCallback((assignmentId: string) => {
@@ -1560,231 +1685,84 @@ function AppContent() {
     };
   }, [contextMenu, snapshot.assignments]);
 
-  // Quick Placement: get the LAST unscheduled task (for sidebar highlight)
-  // In backward scheduling, we always show the last task as the one to place
-  const lastUnscheduledTask = useMemo(() => {
-    if (!isQuickPlacementMode || !selectedJob) {
-      return null;
+  // Derive whether the context menu task is a split task
+  const contextMenuTask = useMemo(() => {
+    if (!contextMenu) return null;
+    // For grid context menu, assignmentId is the assignment ID
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (assignment) {
+      return snapshot.tasks.find((t) => t.id === assignment.taskId) as InternalTask | undefined ?? null;
     }
-    return getLastUnscheduledTask(selectedJob, snapshot.tasks, snapshot.elements, snapshot.assignments);
-  }, [isQuickPlacementMode, selectedJob, snapshot.tasks, snapshot.elements, snapshot.assignments]);
+    return null;
+  }, [contextMenu, snapshot.assignments, snapshot.tasks]);
 
-  // Quick Placement: get the task for the hovered station (for validation)
-  const quickPlacementTask = useMemo(() => {
-    if (!isQuickPlacementMode || !selectedJob || !quickPlacementHover.stationId) {
-      return null;
-    }
-    return getAvailableTaskForStation(
-      selectedJob,
-      snapshot.tasks,
-      snapshot.elements,
-      snapshot.assignments,
-      quickPlacementHover.stationId
-    );
-  }, [isQuickPlacementMode, selectedJob, quickPlacementHover.stationId, snapshot.tasks, snapshot.elements, snapshot.assignments]);
+  const isContextMenuTaskSplit = contextMenuTask?.type === 'Internal' && !!contextMenuTask.splitGroupId;
 
-  // Quick Placement: calculate scheduled start from Y position
-  const quickPlacementScheduledStart = useMemo(() => {
-    if (!quickPlacementHover.stationId || quickPlacementHover.snappedY === 0) {
-      return null;
-    }
-    const dropTime = yPositionToTime(quickPlacementHover.snappedY, START_HOUR, gridStartDate, pixelsPerHour);
-    return dropTime.toISOString();
-  }, [quickPlacementHover.stationId, quickPlacementHover.snappedY, gridStartDate, pixelsPerHour]);
-
-  // Quick Placement: validation using the same logic as drag
-  const quickPlacementValidation = useDropValidation({
-    snapshot,
-    task: quickPlacementTask,
-    targetStationId: quickPlacementHover.stationId,
-    scheduledStart: quickPlacementScheduledStart,
-    bypassPrecedence: isAltPressed,
-  });
-
-  // Quick Placement: precedence constraint Y positions
-  const quickPlacementPrecedenceConstraints = useMemo(() => {
-    if (!quickPlacementTask) {
-      return { earliestY: null, latestY: null };
-    }
-    const earliestY = getPredecessorConstraint(quickPlacementTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    const latestY = getSuccessorConstraint(quickPlacementTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    return { earliestY, latestY };
-  }, [quickPlacementTask, snapshot, pixelsPerHour, gridStartDate]);
-
-  // Quick Placement: auto-scroll grid to the target station and predecessor constraint line
-  useEffect(() => {
-    if (!isQuickPlacementMode || !lastUnscheduledTask || !gridRef.current) return;
-    if (lastUnscheduledTask.type !== 'Internal') return;
-
-    const stationIndex = snapshot.stations.findIndex((s) => s.id === lastUnscheduledTask.stationId);
-    if (stationIndex < 0) return;
-
-    // Horizontal: scroll to left edge of target station column
-    const { x: stationX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
-    const scrollX = Math.max(0, stationX);
-
-    // Vertical: scroll to predecessor constraint (purple line) if available, else successor (orange)
-    const earliestY = getPredecessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    const latestY = getSuccessorConstraint(lastUnscheduledTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    const targetY = earliestY ?? latestY;
-
-    // Fallback: workshopExitDate (blue deadline line) when no precedence constraints
-    const deadlineY = selectedJob?.workshopExitDate
-      ? timeToYPosition(new Date(selectedJob.workshopExitDate), START_HOUR, pixelsPerHour, gridStartDate)
-      : null;
-
-    const scrollTargetY = targetY ?? deadlineY;
-
-    if (scrollTargetY !== null) {
-      const viewportHeight = gridRef.current.getViewportHeight();
-      // Constraint: viewport 30% | Deadline fallback: viewport 70% (bottom, since we place bottom-up)
-      const offset = targetY !== null ? 0.3 : 0.7;
-      const scrollY = Math.max(0, scrollTargetY - viewportHeight * offset);
-      gridRef.current.scrollTo(scrollX, scrollY, 'smooth');
-    } else {
-      gridRef.current.scrollToX(scrollX, 'smooth');
-    }
-  }, [isQuickPlacementMode, lastUnscheduledTask, snapshot, categoryMap, displayMode, pixelsPerHour, gridStartDate, selectedJob]);
-
-  // Quick Placement: handle mouse move in station column
-  // v0.3.48: Use pixelsPerHour for zoom-aware snapping
-  const handleQuickPlacementMouseMove = useCallback((stationId: string, y: number) => {
-    const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
-    setQuickPlacementHover({ stationId, y, snappedY });
-  }, [pixelsPerHour]);
-
-  // Quick Placement: handle mouse leave from station column
-  const handleQuickPlacementMouseLeave = useCallback(() => {
-    setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-  }, []);
-
-  // Quick Placement: handle click to place task
-  // v0.5.2: Now uses RTK Query mutation
-  const handleQuickPlacementClick = useCallback(async (stationId: string, y: number) => {
-    if (!selectedJob || !isQuickPlacementMode) return;
-
-    // Get the available task for this station
-    const taskToPlace = getAvailableTaskForStation(
-      selectedJob,
-      snapshot.tasks,
-      snapshot.elements,
-      snapshot.assignments,
-      stationId
-    );
-
-    if (!taskToPlace) {
-      console.log('No task available to place on this station');
-      return;
-    }
-
-    // Calculate the time from Y position (multi-day aware)
-    // v0.3.48: Use pixelsPerHour for zoom-aware snapping
-    const snappedY = snapToGrid(Math.max(0, y), pixelsPerHour);
-    const dropTime = yPositionToTime(snappedY, START_HOUR, gridStartDate, pixelsPerHour);
-    const scheduledStart = dropTime.toISOString();
-
-    // Client-side validation before API call
-    const proposedAssignment: ProposedAssignment = {
-      taskId: taskToPlace.id,
-      targetId: stationId,
-      isOutsourced: false,
-      scheduledStart,
-      bypassPrecedence: isAltPressed,
-    };
-    const validationResult = validateAssignment(proposedAssignment, snapshot);
-
-    // Check for blocking conflicts (same logic as drag & drop)
-    // StationConflict is non-blocking (push-down) UNLESS the existing tile is completed
-    const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
-             !(c.type === 'PrecedenceConflict' &&
-               c.details?.constraintType === 'predecessor' &&
-               validationResult.suggestedStart) &&
-             !(c.type === 'PrecedenceConflict' && isAltPressed) &&
-             !(c.type === 'ApprovalGateConflict')
-    );
-
-    if (blockingConflicts.length > 0) {
-      console.log('Quick placement blocked: validation failed', blockingConflicts);
-      return;
-    }
-
-    console.log('Quick placement creating assignment:', {
-      taskId: taskToPlace.id,
-      stationId,
-      scheduledStart,
+  // Handle context menu "Split" action — open the split popover
+  const handleContextMenuSplit = useCallback(() => {
+    if (!contextMenu) return;
+    // Find the task from the context menu's assignment
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
+    const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
+    if (!task || task.type !== 'Internal') return;
+    const internalTask = task as InternalTask;
+    const station = snapshot.stations.find((s) => s.id === internalTask.stationId);
+    setSplitPopover({
+      x: contextMenu.x,
+      y: contextMenu.y,
+      taskId: internalTask.id,
+      task: internalTask,
+      stationName: station?.name ?? 'Unknown',
     });
+  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.stations]);
 
-    const hasPrecedenceConflict = validationResult.conflicts.some(
-      (c) => c.type === 'PrecedenceConflict'
-    );
-
+  // Handle context menu "Fuse" action
+  const handleContextMenuFuse = useCallback(async () => {
+    if (!contextMenu) return;
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
     try {
-      const result = await assignTask({
-        taskId: taskToPlace.id,
-        body: {
-          targetId: stationId,
-          scheduledStart,
-          isOutsourced: false,
-          ...(isAltPressed && hasPrecedenceConflict ? { bypassPrecedence: true } : {}),
-        },
-      }).unwrap();
-
-      console.log('Quick placement assignment created:', result);
-      // Cache invalidation is automatic via invalidatesTags
+      await fuseTask(assignment.taskId).unwrap();
     } catch (error) {
-      console.error('Failed to create assignment:', error);
       showToast(getErrorMessage(error));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Only react to specific snapshot properties, not entire object
-  }, [selectedJob, isQuickPlacementMode, snapshot.tasks, snapshot.assignments, snapshot.stations, snapshot.elements, gridStartDate, pixelsPerHour, assignTask, showToast, isAltPressed]);
+  }, [contextMenu, snapshot.assignments, fuseTask, showToast]);
 
-  // Calculate which stations have available tasks (for quick placement cursor)
-  const stationsWithAvailableTasks = useMemo(() => {
-    if (!isQuickPlacementMode || !selectedJob) {
-      return new Set<string>();
-    }
-    const stationIds = new Set<string>();
-    snapshot.stations.forEach((station) => {
-      const task = getAvailableTaskForStation(
-        selectedJob,
-        snapshot.tasks,
-        snapshot.elements,
-        snapshot.assignments,
-        station.id
-      );
-      if (task) {
-        stationIds.add(station.id);
-      }
-    });
-    return stationIds;
-  }, [isQuickPlacementMode, selectedJob, snapshot.stations, snapshot.tasks, snapshot.elements, snapshot.assignments]);
-
-  // Handle station compact - remove gaps between tiles
-  // Respects precedence: tasks cannot start before their predecessor ends
-  // Works in both mock and API modes via RTK Query mutation
-  const handleCompact = useCallback(async (stationId: string) => {
-    setCompactingStationId(stationId);
+  // Handle split confirm from popover
+  const handleSplitConfirm = useCallback(async (ratio: number) => {
+    if (!splitPopover) return;
     try {
-      await compactStation(stationId).unwrap();
-    } catch (err) {
-      showToast(getErrorMessage(err), 'error');
-    } finally {
-      setCompactingStationId(null);
+      await splitTask({ taskId: splitPopover.taskId, body: { ratio } }).unwrap();
+    } catch (error) {
+      showToast(getErrorMessage(error));
     }
-  }, [compactStation, showToast]);
+    setSplitPopover(null);
+  }, [splitPopover, splitTask, showToast]);
 
-  // Toggle Quick Placement
-  const handleToggleQuickPlacement = useCallback(() => {
-    setIsQuickPlacementMode((prev) => {
-      if (prev) {
-        // Turning off: clear job selection to remove tile muting
-        setSelectedJobId(null);
-      }
-      return !prev;
+  // Handle split from JobDetailsPanel (both assigned and unassigned tasks)
+  const handlePanelSplitTask = useCallback((taskId: string, x: number, y: number) => {
+    const task = snapshot.tasks.find((t) => t.id === taskId);
+    if (!task || task.type !== 'Internal') return;
+    const internalTask = task as InternalTask;
+    const station = snapshot.stations.find((s) => s.id === internalTask.stationId);
+    setSplitPopover({
+      x,
+      y,
+      taskId: internalTask.id,
+      task: internalTask,
+      stationName: station?.name ?? 'Unknown',
     });
-    setQuickPlacementHover({ stationId: null, y: 0, snappedY: 0 });
-  }, [setSelectedJobId, setIsQuickPlacementMode, setQuickPlacementHover]);
+  }, [snapshot.tasks, snapshot.stations]);
+
+  // Handle fuse from JobDetailsPanel
+  const handlePanelFuseTask = useCallback(async (taskId: string) => {
+    try {
+      await fuseTask(taskId).unwrap();
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [fuseTask, showToast]);
 
   // v0.3.54: Handle pick from sidebar (unscheduled task)
   // v0.3.55: Added scroll to target column and save scroll position
@@ -1835,7 +1813,7 @@ function AppContent() {
     const elementTasks = element.taskIds
       .map((id) => taskById.get(id))
       .filter((t): t is Task => t !== undefined)
-      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      .sort(compareTaskOrder);
     const lastTask = elementTasks[elementTasks.length - 1];
     if (!lastTask || lastTask.id !== task.id) return;
 
@@ -1893,12 +1871,13 @@ function AppContent() {
     // so PrecedenceConflict is always blocking (unless Alt-bypassed).
     // StationConflict IS blocking in pick mode (means overlap with another task).
     const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'ApprovalGateConflict')
+      (c) => !(c.type === 'ApprovalGateConflict') &&
+             !(c.type === 'DeadlineConflict')
     );
 
     // Check if only warning (non-blocking) conflicts exist
     const hasWarningOnly = blockingConflicts.length === 0 &&
-      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict');
+      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict');
 
     // Determine ring state
     let ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
@@ -1906,8 +1885,8 @@ function AppContent() {
     if (validationResult.valid) {
       ringState = 'valid';
     } else if (blockingConflicts.length === 0) {
-      ringState = validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict') ? 'warning' : 'valid';
-    } else if (isAltPressed && validationResult.conflicts.some((c) => c.type === 'PrecedenceConflict')) {
+      ringState = validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict') ? 'warning' : 'valid';
+    } else if (isAltPressed && blockingConflicts.length > 0) {
       ringState = 'bypass';
     } else {
       ringState = 'invalid';
@@ -1960,12 +1939,14 @@ function AppContent() {
     // StationConflict is NOT blocking (push-down) UNLESS the existing tile is completed
     // PrecedenceConflict with suggestedStart is NOT blocking (can be placed at suggested time)
     // ApprovalGateConflict is NOT blocking (all gates are warning-only)
+    // DeadlineConflict is NOT blocking (user can place after deadline)
     const blockingConflicts = validationResult.conflicts.filter(
       (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
              !(c.type === 'PrecedenceConflict' &&
                c.details?.constraintType === 'predecessor' &&
                validationResult.suggestedStart) &&
-             !(c.type === 'ApprovalGateConflict')
+             !(c.type === 'ApprovalGateConflict') &&
+             !(c.type === 'DeadlineConflict')
     );
 
     if (blockingConflicts.length > 0 && !isAltPressed) {
@@ -2063,49 +2044,26 @@ function AppContent() {
     setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
   }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, assignTask, rescheduleTask, showToast]);
 
-  // Handle global timeline compaction (v0.3.35)
-  // Compacts each station that has assignments via the compact endpoint.
-  // Runs multiple passes to resolve cross-station dependencies: if a successor's
-  // station is compacted before its predecessor's station, the successor can only
-  // fully compact once the predecessor has been compacted in a previous pass.
-  const handleCompactTimeline = useCallback(async (_horizonHours: CompactHorizon) => {
-    setIsCompactingTimeline(true);
-    try {
-      const stationsWithAssignments = snapshot.stations.filter((s) =>
-        snapshot.assignments.some((a) => a.targetId === s.id && !a.isOutsourced)
-      );
-      // Multiple passes: each pass resolves one level of cross-station dependencies.
-      // $now advances between passes but only by seconds — negligible vs. hour-scale
-      // scheduling. Already-compacted tasks won't re-compact (earliestStart >= scheduledStart).
-      const MAX_PASSES = 5;
-      for (let pass = 0; pass < MAX_PASSES; pass++) {
-        let passCompacted = 0;
-        for (const station of stationsWithAssignments) {
-          const result = await compactStation(station.id).unwrap();
-          passCompacted += result.compactedCount;
-        }
-        if (passCompacted === 0) break;
-      }
-    } catch (err) {
-      showToast(getErrorMessage(err), 'error');
-    } finally {
-      setIsCompactingTimeline(false);
-    }
-  }, [snapshot.stations, snapshot.assignments, compactStation, showToast]);
+  // Smart compaction handler
+  const handleSmartCompact = useCallback(() => {
+    setIsSmartCompactOpen(true);
+  }, []);
+
+  const handleSmartCompactComplete = useCallback(() => {
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [dispatch]);
 
   // Compute footer mode from app state
   const footerMode = useMemo(() => {
     if (isPicking) return 'picking' as const;
-    if (isQuickPlacementMode) return 'quickPlacement' as const;
     if (isJcfModalOpen) return 'jcfModal' as const;
     if (selectedJobId) return 'jobSelected' as const;
     return 'default' as const;
-  }, [isPicking, isQuickPlacementMode, isJcfModalOpen, selectedJobId]);
+  }, [isPicking, isJcfModalOpen, selectedJobId]);
 
   // Scheduler-specific commands — registered into the global Command Center
   const schedulerCommands = useCommands({
     selectedJobId,
-    isQuickPlacementMode,
     onJumpToToday: useCallback(() => {
       if (gridRef.current) {
         const now = new Date();
@@ -2134,10 +2092,6 @@ function AppContent() {
     }, [selectedJobId, orderedJobIds, setSelectedJobId]),
     onNavigateScheduler: useCallback(() => navigate('/'), [navigate]),
     onNavigateFlux: useCallback(() => navigate('/flux'), [navigate]),
-    onToggleQuickPlacement: useCallback(() => {
-      if (!selectedJobId) return;
-      setIsQuickPlacementMode(prev => !prev);
-    }, [selectedJobId]),
     onEditJob: handleEditJob,
     onNewJob: useCallback(() => {
       navigate('/job/new');
@@ -2151,7 +2105,8 @@ function AppContent() {
     onToggleSidebar: useCallback(() => {
       setIsSidebarVisible(prev => !prev);
     }, []),
-    onCompactTimeline: handleCompactTimeline,
+    onSmartCompact: handleSmartCompact,
+    onEvaluateSchedule: useCallback(() => setIsEvaluationOpen(true), []),
     onZoomIn: useCallback(() => {
       const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
       if (idx < ZOOM_LEVELS.length - 1) {
@@ -2167,6 +2122,11 @@ function AppContent() {
     onOpenSaveLoad: useCallback(() => {
       setIsSaveLoadOpen(true);
     }, []),
+    onClearJobAssignments: handleClearJobAssignments,
+    onClearAllAssignments: triggerMassUnschedule,
+    onAsapPlacement: handleAsapPlacement,
+    onAlapPlacement: handleAlapPlacement,
+    onAutoPlaceAll: handleAutoPlaceAll,
   });
 
   // Register scheduler-specific commands into the global Command Center
@@ -2236,7 +2196,7 @@ function AppContent() {
           stations={snapshot.stations}
           categories={snapshot.categories}
           providers={snapshot.providers}
-          activeTaskId={lastUnscheduledTask?.id}
+          activeTaskId={undefined}
           pickedTaskId={pickedTask?.id}
           conflictTaskIds={conflictTaskIds}
           onJumpToTask={handleJumpToTask}
@@ -2252,10 +2212,14 @@ function AppContent() {
           onEditJob={handleEditJob}
           lateJobIds={lateJobIds}
           shippedJobIds={shippedJobIds}
+          onSplitTask={handlePanelSplitTask}
+          onFuseTask={handlePanelFuseTask}
+          allJobs={snapshot.jobs}
+          onSelectJob={setSelectedJobId}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mode banner — shows active mode (quick placement / picking) */}
-          <ModeBanner mode={isPicking ? 'picking' : isQuickPlacementMode ? 'quickPlacement' : null} />
+          {/* Mode banner — shows active mode (picking) */}
+          <ModeBanner mode={isPicking ? 'picking' : null} />
           <div className="flex-1 flex overflow-hidden">
         <DateStrip
           startDate={gridStartDate}
@@ -2283,22 +2247,11 @@ function AppContent() {
           startDate={gridStartDate}
           totalDays={DAY_COUNT}
           onSelectJob={setSelectedJobId}
-          onDeselect={() => setSelectedJobId(null)}
+          onDeselect={handleDeselect}
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
           onToggleComplete={handleToggleComplete}
-          isQuickPlacementMode={isQuickPlacementMode}
-          stationsWithAvailableTasks={stationsWithAvailableTasks}
-          quickPlacementIndicatorY={quickPlacementHover.snappedY}
-          quickPlacementHoverStationId={quickPlacementHover.stationId}
-          onQuickPlacementMouseMove={handleQuickPlacementMouseMove}
-          onQuickPlacementMouseLeave={handleQuickPlacementMouseLeave}
-          onQuickPlacementClick={handleQuickPlacementClick}
-          quickPlacementValidation={quickPlacementValidation}
           isAltPressed={isAltPressed}
-          quickPlacementPrecedenceConstraints={quickPlacementPrecedenceConstraints}
-          compactingStationId={compactingStationId}
-          onCompact={handleCompact}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
@@ -2318,8 +2271,6 @@ function AppContent() {
           displayMode={displayMode}
           lateJobIds={lateJobIds}
           shippedJobIds={shippedJobIds}
-          quickPlacementGhostLabel={selectedJob?.reference}
-          quickPlacementGhostHeight={quickPlacementTask ? ((quickPlacementTask.duration.setupMinutes + quickPlacementTask.duration.runMinutes) / 60) * pixelsPerHour : undefined}
         />
           </div>
           </div>
@@ -2330,7 +2281,7 @@ function AppContent() {
 
       {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
       {selectedJobId && (
-        <style>{`[data-job-id="${selectedJobId}"] { box-shadow: 0 0 0 2px ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; }`}</style>
+        <style>{`[data-job-id="${selectedJobId}"]::after { content: ''; position: absolute; inset: 0; border: 2px solid ${theme === 'light' ? 'rgba(147,51,234,0.75)' : 'rgba(255,255,255,0.7)'}; z-index: 5; pointer-events: none; }`}</style>
       )}
 
       <ShortcutFooter mode={footerMode} />
@@ -2358,7 +2309,22 @@ function AppContent() {
           onSwapUp={handleContextMenuMoveUp}
           onSwapDown={handleContextMenuMoveDown}
           onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
+          onSplit={handleContextMenuSplit}
+          onFuse={handleContextMenuFuse}
+          isSplit={isContextMenuTaskSplit}
           onClose={handleContextMenuClose}
+        />
+      )}
+
+      {/* Split task popover */}
+      {splitPopover && (
+        <SplitTaskPopover
+          x={splitPopover.x}
+          y={splitPopover.y}
+          task={splitPopover.task}
+          stationName={splitPopover.stationName}
+          onConfirm={handleSplitConfirm}
+          onCancel={() => setSplitPopover(null)}
         />
       )}
 
@@ -2390,6 +2356,9 @@ function AppContent() {
           onShipperIdChange={setJcfShipperId}
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
+          requiredJobs={jcfRequiredJobs}
+          onRequiredJobsChange={setJcfRequiredJobs}
+          jobSuggestions={snapshot?.jobs.map((j) => ({ reference: j.reference, client: j.client })) ?? []}
         />
         {/* v0.4.9: Elements Table */}
         <div className="mt-[13px]">
@@ -2440,6 +2409,16 @@ function AppContent() {
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
 
+      {/* Debug Export FAB — copy snapshot to clipboard */}
+      <button
+        onClick={handleDebugExport}
+        className="fixed bottom-[136px] right-6 z-40 w-10 h-10 rounded-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 shadow-lg transition-all flex items-center justify-center opacity-50 hover:opacity-100"
+        aria-label="Copy debug snapshot to clipboard"
+        title="Copy debug snapshot to clipboard"
+      >
+        <ClipboardCopy size={16} />
+      </button>
+
       {/* Save/Load FAB — stacked above Command Center FAB */}
       <button
         onClick={() => setIsSaveLoadOpen(true)}
@@ -2449,6 +2428,77 @@ function AppContent() {
       >
         <Save size={20} />
       </button>
+
+      {/* Mass unschedule confirmation dialog */}
+      {massUnscheduleConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+             style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+             onClick={() => setMassUnscheduleConfirm(null)}>
+          <div className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
+               style={{ minWidth: '22rem' }}
+               onClick={e => e.stopPropagation()}>
+            <h2 className="text-flux-text-primary font-semibold mb-2">
+              Effacer toutes les tuiles ?
+            </h2>
+            <p className="text-flux-text-secondary mb-4" style={{ fontSize: '13px' }}>
+              {getClearableCount(massUnscheduleConfirm.includeInProgress)} tuile(s) seront désplanifiée(s).
+              {!massUnscheduleConfirm.includeInProgress && ' Les tuiles terminées et en cours seront conservées.'}
+              {massUnscheduleConfirm.includeInProgress && ' Les tuiles terminées seront conservées.'}
+            </p>
+            <div className="flex flex-col gap-2 mb-6">
+              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={massUnscheduleConfirm.includeInProgress}
+                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, includeInProgress: e.target.checked } : prev)}
+                  className="accent-red-600"
+                />
+                Inclure les tuiles en cours (intersectent avec NOW)
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={massUnscheduleConfirm.fuseSplits}
+                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, fuseSplits: e.target.checked } : prev)}
+                  className="accent-red-600"
+                />
+                Fusionner les tuiles splittées
+              </label>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
+                      onClick={() => setMassUnscheduleConfirm(null)}>
+                Annuler
+              </button>
+              <button className="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
+                      onClick={handleMassUnscheduleConfirm}>
+                Tout effacer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Evaluation modal */}
+      <ScheduleEvaluationModal
+        isOpen={isEvaluationOpen}
+        onClose={() => setIsEvaluationOpen(false)}
+      />
+
+      {/* Smart Compaction modal */}
+      <SmartCompactModal
+        isOpen={isSmartCompactOpen}
+        onClose={() => setIsSmartCompactOpen(false)}
+        onComplete={handleSmartCompactComplete}
+      />
+
+      {/* Auto-place V1 modal */}
+      <AutoPlaceModal
+        isOpen={isAutoPlaceOpen}
+        onClose={() => setIsAutoPlaceOpen(false)}
+        onComplete={handleAutoPlaceComplete}
+        apiBaseUrl="/api/v1"
+      />
 
       {/* Schedule save/load modal */}
       <ScheduleSaveLoadModal

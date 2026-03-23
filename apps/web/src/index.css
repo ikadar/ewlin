@@ -211,6 +211,40 @@ body {
 }
 
 
+/* ── Tile visual separation (borders, shadow, alternating shade, gradient) ── */
+
+/* 1. Inset shadow */
+[data-testid^="tile-"] {
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), inset 0 -1px 2px rgba(0,0,0,0.04);
+}
+
+/* Setup section inner bottom border (border-box keeps it inside the element height) */
+[data-testid="tile-setup-section"] {
+  border-bottom: 1px dotted black;
+}
+
+/* Run section inner bottom border */
+[data-testid="tile-run-section"] {
+  border-bottom: 3px solid black;
+}
+
+/* Left border notch on run section — breaks visual continuity between stacked tiles */
+[data-testid="tile-run-section"]::before {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: -4px;
+  width: 4px;
+  height: 3px;
+  background: var(--color-flux-base);
+  z-index: 20;
+}
+
+/* ── Light mode tile separation adjustments ── */
+html.light [data-testid^="tile-"] {
+  box-shadow: inset 0 0 0 1px rgba(30,14,42,0.06), inset 0 -1px 2px rgba(30,14,42,0.03);
+}
+
 /* Tile selection ring is applied via dynamic <style> tag on [data-job-id] selector (box-shadow) */
 
 /* v0.3.56: Pick & Place visual feedback */

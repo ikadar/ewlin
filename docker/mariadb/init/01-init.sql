@@ -19,16 +19,8 @@
 -- Scheduling View schema (for future use)
 -- CREATE SCHEMA IF NOT EXISTS scheduling_view;
 
--- Grant privileges to application user
--- (Already done by MARIADB_USER env var, but explicit for clarity)
-GRANT ALL PRIVILEGES ON `flux_scheduler`.* TO 'flux_user'@'%';
-
--- Create test database for PHPUnit integration tests
--- (Symfony DBAL appends '_test' suffix in test environment via doctrine.yaml dbname_suffix)
-CREATE DATABASE IF NOT EXISTS `flux_scheduler_test` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-GRANT ALL PRIVILEGES ON `flux_scheduler_test`.* TO 'flux_user'@'%';
-
-FLUSH PRIVILEGES;
+-- Privileges are granted automatically by MARIADB_USER/MARIADB_DATABASE env vars.
+-- No hardcoded user/database names here — each instance uses its own values.
 
 -- Verify setup
-SELECT 'Database initialization complete (main + test)' AS status;
+SELECT 'Database initialization complete' AS status;

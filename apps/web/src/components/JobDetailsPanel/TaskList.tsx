@@ -1,6 +1,7 @@
-import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import { useMemo } from 'react';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
 import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
-import { isLastTaskOfJob } from '../../utils/taskHelpers';
+import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
@@ -47,6 +48,8 @@ export interface TaskListProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Callback when completion icon is clicked (assignmentId) */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when right-clicking a scheduled tile (context menu) */
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
 }
 
 /**
@@ -73,21 +76,15 @@ export function TaskList({
   onDepartureChange,
   onReturnChange,
   onToggleComplete,
+  onContextMenu,
 }: TaskListProps) {
-  // Create lookup maps for efficient access
-  const assignmentByTaskId = new Map(
-    assignments.map((a) => [a.taskId, a])
-  );
-  const stationById = new Map(
-    stations.map((s) => [s.id, s])
-  );
-  const taskById = new Map(
-    tasks.map((t) => [t.id, t])
-  );
-  // v0.5.11: Provider lookup map
-  const providerById = new Map(
-    providers.map((p) => [p.id, p])
-  );
+  // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
+  const { assignmentByTaskId, stationById, taskById, providerById } = useMemo(() => ({
+    assignmentByTaskId: new Map(assignments.map((a) => [a.taskId, a])),
+    stationById: new Map(stations.map((s) => [s.id, s])),
+    taskById: new Map(tasks.map((t) => [t.id, t])),
+    providerById: new Map(providers.map((p) => [p.id, p])),
+  }), [assignments, stations, tasks, providers]);
 
   if (tasks.length === 0) {
     return (
@@ -176,7 +173,7 @@ export function TaskList({
       const prereqTasks = prereqElem.taskIds
         .map((id) => taskById.get(id))
         .filter((t): t is Task => t !== undefined)
-        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        .sort(compareTaskOrder);
       const lastTask = prereqTasks[prereqTasks.length - 1];
       if (!lastTask) return undefined;
       const lastAssignment = assignmentByTaskId.get(lastTask.id);
@@ -192,7 +189,7 @@ export function TaskList({
    * Render task tiles for an element
    */
   const renderTaskTiles = (elementTasks: Task[], element: Element) => {
-    const sortedTasks = [...elementTasks].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    const sortedTasks = [...elementTasks].sort(compareTaskOrder);
 
     return sortedTasks.map((task, index) => {
       const assignment = assignmentByTaskId.get(task.id);
@@ -214,7 +211,12 @@ export function TaskList({
           ?? (index === 0 ? getCrossElementPredecessorEnd(element) : undefined));
 
       // Check if previous task is a printing task (for dry time label)
-      const showDryTimeLabel = prevTask && isPrintingTask(prevTask);
+      // Skip dry time between parts of the same split group (still same print run)
+      const sameGroup = prevTask
+        && task.type === 'Internal' && prevTask.type === 'Internal'
+        && (task as InternalTask).splitGroupId != null
+        && (task as InternalTask).splitGroupId === (prevTask as InternalTask).splitGroupId;
+      const showDryTimeLabel = prevTask && isPrintingTask(prevTask) && !sameGroup;
 
       // One-way shipping: last outsourced task of a job ships directly to client
       const isLastTask = task.type === 'Outsourced' && isLastTaskOfJob(task.id, elements, tasks);
@@ -258,6 +260,7 @@ export function TaskList({
             onReturnChange={onReturnChange}
             isCompleted={isCompleted}
             onToggleComplete={onToggleComplete}
+            onContextMenu={onContextMenu}
           />
         </div>
       );

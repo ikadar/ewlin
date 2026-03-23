@@ -13,7 +13,9 @@ import {
   worstPrerequisiteStatus,
   getMultiElementStationData,
   sortStationDataBySeverity,
+  getFluxJobStatus,
 } from './fluxAggregation';
+import { FluxJobStatusDot } from './FluxJobStatusDot';
 import { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
 import { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
 import { FluxStationIndicator } from './FluxStationIndicator';
@@ -56,6 +58,10 @@ interface FluxTableProps {
   onToggleShipped?: (jobInternalId: string, shipped: boolean) => void;
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
+  /** Job IDs (internal UUIDs) that are late (from schedule snapshot). */
+  lateJobIds?: Set<string>;
+  /** Job IDs (internal UUIDs) that have scheduling conflicts (excluding DeadlineConflict). */
+  conflictJobIds?: Set<string>;
 }
 
 // Frozen zone shadow styles (spec 3.6) — uses CSS variable for theme adaptability
@@ -119,9 +125,11 @@ function FluxTableHeader() {
       <tr className="bg-flux-hover border-b border-flux-border">
         {/* Expand — frozen left, no header */}
         <th className={`${stickyHeaderCell} left-0 w-6 py-3`} />
+        {/* Status dot — frozen left, no header */}
+        <th className={`${stickyHeaderCell} left-6 py-3`} />
         {/* ID — frozen left */}
         <th
-          className={`${stickyHeaderCell} left-6 ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-10 ${sortableHeader}`}
           title="Identifiant"
           onClick={() => onSortChange('id')}
         >
@@ -129,7 +137,7 @@ function FluxTableHeader() {
         </th>
         {/* Client — frozen left */}
         <th
-          className={`${stickyHeaderCell} left-[6.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[7.5rem] ${sortableHeader}`}
           title="Client"
           onClick={() => onSortChange('client')}
         >
@@ -137,7 +145,7 @@ function FluxTableHeader() {
         </th>
         {/* Designation — frozen left + right shadow */}
         <th
-          className={`${stickyHeaderCell} left-[15.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[16.5rem] ${sortableHeader}`}
           style={LEFT_SHADOW}
           title="Désignation"
           onClick={() => onSortChange('designation')}
@@ -260,19 +268,34 @@ const FluxTableRow = memo(function FluxTableRow({
   // +N count only when collapsed (sub-rows show individual elements when expanded)
   const plusCount = isMulti && !isExpanded ? job.elements.length - 1 : undefined;
 
+  // Job-level status for dot + row tint
+  const jobStatus = getFluxJobStatus(job, ctx.lateJobIds, ctx.conflictJobIds);
+
+  // Row background tint: subtle rgba on <tr>, opaque mix on sticky cells
+  // flux-elevated = rgb(36,36,36). We blend the status color at ~5%.
+  const ROW_TINT: Record<string, { tr: string; sticky: string }> = {
+    late:     { tr: 'rgba(248,113,113,0.06)', sticky: 'rgb(49,39,39)' },
+    conflict: { tr: 'rgba(251,191,36,0.06)',  sticky: 'rgb(47,44,36)' },
+  };
+  const tint = jobStatus ? ROW_TINT[jobStatus] : null;
+
   const cellBase = `${stickyCell} px-4 py-0 text-sm text-flux-text-secondary`;
+  const stickyBg = tint ? { backgroundColor: tint.sticky } : undefined;
 
   // Left border style reflects expanded state
   const expandCellStyle = isMulti
-    ? { borderLeft: isExpanded ? '3px solid rgba(99,102,241,1)' : '3px solid rgba(99,102,241,0.25)' }
-    : undefined;
+    ? { borderLeft: isExpanded ? '3px solid rgba(99,102,241,1)' : '3px solid rgba(99,102,241,0.25)', ...stickyBg }
+    : stickyBg;
+
+  // Row background: status tint > focus tint > none
+  const rowBg = isFocused ? 'rgba(99,102,241,0.08)' : tint?.tr;
 
   return (
     <tr
       className={`border-b border-flux-border group transition-colors cursor-pointer hover:bg-flux-hover ${isMulti ? 'row-multi' : ''} ${isFocused ? 'ring-1 ring-inset ring-indigo-500/40' : ''}`}
       style={{
         height: '2.25rem',
-        backgroundColor: isFocused ? 'rgba(99,102,241,0.08)' : undefined,
+        backgroundColor: rowBg,
       }}
       data-testid="flux-table-row"
       data-job-id={job.id}
@@ -306,20 +329,27 @@ const FluxTableRow = memo(function FluxTableRow({
         )}
       </td>
 
+      {/* Status dot — frozen left */}
+      <td className={`${stickyCell} left-6 py-0`} style={stickyBg}>
+        <div className="flex items-center justify-center h-full">
+          <FluxJobStatusDot status={jobStatus} />
+        </div>
+      </td>
+
       {/* ID — frozen left */}
-      <td className={`${stickyCell} left-6 px-4 py-0 text-sm text-flux-text-primary font-mono font-medium whitespace-nowrap`}>
+      <td className={`${stickyCell} left-10 px-4 py-0 text-sm text-flux-text-primary font-mono font-medium whitespace-nowrap`} style={stickyBg}>
         {job.id}
       </td>
 
       {/* Client — frozen left */}
-      <td className={`${cellBase} left-[6.5rem] whitespace-nowrap`}>
+      <td className={`${cellBase} left-[7.5rem] whitespace-nowrap`} style={stickyBg}>
         {job.client}
       </td>
 
       {/* Designation — frozen left + right shadow */}
       <td
-        className={`${cellBase} left-[15.5rem]`}
-        style={LEFT_SHADOW}
+        className={`${cellBase} left-[16.5rem]`}
+        style={tint ? { ...LEFT_SHADOW, backgroundColor: tint.sticky } : LEFT_SHADOW}
         data-testid="flux-designation"
       >
         {job.designation}
@@ -439,7 +469,7 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Actions — frozen right */}
       <td
         className={`${stickyCell} right-0 px-4 py-0`}
-        style={RIGHT_SHADOW}
+        style={tint ? { ...RIGHT_SHADOW, backgroundColor: tint.sticky } : RIGHT_SHADOW}
       >
         <div className="flex items-center gap-2">
           <button
@@ -496,15 +526,18 @@ function FluxSubRow({
         style={{ borderLeft: '3px solid rgb(99,102,241)' }}
       />
 
-      {/* ID — empty */}
+      {/* Status dot — empty */}
       <td className={`${subRowStickyCell} left-6`} />
 
+      {/* ID — empty */}
+      <td className={`${subRowStickyCell} left-10`} />
+
       {/* Client — empty */}
-      <td className={`${subRowStickyCell} left-[6.5rem]`} />
+      <td className={`${subRowStickyCell} left-[7.5rem]`} />
 
       {/* Designation — label with arrow prefix */}
       <td
-        className={`${subRowStickyCell} left-[15.5rem] px-4 py-0 text-flux-text-tertiary`}
+        className={`${subRowStickyCell} left-[16.5rem] px-4 py-0 text-flux-text-tertiary`}
         style={LEFT_SHADOW}
         data-testid="flux-sub-designation"
       >
@@ -593,6 +626,8 @@ export const FluxTable = memo(function FluxTable({
   shippers = [],
   onToggleShipped,
   onStationClick,
+  lateJobIds = new Set<string>(),
+  conflictJobIds = new Set<string>(),
 }: FluxTableProps) {
   // openListboxId is managed here to coordinate "only one listbox open at a time"
   const [openListboxId, setOpenListboxId] = useState<string | null>(null);
@@ -614,6 +649,8 @@ export const FluxTable = memo(function FluxTable({
     sortDirection,
     onSortChange,
     onStationClick,
+    lateJobIds,
+    conflictJobIds,
   };
 
   return (
@@ -628,6 +665,7 @@ export const FluxTable = memo(function FluxTable({
         >
           <colgroup>
             <col style={{ width: '1.5rem' }} />
+            <col style={{ width: '1rem' }} />
             <col style={{ width: '5rem' }} />
             <col style={{ width: '9rem' }} />
             <col style={{ width: '16rem' }} />

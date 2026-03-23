@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
-import type { CompactHorizon } from '../../utils';
 
 export interface Command {
   id: string;
   label: string;
-  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Compaction' | 'Jobs';
+  category: 'Navigation' | 'Actions' | 'Affichage' | 'Grille' | 'Job selectionne' | 'Jobs';
   shortcut?: string;
   keywords?: string;
   icon?: string;
@@ -24,22 +23,26 @@ export interface UseCommandsOptions {
   onNavigateFlux: () => void;
   onNewJob: () => void;
   onSearchJobs: () => void;
-  onCompactTimeline: (horizon: CompactHorizon) => void;
+  onSmartCompact: () => void;
+  onEvaluateSchedule: () => void;
 
   // Scheduler-specific (optional — omitted when called from non-scheduler pages)
   selectedJobId?: string | null;
-  isQuickPlacementMode?: boolean;
   onJumpToToday?: () => void;
   onJumpToDeparture?: () => void;
   onPrevJob?: () => void;
   onNextJob?: () => void;
-  onToggleQuickPlacement?: () => void;
   onEditJob?: () => void;
   onToggleDisplayMode?: () => void;
   onToggleSidebar?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onOpenSaveLoad?: () => void;
+  onClearJobAssignments?: () => void;
+  onClearAllAssignments?: () => void;
+  onAsapPlacement?: () => void;
+  onAlapPlacement?: () => void;
+  onAutoPlaceAll?: () => void;
 }
 
 const RECENT_KEY = 'flux-recent-commands';
@@ -82,7 +85,6 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     id: 'actions',
     title: 'Actions',
     shortcuts: [
-      { label: 'Placement rapide', keys: ['Alt', 'Q'] },
       { label: 'Modifier le job', keys: ['Alt', 'E'] },
       { label: 'Nouveau job', keys: ['Alt', 'N'] },
       { label: 'Rechercher des jobs', keys: ['Alt', 'F'] },
@@ -110,21 +112,20 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     id: 'job-context',
     title: 'Job selectionne',
     shortcuts: [
-      { label: 'Placer ce job', keys: ['Alt', 'Q'] },
       { label: 'Voir le depart', keys: ['Alt', 'D'] },
       { label: 'Modifier ce job', keys: ['Alt', 'E'] },
       { label: 'Tache terminee', keys: ['Space'] },
+      { label: 'Auto-place ASAP', keys: ['Alt+P', 'S'] },
+      { label: 'Auto-place ALAP', keys: ['Alt+P', 'L'] },
+      { label: 'Effacer toutes les tuiles', keys: ['Alt', 'Z'] },
+      { label: 'Effacer toutes les tuiles (global)', keys: ['Ctrl', 'Alt', 'Z'] },
     ],
   },
   {
     id: 'compaction',
     title: 'Compaction',
     shortcuts: [
-      { label: 'Compacter 4h', keys: ['Alt+C', '1'] },
-      { label: 'Compacter 8h', keys: ['Alt+C', '2'] },
-      { label: 'Compacter 24h', keys: ['Alt+C', '3'] },
-      { label: 'Compacter 48h', keys: ['Alt+C', '4'] },
-      { label: 'Compacter 72h', keys: ['Alt+C', '5'] },
+      { label: 'Smart Compaction', keys: ['Ctrl', 'Alt', 'C'] },
     ],
   },
   {
@@ -139,23 +140,27 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
 export function useCommands(options: UseCommandsOptions): Command[] {
   const {
     selectedJobId,
-    isQuickPlacementMode,
     onNavigateScheduler,
     onNavigateFlux,
     onNewJob,
     onSearchJobs,
-    onCompactTimeline,
+    onSmartCompact,
+    onEvaluateSchedule,
     onJumpToToday,
     onJumpToDeparture,
     onPrevJob,
     onNextJob,
-    onToggleQuickPlacement,
     onEditJob,
     onToggleDisplayMode,
     onToggleSidebar,
     onZoomIn,
     onZoomOut,
     onOpenSaveLoad,
+    onClearJobAssignments,
+    onClearAllAssignments,
+    onAsapPlacement,
+    onAlapPlacement,
+    onAutoPlaceAll,
   } = options;
 
   return useMemo(() => {
@@ -168,12 +173,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       { id: 'new-job', label: 'Nouveau job', category: 'Actions', shortcut: 'Alt+N', keywords: 'create creer nouveau job', icon: 'plus', action: onNewJob },
       { id: 'search-jobs', label: 'Rechercher des jobs', category: 'Actions', shortcut: 'Alt+F', keywords: 'search chercher rechercher filtrer', icon: 'search', action: onSearchJobs },
 
-      // Compaction (shared)
-      { id: 'compact-4h', label: 'Compacter 4h', category: 'Compaction', shortcut: 'Alt+C 1', keywords: 'compact compacter timeline global 4h', action: () => onCompactTimeline(4) },
-      { id: 'compact-8h', label: 'Compacter 8h', category: 'Compaction', shortcut: 'Alt+C 2', keywords: 'compact compacter timeline global 8h', action: () => onCompactTimeline(8) },
-      { id: 'compact-24h', label: 'Compacter 24h', category: 'Compaction', shortcut: 'Alt+C 3', keywords: 'compact compacter timeline global 24h', action: () => onCompactTimeline(24) },
-      { id: 'compact-48h', label: 'Compacter 48h', category: 'Compaction', shortcut: 'Alt+C 4', keywords: 'compact compacter timeline global 48h', action: () => onCompactTimeline(48) },
-      { id: 'compact-72h', label: 'Compacter 72h', category: 'Compaction', shortcut: 'Alt+C 5', keywords: 'compact compacter timeline global 72h', action: () => onCompactTimeline(72) },
+      // Smart Compaction (shared)
+      { id: 'smart-compact', label: 'Smart Compaction', category: 'Actions', shortcut: 'Ctrl+Alt+C', keywords: 'compact smart similarity reorder optimize compacter', action: onSmartCompact },
+      { id: 'evaluate-schedule', label: 'Évaluation du planning', category: 'Actions', shortcut: 'Ctrl+Alt+E', keywords: 'évaluation score calage délai retard evaluate scoring', icon: 'sparkles', action: onEvaluateSchedule },
 
     ];
 
@@ -192,11 +194,23 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     }
 
     // Scheduler-specific: Actions
-    if (onToggleQuickPlacement) {
-      commands.push({ id: 'quick-placement', label: isQuickPlacementMode ? 'Quitter le placement rapide' : 'Mode placement rapide', category: 'Actions', shortcut: 'Alt+Q', keywords: 'place assign quick rapide placement', icon: 'zap', action: onToggleQuickPlacement });
-    }
     if (onEditJob) {
       commands.push({ id: 'edit-job', label: 'Modifier le job', category: 'Actions', shortcut: 'Alt+E', keywords: 'edit modifier job formulaire', icon: 'pencil', action: onEditJob });
+    }
+    if (onClearJobAssignments) {
+      commands.push({ id: 'clear-job-tiles', label: 'Effacer toutes les tuiles', category: 'Job selectionne', shortcut: 'Alt+Z', keywords: 'effacer supprimer tuiles désplanifier rappeler clear remove tiles unschedule recall', icon: 'trash-2', action: onClearJobAssignments });
+    }
+    if (onClearAllAssignments) {
+      commands.push({ id: 'clear-all-tiles', label: 'Effacer toutes les tuiles (global)', category: 'Actions', shortcut: 'Ctrl+Alt+Z', keywords: 'effacer tout désplanifier masse rappeler global réinitialiser clear all unschedule mass recall global reset', icon: 'trash-2', action: onClearAllAssignments });
+    }
+    if (onAsapPlacement) {
+      commands.push({ id: 'asap-placement', label: 'Auto-place ASAP', category: 'Job selectionne', shortcut: 'Alt+P S', keywords: 'asap auto place schedule earliest soon precedence', icon: 'fast-forward', action: onAsapPlacement });
+    }
+    if (onAlapPlacement) {
+      commands.push({ id: 'alap-placement', label: 'Auto-place ALAP', category: 'Job selectionne', shortcut: 'Alt+P L', keywords: 'alap latest deadline backward auto place', icon: 'rewind', action: onAlapPlacement });
+    }
+    if (onAutoPlaceAll) {
+      commands.push({ id: 'auto-place-all', label: 'Auto-place all (V1)', category: 'Actions', shortcut: 'Ctrl+Alt+P', keywords: 'auto place all global fbi dynamic cr schedule everything', icon: 'zap', action: onAutoPlaceAll });
     }
 
     // Scheduler-specific: Affichage
@@ -222,5 +236,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, isQuickPlacementMode, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onCompactTimeline, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onToggleQuickPlacement, onEditJob, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

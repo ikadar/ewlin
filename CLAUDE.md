@@ -17,9 +17,9 @@ ewlin/
     └── domain-model/     # Üzleti szabályok, vocabulary
 ```
 
-## Nyelv
+## Language
 
-A user magyarul kommunikál. A kód, commit üzenetek, és dokumentáció angolul készül.
+Always communicate with the user in English. Code, commit messages, and documentation are also in English.
 
 ## Release workflow
 

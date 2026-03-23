@@ -48,6 +48,8 @@ export interface JcfState {
   isJcfSaving: boolean;
   /** Save error message (null if no error) */
   jcfSaveError: string | null;
+  /** Required job references (comma-separated) */
+  jcfRequiredJobs: string;
 }
 
 // ============================================================================
@@ -69,6 +71,7 @@ const initialState: JcfState = {
   isTemplateSaving: false,
   isJcfSaving: false,
   jcfSaveError: null,
+  jcfRequiredJobs: '',
 };
 
 // ============================================================================
@@ -93,6 +96,7 @@ const jcfSlice = createSlice({
       state.jcfQuantity = '';
       state.jcfDeadline = '';
       state.jcfShipperId = '';
+      state.jcfRequiredJobs = '';
       state.jcfElements = [{ ...DEFAULT_ELEMENT }];
       state.sequenceWorkflow = [];
       state.jcfSaveError = null;
@@ -150,6 +154,10 @@ const jcfSlice = createSlice({
       state.jcfSaveError = action.payload;
     },
 
+    setJcfRequiredJobs: (state, action: PayloadAction<string>) => {
+      state.jcfRequiredJobs = action.payload;
+    },
+
     resetJcfForm: (state) => {
       state.jcfClient = '';
       state.jcfTemplate = '';
@@ -161,6 +169,7 @@ const jcfSlice = createSlice({
       state.sequenceWorkflow = [];
       state.jcfSaveError = null;
       state.isJcfSaving = false;
+      state.jcfRequiredJobs = '';
     },
   },
 });
@@ -185,6 +194,7 @@ export const {
   setIsTemplateSaving,
   setIsJcfSaving,
   setJcfSaveError,
+  setJcfRequiredJobs,
   resetJcfForm,
 } = jcfSlice.actions;
 

@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scheduling Minimap Playground</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,BlinkMacSystemFont,sans-serif;background:#0d1117;color:#e6edf3;height:100vh;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* Header */
+#header{height:48px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 16px;gap:16px;flex-shrink:0}
+#header h1{font-size:14px;font-weight:600;color:#e6edf3;white-space:nowrap}
+#presets{display:flex;gap:6px;margin-left:auto}
+.preset-btn{background:#21262d;color:#8b949e;border:1px solid #30363d;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;transition:all .15s}
+.preset-btn:hover{background:#30363d;color:#e6edf3}
+.preset-btn.active{background:#1f6feb;color:#fff;border-color:#1f6feb}
+
+/* Body */
+#body{flex:1;display:flex;overflow:hidden}
+
+/* Controls */
+#controls{width:220px;flex-shrink:0;background:#161b22;border-right:1px solid #30363d;padding:12px;overflow-y:auto}
+.ctrl-group{margin-bottom:16px}
+.ctrl-group h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8b949e;margin-bottom:8px}
+.ctrl-row{margin-bottom:8px}
+.ctrl-row label{display:block;font-size:12px;color:#c9d1d9;margin-bottom:4px}
+.seg-control{display:flex;gap:0;border:1px solid #30363d;border-radius:6px;overflow:hidden}
+.seg-btn{flex:1;background:#21262d;color:#8b949e;border:none;padding:6px 4px;font-size:11px;cursor:pointer;transition:all .15s;border-right:1px solid #30363d}
+.seg-btn:last-child{border-right:none}
+.seg-btn.active{background:#1f6feb;color:#fff}
+.seg-btn:hover:not(.active){background:#30363d;color:#e6edf3}
+input[type=range]{width:100%;accent-color:#58a6ff;height:4px;margin-top:4px}
+.range-val{font-size:11px;color:#58a6ff;float:right}
+.toggle-row{display:flex;align-items:center;justify-content:space-between}
+.toggle-row label{margin-bottom:0}
+.toggle{position:relative;width:36px;height:20px;cursor:pointer}
+.toggle input{display:none}
+.toggle-track{position:absolute;inset:0;background:#30363d;border-radius:10px;transition:background .2s}
+.toggle input:checked+.toggle-track{background:#1f6feb}
+.toggle-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#e6edf3;border-radius:50%;transition:transform .2s}
+.toggle input:checked~.toggle-knob{transform:translateX(16px)}
+.kbd-hint{font-size:10px;color:#484f58;margin-left:4px}
+.selection-info{background:#21262d;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:11px;color:#8b949e}
+.selection-info .job-name{color:#e6edf3;font-weight:600}
+.selection-info .job-detail{margin-top:2px}
+.clear-btn{background:none;border:1px solid #30363d;color:#8b949e;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;margin-top:6px}
+.clear-btn:hover{color:#e6edf3;border-color:#8b949e}
+.legend{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#8b949e}
+.legend-swatch{width:10px;height:10px;border-radius:2px}
+
+/* Content area */
+#content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#grid-row{flex:1;display:flex;overflow:hidden}
+
+/* Time column (left side, syncs vertically) */
+#time-col{width:68px;flex-shrink:0;background:#0d1117;border-right:1px solid #30363d;display:flex;flex-direction:column}
+.time-col-header{height:36px;flex-shrink:0;border-bottom:1px solid #30363d;background:#161b22;display:flex;align-items:center;justify-content:center;font-size:10px;color:#484f58}
+#time-labels-wrap{flex:1;overflow:hidden;position:relative}
+#time-labels{position:relative}
+.time-label{position:absolute;right:8px;font-size:9px;color:#484f58;transform:translateY(-50%);white-space:nowrap}
+.time-label.day-start{color:#c9d1d9;font-weight:600;font-size:10px}
+
+/* Main grid (scrolls both ways) */
+#grid-scroll{flex:1;overflow:auto;position:relative;background:#0d1117}
+#grid-content{position:relative}
+
+/* Station headers (sticky top row) */
+#station-headers{position:sticky;top:0;z-index:5;display:flex;background:#161b22;border-bottom:1px solid #30363d;height:36px}
+.station-header{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#c9d1d9;border-right:1px solid #30363d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.station-header:nth-child(even){background:rgba(10,14,20,0.5)}
+
+/* Grid body (station columns side by side) */
+#grid-body{display:flex;position:relative}
+.station-column{position:relative;border-right:1px solid #1c2128}
+.station-column:nth-child(even){background:rgba(10,14,20,0.3)}
+
+/* Hour grid lines */
+.hour-line{position:absolute;left:0;height:0;border-top:1px solid #1c2128;pointer-events:none;z-index:1}
+.hour-line.day-start{border-top:1px solid #30363d}
+
+/* Job blocks (positioned vertically within columns) */
+.job-block{position:absolute;left:3px;right:3px;border-radius:3px;padding:2px 4px;font-size:9px;line-height:1.2;color:#fff;overflow:hidden;cursor:pointer;transition:filter .1s,box-shadow .15s;text-shadow:0 1px 2px rgba(0,0,0,.5);z-index:2;min-height:2px}
+.job-block:hover{filter:brightness(1.25);z-index:3}
+.job-block.selected{box-shadow:0 0 0 2px #fff,0 0 12px rgba(88,166,255,.6);z-index:4;filter:brightness(1.15)}
+
+/* Minimap right rail */
+#minimap-right{width:130px;flex-shrink:0;background:#0a0e14;border-left:1px solid #30363d;position:relative;cursor:crosshair;display:none}
+#minimap-right.visible{display:block}
+#minimap-right canvas{display:block;width:100%;height:100%}
+
+/* Minimap bottom bar */
+#minimap-bottom{height:90px;flex-shrink:0;background:#0a0e14;border-top:1px solid #30363d;position:relative;cursor:crosshair;display:none}
+#minimap-bottom.visible{display:block}
+#minimap-bottom canvas{display:block;width:100%;height:100%}
+
+/* Prompt bar */
+#prompt-bar{flex-shrink:0;background:#161b22;border-top:1px solid #30363d;padding:8px 16px;display:flex;align-items:center;gap:12px;min-height:44px}
+#prompt-text{flex:1;font-size:11px;color:#8b949e;font-family:'SF Mono',Menlo,monospace;line-height:1.4;max-height:60px;overflow-y:auto}
+#copy-btn{background:#21262d;color:#8b949e;border:1px solid #30363d;padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;transition:all .15s}
+#copy-btn:hover{background:#30363d;color:#e6edf3}
+#copy-btn.copied{background:#238636;color:#fff;border-color:#238636}
+
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#0d1117}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#484f58}
+::-webkit-scrollbar-corner{background:#0d1117}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>Scheduling Minimap Playground</h1>
+    <div id="presets">
+      <button class="preset-btn active" data-preset="default">Default</button>
+      <button class="preset-btn" data-preset="bottleneck">Bottleneck</button>
+      <button class="preset-btn" data-preset="status">Status Board</button>
+      <button class="preset-btn" data-preset="sparse">Sparse</button>
+      <button class="preset-btn" data-preset="packed">Full Capacity</button>
+    </div>
+  </div>
+
+  <div id="body">
+    <div id="controls">
+      <div class="ctrl-group">
+        <h3>Minimap</h3>
+        <div class="ctrl-row">
+          <label>Position</label>
+          <div class="seg-control" id="seg-position">
+            <button class="seg-btn active" data-val="right">Right Rail</button>
+            <button class="seg-btn" data-val="bottom">Bottom Bar</button>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div class="toggle-row">
+            <label>Visible <span class="kbd-hint">(M)</span></label>
+            <label class="toggle">
+              <input type="checkbox" id="chk-visible" checked>
+              <span class="toggle-track"></span>
+              <span class="toggle-knob"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <h3>Data</h3>
+        <div class="ctrl-row">
+          <label>Job Density <span class="range-val" id="val-density">60%</span></label>
+          <input type="range" id="rng-density" min="10" max="100" value="60">
+        </div>
+        <div class="ctrl-row">
+          <label>Stations <span class="range-val" id="val-stations">10</span></label>
+          <input type="range" id="rng-stations" min="4" max="14" value="10">
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <h3>Appearance</h3>
+        <div class="ctrl-row">
+          <label>Color Mode</label>
+          <div class="seg-control" id="seg-colormode">
+            <button class="seg-btn active" data-val="type">Type</button>
+            <button class="seg-btn" data-val="priority">Priority</button>
+            <button class="seg-btn" data-val="status">Status</button>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div class="toggle-row">
+            <label>Highlight Gaps</label>
+            <label class="toggle">
+              <input type="checkbox" id="chk-gaps">
+              <span class="toggle-track"></span>
+              <span class="toggle-knob"></span>
+            </label>
+          </div>
+        </div>
+        <div class="ctrl-row" id="legend-container">
+          <label>Legend</label>
+          <div class="legend" id="legend"></div>
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <h3>Selection</h3>
+        <div id="selection-panel">
+          <div class="selection-info" style="color:#484f58">Click a job in the grid to highlight it on the minimap</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="content">
+      <div id="grid-row">
+        <div id="time-col">
+          <div class="time-col-header">Time</div>
+          <div id="time-labels-wrap"><div id="time-labels"></div></div>
+        </div>
+        <div id="grid-scroll"><div id="grid-content"></div></div>
+        <div id="minimap-right" class="visible"><canvas id="canvas-right"></canvas></div>
+      </div>
+      <div id="minimap-bottom"><canvas id="canvas-bottom"></canvas></div>
+    </div>
+  </div>
+
+  <div id="prompt-bar">
+    <div id="prompt-text"></div>
+    <button id="copy-btn">Copy</button>
+  </div>
+</div>
+
+<script>
+// ===================== CONSTANTS =====================
+const PX_PER_MIN = 2;
+const TOTAL_MINUTES = 1440; // 3 days x 8h
+const GRID_HEIGHT = TOTAL_MINUTES * PX_PER_MIN; // 2880px
+const COL_WIDTH = 120;
+const HEADER_H = 36;
+const DAYS = ['Monday','Tuesday','Wednesday'];
+const HOURS_PER_DAY = 8;
+const START_HOUR = 8;
+
+const STATION_POOL = [
+  'Prepress','Digital A','Digital B','Offset 1',
+  'Offset 2','Large Fmt','Cutting','Folding',
+  'Binding','Lamination','UV Coat','QC & Pack',
+  'Ship Prep','CNC Router'
+];
+
+const JOB_TYPES = [
+  {name:'Business Cards',prefix:'BC',color:'#4FC3F7'},
+  {name:'Brochures',prefix:'BR',color:'#81C784'},
+  {name:'Posters',prefix:'PO',color:'#FFB74D'},
+  {name:'Books',prefix:'BK',color:'#BA68C8'},
+  {name:'Flyers',prefix:'FL',color:'#FF8A65'},
+  {name:'Banners',prefix:'BN',color:'#4DB6AC'},
+  {name:'Packaging',prefix:'PK',color:'#F06292'},
+  {name:'Stickers',prefix:'ST',color:'#AED581'}
+];
+
+const PRIORITY_COLORS = {low:'#4DB6AC',medium:'#FFD54F',high:'#FF8A65',urgent:'#EF5350'};
+const STATUS_COLORS   = {queued:'#78909C',inProgress:'#42A5F5',done:'#66BB6A',late:'#EF5350'};
+const PRIORITIES = ['low','medium','high','urgent'];
+const STATUSES   = ['queued','inProgress','done','late'];
+
+const PRESETS = {
+  default:    {position:'right', visible:true, density:60,  stations:10, colorMode:'type',     gaps:false},
+  bottleneck: {position:'right', visible:true, density:85,  stations:10, colorMode:'priority', gaps:true},
+  status:     {position:'bottom',visible:true, density:70,  stations:8,  colorMode:'status',   gaps:false},
+  sparse:     {position:'right', visible:true, density:30,  stations:6,  colorMode:'type',     gaps:false},
+  packed:     {position:'bottom',visible:true, density:95,  stations:12, colorMode:'type',     gaps:true}
+};
+const DEFAULTS = PRESETS.default;
+
+// ===================== STATE =====================
+const state = {
+  position:'right', visible:true, density:60, stationCount:10,
+  colorMode:'type', highlightGaps:false, selectedJobId:null,
+  activePreset:'default', stations:[], jobs:[]
+};
+
+// ===================== SEEDED RANDOM =====================
+let _seed = 42;
+function srand(s){_seed=s}
+function rand(){_seed=(_seed*16807)%2147483647;return(_seed-1)/2147483646}
+function randInt(a,b){return a+Math.floor(rand()*(b-a+1))}
+function pick(arr){return arr[Math.floor(rand()*arr.length)]}
+
+// ===================== DATA GENERATION =====================
+function generateData(){
+  srand(42);
+  state.stations = STATION_POOL.slice(0,state.stationCount).map((name,i)=>({id:i,name}));
+  state.jobs = [];
+  let id = 0;
+  const density = state.density / 100;
+
+  for(let si=0; si<state.stations.length; si++){
+    let t = randInt(0, Math.floor(30*(1-density)));
+    while(t < TOTAL_MINUTES){
+      const type = pick(JOB_TYPES);
+      const dur = randInt(15, 180);
+      if(t+dur > TOTAL_MINUTES) break;
+      state.jobs.push({
+        id: id++, stationIndex: si, start: t, duration: dur,
+        type, name: type.prefix+'-'+String(id).padStart(3,'0'),
+        priority: pick(PRIORITIES), status: pick(STATUSES)
+      });
+      t += dur;
+      if(rand() > density*0.85) t += randInt(5, Math.floor(90*(1-density)+10));
+      else t += randInt(0,3);
+    }
+  }
+  state.selectedJobId = null;
+}
+
+// ===================== COLOR =====================
+function getJobColor(job){
+  if(state.colorMode==='type')     return job.type.color;
+  if(state.colorMode==='priority') return PRIORITY_COLORS[job.priority];
+  return STATUS_COLORS[job.status];
+}
+
+// ===================== GRID RENDERING (VERTICAL) =====================
+function renderGrid(){
+  const gc = document.getElementById('grid-content');
+  gc.innerHTML = '';
+  const gridW = state.stations.length * COL_WIDTH;
+  gc.style.width  = gridW + 'px';
+  gc.style.height = (GRID_HEIGHT + HEADER_H) + 'px';
+
+  // Station headers (sticky top)
+  const headers = document.createElement('div');
+  headers.id = 'station-headers';
+  state.stations.forEach((st,i) => {
+    const h = document.createElement('div');
+    h.className = 'station-header';
+    h.style.width = COL_WIDTH + 'px';
+    h.textContent = st.name;
+    headers.appendChild(h);
+  });
+  gc.appendChild(headers);
+
+  // Grid body (columns)
+  const body = document.createElement('div');
+  body.id = 'grid-body';
+  body.style.height = GRID_HEIGHT + 'px';
+  body.style.width  = gridW + 'px';
+  body.style.position = 'relative';
+
+  // Hour gridlines (span full width)
+  for(let d=0; d<3; d++){
+    for(let h=0; h<=HOURS_PER_DAY; h++){
+      const min = (d*HOURS_PER_DAY+h)*60;
+      const line = document.createElement('div');
+      line.className = 'hour-line'+(h===0?' day-start':'');
+      line.style.top   = (min*PX_PER_MIN)+'px';
+      line.style.width  = gridW+'px';
+      body.appendChild(line);
+    }
+  }
+
+  // Station columns with jobs
+  state.stations.forEach((st,i) => {
+    const col = document.createElement('div');
+    col.className = 'station-column';
+    col.style.width  = COL_WIDTH+'px';
+    col.style.height = GRID_HEIGHT+'px';
+
+    const colJobs = state.jobs.filter(j=>j.stationIndex===i);
+    colJobs.forEach(job => {
+      const b = document.createElement('div');
+      b.className = 'job-block'+(job.id===state.selectedJobId?' selected':'');
+      b.style.top    = (job.start*PX_PER_MIN)+'px';
+      b.style.height = (job.duration*PX_PER_MIN)+'px';
+      b.style.backgroundColor = getJobColor(job);
+      b.dataset.jobId = job.id;
+      b.title = `${job.name} — ${job.type.name}\n${job.duration}min | ${job.priority} | ${job.status}`;
+      if(job.duration*PX_PER_MIN > 28) b.textContent = job.name;
+      col.appendChild(b);
+    });
+    body.appendChild(col);
+  });
+
+  gc.appendChild(body);
+
+  // Time labels
+  renderTimeLabels();
+}
+
+function renderTimeLabels(){
+  const tl = document.getElementById('time-labels');
+  tl.innerHTML = '';
+  tl.style.height = GRID_HEIGHT+'px';
+
+  for(let d=0; d<3; d++){
+    for(let h=0; h<HOURS_PER_DAY; h++){
+      const min = (d*HOURS_PER_DAY+h)*60;
+      const lbl = document.createElement('div');
+      lbl.className = 'time-label'+(h===0?' day-start':'');
+      lbl.style.top = (min*PX_PER_MIN)+'px';
+      if(h===0) lbl.textContent = DAYS[d]+' '+(START_HOUR+h)+':00';
+      else lbl.textContent = (START_HOUR+h)+':00';
+      tl.appendChild(lbl);
+    }
+  }
+}
+
+// ===================== MINIMAP RENDERING =====================
+let pulsePhase = 0;
+let pulseRaf = null;
+
+function getActiveCanvas(){
+  return document.getElementById(state.position==='right'?'canvas-right':'canvas-bottom');
+}
+function getActiveContainer(){
+  return document.getElementById(state.position==='right'?'minimap-right':'minimap-bottom');
+}
+
+function renderMinimap(){
+  const container = getActiveContainer();
+  const canvas    = getActiveCanvas();
+  if(!state.visible || !container.offsetWidth || !container.offsetHeight) return;
+
+  const rect = container.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  if(w<1||h<1) return;
+
+  const dpr = window.devicePixelRatio||1;
+  const cw = Math.floor(w*dpr), ch = Math.floor(h*dpr);
+  if(canvas.width!==cw||canvas.height!==ch){ canvas.width=cw; canvas.height=ch; }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  // Minimap maps: X = stations, Y = time
+  const stationW  = w / state.stations.length;
+  const timeScale = h / TOTAL_MINUTES; // minimap px per minute
+
+  // Background
+  ctx.fillStyle = '#0a0e14';
+  ctx.fillRect(0,0,w,h);
+
+  // Station column bands
+  state.stations.forEach((_,i) => {
+    ctx.fillStyle = i%2===0 ? '#12161e' : '#0e1219';
+    ctx.fillRect(i*stationW, 0, stationW, h);
+  });
+
+  // Column dividers
+  ctx.strokeStyle = '#1c2128';
+  ctx.lineWidth = 0.5;
+  state.stations.forEach((_,i) => {
+    if(i===0) return;
+    ctx.beginPath();
+    ctx.moveTo(i*stationW, 0);
+    ctx.lineTo(i*stationW, h);
+    ctx.stroke();
+  });
+
+  // Day divider lines (horizontal)
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 0.5;
+  for(let d=1; d<3; d++){
+    const y = d * HOURS_PER_DAY * 60 * timeScale;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+
+  // Gap highlighting
+  if(state.highlightGaps){
+    state.stations.forEach((_,i) => {
+      const x = i*stationW;
+      const colJobs = state.jobs.filter(j=>j.stationIndex===i).sort((a,b)=>a.start-b.start);
+      let end = 0;
+      colJobs.forEach(j => {
+        if(j.start > end){
+          const gy = end*timeScale, gh = (j.start-end)*timeScale;
+          ctx.fillStyle = 'rgba(239,83,80,0.15)';
+          ctx.fillRect(x+0.5, gy, stationW-1, gh);
+        }
+        end = Math.max(end, j.start+j.duration);
+      });
+      if(end < TOTAL_MINUTES){
+        ctx.fillStyle = 'rgba(239,83,80,0.08)';
+        ctx.fillRect(x+0.5, end*timeScale, stationW-1, (TOTAL_MINUTES-end)*timeScale);
+      }
+    });
+  }
+
+  // Jobs
+  ctx.globalAlpha = 0.85;
+  state.jobs.forEach(job => {
+    const jx = job.stationIndex*stationW + 1;
+    const jy = job.start*timeScale;
+    const jw = stationW - 2;
+    const jh = Math.max(job.duration*timeScale, 1);
+    ctx.fillStyle = getJobColor(job);
+    ctx.fillRect(jx, jy, jw, jh);
+  });
+  ctx.globalAlpha = 1;
+
+  // Selected job glow
+  if(state.selectedJobId !== null){
+    const job = state.jobs.find(j=>j.id===state.selectedJobId);
+    if(job){
+      const jx = job.stationIndex*stationW;
+      const jy = job.start*timeScale;
+      const jw = stationW;
+      const jh = Math.max(job.duration*timeScale, 2);
+      const glow = 4+Math.sin(pulsePhase)*3;
+      ctx.save();
+      ctx.shadowColor='#fff'; ctx.shadowBlur=glow;
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+      ctx.strokeRect(jx+0.5, jy+0.5, jw-1, jh-1);
+      ctx.restore();
+    }
+  }
+
+  // Viewport indicator
+  const gridEl = document.getElementById('grid-scroll');
+  const gcEl   = document.getElementById('grid-content');
+  const scrollW = gcEl.scrollWidth  || 1;
+  const scrollH = gcEl.scrollHeight || 1;
+
+  const vpX = (gridEl.scrollLeft / scrollW) * w;
+  const vpY = (gridEl.scrollTop  / scrollH) * h;
+  const vpW = (gridEl.clientWidth  / scrollW) * w;
+  const vpH = (gridEl.clientHeight / scrollH) * h;
+
+  // Dim outside viewport
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0,   0,    w,    vpY);               // top
+  ctx.fillRect(0,   vpY+vpH, w, h-vpY-vpH);         // bottom
+  ctx.fillRect(0,   vpY,  vpX,  vpH);                // left
+  ctx.fillRect(vpX+vpW, vpY, w-vpX-vpW, vpH);       // right
+
+  // Viewport border
+  ctx.strokeStyle = 'rgba(88,166,255,0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(vpX+0.5, vpY+0.5, vpW-1, vpH-1);
+}
+
+// Pulse animation
+function startPulse(){
+  if(pulseRaf) return;
+  (function tick(){ pulsePhase+=0.08; renderMinimap();
+    pulseRaf = state.selectedJobId!==null ? requestAnimationFrame(tick) : null;
+  })();
+}
+function stopPulse(){ if(pulseRaf){cancelAnimationFrame(pulseRaf);pulseRaf=null} }
+
+// ===================== MINIMAP INTERACTION =====================
+function setupMinimapInteraction(container, canvas){
+  let dragging=false, dragSX, dragSY, scrollSX, scrollSY;
+
+  container.addEventListener('mousedown', e=>{
+    if(!state.visible) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+    const grid = document.getElementById('grid-scroll');
+    const gc   = document.getElementById('grid-content');
+
+    // Jump viewport center to click position
+    grid.scrollLeft = (mx/rect.width)  * gc.scrollWidth  - grid.clientWidth/2;
+    grid.scrollTop  = (my/rect.height) * gc.scrollHeight - grid.clientHeight/2;
+
+    dragging=true;
+    dragSX=e.clientX; dragSY=e.clientY;
+    scrollSX=grid.scrollLeft; scrollSY=grid.scrollTop;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const grid = document.getElementById('grid-scroll');
+    const gc   = document.getElementById('grid-content');
+    grid.scrollLeft = scrollSX + (e.clientX-dragSX) * (gc.scrollWidth/rect.width);
+    grid.scrollTop  = scrollSY + (e.clientY-dragSY) * (gc.scrollHeight/rect.height);
+  });
+
+  document.addEventListener('mouseup', ()=>{ dragging=false });
+}
+
+// ===================== SCROLL SYNC =====================
+function setupScrollSync(){
+  const grid = document.getElementById('grid-scroll');
+  const timeWrap = document.getElementById('time-labels-wrap');
+  let raf = null;
+  grid.addEventListener('scroll', ()=>{
+    // Sync time labels with vertical scroll
+    timeWrap.scrollTop = grid.scrollTop - HEADER_H;
+    if(raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(()=>{ renderMinimap(); raf=null; });
+  });
+}
+
+// ===================== JOB CLICK =====================
+function setupJobClick(){
+  document.getElementById('grid-content').addEventListener('click', e=>{
+    const block = e.target.closest('.job-block');
+    if(!block) return;
+    const jobId = parseInt(block.dataset.jobId);
+    state.selectedJobId = state.selectedJobId===jobId ? null : jobId;
+    updateSelection(); recolorGrid();
+    if(state.selectedJobId!==null) startPulse();
+    else { stopPulse(); renderMinimap(); }
+  });
+}
+
+function updateSelection(){
+  const panel = document.getElementById('selection-panel');
+  if(state.selectedJobId===null){
+    panel.innerHTML='<div class="selection-info" style="color:#484f58">Click a job in the grid to highlight it on the minimap</div>';
+    return;
+  }
+  const job = state.jobs.find(j=>j.id===state.selectedJobId);
+  if(!job) return;
+  const station = state.stations[job.stationIndex];
+  panel.innerHTML=`<div class="selection-info">
+    <div class="job-name" style="color:${getJobColor(job)}">${job.name}</div>
+    <div class="job-detail">${job.type.name}</div>
+    <div class="job-detail">${station.name} &middot; ${job.duration}min</div>
+    <div class="job-detail">${job.priority} priority &middot; ${job.status}</div>
+    <button class="clear-btn" onclick="clearSelection()">Clear</button>
+  </div>`;
+}
+
+function clearSelection(){
+  state.selectedJobId=null; updateSelection(); recolorGrid(); stopPulse(); renderMinimap();
+}
+
+function recolorGrid(){
+  document.querySelectorAll('.job-block').forEach(b=>{
+    const job = state.jobs.find(j=>j.id===parseInt(b.dataset.jobId));
+    if(!job) return;
+    b.style.backgroundColor = getJobColor(job);
+    b.classList.toggle('selected', job.id===state.selectedJobId);
+  });
+}
+
+// ===================== LEGEND =====================
+function renderLegend(){
+  const el = document.getElementById('legend');
+  let items;
+  if(state.colorMode==='type')     items=JOB_TYPES.map(t=>({label:t.prefix,color:t.color,title:t.name}));
+  else if(state.colorMode==='priority') items=PRIORITIES.map(p=>({label:p,color:PRIORITY_COLORS[p]}));
+  else items=STATUSES.map(s=>({label:s.replace(/([A-Z])/g,' $1').trim(),color:STATUS_COLORS[s]}));
+  el.innerHTML = items.map(it=>`<div class="legend-item" title="${it.title||it.label}"><span class="legend-swatch" style="background:${it.color}"></span>${it.label}</div>`).join('');
+}
+
+// ===================== LAYOUT =====================
+function updateLayout(){
+  const mr = document.getElementById('minimap-right');
+  const mb = document.getElementById('minimap-bottom');
+  if(state.position==='right'){ mr.classList.toggle('visible',state.visible); mb.classList.remove('visible'); }
+  else { mr.classList.remove('visible'); mb.classList.toggle('visible',state.visible); }
+  requestAnimationFrame(renderMinimap);
+}
+
+// ===================== PROMPT =====================
+function updatePrompt(){
+  const parts = [];
+  parts.push(`Position: ${state.position==='right'?'right sidebar (130px)':'bottom bar (90px)'}`);
+  parts.push(`Color: by ${state.colorMode}`);
+  if(state.density!==DEFAULTS.density){
+    const desc = state.density>80?'dense':state.density>50?'moderate':'sparse';
+    parts.push(`density: ${desc} (~${state.density}%)`);
+  }
+  if(state.stationCount!==DEFAULTS.stations) parts.push(`${state.stationCount} stations`);
+  if(state.highlightGaps) parts.push('gap highlighting on');
+
+  const prompt = `Implement a vertical scheduling grid minimap. Stations are columns, time flows top-to-bottom. ${parts.join('. ')}. Features: click-to-navigate, drag viewport, keyboard toggle (M). Jobs render as abstract color blocks — pattern recognition over readability. Areas outside viewport are dimmed.${state.highlightGaps?' Idle gaps highlighted in subtle red.':''}`;
+  document.getElementById('prompt-text').textContent = prompt;
+}
+
+// ===================== CONTROLS =====================
+function setupControls(){
+  function setupSeg(id, cb){
+    document.getElementById(id).querySelectorAll('.seg-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        btn.parentElement.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        cb(btn.dataset.val);
+      });
+    });
+  }
+
+  setupSeg('seg-position', v=>{ state.position=v; updateLayout(); updatePrompt(); syncPresetHighlight(); });
+  setupSeg('seg-colormode', v=>{ state.colorMode=v; recolorGrid(); renderMinimap(); renderLegend(); updatePrompt(); syncPresetHighlight(); });
+
+  document.getElementById('rng-density').addEventListener('input', e=>{
+    state.density=+e.target.value;
+    document.getElementById('val-density').textContent=state.density+'%';
+    generateData(); renderGrid(); renderMinimap(); updatePrompt(); syncPresetHighlight();
+  });
+
+  document.getElementById('rng-stations').addEventListener('input', e=>{
+    state.stationCount=+e.target.value;
+    document.getElementById('val-stations').textContent=state.stationCount;
+    generateData(); renderGrid(); requestAnimationFrame(renderMinimap); updatePrompt(); syncPresetHighlight();
+  });
+
+  document.getElementById('chk-visible').addEventListener('change', e=>{
+    state.visible=e.target.checked; updateLayout(); updatePrompt(); syncPresetHighlight();
+  });
+
+  document.getElementById('chk-gaps').addEventListener('change', e=>{
+    state.highlightGaps=e.target.checked; renderMinimap(); updatePrompt(); syncPresetHighlight();
+  });
+
+  document.addEventListener('keydown', e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+    if(e.key==='m'||e.key==='M'){
+      state.visible=!state.visible;
+      document.getElementById('chk-visible').checked=state.visible;
+      updateLayout(); updatePrompt();
+    }
+  });
+
+  document.querySelectorAll('.preset-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>applyPreset(btn.dataset.preset));
+  });
+
+  document.getElementById('copy-btn').addEventListener('click',()=>{
+    navigator.clipboard.writeText(document.getElementById('prompt-text').textContent);
+    const btn=document.getElementById('copy-btn');
+    btn.textContent='Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); },1500);
+  });
+}
+
+// ===================== PRESETS =====================
+function applyPreset(name){
+  const p = PRESETS[name]; if(!p) return;
+  Object.assign(state, {
+    position:p.position, visible:p.visible, density:p.density,
+    stationCount:p.stations, colorMode:p.colorMode, highlightGaps:p.gaps, activePreset:name
+  });
+  // Sync UI
+  document.querySelectorAll('#seg-position .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===p.position));
+  document.querySelectorAll('#seg-colormode .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===p.colorMode));
+  document.getElementById('chk-visible').checked=p.visible;
+  document.getElementById('chk-gaps').checked=p.gaps;
+  document.getElementById('rng-density').value=p.density;
+  document.getElementById('val-density').textContent=p.density+'%';
+  document.getElementById('rng-stations').value=p.stations;
+  document.getElementById('val-stations').textContent=p.stations;
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.toggle('active',b.dataset.preset===name));
+  generateData(); renderGrid(); updateLayout(); renderLegend(); updatePrompt();
+}
+
+function syncPresetHighlight(){
+  const match = Object.entries(PRESETS).find(([_,p])=>
+    p.position===state.position && p.visible===state.visible && p.density===state.density &&
+    p.stations===state.stationCount && p.colorMode===state.colorMode && p.gaps===state.highlightGaps
+  );
+  state.activePreset = match?match[0]:null;
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.toggle('active',b.dataset.preset===state.activePreset));
+}
+
+// ===================== RESIZE =====================
+function setupResize(){
+  let rr=null;
+  window.addEventListener('resize',()=>{
+    if(rr)cancelAnimationFrame(rr);
+    rr=requestAnimationFrame(()=>{renderMinimap();rr=null});
+  });
+}
+
+// ===================== INIT =====================
+function init(){
+  generateData(); renderGrid();
+  setupScrollSync(); setupJobClick(); setupControls(); setupResize(); renderLegend();
+  setupMinimapInteraction(document.getElementById('minimap-right'),  document.getElementById('canvas-right'));
+  setupMinimapInteraction(document.getElementById('minimap-bottom'), document.getElementById('canvas-bottom'));
+  updateLayout(); updatePrompt();
+
+  // Scroll to mid-morning on day 1
+  const grid = document.getElementById('grid-scroll');
+  requestAnimationFrame(()=>{ grid.scrollTop = 120; });
+}
+
+init();
+</script>
+</body>
+</html>

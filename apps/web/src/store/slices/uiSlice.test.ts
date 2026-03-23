@@ -9,16 +9,12 @@ import {
   uiReducer,
   setSelectedJobId,
   setIsAltPressed,
-  setIsQuickPlacementMode,
-  setQuickPlacementHover,
   setPickValidation,
   setPixelsPerHour,
   setContextMenu,
   clearContextMenu,
   setFocusedDate,
   setViewportHours,
-  setCompactingStationId,
-  setIsCompactingTimeline,
   resetUiState,
   type UiState,
 } from './uiSlice';
@@ -28,8 +24,6 @@ describe('uiSlice', () => {
   const initialState: UiState = {
     selectedJobId: null,
     isAltPressed: false,
-    isQuickPlacementMode: false,
-    quickPlacementHover: { stationId: null, y: 0, snappedY: 0 },
     pickValidation: {
       scheduledStart: null,
       ringState: 'none',
@@ -41,8 +35,6 @@ describe('uiSlice', () => {
     focusedDate: null,
     viewportStartHour: 0,
     viewportEndHour: 8,
-    compactingStationId: null,
-    isCompactingTimeline: false,
   };
 
   describe('setSelectedJobId', () => {
@@ -68,36 +60,6 @@ describe('uiSlice', () => {
       const stateWithAlt = { ...initialState, isAltPressed: true };
       const state = uiReducer(stateWithAlt, setIsAltPressed(false));
       expect(state.isAltPressed).toBe(false);
-    });
-  });
-
-  describe('setIsQuickPlacementMode', () => {
-    it('enables quick placement mode', () => {
-      const state = uiReducer(initialState, setIsQuickPlacementMode(true));
-      expect(state.isQuickPlacementMode).toBe(true);
-    });
-
-    it('disables quick placement mode and resets hover', () => {
-      const stateWithQP = {
-        ...initialState,
-        isQuickPlacementMode: true,
-        quickPlacementHover: { stationId: 'station-1', y: 100, snappedY: 96 },
-      };
-      const state = uiReducer(stateWithQP, setIsQuickPlacementMode(false));
-      expect(state.isQuickPlacementMode).toBe(false);
-      expect(state.quickPlacementHover).toEqual({
-        stationId: null,
-        y: 0,
-        snappedY: 0,
-      });
-    });
-  });
-
-  describe('setQuickPlacementHover', () => {
-    it('sets quick placement hover state', () => {
-      const hover = { stationId: 'station-1', y: 150, snappedY: 144 };
-      const state = uiReducer(initialState, setQuickPlacementHover(hover));
-      expect(state.quickPlacementHover).toEqual(hover);
     });
   });
 
@@ -172,31 +134,11 @@ describe('uiSlice', () => {
     });
   });
 
-  describe('compacting state', () => {
-    it('setCompactingStationId sets station ID', () => {
-      const state = uiReducer(initialState, setCompactingStationId('station-1'));
-      expect(state.compactingStationId).toBe('station-1');
-    });
-
-    it('setCompactingStationId clears station ID', () => {
-      const stateWithStation = { ...initialState, compactingStationId: 'station-1' };
-      const state = uiReducer(stateWithStation, setCompactingStationId(null));
-      expect(state.compactingStationId).toBeNull();
-    });
-
-    it('setIsCompactingTimeline sets compacting state', () => {
-      const state = uiReducer(initialState, setIsCompactingTimeline(true));
-      expect(state.isCompactingTimeline).toBe(true);
-    });
-  });
-
   describe('resetUiState', () => {
     it('resets all state to initial values', () => {
       const modifiedState: UiState = {
         selectedJobId: 'job-123',
         isAltPressed: true,
-        isQuickPlacementMode: true,
-        quickPlacementHover: { stationId: 'station-1', y: 100, snappedY: 96 },
         pickValidation: {
           scheduledStart: '2024-02-10T08:00:00Z',
           ringState: 'valid',
@@ -208,8 +150,6 @@ describe('uiSlice', () => {
         focusedDate: '2024-02-10T12:00:00Z',
         viewportStartHour: 10,
         viewportEndHour: 20,
-        compactingStationId: 'station-1',
-        isCompactingTimeline: true,
       };
 
       const state = uiReducer(modifiedState, resetUiState());

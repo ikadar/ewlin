@@ -281,6 +281,38 @@ export function subtractWorkingTime(
 }
 
 /**
+ * Snap a time to the previous available working time end.
+ * If the time is already within working hours, returns the same time.
+ * If not, returns the end of the previous working slot (same day or previous working day).
+ *
+ * Mirror of snapToNextWorkingTime() — used for ALAP backward placement.
+ */
+export function snapToPreviousWorkingTime(time: Date, station: Station): Date {
+  // If already within working hours, return as-is
+  if (isWithinWorkingHours(time, station)) {
+    return new Date(time);
+  }
+
+  const daySchedule = getDayScheduleForDate(time, station);
+
+  // If day is operating, find the latest slot that ends before current time
+  if (daySchedule.isOperating && daySchedule.slots.length > 0) {
+    const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+
+    // Reverse iterate to find the latest slot ending before our time
+    for (let i = daySchedule.slots.length - 1; i >= 0; i--) {
+      const slot = daySchedule.slots[i];
+      if (slot.end <= timeStr) {
+        return parseTimeToDate(slot.end, time);
+      }
+    }
+  }
+
+  // No usable slots today, go to previous working day end
+  return getPreviousWorkingDayEnd(time, station);
+}
+
+/**
  * Check if a time falls within working hours of a station.
  */
 export function isWithinWorkingHours(time: Date, station: Station): boolean {
@@ -310,6 +342,39 @@ export function isWithinWorkingHours(time: Date, station: Station): boolean {
  * But work can only START during working hours. So if drying ends at 12:30 (during lunch),
  * the earliest a task can start is 13:00 (when lunch ends).
  */
+/** Round UP to the next 15-minute boundary (:00, :15, :30, :45). */
+export function ceilToQuarterHour(date: Date): Date {
+  const result = new Date(date);
+  const minutes = result.getMinutes();
+  const remainder = minutes % 15;
+  if (remainder > 0) {
+    result.setMinutes(minutes + (15 - remainder), 0, 0);
+  }
+  return result;
+}
+
+/** Round DOWN to the previous 15-minute boundary (:00, :15, :30, :45). */
+export function floorToQuarterHour(date: Date): Date {
+  const result = new Date(date);
+  const minutes = result.getMinutes();
+  const remainder = minutes % 15;
+  result.setMinutes(minutes - remainder, 0, 0);
+  return result;
+}
+
+/** Round to the NEAREST 15-minute boundary (:00, :15, :30, :45). */
+export function roundToNearestQuarterHour(date: Date): Date {
+  const result = new Date(date);
+  const minutes = result.getMinutes();
+  const remainder = minutes % 15;
+  if (remainder < 8) {
+    result.setMinutes(minutes - remainder, 0, 0);
+  } else {
+    result.setMinutes(minutes + (15 - remainder), 0, 0);
+  }
+  return result;
+}
+
 export function snapToNextWorkingTime(time: Date, station: Station): Date {
   // If already within working hours, return as-is
   if (isWithinWorkingHours(time, station)) {

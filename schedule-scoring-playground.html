@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Évaluation du planning</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f0f12; color: #fafafa; display: flex; height: 100vh; overflow: hidden; }
+  :root {
+    --bg: #18181b; --bg-el: #27272a; --border: #3f3f46;
+    --text: #fafafa; --text-sec: #a1a1aa; --text-dim: #71717a;
+    --green: #22c55e; --amber: #f59e0b; --red: #ef4444;
+  }
+  svg.icon { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+  .controls { width: 300px; min-width: 300px; background: var(--bg); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; }
+  .controls h2 { font-size: 13px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+  .ctrl-group { margin-bottom: 16px; }
+  .ctrl-group h3 { font-size: 11px; color: var(--amber); font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .ctrl-row label { font-size: 11px; color: var(--text-sec); flex: 1; min-width: 0; }
+  .ctrl-row input[type=range] { width: 80px; accent-color: var(--amber); }
+  .ctrl-row .val { font-size: 10px; color: var(--text-dim); width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .preview-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .preview-scroll { flex: 1; overflow-y: auto; display: flex; justify-content: center; padding: 32px 24px; }
+
+  .modal { background: var(--bg-el); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 48px rgba(0,0,0,0.4); width: 100%; max-width: 480px; overflow: hidden; }
+  .modal-header { display: flex; align-items: center; gap: 8px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .modal-header .icon-wrap { color: var(--amber); display: flex; }
+  .modal-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
+  .modal-header .ts { font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; }
+  .modal-body { padding: 16px 20px; }
+
+  .columns { display: flex; gap: 14px; }
+  .col-panel { flex: 1; background: rgba(255,255,255,0.02); border-radius: 10px; padding: 14px; }
+  .col-title { font-size: 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+  .hero { text-align: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .hero-val { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+  .hero-unit { font-size: 13px; font-weight: 400; color: var(--text-dim); }
+
+  .detail-row { display: flex; align-items: baseline; gap: 6px; padding: 4px 0; }
+  .detail-name { font-size: 11px; color: var(--text-sec); flex: 1; }
+  .detail-val { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .detail-ctx { font-size: 10px; color: var(--text-dim); font-weight: 400; }
+
+  .c-g { color: var(--green); } .c-w { color: var(--amber); } .c-r { color: var(--red); } .c-t { color: var(--text); }
+
+  .modal-footer { padding: 10px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+  .close-btn { font-size: 12px; padding: 6px 16px; background: #3f3f46; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-weight: 500; }
+
+  .prompt-area { border-top: 1px solid var(--border); padding: 12px 20px; background: var(--bg); }
+  .prompt-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .prompt-header span { font-size: 11px; color: var(--text-dim); }
+  .copy-btn { font-size: 11px; padding: 4px 10px; background: var(--amber); color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+  .prompt-text { font-size: 11px; color: var(--text-sec); line-height: 1.5; max-height: 120px; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h2><svg class="icon" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> Valeurs simulées</h2>
+
+  <div class="ctrl-group">
+    <h3><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Délais</h3>
+    <div class="ctrl-row"><label>Jobs total</label><input type="range" min="1" max="50" value="20" data-id="total_jobs"><span class="val">20</span></div>
+    <div class="ctrl-row"><label>En retard</label><input type="range" min="0" max="20" value="3" data-id="late_count"><span class="val">3</span></div>
+    <div class="ctrl-row"><label>Retard moyen</label><input type="range" min="0" max="48" value="4" step="0.5" data-id="avg_late"><span class="val">4 h</span></div>
+    <div class="ctrl-row"><label>Retard max</label><input type="range" min="0" max="72" value="12" data-id="max_late"><span class="val">12 h</span></div>
+  </div>
+
+  <div class="ctrl-group">
+    <h3><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Calages</h3>
+    <div class="ctrl-row"><label>Impression</label><input type="range" min="0" max="50" value="14" data-id="sim_print"><span class="val">14</span></div>
+    <div class="ctrl-row"><label>Finition</label><input type="range" min="0" max="80" value="22" data-id="sim_finish"><span class="val">22</span></div>
+  </div>
+</div>
+
+<div class="preview-area">
+  <div class="preview-scroll">
+    <div style="width:100%;max-width:480px">
+      <div class="modal" id="modal"></div>
+    </div>
+  </div>
+  <div class="prompt-area">
+    <div class="prompt-header">
+      <span>Prompt d'implémentation</span>
+      <button class="copy-btn" onclick="copyPrompt()">Copier</button>
+    </div>
+    <div class="prompt-text" id="prompt"></div>
+  </div>
+</div>
+
+<script>
+const ICONS = {
+  sparkles: '<svg class="icon" viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>',
+  clock: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  calendar: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  link: '<svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+};
+
+const V = {};
+document.querySelectorAll('input[type=range]').forEach(inp => {
+  V[inp.dataset.id] = parseFloat(inp.value);
+  inp.addEventListener('input', () => {
+    V[inp.dataset.id] = parseFloat(inp.value);
+    const id = inp.dataset.id;
+    const isH = ['avg_late','max_late'].includes(id);
+    inp.nextElementSibling.textContent = isH ? `${inp.value} h` : inp.value;
+    render();
+  });
+});
+
+function clrPct(v) { return v >= 85 ? 'g' : v >= 60 ? 'w' : 'r'; }
+function clrLate(v) { return v === 0 ? 'g' : v <= 3 ? 'w' : 'r'; }
+function clrH(v) { return v === 0 ? 'g' : v <= 8 ? 'w' : 'r'; }
+
+function render() {
+  const ts = new Date().toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const total = V.total_jobs;
+  const ontime = total - V.late_count;
+  const pct = total > 0 ? Math.round(ontime / total * 100) : 0;
+  const simTotal = V.sim_print + V.sim_finish;
+
+  document.getElementById('modal').innerHTML = `
+    <div class="modal-header">
+      <span class="icon-wrap">${ICONS.sparkles}</span>
+      <h2>Évaluation du planning</h2>
+      <span class="ts">${ICONS.clock} ${ts}</span>
+    </div>
+    <div class="modal-body">
+      <div class="columns">
+
+        <div class="col-panel">
+          <div class="col-title">${ICONS.calendar} Respect des délais</div>
+          <div class="hero">
+            <div class="hero-val c-${clrPct(pct)}">${pct}<span class="hero-unit"> %</span></div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-name">Jobs en retard</span>
+            <span class="detail-val c-${clrLate(V.late_count)}">${Math.round(V.late_count)} <span class="detail-ctx">/ ${total}</span></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-name">Retard moyen</span>
+            <span class="detail-val c-${clrH(V.avg_late)}">${V.avg_late} <span class="detail-ctx">h</span></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-name">Retard maximum</span>
+            <span class="detail-val c-${clrH(V.max_late)}">${V.max_late} <span class="detail-ctx">h</span></span>
+          </div>
+        </div>
+
+        <div class="col-panel">
+          <div class="col-title">${ICONS.link} Optimisation des calages</div>
+          <div class="hero">
+            <div class="hero-val c-t">${Math.round(simTotal)}<span class="hero-unit"> pts</span></div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-name">Impression</span>
+            <span class="detail-val c-t">${Math.round(V.sim_print)} <span class="detail-ctx">pts</span></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-name">Finition</span>
+            <span class="detail-val c-t">${Math.round(V.sim_finish)} <span class="detail-ctx">pts</span></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-footer"><button class="close-btn">Fermer</button></div>
+  `;
+  updatePrompt();
+}
+
+function updatePrompt() {
+  const lines = [];
+  lines.push('Implémente la modale "Évaluation du planning" déclenchée par Ctrl+Alt+E.');
+  lines.push('Icônes Lucide uniquement. Modale en français, thème sombre Flux.');
+  lines.push('');
+  lines.push('Header : Sparkles + "Évaluation du planning" + timestamp (Clock).');
+  lines.push('');
+  lines.push('Layout : 2 colonnes côte à côte dans des panneaux arrondis.');
+  lines.push('');
+  lines.push('Colonne gauche — "Respect des délais" (Calendar) :');
+  lines.push('  Hero en gros : % de jobs à l\'heure (coloré vert ≥85, orange ≥60, rouge <60)');
+  lines.push('  Détails :');
+  lines.push('    - Jobs en retard : N / total (coloré : vert si 0, orange si ≤3, rouge sinon)');
+  lines.push('    - Retard moyen : X h (coloré : vert si 0, orange si ≤8h, rouge sinon)');
+  lines.push('    - Retard maximum : X h (coloré idem)');
+  lines.push('');
+  lines.push('Colonne droite — "Optimisation des calages" (Link) :');
+  lines.push('  Hero en gros : score total en pts (somme impression + finition)');
+  lines.push('  Détails :');
+  lines.push('    - Impression : N pts');
+  lines.push('    - Finition : N pts');
+  lines.push('  Score = nombre de critères de similarité matchés entre tuiles consécutives.');
+  lines.push('  Plus c\'est haut, moins il y a de calages. Pas de couleur, juste le nombre.');
+  lines.push('');
+  lines.push('Bouton Fermer en bas.');
+  document.getElementById('prompt').textContent = lines.join('\n');
+}
+
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('prompt').textContent).then(() => {
+    const b = document.querySelector('.copy-btn');
+    b.textContent = 'Copié !'; setTimeout(() => b.textContent = 'Copier', 1500);
+  });
+}
+
+render();
+</script>
+</body>
+</html>

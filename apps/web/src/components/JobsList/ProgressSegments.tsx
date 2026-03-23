@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { Task, TaskAssignment } from '@flux/types';
 import { isInternalTask, isOutsourcedTask } from '@flux/types';
+import { compareTaskOrder } from '../../utils/taskHelpers';
 
 export interface ProgressSegmentsProps {
   /** Tasks for this job */
@@ -86,7 +87,7 @@ export function ProgressSegments({ tasks, assignments }: ProgressSegmentsProps) 
   assignments.forEach((a) => assignmentMap.set(a.taskId, a));
 
   // Sort tasks by sequence order
-  const sortedTasks = [...tasks].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+  const sortedTasks = [...tasks].sort(compareTaskOrder);
 
   return (
     <div className="flex flex-wrap gap-0.5" data-testid="progress-segments">

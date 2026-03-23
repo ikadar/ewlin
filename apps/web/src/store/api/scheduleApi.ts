@@ -23,9 +23,11 @@ import type {
   AssignmentResponse,
   CompletionResponse,
   UnassignmentResponse,
-  CompactStationResponse,
   ClientSuggestionsResponse,
   ReferenceLookupResponse,
+  SplitTaskRequest,
+  SplitTaskResponse,
+  FuseTaskResponse,
   InternalTask,
   TaskAssignment,
   PaperStatus,
@@ -35,6 +37,8 @@ import type {
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
+import { generateId } from '@/utils/generateId';
+import { applySplitToSnapshot, applyFuseToSnapshot } from '@/utils/splitFuse';
 
 /**
  * Response from getSavedSchedules query.
@@ -248,6 +252,79 @@ export const scheduleApi = createApi({
         method: 'PUT',
         body,
       }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Clear all tile assignments for a job.
+     *
+     * Mock mode: Removes all assignments for the job's tasks
+     * Real mode: DELETE /jobs/{id}/assignments
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    clearJobAssignments: builder.mutation<{ unassignedCount: number }, string>({
+      query: (jobId) => ({
+        url: `/jobs/${jobId}/assignments`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted(jobId, { dispatch, queryFulfilled, getState }) {
+        const state = getState() as { scheduleApi: { queries: Record<string, { data?: ScheduleSnapshot }> } };
+        const snapshotQuery = Object.values(state.scheduleApi.queries).find(
+          (q) => q?.data && 'assignments' in q.data
+        );
+        const snapshot = snapshotQuery?.data as ScheduleSnapshot | undefined;
+
+        if (!snapshot) return;
+
+        // Collect all task IDs for this job
+        const job = snapshot.jobs.find((j) => j.id === jobId);
+        if (!job) return;
+
+        const jobTaskIds = new Set(job.taskIds);
+
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const now = new Date().toISOString();
+            draft.assignments = draft.assignments.filter((a) => {
+              if (!jobTaskIds.has(a.taskId)) return true;
+              if (a.isCompleted) return true;
+              if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return true;
+              return false;
+            });
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    /**
+     * Clear all clearable tile assignments globally (across all jobs).
+     *
+     * Mock mode: Removes all non-completed, non-in-progress assignments
+     * Real mode: DELETE /schedule/assignments
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    clearAllAssignments: builder.mutation<
+      { unassignedCount: number },
+      { includeInProgress?: boolean; fuseSplits?: boolean } | void
+    >({
+      query: (opts) => {
+        const params = new URLSearchParams();
+        if (opts && opts.includeInProgress) params.set('includeInProgress', '1');
+        if (opts && opts.fuseSplits) params.set('fuseSplits', '1');
+        const qs = params.toString();
+        return { url: `/schedule/assignments${qs ? `?${qs}` : ''}`, method: 'DELETE' };
+      },
+      // No optimistic update — let the refetch handle UI update to avoid
+      // flicker on in-progress tiles (client/server NOW can differ slightly)
       invalidatesTags: ['Snapshot'],
     }),
 
@@ -525,18 +602,124 @@ export const scheduleApi = createApi({
     }),
 
     /**
-     * Compact a station's assignments (remove gaps).
+     * Batch reschedule multiple task assignments atomically.
      *
-     * Mock mode: mockBaseQuery handles this via handleCompactStation
-     * Real mode: POST /stations/{stationId}/compact
-     *
-     * Uses optimistic update for instant UI feedback:
-     * - Immediately compacts assignments in cache
-     * - Automatically rolls back on error
+     * Used by smart compaction to persist all reordered assignments in a single request.
      */
-    compactStation: builder.mutation<CompactStationResponse, string>({
-      query: (stationId) => ({
-        url: `/stations/${stationId}/compact`,
+    batchReschedule: builder.mutation<
+      { updatedCount: number },
+      { assignments: Array<{ taskId: string; scheduledStart: string; scheduledEnd: string }> }
+    >({
+      query: (body) => ({
+        url: '/schedule/batch-reschedule',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Split an internal task into two parts.
+     *
+     * Mock mode: mockBaseQuery handles this via handleSplitTask
+     * Real mode: POST /tasks/{taskId}/split
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    splitTask: builder.mutation<
+      SplitTaskResponse,
+      { taskId: string; body: SplitTaskRequest }
+    >({
+      query: ({ taskId, body }) => ({
+        url: `/tasks/${taskId}/split`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted({ taskId, body }, { dispatch, queryFulfilled }) {
+        const partAId = generateId();
+        const partBId = generateId();
+        const now = new Date().toISOString();
+
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            applySplitToSnapshot(draft, {
+              taskId,
+              ratio: body.ratio,
+              partAId,
+              partBId,
+              now,
+            });
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    /**
+     * Fuse (merge) all parts of a split task back into one.
+     *
+     * Mock mode: mockBaseQuery handles this via handleFuseTask
+     * Real mode: POST /tasks/{taskId}/fuse
+     *
+     * Uses optimistic update for instant UI feedback.
+     */
+    fuseTask: builder.mutation<FuseTaskResponse, string>({
+      query: (taskId) => ({
+        url: `/tasks/${taskId}/fuse`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted(taskId, { dispatch, queryFulfilled }) {
+        const restoredId = generateId();
+        const now = new Date().toISOString();
+
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            applyFuseToSnapshot(draft, { taskId, restoredId, now });
+          })
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    /**
+     * Auto-place all unscheduled tasks for a job using server-side ASAP algorithm.
+     *
+     * Mock mode: mockBaseQuery handles this via handleAutoPlace
+     * Real mode: POST /jobs/{jobId}/auto-place
+     *
+     * No optimistic update — waits for server response then refetches snapshot.
+     */
+    autoPlaceJob: builder.mutation<{ placedCount: number; computeMs?: number }, string>({
+      query: (jobId) => ({
+        url: `/jobs/${jobId}/auto-place`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Auto-place all unscheduled tasks for a job using server-side ALAP algorithm.
+     *
+     * Mock mode: mockBaseQuery handles this via handleAutoPlaceAlap
+     * Real mode: POST /jobs/{jobId}/auto-place-alap
+     *
+     * No optimistic update — waits for server response then refetches snapshot.
+     */
+    autoPlaceJobAlap: builder.mutation<{ placedCount: number; computeMs?: number }, string>({
+      query: (jobId) => ({
+        url: `/jobs/${jobId}/auto-place-alap`,
         method: 'POST',
       }),
       invalidatesTags: ['Snapshot'],
@@ -590,12 +773,18 @@ export const {
   useCreateJobMutation,
   useUpdateJobMutation,
   useDeleteJobMutation,
+  useClearJobAssignmentsMutation,
+  useClearAllAssignmentsMutation,
   useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
-  useCompactStationMutation,
+  useBatchRescheduleMutation,
+  useSplitTaskMutation,
+  useFuseTaskMutation,
+  useAutoPlaceJobMutation,
+  useAutoPlaceJobAlapMutation,
   useGetSavedSchedulesQuery,
   useSaveScheduleMutation,
   useLoadScheduleMutation,

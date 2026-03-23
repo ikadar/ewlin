@@ -1,22 +1,10 @@
-import { Plus, Move } from 'lucide-react';
+import { Move } from 'lucide-react';
 
 interface ModeBannerProps {
-  mode: 'quickPlacement' | 'picking' | null;
+  mode: 'picking' | null;
 }
 
 const MODE_CONFIGS = {
-  quickPlacement: {
-    gradient: 'from-emerald-500/35 to-transparent',
-    label: 'Placement rapide',
-    hint: 'Cliquez pour placer · Esc pour quitter',
-    labelClass: 'text-emerald-400',
-    hintClass: 'text-emerald-500/60',
-    iconClass: 'text-emerald-400',
-    escBorderClass: 'border-emerald-500/30',
-    escTextClass: 'text-emerald-500/70',
-    escBgClass: 'bg-emerald-500/8',
-    Icon: Plus,
-  },
   picking: {
     gradient: 'from-amber-500/35 to-transparent',
     label: 'Pick & Place',

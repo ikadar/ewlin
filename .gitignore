@@ -24,6 +24,8 @@ pnpm-debug.log*
 
 # Production
 backups/
+snapshots/
+snapshot.json
 
 # IDE / Editor
 .idea/
@@ -47,6 +49,7 @@ Thumbs.db
 .claude/settings*.json
 .claude/statsig/
 .claude/todos/
+.mcp.json
 
 # Obsidian
 .obsidian/

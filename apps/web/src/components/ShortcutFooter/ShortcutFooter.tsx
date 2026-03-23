@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { KBD_CLASS } from './kbdStyles';
 
-export type FooterMode = 'default' | 'jobSelected' | 'quickPlacement' | 'picking' | 'jcfModal' | 'flux';
+export type FooterMode = 'default' | 'jobSelected' | 'picking' | 'jcfModal' | 'flux';
 
 export interface ShortcutFooterProps {
   mode: FooterMode;
@@ -22,57 +22,49 @@ interface ModeConfig {
 const MODE_CONFIGS: Record<FooterMode, ModeConfig> = {
   default: {
     shortcuts: [
-      { keys: ['Home'], label: 'Today' },
-      { keys: ['PgUp', 'PgDn'], label: 'Scroll' },
+      { keys: ['Home'], label: "Aujourd'hui" },
+      { keys: ['PgUp', 'PgDn'], label: 'Défiler' },
       { keys: ['Ctrl', '+', '-'], label: 'Zoom' },
-      { keys: ['Alt', 'A'], label: 'Display' },
-      { keys: ['Alt', 'K'], label: 'Commands' },
+      { keys: ['Alt', 'A'], label: 'Affichage' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
     ],
   },
   jobSelected: {
     shortcuts: [
-      { keys: ['Click'], label: 'Pick tile' },
-      { keys: ['Esc'], label: 'Close' },
-      { keys: ['Alt', 'Q'], label: 'Place' },
-      { keys: ['Alt', 'D'], label: 'Departure' },
-      { keys: ['Alt', '\u2191', '\u2193'], label: 'Navigate' },
-      { keys: ['Alt', 'K'], label: 'Commands' },
-    ],
-  },
-  quickPlacement: {
-    modeLabel: '\u26A1 QUICK PLACEMENT',
-    modeLabelClass: 'text-emerald-400',
-    shortcuts: [
-      { keys: ['Click'], label: 'Place' },
-      { keys: ['Alt', '\u2191', '\u2193'], label: 'Switch Job' },
-      { keys: ['Esc'], label: 'Exit' },
-      { keys: ['Alt', 'K'], label: 'Commands' },
+      { keys: ['Click'], label: 'Saisir tuile' },
+      { keys: ['Esc'], label: 'Fermer' },
+      { keys: ['Alt', 'D'], label: 'Départ' },
+      { keys: ['Alt', '\u2191', '\u2193'], label: 'Naviguer' },
+      { keys: ['Alt', 'P', 'S'], label: 'ASAP' },
+      { keys: ['Alt', 'P', 'L'], label: 'ALAP' },
+      { keys: ['Alt', 'Z'], label: 'Effacer tuiles' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
     ],
   },
   picking: {
-    modeLabel: '\uD83C\uDFAF PICKING',
+    modeLabel: '\uD83C\uDFAF PLACEMENT',
     modeLabelClass: 'text-amber-400',
     shortcuts: [
-      { keys: ['Click'], label: 'Place' },
-      { keys: ['Esc'], label: 'Cancel' },
-      { keys: ['Alt', 'K'], label: 'Commands' },
+      { keys: ['Click'], label: 'Placer' },
+      { keys: ['Esc'], label: 'Annuler' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
     ],
   },
   jcfModal: {
     shortcuts: [
-      { keys: ['\u2318', 'S'], label: 'Save' },
-      { keys: ['Alt', '\u2190', '\u2191', '\u2193', '\u2192'], label: 'Navigate' },
-      { keys: ['Tab'], label: 'Next Cell' },
-      { keys: ['Esc'], label: 'Close' },
-      { keys: ['Alt', 'K'], label: 'Commands' },
+      { keys: ['\u2318', 'S'], label: 'Sauvegarder' },
+      { keys: ['Alt', '\u2190', '\u2191', '\u2193', '\u2192'], label: 'Naviguer' },
+      { keys: ['Tab'], label: 'Cellule suiv.' },
+      { keys: ['Esc'], label: 'Fermer' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
     ],
   },
   flux: {
     shortcuts: [
-      { keys: ['Alt', 'F'], label: 'Search' },
-      { keys: ['Alt', 'N'], label: 'New Job' },
-      { keys: ['Alt', '\u2190', '\u2192'], label: 'Tabs' },
-      { keys: ['Alt', 'K'], label: 'Commands' },
+      { keys: ['Alt', 'F'], label: 'Rechercher' },
+      { keys: ['Alt', 'N'], label: 'Nouveau job' },
+      { keys: ['Alt', '\u2190', '\u2192'], label: 'Onglets' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
     ],
   },
 };

@@ -21,7 +21,6 @@ import type {
   AssignmentResponse,
   CompletionResponse,
   UnassignmentResponse,
-  CompactStationResponse,
   InternalTask,
   OutsourcedTask,
   Station,
@@ -36,13 +35,15 @@ import type {
   JcfTemplateCreateInput,
   JcfTemplateUpdateInput,
 } from '@flux/types';
-import { DRY_TIME_MS } from '@flux/types';
 import { getSnapshot, updateSnapshot } from '../../mock/snapshot';
 import { FLUX_STATIC_JOBS } from '../../mock/fluxStaticData';
 import { getTemplates as mockGetTemplates, createTemplate as mockCreateTemplate, updateTemplate as mockUpdateTemplate, deleteTemplate as mockDeleteTemplate } from '../../mock/templateApi';
 import { generateId, calculateEndTime, applyPushDown } from '../../utils';
+import { applySplitToSnapshot, applyFuseToSnapshot } from '../../utils/splitFuse';
 import { calculateOutsourcingDates } from '../../utils/outsourcingCalculation';
-import { isLastTaskOfJob } from '../../utils/taskHelpers';
+import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
+import { computeAsapPlacements } from '../../utils/asapPlacement';
+import { computeAlapPlacements } from '../../utils/alapPlacement';
 import { normalizeError, createNotFoundError } from './errorNormalization';
 
 // ============================================================================
@@ -119,7 +120,7 @@ function autoAssignOutsourcedSuccessors(
       const prereqTasks = prereqElem.taskIds
         .map((id) => taskById.get(id))
         .filter((t): t is Task => t !== undefined)
-        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        .sort(compareTaskOrder);
       const lastTask = prereqTasks[prereqTasks.length - 1];
       if (!lastTask) { allScheduled = false; break; }
 
@@ -231,7 +232,7 @@ function getOutsourcedTasksToRemoveOnUnassign(
         const prereqTasks = prereqElem.taskIds
           .map((id) => taskById.get(id))
           .filter((t): t is Task => t !== undefined)
-          .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+          .sort(compareTaskOrder);
         const lastTask = prereqTasks[prereqTasks.length - 1];
         if (!lastTask || !assignmentByTaskId.has(lastTask.id)) {
           allPrereqsScheduled = false;
@@ -256,7 +257,7 @@ function getOutsourcedTasksToRemoveOnUnassign(
  */
 const handleGetSnapshot = async (): Promise<{ data: ScheduleSnapshot }> => {
   const snapshot = getSnapshot();
-  return { data: snapshot };
+  return { data: structuredClone(snapshot) };
 };
 
 /**
@@ -771,6 +772,14 @@ const handleCreateJob = async (
     }
   }
 
+  // Resolve requiredJobReferences to IDs
+  let resolvedRequiredJobIds: string[] = [];
+  if (body.requiredJobReferences && body.requiredJobReferences.length > 0) {
+    resolvedRequiredJobIds = body.requiredJobReferences
+      .map((ref) => currentSnapshot.jobs.find((j) => j.reference === ref)?.id)
+      .filter((id): id is string => id !== undefined);
+  }
+
   // Create job
   const job: Job = {
     id: jobId,
@@ -783,6 +792,7 @@ const handleCreateJob = async (
     fullyScheduled: false,
     color: jobColor,
     comments: [],
+    requiredJobIds: resolvedRequiredJobIds,
     elementIds,
     taskIds: allTaskIds,
     createdAt: now,
@@ -932,6 +942,14 @@ const handleUpdateJob = async (
     }
   }
 
+  // Resolve requiredJobReferences to IDs
+  let resolvedRequiredJobIds: string[] | undefined;
+  if (body.requiredJobReferences !== undefined) {
+    resolvedRequiredJobIds = body.requiredJobReferences
+      .map((ref) => currentSnapshot.jobs.find((j) => j.reference === ref)?.id)
+      .filter((id): id is string => id !== undefined);
+  }
+
   // Merge metadata (only provided fields)
   const updatedJob: Job = {
     ...existingJob,
@@ -940,6 +958,7 @@ const handleUpdateJob = async (
     ...(body.description !== undefined && { description: body.description }),
     ...(body.workshopExitDate !== undefined && { workshopExitDate: body.workshopExitDate }),
     ...(body.quantity !== undefined && { quantity: body.quantity }),
+    ...(resolvedRequiredJobIds !== undefined && { requiredJobIds: resolvedRequiredJobIds }),
     elementIds: newElementIds,
     taskIds: newTaskIds,
     updatedAt: now,
@@ -992,6 +1011,321 @@ const handleUpdateJob = async (
 };
 
 // ============================================================================
+// Clear Job Assignments Handler
+// ============================================================================
+
+/**
+ * DELETE /jobs/:jobId/assignments - Clear all tile assignments for a job
+ */
+const handleClearJobAssignments: MockRouteHandler = async (args: FetchArgs) => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)\/assignments$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const job = currentSnapshot.jobs.find((j: Job) => j.id === jobId);
+  if (!job) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const jobTaskIds = new Set(job.taskIds);
+
+  // Find clearable assignments (exclude completed and in-progress)
+  const now = new Date().toISOString();
+  const jobAssignmentTaskIds = currentSnapshot.assignments
+    .filter((a: TaskAssignment) => jobTaskIds.has(a.taskId))
+    .filter((a: TaskAssignment) => !a.isCompleted)
+    .filter((a: TaskAssignment) => {
+      if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+      return true;
+    })
+    .map((a: TaskAssignment) => a.taskId);
+
+  const clearableTaskIds = new Set(jobAssignmentTaskIds);
+
+  // For each task being unassigned, check for outsourced cascade removals
+  let remainingAssignments = currentSnapshot.assignments.filter(
+    (a: TaskAssignment) => !clearableTaskIds.has(a.taskId)
+  );
+
+  const outsourcedToRemove = new Set<string>();
+  for (const taskId of jobAssignmentTaskIds) {
+    const toRemove = getOutsourcedTasksToRemoveOnUnassign(
+      currentSnapshot,
+      taskId,
+      remainingAssignments
+    );
+    for (const id of toRemove) {
+      outsourcedToRemove.add(id);
+    }
+  }
+
+  remainingAssignments = remainingAssignments.filter(
+    (a: TaskAssignment) => !outsourcedToRemove.has(a.taskId)
+  );
+
+  updateSnapshot((snapshot) => ({
+    ...snapshot,
+    assignments: remainingAssignments,
+  }));
+
+  return { data: { unassignedCount: jobAssignmentTaskIds.length } };
+};
+
+/**
+ * DELETE /schedule/assignments - Clear all clearable tile assignments globally
+ *
+ * Query params:
+ * - includeInProgress=1: also clear tiles intersecting with NOW
+ * - fuseSplits=1: fuse split tile groups back into single tasks after clearing
+ */
+const handleClearAllAssignments: MockRouteHandler = async (args: FetchArgs) => {
+  const url = new URL(args.url, 'http://localhost');
+  const includeInProgress = url.searchParams.get('includeInProgress') === '1';
+  const fuseSplits = url.searchParams.get('fuseSplits') === '1';
+
+  const currentSnapshot = getSnapshot();
+  const now = new Date().toISOString();
+
+  const clearableTaskIds = new Set(
+    currentSnapshot.assignments
+      .filter((a: TaskAssignment) => !a.isCompleted)
+      .filter((a: TaskAssignment) => {
+        if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
+        return true;
+      })
+      .map((a: TaskAssignment) => a.taskId)
+  );
+
+  let remainingAssignments = currentSnapshot.assignments.filter(
+    (a: TaskAssignment) => !clearableTaskIds.has(a.taskId)
+  );
+
+  // Outsourced cascade removal
+  const outsourcedToRemove = new Set<string>();
+  for (const taskId of clearableTaskIds) {
+    const toRemove = getOutsourcedTasksToRemoveOnUnassign(currentSnapshot, taskId, remainingAssignments);
+    for (const id of toRemove) outsourcedToRemove.add(id);
+  }
+  remainingAssignments = remainingAssignments.filter(
+    (a: TaskAssignment) => !outsourcedToRemove.has(a.taskId)
+  );
+
+  updateSnapshot((snapshot) => {
+    const updated = { ...snapshot, assignments: remainingAssignments };
+
+    // Fuse split groups where ALL parts have been cleared
+    if (fuseSplits) {
+      const splitGroups = new Map<string, string[]>();
+      for (const task of updated.tasks) {
+        if (task.type === 'Internal') {
+          const it = task as InternalTask;
+          if (it.splitGroupId) {
+            const group = splitGroups.get(it.splitGroupId) || [];
+            group.push(it.id);
+            splitGroups.set(it.splitGroupId, group);
+          }
+        }
+      }
+      for (const [, memberIds] of splitGroups) {
+        // Only fuse if ALL members are unassigned (none remain in assignments)
+        const anyStillAssigned = memberIds.some((id) =>
+          updated.assignments.some((a: TaskAssignment) => a.taskId === id)
+        );
+        if (!anyStillAssigned) {
+          const restoredId = crypto.randomUUID();
+          applyFuseToSnapshot(updated as ScheduleSnapshot, { taskId: memberIds[0], restoredId, now });
+        }
+      }
+    }
+
+    return updated;
+  });
+
+  return { data: { unassignedCount: clearableTaskIds.size } };
+};
+
+// ============================================================================
+// Auto-Place Job Handler
+// ============================================================================
+
+/**
+ * POST /jobs/:jobId/auto-place - ASAP auto-placement for all unscheduled tasks
+ */
+const handleAutoPlace: MockRouteHandler = async (args: FetchArgs) => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)\/auto-place$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const job = currentSnapshot.jobs.find((j: Job) => j.id === jobId);
+  if (!job) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const t0 = performance.now();
+  const result = computeAsapPlacements(jobId, currentSnapshot);
+  const computeMs = Math.round(performance.now() - t0);
+
+  if (result.placements.length === 0) {
+    return { data: { placedCount: 0, computeMs } };
+  }
+
+  // Apply placements to snapshot
+  updateSnapshot((snapshot) => {
+    const updatedAssignments = [...snapshot.assignments];
+
+    for (const p of result.placements) {
+      const task = snapshot.tasks.find((t: Task) => t.id === p.taskId);
+      let scheduledEnd: string;
+
+      if (task && 'stationId' in task) {
+        const station = snapshot.stations.find((s: Station) => s.id === p.targetId);
+        scheduledEnd = calculateEndTime(task as InternalTask, p.scheduledStart, station);
+      } else if (task && 'providerId' in task) {
+        const outsourcedTask = task as OutsourcedTask;
+        const provider = snapshot.providers?.find(pr => pr.id === outsourcedTask.providerId);
+        if (provider) {
+          const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
+          const dates = calculateOutsourcingDates(p.scheduledStart, {
+            workDays: outsourcedTask.duration.openDays,
+            latestDepartureTime: provider.latestDepartureTime,
+            receptionTime: provider.receptionTime,
+            transitDays: provider.transitDays,
+            oneWay,
+          });
+          scheduledEnd = dates ? dates.return.toISOString() : p.scheduledStart;
+        } else {
+          scheduledEnd = p.scheduledStart;
+        }
+      } else {
+        scheduledEnd = p.scheduledStart;
+      }
+
+      const now = new Date().toISOString();
+      updatedAssignments.push({
+        id: generateId(),
+        taskId: p.taskId,
+        targetId: p.targetId,
+        isOutsourced: p.isOutsourced,
+        scheduledStart: p.scheduledStart,
+        scheduledEnd,
+        isCompleted: false,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // Also run auto-assign outsourced successors for each placed internal task
+    let finalAssignments = updatedAssignments;
+    for (const p of result.placements) {
+      if (!p.isOutsourced) {
+        const autoResult = autoAssignOutsourcedSuccessors(
+          { ...snapshot, assignments: finalAssignments },
+          p.taskId,
+          finalAssignments,
+        );
+        finalAssignments = [
+          ...finalAssignments.filter(
+            (a: TaskAssignment) => !autoResult.updatedAssignments.some(u => u.taskId === a.taskId)
+          ),
+          ...autoResult.newAssignments,
+          ...autoResult.updatedAssignments,
+        ];
+      }
+    }
+
+    return { ...snapshot, assignments: finalAssignments };
+  });
+
+  return { data: { placedCount: result.placements.length, computeMs } };
+};
+
+// ============================================================================
+// Auto-Place Job ALAP Handler
+// ============================================================================
+
+/**
+ * POST /jobs/:jobId/auto-place-alap - ALAP auto-placement for all unscheduled tasks
+ */
+const handleAutoPlaceAlap: MockRouteHandler = async (args: FetchArgs) => {
+  const jobId = extractPathParam(args.url, /\/jobs\/([^/]+)\/auto-place-alap$/);
+  if (!jobId) {
+    return { error: createNotFoundError('Invalid job ID') };
+  }
+
+  const currentSnapshot = getSnapshot();
+  const job = currentSnapshot.jobs.find((j: Job) => j.id === jobId);
+  if (!job) {
+    return { error: createNotFoundError('Job not found') };
+  }
+
+  const t0 = performance.now();
+  const result = computeAlapPlacements(jobId, currentSnapshot);
+  const computeMs = Math.round(performance.now() - t0);
+
+  if (result.placements.length === 0) {
+    return { data: { placedCount: 0, computeMs } };
+  }
+
+  // Apply placements to snapshot
+  updateSnapshot((snapshot) => {
+    const updatedAssignments = [...snapshot.assignments];
+
+    for (const p of result.placements) {
+      const task = snapshot.tasks.find((t: Task) => t.id === p.taskId);
+      let scheduledEnd: string;
+
+      if (task && 'stationId' in task) {
+        const station = snapshot.stations.find((s: Station) => s.id === p.targetId);
+        scheduledEnd = calculateEndTime(task as InternalTask, p.scheduledStart, station);
+      } else if (task && 'providerId' in task) {
+        const outsourcedTask = task as OutsourcedTask;
+        const provider = snapshot.providers?.find(pr => pr.id === outsourcedTask.providerId);
+        if (provider) {
+          const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
+          const dates = calculateOutsourcingDates(p.scheduledStart, {
+            workDays: outsourcedTask.duration.openDays,
+            latestDepartureTime: provider.latestDepartureTime,
+            receptionTime: provider.receptionTime,
+            transitDays: provider.transitDays,
+            oneWay,
+          });
+          scheduledEnd = dates ? dates.return.toISOString() : p.scheduledStart;
+        } else {
+          scheduledEnd = p.scheduledStart;
+        }
+      } else {
+        scheduledEnd = p.scheduledStart;
+      }
+
+      const now = new Date().toISOString();
+      updatedAssignments.push({
+        id: generateId(),
+        taskId: p.taskId,
+        targetId: p.targetId,
+        isOutsourced: p.isOutsourced,
+        scheduledStart: p.scheduledStart,
+        scheduledEnd,
+        isCompleted: false,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // ALAP places ALL outsourced tasks backward explicitly — no autoAssignSuccessors
+    // (which uses forward/ASAP logic and would create lateness).
+    return { ...snapshot, assignments: updatedAssignments };
+  });
+
+  return { data: { placedCount: result.placements.length, computeMs } };
+};
+
+// ============================================================================
 // Delete Job Handler
 // ============================================================================
 
@@ -1031,156 +1365,52 @@ const handleDeleteJob = async (
 // ============================================================================
 
 /**
- * POST /stations/:stationId/compact - Compact station assignments
+ * POST /schedule/batch-reschedule - Batch reschedule multiple assignments
  *
- * Removes gaps between tiles on a station by moving them as early as possible.
- * For each tile (earliest to latest), earliestStart = max(previousTileEnd,
- * predecessorEnd + optional drying time). First tile with no predecessor stays
- * in place. Respects precedence rules and drying time after offset printing.
- *
- * @see services/php-api/src/Service/CompactStationService.php
+ * Used by smart compaction to persist all reordered assignments in a single request.
  */
-const handleCompactStation = async (
+const handleBatchReschedule = async (
   args: FetchArgs
-): Promise<{ data: CompactStationResponse } | { error: FetchBaseQueryError }> => {
-  const stationId = extractPathParam(args.url, /\/stations\/([^/]+)\/compact/);
-  if (!stationId) {
-    return { error: createNotFoundError('Invalid station ID') };
+): Promise<{ data: { updatedCount: number } } | { error: FetchBaseQueryError }> => {
+  const body = args.body as { assignments?: Array<{ taskId: string; scheduledStart: string; scheduledEnd: string }> } | undefined;
+  const assignments = body?.assignments;
+
+  if (!assignments || !Array.isArray(assignments)) {
+    return { error: createNotFoundError('Request body must contain an "assignments" array.') };
   }
 
   const currentSnapshot = getSnapshot();
-  const station = currentSnapshot.stations.find((s) => s.id === stationId);
-  if (!station) {
-    return { error: createNotFoundError('Station not found') };
+  const assignmentMap = new Map(currentSnapshot.assignments.map((a) => [a.taskId, a]));
+
+  let updatedCount = 0;
+  const updates = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
+
+  for (const item of assignments) {
+    if (!item.taskId || !item.scheduledStart || !item.scheduledEnd) continue;
+    const existing = assignmentMap.get(item.taskId);
+    if (!existing) continue;
+
+    updates.set(item.taskId, {
+      scheduledStart: item.scheduledStart,
+      scheduledEnd: item.scheduledEnd,
+    });
+    updatedCount++;
   }
 
-  // Get assignments for this station, sorted by start time
-  const stationAssignments = currentSnapshot.assignments
-    .filter((a) => a.targetId === stationId && !a.isOutsourced)
-    .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
-
-  if (stationAssignments.length === 0) {
-    return { data: { compactedCount: 0, assignments: [] } };
-  }
-
-  const taskMap = new Map(currentSnapshot.tasks.map((t) => [t.id, t]));
-  const updatedEndTimes = new Map<string, Date>();
-  let compactedCount = 0;
-  let previousEndTime: Date | null = null;
-  const updatedAssignmentsMap = new Map<string, { scheduledStart: string; scheduledEnd: string }>();
-
-  for (const assignment of stationAssignments) {
-    const task = taskMap.get(assignment.taskId);
-
-    // Calculate earliest valid start: max(previousTileEnd, predecessorEnd+dryTime)
-    let earliestStart: Date | null = null;
-
-    // Station constraint: previous tile on same station
-    if (previousEndTime !== null) {
-      earliestStart = previousEndTime;
-    }
-
-    // Precedence constraint: predecessor's end time (+ drying time if offset station)
-    if (task) {
-      const predecessorEnd = getCompactPredecessorEnd(task, currentSnapshot, updatedEndTimes);
-      if (predecessorEnd && (!earliestStart || predecessorEnd > earliestStart)) {
-        earliestStart = predecessorEnd;
-      }
-    }
-
-    // If no constraints (first tile with no predecessor), keep current position
-    if (earliestStart === null) {
-      earliestStart = new Date(assignment.scheduledStart);
-    }
-
-    // Calculate new end time
-    const newEnd: string = task?.type === 'Internal'
-      ? calculateEndTime(task as InternalTask, earliestStart.toISOString(), station)
-      : new Date(earliestStart.getTime() + (new Date(assignment.scheduledEnd).getTime() - new Date(assignment.scheduledStart).getTime())).toISOString();
-
-    // Check if position actually changed
-    if (earliestStart.getTime() !== new Date(assignment.scheduledStart).getTime()) {
-      updatedAssignmentsMap.set(assignment.id, {
-        scheduledStart: earliestStart.toISOString(),
-        scheduledEnd: newEnd,
-      });
-      compactedCount++;
-    }
-
-    updatedEndTimes.set(assignment.taskId, new Date(newEnd));
-    previousEndTime = new Date(newEnd);
-  }
-
-  // Apply updates to snapshot
-  if (compactedCount > 0) {
+  if (updatedCount > 0) {
     updateSnapshot((snapshot) => ({
       ...snapshot,
-      assignments: snapshot.assignments.map((assignment) => {
-        const updated = updatedAssignmentsMap.get(assignment.id);
-        return updated
-          ? { ...assignment, scheduledStart: updated.scheduledStart, scheduledEnd: updated.scheduledEnd, updatedAt: new Date().toISOString() }
-          : assignment;
+      assignments: snapshot.assignments.map((a) => {
+        const update = updates.get(a.taskId);
+        return update
+          ? { ...a, scheduledStart: update.scheduledStart, scheduledEnd: update.scheduledEnd, updatedAt: new Date().toISOString() }
+          : a;
       }),
     }));
   }
 
-  // Build response
-  const responseAssignments: AssignmentResponse[] = stationAssignments.map((a) => {
-    const updated = updatedAssignmentsMap.get(a.id);
-    return {
-      taskId: a.taskId,
-      targetId: a.targetId,
-      isOutsourced: a.isOutsourced,
-      scheduledStart: updated?.scheduledStart ?? a.scheduledStart,
-      scheduledEnd: updated?.scheduledEnd ?? a.scheduledEnd,
-      isCompleted: a.isCompleted,
-      completedAt: a.completedAt,
-    };
-  });
-
-  return {
-    data: {
-      compactedCount,
-      assignments: responseAssignments,
-    },
-  };
+  return { data: { updatedCount } };
 };
-
-/**
- * Get the predecessor's effective end time for compaction.
- *
- * Returns the predecessor's scheduledEnd (or updated end if already compacted),
- * plus DRY_TIME_MS if the predecessor is at a printing (offset) station.
- */
-function getCompactPredecessorEnd(
-  task: Task,
-  snapshot: ScheduleSnapshot,
-  updatedEndTimes: Map<string, Date>,
-): Date | null {
-  const elementTasks = snapshot.tasks
-    .filter((t) => t.elementId === task.elementId)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
-
-  if (taskIndex <= 0) return null;
-
-  const predecessorTask = elementTasks[taskIndex - 1];
-  const predecessorAssignment = snapshot.assignments.find((a) => a.taskId === predecessorTask.id);
-  if (!predecessorAssignment) return null;
-
-  // Use updated end time if predecessor was already compacted in this pass
-  const predecessorEnd = updatedEndTimes.get(predecessorTask.id)
-    ?? new Date(predecessorAssignment.scheduledEnd);
-
-  // Add drying time if predecessor is at a printing (offset) station
-  const predStation = snapshot.stations.find((s) => s.id === predecessorAssignment.targetId);
-  const category = snapshot.categories.find((c) => c.id === predStation?.categoryId);
-  if (category?.name.toLowerCase().includes('offset')) {
-    return new Date(predecessorEnd.getTime() + DRY_TIME_MS);
-  }
-
-  return predecessorEnd;
-}
 
 // ============================================================================
 // Route Configuration
@@ -2717,6 +2947,92 @@ const handleDeleteSavedSchedule: MockRouteHandler = async (args: FetchArgs) => {
   return { data: null };
 };
 
+// ============================================================================
+// Split / Fuse Task Handlers
+// ============================================================================
+
+const handleSplitTask: MockRouteHandler = async (args: FetchArgs) => {
+  const taskId = extractPathParam(args.url, /^\/tasks\/([^/]+)\/split$/);
+  if (!taskId) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing task ID' } } };
+  }
+
+  const body = args.body as { ratio: number } | undefined;
+  const ratio = body?.ratio ?? 0.5;
+  if (ratio < 0.05 || ratio > 0.95) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Ratio must be between 0.05 and 0.95' } } };
+  }
+
+  const snapshot = getSnapshot();
+  const task = snapshot.tasks.find((t) => t.id === taskId);
+  if (!task || task.type !== 'Internal') {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Internal task not found' } } };
+  }
+
+  const partAId = generateId();
+  const partBId = generateId();
+  const now = new Date().toISOString();
+
+  let splitGroupId = '';
+  updateSnapshot((snapshot) => {
+    const updated = { ...snapshot };
+    const result = applySplitToSnapshot(updated, { taskId, ratio, partAId, partBId, now });
+    if (result) {
+      splitGroupId = result.splitGroupId;
+    }
+    return updated;
+  });
+
+  return {
+    data: {
+      partIds: [partAId, partBId],
+      splitGroupId,
+    },
+  };
+};
+
+const handleFuseTask: MockRouteHandler = async (args: FetchArgs) => {
+  const taskId = extractPathParam(args.url, /^\/tasks\/([^/]+)\/fuse$/);
+  if (!taskId) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing task ID' } } };
+  }
+
+  const snapshot = getSnapshot();
+  const task = snapshot.tasks.find((t) => t.id === taskId) as InternalTask | undefined;
+  if (!task || task.type !== 'Internal' || !task.splitGroupId) {
+    return { error: { status: 404, data: { error: 'NotFound', message: 'Split task not found' } } };
+  }
+
+  const splitGroupId = task.splitGroupId;
+  const groupMembers = snapshot.tasks.filter(
+    (t) => t.type === 'Internal' && (t as InternalTask).splitGroupId === splitGroupId
+  ) as InternalTask[];
+
+  if (groupMembers.length < 2) {
+    return { error: { status: 400, data: { error: 'BadRequest', message: 'Task is not split' } } };
+  }
+
+  const restoredId = generateId();
+  const now = new Date().toISOString();
+
+  let originalRunMinutes = 0;
+  updateSnapshot((snapshot) => {
+    const updated = { ...snapshot };
+    const result = applyFuseToSnapshot(updated, { taskId, restoredId, now });
+    if (result) {
+      originalRunMinutes = result.originalRunMinutes;
+    }
+    return updated;
+  });
+
+  return {
+    data: {
+      taskId: restoredId,
+      runMinutes: originalRunMinutes,
+    },
+  };
+};
+
 const routes: MockRoute[] = [
   // Schedule
   { method: 'GET', pattern: /^\/schedule\/snapshot$/, handler: handleGetSnapshot },
@@ -2732,6 +3048,10 @@ const routes: MockRoute[] = [
   { method: 'GET', pattern: /^\/jobs\/lookup-by-reference/, handler: handleLookupByReference },
   { method: 'POST', pattern: /^\/jobs$/, handler: handleCreateJob },
   { method: 'PUT', pattern: /^\/jobs\/[^/]+$/, handler: handleUpdateJob },
+  { method: 'POST', pattern: /^\/jobs\/[^/]+\/auto-place-alap$/, handler: handleAutoPlaceAlap },
+  { method: 'POST', pattern: /^\/jobs\/[^/]+\/auto-place$/, handler: handleAutoPlace },
+  { method: 'DELETE', pattern: /^\/jobs\/[^/]+\/assignments$/, handler: handleClearJobAssignments },
+  { method: 'DELETE', pattern: /^\/schedule\/assignments$/, handler: handleClearAllAssignments },
   { method: 'DELETE', pattern: /^\/jobs\/[^/]+$/, handler: handleDeleteJob },
 
   // Elements
@@ -2777,14 +3097,14 @@ const routes: MockRoute[] = [
   { method: 'PUT',    pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleUpdateFeuilleFormat },
   { method: 'DELETE', pattern: /^\/feuille-formats\/[^/]+$/,    handler: handleDeleteFeuilleFormat },
 
-  // Stations (management CRUD — must come before the compact handler)
+  // Stations (management CRUD)
   { method: 'GET',    pattern: /^\/stations$/,        handler: handleGetStations },
   { method: 'POST',   pattern: /^\/stations$/,         handler: handleCreateStation },
   { method: 'PUT',    pattern: /^\/stations\/[^/]+$/,  handler: handleUpdateStation },
   { method: 'DELETE', pattern: /^\/stations\/[^/]+$/,  handler: handleDeleteStation },
 
-  // Station operations
-  { method: 'POST', pattern: /^\/stations\/[^/]+\/compact$/, handler: handleCompactStation },
+  // Schedule operations
+  { method: 'POST', pattern: /^\/schedule\/batch-reschedule$/, handler: handleBatchReschedule },
 
   // Task assignments
   { method: 'POST', pattern: /^\/tasks\/[^/]+\/assign$/, handler: handleAssignTask },
@@ -2793,6 +3113,10 @@ const routes: MockRoute[] = [
 
   // Task completion
   { method: 'PUT', pattern: /^\/tasks\/[^/]+\/completion$/, handler: handleToggleCompletion },
+
+  // Task split/fuse
+  { method: 'POST', pattern: /^\/tasks\/[^/]+\/split$/, handler: handleSplitTask },
+  { method: 'POST', pattern: /^\/tasks\/[^/]+\/fuse$/,  handler: handleFuseTask },
 
   // Saved Schedules (load must come before generic ID route)
   { method: 'GET',    pattern: /^\/saved-schedules$/,              handler: handleGetSavedSchedules },
@@ -2841,8 +3165,11 @@ export const mockBaseQuery: BaseQueryFn<
   const normalizedArgs = normalizeArgs(args);
   const { url, method } = normalizedArgs;
 
+  // Strip query string for route matching (handlers parse params from full URL)
+  const pathOnly = url.split('?')[0];
+
   // Find matching route
-  const route = routes.find((r) => r.method === method && r.pattern.test(url));
+  const route = routes.find((r) => r.method === method && r.pattern.test(pathOnly));
 
   if (!route) {
     return {

@@ -3,8 +3,8 @@
  * Tests for station header including REQ-18: Group capacity display
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { StationHeader, type GroupCapacityInfo } from './StationHeader';
 import type { Station } from '@flux/types';
 
@@ -39,47 +39,6 @@ describe('StationHeader', () => {
     render(<StationHeader station={createStation('sta-test')} />);
 
     expect(screen.getByTestId('station-header-sta-test')).toBeInTheDocument();
-  });
-
-  describe('Compact button', () => {
-    it('shows compact button when onCompact provided', () => {
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          hasTiles={true}
-          onCompact={vi.fn()}
-        />
-      );
-
-      expect(screen.getByTestId('compact-button-sta-1')).toBeInTheDocument();
-    });
-
-    it('disables compact button when no tiles', () => {
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          hasTiles={false}
-          onCompact={vi.fn()}
-        />
-      );
-
-      const button = screen.getByTestId('compact-button-sta-1');
-      expect(button).toBeDisabled();
-    });
-
-    it('calls onCompact when clicked with tiles', () => {
-      const onCompact = vi.fn();
-      render(
-        <StationHeader
-          station={createStation('sta-1')}
-          hasTiles={true}
-          onCompact={onCompact}
-        />
-      );
-
-      fireEvent.click(screen.getByTestId('compact-button-sta-1'));
-      expect(onCompact).toHaveBeenCalledWith('sta-1');
-    });
   });
 
   // NOTE: Group Capacity Display (REQ-18) was removed from StationHeader in REQ-06

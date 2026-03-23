@@ -1,29 +1,14 @@
 import type { ScheduleSnapshot, TaskAssignment, Task, Station, InternalTask, Element } from '@flux/types';
 import { DRY_TIME_MS } from '@flux/types';
-import { getJobIdForTask } from './taskHelpers';
+import { getJobIdForTask, compareTaskOrder } from './taskHelpers';
 import { isPrintingStation } from './precedenceConstraints';
-import { snapToNextWorkingTime } from './workingTime';
+import { snapToNextWorkingTime, roundToNearestQuarterHour } from './workingTime';
 import { COMPACT_HORIZONS } from '../constants';
 import type { CompactHorizon } from '../constants';
 
 export { COMPACT_HORIZONS };
 export type { CompactHorizon };
 
-/**
- * Round a date UP to the next 15-minute boundary.
- * e.g., 12:11 → 12:15, 12:00 → 12:00, 12:46 → 13:00
- */
-function snapToQuarterHour(date: Date): Date {
-  const snapped = new Date(date);
-  const minutes = snapped.getMinutes();
-  const remainder = minutes % 15;
-  if (remainder > 0) {
-    snapped.setMinutes(minutes + (15 - remainder), 0, 0);
-  } else {
-    snapped.setSeconds(0, 0);
-  }
-  return snapped;
-}
 
 /**
  * Check if a task is immobile (cannot be moved during compaction).
@@ -47,28 +32,30 @@ function isWithinHorizon(assignment: TaskAssignment, now: Date, horizonMs: numbe
 }
 
 /**
- * Find the predecessor task for a given task (by sequenceOrder within the same job).
+ * Find the predecessor task for a given task (positional lookup in sorted element tasks).
  */
-function findPredecessorTask(task: Task, allTasks: Task[], elements: Element[]): Task | undefined {
-  if (task.sequenceOrder <= 0) return undefined;
+function findPredecessorTask(task: Task, allTasks: Task[], _elements: Element[]): Task | undefined {
+  const elementTasks = allTasks
+    .filter((t) => t.elementId === task.elementId)
+    .sort(compareTaskOrder);
 
-  const jobId = getJobIdForTask(task, elements);
-  if (!jobId) return undefined;
-
-  // Find tasks with same elementId (same job) and one lower sequenceOrder
-  return allTasks.find(
-    (t) => t.elementId === task.elementId && t.sequenceOrder === task.sequenceOrder - 1
-  );
+  const taskIndex = elementTasks.findIndex((t) => t.id === task.id);
+  if (taskIndex > 0) {
+    return elementTasks[taskIndex - 1];
+  }
+  return undefined;
 }
 
 /**
  * Get the end time of a single task, considering any updates made during compaction.
  * Includes drying time if the task is at a printing station.
+ * Skips drying time when the successor is in the same split group.
  */
 function getTaskEndTime(
   task: Task,
   snapshot: ScheduleSnapshot,
-  updatedEndTimes: Map<string, Date>
+  updatedEndTimes: Map<string, Date>,
+  successorTask?: Task
 ): Date | null {
   const assignment = snapshot.assignments.find((a) => a.taskId === task.id);
   if (!assignment) return null;
@@ -76,7 +63,13 @@ function getTaskEndTime(
   const updatedEnd = updatedEndTimes.get(task.id);
   const endTime = updatedEnd ?? new Date(assignment.scheduledEnd);
 
-  if (isPrintingStation(snapshot, assignment.targetId)) {
+  // Skip dry time between parts of the same split group
+  const sameGroup = successorTask
+    && task.type === 'Internal' && successorTask.type === 'Internal'
+    && (task as InternalTask).splitGroupId != null
+    && (task as InternalTask).splitGroupId === (successorTask as InternalTask).splitGroupId;
+
+  if (isPrintingStation(snapshot, assignment.targetId) && !sameGroup) {
     return new Date(endTime.getTime() + DRY_TIME_MS);
   }
 
@@ -97,7 +90,7 @@ function getPredecessorEndTime(
   // Intra-element predecessor (same element, sequenceOrder - 1)
   const intraElementPred = findPredecessorTask(task, snapshot.tasks, snapshot.elements);
   if (intraElementPred) {
-    return getTaskEndTime(intraElementPred, snapshot, updatedEndTimes);
+    return getTaskEndTime(intraElementPred, snapshot, updatedEndTimes, task);
   }
 
   // Cross-element predecessors (first task of element → check prerequisiteElementIds)
@@ -117,7 +110,7 @@ function getPredecessorEndTime(
     const prereqTasks = prereqElem.taskIds
       .map((id) => taskById.get(id))
       .filter((t): t is Task => t !== undefined)
-      .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+      .sort(compareTaskOrder);
     const lastTask = prereqTasks[prereqTasks.length - 1];
     if (!lastTask) continue;
 
@@ -260,7 +253,7 @@ function processAssignment(ctx: ProcessAssignmentContext): ProcessAssignmentResu
  */
 export function compactTimeline(options: CompactTimelineOptions): CompactTimelineResult {
   const { snapshot, horizonHours, calculateEndTime: calculateEndTimeFn } = options;
-  const now = snapToQuarterHour(options.now ?? new Date());
+  const now = roundToNearestQuarterHour(options.now ?? new Date());
   const horizonMs = horizonHours * 60 * 60 * 1000;
 
   const taskMap = new Map(snapshot.tasks.map((t) => [t.id, t]));

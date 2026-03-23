@@ -1,6 +1,8 @@
-import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider } from '@flux/types';
+import { useState, useCallback, useMemo } from 'react';
+import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
 import { X } from 'lucide-react';
 import { TaskList } from './TaskList';
+import { JobDetailContextMenu } from './JobDetailContextMenu';
 import { getTasksForJob } from '../../utils/taskHelpers';
 
 /** Payload for element prerequisite status updates */
@@ -57,6 +59,14 @@ export interface JobDetailsPanelProps {
   lateJobIds?: Set<string>;
   /** Job IDs that are shipped (highest priority tile coloring) */
   shippedJobIds?: Set<string>;
+  /** Callback when split is requested (taskId, x, y) */
+  onSplitTask?: (taskId: string, x: number, y: number) => void;
+  /** Callback when fuse is requested (taskId) */
+  onFuseTask?: (taskId: string) => void;
+  /** All jobs in snapshot (for dependency display) */
+  allJobs?: Job[];
+  /** Callback when a dependency job chip is clicked */
+  onSelectJob?: (jobId: string) => void;
 }
 
 /** Format workshop exit date as DD/MM/YYYY a HHhMM */
@@ -104,21 +114,101 @@ export function JobDetailsPanel({
   onEditJob,
   lateJobIds,
   shippedJobIds,
+  onSplitTask,
+  onFuseTask,
+  allJobs,
+  onSelectJob,
 }: JobDetailsPanelProps) {
+  // Memoize data filtering for this job
+  const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
+  const { jobTasks, jobElements, jobAssignments } = useMemo(() => {
+    if (!job) return emptyJobData;
+    const jt = getTasksForJob(job.id, tasks, elements);
+    const je = elements.filter((e) => job.elementIds.includes(e.id));
+    const jtIds = new Set(jt.map((t) => t.id));
+    const ja = assignments.filter((a) => jtIds.has(a.taskId));
+    return { jobTasks: jt, jobElements: je, jobAssignments: ja };
+  }, [job, tasks, elements, assignments]);
+
+  // Context menu state
+  // For unassigned tasks, assignmentId is actually the taskId (no assignment exists)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    assignmentId: string;
+    isCompleted: boolean;
+    taskId?: string;
+    isUnassigned?: boolean;
+  } | null>(null);
+
+  const handleTileContextMenu = useCallback(
+    (x: number, y: number, assignmentId: string, isCompleted: boolean) => {
+      // Check if this is an unassigned task (assignmentId is actually a taskId)
+      const isAssignment = jobAssignments.some((a) => a.id === assignmentId);
+      if (isAssignment) {
+        const assignment = jobAssignments.find((a) => a.id === assignmentId);
+        setContextMenu({ x, y, assignmentId, isCompleted, taskId: assignment?.taskId });
+      } else {
+        // assignmentId is actually a taskId for unassigned tasks
+        setContextMenu({ x, y, assignmentId, isCompleted: false, taskId: assignmentId, isUnassigned: true });
+      }
+    },
+    [jobAssignments]
+  );
+
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const handleContextMenuRecall = useCallback(() => {
+    if (contextMenu && onRecallTask) {
+      onRecallTask(contextMenu.assignmentId);
+    }
+  }, [contextMenu, onRecallTask]);
+
+  const handleContextMenuToggleComplete = useCallback(() => {
+    if (contextMenu && onToggleComplete) {
+      onToggleComplete(contextMenu.assignmentId);
+    }
+  }, [contextMenu, onToggleComplete]);
+
+  const handleContextMenuSplit = useCallback(() => {
+    if (contextMenu && contextMenu.taskId && onSplitTask) {
+      onSplitTask(contextMenu.taskId, contextMenu.x, contextMenu.y);
+    }
+  }, [contextMenu, onSplitTask]);
+
+  const handleContextMenuFuse = useCallback(() => {
+    if (contextMenu && contextMenu.taskId && onFuseTask) {
+      onFuseTask(contextMenu.taskId);
+    }
+  }, [contextMenu, onFuseTask]);
+
+  // Dependencies: required jobs and dependent jobs
+  const requiredJobs = useMemo(() => {
+    if (!allJobs || !job?.requiredJobIds || job.requiredJobIds.length === 0) return [];
+    return job.requiredJobIds
+      .map((id) => allJobs.find((j) => j.id === id))
+      .filter((j): j is Job => j !== undefined);
+  }, [allJobs, job?.requiredJobIds]);
+
+  const dependentJobs = useMemo(() => {
+    if (!allJobs || !job) return [];
+    return allJobs.filter(
+      (j) => j.requiredJobIds && j.requiredJobIds.includes(job.id)
+    );
+  }, [allJobs, job?.id]);
+
   // Don't render if no job selected
   if (!job) {
     return null;
   }
 
-  // Filter tasks for this job
-  const jobTasks = getTasksForJob(job.id, tasks, elements);
-
-  // Filter elements for this job
-  const jobElements = elements.filter((e) => job.elementIds.includes(e.id));
-
-  // Filter assignments for this job's tasks
-  const jobTaskIds = new Set(jobTasks.map((t) => t.id));
-  const jobAssignments = assignments.filter((a) => jobTaskIds.has(a.taskId));
+  // Determine if the context menu task is a split task
+  const contextMenuTaskObj = contextMenu?.taskId
+    ? jobTasks.find((t) => t.id === contextMenu.taskId) as InternalTask | undefined
+    : null;
+  const isContextMenuSplit = contextMenuTaskObj?.type === 'Internal' && !!contextMenuTaskObj.splitGroupId;
 
   // REQ-02: Handle departure date click
   const handleDateClick = onDateClick
@@ -168,6 +258,32 @@ export function JobDetailsPanel({
           </div>
         )}
 
+        {/* Dependencies section */}
+        {requiredJobs.length > 0 && (
+          <div className="pt-1.5" data-testid="job-dependencies">
+            <div className="text-xs text-zinc-500 mb-1">Prérequis:</div>
+            <div className="flex flex-wrap gap-1">
+              {requiredJobs.map((rj) => (
+                <button
+                  key={rj.id}
+                  onClick={() => onSelectJob?.(rj.id)}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-purple-900/30 border border-purple-700/30 text-purple-300 hover:bg-purple-900/50 transition-colors truncate max-w-[140px]"
+                  title={`${rj.reference} - ${rj.client}`}
+                >
+                  {rj.reference}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {dependentJobs.length > 0 && (
+          <div className="pt-1" data-testid="job-dependents">
+            <div className="text-xs text-zinc-500">
+              Requis par: {dependentJobs.map((j) => j.reference).join(', ')}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Task tiles grouped by element */}
@@ -192,7 +308,23 @@ export function JobDetailsPanel({
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
         onToggleComplete={onToggleComplete}
+        onContextMenu={handleTileContextMenu}
       />
+
+      {contextMenu && (
+        <JobDetailContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          isCompleted={contextMenu.isCompleted}
+          onToggleComplete={handleContextMenuToggleComplete}
+          onRecall={handleContextMenuRecall}
+          onSplit={onSplitTask ? handleContextMenuSplit : undefined}
+          onFuse={onFuseTask ? handleContextMenuFuse : undefined}
+          isSplit={isContextMenuSplit}
+          isUnassigned={contextMenu.isUnassigned}
+          onClose={handleContextMenuClose}
+        />
+      )}
     </div>
   );
 }

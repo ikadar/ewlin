@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import type { Task, TaskAssignment } from '@flux/types';
 import { AlertCircle, Shuffle } from 'lucide-react';
 import { ProgressDots } from './ProgressDots';
@@ -24,8 +24,10 @@ export interface JobCardProps {
   problemType?: JobProblemType;
   /** Whether the job is selected */
   isSelected?: boolean;
-  /** Click handler */
-  onClick?: () => void;
+  /** Buffer time label for fully-scheduled jobs (e.g., "+2j 4h") */
+  bufferLabel?: string;
+  /** Click handler — receives job ID */
+  onClick?: (jobId: string) => void;
 }
 
 /**
@@ -42,9 +44,15 @@ export const JobCard = memo(function JobCard({
   assignments,
   deadline,
   problemType,
+  bufferLabel,
   isSelected = false,
   onClick,
 }: JobCardProps) {
+  // Step 2c: Stable per-card click handler
+  const handleClick = useCallback(() => {
+    onClick?.(id);
+  }, [onClick, id]);
+
   // REQ-05: block display respects margins (w-full + margins caused overflow)
   const baseClasses = 'mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors focus-visible:ring-1 focus-visible:ring-white/30';
 
@@ -87,7 +95,7 @@ export const JobCard = memo(function JobCard({
     <button
       type="button"
       className={`${baseClasses} ${stateClasses} text-left w-[calc(100%-1rem)]`}
-      onClick={onClick}
+      onClick={handleClick}
       data-testid={`job-card-${id}`}
     >
       {/* Header row: reference · client + date/icon - REQ-05: overflow fix */}
@@ -104,15 +112,22 @@ export const JobCard = memo(function JobCard({
         {description}
       </div>
 
-      {/* Footer: progress dots (left) + badge (right) */}
+      {/* Footer: progress dots (left) + badge/buffer (right) */}
       <div className="flex items-center justify-between">
         <ProgressDots tasks={tasks} assignments={assignments} />
-        {problemType === 'late' && (
-          <span className="text-xs font-medium text-red-400">En retard</span>
-        )}
-        {problemType === 'conflict' && (
-          <span className="text-xs font-medium text-amber-400">Conflit</span>
-        )}
+        <div className="flex items-center gap-2">
+          {problemType === 'late' && (
+            <span className="text-xs font-medium text-red-400">En retard</span>
+          )}
+          {problemType === 'conflict' && (
+            <span className="text-xs font-medium text-amber-400">Conflit</span>
+          )}
+          {bufferLabel && (
+            <span className={`text-xs font-medium ${bufferLabel.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
+              {bufferLabel}
+            </span>
+          )}
+        </div>
       </div>
     </button>
   );

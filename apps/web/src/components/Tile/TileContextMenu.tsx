@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2 } from 'lucide-react';
+import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2, Scissors, Merge } from 'lucide-react';
 
 export interface TileContextMenuProps {
   /** Menu position X coordinate (from cursor) */
@@ -23,6 +23,12 @@ export interface TileContextMenuProps {
   onSwapDown: () => void;
   /** Callback for "Recall" action (unassign) */
   onRecall: () => void;
+  /** Callback for "Split" action */
+  onSplit?: () => void;
+  /** Callback for "Fuse" action */
+  onFuse?: () => void;
+  /** Whether this task is part of a split group */
+  isSplit?: boolean;
   /** Callback to close the menu */
   onClose: () => void;
 }
@@ -82,6 +88,9 @@ export function TileContextMenu({
   onSwapUp,
   onSwapDown,
   onRecall,
+  onSplit,
+  onFuse,
+  isSplit = false,
   onClose,
 }: TileContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -188,6 +197,16 @@ export function TileContextMenu({
     }
   };
 
+  const handleSplit = () => {
+    onSplit?.();
+    onClose();
+  };
+
+  const handleFuse = () => {
+    onFuse?.();
+    onClose();
+  };
+
   return createPortal(
     <div
       ref={menuRef}
@@ -216,6 +235,23 @@ export function TileContextMenu({
         testId="context-menu-recall"
       />
       <Separator />
+      {onSplit && !isCompleted && (
+        <MenuItem
+          icon={<Scissors className="w-4 h-4" />}
+          label={isSplit ? 'Diviser encore' : 'Diviser'}
+          onClick={handleSplit}
+          testId="context-menu-split"
+        />
+      )}
+      {isSplit && onFuse && (
+        <MenuItem
+          icon={<Merge className="w-4 h-4" />}
+          label="Fusionner"
+          onClick={handleFuse}
+          testId="context-menu-fuse"
+        />
+      )}
+      {(onSplit || (isSplit && onFuse)) && <Separator />}
       <MenuItem
         icon={<ChevronUp className="w-4 h-4" />}
         label="Déplacer vers le haut"

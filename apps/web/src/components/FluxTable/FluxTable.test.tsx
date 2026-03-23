@@ -310,4 +310,89 @@ describe('FluxTable', () => {
     const chevron = clientHeader.querySelector('svg');
     expect(chevron?.classList.contains('opacity-0')).toBe(true);
   });
+
+  // ── Job status dot ──────────────────────────────────────────────────────
+
+  it('shows late status dot for job with a late station', () => {
+    render(<FluxTable categories={dummyCategories} jobs={[multiJob]} />);
+    const dot = screen.getByTestId('flux-job-status-dot');
+    expect(dot).toBeInTheDocument();
+    expect(dot).toHaveAttribute('data-status', 'late');
+    expect(dot).toHaveAttribute('aria-label', 'En retard');
+  });
+
+  it('does not show status dot for job with no late stations', () => {
+    render(<FluxTable categories={dummyCategories} jobs={[singleJob]} />);
+    expect(screen.queryByTestId('flux-job-status-dot')).not.toBeInTheDocument();
+  });
+
+  it('shows conflict status dot when job internalId is in conflictJobIds', () => {
+    const conflictJob: FluxJob = {
+      ...singleJob,
+      id: '00099',
+      internalId: 'uuid-conflict-job',
+    };
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[conflictJob]}
+        conflictJobIds={new Set(['uuid-conflict-job'])}
+      />,
+    );
+    const dot = screen.getByTestId('flux-job-status-dot');
+    expect(dot).toHaveAttribute('data-status', 'conflict');
+    expect(dot).toHaveAttribute('aria-label', 'Conflit');
+  });
+
+  it('late status takes priority over conflict', () => {
+    const lateConflictJob: FluxJob = {
+      ...multiJob,
+      internalId: 'uuid-late-conflict',
+    };
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[lateConflictJob]}
+        conflictJobIds={new Set(['uuid-late-conflict'])}
+      />,
+    );
+    const dot = screen.getByTestId('flux-job-status-dot');
+    expect(dot).toHaveAttribute('data-status', 'late');
+  });
+
+  it('shows late status dot when job is in lateJobIds (snapshot-level late)', () => {
+    const snapshotLateJob: FluxJob = {
+      ...singleJob,
+      id: '00055',
+      internalId: 'uuid-snapshot-late',
+    };
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[snapshotLateJob]}
+        lateJobIds={new Set(['uuid-snapshot-late'])}
+      />,
+    );
+    const dot = screen.getByTestId('flux-job-status-dot');
+    expect(dot).toHaveAttribute('data-status', 'late');
+    expect(dot).toHaveAttribute('aria-label', 'En retard');
+  });
+
+  it('snapshot-level late takes priority over conflict', () => {
+    const bothJob: FluxJob = {
+      ...singleJob,
+      id: '00066',
+      internalId: 'uuid-both',
+    };
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[bothJob]}
+        lateJobIds={new Set(['uuid-both'])}
+        conflictJobIds={new Set(['uuid-both'])}
+      />,
+    );
+    const dot = screen.getByTestId('flux-job-status-dot');
+    expect(dot).toHaveAttribute('data-status', 'late');
+  });
 });

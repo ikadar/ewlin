@@ -6,6 +6,7 @@
 import {
   PREREQUISITE_STATUS_COLOR,
   type FluxElement,
+  type FluxJob,
   type FluxStationData,
   type PrerequisiteColor,
   type PrerequisiteStatus,
@@ -82,4 +83,28 @@ export function sortStationDataBySeverity(data: FluxStationData[]): FluxStationD
   return [...data].sort(
     (a, b) => STATION_STATE_SEVERITY[a.state] - STATION_STATE_SEVERITY[b.state],
   );
+}
+
+// ── Job-level status ─────────────────────────────────────────────────────
+
+/** Job-level problem indicator for the Flux table row. */
+export type FluxJobStatus = 'late' | 'conflict' | null;
+
+/**
+ * Derives the job-level problem status from station data and schedule snapshot.
+ * A job is "late" if ANY station has state === 'late' OR it appears in lateJobIds.
+ * Conflict detection uses conflictJobIds (excluding DeadlineConflict).
+ */
+export function getFluxJobStatus(
+  job: FluxJob,
+  lateJobIds?: Set<string>,
+  conflictJobIds?: Set<string>,
+): FluxJobStatus {
+  const jobKey = job.internalId ?? job.id;
+  const isLate = job.elements.some(el =>
+    Object.values(el.stations).some(s => s?.state === 'late'),
+  ) || lateJobIds?.has(jobKey);
+  if (isLate) return 'late';
+  if (conflictJobIds?.has(jobKey)) return 'conflict';
+  return null;
 }

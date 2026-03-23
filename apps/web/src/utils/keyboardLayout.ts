@@ -40,6 +40,25 @@ export function isAltLetter(e: KeyboardEvent, letter: string): boolean {
 }
 
 /**
+ * Check if a keyboard event matches a Ctrl+Alt+<letter> shortcut,
+ * regardless of QWERTY/AZERTY layout and macOS Alt remapping.
+ *
+ * @param e - The keyboard event
+ * @param letter - The intended logical letter (e.g., 'z' for Ctrl+Alt+Z)
+ */
+export function isCtrlAltLetter(e: KeyboardEvent, letter: string): boolean {
+  if (!e.altKey || !e.ctrlKey || e.metaKey) return false;
+
+  const l = letter.toLowerCase();
+  const expectedKeyCode = LETTER_KEYCODES[l];
+
+  if (expectedKeyCode !== undefined && e.keyCode === expectedKeyCode) return true;
+  if (e.key.toLowerCase() === l) return true;
+
+  return false;
+}
+
+/**
  * No-op kept for API compatibility — detection is no longer needed
  * since keyCode is layout-agnostic.
  */

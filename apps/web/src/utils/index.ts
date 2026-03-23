@@ -5,12 +5,6 @@ export type { PushDownResult } from './pushDown';
 export { applySwap, findAdjacentAssignment } from './swap';
 export type { SwapDirection, SwapResult } from './swap';
 export {
-  getAvailableTaskForStation,
-  getLastUnscheduledTask,
-  canActivateQuickPlacement,
-  getStationsWithAvailableTasks,
-} from './quickPlacement';
-export {
   getOrderedJobIds,
   getPreviousJobId,
   getNextJobId,
@@ -39,7 +33,7 @@ export { getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, ge
 export type { DryingTimeInfo, OutsourcingTimeInfo } from './precedenceConstraints';
 export { getValidationMessage, getPrimaryValidationMessage } from './validationMessages';
 export { addWorkingTime, subtractWorkingTime, getDayScheduleForDate, isWithinWorkingHours, snapToNextWorkingTime } from './workingTime';
-export { getJobIdForTask, createTaskToJobMap, getTasksForJob, groupTasksByJob } from './taskHelpers';
+export { getJobIdForTask, createTaskToJobMap, getTasksForJob, groupTasksByJob, compareTaskOrder } from './taskHelpers';
 export { mergeWithSession } from './mergeWithSession';
 export {
   isElementBlocked,
@@ -75,3 +69,5 @@ export {
 export type { OutsourcingParams } from './outsourcingCalculation';
 export { recalculatePrecedenceConflicts, updateSnapshotConflicts } from './conflictRecalculation';
 export { cn } from './cn';
+export { applySplitToSnapshot, applyFuseToSnapshot } from './splitFuse';
+export type { SplitParams, SplitResult, FuseParams, FuseResult } from './splitFuse';

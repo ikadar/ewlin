@@ -24,6 +24,16 @@ export function muteMercure(durationMs = 2000): void {
 /**
  * Check whether Mercure events should be ignored (own mutation in flight).
  */
+/**
+ * Immediately unmute Mercure (e.g. when auto-place finishes).
+ */
+export function unmuteMercure(): void {
+  muteUntil = 0;
+}
+
+/**
+ * Check whether Mercure events should be ignored (own mutation in flight).
+ */
 export function isMercureMuted(): boolean {
   return Date.now() < muteUntil;
 }

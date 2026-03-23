@@ -16,7 +16,7 @@ function RootLayoutInner() {
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
   const { toastMessage, dismissToast } = useMercureSubscription();
 
-  const chordPendingRef = useRef<'compact' | null>(null);
+  const chordPendingRef = useRef<'compact' | 'placement' | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Shared commands available on all pages
@@ -45,6 +45,20 @@ function RootLayoutInner() {
 
       // Don't handle shortcuts when command palette is open
       if (isOpen) return;
+
+      // Chord shortcut: if Alt+P was pressed, wait for S
+      // Use keyCode because macOS remaps e.key under Alt (e.g. Alt+S → 'ß')
+      if (chordPendingRef.current === 'placement') {
+        chordPendingRef.current = null;
+        if (chordTimeoutRef.current) { clearTimeout(chordTimeoutRef.current); chordTimeoutRef.current = null; }
+        const map: Record<number, string> = { 83: 'asap-placement', 76: 'alap-placement' }; // 83 = S, 76 = L
+        const cmdId = map[e.keyCode];
+        if (cmdId) {
+          e.preventDefault();
+          allCommands.find(c => c.id === cmdId)?.action();
+        }
+        return; // consume chord regardless
+      }
 
       // Chord shortcut: if Alt+C was pressed, wait for 1-5
       if (chordPendingRef.current === 'compact') {
@@ -76,10 +90,19 @@ function RootLayoutInner() {
         return;
       }
 
-      // Alt+P: navigate to scheduler
+      // Alt+P: chord prefix for placement (when available), else navigate to scheduler
       if (isAltLetter(e, 'p')) {
         e.preventDefault();
-        navigate('/');
+        if (allCommands.some(c => c.id === 'asap-placement' || c.id === 'alap-placement')) {
+          chordPendingRef.current = 'placement';
+          if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
+          chordTimeoutRef.current = setTimeout(() => {
+            chordPendingRef.current = null;
+            navigate('/');
+          }, 1500);
+        } else {
+          navigate('/');
+        }
         return;
       }
 
