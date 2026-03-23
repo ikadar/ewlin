@@ -25,6 +25,7 @@ pnpm-debug.log*
 # Production
 backups/
 snapshots/
+snapshot.json
 
 # IDE / Editor
 .idea/
