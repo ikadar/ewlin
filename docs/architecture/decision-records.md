@@ -31,6 +31,7 @@ Each ADR is a **small, immutable document**. When a decision is changed, a *new*
 | [ADR-011](#adr-011--lezer-parser-system-for-task-dsl) | Lezer Parser System for Task DSL | Accepted | 2025-12-11 |
 | [ADR-012](#adr-012--event-sourcing-for-schedule-aggregate-future) | Event Sourcing (Future) | Proposed | 2025-01-25 |
 | [ADR-013](#adr-013--element-layer-with-hybrid-sequencing) | Element Layer with Hybrid Sequencing | Accepted | 2025-12-20 |
+| [ADR-014](adr-014-compaction-service-extraction.md) | Extract Smart Compaction to Node.js | Proposed | 2026-03-24 |
 
 ---
 

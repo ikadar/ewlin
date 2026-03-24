@@ -15,7 +15,7 @@ Detect the user's intent from their message:
 If the user asks to "clear", "purge", "delete", or "remove" jobs (without generating new ones), run:
 
 ```bash
-cd /Users/jpi/Documents/dev/claude-code/merlin/services/php-api && bin/console dbal:run-sql "SET FOREIGN_KEY_CHECKS=0; TRUNCATE tasks; TRUNCATE elements; TRUNCATE job_comments; TRUNCATE jobs; UPDATE schedules SET assignments='[]', version=version+1; SET FOREIGN_KEY_CHECKS=1;"
+cd services/php-api && bin/console dbal:run-sql "SET FOREIGN_KEY_CHECKS=0; TRUNCATE tasks; TRUNCATE elements; TRUNCATE job_comments; TRUNCATE jobs; UPDATE schedules SET assignments='[]', version=version+1; SET FOREIGN_KEY_CHECKS=1;"
 ```
 
 Report that all jobs, elements, tasks, and comments have been cleared.
@@ -29,7 +29,7 @@ Use sensible defaults if not specified:
 - **purge**: default yes (include `--purge` flag)
 
 ```bash
-cd /Users/jpi/Documents/dev/claude-code/merlin/services/php-api && bin/console app:jobs:generate --count={count} --from={from} --to={to} --purge -n
+cd services/php-api && bin/console app:jobs:generate --count={count} --from={from} --to={to} --purge -n
 ```
 
-Report the output — the command prints a progress bar and summary table with job type breakdown and totals.
+Report the output — the command prints a database configuration summary, progress bar, and summary table with job type breakdown and totals.

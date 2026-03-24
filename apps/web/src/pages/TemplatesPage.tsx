@@ -7,12 +7,12 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft } from 'lucide-react';
+import { Search, ArrowLeft, Plus } from 'lucide-react';
 import type { JcfTemplate } from '@flux/types';
 import { JcfTemplateList } from '../components/JcfTemplateList/JcfTemplateList';
 import { JcfTemplateEditorModal } from '../components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from '../components/JcfTemplateEditorModal';
-import { useGetTemplatesQuery, useUpdateTemplateMutation, useDeleteTemplateMutation } from '../store/api/templateApi';
+import { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation } from '../store/api/templateApi';
 import { useGetSnapshotQuery } from '../store';
 
 export function TemplatesPage() {
@@ -21,11 +21,13 @@ export function TemplatesPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Template editor state
+  const [isCreating, setIsCreating] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<JcfTemplate | null>(null);
   // Delete confirmation state
   const [deletingTemplate, setDeletingTemplate] = useState<JcfTemplate | null>(null);
 
   const { data, isLoading, error } = useGetTemplatesQuery();
+  const [createTemplate, { isLoading: isCreatingTemplate }] = useCreateTemplateMutation();
   const [updateTemplate, { isLoading: isUpdating }] = useUpdateTemplateMutation();
   const [deleteTemplate] = useDeleteTemplateMutation();
   const { data: snapshotData } = useGetSnapshotQuery();
@@ -45,7 +47,7 @@ export function TemplatesPage() {
   // Keyboard shortcuts
   useEffect(() => {
     // Don't handle page-level shortcuts when editor modal is open
-    if (editingTemplate) return;
+    if (editingTemplate || isCreating) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape: blur search or go back
@@ -72,7 +74,7 @@ export function TemplatesPage() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [navigate, editingTemplate]);
+  }, [navigate, editingTemplate, isCreating]);
 
   // Client-side search filtering
   const filteredTemplates = useMemo(() => {
@@ -86,6 +88,26 @@ export function TemplatesPage() {
         t.description?.toLowerCase().includes(query),
     );
   }, [templates, searchQuery]);
+
+  // Create handler
+  const handleCreateSave = useCallback(async (data: TemplateEditorData) => {
+    try {
+      const elementsWithWorkflow = data.elements.map(el => ({
+        ...el,
+        sequenceWorkflow: el.sequence.split('\n').map(s => s.trim()).filter(Boolean),
+      }));
+      await createTemplate({
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        clientName: data.clientName,
+        elements: elementsWithWorkflow,
+      }).unwrap();
+      setIsCreating(false);
+    } catch (err) {
+      console.error('Failed to create template:', err);
+    }
+  }, [createTemplate]);
 
   // Edit handlers
   const handleEditClick = useCallback((template: JcfTemplate) => {
@@ -154,6 +176,13 @@ export function TemplatesPage() {
           </button>
           <h1 className="text-xl font-semibold text-flux-text-primary">Templates</h1>
         </div>
+        <button
+          onClick={() => setIsCreating(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-flux-text-primary bg-blue-600 hover:bg-blue-500 rounded transition-colors"
+        >
+          <Plus size={16} />
+          Nouveau template
+        </button>
       </header>
 
       {/* Content */}
@@ -202,6 +231,20 @@ export function TemplatesPage() {
           </>
         )}
       </main>
+
+      {/* Template editor modal (create mode) */}
+      <JcfTemplateEditorModal
+        isOpen={isCreating}
+        initialElements={[{
+          name: 'ELT', precedences: '', quantite: '1', format: '', pagination: '',
+          papier: '', imposition: '', impression: '', surfacage: '', autres: '',
+          qteFeuilles: '', commentaires: '', sequence: '',
+        }]}
+        onSave={handleCreateSave}
+        onCancel={() => setIsCreating(false)}
+        isSaving={isCreatingTemplate}
+        postePresets={snapshotPostes}
+      />
 
       {/* Template editor modal (edit mode) */}
       <JcfTemplateEditorModal
