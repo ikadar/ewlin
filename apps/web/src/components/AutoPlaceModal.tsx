@@ -165,7 +165,7 @@ function useAutoPlaceSSE(apiBaseUrl: string) {
     muteMercure(10 * 60 * 1000);
 
     // Use fetch with ReadableStream for SSE (EventSource doesn't support POST)
-    const token = sessionStorage.getItem('flux_auth_token');
+    const token = localStorage.getItem('flux_auth_token');
     const headers: Record<string, string> = { 'Accept': 'text/event-stream' };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

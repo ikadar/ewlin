@@ -147,7 +147,7 @@ export function SmartCompactModal({ isOpen, onClose, onComplete }: SmartCompactM
 
     muteMercure(5 * 60 * 1000);
 
-    const token = sessionStorage.getItem('flux_auth_token');
+    const token = localStorage.getItem('flux_auth_token');
     const headers: Record<string, string> = {
       'Accept': 'text/event-stream',
       'Content-Type': 'application/json',
