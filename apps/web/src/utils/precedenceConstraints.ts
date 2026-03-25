@@ -14,7 +14,7 @@ import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element, Outsourc
 import { isOutsourcedTask, DRY_TIME_MS } from '@flux/types';
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
-import { subtractWorkingTime, snapToNextWorkingTime, snapToPreviousWorkingTime } from './workingTime';
+import { subtractWorkingTime, snapToNextWorkingTime, snapToPreviousWorkingTime, ceilToQuarterHour, floorToQuarterHour } from './workingTime';
 import { getElementTasks } from './taskHelpers';
 import { calculateDepartureDate, calculateReturnDate } from './outsourcingCalculation';
 
@@ -459,7 +459,10 @@ export function getPredecessorConstraint(
 
   if (!latestEarliestStart) return null;
 
-  // Snap to the successor (picked) task's station working hours
+  // Align to quarter-hour grid (ceil), then snap to working hours.
+  // Order matters: ceil can push into non-working time (e.g., 11:51 → 12:00
+  // where 12:00 is lunch), so snap must run AFTER to correct it.
+  latestEarliestStart = ceilToQuarterHour(latestEarliestStart);
   if (task.type === 'Internal') {
     const successorStation = findStationById(snapshot, task.stationId);
     if (successorStation) {
@@ -580,12 +583,14 @@ export function getSuccessorConstraint(
 
   // Snap to the task's station working hours (backward — latest start must
   // fall within operating hours, not in a lunch break or after-hours gap)
+  // and align to quarter-hour grid so the line matches the drop snap position
   if (task.type === 'Internal') {
     const station = findStationById(snapshot, task.stationId);
     if (station) {
       earliestLatestStart = snapToPreviousWorkingTime(earliestLatestStart, station);
     }
   }
+  earliestLatestStart = floorToQuarterHour(earliestLatestStart);
 
   return timeToYPosition(earliestLatestStart, startHour, pixelsPerHour, gridStartDate);
 }
