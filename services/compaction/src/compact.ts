@@ -90,7 +90,7 @@ export function compact(
     message: 'Propagating to downstream stations',
   });
 
-  compactAllStations(analyses, snapshot, now);
+  compactAllStations(analyses, snapshot, now, horizonEnd);
 
   // ========================================================================
   // Phase 3 — Print-free reorder
@@ -123,7 +123,7 @@ export function compact(
   }
 
   // Re-compact after print-free reorder
-  compactAllStations(analyses, snapshot, now);
+  compactAllStations(analyses, snapshot, now, horizonEnd);
 
   // ========================================================================
   // Phase 4 — Validate & rollback

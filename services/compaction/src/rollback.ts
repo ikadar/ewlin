@@ -152,7 +152,7 @@ export function validateAndRollback(
 
   // Re-compact after rollbacks
   if (rollbackCount > 0) {
-    compactAllStations(analyses, snapshot, now);
+    compactAllStations(analyses, snapshot, now, horizonEnd);
   }
 
   return rollbackCount;

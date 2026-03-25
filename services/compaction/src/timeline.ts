@@ -167,6 +167,7 @@ export function compactStation(
   analysis: StationAnalysis,
   snapshot: ScheduleSnapshot,
   now: Date,
+  horizonEnd: Date,
 ): number {
   const station = analysis.station;
   let nextAvailable = new Date(now);
@@ -190,6 +191,15 @@ export function compactStation(
 
     // Skip immobile (past or completed)
     if (start < now || a.isCompleted) {
+      const end = parseTimestamp(a.scheduledEnd);
+      if (end > nextAvailable) {
+        nextAvailable = end;
+      }
+      continue;
+    }
+
+    // Skip frozen (beyond horizon) — track end time but don't move
+    if (start > horizonEnd) {
       const end = parseTimestamp(a.scheduledEnd);
       if (end > nextAvailable) {
         nextAvailable = end;
@@ -240,6 +250,7 @@ export function compactAllStations(
   analyses: StationAnalysis[],
   snapshot: ScheduleSnapshot,
   now: Date,
+  horizonEnd: Date,
 ): number {
   const maxPasses = 5;
   let totalMoved = 0;
@@ -255,7 +266,7 @@ export function compactAllStations(
     let movedInPass = 0;
 
     for (const analysis of sorted) {
-      movedInPass += compactStation(analysis, snapshot, now);
+      movedInPass += compactStation(analysis, snapshot, now, horizonEnd);
     }
 
     totalMoved += movedInPass;
