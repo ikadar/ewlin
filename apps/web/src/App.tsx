@@ -1083,8 +1083,20 @@ function AppContent() {
   // Debug export: copy full snapshot to clipboard
   const handleDebugExport = useCallback(async () => {
     try {
-      const payload = buildDebugPayload(snapshot);
-      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      const text = JSON.stringify(buildDebugPayload(snapshot), null, 2);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for non-HTTPS contexts
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
       showToast('Debug snapshot copied to clipboard', 'success');
     } catch {
       showToast('Failed to copy to clipboard', 'error');

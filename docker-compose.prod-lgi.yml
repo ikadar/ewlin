@@ -32,6 +32,15 @@ services:
     networks:
       flux-network: null
 
+  compaction-service:
+    container_name: lgi-compaction-service
+    ports: !reset []
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      flux-network: null
+
   mariadb:
     container_name: lgi-mariadb
     ports: !override

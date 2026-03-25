@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output (we build in Docker)
+dist/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Test files
+tests/
+*.test.ts
+*.spec.ts
+vitest.config.ts
+coverage/
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+
+# Docker (prevent recursive copy)
+Dockerfile
+.dockerignore

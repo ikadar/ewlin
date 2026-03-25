@@ -1134,7 +1134,7 @@ const handleClearAllAssignments: MockRouteHandler = async (args: FetchArgs) => {
           updated.assignments.some((a: TaskAssignment) => a.taskId === id)
         );
         if (!anyStillAssigned) {
-          const restoredId = crypto.randomUUID();
+          const restoredId = generateId();
           applyFuseToSnapshot(updated as ScheduleSnapshot, { taskId: memberIds[0], restoredId, now });
         }
       }

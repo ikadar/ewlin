@@ -42,6 +42,30 @@ services:
       - flux-network
 
   # ===========================================
+  # Compaction Service (Node.js HTTP API)
+  # ===========================================
+  compaction-service:
+    build:
+      context: .
+      dockerfile: services/compaction/Dockerfile
+    container_name: flux-compaction-service
+    restart: unless-stopped
+    ports:
+      - "${COMPACTION_SERVICE_PORT:-3002}:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      TZ: Europe/Paris
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - flux-network
+
+  # ===========================================
   # PHP-FPM (Symfony API)
   # ===========================================
   php:
