@@ -14,7 +14,7 @@ import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element, Outsourc
 import { isOutsourcedTask, DRY_TIME_MS } from '@flux/types';
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
-import { subtractWorkingTime, snapToNextWorkingTime } from './workingTime';
+import { subtractWorkingTime, snapToNextWorkingTime, snapToPreviousWorkingTime } from './workingTime';
 import { getElementTasks } from './taskHelpers';
 import { calculateDepartureDate, calculateReturnDate } from './outsourcingCalculation';
 
@@ -577,6 +577,15 @@ export function getSuccessorConstraint(
   }
 
   if (!earliestLatestStart) return null;
+
+  // Snap to the task's station working hours (backward — latest start must
+  // fall within operating hours, not in a lunch break or after-hours gap)
+  if (task.type === 'Internal') {
+    const station = findStationById(snapshot, task.stationId);
+    if (station) {
+      earliestLatestStart = snapToPreviousWorkingTime(earliestLatestStart, station);
+    }
+  }
 
   return timeToYPosition(earliestLatestStart, startHour, pixelsPerHour, gridStartDate);
 }
