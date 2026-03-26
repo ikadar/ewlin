@@ -52,6 +52,9 @@ export function JobsList({
   const conflictJobIds = useMemo(() => {
     const ids = new Set<string>();
     conflicts.forEach((c) => {
+      // ApprovalGateConflict and DeadlineConflict are warnings, not scheduling conflicts.
+      // They have their own indicators (dashed border / late badge).
+      if (c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict') return;
       // Get job IDs from tasks involved in conflicts
       const task = tasks.find((t) => t.id === c.taskId);
       if (task) {
