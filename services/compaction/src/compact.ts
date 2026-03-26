@@ -1,6 +1,6 @@
 import type { ScheduleSnapshot, TaskAssignment } from '@flux/types';
 import { parseTimestamp, formatTimestamp } from '@flux/schedule-validator';
-import { classifyStations, getPrintfreeTiles } from './classify.js';
+import { classifyStations, getPrintfreeTiles, hasFrozenDownstream } from './classify.js';
 import { clusterAndReorder } from './cluster.js';
 import { scoreSimilarity } from './reorder.js';
 import { compactAllStations, applyReordersToSnapshot } from './timeline.js';
@@ -67,8 +67,21 @@ export function compact(
       stepsCompleted: ++stepsCompleted,
     });
 
-    const before = scoreSimilarity(analysis.movableTiles, analysis.criteria);
-    const reordered = clusterAndReorder(analysis.movableTiles, analysis.criteria, analysis.anchorSpec);
+    // Exclude pinned tiles: tiles whose downstream chain has frozen assignments.
+    // Reordering these would push downstream tiles into frozen territory.
+    const reorderableTiles = analysis.movableTiles.filter(
+      tile => !hasFrozenDownstream(tile, snapshot, horizonEnd)
+    );
+
+    if (reorderableTiles.length < 2) {
+      // Not enough reorderable tiles — skip similarity optimization
+      similarityBefore += scoreSimilarity(analysis.movableTiles, analysis.criteria);
+      similarityAfter += scoreSimilarity(analysis.movableTiles, analysis.criteria);
+      continue;
+    }
+
+    const before = scoreSimilarity(reorderableTiles, analysis.criteria);
+    const reordered = clusterAndReorder(reorderableTiles, analysis.criteria, analysis.anchorSpec);
     const after = scoreSimilarity(reordered, analysis.criteria);
 
     similarityBefore += before;
@@ -112,8 +125,15 @@ export function compact(
       stepsCompleted: ++stepsCompleted,
     });
 
-    const before = scoreSimilarity(tiles, analysis.criteria);
-    const reordered = clusterAndReorder(tiles, analysis.criteria, analysis.anchorSpec);
+    // Exclude pinned tiles (frozen downstream)
+    const reorderableTiles = tiles.filter(
+      tile => !hasFrozenDownstream(tile, snapshot, horizonEnd)
+    );
+
+    if (reorderableTiles.length < 2) continue;
+
+    const before = scoreSimilarity(reorderableTiles, analysis.criteria);
+    const reordered = clusterAndReorder(reorderableTiles, analysis.criteria, analysis.anchorSpec);
     const after = scoreSimilarity(reordered, analysis.criteria);
 
     if (after > before) {
