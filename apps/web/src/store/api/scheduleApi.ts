@@ -594,6 +594,9 @@ export const scheduleApi = createApi({
         );
         try {
           await queryFulfilled;
+          // Cross-API invalidation: Flux dashboard needs to re-fetch
+          const { fluxApi } = await import('./fluxApi');
+          dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
         } catch {
           // Rollback on error
           patchResult.undo();
