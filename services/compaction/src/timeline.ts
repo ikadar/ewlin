@@ -128,6 +128,12 @@ export function findEarliestValidStart(
       }
       if (conflict.type === 'PrecedenceConflict' && result.suggestedStart) {
         const suggested = parseTimestamp(result.suggestedStart);
+        // If suggested is BEFORE current earliest, constraints are contradictory:
+        // predecessor pushes forward but successor pushes back (frozen tile).
+        // Can't resolve — don't move this tile.
+        if (suggested.getTime() < earliest.getTime()) {
+          return null;
+        }
         // Ensure we don't go before station's next available slot
         earliest = new Date(Math.max(suggested.getTime(), stationNextAvailable.getTime()));
         advanced = true;
@@ -223,7 +229,14 @@ export function compactStation(
     };
 
     const placement = findEarliestValidStart(tile, station, snapshot, nextAvailable, now);
-    if (!placement) continue;
+    if (!placement) {
+      // Contradictory constraints — keep tile at original position, track its end
+      const end = parseTimestamp(a.scheduledEnd);
+      if (end > nextAvailable) {
+        nextAvailable = end;
+      }
+      continue;
+    }
 
     const newStartStr = formatTimestamp(placement.start);
     const newEndStr = formatTimestamp(placement.end);

@@ -4,9 +4,11 @@ import {
   findElement,
   findTask,
   parseTimestamp,
+  validateAssignment,
+  formatTimestamp,
 } from '@flux/schedule-validator';
 import type { StationAnalysis } from './types.js';
-import { compactAllStations, mutateSnapshot } from './timeline.js';
+import { mutateSnapshot } from './timeline.js';
 
 // ============================================================================
 // Get job's latest end time from current snapshot
@@ -18,7 +20,6 @@ export function getJobLastEndTime(
 ): Date | null {
   let latest: Date | null = null;
 
-  // Find all elements for this job
   const elements = snapshot.elements.filter(e => e.jobId === jobId);
   const taskIds = new Set<string>();
   for (const el of elements) {
@@ -27,7 +28,6 @@ export function getJobLastEndTime(
     }
   }
 
-  // Find latest scheduledEnd among assignments for these tasks
   for (const a of snapshot.assignments) {
     if (taskIds.has(a.taskId)) {
       const end = parseTimestamp(a.scheduledEnd);
@@ -110,50 +110,91 @@ export function validateAndRollback(
     }
   }
 
-  // Check if any moved job became late
   const jobsToRollback = new Set<string>();
+
   for (const jobId of movedJobIds) {
     const job = findJob(snapshot, jobId);
     if (!job?.workshopExitDate) continue;
 
+    // Check 1: on-time → late regression
     const deadline = parseDeadline(job.workshopExitDate);
     const originalEnd = getJobLastEndTimeFromOriginal(jobId, originalAssignments, snapshot);
     const currentEnd = getJobLastEndTime(jobId, snapshot);
 
-    if (!originalEnd || !currentEnd) continue;
+    if (originalEnd && currentEnd) {
+      const wasOnTime = originalEnd <= deadline;
+      const isNowLate = currentEnd > deadline;
+      if (wasOnTime && isNowLate) {
+        jobsToRollback.add(jobId);
+        continue;
+      }
+    }
 
-    const wasOnTime = originalEnd <= deadline;
-    const isNowLate = currentEnd > deadline;
+    // Check 2: validate every moved assignment for this job.
+    // If ANY has a NEW conflict (PrecedenceConflict, StationConflict, etc.),
+    // rollback the entire job.
+    const elements = snapshot.elements.filter(e => e.jobId === jobId);
+    const jobTaskIds = new Set<string>();
+    for (const el of elements) {
+      for (const tid of el.taskIds) {
+        jobTaskIds.add(tid);
+      }
+    }
 
-    if (wasOnTime && isNowLate) {
+    let hasNewConflict = false;
+    for (const a of snapshot.assignments) {
+      if (!jobTaskIds.has(a.taskId)) continue;
+
+      const orig = originalAssignments.get(a.taskId);
+      // Only validate tiles that moved or whose neighbors moved
+      const task = findTask(snapshot, a.taskId);
+      if (!task) continue;
+
+      const result = validateAssignment(
+        {
+          taskId: a.taskId,
+          targetId: a.targetId,
+          isOutsourced: a.isOutsourced,
+          scheduledStart: a.scheduledStart,
+        },
+        snapshot,
+      );
+
+      if (result.conflicts.length > 0) {
+        // Check if these conflicts are NEW (didn't exist with original positions)
+        // Quick check: if the assignment didn't move, the conflict is from
+        // a NEIGHBOR that moved — still caused by compaction
+        const blocking = result.conflicts.filter(
+          c => c.type !== 'ApprovalGateConflict' && c.type !== 'DeadlineConflict'
+        );
+        if (blocking.length > 0) {
+          hasNewConflict = true;
+          break;
+        }
+      }
+    }
+
+    if (hasNewConflict) {
       jobsToRollback.add(jobId);
     }
   }
 
   if (jobsToRollback.size === 0) return 0;
 
-  // Rollback: restore original assignments for all tasks of rolled-back jobs
+  // Any conflict means partial rollback would create mixed state (some tiles
+  // at original, some at compacted positions on the same station → overlaps).
+  // Revert ALL moved tiles, not just the affected jobs.
   let rollbackCount = 0;
-  for (const jobId of jobsToRollback) {
-    const elements = snapshot.elements.filter(e => e.jobId === jobId);
-    for (const el of elements) {
-      for (const taskId of el.taskIds) {
-        const orig = originalAssignments.get(taskId);
-        if (!orig) continue;
+  for (const a of snapshot.assignments) {
+    const orig = originalAssignments.get(a.taskId);
+    if (!orig) continue;
+    if (a.scheduledStart === orig.scheduledStart && a.scheduledEnd === orig.scheduledEnd) continue;
 
-        const current = snapshot.assignments.find(a => a.taskId === taskId);
-        if (!current || current.scheduledStart === orig.scheduledStart) continue;
-
-        mutateSnapshot(snapshot, taskId, orig.scheduledStart, orig.scheduledEnd);
-        rollbackCount++;
-      }
-    }
+    mutateSnapshot(snapshot, a.taskId, orig.scheduledStart, orig.scheduledEnd);
+    rollbackCount++;
   }
 
-  // Re-compact after rollbacks
-  if (rollbackCount > 0) {
-    compactAllStations(analyses, snapshot, now, horizonEnd);
-  }
+  // Do NOT re-compact after rollback — the original positions were conflict-free.
 
   return rollbackCount;
 }
