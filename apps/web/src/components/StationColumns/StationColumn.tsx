@@ -66,9 +66,18 @@ const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
 ];
 
 /**
- * Get the day schedule for a specific day of week.
+ * Get the day schedule for a specific date.
+ * Checks exceptions first, then falls back to the regular weekly schedule.
  */
-function getDaySchedule(station: Station, dayOfWeek: number): DaySchedule {
+function getDaySchedule(station: Station, dayOfWeek: number, date?: Date): DaySchedule {
+  // Check for a date-specific exception
+  if (date && station.exceptions?.length) {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const exception = station.exceptions.find((e) => e.date === dateStr);
+    if (exception) {
+      return exception.schedule;
+    }
+  }
   const dayName = DAY_NAMES[dayOfWeek];
   return station.operatingSchedule[dayName];
 }
@@ -112,8 +121,9 @@ export const StationColumn = memo(function StationColumn({
   const isMultiDayGrid = gridStartDate !== undefined && numberOfDays > 1;
 
   // Use current day if not specified (for single-day mode)
-  const effectiveDayOfWeek = dayOfWeek ?? new Date().getDay();
-  const daySchedule = getDaySchedule(station, effectiveDayOfWeek);
+  const today = gridStartDate ?? new Date();
+  const effectiveDayOfWeek = dayOfWeek ?? today.getDay();
+  const daySchedule = getDaySchedule(station, effectiveDayOfWeek, today);
 
   // Calculate total height
   const totalHeight = hoursToDisplay * pixelsPerHour;
@@ -230,7 +240,7 @@ export const StationColumn = memo(function StationColumn({
             // Calculate the date for this day
             const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
             const dayOfWeekForDay = currentDate.getDay();
-            const dayScheduleForDay = getDaySchedule(station, dayOfWeekForDay);
+            const dayScheduleForDay = getDaySchedule(station, dayOfWeekForDay, currentDate);
             const dayYOffset = dayIndex * 24 * pixelsPerHour;
 
             visibleDays.push(
