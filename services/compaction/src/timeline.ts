@@ -109,13 +109,18 @@ export function findEarliestValidStart(
 
     const result = validateAssignment(proposed, snapshot);
 
-    if (result.valid || result.conflicts.length === 0) {
+    // Filter out warning-only conflicts (not scheduling constraints)
+    const blockingConflicts = result.conflicts.filter(
+      c => c.type !== 'ApprovalGateConflict' && c.type !== 'DeadlineConflict'
+    );
+
+    if (result.valid || blockingConflicts.length === 0) {
       return { start: earliest, end: endTime };
     }
 
-    // Handle conflicts by advancing the start time
+    // Handle blocking conflicts by advancing the start time
     let advanced = false;
-    for (const conflict of result.conflicts) {
+    for (const conflict of blockingConflicts) {
       if (conflict.type === 'StationConflict' && conflict.details) {
         // Advance past the conflicting tile's end (field name: conflictEnd)
         const details = conflict.details as Record<string, unknown>;
