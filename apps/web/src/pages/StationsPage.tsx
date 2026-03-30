@@ -23,6 +23,7 @@ import {
   FluxSelect,
 } from '../components/ScheduleEditor';
 import type { OperatingSchedule, ScheduleExceptionInput, DaySchedule } from '../components/ScheduleEditor';
+import { generateId } from '../utils/generateId';
 
 // ============================================================================
 // Constants
@@ -95,7 +96,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   const [exceptionsData, setExceptionsData] = useState<ScheduleExceptionInput[]>(() => {
     if (!initial?.scheduleExceptions?.length) return [];
     return initial.scheduleExceptions.map((e) => ({
-      id: crypto.randomUUID(),
+      id: generateId(),
       date: (e as { date: string }).date ?? '',
       reason: ((e as { reason: string | null }).reason ?? ''),
       schedule: ((e as { type: string }).type === 'MODIFIED' && (e as { schedule: DaySchedule | null }).schedule)
@@ -359,7 +360,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
                         if (!Array.isArray(parsed)) throw new Error();
                         setExceptionsData(
                           parsed.map((e: Record<string, unknown>) => ({
-                            id: crypto.randomUUID(),
+                            id: generateId(),
                             date: (e.date as string) ?? '',
                             reason: (e.reason as string) ?? '',
                             schedule: (e.type === 'MODIFIED' && e.schedule)

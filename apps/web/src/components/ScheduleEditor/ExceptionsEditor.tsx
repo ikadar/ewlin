@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
+import { generateId } from '../../utils/generateId';
 import { DayScheduleRow } from './DayScheduleRow';
 import type { DaySchedule } from './DayScheduleRow';
 
@@ -20,7 +21,7 @@ export function ExceptionsEditor({ value, onChange }: ExceptionsEditorProps) {
     onChange([
       ...value,
       {
-        id: crypto.randomUUID(),
+        id: generateId(),
         date: today,
         reason: '',
         schedule: { isOperating: false, slots: [] },
