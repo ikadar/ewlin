@@ -17,6 +17,12 @@ import {
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
 import { useGetSnapshotQuery } from '../store';
 import type { StationResponse, StationInput } from '../store/api/stationApi';
+import {
+  OperatingScheduleEditor,
+  ExceptionsEditor,
+  FluxSelect,
+} from '../components/ScheduleEditor';
+import type { OperatingSchedule, ScheduleExceptionInput, DaySchedule } from '../components/ScheduleEditor';
 
 // ============================================================================
 // Constants
@@ -80,18 +86,31 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   const [status, setStatus] = useState<string>(initial?.status ?? 'Available');
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? categories[0]?.id ?? '');
   const [groupId, setGroupId] = useState(initial?.groupId ?? groups[0]?.id ?? '');
-  const [capacity, setCapacity] = useState(initial?.capacity ?? 1);
-  const [displayOrder, setDisplayOrder] = useState(initial?.displayOrder ?? 0);
-  const [scheduleJson, setScheduleJson] = useState(
-    initial?.operatingSchedule != null
-      ? JSON.stringify(initial.operatingSchedule, null, 2)
-      : DEFAULT_SCHEDULE_JSON
+  const [capacity, setCapacity] = useState(String(initial?.capacity ?? 1));
+  const [displayOrder, setDisplayOrder] = useState(String(initial?.displayOrder ?? 0));
+  // Visual mode state
+  const [scheduleData, setScheduleData] = useState<OperatingSchedule>(
+    (initial?.operatingSchedule as unknown as OperatingSchedule) ?? DEFAULT_OPERATING_SCHEDULE
   );
-  const [exceptionsJson, setExceptionsJson] = useState(
-    initial?.scheduleExceptions != null
-      ? JSON.stringify(initial.scheduleExceptions, null, 2)
-      : '[]'
-  );
+  const [exceptionsData, setExceptionsData] = useState<ScheduleExceptionInput[]>(() => {
+    if (!initial?.scheduleExceptions?.length) return [];
+    return initial.scheduleExceptions.map((e) => ({
+      id: crypto.randomUUID(),
+      date: (e as { date: string }).date ?? '',
+      reason: ((e as { reason: string | null }).reason ?? ''),
+      schedule: ((e as { type: string }).type === 'MODIFIED' && (e as { schedule: DaySchedule | null }).schedule)
+        ? (e as { schedule: DaySchedule }).schedule
+        : { isOperating: false, slots: [] },
+    }));
+  });
+
+  // Mode toggles (visual vs JSON)
+  const [scheduleJsonMode, setScheduleJsonMode] = useState(false);
+  const [exceptionsJsonMode, setExceptionsJsonMode] = useState(false);
+
+  // JSON fallback state
+  const [scheduleJson, setScheduleJson] = useState('');
+  const [exceptionsJson, setExceptionsJson] = useState('');
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [exceptionsError, setExceptionsError] = useState<string | null>(null);
 
@@ -139,31 +158,46 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
 
   const canSave =
     name.trim() !== '' &&
-    scheduleError === null &&
-    exceptionsError === null;
+    (!scheduleJsonMode || scheduleError === null) &&
+    (!exceptionsJsonMode || exceptionsError === null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSave) return;
 
-    const scheduleValid = validateScheduleJson(scheduleJson);
-    const exceptionsValid = validateExceptionsJson(exceptionsJson);
-    if (!scheduleValid || !exceptionsValid) return;
+    let operatingSchedule: Record<string, unknown> | null;
+    let scheduleExceptions: unknown[] | null;
 
-    const operatingSchedule = scheduleJson.trim()
-      ? (JSON.parse(scheduleJson) as Record<string, unknown>)
-      : null;
-    const scheduleExceptions = exceptionsJson.trim()
-      ? (JSON.parse(exceptionsJson) as unknown[])
-      : null;
+    if (scheduleJsonMode) {
+      const valid = validateScheduleJson(scheduleJson);
+      if (!valid) return;
+      operatingSchedule = scheduleJson.trim() ? (JSON.parse(scheduleJson) as Record<string, unknown>) : null;
+    } else {
+      operatingSchedule = scheduleData as unknown as Record<string, unknown>;
+    }
+
+    if (exceptionsJsonMode) {
+      const valid = validateExceptionsJson(exceptionsJson);
+      if (!valid) return;
+      scheduleExceptions = exceptionsJson.trim() ? (JSON.parse(exceptionsJson) as unknown[]) : null;
+    } else {
+      scheduleExceptions = exceptionsData.length > 0
+        ? exceptionsData.map((exc) => ({
+            date: exc.date,
+            type: exc.schedule.isOperating ? 'MODIFIED' : 'CLOSED',
+            reason: exc.reason || null,
+            schedule: exc.schedule.isOperating ? exc.schedule : null,
+          }))
+        : null;
+    }
 
     await onSave({
       name: name.trim(),
       status,
       categoryId,
       groupId,
-      capacity,
-      displayOrder,
+      capacity: parseInt(capacity, 10) || 1,
+      displayOrder: parseInt(displayOrder, 10) || 0,
       operatingSchedule,
       scheduleExceptions,
     });
@@ -188,7 +222,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+              className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
               placeholder="Ex : Komori G40"
             />
           </div>
@@ -197,15 +231,12 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm text-flux-text-secondary mb-1">Statut</label>
-              <select
+              <FluxSelect
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                ))}
-              </select>
+                onChange={setStatus}
+                options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
+                className="w-full"
+              />
             </div>
             <div>
               <label className="block text-sm text-flux-text-secondary mb-1">Capacité</label>
@@ -213,8 +244,9 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
                 type="number"
                 min={1}
                 value={capacity}
-                onChange={(e) => setCapacity(parseInt(e.target.value, 10) || 1)}
-                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                onChange={(e) => setCapacity(e.target.value)}
+                onBlur={() => { const n = parseInt(capacity, 10); setCapacity(String(isNaN(n) || n < 1 ? 1 : n)); }}
+                className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
               />
             </div>
             <div>
@@ -222,8 +254,9 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               <input
                 type="number"
                 value={displayOrder}
-                onChange={(e) => setDisplayOrder(parseInt(e.target.value, 10) || 0)}
-                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                onChange={(e) => setDisplayOrder(e.target.value)}
+                onBlur={() => { const n = parseInt(displayOrder, 10); setDisplayOrder(String(isNaN(n) ? 0 : n)); }}
+                className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
               />
             </div>
           </div>
@@ -232,67 +265,160 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-flux-text-secondary mb-1">Catégorie</label>
-              <select
+              <FluxSelect
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                onChange={setCategoryId}
+                options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                className="w-full"
+              />
             </div>
             <div>
               <label className="block text-sm text-flux-text-secondary mb-1">Groupe</label>
-              <select
+              <FluxSelect
                 value={groupId}
-                onChange={(e) => setGroupId(e.target.value)}
-                className="w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-              >
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
+                onChange={setGroupId}
+                options={groups.map((g) => ({ value: g.id, label: g.name }))}
+                className="w-full"
+              />
             </div>
           </div>
 
-          {/* Row 4: Operating Schedule JSON */}
+          {/* Row 4: Operating Schedule */}
           <div>
-            <label className="block text-sm text-flux-text-secondary mb-1">Planning d'exploitation (JSON)</label>
-            <textarea
-              rows={10}
-              value={scheduleJson}
-              onChange={(e) => {
-                setScheduleJson(e.target.value);
-                setScheduleError(null);
-              }}
-              onBlur={() => validateScheduleJson(scheduleJson)}
-              className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${scheduleError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
-              placeholder="{}"
-              spellCheck={false}
-            />
-            {scheduleError && (
-              <p className="mt-1 text-xs text-red-400">{scheduleError}</p>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm text-flux-text-secondary">Planning d'exploitation</label>
+              <div className="inline-flex rounded-md overflow-hidden border border-flux-border-light">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (scheduleJsonMode) {
+                      // Switching to visual: try to parse current JSON
+                      try {
+                        const parsed = JSON.parse(scheduleJson);
+                        setScheduleData(parsed as OperatingSchedule);
+                        setScheduleJsonMode(false);
+                        setScheduleError(null);
+                      } catch {
+                        setScheduleError('JSON invalide — impossible de basculer en mode visuel');
+                      }
+                    }
+                  }}
+                  className={`px-3 py-0.5 text-xs transition-colors ${!scheduleJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
+                >
+                  Visuel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!scheduleJsonMode) {
+                      setScheduleJson(JSON.stringify(scheduleData, null, 2));
+                      setScheduleJsonMode(true);
+                      setScheduleError(null);
+                    }
+                  }}
+                  className={`px-3 py-0.5 text-xs transition-colors ${scheduleJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
+                >
+                  JSON
+                </button>
+              </div>
+            </div>
+            {scheduleJsonMode ? (
+              <>
+                <textarea
+                  rows={10}
+                  value={scheduleJson}
+                  onChange={(e) => {
+                    setScheduleJson(e.target.value);
+                    setScheduleError(null);
+                  }}
+                  onBlur={() => validateScheduleJson(scheduleJson)}
+                  className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${scheduleError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
+                  placeholder="{}"
+                  spellCheck={false}
+                />
+                {scheduleError && (
+                  <p className="mt-1 text-xs text-red-400">{scheduleError}</p>
+                )}
+              </>
+            ) : (
+              <OperatingScheduleEditor value={scheduleData} onChange={setScheduleData} />
             )}
           </div>
 
-          {/* Row 5: Exceptions JSON */}
+          {/* Row 5: Exceptions */}
           <div>
-            <label className="block text-sm text-flux-text-secondary mb-1">Exceptions (JSON)</label>
-            <textarea
-              rows={5}
-              value={exceptionsJson}
-              onChange={(e) => {
-                setExceptionsJson(e.target.value);
-                setExceptionsError(null);
-              }}
-              onBlur={() => validateExceptionsJson(exceptionsJson)}
-              className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${exceptionsError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
-              placeholder="[]"
-              spellCheck={false}
-            />
-            {exceptionsError && (
-              <p className="mt-1 text-xs text-red-400">{exceptionsError}</p>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm text-flux-text-secondary">Exceptions de planning</label>
+              <div className="inline-flex rounded-md overflow-hidden border border-flux-border-light">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (exceptionsJsonMode) {
+                      try {
+                        const parsed = JSON.parse(exceptionsJson);
+                        if (!Array.isArray(parsed)) throw new Error();
+                        setExceptionsData(
+                          parsed.map((e: Record<string, unknown>) => ({
+                            id: crypto.randomUUID(),
+                            date: (e.date as string) ?? '',
+                            reason: (e.reason as string) ?? '',
+                            schedule: (e.type === 'MODIFIED' && e.schedule)
+                              ? (e.schedule as DaySchedule)
+                              : { isOperating: false, slots: [] },
+                          }))
+                        );
+                        setExceptionsJsonMode(false);
+                        setExceptionsError(null);
+                      } catch {
+                        setExceptionsError('JSON invalide — impossible de basculer en mode visuel');
+                      }
+                    }
+                  }}
+                  className={`px-3 py-0.5 text-xs transition-colors ${!exceptionsJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
+                >
+                  Visuel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!exceptionsJsonMode) {
+                      const apiFormat = exceptionsData.map((exc) => ({
+                        date: exc.date,
+                        type: exc.schedule.isOperating ? 'MODIFIED' : 'CLOSED',
+                        reason: exc.reason || null,
+                        schedule: exc.schedule.isOperating ? exc.schedule : null,
+                      }));
+                      setExceptionsJson(JSON.stringify(apiFormat, null, 2));
+                      setExceptionsJsonMode(true);
+                      setExceptionsError(null);
+                    }
+                  }}
+                  className={`px-3 py-0.5 text-xs transition-colors ${exceptionsJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
+                >
+                  JSON
+                </button>
+              </div>
+            </div>
+            {exceptionsJsonMode ? (
+              <>
+                <textarea
+                  rows={5}
+                  value={exceptionsJson}
+                  onChange={(e) => {
+                    setExceptionsJson(e.target.value);
+                    setExceptionsError(null);
+                  }}
+                  onBlur={() => validateExceptionsJson(exceptionsJson)}
+                  className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${exceptionsError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
+                  placeholder="[]"
+                  spellCheck={false}
+                />
+                {exceptionsError && (
+                  <p className="mt-1 text-xs text-red-400">{exceptionsError}</p>
+                )}
+              </>
+            ) : (
+              <ExceptionsEditor value={exceptionsData} onChange={setExceptionsData} />
             )}
           </div>
 
