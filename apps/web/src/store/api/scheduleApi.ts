@@ -647,6 +647,41 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Batch set pin status for multiple tasks atomically.
+     *
+     * Real mode: PUT /tasks/batch-pin
+     * Single optimistic update for all affected assignments.
+     */
+    batchSetPin: builder.mutation<{ updatedCount: number }, { taskIds: string[]; isPinned: boolean }>({
+      query: (body) => ({
+        url: '/tasks/batch-pin',
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted({ taskIds, isPinned }, { dispatch, queryFulfilled }) {
+        const taskIdSet = new Set(taskIds);
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const now = new Date().toISOString();
+            for (const a of draft.assignments) {
+              if (taskIdSet.has(a.taskId) && a.isPinned !== isPinned) {
+                a.isPinned = isPinned;
+                a.pinnedAt = isPinned ? now : null;
+                a.updatedAt = now;
+              }
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    /**
      * Batch reschedule multiple task assignments atomically.
      *
      * Used by smart compaction to persist all reordered assignments in a single request.
@@ -826,6 +861,7 @@ export const {
   useUnassignTaskMutation,
   useToggleCompletionMutation,
   useTogglePinMutation,
+  useBatchSetPinMutation,
   useBatchRescheduleMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,

@@ -23,7 +23,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -312,6 +312,7 @@ function AppContent() {
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
   const [togglePin] = useTogglePinMutation();
+  const [batchSetPin] = useBatchSetPinMutation();
 
   const [splitTask] = useSplitTaskMutation();
   const [fuseTask] = useFuseTaskMutation();
@@ -1077,6 +1078,37 @@ function AppContent() {
     }
   }, [selectedJobId, clearJobAssignments, showToast]);
 
+  // Handle pin/unpin all placed tiles for selected job (Alt+F)
+  const handlePinAllJobTiles = useCallback(async () => {
+    if (!selectedJobId) return;
+    const jobTaskIds = new Set(
+      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
+    );
+    const jobAssignments = snapshot.assignments.filter((a) => jobTaskIds.has(a.taskId));
+    if (jobAssignments.length === 0) return;
+
+    // If all are pinned → unpin all, otherwise → pin all
+    const allPinned = jobAssignments.every((a) => a.isPinned);
+    const targetPinned = !allPinned;
+    const taskIds = jobAssignments
+      .filter((a) => a.isPinned !== targetPinned)
+      .map((a) => a.taskId);
+
+    if (taskIds.length === 0) return;
+
+    try {
+      await batchSetPin({ taskIds, isPinned: targetPinned }).unwrap();
+      showToast(
+        targetPinned
+          ? `${taskIds.length} tuile(s) épinglée(s)`
+          : `${taskIds.length} tuile(s) désépinglée(s)`,
+        'success'
+      );
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
+
   // Count clearable tiles for mass unschedule confirmation
   const getClearableCount = useCallback((includeInProgress = false, includePinned = false) => {
     if (!snapshotData) return 0;
@@ -1156,9 +1188,9 @@ function AppContent() {
 
   // Trigger mass unschedule confirmation dialog
   const triggerMassUnschedule = useCallback(() => {
-    // Open dialog if there are ANY non-completed tiles (with or without in-progress)
-    const countWithInProgress = getClearableCount(true);
-    if (countWithInProgress > 0) {
+    // Open dialog if there are ANY non-completed tiles (including in-progress and pinned)
+    const countAll = getClearableCount(true, true);
+    if (countAll > 0) {
       setMassUnscheduleConfirm({ count: getClearableCount(), includeInProgress: false, fuseSplits: false, includePinned: false });
     }
   }, [getClearableCount]);
@@ -1258,6 +1290,13 @@ function AppContent() {
       if (isCtrlAltLetter(e, 'z')) {
         e.preventDefault();
         triggerMassUnschedule();
+        return;
+      }
+
+      // Alt+F: toggle pin on all placed tiles for selected job (Figer)
+      if (isAltLetter(e, 'f') && selectedJobId) {
+        e.preventDefault();
+        handlePinAllJobTiles();
         return;
       }
 
@@ -2165,6 +2204,7 @@ function AppContent() {
       setIsSaveLoadOpen(true);
     }, []),
     onClearJobAssignments: handleClearJobAssignments,
+    onPinAllJobTiles: selectedJobId ? handlePinAllJobTiles : undefined,
     onClearAllAssignments: triggerMassUnschedule,
     onAsapPlacement: handleAsapPlacement,
     onAlapPlacement: handleAlapPlacement,

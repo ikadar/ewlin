@@ -39,6 +39,7 @@ export interface UseCommandsOptions {
   onZoomOut?: () => void;
   onOpenSaveLoad?: () => void;
   onClearJobAssignments?: () => void;
+  onPinAllJobTiles?: () => void;
   onClearAllAssignments?: () => void;
   onAsapPlacement?: () => void;
   onAlapPlacement?: () => void;
@@ -157,6 +158,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onZoomOut,
     onOpenSaveLoad,
     onClearJobAssignments,
+    onPinAllJobTiles,
     onClearAllAssignments,
     onAsapPlacement,
     onAlapPlacement,
@@ -199,6 +201,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     }
     if (onClearJobAssignments) {
       commands.push({ id: 'clear-job-tiles', label: 'Effacer toutes les tuiles', category: 'Job selectionne', shortcut: 'Alt+Z', keywords: 'effacer supprimer tuiles désplanifier rappeler clear remove tiles unschedule recall', icon: 'trash-2', action: onClearJobAssignments });
+    }
+    if (onPinAllJobTiles) {
+      commands.push({ id: 'pin-all-job-tiles', label: 'Figer/défiger toutes les tuiles', category: 'Job selectionne', shortcut: 'Alt+F', keywords: 'pin unpin figer défiger épingler désépingler lock unlock verrouiller', icon: 'pin', action: onPinAllJobTiles });
     }
     if (onClearAllAssignments) {
       commands.push({ id: 'clear-all-tiles', label: 'Effacer toutes les tuiles (global)', category: 'Actions', shortcut: 'Ctrl+Alt+Z', keywords: 'effacer tout désplanifier masse rappeler global réinitialiser clear all unschedule mass recall global reset', icon: 'trash-2', action: onClearAllAssignments });

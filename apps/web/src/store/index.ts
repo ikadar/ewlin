@@ -126,6 +126,7 @@ export {
   useUnassignTaskMutation,
   useToggleCompletionMutation,
   useTogglePinMutation,
+  useBatchSetPinMutation,
   useBatchRescheduleMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,
