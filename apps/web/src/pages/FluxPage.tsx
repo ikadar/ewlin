@@ -226,10 +226,10 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     setDeleteConfirmJobId(null);
   }, [deleteConfirmJobId, dispatch, jobs, deleteJob]);
 
-  /** Open the scheduler in a new tab scrolled to the clicked task (F9). */
+  /** Navigate to the scheduler scrolled to the clicked task (F9). */
   const handleStationClick = useCallback((taskId: string) => {
-    window.open(`/?task=${encodeURIComponent(taskId)}`, '_blank');
-  }, []);
+    navigate(`/?task=${encodeURIComponent(taskId)}`);
+  }, [navigate]);
 
   /** Open JCF in edit mode for a job, then return to Flux on close (qa.md K6.2). */
   const handleEditJob = useCallback((jobId: string) => {
