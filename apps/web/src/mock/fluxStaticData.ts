@@ -47,6 +47,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       },
     ],
     transporteur: 'Chronopost',
+    batDeadline: null,
     parti: { shipped: true, date: '25/02' },
   },
 
@@ -106,6 +107,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       },
     ],
     transporteur: null,
+    batDeadline: null,
     parti: { shipped: false, date: null },
   },
 
@@ -150,6 +152,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       },
     ],
     transporteur: 'DHL',
+    batDeadline: null,
     parti: { shipped: false, date: null },
   },
 
@@ -185,6 +188,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       },
     ],
     transporteur: 'TNT',
+    batDeadline: null,
     parti: { shipped: false, date: null },
   },
 
@@ -217,6 +221,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       },
     ],
     transporteur: 'GLS',
+    batDeadline: null,
     parti: { shipped: true, date: '26/02' },
   },
 ];

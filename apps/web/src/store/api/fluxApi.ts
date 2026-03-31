@@ -64,6 +64,7 @@ interface FluxJobApiResponse {
   shipper: string | null;
   shipped: boolean;
   shippedAt: string | null;
+  batDeadline: string | null;
 }
 
 // ============================================================================
@@ -102,6 +103,7 @@ function transformFluxJobsResponse(
         stations: el.stations as Record<string, FluxStationData>,
         outsourcing: (el.outsourcing ?? []) as FluxOutsourcingTask[],
       })),
+      batDeadline: job.batDeadline ?? null,
       transporteur: job.shipper,
       parti: {
         shipped: job.shipped,

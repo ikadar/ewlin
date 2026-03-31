@@ -86,6 +86,17 @@ function formatDepartureDate(dateStr: string): string {
   return `Dep. ${day}/${month}/${year} a ${hours}h${minutes}`;
 }
 
+/** Format BAT deadline as DD/MM/YYYY a HHhMM */
+function formatBatDeadline(dateStr: string): string {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (match) {
+    const [, , month, day, hours, minutes] = match;
+    const year = match[1];
+    return `D.L. BAT ${day}/${month}/${year} a ${hours}h${minutes}`;
+  }
+  return `D.L. BAT ${dateStr}`;
+}
+
 /**
  * Job Details Panel showing selected job information and task list.
  * Only visible when a job is selected.
@@ -244,6 +255,13 @@ export function JobDetailsPanel({
         >
           {formatDepartureDate(job.workshopExitDate)}
         </div>
+
+        {/* Line 3b: BAT deadline (if set) */}
+        {job.batDeadline && (
+          <div className="text-xs text-zinc-400">
+            {formatBatDeadline(job.batDeadline)}
+          </div>
+        )}
 
         {/* Line 4: Modifier button */}
         {onEditJob && (

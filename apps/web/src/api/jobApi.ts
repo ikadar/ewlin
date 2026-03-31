@@ -39,6 +39,7 @@ export interface CreateJobRequest {
   client: string;
   description: string;
   workshopExitDate: string;
+  batDeadline?: string | null;
   quantity?: number;
   shipperId?: string;
   status: 'draft' | 'planned' | 'in_progress' | 'delayed' | 'completed' | 'cancelled';
@@ -157,6 +158,7 @@ export function transformJcfToRequest(
   quantity?: string,
   shipperId?: string,
   requiredJobs?: string,
+  batDeadline?: string,
 ): CreateJobRequest {
   // Parse required jobs: "JOB-001, JOB-002" → ["JOB-001", "JOB-002"]
   const requiredJobReferences = requiredJobs
@@ -173,6 +175,7 @@ export function transformJcfToRequest(
     ...(quantity ? { quantity: parseInt(quantity, 10) } : {}),
     ...(shipperId ? { shipperId } : {}),
     ...(requiredJobReferences && requiredJobReferences.length > 0 ? { requiredJobReferences } : {}),
+    ...(batDeadline ? { batDeadline } : {}),
   };
 }
 

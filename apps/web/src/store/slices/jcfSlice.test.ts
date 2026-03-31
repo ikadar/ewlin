@@ -35,12 +35,15 @@ describe('jcfSlice', () => {
     jcfIntitule: '',
     jcfQuantity: '',
     jcfDeadline: '',
+    jcfBatDeadline: '',
+    jcfShipperId: '',
     jcfElements: [{ ...DEFAULT_ELEMENT }],
     sequenceWorkflow: [],
     isTemplateEditorOpen: false,
     isTemplateSaving: false,
     isJcfSaving: false,
     jcfSaveError: null,
+    jcfRequiredJobs: '',
   };
 
   describe('modal actions', () => {
@@ -177,12 +180,15 @@ describe('jcfSlice', () => {
         jcfIntitule: 'Test Job',
         jcfQuantity: '1000',
         jcfDeadline: '2024-02-15',
+        jcfBatDeadline: '2024-02-10T10:00',
+        jcfShipperId: 'shipper-1',
         jcfElements: [{ ...DEFAULT_ELEMENT, name: 'COUV' }],
         sequenceWorkflow: ['Print', 'Cut'],
         isTemplateEditorOpen: false,
         isTemplateSaving: false,
         isJcfSaving: true,
         jcfSaveError: 'Error',
+        jcfRequiredJobs: 'JOB-001',
       };
 
       const state = jcfReducer(filledState, resetJcfForm());

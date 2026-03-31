@@ -172,6 +172,14 @@ function FluxTableHeader() {
         </th>
         <th
           className={prereqHeader}
+          title="Deadline BAT"
+        >
+          <div className="flex items-center justify-center gap-1">
+            D.L. BAT
+          </div>
+        </th>
+        <th
+          className={prereqHeader}
           title="Papier"
           onClick={() => onSortChange('papier')}
         >
@@ -368,10 +376,9 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Prerequisite badge/listbox cells */}
       {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map((col, i) => {
         const status = [bat, papier, formes, plaques][i]!;
-        if (isMulti && isExpanded) {
-          return <td key={col} className="px-1 py-0" />;
-        }
-        return isMulti ? (
+        const cell = isMulti && isExpanded ? (
+          <td key={col} className="px-1 py-0" />
+        ) : isMulti ? (
           <td key={col} className="px-1 py-0">
             <FluxPrerequisiteBadge status={status} plusCount={plusCount} />
           </td>
@@ -385,6 +392,16 @@ const FluxTableRow = memo(function FluxTableRow({
             />
           </td>
         );
+        // Insert DL BAT cell right after BAT column
+        if (col === 'bat') {
+          return [
+            cell,
+            <td key="dl-bat" className="px-1 py-0 text-xs text-flux-text-secondary whitespace-nowrap text-center">
+              {job.batDeadline ?? ''}
+            </td>,
+          ];
+        }
+        return cell;
       })}
 
       {/* Station cells — dynamic from API */}
@@ -548,17 +565,23 @@ function FluxSubRow({
       <td />
 
       {/* Prerequisite listbox cells */}
-      {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map(col => (
-        <td key={col} className="p-0">
-          <FluxPrerequisiteListbox
-            jobId={job.id}
-            elementId={element.id}
-            column={col}
-            status={element[col]}
-            compact
-          />
-        </td>
-      ))}
+      {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map(col => {
+        const cell = (
+          <td key={col} className="p-0">
+            <FluxPrerequisiteListbox
+              jobId={job.id}
+              elementId={element.id}
+              column={col}
+              status={element[col]}
+              compact
+            />
+          </td>
+        );
+        if (col === 'bat') {
+          return [cell, <td key="dl-bat" />];
+        }
+        return cell;
+      })}
 
       {/* Station cells — dynamic from API */}
       {ctx.categories.map(cat => {
@@ -671,6 +694,7 @@ export const FluxTable = memo(function FluxTable({
             <col style={{ width: '16rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '6rem' }} />
+            <col style={{ width: '5rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '6rem' }} />

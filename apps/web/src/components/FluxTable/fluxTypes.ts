@@ -164,6 +164,8 @@ export interface FluxJob {
   designation: string;
   /** Workshop exit date in JJ/MM format, e.g. "28/02". */
   sortie: string;
+  /** BAT deadline in JJ/MM format, e.g. "15/04". null if not set. */
+  batDeadline: string | null;
   /** One element for single-element jobs; two or more for multi-element. */
   elements: FluxElement[];
   transporteur: string | null;

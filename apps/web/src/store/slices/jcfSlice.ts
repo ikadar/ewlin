@@ -34,6 +34,8 @@ export interface JcfState {
   jcfQuantity: string;
   /** Deadline (ISO date string or French format) */
   jcfDeadline: string;
+  /** BAT deadline (ISO date string or French format) */
+  jcfBatDeadline: string;
   /** Shipper (transporteur) ID */
   jcfShipperId: string;
   /** Elements array */
@@ -64,6 +66,7 @@ const initialState: JcfState = {
   jcfIntitule: '',
   jcfQuantity: '',
   jcfDeadline: '',
+  jcfBatDeadline: '',
   jcfShipperId: '',
   jcfElements: [{ ...DEFAULT_ELEMENT }],
   sequenceWorkflow: [],
@@ -95,6 +98,7 @@ const jcfSlice = createSlice({
       state.jcfIntitule = '';
       state.jcfQuantity = '';
       state.jcfDeadline = '';
+      state.jcfBatDeadline = '';
       state.jcfShipperId = '';
       state.jcfRequiredJobs = '';
       state.jcfElements = [{ ...DEFAULT_ELEMENT }];
@@ -124,6 +128,10 @@ const jcfSlice = createSlice({
 
     setJcfDeadline: (state, action: PayloadAction<string>) => {
       state.jcfDeadline = action.payload;
+    },
+
+    setJcfBatDeadline: (state, action: PayloadAction<string>) => {
+      state.jcfBatDeadline = action.payload;
     },
 
     setJcfShipperId: (state, action: PayloadAction<string>) => {
@@ -164,6 +172,7 @@ const jcfSlice = createSlice({
       state.jcfIntitule = '';
       state.jcfQuantity = '';
       state.jcfDeadline = '';
+      state.jcfBatDeadline = '';
       state.jcfShipperId = '';
       state.jcfElements = [{ ...DEFAULT_ELEMENT }];
       state.sequenceWorkflow = [];
@@ -187,6 +196,7 @@ export const {
   setJcfIntitule,
   setJcfQuantity,
   setJcfDeadline,
+  setJcfBatDeadline,
   setJcfShipperId,
   setJcfElements,
   setSequenceWorkflow,

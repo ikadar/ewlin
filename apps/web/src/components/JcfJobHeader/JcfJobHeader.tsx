@@ -28,6 +28,9 @@ export interface JcfJobHeaderProps {
   onShipperIdChange?: (value: string) => void;
   deadline: string;
   onDeadlineChange: (value: string) => void;
+  /** BAT deadline (ISO or French format) */
+  batDeadline?: string;
+  onBatDeadlineChange?: (value: string) => void;
   /** Required job references (comma-separated) */
   requiredJobs?: string;
   onRequiredJobsChange?: (value: string) => void;
@@ -60,15 +63,23 @@ export function JcfJobHeader({
   onShipperIdChange,
   deadline,
   onDeadlineChange,
+  batDeadline,
+  onBatDeadlineChange,
   requiredJobs,
   onRequiredJobsChange,
   jobSuggestions,
 }: JcfJobHeaderProps) {
   const deadlineInputRef = useRef<HTMLInputElement>(null);
   const nativeDateRef = useRef<HTMLInputElement>(null);
+  const batDeadlineInputRef = useRef<HTMLInputElement>(null);
+  const nativeBatDateRef = useRef<HTMLInputElement>(null);
 
   const handleOpenPicker = () => {
     nativeDateRef.current?.showPicker();
+  };
+
+  const handleOpenBatPicker = () => {
+    nativeBatDateRef.current?.showPicker();
   };
 
   // Auto-persist new client names to the clients table
@@ -227,11 +238,31 @@ export function JcfJobHeader({
     ? `${parsedDeadline}T14:00`
     : parsedDeadline || `${new Date().toISOString().slice(0, 10)}T14:00`;
 
+  // --- BAT Deadline ---
+  const handleBatDeadlineBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const parsed = parseFrenchDate(e.target.value);
+    if (parsed) {
+      onBatDeadlineChange?.(parsed);
+    }
+  };
+
+  const handleNativeBatDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onBatDeadlineChange?.(e.target.value);
+  };
+
+  const batDeadlineVal = batDeadline ?? '';
+  const batDeadlineDisplay = batDeadlineVal.includes('-') ? formatToFrench(batDeadlineVal) : batDeadlineVal;
+  const parsedBatDeadline = batDeadlineVal.includes('-') ? batDeadlineVal : parseFrenchDate(batDeadlineVal);
+  const batDeadlineNativeValue = parsedBatDeadline && !parsedBatDeadline.includes('T')
+    ? `${parsedBatDeadline}T14:00`
+    : parsedBatDeadline || `${new Date().toISOString().slice(0, 10)}T14:00`;
+
   return (
     <div
       className="bg-zinc-900/50 rounded-[3px] border border-zinc-800 p-[10px]"
       data-testid="jcf-job-header"
     >
+      {/* Row 1: Identity */}
       <div className="flex gap-[10px] flex-wrap">
         {/* ID — editable for reference lookup (v0.5.6) */}
         <div className="w-[91px]">
@@ -303,7 +334,10 @@ export function JcfJobHeader({
             data-testid="jcf-field-intitule"
           />
         </div>
+      </div>
 
+      {/* Row 2: Details */}
+      <div className="flex gap-[10px] flex-wrap mt-2">
         {/* Quantité */}
         <div className="w-[78px]">
           <label htmlFor="jcf-quantite" className={labelClass}>
@@ -320,23 +354,10 @@ export function JcfJobHeader({
           />
         </div>
 
-        {/* Transporteur */}
-        {onShipperIdChange && (
-          <div className="w-[156px]">
-            <label className={labelClass}>Transporteur</label>
-            <JcfTransporteurSelect
-              shippers={shippers}
-              value={shipperId ?? ''}
-              onChange={onShipperIdChange}
-              inputBaseClass={inputBaseClass}
-            />
-          </div>
-        )}
-
         {/* Deadline */}
         <div className="w-[156px]">
           <label htmlFor="jcf-deadline" className={labelClass}>
-            Deadline
+            Départ atelier
           </label>
           <div className="relative">
             <input
@@ -367,6 +388,56 @@ export function JcfJobHeader({
             />
           </div>
         </div>
+
+        {/* D.L. BAT */}
+        {onBatDeadlineChange && (
+          <div className="w-[156px]">
+            <label htmlFor="jcf-bat-deadline" className={labelClass}>
+              Date limite BAT
+            </label>
+            <div className="relative">
+              <input
+                ref={batDeadlineInputRef}
+                id="jcf-bat-deadline"
+                type="text"
+                placeholder="jj/mm 14:00"
+                value={batDeadlineDisplay}
+                onChange={(e) => onBatDeadlineChange(e.target.value)}
+                onBlur={handleBatDeadlineBlur}
+                className={`${inputBaseClass} font-mono pr-[26px]`}
+                autoComplete="off"
+                data-testid="jcf-field-bat-deadline"
+                onClick={handleOpenBatPicker}
+              />
+              <input
+                ref={nativeBatDateRef}
+                type="datetime-local"
+                aria-hidden="true"
+                value={batDeadlineNativeValue}
+                onChange={handleNativeBatDateChange}
+                className="absolute inset-0 opacity-0 pointer-events-none"
+                tabIndex={-1}
+              />
+              <Calendar
+                size={16}
+                className="absolute right-[7px] top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Transporteur */}
+        {onShipperIdChange && (
+          <div className="w-[156px]">
+            <label className={labelClass}>Transporteur</label>
+            <JcfTransporteurSelect
+              shippers={shippers}
+              value={shipperId ?? ''}
+              onChange={onShipperIdChange}
+              inputBaseClass={inputBaseClass}
+            />
+          </div>
+        )}
 
         {/* Required Jobs (prerequisites) */}
         {onRequiredJobsChange && (
