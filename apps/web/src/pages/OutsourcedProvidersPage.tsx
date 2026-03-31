@@ -110,8 +110,8 @@ function ProviderFormModal({ initial, onSave, onCancel, isSaving }: ProviderForm
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onCancel} onKeyDown={e => { if (e.key === 'Escape') onCancel(); }} tabIndex={-1}>
+      <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
         <h2 className="text-flux-text-primary font-medium mb-4">
           {initial ? 'Modifier le sous-traitant' : 'Nouveau sous-traitant'}
         </h2>
@@ -501,8 +501,8 @@ export function OutsourcedProvidersPage() {
 
       {/* Delete confirmation */}
       {deletingProvider && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeletingProvider(null)} onKeyDown={e => { if (e.key === 'Escape') setDeletingProvider(null); }} tabIndex={-1}>
+          <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-flux-text-primary font-medium mb-2">Supprimer le sous-traitant</h2>
             <p className="text-sm text-flux-text-secondary mb-4">
               Supprimer{' '}

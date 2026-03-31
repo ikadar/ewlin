@@ -49,8 +49,8 @@ function ClientFormModal({ initial, onSave, onCancel, isSaving }: ClientFormModa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 w-full max-w-sm mx-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onCancel} onKeyDown={e => { if (e.key === 'Escape') onCancel(); }} tabIndex={-1}>
+      <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 w-full max-w-sm mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
         <h2 className="text-flux-text-primary font-medium mb-4">
           {initial ? 'Modifier le client' : 'Nouveau client'}
         </h2>
@@ -337,8 +337,8 @@ export function ClientsPage() {
 
       {/* Delete confirmation */}
       {deletingClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeletingClient(null)} onKeyDown={e => { if (e.key === 'Escape') setDeletingClient(null); }} tabIndex={-1}>
+          <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-flux-text-primary font-medium mb-2">Supprimer le client</h2>
             <p className="text-sm text-flux-text-secondary mb-4">
               Supprimer{' '}

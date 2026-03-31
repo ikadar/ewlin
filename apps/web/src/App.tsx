@@ -2481,7 +2481,10 @@ function AppContent() {
       {massUnscheduleConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center"
              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-             onClick={() => setMassUnscheduleConfirm(null)}>
+             onClick={() => setMassUnscheduleConfirm(null)}
+             onKeyDown={e => { if (e.key === 'Escape') setMassUnscheduleConfirm(null); }}
+             tabIndex={-1}
+             ref={el => el?.focus()}>
           <div className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
                style={{ width: '28rem' }}
                onClick={e => e.stopPropagation()}>

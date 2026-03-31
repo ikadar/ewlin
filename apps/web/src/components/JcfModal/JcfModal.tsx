@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { X, Save } from 'lucide-react';
 import { KBD_CLASS } from '../ShortcutFooter/kbdStyles';
 
@@ -42,11 +42,26 @@ export function JcfModal({
   error = null,
   saveLabel,
 }: JcfModalProps) {
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
   const stableOnSave = useCallback(() => {
     onSave?.();
   }, [onSave]);
 
-  // Cmd+S / Ctrl+S triggers save
+  const requestClose = useCallback(() => {
+    setShowCloseConfirm(true);
+  }, []);
+
+  const confirmClose = useCallback(() => {
+    setShowCloseConfirm(false);
+    onClose();
+  }, [onClose]);
+
+  const cancelClose = useCallback(() => {
+    setShowCloseConfirm(false);
+  }, []);
+
+  // Cmd+S / Ctrl+S triggers save, Escape triggers close confirmation
   useEffect(() => {
     if (!isOpen) return;
 
@@ -56,12 +71,19 @@ export function JcfModal({
         stableOnSave();
         return;
       }
-
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (showCloseConfirm) {
+          cancelClose();
+        } else {
+          requestClose();
+        }
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, stableOnSave]);
+  }, [isOpen, stableOnSave, showCloseConfirm, requestClose, cancelClose]);
 
   if (!isOpen) return null;
 
@@ -69,10 +91,12 @@ export function JcfModal({
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
       data-testid="jcf-modal-backdrop"
+      onClick={requestClose}
     >
       <div
         className="w-[95vw] max-w-[2200px] max-h-[90vh] bg-zinc-950 rounded-[7px] border border-zinc-800 flex flex-col overflow-hidden text-base leading-[1.4]"
         data-testid="jcf-modal-dialog"
+        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <header className="flex-shrink-0 flex items-center justify-between px-[13px] py-[10px] bg-zinc-900 border-b border-zinc-800">
@@ -80,7 +104,7 @@ export function JcfModal({
             {title}
           </h1>
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="p-[3px] rounded-[3px] hover:bg-zinc-800 transition-colors"
             aria-label="Fermer"
             data-testid="jcf-modal-close"
@@ -151,7 +175,7 @@ export function JcfModal({
               </button>
             )}
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="px-[13px] py-[6px] text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-[5px] font-medium transition-colors"
               data-testid="jcf-modal-cancel"
             >
@@ -171,6 +195,42 @@ export function JcfModal({
           </div>
         </footer>
       </div>
+
+      {/* Close confirmation overlay */}
+      {showCloseConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={cancelClose}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 shadow-xl"
+            style={{ width: '24rem' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-zinc-100 font-semibold mb-2">
+              Modifications non enregistrées
+            </h2>
+            <p className="text-zinc-400 text-sm mb-6">
+              Vous avez des modifications en cours. Voulez-vous quitter sans enregistrer ?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded text-sm text-zinc-300 hover:bg-zinc-800 border border-zinc-700 transition-colors"
+                onClick={cancelClose}
+              >
+                Continuer
+              </button>
+              <button
+                className="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
+                onClick={confirmClose}
+              >
+                Quitter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
