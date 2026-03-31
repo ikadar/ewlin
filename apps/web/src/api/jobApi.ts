@@ -116,6 +116,51 @@ function isUseMock(): boolean {
 // ============================================================================
 
 /**
+ * Parse a duration string with optional time units to minutes.
+ * Supports: "180", "180m", "3h", "3h30", "3h30m"
+ */
+function parseDurationToMinutes(s: string): number {
+  const trimmed = s.trim();
+  // "3h30m" or "3h30"
+  const hm = trimmed.match(/^(\d+)h(\d+)m?$/i);
+  if (hm) return parseInt(hm[1]!, 10) * 60 + parseInt(hm[2]!, 10);
+  // "3h"
+  const h = trimmed.match(/^(\d+)h$/i);
+  if (h) return parseInt(h[1]!, 10) * 60;
+  // "180m" or "180"
+  const m = trimmed.match(/^(\d+)m?$/i);
+  if (m) return parseInt(m[1]!, 10);
+  return 0;
+}
+
+/**
+ * Normalize a sequence DSL line's durations from human-friendly units to raw minutes.
+ * "G37(20m+3h)" → "G37(20+180)"
+ * "ST:Reliure_Martin(3j):dos carré collé" → unchanged (outsourced syntax)
+ */
+function normalizeSequenceLine(line: string): string {
+  // Match: StationName(setup+run) pattern
+  return line.replace(/\(([^)]+)\)/, (_, inner: string) => {
+    const parts = inner.split('+');
+    if (parts.length === 2) {
+      const setup = parseDurationToMinutes(parts[0]!);
+      const run = parseDurationToMinutes(parts[1]!);
+      return `(${setup}+${run})`;
+    }
+    // Single value like (3j) for outsourced — leave as-is
+    return `(${inner})`;
+  });
+}
+
+/**
+ * Normalize all lines of a sequence DSL to raw minutes.
+ */
+function normalizeSequenceDsl(dsl: string): string {
+  if (!dsl) return dsl;
+  return dsl.split('\n').map(normalizeSequenceLine).join('\n');
+}
+
+/**
  * Transform JCF form element to API request format.
  *
  * Maps frontend field names to backend API field names:
@@ -131,7 +176,7 @@ export function transformJcfElementToRequest(element: JcfElement): CreateJobElem
 
   return {
     name: element.name,
-    sequence: element.sequence || undefined,
+    sequence: element.sequence ? normalizeSequenceDsl(element.sequence) : undefined,
     prerequisiteNames,
     ...(element.format ? { format: element.format } : {}),
     ...(element.papier ? { papier: element.papier } : {}),

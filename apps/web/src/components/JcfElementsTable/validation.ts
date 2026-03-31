@@ -43,7 +43,7 @@ const MESSAGES = {
   impression: `<strong>Format Impression invalide</strong><br>Syntaxe attendue : <code>recto/verso</code><br>Exemples : <code>Q/Q</code>, <code>Q/</code>, <code>CMJN/CMJN</code>`,
   surfacage: `<strong>Format Surfacage invalide</strong><br>Syntaxe attendue : <code>recto/verso</code><br>Exemples : <code>mat/mat</code>, <code>brillant/</code>, <code>vernis/</code>`,
   format: `<strong>Format produit invalide</strong><br>Formats acceptés :<br>• ISO : <code>A4</code>, <code>A3</code><br>• Dimensions : <code>210x297</code><br>• Fini : <code>A4f</code>, <code>A4fi</code><br>• Composite : <code>A3/A6</code>`,
-  sequence: `<strong>Format Séquence invalide</strong><br>Une ligne par opération :<br>• Poste : <code>Komori(20+40)</code><br>• Sous-traitant : <code>ST:Reliure(3j):desc</code>`,
+  sequence: `<strong>Format Séquence invalide</strong><br>Une ligne par opération :<br>• Poste : <code>Komori(20+40)</code> ou <code>Komori(20m+3h)</code><br>• Sous-traitant : <code>ST:Reliure(3j):desc</code>`,
   precedences: `<strong>Prédécesseur inconnu</strong><br>Un ou plusieurs éléments référencés n'existent pas.`,
 };
 

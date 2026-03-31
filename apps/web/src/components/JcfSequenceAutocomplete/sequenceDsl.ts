@@ -8,8 +8,11 @@
  * @see implicit-logic-specification.md §5.1 (Sequence State Machine)
  */
 
-/** Poste line validation regex: Name(duration) or Name(setup+run) */
-const POSTE_REGEX = /^\w+\(\d+(\+\d+)?\)$/;
+/** Duration token: bare minutes, minutes with m, hours, hours+minutes (e.g. 20, 20m, 3h, 3h30, 3h30m) */
+const DURATION = '(?:\\d+h\\d+m?|\\d+[hm]?|\\d+h)';
+
+/** Poste line validation regex: Name(duration) or Name(setup+run) with optional time units */
+const POSTE_REGEX = new RegExp(`^\\w+\\(${DURATION}(\\+${DURATION})?\\)$`);
 
 /** ST line validation regex: ST:Name(duration):description — supports accented chars */
 const ST_REGEX = /^ST:[\w\p{L}]+\(\d+[jh]?\):.+$/u;
