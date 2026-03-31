@@ -33,7 +33,8 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const dispatch = useAppDispatch();
 
   // ── API data (RTK Query cache as source of truth) ─────────────────────────
-  const { data: jobs = [], isLoading: isJobsLoading, isError } = useGetFluxJobsQuery();
+  // Refetch on mount to pick up changes made in the scheduler
+  const { data: jobs = [], isLoading: isJobsLoading, isError } = useGetFluxJobsQuery(undefined, { refetchOnMountOrArgChange: true });
   const { data: categories = [], isLoading: isCategoriesLoading } = useGetStationCategoriesQuery();
 
   const isLoading = isJobsLoading || isCategoriesLoading;

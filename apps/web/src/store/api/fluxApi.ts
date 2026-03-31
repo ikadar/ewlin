@@ -300,6 +300,8 @@ export const fluxApi = createApi({
         try {
           await queryFulfilled;
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          // Refetch flux to update station indicators (tasks marked completed by backend)
+          dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
         } catch {
           patchResult.undo();
         }
