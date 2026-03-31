@@ -22,6 +22,7 @@ import type {
   AssignTaskRequest,
   AssignmentResponse,
   CompletionResponse,
+  PinResponse,
   UnassignmentResponse,
   ClientSuggestionsResponse,
   ReferenceLookupResponse,
@@ -290,6 +291,7 @@ export const scheduleApi = createApi({
             draft.assignments = draft.assignments.filter((a) => {
               if (!jobTaskIds.has(a.taskId)) return true;
               if (a.isCompleted) return true;
+              if (a.isPinned) return true;
               if (a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return true;
               return false;
             });
@@ -314,12 +316,13 @@ export const scheduleApi = createApi({
      */
     clearAllAssignments: builder.mutation<
       { unassignedCount: number },
-      { includeInProgress?: boolean; fuseSplits?: boolean } | void
+      { includeInProgress?: boolean; fuseSplits?: boolean; includePinned?: boolean } | void
     >({
       query: (opts) => {
         const params = new URLSearchParams();
         if (opts && opts.includeInProgress) params.set('includeInProgress', '1');
         if (opts && opts.fuseSplits) params.set('fuseSplits', '1');
+        if (opts && opts.includePinned) params.set('includePinned', '1');
         const qs = params.toString();
         return { url: `/schedule/assignments${qs ? `?${qs}` : ''}`, method: 'DELETE' };
       },
@@ -605,6 +608,45 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Toggle the pin status of an assigned task.
+     *
+     * Mock mode: mockBaseQuery handles this
+     * Real mode: PUT /tasks/{taskId}/pin
+     *
+     * Uses optimistic update for instant UI feedback:
+     * - Immediately toggles isPinned in cache
+     * - Automatically rolls back on error
+     */
+    togglePin: builder.mutation<PinResponse, string>({
+      query: (taskId) => ({
+        url: `/tasks/${taskId}/pin`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted(taskId, { dispatch, queryFulfilled }) {
+        // Optimistic update: immediately toggle pin in cache
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const assignment = draft.assignments.find((a) => a.taskId === taskId);
+            if (assignment) {
+              assignment.isPinned = !assignment.isPinned;
+              assignment.pinnedAt = assignment.isPinned
+                ? new Date().toISOString()
+                : null;
+              assignment.updatedAt = new Date().toISOString();
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          // Rollback on error
+          patchResult.undo();
+        }
+      },
+    }),
+
+    /**
      * Batch reschedule multiple task assignments atomically.
      *
      * Used by smart compaction to persist all reordered assignments in a single request.
@@ -783,6 +825,7 @@ export const {
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
   useToggleCompletionMutation,
+  useTogglePinMutation,
   useBatchRescheduleMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,

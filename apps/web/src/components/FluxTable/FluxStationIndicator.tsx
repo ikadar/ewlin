@@ -35,10 +35,14 @@ export const FluxStationIndicator = memo(function FluxStationIndicator({
 }: FluxStationIndicatorProps) {
   if (!data || data.state === 'empty') return null;
 
-  const { state, progress = 0 } = data;
+  const { state, progress = 0, isPinned = false } = data;
   const color = STATE_COLOR[state];
   const stateLabel = STATION_STATE_LABEL[state];
-  const tooltipText = stateLabel ? `${stationName} — ${stateLabel}` : stationName;
+  const tooltipText = isPinned
+    ? (stateLabel ? `${stationName} — ${stateLabel} (épinglé)` : `${stationName} (épinglé)`)
+    : (stateLabel ? `${stationName} — ${stateLabel}` : stationName);
+
+  const pinRect = isPinned ? <rect x="2" y="2" width="20" height="20" fill={color} fillOpacity="0.12" /> : null;
 
   if (state === 'planned') {
     return (
@@ -52,6 +56,7 @@ export const FluxStationIndicator = memo(function FluxStationIndicator({
         data-state={state}
       >
         <title>{tooltipText}</title>
+        {pinRect}
         <circle cx="12" cy="12" r="5" fill={color} stroke="var(--color-flux-elevated)" strokeWidth="1.5" />
       </svg>
     );
@@ -69,6 +74,7 @@ export const FluxStationIndicator = memo(function FluxStationIndicator({
         data-state={state}
       >
         <title>{tooltipText}</title>
+        {pinRect}
         <circle cx="12" cy="12" r="5" fill={color} fillOpacity="0.7" />
       </svg>
     );
@@ -88,6 +94,7 @@ export const FluxStationIndicator = memo(function FluxStationIndicator({
       data-state={state}
     >
       <title>{tooltipText}</title>
+      {pinRect}
       {/* Track ring */}
       <circle
         cx="12"

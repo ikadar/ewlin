@@ -121,6 +121,8 @@ export interface FluxStationData {
   progress?: number;
   /** Task ID for deep-linking to the scheduler (F9). */
   taskId?: string;
+  /** Whether the task at this station is pinned. */
+  isPinned?: boolean;
 }
 
 // ── ST (Sous-traitance) types ──────────────────────────────────────────────

@@ -89,6 +89,7 @@ describe('Redux Store', () => {
         useRescheduleTaskMutation,
         useUnassignTaskMutation,
         useToggleCompletionMutation,
+        useTogglePinMutation,
       } = await import('./index');
 
       expect(useCreateJobMutation).toBeDefined();
@@ -96,6 +97,7 @@ describe('Redux Store', () => {
       expect(useRescheduleTaskMutation).toBeDefined();
       expect(useUnassignTaskMutation).toBeDefined();
       expect(useToggleCompletionMutation).toBeDefined();
+      expect(useTogglePinMutation).toBeDefined();
     });
   });
 });

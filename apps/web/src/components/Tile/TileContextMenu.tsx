@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2, Scissors, Merge } from 'lucide-react';
+import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2, Scissors, Merge, Pin } from 'lucide-react';
 
 export interface TileContextMenuProps {
   /** Menu position X coordinate (from cursor) */
@@ -9,6 +9,10 @@ export interface TileContextMenuProps {
   y: number;
   /** Whether tile is currently completed */
   isCompleted: boolean;
+  /** Whether tile is currently pinned */
+  isPinned: boolean;
+  /** Callback for "Toggle pin" action */
+  onTogglePin: () => void;
   /** Whether swap up is available (has tile above) */
   canSwapUp: boolean;
   /** Whether swap down is available (has tile below) */
@@ -81,6 +85,8 @@ export function TileContextMenu({
   x,
   y,
   isCompleted,
+  isPinned,
+  onTogglePin,
   canSwapUp,
   canSwapDown,
   onViewDetails,
@@ -176,6 +182,11 @@ export function TileContextMenu({
     onClose();
   };
 
+  const handleTogglePin = () => {
+    onTogglePin();
+    onClose();
+  };
+
   const handleSwapUp = () => {
     if (canSwapUp) {
       onSwapUp();
@@ -191,7 +202,7 @@ export function TileContextMenu({
   };
 
   const handleRecall = () => {
-    if (!isCompleted) {
+    if (!isCompleted && !isPinned) {
       onRecall();
       onClose();
     }
@@ -228,10 +239,16 @@ export function TileContextMenu({
         testId="context-menu-toggle-complete"
       />
       <MenuItem
+        icon={<Pin className="w-4 h-4" />}
+        label={isPinned ? 'Désépingler' : 'Épingler'}
+        onClick={handleTogglePin}
+        testId="context-menu-toggle-pin"
+      />
+      <MenuItem
         icon={<Undo2 className="w-4 h-4" />}
         label="Rappeler (désassigner)"
         onClick={handleRecall}
-        disabled={isCompleted}
+        disabled={isCompleted || isPinned}
         testId="context-menu-recall"
       />
       <Separator />

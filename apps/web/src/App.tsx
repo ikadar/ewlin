@@ -23,7 +23,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -311,6 +311,7 @@ function AppContent() {
   const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
+  const [togglePin] = useTogglePinMutation();
 
   const [splitTask] = useSplitTaskMutation();
   const [fuseTask] = useFuseTaskMutation();
@@ -395,6 +396,7 @@ function AppContent() {
     y: number;
     assignmentId: string;
     isCompleted: boolean;
+    isPinned: boolean;
   } | null>(null);
 
   // Split task popover state
@@ -449,6 +451,7 @@ function AppContent() {
     count: number;
     includeInProgress: boolean;
     fuseSplits: boolean;
+    includePinned: boolean;
   } | null>(null);
   // Auto-place V1 modal
   const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
@@ -1075,11 +1078,12 @@ function AppContent() {
   }, [selectedJobId, clearJobAssignments, showToast]);
 
   // Count clearable tiles for mass unschedule confirmation
-  const getClearableCount = useCallback((includeInProgress = false) => {
+  const getClearableCount = useCallback((includeInProgress = false, includePinned = false) => {
     if (!snapshotData) return 0;
     const now = new Date().toISOString();
     return snapshotData.assignments.filter((a) => {
       if (a.isCompleted) return false;
+      if (!includePinned && a.isPinned) return false;
       if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
       return true;
     }).length;
@@ -1111,10 +1115,10 @@ function AppContent() {
   // Handle mass unschedule all tiles (CTRL+ALT+Z)
   const handleMassUnscheduleConfirm = useCallback(async () => {
     if (!massUnscheduleConfirm) return;
-    const { includeInProgress, fuseSplits } = massUnscheduleConfirm;
+    const { includeInProgress, fuseSplits, includePinned } = massUnscheduleConfirm;
     setMassUnscheduleConfirm(null);
     try {
-      const result = await clearAllAssignments({ includeInProgress, fuseSplits }).unwrap();
+      const result = await clearAllAssignments({ includeInProgress, fuseSplits, includePinned }).unwrap();
       showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
 
       // Fuse split groups that are now fully unassigned
@@ -1155,7 +1159,7 @@ function AppContent() {
     // Open dialog if there are ANY non-completed tiles (with or without in-progress)
     const countWithInProgress = getClearableCount(true);
     if (countWithInProgress > 0) {
-      setMassUnscheduleConfirm({ count: getClearableCount(), includeInProgress: false, fuseSplits: false });
+      setMassUnscheduleConfirm({ count: getClearableCount(), includeInProgress: false, fuseSplits: false, includePinned: false });
     }
   }, [getClearableCount]);
 
@@ -1381,8 +1385,8 @@ function AppContent() {
   }, [handleSwap]);
 
   // v0.3.58: Handle context menu open
-  const handleContextMenuOpen = useCallback((x: number, y: number, assignmentId: string, isCompleted: boolean) => {
-    setContextMenu({ x, y, assignmentId, isCompleted });
+  const handleContextMenuOpen = useCallback((x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned = false) => {
+    setContextMenu({ x, y, assignmentId, isCompleted, isPinned });
   }, []);
 
   // v0.3.58: Handle context menu close
@@ -1662,6 +1666,27 @@ function AppContent() {
     if (!contextMenu) return;
     handleToggleComplete(contextMenu.assignmentId);
   }, [contextMenu, handleToggleComplete]);
+
+  // Handle toggle pin (mirrors handleToggleComplete)
+  const handleTogglePin = useCallback(async (assignmentId: string) => {
+    const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
+    if (!assignment) {
+      console.warn('Assignment not found for pin toggle:', assignmentId);
+      return;
+    }
+
+    try {
+      await togglePin(assignment.taskId).unwrap();
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [snapshot.assignments, togglePin, showToast]);
+
+  // Handle context menu "Toggle pin" action
+  const handleContextMenuTogglePin = useCallback(() => {
+    if (!contextMenu) return;
+    handleTogglePin(contextMenu.assignmentId);
+  }, [contextMenu, handleTogglePin]);
 
   // v0.3.58: Handle context menu "Move up" action
   const handleContextMenuMoveUp = useCallback(() => {
@@ -2223,6 +2248,7 @@ function AppContent() {
           onDateClick={handleDateClick}
           onElementStatusChange={handleElementStatusChange}
           onToggleComplete={handleToggleComplete}
+          onTogglePin={handleTogglePin}
           onWorkDaysChange={handleOutsourcingWorkDaysChange}
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}
@@ -2268,6 +2294,7 @@ function AppContent() {
           onSwapUp={handleSwapUp}
           onSwapDown={handleSwapDown}
           onToggleComplete={handleToggleComplete}
+          onTogglePin={handleTogglePin}
           isAltPressed={isAltPressed}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
@@ -2319,6 +2346,8 @@ function AppContent() {
           x={contextMenu.x}
           y={contextMenu.y}
           isCompleted={contextMenu.isCompleted}
+          isPinned={contextMenu.isPinned}
+          onTogglePin={handleContextMenuTogglePin}
           canSwapUp={getContextMenuSwapAvailability().canSwapUp}
           canSwapDown={getContextMenuSwapAvailability().canSwapDown}
           onViewDetails={handleContextMenuViewDetails}
@@ -2454,15 +2483,16 @@ function AppContent() {
              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
              onClick={() => setMassUnscheduleConfirm(null)}>
           <div className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
-               style={{ minWidth: '22rem' }}
+               style={{ width: '28rem' }}
                onClick={e => e.stopPropagation()}>
             <h2 className="text-flux-text-primary font-semibold mb-2">
               Effacer toutes les tuiles ?
             </h2>
-            <p className="text-flux-text-secondary mb-4" style={{ fontSize: '13px' }}>
-              {getClearableCount(massUnscheduleConfirm.includeInProgress)} tuile(s) seront désplanifiée(s).
-              {!massUnscheduleConfirm.includeInProgress && ' Les tuiles terminées et en cours seront conservées.'}
-              {massUnscheduleConfirm.includeInProgress && ' Les tuiles terminées seront conservées.'}
+            <p className="text-flux-text-secondary mb-1" style={{ fontSize: '13px' }}>
+              Les tuiles terminées seront toujours conservées.
+            </p>
+            <p className="text-flux-text-primary font-mono mb-4" style={{ fontSize: '13px' }}>
+              {getClearableCount(massUnscheduleConfirm.includeInProgress, massUnscheduleConfirm.includePinned)} tuile(s) à effacer
             </p>
             <div className="flex flex-col gap-2 mb-6">
               <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
@@ -2472,7 +2502,7 @@ function AppContent() {
                   onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, includeInProgress: e.target.checked } : prev)}
                   className="accent-red-600"
                 />
-                Inclure les tuiles en cours (intersectent avec NOW)
+                Inclure les tuiles en cours d'exécution
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
                 <input
@@ -2482,6 +2512,15 @@ function AppContent() {
                   className="accent-red-600"
                 />
                 Fusionner les tuiles splittées
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={massUnscheduleConfirm.includePinned}
+                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, includePinned: e.target.checked } : prev)}
+                  className="accent-red-600"
+                />
+                Inclure les tuiles épinglées
               </label>
             </div>
             <div className="flex justify-end gap-3">

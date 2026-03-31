@@ -1,6 +1,6 @@
 import { memo, useRef, useState } from 'react';
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask, InternalTask } from '@flux/types';
-import { Circle, CircleCheck, Scissors } from 'lucide-react';
+import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
 import { useTooltipDelay } from '../../hooks';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 
@@ -41,10 +41,14 @@ export interface TaskTileProps {
   isLastTaskOfJob?: boolean;
   /** Whether the task assignment is completed */
   isCompleted?: boolean;
+  /** Whether the task assignment is pinned */
+  isPinned?: boolean;
   /** Callback to toggle completion state */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback to toggle pin state */
+  onTogglePin?: (assignmentId: string) => void;
   /** Callback when right-clicking a scheduled tile (context menu) */
-  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
 }
 
 /** Visual style config per tile state */
@@ -115,7 +119,9 @@ export const TaskTile = memo(function TaskTile({
   onReturnChange,
   isLastTaskOfJob: isLastTask,
   isCompleted = false,
+  isPinned = false,
   onToggleComplete,
+  onTogglePin,
   onContextMenu,
 }: TaskTileProps) {
   // v0.5.11: Outsourced tasks render as mini-form
@@ -183,6 +189,14 @@ export const TaskTile = memo(function TaskTile({
     }
   };
 
+  // Pin icon click handler
+  const handleTogglePin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onTogglePin && assignment) {
+      onTogglePin(assignment.id);
+    }
+  };
+
   // Active placement styling (white ring/halo)
   const activePlacementStyle = isActivePlacement
     ? { boxShadow: '0 0 0 2px white, 0 0 16px rgba(255, 255, 255, 0.5)' }
@@ -216,7 +230,7 @@ export const TaskTile = memo(function TaskTile({
     const handleContextMenu = (e: React.MouseEvent) => {
       if (onContextMenu && assignment) {
         e.preventDefault();
-        onContextMenu(e.clientX, e.clientY, assignment.id, isCompleted);
+        onContextMenu(e.clientX, e.clientY, assignment.id, isCompleted, isPinned);
       }
     };
 
@@ -247,6 +261,15 @@ export const TaskTile = memo(function TaskTile({
                   onClick={handleToggleComplete}
                 />
               )}
+              <Pin
+                className={`w-3 h-3 shrink-0 cursor-pointer transition-colors ${
+                  isPinned
+                    ? 'text-amber-500 hover:text-amber-400'
+                    : 'text-zinc-700 hover:text-zinc-400'
+                }`}
+                onClick={handleTogglePin}
+                title={isPinned ? 'Désépingler' : 'Épingler'}
+              />
               <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>{displayName}</span>
               {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
                 <>

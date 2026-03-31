@@ -1,11 +1,13 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Square, CheckSquare, Undo2, Scissors, Merge } from 'lucide-react';
+import { Square, CheckSquare, Undo2, Scissors, Merge, Pin } from 'lucide-react';
 
 export interface JobDetailContextMenuProps {
   x: number;
   y: number;
   isCompleted: boolean;
+  isPinned: boolean;
+  onTogglePin: () => void;
   onToggleComplete: () => void;
   onRecall: () => void;
   onSplit?: () => void;
@@ -49,6 +51,8 @@ export function JobDetailContextMenu({
   x,
   y,
   isCompleted,
+  isPinned,
+  onTogglePin,
   onToggleComplete,
   onRecall,
   onSplit,
@@ -127,8 +131,13 @@ export function JobDetailContextMenu({
     onClose();
   };
 
+  const handleTogglePin = () => {
+    onTogglePin();
+    onClose();
+  };
+
   const handleRecall = () => {
-    if (!isCompleted) {
+    if (!isCompleted && !isPinned) {
       onRecall();
       onClose();
     }
@@ -161,10 +170,16 @@ export function JobDetailContextMenu({
             testId="job-detail-context-toggle-complete"
           />
           <MenuItem
+            icon={<Pin className="w-4 h-4" />}
+            label={isPinned ? 'Désépingler' : 'Épingler'}
+            onClick={handleTogglePin}
+            testId="job-detail-context-toggle-pin"
+          />
+          <MenuItem
             icon={<Undo2 className="w-4 h-4" />}
             label="Rappeler (désassigner)"
             onClick={handleRecall}
-            disabled={isCompleted}
+            disabled={isCompleted || isPinned}
             testId="job-detail-context-recall"
           />
         </>

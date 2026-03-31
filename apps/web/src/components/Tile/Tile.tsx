@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Circle, CircleCheck, Scissors } from 'lucide-react';
+import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SwapButtons } from './SwapButtons';
@@ -38,6 +38,8 @@ export interface TileProps {
   hasConflict?: boolean;
   /** Callback when completion icon is clicked */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when pin icon is clicked */
+  onTogglePin?: (assignmentId: string) => void;
   /** Pixels per hour for height calculation (default: 80) */
   pixelsPerHour?: number;
   /** v0.3.57: Whether this tile is currently picked (shows placeholder) */
@@ -47,7 +49,7 @@ export interface TileProps {
   /** v0.3.57: Whether picking is active (for muting other tiles) */
   isPickingActive?: boolean;
   /** v0.3.58: Callback when tile is right-clicked (context menu) */
-  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
   /** v0.4.32b: Whether this element is blocked due to missing prerequisites */
   isBlocked?: boolean;
   /** v0.4.32b: Prerequisite blocking info for tooltip display */
@@ -89,6 +91,7 @@ export const Tile = memo(function Tile({
   similarityResults,
   hasConflict = false,
   onToggleComplete,
+  onTogglePin,
   pixelsPerHour = PIXELS_PER_HOUR,
   isPicked = false,
   onPickFromGrid,
@@ -129,7 +132,7 @@ export const Tile = memo(function Tile({
   const handleClick = () => {
     if (isPickingActive) return;
 
-    if (isSelected && !isCompleted && onPickFromGrid) {
+    if (isSelected && !isCompleted && !assignment.isPinned && onPickFromGrid) {
       // Already-selected job's tile → pick for repositioning
       onPickFromGrid(task, job, assignment.id);
     } else {
@@ -149,15 +152,20 @@ export const Tile = memo(function Tile({
 
   // Handle completion toggle (v0.3.33)
   const handleToggleComplete = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Don't trigger job selection
+    e.stopPropagation();
     onToggleComplete?.(assignment.id);
+  };
+
+  const handleTogglePin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onTogglePin?.(assignment.id);
   };
 
   // Handle right-click context menu (v0.3.58)
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onContextMenu?.(e.clientX, e.clientY, assignment.id, isCompleted);
+    onContextMenu?.(e.clientX, e.clientY, assignment.id, isCompleted, assignment.isPinned);
   };
 
   // Determine if we have setup time to show
@@ -261,6 +269,14 @@ export const Tile = memo(function Tile({
               data-testid="tile-incomplete-icon"
             />
           )}
+          <Pin
+            className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
+              assignment.isPinned
+                ? 'text-amber-500 hover:text-amber-400'
+                : 'text-zinc-700 hover:text-zinc-400'
+            }`}
+            onClick={handleTogglePin}
+          />
           <span
             className={`${colorClasses.text} font-medium break-words min-w-0 leading-tight`}
             data-testid="tile-content"
@@ -346,6 +362,7 @@ function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.onSwapUp !== next.onSwapUp ||
     prev.onSwapDown !== next.onSwapDown ||
     prev.onToggleComplete !== next.onToggleComplete ||
+    prev.onTogglePin !== next.onTogglePin ||
     prev.onPickFromGrid !== next.onPickFromGrid ||
     prev.onContextMenu !== next.onContextMenu
   );

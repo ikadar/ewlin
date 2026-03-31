@@ -82,6 +82,8 @@ export interface SchedulingGridProps {
   onSwapDown?: (assignmentId: string) => void;
   /** Callback when completion icon is clicked */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when pin icon is clicked */
+  onTogglePin?: (assignmentId: string) => void;
   /** Whether ALT key is pressed (for precedence bypass) */
   isAltPressed?: boolean;
   /** Schedule conflicts for conflict visualization (REQ-12) */
@@ -119,7 +121,7 @@ export interface SchedulingGridProps {
   /** v0.3.57: Callback when tile is clicked to pick from grid */
   onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
   /** v0.3.58: Callback when tile is right-clicked (context menu) */
-  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
   /** Current display mode (Produit or Tirage) — affects column widths */
   displayMode?: 'produit' | 'tirage';
   /** Set of job IDs that are late (for state-based tile coloring) */
@@ -151,6 +153,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onSwapUp,
       onSwapDown,
       onToggleComplete,
+      onTogglePin,
       isAltPressed = false,
       conflicts = [],
       groups = [],
@@ -639,6 +642,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         onSwapUp={onSwapUp}
                         onSwapDown={onSwapDown}
                         onToggleComplete={onToggleComplete}
+                        onTogglePin={onTogglePin}
                         hasConflict={cached.hasConflict}
                         tileState={cached.tileState}
                         pixelsPerHour={cached.pixelsPerHour}

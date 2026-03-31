@@ -48,8 +48,10 @@ export interface TaskListProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Callback when completion icon is clicked (assignmentId) */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when pin icon is clicked (assignmentId) */
+  onTogglePin?: (assignmentId: string) => void;
   /** Callback when right-clicking a scheduled tile (context menu) */
-  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean) => void;
+  onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
 }
 
 /**
@@ -76,6 +78,7 @@ export function TaskList({
   onDepartureChange,
   onReturnChange,
   onToggleComplete,
+  onTogglePin,
   onContextMenu,
 }: TaskListProps) {
   // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
@@ -259,7 +262,9 @@ export function TaskList({
             onDepartureChange={onDepartureChange}
             onReturnChange={onReturnChange}
             isCompleted={isCompleted}
+            isPinned={assignment?.isPinned ?? false}
             onToggleComplete={onToggleComplete}
+            onTogglePin={onTogglePin}
             onContextMenu={onContextMenu}
           />
         </div>

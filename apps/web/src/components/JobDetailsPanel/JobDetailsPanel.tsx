@@ -51,6 +51,8 @@ export interface JobDetailsPanelProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Callback when completion icon is clicked (assignmentId) */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when pin icon is clicked (assignmentId) */
+  onTogglePin?: (assignmentId: string) => void;
   /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
   conflictTaskIds?: Set<string>;
   /** v0.5.13b: Callback when edit button is clicked */
@@ -119,6 +121,7 @@ export function JobDetailsPanel({
   onDateClick,
   onElementStatusChange,
   onToggleComplete,
+  onTogglePin,
   onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
@@ -148,20 +151,21 @@ export function JobDetailsPanel({
     y: number;
     assignmentId: string;
     isCompleted: boolean;
+    isPinned: boolean;
     taskId?: string;
     isUnassigned?: boolean;
   } | null>(null);
 
   const handleTileContextMenu = useCallback(
-    (x: number, y: number, assignmentId: string, isCompleted: boolean) => {
+    (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => {
       // Check if this is an unassigned task (assignmentId is actually a taskId)
       const isAssignment = jobAssignments.some((a) => a.id === assignmentId);
       if (isAssignment) {
         const assignment = jobAssignments.find((a) => a.id === assignmentId);
-        setContextMenu({ x, y, assignmentId, isCompleted, taskId: assignment?.taskId });
+        setContextMenu({ x, y, assignmentId, isCompleted, isPinned, taskId: assignment?.taskId });
       } else {
         // assignmentId is actually a taskId for unassigned tasks
-        setContextMenu({ x, y, assignmentId, isCompleted: false, taskId: assignmentId, isUnassigned: true });
+        setContextMenu({ x, y, assignmentId, isCompleted: false, isPinned: false, taskId: assignmentId, isUnassigned: true });
       }
     },
     [jobAssignments]
@@ -182,6 +186,12 @@ export function JobDetailsPanel({
       onToggleComplete(contextMenu.assignmentId);
     }
   }, [contextMenu, onToggleComplete]);
+
+  const handleContextMenuTogglePin = useCallback(() => {
+    if (contextMenu && onTogglePin) {
+      onTogglePin(contextMenu.assignmentId);
+    }
+  }, [contextMenu, onTogglePin]);
 
   const handleContextMenuSplit = useCallback(() => {
     if (contextMenu && contextMenu.taskId && onSplitTask) {
@@ -326,6 +336,7 @@ export function JobDetailsPanel({
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
         onToggleComplete={onToggleComplete}
+        onTogglePin={onTogglePin}
         onContextMenu={handleTileContextMenu}
       />
 
@@ -334,6 +345,8 @@ export function JobDetailsPanel({
           x={contextMenu.x}
           y={contextMenu.y}
           isCompleted={contextMenu.isCompleted}
+          isPinned={contextMenu.isPinned}
+          onTogglePin={handleContextMenuTogglePin}
           onToggleComplete={handleContextMenuToggleComplete}
           onRecall={handleContextMenuRecall}
           onSplit={onSplitTask ? handleContextMenuSplit : undefined}
