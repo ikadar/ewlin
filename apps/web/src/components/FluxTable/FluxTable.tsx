@@ -43,19 +43,19 @@ function formatBatDeadlineCell(iso: string | null | undefined): { date: string; 
     urgencyClass = 'text-zinc-500';
   } else if (diffDays === 3) {
     countdown = 'J-3';
-    urgencyClass = 'text-yellow-400';
+    urgencyClass = 'dl-bat-j3';
   } else if (diffDays === 2) {
     countdown = 'J-2';
-    urgencyClass = 'text-orange-400';
+    urgencyClass = 'dl-bat-j2';
   } else if (diffDays === 1) {
     countdown = 'J-1';
-    urgencyClass = 'text-orange-400 font-semibold';
+    urgencyClass = 'dl-bat-j1 font-semibold';
   } else if (diffDays === 0) {
     countdown = 'J-0';
-    urgencyClass = 'text-red-400 font-semibold';
+    urgencyClass = 'dl-bat-overdue font-semibold';
   } else {
     countdown = `J+${Math.abs(diffDays)}`;
-    urgencyClass = 'text-red-400 font-semibold';
+    urgencyClass = 'dl-bat-overdue font-semibold';
   }
   return { date, countdown, urgencyClass };
 }
@@ -343,8 +343,8 @@ const FluxTableRow = memo(function FluxTableRow({
   // Row background tint: subtle rgba on <tr>, opaque mix on sticky cells
   // flux-elevated = rgb(36,36,36). We blend the status color at ~5%.
   const ROW_TINT: Record<string, { tr: string; sticky: string }> = {
-    late:     { tr: 'rgba(248,113,113,0.06)', sticky: 'rgb(49,39,39)' },
-    conflict: { tr: 'rgba(251,191,36,0.06)',  sticky: 'rgb(47,44,36)' },
+    late:     { tr: 'var(--flux-late-row-bg)', sticky: 'var(--flux-late-sticky-bg)' },
+    conflict: { tr: 'var(--flux-conflict-row-bg)', sticky: 'var(--flux-conflict-sticky-bg)' },
   };
   const tint = jobStatus ? ROW_TINT[jobStatus] : null;
 
@@ -369,6 +369,7 @@ const FluxTableRow = memo(function FluxTableRow({
       data-testid="flux-table-row"
       data-job-id={job.id}
       data-flux-focused={isFocused ? 'true' : undefined}
+      data-late-row={jobStatus === 'late' ? 'true' : undefined}
       onClick={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest('button, select, [role="listbox"], [role="option"], a')) return;
@@ -594,6 +595,7 @@ function FluxSubRow({
   index: number;
 }) {
   const ctx = useFluxTableContext();
+  const isLate = job.internalId ? ctx.lateJobIds.has(job.internalId) : false;
   return (
     <tr
       className="border-b border-flux-border group transition-colors hover:bg-flux-hover/50"
@@ -605,6 +607,7 @@ function FluxSubRow({
       data-testid="flux-sub-row"
       data-job-id={job.id}
       data-element-id={element.id}
+      data-late-row={isLate ? 'true' : undefined}
     >
       {/* Expand — indigo border (visual continuation) */}
       <td

@@ -66,7 +66,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     if (!snapshot) return new Set<string>();
     const ids = new Set<string>();
     snapshot.conflicts
-      .filter(c => c.type !== 'DeadlineConflict')
+      .filter(c => c.type !== 'DeadlineConflict' && c.type !== 'ApprovalGateConflict')
       .forEach(c => {
         const task = snapshot.tasks.find(t => t.id === c.taskId);
         if (task) {
