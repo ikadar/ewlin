@@ -257,6 +257,30 @@ function stationsToPostes(
   }));
 }
 
+/**
+ * Convert a station-level DSL sequence to category-level sequence for templates.
+ * Input: "Ryobi524(15+60)\nPolar137(15+15)\nMBOS(60+105)"
+ * Output: "Offset\nCoupe\nPliage" (categories in order, consecutive dupes removed)
+ */
+function sequenceDslToCategories(
+  dsl: string,
+  postes: Array<{ name: string; category: string }>,
+): string {
+  if (!dsl.trim()) return '';
+  const posteMap = new Map(postes.map(p => [p.name.toLowerCase(), p.category]));
+  const categories: string[] = [];
+  for (const line of dsl.split('\n')) {
+    // Extract station name: everything before '(' or whitespace
+    const stationName = line.trim().split(/[(\s]/)[0];
+    if (!stationName) continue;
+    const category = posteMap.get(stationName.toLowerCase());
+    if (category && category !== categories[categories.length - 1]) {
+      categories.push(category);
+    }
+  }
+  return categories.join('\n');
+}
+
 // Inner App component that uses drag state context
 function AppContent() {
   // v0.4.37: RTK Query for snapshot data
@@ -2423,7 +2447,7 @@ function AppContent() {
         onSave={handleJcfSave}
         isSaving={isJcfSaving}
         error={jcfSaveError}
-        onSaveAsTemplate={isEditMode ? undefined : handleSaveAsTemplate}
+        onSaveAsTemplate={handleSaveAsTemplate}
         canSaveAsTemplate={jcfElements.length > 0 && jcfElements.some(el => el.name.trim() !== '')}
       >
         <JcfJobHeader
@@ -2481,7 +2505,9 @@ function AppContent() {
           autres: el.autres,
           qteFeuilles: el.qteFeuilles,
           commentaires: el.commentaires,
-          sequence: sequenceWorkflows[i]?.length > 0 ? sequenceWorkflows[i].join('\n') : '',
+          sequence: sequenceWorkflows[i]?.length > 0
+            ? sequenceWorkflows[i].join('\n')
+            : sequenceDslToCategories(el.sequence, snapshotPostes),
         }))}
         initialClientName={jcfClient}
       />

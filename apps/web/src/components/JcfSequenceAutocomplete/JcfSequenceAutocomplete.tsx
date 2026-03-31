@@ -505,9 +505,29 @@ export function JcfSequenceAutocomplete({
       }
 
       // Dropdown navigation
-      handleDropdownKey(e);
+      if (handleDropdownKey(e)) return;
+
+      // Auto-close parenthesis on Enter: "machine(30" → "machine(30)"
+      if (e.key === 'Enter' && !e.shiftKey) {
+        const textarea = e.target as HTMLTextAreaElement;
+        const pos = textarea.selectionStart;
+        const lines = value.substring(0, pos).split('\n');
+        const currentLine = lines[lines.length - 1] ?? '';
+        if (currentLine.includes('(') && !currentLine.includes(')')) {
+          e.preventDefault();
+          const before = value.substring(0, pos);
+          const after = value.substring(pos);
+          const newValue = before + ')\n' + after;
+          onChange(newValue);
+          // Set cursor after the newline
+          requestAnimationFrame(() => {
+            textarea.selectionStart = textarea.selectionEnd = pos + 2;
+          });
+          return;
+        }
+      }
     },
-    [isOpen, handleDropdownKey, onTabOut, onArrowNav],
+    [isOpen, handleDropdownKey, onTabOut, onArrowNav, value, onChange],
   );
 
   // ── Default styling ────────────────────────────────────────────────────
