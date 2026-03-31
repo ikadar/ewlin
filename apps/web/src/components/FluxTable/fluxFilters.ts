@@ -11,16 +11,15 @@ import { PREREQUISITE_BADGE_LABEL } from './fluxTypes';
 import { worstPrerequisiteStatus } from './fluxAggregation';
 
 /** Route segment → tab identifier mapping (qa.md K11.1). */
-export type TabId = 'all' | 'bat' | 'prepresse' | 'papier' | 'formes' | 'plaques' | 'soustraitance';
+export type TabId = 'all' | 'bat' | 'papier' | 'formes' | 'plaques' | 'soustraitance';
 
 /** The ordered list of tabs (left to right). Used for keyboard cycling. */
-export const TAB_IDS: TabId[] = ['all', 'bat', 'prepresse', 'papier', 'formes', 'plaques', 'soustraitance'];
+export const TAB_IDS: TabId[] = ['all', 'bat', 'papier', 'formes', 'plaques', 'soustraitance'];
 
 /** Maps tab ID to its display label. */
 export const TAB_LABELS: Record<TabId, string> = {
   all:            'Tous',
   bat:            'BAT à traiter',
-  prepresse:      'À faire prépresse',
   papier:         'Cdes papier',
   formes:         'Cdes formes',
   plaques:        'Plaques à produire',
@@ -30,7 +29,6 @@ export const TAB_LABELS: Record<TabId, string> = {
 /** Maps URL pathname to tab ID. Unknown paths default to 'all'. */
 export function pathnameToTab(pathname: string): TabId {
   if (pathname === '/flux/bat')            return 'bat';
-  if (pathname === '/flux/prepresse')      return 'prepresse';
   if (pathname === '/flux/papier')         return 'papier';
   if (pathname === '/flux/formes')         return 'formes';
   if (pathname === '/flux/plaques')        return 'plaques';
@@ -75,7 +73,6 @@ export function filterByTab(job: FluxJob, tab: TabId): boolean {
 
   switch (tab) {
     case 'bat':       return bat !== 'bat_approved' && bat !== 'none';
-    case 'prepresse': return bat !== 'bat_approved' && bat !== 'none';
     case 'papier':    return papier === 'to_order';
     case 'formes':    return formes === 'to_order';
     case 'plaques':   return plaques === 'to_make';
@@ -133,7 +130,7 @@ export function computeTabCounts(
   search: string,
 ): Record<TabId, number> {
   const counts: Record<TabId, number> = {
-    all: 0, bat: 0, prepresse: 0, papier: 0, formes: 0, plaques: 0, soustraitance: 0,
+    all: 0, bat: 0, papier: 0, formes: 0, plaques: 0, soustraitance: 0,
   };
   for (const job of jobs) {
     if (!filterBySearch(job, search)) continue;

@@ -61,7 +61,6 @@ export function AppRoutes() {
         <Route path="/flux" element={<FluxPage />}>
           <Route index element={null} />
           <Route path="bat" element={null} />
-          <Route path="prepresse" element={null} />
           <Route path="papier" element={null} />
           <Route path="formes" element={null} />
           <Route path="plaques" element={null} />
