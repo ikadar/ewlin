@@ -32,10 +32,16 @@ const STATE_LABELS: Record<DotState, string> = {
 };
 
 export function getDotState(
-  _task: Task,
+  task: Task,
   assignment: TaskAssignment | undefined
 ): DotState {
-  if (!assignment) return 'unscheduled';
+  if (!assignment) {
+    // Outsourced tasks with manual dates count as scheduled
+    if (isOutsourcedTask(task) && (task.manualDeparture || task.manualReturn)) {
+      return 'scheduled';
+    }
+    return 'unscheduled';
+  }
   if (assignment.isCompleted) return 'completed';
 
   const scheduledEnd = new Date(assignment.scheduledEnd);
