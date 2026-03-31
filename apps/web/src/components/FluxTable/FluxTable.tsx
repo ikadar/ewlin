@@ -25,6 +25,32 @@ import { FluxTableContext, useFluxTableContext } from './FluxTableContext';
 import { type SortColumn, type SortDirection } from './fluxSort';
 import type { ShipperResponse } from '@/store/api/shipperApi';
 
+/** Get the relevant status change date for a prerequisite column based on current status. */
+function getPrerequisiteDate(element: FluxElement, column: PrerequisiteColumn): string | null {
+  switch (column) {
+    case 'bat':
+      switch (element.bat) {
+        case 'files_received': return element.filesReceivedAt ?? null;
+        case 'bat_sent':       return element.batSentAt ?? null;
+        case 'bat_approved':   return element.batApprovedAt ?? null;
+        default: return null;
+      }
+    case 'papier':
+      switch (element.papier) {
+        case 'ordered':   return element.paperOrderedAt ?? null;
+        case 'delivered': return element.paperDeliveredAt ?? null;
+        default: return null;
+      }
+    case 'formes':
+      switch (element.formes) {
+        case 'ordered':   return element.formeOrderedAt ?? null;
+        case 'delivered': return element.formeDeliveredAt ?? null;
+        default: return null;
+      }
+    default: return null;
+  }
+}
+
 interface FluxTableProps {
   jobs: FluxJob[];
   /** Station categories for dynamic column headers (ordered by displayOrder). */
@@ -376,6 +402,7 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Prerequisite badge/listbox cells */}
       {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map((col, i) => {
         const status = [bat, papier, formes, plaques][i]!;
+        const date = !isMulti ? getPrerequisiteDate(el0, col) : null;
         const cell = isMulti && isExpanded ? (
           <td key={col} className="px-1 py-0" />
         ) : isMulti ? (
@@ -389,6 +416,7 @@ const FluxTableRow = memo(function FluxTableRow({
               elementId={el0.id}
               column={col}
               status={status}
+              date={date}
             />
           </td>
         );
@@ -574,6 +602,7 @@ function FluxSubRow({
               column={col}
               status={element[col]}
               compact
+              date={getPrerequisiteDate(element, col)}
             />
           </td>
         );
@@ -693,10 +722,10 @@ export const FluxTable = memo(function FluxTable({
             <col style={{ width: '9rem' }} />
             <col style={{ width: '16rem' }} />
             <col style={{ width: '6rem' }} />
-            <col style={{ width: '6rem' }} />
+            <col style={{ width: '7.5rem' }} />
             <col style={{ width: '5rem' }} />
-            <col style={{ width: '6rem' }} />
-            <col style={{ width: '6rem' }} />
+            <col style={{ width: '7.5rem' }} />
+            <col style={{ width: '7.5rem' }} />
             <col style={{ width: '6rem' }} />
             {categories.map(cat => (
               <col key={cat.id} style={{ width: '3.5rem' }} />

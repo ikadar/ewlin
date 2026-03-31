@@ -152,6 +152,14 @@ export interface FluxElement {
   stations: Partial<Record<string, FluxStationData>>;
   /** Outsourced tasks for this element. Empty array if none (v0.5.23). */
   outsourcing: FluxOutsourcingTask[];
+  /** Prerequisite date fields (JJ/MM format, null if not set) */
+  filesReceivedAt?: string | null;
+  batSentAt?: string | null;
+  batApprovedAt?: string | null;
+  paperOrderedAt?: string | null;
+  paperDeliveredAt?: string | null;
+  formeOrderedAt?: string | null;
+  formeDeliveredAt?: string | null;
 }
 
 /** A print job row in the Flux dashboard (spec 5.1). */

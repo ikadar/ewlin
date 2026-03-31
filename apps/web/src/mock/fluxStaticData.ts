@@ -44,6 +44,9 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
         outsourcing: [
           { taskId: '00042-t1', actionType: 'Vernis UV sélectif', providerName: 'Faco 37', status: 'done' },
         ],
+        filesReceivedAt: '10/02',
+        batSentAt: '12/02',
+        batApprovedAt: '14/02',
       },
     ],
     transporteur: 'Chronopost',

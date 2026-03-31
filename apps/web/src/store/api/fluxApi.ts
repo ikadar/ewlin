@@ -44,6 +44,13 @@ interface FluxElementApiResponse {
     providerName: string;
     status: FluxSTStatus;
   }>;
+  filesReceivedAt?: string | null;
+  batSentAt?: string | null;
+  batApprovedAt?: string | null;
+  paperOrderedAt?: string | null;
+  paperDeliveredAt?: string | null;
+  formeOrderedAt?: string | null;
+  formeDeliveredAt?: string | null;
 }
 
 /**
@@ -102,6 +109,13 @@ function transformFluxJobsResponse(
         plaques: el.plaques,
         stations: el.stations as Record<string, FluxStationData>,
         outsourcing: (el.outsourcing ?? []) as FluxOutsourcingTask[],
+        filesReceivedAt: el.filesReceivedAt ?? null,
+        batSentAt: el.batSentAt ?? null,
+        batApprovedAt: el.batApprovedAt ?? null,
+        paperOrderedAt: el.paperOrderedAt ?? null,
+        paperDeliveredAt: el.paperDeliveredAt ?? null,
+        formeOrderedAt: el.formeOrderedAt ?? null,
+        formeDeliveredAt: el.formeDeliveredAt ?? null,
       })),
       batDeadline: job.batDeadline ?? null,
       transporteur: job.shipper,

@@ -16,6 +16,8 @@ interface FluxPrerequisiteListboxProps {
   status: PrerequisiteStatus;
   /** Sub-row variant: smaller min-height (2rem vs 2.25rem). */
   compact?: boolean;
+  /** Status change date in JJ/MM format. Passed through to badge. */
+  date?: string | null;
 }
 
 /** Color bar inline style per prerequisite color (spec 3.9). */
@@ -36,6 +38,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
   column,
   status,
   compact = false,
+  date,
 }: FluxPrerequisiteListboxProps) {
   const ctx = useFluxTableContext();
   const myId = `${jobId}-${elementId}-${column}`;
@@ -171,7 +174,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
         aria-expanded={isOpen}
         data-testid="flux-prereq-listbox-trigger"
       >
-        <FluxPrerequisiteBadge status={status} />
+        <FluxPrerequisiteBadge status={status} date={date} />
         {/* Caret icon */}
         <svg
           style={{

@@ -9,6 +9,8 @@ interface FluxPrerequisiteBadgeProps {
    * N = total elements - 1.
    */
   plusCount?: number;
+  /** Status change date in JJ/MM format (e.g. "15/03"). Shown next to badge when set. */
+  date?: string | null;
 }
 
 const COLOR_CLASSES: Record<string, string> = {
@@ -25,6 +27,7 @@ const COLOR_CLASSES: Record<string, string> = {
 export const FluxPrerequisiteBadge = memo(function FluxPrerequisiteBadge({
   status,
   plusCount,
+  date,
 }: FluxPrerequisiteBadgeProps) {
   const color = PREREQUISITE_STATUS_COLOR[status] ?? 'gray';
   const colorClass = COLOR_CLASSES[color];
@@ -38,6 +41,14 @@ export const FluxPrerequisiteBadge = memo(function FluxPrerequisiteBadge({
       >
         {PREREQUISITE_BADGE_LABEL[status] ?? status}
       </span>
+      {date && (
+        <span
+          className="text-zinc-600 whitespace-nowrap leading-none font-mono"
+          style={{ fontSize: '10px' }}
+        >
+          {date}
+        </span>
+      )}
       {plusCount != null && plusCount > 0 && (
         <span
           className="text-flux-text-muted whitespace-nowrap font-semibold leading-none"
