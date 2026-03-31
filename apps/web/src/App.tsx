@@ -23,7 +23,7 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
@@ -337,6 +337,7 @@ function AppContent() {
   const [toggleCompletion] = useToggleCompletionMutation();
   const [togglePin] = useTogglePinMutation();
   const [batchSetPin] = useBatchSetPinMutation();
+  const [updateOutsourcingDates] = useUpdateOutsourcingDatesMutation();
 
   const [splitTask] = useSplitTaskMutation();
   const [fuseTask] = useFuseTaskMutation();
@@ -1604,17 +1605,20 @@ function AppContent() {
   }, [invalidateSnapshot]);
 
   // v0.5.11: Handle outsourcing departure change (local state only)
-  const handleOutsourcingDepartureChange = useCallback((taskId: string, departure: Date | undefined) => {
+  const handleOutsourcingDepartureChange = useCallback(async (taskId: string, departure: Date | undefined) => {
+    const task = snapshot.tasks.find((t) => t.id === taskId);
+    if (!task || task.type !== 'Outsourced') return;
+
     updateSnapshot((currentSnapshot) => {
       const taskIndex = currentSnapshot.tasks.findIndex((t) => t.id === taskId);
       if (taskIndex === -1) return currentSnapshot;
 
-      const task = currentSnapshot.tasks[taskIndex];
-      if (task.type !== 'Outsourced') return currentSnapshot;
+      const t = currentSnapshot.tasks[taskIndex];
+      if (t.type !== 'Outsourced') return currentSnapshot;
 
       const newTasks = [...currentSnapshot.tasks];
       newTasks[taskIndex] = {
-        ...task,
+        ...t,
         manualDeparture: departure?.toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1635,20 +1639,41 @@ function AppContent() {
       return { ...currentSnapshot, tasks: newTasks };
     });
     invalidateSnapshot();
-  }, [invalidateSnapshot]);
+
+    // Persist to backend (only departure — don't overwrite return)
+    try {
+      await updateOutsourcingDates({
+        taskId,
+        manualDeparture: departure?.toISOString() ?? null,
+      }).unwrap();
+    } catch { /* ignore */ }
+
+    // Auto-pin/unpin coupling
+    const assignment = snapshot.assignments.find((a) => a.taskId === taskId);
+    if (assignment) {
+      if (departure && !assignment.isPinned) {
+        try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
+      } else if (!departure && !task.manualReturn && assignment.isPinned) {
+        try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
+      }
+    }
+  }, [snapshot.tasks, snapshot.assignments, togglePin, invalidateSnapshot, updateOutsourcingDates]);
 
   // v0.5.11: Handle outsourcing return change (local state only)
-  const handleOutsourcingReturnChange = useCallback((taskId: string, returnDate: Date | undefined) => {
+  const handleOutsourcingReturnChange = useCallback(async (taskId: string, returnDate: Date | undefined) => {
+    const task = snapshot.tasks.find((t) => t.id === taskId);
+    if (!task || task.type !== 'Outsourced') return;
+
     updateSnapshot((currentSnapshot) => {
       const taskIndex = currentSnapshot.tasks.findIndex((t) => t.id === taskId);
       if (taskIndex === -1) return currentSnapshot;
 
-      const task = currentSnapshot.tasks[taskIndex];
-      if (task.type !== 'Outsourced') return currentSnapshot;
+      const t = currentSnapshot.tasks[taskIndex];
+      if (t.type !== 'Outsourced') return currentSnapshot;
 
       const newTasks = [...currentSnapshot.tasks];
       newTasks[taskIndex] = {
-        ...task,
+        ...t,
         manualReturn: returnDate?.toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1669,7 +1694,25 @@ function AppContent() {
       return { ...currentSnapshot, tasks: newTasks };
     });
     invalidateSnapshot();
-  }, [invalidateSnapshot]);
+
+    // Persist to backend (only return — don't overwrite departure)
+    try {
+      await updateOutsourcingDates({
+        taskId,
+        manualReturn: returnDate?.toISOString() ?? null,
+      }).unwrap();
+    } catch { /* ignore */ }
+
+    // Auto-pin/unpin coupling
+    const assignment = snapshot.assignments.find((a) => a.taskId === taskId);
+    if (assignment) {
+      if (returnDate && !assignment.isPinned) {
+        try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
+      } else if (!returnDate && !task.manualDeparture && assignment.isPinned) {
+        try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
+      }
+    }
+  }, [snapshot.tasks, snapshot.assignments, togglePin, invalidateSnapshot, updateOutsourcingDates]);
 
   // REQ-14: Handle date click - scroll grid to the clicked date
   const handleDateClick = useCallback((date: Date) => {
@@ -1740,10 +1783,27 @@ function AppContent() {
 
     try {
       await togglePin(assignment.taskId).unwrap();
+
+      // If unpinning an outsourced task with manual dates → clear them
+      if (assignment.isPinned) {
+        const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
+        if (task?.type === 'Outsourced' && (task.manualDeparture || task.manualReturn)) {
+          updateSnapshot((s) => {
+            const idx = s.tasks.findIndex((t) => t.id === assignment.taskId);
+            if (idx === -1) return s;
+            const t = s.tasks[idx];
+            if (t.type !== 'Outsourced') return s;
+            const newTasks = [...s.tasks];
+            newTasks[idx] = { ...t, manualDeparture: undefined, manualReturn: undefined, updatedAt: new Date().toISOString() };
+            return { ...s, tasks: newTasks };
+          });
+          invalidateSnapshot();
+        }
+      }
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [snapshot.assignments, togglePin, showToast]);
+  }, [snapshot.assignments, snapshot.tasks, togglePin, showToast, invalidateSnapshot]);
 
   // Handle context menu "Toggle pin" action
   const handleContextMenuTogglePin = useCallback(() => {
@@ -2313,7 +2373,6 @@ function AppContent() {
           onElementStatusChange={handleElementStatusChange}
           onToggleComplete={handleToggleComplete}
           onTogglePin={handleTogglePin}
-          onWorkDaysChange={handleOutsourcingWorkDaysChange}
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}
           onEditJob={handleEditJob}

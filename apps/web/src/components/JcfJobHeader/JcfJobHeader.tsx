@@ -372,74 +372,34 @@ export function JcfJobHeader({
       {/* Row 2: Details */}
       <div className="flex gap-[10px] flex-wrap mt-2">
         {/* Deadline */}
-        <div className="w-[156px]">
+        <div className="w-[182px]">
           <label htmlFor="jcf-deadline" className={labelClass}>
             Départ atelier
           </label>
-          <div className="relative">
-            <input
-              ref={deadlineInputRef}
-              id="jcf-deadline"
-              type="text"
-              placeholder="jj/mm 14:00"
-              value={deadlineDisplay}
-              onChange={(e) => onDeadlineChange(e.target.value)}
-              onBlur={handleDeadlineBlur}
-              className={`${inputBaseClass} font-mono pr-[26px]`}
-              autoComplete="off"
-              data-testid="jcf-field-deadline"
-              onClick={handleOpenPicker}
-            />
-            <input
-              ref={nativeDateRef}
-              type="datetime-local"
-              aria-hidden="true"
-              value={deadlineNativeValue}
-              onChange={handleNativeDateChange}
-              className="absolute inset-0 opacity-0 pointer-events-none"
-              tabIndex={-1}
-            />
-            <Calendar
-              size={16}
-              className="absolute right-[7px] top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
-            />
-          </div>
+          <input
+            id="jcf-deadline"
+            type="datetime-local"
+            value={deadlineNativeValue}
+            onChange={handleNativeDateChange}
+            className={`${inputBaseClass} font-mono [color-scheme:dark]`}
+            data-testid="jcf-field-deadline"
+          />
         </div>
 
         {/* D.L. BAT */}
         {onBatDeadlineChange && (
-          <div className="w-[156px]">
+          <div className="w-[182px]">
             <label htmlFor="jcf-bat-deadline" className={labelClass}>
               Date limite BAT
             </label>
-            <div className="relative">
-              <input
-                ref={batDeadlineInputRef}
-                id="jcf-bat-deadline"
-                type="text"
-                placeholder="jj/mm 14:00"
-                value={batDeadlineDisplay}
-                onChange={(e) => onBatDeadlineChange(e.target.value)}
-                onBlur={handleBatDeadlineBlur}
-                className={`${inputBaseClass} font-mono pr-[26px]`}
-                autoComplete="off"
-                data-testid="jcf-field-bat-deadline"
-                onClick={handleOpenBatPicker}
-              />
-              <input
-                ref={nativeBatDateRef}
-                type="datetime-local"
-                aria-hidden="true"
-                value={batDeadlineNativeValue}
-                onChange={handleNativeBatDateChange}
-                className="absolute inset-0 opacity-0 pointer-events-none"
-                tabIndex={-1}
-              />
-              <Calendar
-                size={16}
-                className="absolute right-[7px] top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
-              />
-            </div>
+            <input
+              id="jcf-bat-deadline"
+              type="datetime-local"
+              value={batDeadlineNativeValue}
+              onChange={handleNativeBatDateChange}
+              className={`${inputBaseClass} font-mono [color-scheme:dark]`}
+              data-testid="jcf-field-bat-deadline"
+            />
           </div>
         )}
 

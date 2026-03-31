@@ -43,8 +43,6 @@ export interface JobDetailsPanelProps {
   onDateClick?: (date: Date) => void;
   /** Callback when element prerequisite status changes (v0.4.32a) */
   onElementStatusChange?: (update: ElementStatusUpdate) => void;
-  /** v0.5.11: Callback when work days changes for outsourced task */
-  onWorkDaysChange?: (taskId: string, workDays: number) => void;
   /** v0.5.11: Callback when manual departure changes for outsourced task */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
@@ -122,7 +120,6 @@ export function JobDetailsPanel({
   onElementStatusChange,
   onToggleComplete,
   onTogglePin,
-  onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
   onEditJob,
@@ -332,7 +329,6 @@ export function JobDetailsPanel({
         onRecallTask={onRecallTask}
         onPick={onPick}
         onElementStatusChange={onElementStatusChange}
-        onWorkDaysChange={onWorkDaysChange}
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
         onToggleComplete={onToggleComplete}

@@ -682,6 +682,21 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Update outsourcing manual dates (departure/return).
+     */
+    updateOutsourcingDates: builder.mutation<
+      { taskId: string; manualDeparture: string | null; manualReturn: string | null },
+      { taskId: string; manualDeparture?: string | null; manualReturn?: string | null }
+    >({
+      query: ({ taskId, ...body }) => ({
+        url: `/tasks/${taskId}/outsourcing-dates`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
      * Batch reschedule multiple task assignments atomically.
      *
      * Used by smart compaction to persist all reordered assignments in a single request.
@@ -862,6 +877,7 @@ export const {
   useToggleCompletionMutation,
   useTogglePinMutation,
   useBatchSetPinMutation,
+  useUpdateOutsourcingDatesMutation,
   useBatchRescheduleMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,

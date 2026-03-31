@@ -31,8 +31,6 @@ export interface TaskTileProps {
   provider?: OutsourcedProvider;
   /** v0.5.11: End time of predecessor task (ISO string) for outsourcing calculations */
   predecessorEndTime?: string;
-  /** v0.5.11: Callback when work days changes for outsourced task */
-  onWorkDaysChange?: (taskId: string, workDays: number) => void;
   /** v0.5.11: Callback when manual departure changes for outsourced task */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
@@ -114,7 +112,6 @@ export const TaskTile = memo(function TaskTile({
   onPick,
   provider,
   predecessorEndTime,
-  onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
   isLastTaskOfJob: isLastTask,
@@ -134,7 +131,6 @@ export const TaskTile = memo(function TaskTile({
         predecessorEndTime={predecessorEndTime}
         workshopExitDate={job.workshopExitDate}
         isLastTaskOfJob={isLastTask}
-        onWorkDaysChange={onWorkDaysChange}
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
       />

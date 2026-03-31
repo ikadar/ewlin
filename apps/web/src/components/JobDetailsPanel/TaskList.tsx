@@ -40,8 +40,6 @@ export interface TaskListProps {
   onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
   /** Callback when element prerequisite status changes (v0.4.32a) */
   onElementStatusChange?: (update: ElementStatusUpdate) => void;
-  /** v0.5.11: Callback when work days changes for outsourced task */
-  onWorkDaysChange?: (taskId: string, workDays: number) => void;
   /** v0.5.11: Callback when manual departure changes for outsourced task */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
@@ -74,7 +72,6 @@ export function TaskList({
   onRecallTask,
   onPick,
   onElementStatusChange,
-  onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
   onToggleComplete,
@@ -258,7 +255,6 @@ export function TaskList({
             provider={provider}
             predecessorEndTime={predecessorEndTime}
             isLastTaskOfJob={isLastTask}
-            onWorkDaysChange={onWorkDaysChange}
             onDepartureChange={onDepartureChange}
             onReturnChange={onReturnChange}
             isCompleted={isCompleted}

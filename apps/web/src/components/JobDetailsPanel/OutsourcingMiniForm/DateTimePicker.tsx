@@ -1,90 +1,104 @@
-import { memo, useCallback, useState, useMemo } from 'react';
-import { formatOutsourcingDateTime, parseOutsourcingDateTime } from '../../../utils/outsourcingCalculation';
+import { memo, useRef, useMemo, useCallback, useState, useEffect } from 'react';
+import { Calendar } from 'lucide-react';
+import { parseFrenchDate, formatToFrench } from '../../JcfJobHeader/frenchDate';
 
 export interface DateTimePickerProps {
-  /** Label for the input (e.g., "Dép:", "Ret:") */
   label: string;
-  /** Current value as Date or ISO string */
   value: Date | string | undefined;
-  /** Callback when value changes */
   onChange: (value: Date | undefined) => void;
-  /** Placeholder when no value */
   placeholder?: string;
-  /** Whether the input is disabled */
   disabled?: boolean;
-  /** Test ID for the input */
   testId?: string;
-  /** Validation state for visual feedback */
   validationState?: 'valid' | 'warning' | 'error';
-  /** Validation message (shown as title tooltip) */
   validationMessage?: string;
+  isAutoCalculated?: boolean;
 }
 
-/**
- * DateTimePicker - Combined date/time input for outsourcing dates.
- * Format: DD/MM HH:MM
- * v0.5.11: Outsourcing Mini-Form
- */
 export const DateTimePicker = memo(function DateTimePicker({
   label,
   value,
   onChange,
-  placeholder = '--/-- --:--',
+  placeholder = 'jj/mm HH:mm',
   disabled = false,
   testId,
   validationState = 'valid',
   validationMessage,
+  isAutoCalculated = false,
 }: DateTimePickerProps) {
-  // Track if user is actively editing
-  const [isEditing, setIsEditing] = useState(false);
-  // Store the user's input while editing
-  const [editingValue, setEditingValue] = useState('');
+  const nativeRef = useRef<HTMLInputElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
-  // Format the display value - either the user's editing input or the formatted prop value
-  const displayValue = useMemo(() => {
-    if (isEditing) {
-      return editingValue;
+  // Convert prop value to ISO string
+  const isoValue = useMemo(() => {
+    if (!value) return '';
+    if (value instanceof Date) {
+      const yyyy = value.getFullYear();
+      const mm = String(value.getMonth() + 1).padStart(2, '0');
+      const dd = String(value.getDate()).padStart(2, '0');
+      const hh = String(value.getHours()).padStart(2, '0');
+      const min = String(value.getMinutes()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
     }
-    return formatOutsourcingDateTime(value);
-  }, [isEditing, editingValue, value]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingValue(e.target.value);
-  }, []);
-
-  const handleFocus = useCallback(() => {
-    // Start editing with current formatted value
-    setEditingValue(formatOutsourcingDateTime(value));
-    setIsEditing(true);
+    const match = String(value).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+    return match ? `${match[1]}T${match[2]}` : '';
   }, [value]);
 
-  const handleBlur = useCallback(() => {
-    setIsEditing(false);
+  const frenchDisplay = isoValue ? formatToFrench(isoValue) : '';
 
-    if (!editingValue.trim()) {
+  // Local text state — synced from prop when not focused
+  const [localText, setLocalText] = useState(frenchDisplay);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalText(frenchDisplay);
+    }
+  }, [frenchDisplay, isFocused]);
+
+  const nativeValue = isoValue || `${new Date().toISOString().slice(0, 10)}T14:00`;
+
+  const handleOpenPicker = useCallback(() => {
+    if (!disabled) nativeRef.current?.showPicker();
+  }, [disabled]);
+
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+    const raw = localText.trim();
+    if (!raw) {
       onChange(undefined);
       return;
     }
-
-    const parsed = parseOutsourcingDateTime(editingValue);
+    const parsed = parseFrenchDate(raw);
     if (parsed) {
-      onChange(parsed);
+      onChange(new Date(parsed));
+    } else {
+      // Invalid — revert to prop display
+      setLocalText(frenchDisplay);
     }
-    // If invalid, just stop editing - displayValue will show the prop value
-  }, [editingValue, onChange]);
+  }, [localText, onChange, frenchDisplay]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        e.currentTarget.blur();
-      } else if (e.key === 'Escape') {
-        // Cancel editing
-        setIsEditing(false);
-        e.currentTarget.blur();
-      }
-    },
-    []
-  );
+  const handleNativeDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value) {
+      const d = new Date(e.target.value);
+      onChange(d);
+      setLocalText(formatToFrench(e.target.value));
+      setIsFocused(false);
+      // Force-close the native picker
+      nativeRef.current?.blur();
+    }
+  }, [onChange]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') e.currentTarget.blur();
+    if (e.key === 'Escape') {
+      setLocalText(frenchDisplay);
+      setIsFocused(false);
+      e.currentTarget.blur();
+    }
+  }, [frenchDisplay]);
 
   const borderClass = validationState === 'error'
     ? 'border-red-500'
@@ -92,22 +106,41 @@ export const DateTimePicker = memo(function DateTimePicker({
       ? 'border-amber-500'
       : 'border-zinc-700';
 
+  const textColor = isAutoCalculated && !isFocused ? 'text-zinc-500' : 'text-zinc-200';
+
   return (
     <div className="flex items-center gap-2">
       <label className="text-zinc-500 text-xs shrink-0 w-8">{label}</label>
-      <input
-        type="text"
-        value={displayValue}
-        onChange={handleChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder={placeholder}
-        title={validationMessage}
-        className={`flex-1 px-1.5 py-0.5 text-xs bg-zinc-800 border ${borderClass} rounded text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed font-mono`}
-        data-testid={testId}
-      />
+      <div className="relative flex-1">
+        <input
+          type="text"
+          value={localText}
+          onChange={(e) => setLocalText(e.target.value)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          onClick={handleOpenPicker}
+          disabled={disabled}
+          placeholder={placeholder}
+          title={validationMessage}
+          className={`w-full px-1.5 py-0.5 text-xs bg-zinc-800 border ${borderClass} rounded ${textColor} placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed font-mono pr-6`}
+          autoComplete="off"
+          data-testid={testId}
+        />
+        <input
+          ref={nativeRef}
+          type="datetime-local"
+          aria-hidden="true"
+          value={nativeValue}
+          onChange={handleNativeDateChange}
+          className="absolute inset-0 opacity-0 pointer-events-none"
+          tabIndex={-1}
+        />
+        <Calendar
+          size={12}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+        />
+      </div>
     </div>
   );
 });

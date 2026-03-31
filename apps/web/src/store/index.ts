@@ -127,6 +127,7 @@ export {
   useToggleCompletionMutation,
   useTogglePinMutation,
   useBatchSetPinMutation,
+  useUpdateOutsourcingDatesMutation,
   useBatchRescheduleMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,

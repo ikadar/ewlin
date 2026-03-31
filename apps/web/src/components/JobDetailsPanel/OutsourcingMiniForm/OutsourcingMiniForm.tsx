@@ -1,50 +1,47 @@
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import type { OutsourcedTask, OutsourcedProvider } from '@flux/types';
-import { WorkDaysInput } from './WorkDaysInput';
-import { DateTimePicker } from './DateTimePicker';
-import { calculateOutsourcingDates, calculateReturnDate } from '../../../utils/outsourcingCalculation';
+import { calculateOutsourcingDates, formatOutsourcingDateTime } from '../../../utils/outsourcingCalculation';
 
 export interface OutsourcingMiniFormProps {
-  /** The outsourced task */
   task: OutsourcedTask;
-  /** The provider for this task */
   provider: OutsourcedProvider | undefined;
-  /** Job color for styling */
   jobColor: string;
-  /** End time of predecessor task (if scheduled) - ISO string */
   predecessorEndTime?: string;
-  /** Job workshop exit date (deadline) - ISO date string */
   workshopExitDate?: string;
-  /** Callback when work days changes */
-  onWorkDaysChange?: (taskId: string, workDays: number) => void;
-  /** Callback when manual departure changes */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
-  /** Callback when manual return changes */
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
-  /** Whether this is the last task of the job (one-way shipping, no return transit) */
   isLastTaskOfJob?: boolean;
 }
 
-/**
- * OutsourcingMiniForm - Embedded form for editing outsourced task parameters.
- * Displays provider info, work days input, and departure/return date pickers.
- * v0.5.11: Outsourcing Mini-Form
- */
 export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   task,
   provider,
   jobColor,
   predecessorEndTime,
-  workshopExitDate,
-  onWorkDaysChange,
   onDepartureChange,
   onReturnChange,
   isLastTaskOfJob,
 }: OutsourcingMiniFormProps) {
-  // Calculate dates from predecessor if available and no manual override
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalDep, setModalDep] = useState('');
+  const [modalRet, setModalRet] = useState('');
+  // Convert ISO/Date to YYYY-MM-DDTHH:mm for native datetime-local
+  const toNative = (d: string | undefined, defaultTime: string): string => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return '';
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
+
   const calculatedDates = useMemo(() => {
     if (!provider || !predecessorEndTime) return null;
-
     return calculateOutsourcingDates(predecessorEndTime, {
       workDays: task.duration.openDays,
       latestDepartureTime: provider.latestDepartureTime,
@@ -54,156 +51,203 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
     });
   }, [predecessorEndTime, provider, task.duration.openDays, isLastTaskOfJob]);
 
-  // Use manual values if set, otherwise use calculated values.
-  // When predecessorEndTime is absent (predecessor unscheduled), dates are meaningless — show empty.
-  const departureValue = useMemo(() => {
-    if (!predecessorEndTime) return undefined;
-    if (task.manualDeparture) {
-      return new Date(task.manualDeparture);
-    }
-    return calculatedDates?.departure;
-  }, [predecessorEndTime, task.manualDeparture, calculatedDates]);
+  const handleClearDeparture = useCallback(() => {
+    onDepartureChange?.(task.id, undefined);
+  }, [task.id, onDepartureChange]);
 
-  const returnValue = useMemo(() => {
-    if (isLastTaskOfJob) return undefined;
-    if (!predecessorEndTime) return undefined;
-    if (task.manualReturn) {
-      return new Date(task.manualReturn);
-    }
-    return calculatedDates?.return;
-  }, [isLastTaskOfJob, predecessorEndTime, task.manualReturn, calculatedDates]);
+  const handleClearReturn = useCallback(() => {
+    onReturnChange?.(task.id, undefined);
+  }, [task.id, onReturnChange]);
 
-  // Validation state for inline feedback
-  const validation = useMemo(() => {
-    const result: {
-      departure: 'valid' | 'warning' | 'error';
-      return: 'valid' | 'warning' | 'error';
-      departureMessage?: string;
-      returnMessage?: string;
-    } = { departure: 'valid', return: 'valid' };
-
-    if (!departureValue) return result;
-
-    // Rule 2: departure < predecessor end → precedence warning (amber)
-    if (predecessorEndTime && departureValue < new Date(predecessorEndTime)) {
-      result.departure = 'warning';
-      result.departureMessage = 'Avant fin prédécesseur';
-    }
-
-    // Rule 3: departure > deadline → error (red), overrides warning
-    if (workshopExitDate) {
-      const deadline = new Date(workshopExitDate);
-      if (departureValue > deadline) {
-        result.departure = 'error';
-        result.departureMessage = 'Après échéance';
-      }
-    }
-
-    // Rule 1: return < calculated minimum → error (red)
-    // Skip return validation for one-way shipping (no return)
-    if (!isLastTaskOfJob && returnValue && provider) {
-      const minReturn = calculateReturnDate(departureValue, {
-        workDays: task.duration.openDays,
-        transitDays: provider.transitDays,
-        receptionTime: provider.receptionTime,
-      });
-      if (returnValue < minReturn) {
-        result.return = 'error';
-        result.returnMessage = 'Avant dép + JO';
-      }
-    }
-
-    return result;
-  }, [departureValue, returnValue, predecessorEndTime, workshopExitDate, provider, task.duration.openDays, isLastTaskOfJob]);
-
-  // Handlers
-  const handleWorkDaysChange = useCallback(
-    (value: number) => {
-      onWorkDaysChange?.(task.id, value);
-    },
-    [task.id, onWorkDaysChange]
-  );
-
-  const handleDepartureChange = useCallback(
-    (value: Date | undefined) => {
-      onDepartureChange?.(task.id, value);
-    },
-    [task.id, onDepartureChange]
-  );
-
-  const handleReturnChange = useCallback(
-    (value: Date | undefined) => {
-      onReturnChange?.(task.id, value);
-    },
-    [task.id, onReturnChange]
-  );
-
-  // Provider name display
   const providerName = provider?.name ?? 'Unknown Provider';
+  const hasManualDep = !!task.manualDeparture;
+  const hasManualRet = !!task.manualReturn;
+  const hasAnyManual = hasManualDep || (hasManualRet && !isLastTaskOfJob);
+
+  const fmt = (d: Date | string | undefined): string => {
+    if (!d) return '';
+    return formatOutsourcingDateTime(d);
+  };
+
+  // Modal open: pre-fill with current manual values
+  const openModal = useCallback(() => {
+    setModalDep(task.manualDeparture ? toNative(task.manualDeparture, provider?.latestDepartureTime ?? '14:00') : '');
+    setModalRet(task.manualReturn ? toNative(task.manualReturn, provider?.receptionTime ?? '10:00') : '');
+    setIsModalOpen(true);
+  }, [task.manualDeparture, task.manualReturn, provider]);
+
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+  }, []);
+
+  const handleModalSave = useCallback(() => {
+    const depDate = modalDep ? new Date(modalDep) : null;
+    const retDate = modalRet ? new Date(modalRet) : null;
+
+    if (depDate && !isNaN(depDate.getTime())) {
+      onDepartureChange?.(task.id, depDate);
+    } else if (!modalDep && hasManualDep) {
+      onDepartureChange?.(task.id, undefined);
+    }
+
+    if (!isLastTaskOfJob) {
+      if (retDate && !isNaN(retDate.getTime())) {
+        onReturnChange?.(task.id, retDate);
+      } else if (!modalRet && hasManualRet) {
+        onReturnChange?.(task.id, undefined);
+      }
+    }
+
+    setIsModalOpen(false);
+  }, [modalDep, modalRet, task.id, isLastTaskOfJob, hasManualDep, hasManualRet, onDepartureChange, onReturnChange]);
+
+  const handleModalKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') closeModal();
+  }, [closeModal]);
 
   return (
-    <div
-      className="text-sm border-l-4 bg-zinc-900/50"
-      style={{ borderLeftColor: jobColor }}
-      data-testid={`outsourcing-mini-form-${task.id}`}
-    >
-      {/* Header: Action type */}
+    <>
       <div
-        className="px-2 py-1 flex items-center gap-2"
-        style={{ backgroundColor: `${jobColor}15` }}
+        className="text-sm border-l-4 bg-zinc-900/50"
+        style={{ borderLeftColor: jobColor }}
+        data-testid={`outsourcing-mini-form-${task.id}`}
       >
-        <span
-          className="font-medium truncate"
-          style={{ color: jobColor }}
-          data-testid="outsourcing-action-type"
-        >
-          {task.actionType}
-        </span>
-      </div>
+        {/* Header */}
+        <div className="px-2 py-1 flex items-center gap-2" style={{ backgroundColor: `${jobColor}15` }}>
+          <span className="font-medium truncate" style={{ color: jobColor }}>{task.actionType}</span>
+        </div>
 
-      {/* Provider name */}
-      <div className="px-2 pt-1 text-xs text-zinc-500" data-testid="outsourcing-provider-name">
-        Provider: {providerName}
-      </div>
+        {/* Body */}
+        <div className="px-2 py-1.5">
+          <div className="text-xs text-zinc-500 mb-1">{providerName} · {task.duration.openDays} JO</div>
 
-      {/* Form fields */}
-      <div className="px-2 py-2 space-y-1.5">
-        {/* Work days input */}
-        <WorkDaysInput
-          value={task.duration.openDays}
-          onChange={handleWorkDaysChange}
-          disabled={!onWorkDaysChange}
-        />
-
-        {/* Departure date/time */}
-        <DateTimePicker
-          label="Dép:"
-          value={departureValue}
-          onChange={handleDepartureChange}
-          disabled={!onDepartureChange}
-          testId="outsourcing-departure"
-          validationState={validation.departure}
-          validationMessage={validation.departureMessage}
-        />
-
-        {/* Return date/time — hidden for one-way shipping (last task of job) */}
-        {isLastTaskOfJob ? (
-          <div className="flex items-center gap-2 text-xs text-zinc-500 py-0.5">
-            <span>Ret:</span>
-            <span className="italic text-zinc-600">Aller simple</span>
+          {/* Departure */}
+          <div className="flex items-center gap-1 text-xs leading-relaxed">
+            <span className="text-zinc-500">Départ</span>
+            {hasManualDep ? (
+              <>
+                <span className="font-mono text-zinc-100">{fmt(task.manualDeparture)}</span>
+                {onDepartureChange && (
+                  <button onClick={handleClearDeparture} className="text-zinc-600 hover:text-red-400 transition-colors leading-none" title="Supprimer">
+                    <X size={12} />
+                  </button>
+                )}
+              </>
+            ) : predecessorEndTime && calculatedDates?.departure ? (
+              <span className="font-mono text-zinc-500">{fmt(calculatedDates.departure)}</span>
+            ) : (
+              <span className="text-zinc-600 italic">non calculable</span>
+            )}
           </div>
-        ) : (
-          <DateTimePicker
-            label="Ret:"
-            value={returnValue}
-            onChange={handleReturnChange}
-            disabled={!onReturnChange}
-            testId="outsourcing-return"
-            validationState={validation.return}
-            validationMessage={validation.returnMessage}
-          />
-        )}
+
+          {/* Return */}
+          {isLastTaskOfJob ? (
+            <div className="text-xs text-zinc-600 italic leading-relaxed">Aller simple</div>
+          ) : (
+            <div className="flex items-center gap-1 text-xs leading-relaxed">
+              <span className="text-zinc-500">Retour</span>
+              {hasManualRet ? (
+                <>
+                  <span className="font-mono text-zinc-100">{fmt(task.manualReturn)}</span>
+                  {onReturnChange && (
+                    <button onClick={handleClearReturn} className="text-zinc-600 hover:text-red-400 transition-colors leading-none" title="Supprimer">
+                      <X size={12} />
+                    </button>
+                  )}
+                </>
+              ) : predecessorEndTime && calculatedDates?.return ? (
+                <span className="font-mono text-zinc-500">{fmt(calculatedDates.return)}</span>
+              ) : (
+                <span className="text-zinc-600 italic">non calculable</span>
+              )}
+            </div>
+          )}
+
+          {/* Link */}
+          {(onDepartureChange || onReturnChange) && (
+            <button
+              onClick={openModal}
+              className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline mt-1 bg-transparent border-none cursor-pointer p-0"
+            >
+              {hasAnyManual ? 'Modifier les dates' : 'Saisir des dates manuelles'}
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Date entry modal */}
+      {isModalOpen && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={closeModal}
+          onKeyDown={handleModalKeyDown}
+          tabIndex={-1}
+          ref={el => el?.focus()}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-700 rounded-lg p-5 shadow-xl"
+            style={{ width: '22rem' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-zinc-100 font-semibold text-sm mb-1">Dates de sous-traitance</h2>
+            <div className="text-xs text-zinc-500 mb-4">{task.actionType} · {providerName} · {task.duration.openDays} JO</div>
+
+            {/* Calculated dates info */}
+            {predecessorEndTime && calculatedDates && (
+              <div className="mb-3">
+                <div className="text-xs text-zinc-600 mb-1 font-medium uppercase tracking-wide" style={{ fontSize: '10px' }}>Dates calculées</div>
+                <div className="text-xs text-zinc-500 font-mono">
+                  Dép: {fmt(calculatedDates.departure)}
+                  {!isLastTaskOfJob && calculatedDates.return && ` · Ret: ${fmt(calculatedDates.return)}`}
+                </div>
+              </div>
+            )}
+
+            {/* Manual date inputs */}
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Départ manuel</label>
+                <input
+                  type="datetime-local"
+                  value={modalDep}
+                  onChange={e => setModalDep(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm font-mono bg-zinc-800 border border-zinc-700 rounded text-zinc-100 focus:outline-none focus:border-blue-500 [color-scheme:dark]"
+                />
+              </div>
+
+              {!isLastTaskOfJob && (
+                <div>
+                  <label className="text-xs text-zinc-400 block mb-1">Retour manuel</label>
+                  <input
+                    type="datetime-local"
+                    value={modalRet}
+                    onChange={e => setModalRet(e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm font-mono bg-zinc-800 border border-zinc-700 rounded text-zinc-100 focus:outline-none focus:border-blue-500 [color-scheme:dark]"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={closeModal}
+                className="px-3 py-1.5 rounded text-xs text-zinc-300 hover:bg-zinc-800 border border-zinc-700 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleModalSave}
+                className="px-3 py-1.5 rounded text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 });
