@@ -13,6 +13,7 @@ export interface OutsourcingMiniFormProps {
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   isLastTaskOfJob?: boolean;
+  isPlaced?: boolean;
 }
 
 export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
@@ -23,6 +24,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   onDepartureChange,
   onReturnChange,
   isLastTaskOfJob,
+  isPlaced = false,
 }: OutsourcingMiniFormProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDep, setModalDep] = useState('');
@@ -113,7 +115,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
         data-testid={`outsourcing-mini-form-${task.id}`}
       >
         {/* Header */}
-        <div className="px-2 py-1 flex items-center gap-2" style={{ backgroundColor: `${jobColor}15` }}>
+        <div className="px-2 py-1 flex items-center gap-2" style={isPlaced ? undefined : { backgroundColor: `${jobColor}15` }}>
           <span className="font-medium truncate" style={{ color: jobColor }}>{task.actionType}</span>
         </div>
 

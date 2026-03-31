@@ -121,19 +121,55 @@ export const TaskTile = memo(function TaskTile({
   onTogglePin,
   onContextMenu,
 }: TaskTileProps) {
-  // v0.5.11: Outsourced tasks render as mini-form
+  // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
+    const style = TILE_STYLES[tileState];
+    const handleOutsourcedToggleComplete = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onToggleComplete && assignment) onToggleComplete(assignment.id);
+    };
+    const handleOutsourcedTogglePin = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onTogglePin && assignment) onTogglePin(assignment.id);
+    };
+    const handleOutsourcedContextMenu = (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (onContextMenu && assignment) onContextMenu(e.clientX, e.clientY, assignment.id, isCompleted, isPinned);
+    };
+
     return (
-      <OutsourcingMiniForm
-        task={task as OutsourcedTask}
-        provider={provider}
-        jobColor={job.color}
-        predecessorEndTime={predecessorEndTime}
-        workshopExitDate={job.workshopExitDate}
-        isLastTaskOfJob={isLastTask}
-        onDepartureChange={onDepartureChange}
-        onReturnChange={onReturnChange}
-      />
+      <div
+        className={`rounded-[3px] ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''}`}
+        style={{ borderLeftColor: style.borderColor }}
+        onContextMenu={handleOutsourcedContextMenu}
+      >
+        {/* Icons row: done + pin */}
+        {assignment && (
+          <div className="flex items-center gap-1 px-2 pt-1">
+            {isCompleted ? (
+              <CircleCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
+            ) : (
+              <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
+            )}
+            <Pin
+              className={`w-3 h-3 shrink-0 cursor-pointer transition-colors ${isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`}
+              onClick={handleOutsourcedTogglePin}
+              title={isPinned ? 'Désépingler' : 'Épingler'}
+            />
+          </div>
+        )}
+        <OutsourcingMiniForm
+          task={task as OutsourcedTask}
+          provider={provider}
+          jobColor={style.borderColor}
+          predecessorEndTime={predecessorEndTime}
+          workshopExitDate={job.workshopExitDate}
+          isLastTaskOfJob={isLastTask}
+          onDepartureChange={onDepartureChange}
+          onReturnChange={onReturnChange}
+          isPlaced={tileState !== 'unplaced'}
+        />
+      </div>
     );
   }
 

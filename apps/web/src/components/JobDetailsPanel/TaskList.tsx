@@ -230,8 +230,13 @@ export function TaskList({
       const isLate = isJobLate || isTaskOverdue;
       const hasConflictFlag = conflictTaskIds?.has(task.id) ?? false;
 
+      // Outsourced tasks with manual dates look "placed" even without a schedule assignment
+      const hasManualDates = task.type === 'Outsourced'
+        && (task.manualDeparture || task.manualReturn);
+      const effectivelyScheduled = isScheduled || hasManualDates;
+
       let tileState: 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
-      if (!isScheduled) tileState = 'unplaced';
+      if (!effectivelyScheduled) tileState = 'unplaced';
       else if (isJobShipped) tileState = 'shipped';
       else if (isLate) tileState = 'late';
       else if (hasConflictFlag) tileState = 'conflict';
