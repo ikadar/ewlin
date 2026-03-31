@@ -334,10 +334,7 @@ export function JcfJobHeader({
             data-testid="jcf-field-intitule"
           />
         </div>
-      </div>
 
-      {/* Row 2: Details */}
-      <div className="flex gap-[10px] flex-wrap mt-2">
         {/* Quantité */}
         <div className="w-[78px]">
           <label htmlFor="jcf-quantite" className={labelClass}>
@@ -354,6 +351,26 @@ export function JcfJobHeader({
           />
         </div>
 
+        {/* Required Jobs (prerequisites) */}
+        {onRequiredJobsChange && (
+          <div className="w-[234px]">
+            <label htmlFor="jcf-required-jobs" className={labelClass}>
+              Prérequis
+            </label>
+            <JcfJobPrecedencesAutocomplete
+              id="jcf-required-jobs"
+              value={requiredJobs ?? ''}
+              onChange={onRequiredJobsChange}
+              suggestions={requiredJobSuggestions}
+              inputClassName={inputBaseClass}
+              placeholder="ex: JOB-001,JOB-002"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Row 2: Details */}
+      <div className="flex gap-[10px] flex-wrap mt-2">
         {/* Deadline */}
         <div className="w-[156px]">
           <label htmlFor="jcf-deadline" className={labelClass}>
@@ -439,22 +456,6 @@ export function JcfJobHeader({
           </div>
         )}
 
-        {/* Required Jobs (prerequisites) */}
-        {onRequiredJobsChange && (
-          <div className="w-[234px]">
-            <label htmlFor="jcf-required-jobs" className={labelClass}>
-              Prérequis
-            </label>
-            <JcfJobPrecedencesAutocomplete
-              id="jcf-required-jobs"
-              value={requiredJobs ?? ''}
-              onChange={onRequiredJobsChange}
-              suggestions={requiredJobSuggestions}
-              inputClassName={inputBaseClass}
-              placeholder="ex: JOB-001,JOB-002"
-            />
-          </div>
-        )}
       </div>
     </div>
   );
