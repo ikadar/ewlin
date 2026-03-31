@@ -763,10 +763,10 @@ export const FluxTable = memo(function FluxTable({
             <col style={{ width: '9rem' }} />
             <col style={{ width: '16rem' }} />
             <col style={{ width: '6rem' }} />
-            <col style={{ width: '7.5rem' }} />
-            <col style={{ width: '5rem' }} />
-            <col style={{ width: '7.5rem' }} />
-            <col style={{ width: '7.5rem' }} />
+            <col style={{ width: '8.5rem' }} />
+            <col style={{ width: '8.5rem' }} />
+            <col style={{ width: '8.5rem' }} />
+            <col style={{ width: '8.5rem' }} />
             <col style={{ width: '6rem' }} />
             {categories.map(cat => (
               <col key={cat.id} style={{ width: '3.5rem' }} />
