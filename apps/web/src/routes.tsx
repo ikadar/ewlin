@@ -60,6 +60,7 @@ export function AppRoutes() {
         {/* Production Flow Dashboard — tab nested routes (v0.5.16) */}
         <Route path="/flux" element={<FluxPage />}>
           <Route index element={null} />
+          <Route path="bat" element={null} />
           <Route path="prepresse" element={null} />
           <Route path="papier" element={null} />
           <Route path="formes" element={null} />

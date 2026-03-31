@@ -43,8 +43,7 @@ export const FluxPrerequisiteBadge = memo(function FluxPrerequisiteBadge({
       </span>
       {date && (
         <span
-          className="text-zinc-600 whitespace-nowrap leading-none font-mono"
-          style={{ fontSize: '10px' }}
+          className="text-sm text-zinc-400 whitespace-nowrap leading-none font-mono"
         >
           {date}
         </span>

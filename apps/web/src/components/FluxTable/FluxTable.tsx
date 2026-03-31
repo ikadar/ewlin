@@ -25,6 +25,41 @@ import { FluxTableContext, useFluxTableContext } from './FluxTableContext';
 import { type SortColumn, type SortDirection } from './fluxSort';
 import type { ShipperResponse } from '@/store/api/shipperApi';
 
+/** Format batDeadline ISO string as "JJ/MM" and compute "J-X" countdown. */
+function formatBatDeadlineCell(iso: string | null | undefined): { date: string; countdown: string; urgencyClass: string } | null {
+  if (!iso) return null;
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const deadlineDate = new Date(parseInt(year!, 10), parseInt(month!, 10) - 1, parseInt(day!, 10));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((deadlineDate.getTime() - today.getTime()) / 86400000);
+  const date = `${day}/${month}`;
+  let countdown: string;
+  let urgencyClass: string;
+  if (diffDays > 3) {
+    countdown = `J-${diffDays}`;
+    urgencyClass = 'text-zinc-500';
+  } else if (diffDays === 3) {
+    countdown = 'J-3';
+    urgencyClass = 'text-yellow-400';
+  } else if (diffDays === 2) {
+    countdown = 'J-2';
+    urgencyClass = 'text-orange-400';
+  } else if (diffDays === 1) {
+    countdown = 'J-1';
+    urgencyClass = 'text-orange-400 font-semibold';
+  } else if (diffDays === 0) {
+    countdown = 'J-0';
+    urgencyClass = 'text-red-400 font-semibold';
+  } else {
+    countdown = `J+${Math.abs(diffDays)}`;
+    urgencyClass = 'text-red-400 font-semibold';
+  }
+  return { date, countdown, urgencyClass };
+}
+
 /** Get the relevant status change date for a prerequisite column based on current status. */
 function getPrerequisiteDate(element: FluxElement, column: PrerequisiteColumn): string | null {
   switch (column) {
@@ -422,10 +457,16 @@ const FluxTableRow = memo(function FluxTableRow({
         );
         // Insert DL BAT cell right after BAT column
         if (col === 'bat') {
+          const dl = formatBatDeadlineCell(job.batDeadline);
           return [
             cell,
-            <td key="dl-bat" className="px-1 py-0 text-xs text-flux-text-secondary whitespace-nowrap text-center">
-              {job.batDeadline ?? ''}
+            <td key="dl-bat" className="px-1 py-0 whitespace-nowrap text-center">
+              {dl ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-sm text-flux-text-secondary">{dl.date}</span>
+                  <span className={`text-sm font-mono ${dl.urgencyClass}`}>{dl.countdown}</span>
+                </span>
+              ) : ''}
             </td>,
           ];
         }

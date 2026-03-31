@@ -108,16 +108,6 @@ export function PrerequisiteStatus({
 
   return (
     <div className="flex items-center gap-1 flex-wrap" data-testid="prerequisite-status">
-      {/* Paper status dropdown */}
-      <PrerequisiteDropdown
-        label="Papier"
-        value={paperStatus}
-        options={paperOptions}
-        type="paper"
-        onChange={onPaperStatusChange ?? (() => {})}
-        dateValue={getPaperDate(paperStatus, paperOrderedAt, paperDeliveredAt)}
-      />
-
       {/* BAT status dropdown */}
       <PrerequisiteDropdown
         label="BAT"
@@ -125,19 +115,16 @@ export function PrerequisiteStatus({
         options={batOptions}
         type="bat"
         onChange={onBatStatusChange ?? (() => {})}
-        dateValue={getBatDate(batStatus, filesReceivedAt, batSentAt, batApprovedAt)}
       />
 
-      {/* Plates status dropdown - only for offset elements */}
-      {hasOffset && (
-        <PrerequisiteDropdown
-          label="Plaques"
-          value={plateStatus}
-          options={plateOptions}
-          type="plate"
-          onChange={onPlateStatusChange ?? (() => {})}
-        />
-      )}
+      {/* Paper status dropdown */}
+      <PrerequisiteDropdown
+        label="Papier"
+        value={paperStatus}
+        options={paperOptions}
+        type="paper"
+        onChange={onPaperStatusChange ?? (() => {})}
+      />
 
       {/* Forme status dropdown - only for die-cutting elements */}
       {hasDieCutting && (
@@ -147,7 +134,17 @@ export function PrerequisiteStatus({
           options={formeOptions}
           type="forme"
           onChange={onFormeStatusChange ?? (() => {})}
-          dateValue={getFormeDate(formeStatus, formeOrderedAt, formeDeliveredAt)}
+        />
+      )}
+
+      {/* Plates status dropdown - only for offset elements */}
+      {hasOffset && (
+        <PrerequisiteDropdown
+          label="Plaques"
+          value={plateStatus}
+          options={plateOptions}
+          type="plate"
+          onChange={onPlateStatusChange ?? (() => {})}
         />
       )}
     </div>

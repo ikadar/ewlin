@@ -224,6 +224,9 @@ export const fluxApi = createApi({
           // Invalidate the scheduling snapshot so the scheduling view
           // reflects the updated prerequisite status on next render.
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          // Refetch flux jobs to get server-side auto-set date fields
+          // (e.g. batSentAt, paperOrderedAt) that the optimistic update can't predict.
+          dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
         } catch {
           patchResult.undo();
         }
