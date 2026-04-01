@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-  <!-- 45° diagonal stripes: dark purple overlay for light mode -->
-  <line x1="0" y1="28" x2="28" y2="0" stroke="rgba(30,14,42,0.06)" stroke-width="14"/>
-  <line x1="-14" y1="14" x2="14" y2="-14" stroke="rgba(30,14,42,0.06)" stroke-width="14"/>
-  <line x1="14" y1="42" x2="42" y2="14" stroke="rgba(30,14,42,0.06)" stroke-width="14"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 45° diagonal stripes: 5px wide, 34% dark purple opacity for light mode -->
+  <line x1="0" y1="16" x2="16" y2="0" stroke="rgba(30,14,42,0.34)" stroke-width="5"/>
+  <line x1="-8" y1="8" x2="8" y2="-8" stroke="rgba(30,14,42,0.34)" stroke-width="5"/>
+  <line x1="8" y1="24" x2="24" y2="8" stroke="rgba(30,14,42,0.34)" stroke-width="5"/>
 </svg>
