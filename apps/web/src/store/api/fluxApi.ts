@@ -208,6 +208,16 @@ export const fluxApi = createApi({
         body: { status },
       }),
       invalidatesTags: ['FluxJobs'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Cross-API invalidation: schedule snapshot uses task.status for outsourced tile state
+          const { scheduleApi } = await import('./scheduleApi');
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          // noop — no optimistic update to roll back
+        }
+      },
     }),
 
     /**

@@ -108,6 +108,15 @@ describe('getDotState', () => {
     };
     expect(getDotState(task, undefined)).toBe('scheduled');
   });
+
+  it('returns "completed" for outsourced task with Completed status (no assignment)', () => {
+    const task = {
+      ...createOutsourcedTask('task-1', 'job-1', 3),
+      status: 'Completed' as const,
+      manualReturn: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    };
+    expect(getDotState(task, undefined)).toBe('completed');
+  });
 });
 
 describe('ProgressDots component', () => {

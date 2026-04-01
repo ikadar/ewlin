@@ -35,17 +35,17 @@ export function getDotState(
   task: Task,
   assignment: TaskAssignment | undefined
 ): DotState {
-  if (!assignment) {
-    // Outsourced tasks with manual dates count as scheduled (or late if dates are past)
-    if (isOutsourcedTask(task) && (task.manualDeparture || task.manualReturn)) {
-      const dateToCheck = task.manualReturn || task.manualDeparture;
-      if (dateToCheck && new Date(dateToCheck) < new Date()) {
-        return 'late';
-      }
-      return 'scheduled';
-    }
-    return 'unscheduled';
+  // Outsourced tasks: use task.status (shared with Flux ST column)
+  if (isOutsourcedTask(task)) {
+    if (task.status === 'Completed') return 'completed';
+    const hasManualDates = task.manualDeparture || task.manualReturn;
+    if (!assignment && !hasManualDates) return 'unscheduled';
+    const dateToCheck = assignment?.scheduledEnd ?? task.manualReturn ?? task.manualDeparture;
+    if (dateToCheck && new Date(dateToCheck) < new Date()) return 'late';
+    return 'scheduled';
   }
+
+  if (!assignment) return 'unscheduled';
   if (assignment.isCompleted) return 'completed';
 
   const scheduledEnd = new Date(assignment.scheduledEnd);

@@ -3,6 +3,7 @@ import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, Outsourced
 import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
 import { useTooltipDelay } from '../../hooks';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
+import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -43,6 +44,8 @@ export interface TaskTileProps {
   isPinned?: boolean;
   /** Callback to toggle completion state */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback to toggle outsourced task done via task.status (shared with Flux ST column) */
+  onToggleOutsourcedDone?: (taskId: string) => void;
   /** Callback to toggle pin state */
   onTogglePin?: (assignmentId: string) => void;
   /** Callback when right-clicking a scheduled tile (context menu) */
@@ -118,6 +121,7 @@ export const TaskTile = memo(function TaskTile({
   isCompleted = false,
   isPinned = false,
   onToggleComplete,
+  onToggleOutsourcedDone,
   onTogglePin,
   onContextMenu,
 }: TaskTileProps) {
@@ -126,7 +130,7 @@ export const TaskTile = memo(function TaskTile({
     const style = TILE_STYLES[tileState];
     const handleOutsourcedToggleComplete = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (onToggleComplete && assignment) onToggleComplete(assignment.id);
+      if (onToggleOutsourcedDone) onToggleOutsourcedDone(task.id);
     };
     const handleOutsourcedTogglePin = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -137,18 +141,24 @@ export const TaskTile = memo(function TaskTile({
       if (onContextMenu && assignment) onContextMenu(e.clientX, e.clientY, assignment.id, isCompleted, isPinned);
     };
 
-    // Build inline header icons for the mini-form
+    // Build inline header icons for the mini-form — 3-state ST status (same as Flux column)
+    const stStatus = taskStatusToFluxST(task.status);
     const headerIcons = tileState !== 'unplaced' ? (
       <>
-        {assignment ? (
-          isCompleted ? (
-            <CircleCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
-          ) : (
-            <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
-          )
-        ) : (
-          <Circle className="w-3.5 h-3.5 text-zinc-700 shrink-0 cursor-default opacity-50" />
-        )}
+        <button
+          type="button"
+          className={`shrink-0 cursor-pointer transition-colors ${
+            stStatus === 'done' ? 'text-emerald-500 hover:text-emerald-400'
+            : stStatus === 'progress' ? 'text-amber-500 hover:text-amber-400'
+            : 'text-zinc-500 hover:text-zinc-400'
+          }`}
+          style={{ background: 'none', border: 'none', padding: 0 }}
+          onClick={handleOutsourcedToggleComplete}
+        >
+          {stStatus === 'done' && <DoneIcon />}
+          {stStatus === 'progress' && <ProgressIcon />}
+          {stStatus === 'pending' && <PendingIcon />}
+        </button>
         {assignment && (
           <Pin
             className={`w-3 h-3 shrink-0 cursor-pointer transition-colors ${isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`}

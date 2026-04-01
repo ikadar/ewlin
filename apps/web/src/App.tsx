@@ -23,14 +23,16 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
+import { useUpdateSTStatusMutation } from './store';
+import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
-import { applySwap, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
+import { applySwap, formatAutoSaveName, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
 import {
   PickStateProvider,
@@ -338,6 +340,7 @@ function AppContent() {
   const [togglePin] = useTogglePinMutation();
   const [batchSetPin] = useBatchSetPinMutation();
   const [updateOutsourcingDates] = useUpdateOutsourcingDatesMutation();
+  const [updateSTStatus] = useUpdateSTStatusMutation();
 
   const [splitTask] = useSplitTaskMutation();
   const [fuseTask] = useFuseTaskMutation();
@@ -348,6 +351,7 @@ function AppContent() {
   const [clearAllAssignments] = useClearAllAssignmentsMutation();
   const [autoPlaceJob] = useAutoPlaceJobMutation();
   const [autoPlaceJobAlap] = useAutoPlaceJobAlapMutation();
+  const [saveSchedule] = useSaveScheduleMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
@@ -1226,9 +1230,20 @@ function AppContent() {
     }
   }, [getClearableCount]);
 
+  // Auto-save schedule before any autoplace operation
+  const autoSaveBeforeAutoplace = useCallback(async () => {
+    try {
+      await saveSchedule({ name: formatAutoSaveName() }).unwrap();
+    } catch (error) {
+      console.warn('Auto-save before autoplace failed:', error);
+      showToast('Sauvegarde auto échouée — placement en cours', 'info');
+    }
+  }, [saveSchedule, showToast]);
+
   // Handle ASAP auto-placement for selected job (ALT+P S)
   const handleAsapPlacement = useCallback(async () => {
     if (!selectedJobId) return;
+    await autoSaveBeforeAutoplace();
     try {
       const result = await autoPlaceJob(selectedJobId).unwrap();
       if (result.placedCount === 0) {
@@ -1240,11 +1255,12 @@ function AppContent() {
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [selectedJobId, autoPlaceJob, showToast]);
+  }, [selectedJobId, autoPlaceJob, showToast, autoSaveBeforeAutoplace]);
 
   // Handle ALAP auto-placement for selected job (ALT+P L)
   const handleAlapPlacement = useCallback(async () => {
     if (!selectedJobId) return;
+    await autoSaveBeforeAutoplace();
     try {
       const result = await autoPlaceJobAlap(selectedJobId).unwrap();
       if (result.placedCount === 0) {
@@ -1256,12 +1272,13 @@ function AppContent() {
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [selectedJobId, autoPlaceJobAlap, showToast]);
+  }, [selectedJobId, autoPlaceJobAlap, showToast, autoSaveBeforeAutoplace]);
 
   // Handle global auto-place V1 (Ctrl+Alt+P)
-  const handleAutoPlaceAll = useCallback(() => {
+  const handleAutoPlaceAll = useCallback(async () => {
+    await autoSaveBeforeAutoplace();
     setIsAutoPlaceOpen(true);
-  }, []);
+  }, [autoSaveBeforeAutoplace]);
 
   const handleAutoPlaceComplete = useCallback(() => {
     // Refetch snapshot when auto-place finishes
@@ -1772,6 +1789,18 @@ function AppContent() {
       showToast(getErrorMessage(error));
     }
   }, [snapshot.assignments, toggleCompletion, showToast]);
+
+  // Handle outsourced task ST status cycle — same data as Flux ST column (pending → progress → done)
+  const handleToggleOutsourcedDone = useCallback(async (taskId: string) => {
+    const task = snapshot.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const newStatus = nextSTStatus(taskStatusToFluxST(task.status));
+    try {
+      await updateSTStatus({ taskId, status: newStatus }).unwrap();
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    }
+  }, [snapshot.tasks, updateSTStatus, showToast]);
 
   // v0.3.58: Handle context menu "Toggle completion" action
   const handleContextMenuToggleComplete = useCallback(() => {
@@ -2378,6 +2407,7 @@ function AppContent() {
           onDateClick={handleDateClick}
           onElementStatusChange={handleElementStatusChange}
           onToggleComplete={handleToggleComplete}
+          onToggleOutsourcedDone={handleToggleOutsourcedDone}
           onTogglePin={handleTogglePin}
           onDepartureChange={handleOutsourcingDepartureChange}
           onReturnChange={handleOutsourcingReturnChange}

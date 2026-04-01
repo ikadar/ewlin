@@ -33,6 +33,22 @@ export function formatDateDDMMYYYY(isoTimestamp: string | undefined): string | u
  * @param isoString - ISO timestamp string (e.g., "2026-01-15T10:30:00.000Z")
  * @returns Formatted string (e.g., "15/01 10:30") or undefined if input is undefined/invalid
  */
+const FRENCH_MONTHS = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+];
+
+export function formatAutoSaveName(date: Date = new Date()): string {
+  const day = date.getDate();
+  const dayStr = day === 1 ? '1er' : String(day);
+  const month = FRENCH_MONTHS[date.getMonth()];
+  const year = date.getFullYear();
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const s = String(date.getSeconds()).padStart(2, '0');
+  return `Sauvegarde auto — ${dayStr} ${month} ${year}, ${h}h${m}m${s}s`;
+}
+
 export function formatScheduleDateTime(isoString: string | undefined): string | undefined {
   if (!isoString) return undefined;
   try {

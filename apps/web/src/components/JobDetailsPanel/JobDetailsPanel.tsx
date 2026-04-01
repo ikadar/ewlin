@@ -49,6 +49,8 @@ export interface JobDetailsPanelProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Callback when completion icon is clicked (assignmentId) */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when outsourced task done circle is clicked (taskId) */
+  onToggleOutsourcedDone?: (taskId: string) => void;
   /** Callback when pin icon is clicked (assignmentId) */
   onTogglePin?: (assignmentId: string) => void;
   /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
@@ -119,6 +121,7 @@ export function JobDetailsPanel({
   onDateClick,
   onElementStatusChange,
   onToggleComplete,
+  onToggleOutsourcedDone,
   onTogglePin,
   onDepartureChange,
   onReturnChange,
@@ -332,6 +335,7 @@ export function JobDetailsPanel({
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
         onToggleComplete={onToggleComplete}
+        onToggleOutsourcedDone={onToggleOutsourcedDone}
         onTogglePin={onTogglePin}
         onContextMenu={handleTileContextMenu}
       />

@@ -46,6 +46,8 @@ export interface TaskListProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   /** Callback when completion icon is clicked (assignmentId) */
   onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when outsourced task done circle is clicked (taskId) */
+  onToggleOutsourcedDone?: (taskId: string) => void;
   /** Callback when pin icon is clicked (assignmentId) */
   onTogglePin?: (assignmentId: string) => void;
   /** Callback when right-clicking a scheduled tile (context menu) */
@@ -75,6 +77,7 @@ export function TaskList({
   onDepartureChange,
   onReturnChange,
   onToggleComplete,
+  onToggleOutsourcedDone,
   onTogglePin,
   onContextMenu,
 }: TaskListProps) {
@@ -223,7 +226,10 @@ export function TaskList({
 
       // Compute tile state for state-based coloring
       const isScheduled = !!assignment;
-      const isCompleted = assignment?.isCompleted ?? false;
+      // Outsourced tasks use task.status (shared with Flux ST column); internal use assignment
+      const isCompleted = task.type === 'Outsourced'
+        ? task.status === 'Completed'
+        : (assignment?.isCompleted ?? false);
       const isJobShipped = shippedJobIds?.has(job.id) ?? false;
       const isJobLate = lateJobIds?.has(job.id) ?? false;
       const isTaskOverdue = isScheduled && !isCompleted && new Date(assignment!.scheduledEnd) < new Date();
@@ -271,6 +277,7 @@ export function TaskList({
             isCompleted={isCompleted}
             isPinned={assignment?.isPinned ?? false}
             onToggleComplete={onToggleComplete}
+            onToggleOutsourcedDone={onToggleOutsourcedDone}
             onTogglePin={onTogglePin}
             onContextMenu={onContextMenu}
           />

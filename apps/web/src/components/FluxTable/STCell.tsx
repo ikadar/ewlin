@@ -14,19 +14,27 @@
 
 import { memo, useRef, useCallback } from 'react';
 import type { FluxOutsourcingTask, FluxSTStatus } from './fluxTypes';
+import type { TaskStatus } from '@flux/types';
 
 // ── ST status cycle ──────────────────────────────────────────────────────────
 
 const ST_CYCLE: FluxSTStatus[] = ['pending', 'progress', 'done'];
 
-function nextSTStatus(current: FluxSTStatus): FluxSTStatus {
+export function nextSTStatus(current: FluxSTStatus): FluxSTStatus {
   return ST_CYCLE[(ST_CYCLE.indexOf(current) + 1) % 3]!;
+}
+
+/** Map TaskStatus (schedule snapshot) to FluxSTStatus (mirrors FluxElementResponse::mapToFluxSTStatus). */
+export function taskStatusToFluxST(status: TaskStatus): FluxSTStatus {
+  if (status === 'Completed') return 'done';
+  if (status === 'Assigned') return 'progress';
+  return 'pending';
 }
 
 // ── SVG Icons ────────────────────────────────────────────────────────────────
 
 /** Pending: empty circle ○ */
-function PendingIcon() {
+export function PendingIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -42,7 +50,7 @@ function PendingIcon() {
 }
 
 /** Progress: circle with center dot ⊙ */
-function ProgressIcon() {
+export function ProgressIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -59,7 +67,7 @@ function ProgressIcon() {
 }
 
 /** Done: circle with checkmark ✓ (Lucide circle-check style) */
-function DoneIcon() {
+export function DoneIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
