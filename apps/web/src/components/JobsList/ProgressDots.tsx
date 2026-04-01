@@ -36,8 +36,12 @@ export function getDotState(
   assignment: TaskAssignment | undefined
 ): DotState {
   if (!assignment) {
-    // Outsourced tasks with manual dates count as scheduled
+    // Outsourced tasks with manual dates count as scheduled (or late if dates are past)
     if (isOutsourcedTask(task) && (task.manualDeparture || task.manualReturn)) {
+      const dateToCheck = task.manualReturn || task.manualDeparture;
+      if (dateToCheck && new Date(dateToCheck) < new Date()) {
+        return 'late';
+      }
       return 'scheduled';
     }
     return 'unscheduled';

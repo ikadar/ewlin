@@ -227,7 +227,13 @@ export function TaskList({
       const isJobShipped = shippedJobIds?.has(job.id) ?? false;
       const isJobLate = lateJobIds?.has(job.id) ?? false;
       const isTaskOverdue = isScheduled && !isCompleted && new Date(assignment!.scheduledEnd) < new Date();
-      const isLate = isJobLate || isTaskOverdue;
+      // Outsourced tasks with manual dates but no assignment: check manual return/departure
+      const isOutsourcedOverdue = !isScheduled && task.type === 'Outsourced' && (() => {
+        // One-way tasks (last task of job) use departure; others use return
+        const dateToCheck = isLastTask ? task.manualDeparture : (task.manualReturn ?? undefined);
+        return !!dateToCheck && new Date(dateToCheck) < new Date();
+      })();
+      const isLate = isJobLate || isTaskOverdue || isOutsourcedOverdue;
       const hasConflictFlag = conflictTaskIds?.has(task.id) ?? false;
 
       // Outsourced tasks with manual dates look "placed" even without a schedule assignment

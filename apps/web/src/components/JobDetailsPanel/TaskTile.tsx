@@ -137,27 +137,34 @@ export const TaskTile = memo(function TaskTile({
       if (onContextMenu && assignment) onContextMenu(e.clientX, e.clientY, assignment.id, isCompleted, isPinned);
     };
 
+    // Build inline header icons for the mini-form
+    const headerIcons = tileState !== 'unplaced' ? (
+      <>
+        {assignment ? (
+          isCompleted ? (
+            <CircleCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
+          ) : (
+            <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
+          )
+        ) : (
+          <Circle className="w-3.5 h-3.5 text-zinc-700 shrink-0 cursor-default opacity-50" />
+        )}
+        {assignment && (
+          <Pin
+            className={`w-3 h-3 shrink-0 cursor-pointer transition-colors ${isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`}
+            onClick={handleOutsourcedTogglePin}
+            title={isPinned ? 'Désépingler' : 'Épingler'}
+          />
+        )}
+      </>
+    ) : undefined;
+
     return (
       <div
         className={`rounded-[3px] ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''}`}
         style={{ borderLeftColor: style.borderColor }}
         onContextMenu={handleOutsourcedContextMenu}
       >
-        {/* Icons row: done + pin */}
-        {assignment && (
-          <div className="flex items-center gap-1 px-2 pt-1">
-            {isCompleted ? (
-              <CircleCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
-            ) : (
-              <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors" onClick={handleOutsourcedToggleComplete} />
-            )}
-            <Pin
-              className={`w-3 h-3 shrink-0 cursor-pointer transition-colors ${isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`}
-              onClick={handleOutsourcedTogglePin}
-              title={isPinned ? 'Désépingler' : 'Épingler'}
-            />
-          </div>
-        )}
         <OutsourcingMiniForm
           task={task as OutsourcedTask}
           provider={provider}
@@ -168,6 +175,7 @@ export const TaskTile = memo(function TaskTile({
           onDepartureChange={onDepartureChange}
           onReturnChange={onReturnChange}
           isPlaced={tileState !== 'unplaced'}
+          headerIcons={headerIcons}
         />
       </div>
     );

@@ -14,6 +14,8 @@ export interface OutsourcingMiniFormProps {
   onReturnChange?: (taskId: string, returnDate: Date | undefined) => void;
   isLastTaskOfJob?: boolean;
   isPlaced?: boolean;
+  /** Inline icons (circle, pin) rendered in the header row */
+  headerIcons?: React.ReactNode;
 }
 
 export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
@@ -25,6 +27,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   onReturnChange,
   isLastTaskOfJob,
   isPlaced = false,
+  headerIcons,
 }: OutsourcingMiniFormProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDep, setModalDep] = useState('');
@@ -115,7 +118,8 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
         data-testid={`outsourcing-mini-form-${task.id}`}
       >
         {/* Header */}
-        <div className="px-2 py-1 flex items-center gap-2" style={isPlaced ? undefined : { backgroundColor: `${jobColor}15` }}>
+        <div className="px-2 py-1 flex items-center gap-1.5" style={isPlaced ? undefined : { backgroundColor: `${jobColor}15` }}>
+          {headerIcons}
           <span className="font-medium truncate" style={{ color: jobColor }}>{task.actionType}</span>
         </div>
 

@@ -92,6 +92,22 @@ describe('getDotState', () => {
     const assignment = createAssignment('task-1', false, futureDate);
     expect(getDotState(task, assignment)).toBe('scheduled');
   });
+
+  it('returns "late" for outsourced task with past manualReturn and no assignment', () => {
+    const task = {
+      ...createOutsourcedTask('task-1', 'job-1', 3),
+      manualReturn: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    };
+    expect(getDotState(task, undefined)).toBe('late');
+  });
+
+  it('returns "scheduled" for outsourced task with future manualReturn and no assignment', () => {
+    const task = {
+      ...createOutsourcedTask('task-1', 'job-1', 3),
+      manualReturn: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+    expect(getDotState(task, undefined)).toBe('scheduled');
+  });
 });
 
 describe('ProgressDots component', () => {
