@@ -378,6 +378,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       if (conflict.type === 'GroupCapacityConflict' && conflict.taskId) {
         taskIds.add(conflict.taskId);
       }
+      // Availability conflicts (tile on unavailable period)
+      if (conflict.type === 'AvailabilityConflict' && conflict.taskId) {
+        taskIds.add(conflict.taskId);
+      }
     });
     return taskIds;
   }, [conflicts]);

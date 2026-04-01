@@ -14,10 +14,12 @@ import { validateAssignment } from '@flux/schedule-validator';
  * @param snapshot - The current schedule snapshot
  * @returns Array of all current precedence conflicts
  */
+const RECALCULATED_TYPES: Set<string> = new Set(['PrecedenceConflict', 'AvailabilityConflict']);
+
 export function recalculatePrecedenceConflicts(snapshot: ScheduleSnapshot): ScheduleConflict[] {
   const conflicts: ScheduleConflict[] = [];
 
-  // Validate each assignment for precedence conflicts
+  // Validate each assignment for precedence and availability conflicts
   for (const assignment of snapshot.assignments) {
     const proposedAssignment: ProposedAssignment = {
       taskId: assignment.taskId,
@@ -28,16 +30,16 @@ export function recalculatePrecedenceConflicts(snapshot: ScheduleSnapshot): Sche
     };
 
     const validationResult = validateAssignment(proposedAssignment, snapshot);
-    const precedenceConflicts = validationResult.conflicts.filter(
-      (c) => c.type === 'PrecedenceConflict'
+    const relevantConflicts = validationResult.conflicts.filter(
+      (c) => RECALCULATED_TYPES.has(c.type)
     );
-    conflicts.push(...precedenceConflicts);
+    conflicts.push(...relevantConflicts);
   }
 
-  // Deduplicate conflicts (same taskId + relatedTaskId combination)
+  // Deduplicate conflicts (same type + taskId + relatedTaskId combination)
   const seen = new Set<string>();
   return conflicts.filter((conflict) => {
-    const key = `${conflict.taskId}-${conflict.relatedTaskId ?? ''}`;
+    const key = `${conflict.type}-${conflict.taskId}-${conflict.relatedTaskId ?? ''}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -52,16 +54,16 @@ export function recalculatePrecedenceConflicts(snapshot: ScheduleSnapshot): Sche
  * @returns Updated snapshot with recalculated conflicts
  */
 export function updateSnapshotConflicts(snapshot: ScheduleSnapshot): ScheduleSnapshot {
-  // Keep non-precedence conflicts
-  const nonPrecedenceConflicts = snapshot.conflicts.filter(
-    (c) => c.type !== 'PrecedenceConflict'
+  // Keep conflicts that are not recalculated by us
+  const preservedConflicts = snapshot.conflicts.filter(
+    (c) => !RECALCULATED_TYPES.has(c.type)
   );
 
-  // Recalculate precedence conflicts
-  const precedenceConflicts = recalculatePrecedenceConflicts(snapshot);
+  // Recalculate precedence + availability conflicts
+  const recalculated = recalculatePrecedenceConflicts(snapshot);
 
   return {
     ...snapshot,
-    conflicts: [...nonPrecedenceConflicts, ...precedenceConflicts],
+    conflicts: [...preservedConflicts, ...recalculated],
   };
 }

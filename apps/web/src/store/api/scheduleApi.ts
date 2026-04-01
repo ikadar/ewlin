@@ -40,6 +40,7 @@ import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
 import { generateId } from '@/utils/generateId';
 import { applySplitToSnapshot, applyFuseToSnapshot } from '@/utils/splitFuse';
+import { updateSnapshotConflicts } from '@/utils/conflictRecalculation';
 
 /**
  * Response from getSavedSchedules query.
@@ -187,6 +188,8 @@ export const scheduleApi = createApi({
     getSnapshot: builder.query<SnapshotWithConfig, void>({
       query: () => '/schedule/snapshot',
       providesTags: ['Snapshot'],
+      transformResponse: (response: SnapshotWithConfig) =>
+        updateSnapshotConflicts(response) as SnapshotWithConfig,
     }),
 
     /**
