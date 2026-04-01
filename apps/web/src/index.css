@@ -440,6 +440,8 @@ html.light [data-testid="flux-station-indicator"][data-state="in-progress"] circ
 html.light [data-testid="flux-station-indicator"][data-state="late"] circle[stroke-opacity] { stroke-opacity: 0.3 !important; }
 html.light [data-testid="flux-station-indicator"][data-state="in-progress"] circle[fill-opacity],
 html.light [data-testid="flux-station-indicator"][data-state="late"] circle[fill-opacity] { fill-opacity: 0.9 !important; }
+/* Pinned cell background rect — stronger contrast in light mode */
+html.light [data-testid="flux-station-indicator"] rect { fill-opacity: 0.28 !important; }
 
 /* shadow-xl / shadow-lg — soften for light mode */
 html.light .shadow-xl { box-shadow: 0 8px 24px rgba(30,14,42,0.10) !important; }
