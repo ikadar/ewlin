@@ -1186,19 +1186,23 @@ const handleAutoPlace: MockRouteHandler = async (args: FetchArgs) => {
         scheduledEnd = calculateEndTime(task as InternalTask, p.scheduledStart, station);
       } else if (task && 'providerId' in task) {
         const outsourcedTask = task as OutsourcedTask;
-        const provider = snapshot.providers?.find(pr => pr.id === outsourcedTask.providerId);
-        if (provider) {
-          const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
-          const dates = calculateOutsourcingDates(p.scheduledStart, {
-            workDays: outsourcedTask.duration.openDays,
-            latestDepartureTime: provider.latestDepartureTime,
-            receptionTime: provider.receptionTime,
-            transitDays: provider.transitDays,
-            oneWay,
-          });
-          scheduledEnd = dates ? dates.return.toISOString() : p.scheduledStart;
+        if (outsourcedTask.manualReturn) {
+          scheduledEnd = outsourcedTask.manualReturn;
         } else {
-          scheduledEnd = p.scheduledStart;
+          const provider = snapshot.providers?.find(pr => pr.id === outsourcedTask.providerId);
+          if (provider) {
+            const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
+            const dates = calculateOutsourcingDates(p.scheduledStart, {
+              workDays: outsourcedTask.duration.openDays,
+              latestDepartureTime: provider.latestDepartureTime,
+              receptionTime: provider.receptionTime,
+              transitDays: provider.transitDays,
+              oneWay,
+            });
+            scheduledEnd = dates ? dates.return.toISOString() : p.scheduledStart;
+          } else {
+            scheduledEnd = p.scheduledStart;
+          }
         }
       } else {
         scheduledEnd = p.scheduledStart;
@@ -1219,26 +1223,8 @@ const handleAutoPlace: MockRouteHandler = async (args: FetchArgs) => {
       });
     }
 
-    // Also run auto-assign outsourced successors for each placed internal task
-    let finalAssignments = updatedAssignments;
-    for (const p of result.placements) {
-      if (!p.isOutsourced) {
-        const autoResult = autoAssignOutsourcedSuccessors(
-          { ...snapshot, assignments: finalAssignments },
-          p.taskId,
-          finalAssignments,
-        );
-        finalAssignments = [
-          ...finalAssignments.filter(
-            (a: TaskAssignment) => !autoResult.updatedAssignments.some(u => u.taskId === a.taskId)
-          ),
-          ...autoResult.newAssignments,
-          ...autoResult.updatedAssignments,
-        ];
-      }
-    }
-
-    return { ...snapshot, assignments: finalAssignments };
+    // All outsourced tasks are now dispatched directly — no autoAssignOutsourcedSuccessors needed
+    return { ...snapshot, assignments: updatedAssignments };
   });
 
   return { data: { placedCount: result.placements.length, computeMs } };
@@ -1284,19 +1270,23 @@ const handleAutoPlaceAlap: MockRouteHandler = async (args: FetchArgs) => {
         scheduledEnd = calculateEndTime(task as InternalTask, p.scheduledStart, station);
       } else if (task && 'providerId' in task) {
         const outsourcedTask = task as OutsourcedTask;
-        const provider = snapshot.providers?.find(pr => pr.id === outsourcedTask.providerId);
-        if (provider) {
-          const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
-          const dates = calculateOutsourcingDates(p.scheduledStart, {
-            workDays: outsourcedTask.duration.openDays,
-            latestDepartureTime: provider.latestDepartureTime,
-            receptionTime: provider.receptionTime,
-            transitDays: provider.transitDays,
-            oneWay,
-          });
-          scheduledEnd = dates ? dates.return.toISOString() : p.scheduledStart;
+        if (outsourcedTask.manualReturn) {
+          scheduledEnd = outsourcedTask.manualReturn;
         } else {
-          scheduledEnd = p.scheduledStart;
+          const provider = snapshot.providers?.find(pr => pr.id === outsourcedTask.providerId);
+          if (provider) {
+            const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
+            const dates = calculateOutsourcingDates(p.scheduledStart, {
+              workDays: outsourcedTask.duration.openDays,
+              latestDepartureTime: provider.latestDepartureTime,
+              receptionTime: provider.receptionTime,
+              transitDays: provider.transitDays,
+              oneWay,
+            });
+            scheduledEnd = dates ? dates.return.toISOString() : p.scheduledStart;
+          } else {
+            scheduledEnd = p.scheduledStart;
+          }
         }
       } else {
         scheduledEnd = p.scheduledStart;
@@ -1317,8 +1307,6 @@ const handleAutoPlaceAlap: MockRouteHandler = async (args: FetchArgs) => {
       });
     }
 
-    // ALAP places ALL outsourced tasks backward explicitly — no autoAssignSuccessors
-    // (which uses forward/ASAP logic and would create lateness).
     return { ...snapshot, assignments: updatedAssignments };
   });
 

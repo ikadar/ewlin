@@ -33,7 +33,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   const [modalDep, setModalDep] = useState('');
   const [modalRet, setModalRet] = useState('');
   // Convert ISO/Date to YYYY-MM-DDTHH:mm for native datetime-local
-  const toNative = (d: string | undefined, defaultTime: string): string => {
+  const toNative = (d: string | undefined): string => {
     if (!d) return '';
     const date = new Date(d);
     if (isNaN(date.getTime())) return '';
@@ -43,6 +43,16 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
     const hh = String(date.getHours()).padStart(2, '0');
     const min = String(date.getMinutes()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
+
+  // Build today's date at a given HH:MM time for default picker values
+  const toNativeWithDefaultTime = (time: string): string => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const [hh, min] = time.split(':');
+    return `${yyyy}-${mm}-${dd}T${(hh ?? '12').padStart(2, '0')}:${(min ?? '00').padStart(2, '0')}`;
   };
 
   const calculatedDates = useMemo(() => {
@@ -56,13 +66,10 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
     });
   }, [predecessorEndTime, provider, task.duration.openDays, isLastTaskOfJob]);
 
-  const handleClearDeparture = useCallback(() => {
+  const handleClearAllDates = useCallback(() => {
     onDepartureChange?.(task.id, undefined);
-  }, [task.id, onDepartureChange]);
-
-  const handleClearReturn = useCallback(() => {
     onReturnChange?.(task.id, undefined);
-  }, [task.id, onReturnChange]);
+  }, [task.id, onDepartureChange, onReturnChange]);
 
   const providerName = provider?.name ?? 'Unknown Provider';
   const hasManualDep = !!task.manualDeparture;
@@ -74,12 +81,16 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
     return formatOutsourcingDateTime(d);
   };
 
-  // Modal open: pre-fill with current manual values
+  // Modal open: pre-fill with manual dates → calculated dates → provider default times
   const openModal = useCallback(() => {
-    setModalDep(task.manualDeparture ? toNative(task.manualDeparture, provider?.latestDepartureTime ?? '14:00') : '');
-    setModalRet(task.manualReturn ? toNative(task.manualReturn, provider?.receptionTime ?? '10:00') : '');
+    const calcDep = calculatedDates?.departure ? toNative(calculatedDates.departure.toISOString()) : '';
+    const calcRet = calculatedDates?.return ? toNative(calculatedDates.return.toISOString()) : '';
+    const fallbackDep = calcDep || (provider ? toNativeWithDefaultTime(provider.latestDepartureTime) : '');
+    const fallbackRet = calcRet || (provider ? toNativeWithDefaultTime(provider.receptionTime) : '');
+    setModalDep(task.manualDeparture ? toNative(task.manualDeparture) : fallbackDep);
+    setModalRet(task.manualReturn ? toNative(task.manualReturn) : fallbackRet);
     setIsModalOpen(true);
-  }, [task.manualDeparture, task.manualReturn, provider]);
+  }, [task.manualDeparture, task.manualReturn, provider, calculatedDates]);
 
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
@@ -110,6 +121,9 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
     if (e.key === 'Escape') closeModal();
   }, [closeModal]);
 
+  // Validation: departure always required, return required for non-terminal
+  const canSave = modalDep !== '' && (isLastTaskOfJob || modalRet !== '');
+
   return (
     <>
       <div
@@ -131,14 +145,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
           <div className="flex items-center gap-1 text-xs leading-relaxed">
             <span className="text-zinc-500">Départ</span>
             {hasManualDep ? (
-              <>
-                <span className="font-mono text-zinc-100">{fmt(task.manualDeparture)}</span>
-                {onDepartureChange && (
-                  <button onClick={handleClearDeparture} className="text-zinc-600 hover:text-red-400 transition-colors leading-none" title="Supprimer">
-                    <X size={12} />
-                  </button>
-                )}
-              </>
+              <span className="font-mono text-zinc-100">{fmt(task.manualDeparture)}</span>
             ) : predecessorEndTime && calculatedDates?.departure ? (
               <span className="font-mono text-zinc-500">{fmt(calculatedDates.departure)}</span>
             ) : (
@@ -153,14 +160,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
             <div className="flex items-center gap-1 text-xs leading-relaxed">
               <span className="text-zinc-500">Retour</span>
               {hasManualRet ? (
-                <>
-                  <span className="font-mono text-zinc-100">{fmt(task.manualReturn)}</span>
-                  {onReturnChange && (
-                    <button onClick={handleClearReturn} className="text-zinc-600 hover:text-red-400 transition-colors leading-none" title="Supprimer">
-                      <X size={12} />
-                    </button>
-                  )}
-                </>
+                <span className="font-mono text-zinc-100">{fmt(task.manualReturn)}</span>
               ) : predecessorEndTime && calculatedDates?.return ? (
                 <span className="font-mono text-zinc-500">{fmt(calculatedDates.return)}</span>
               ) : (
@@ -171,12 +171,23 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
 
           {/* Link */}
           {(onDepartureChange || onReturnChange) && (
-            <button
-              onClick={openModal}
-              className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline mt-1 bg-transparent border-none cursor-pointer p-0"
-            >
-              {hasAnyManual ? 'Modifier les dates' : 'Saisir des dates manuelles'}
-            </button>
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                onClick={openModal}
+                className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-transparent border-none cursor-pointer p-0"
+              >
+                {hasAnyManual ? 'Modifier les dates' : 'Saisir des dates manuelles'}
+              </button>
+              {hasAnyManual && (
+                <button
+                  onClick={handleClearAllDates}
+                  className="text-zinc-600 hover:text-red-400 transition-colors leading-none"
+                  title="Supprimer toutes les dates manuelles"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -222,17 +233,18 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
                 />
               </div>
 
-              {!isLastTaskOfJob && (
-                <div>
-                  <label className="text-xs text-zinc-400 block mb-1">Retour manuel</label>
-                  <input
-                    type="datetime-local"
-                    value={modalRet}
-                    onChange={e => setModalRet(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm font-mono bg-zinc-800 border border-zinc-700 rounded text-zinc-100 focus:outline-none focus:border-blue-500 [color-scheme:dark]"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">
+                  Retour manuel{isLastTaskOfJob && <span className="text-zinc-600 italic"> (Aller simple)</span>}
+                </label>
+                <input
+                  type="datetime-local"
+                  value={isLastTaskOfJob ? '' : modalRet}
+                  onChange={e => setModalRet(e.target.value)}
+                  disabled={isLastTaskOfJob}
+                  className="w-full px-2 py-1.5 text-sm font-mono bg-zinc-800 border border-zinc-700 rounded text-zinc-100 focus:outline-none focus:border-blue-500 [color-scheme:dark] disabled:opacity-40 disabled:cursor-not-allowed"
+                />
+              </div>
             </div>
 
             {/* Actions */}
@@ -245,7 +257,8 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
               </button>
               <button
                 onClick={handleModalSave}
-                className="px-3 py-1.5 rounded text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                disabled={!canSave}
+                className="px-3 py-1.5 rounded text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
               >
                 Enregistrer
               </button>

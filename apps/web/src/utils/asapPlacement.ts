@@ -25,9 +25,6 @@ export function computeAsapPlacements(
   const jobElements = snapshot.elements.filter(e => e.jobId === jobId);
   const jobTasks = snapshot.tasks.filter(t => jobElements.some(e => e.id === t.elementId));
 
-  // Build element map for quick lookups
-  const elementMap = new Map<string, Element>(jobElements.map(e => [e.id, e]));
-
   // Topological sort of elements using Kahn's algorithm
   const sortedElements = topologicalSortElements(jobElements);
 
@@ -67,15 +64,8 @@ export function computeAsapPlacements(
     } else {
       const placement = placeOutsourcedTask(task, workingSnapshot, now);
       if (placement) {
-        // Always add to working snapshot so downstream tasks see correct precedence
+        placements.push(placement);
         addSyntheticAssignment(workingSnapshot, placement);
-
-        // Dispatch decision: only dispatch root-element outsourced tasks
-        const element = elementMap.get(task.elementId);
-        if (element && element.prerequisiteElementIds.length === 0) {
-          placements.push(placement);
-        }
-        // Tasks with prerequisites: backend autoAssignOutsourcedSuccessors handles them
       } else {
         skippedCount++;
       }
@@ -166,6 +156,16 @@ function placeOutsourcedTask(
   const provider = snapshot.providers?.find(p => p.id === task.providerId);
   if (!provider) return null;
 
+  // Honor manual dates if set
+  if (task.manualDeparture) {
+    return {
+      taskId: task.id,
+      targetId: task.providerId,
+      isOutsourced: true,
+      scheduledStart: task.manualDeparture,
+    };
+  }
+
   // Get precedence floor from working snapshot
   const proposed = { taskId: task.id, targetId: task.providerId, isOutsourced: true, scheduledStart: now };
   const precedenceFloor = getSuggestedStartForPrecedence(proposed, snapshot);
@@ -242,21 +242,25 @@ function addSyntheticAssignment(
     const station = snapshot.stations.find(s => s.id === placement.targetId);
     scheduledEnd = calculateEndTime(task, placement.scheduledStart, station);
   } else if (task && !isInternalTask(task)) {
-    // Outsourced: find provider and calculate return date
+    // Outsourced: use manualReturn if set, otherwise calculate return date
     const outsourcedTask = task as OutsourcedTask;
-    const provider = snapshot.providers?.find(p => p.id === outsourcedTask.providerId);
-    if (provider) {
-      const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
-      const dates = calculateOutsourcingDates(placement.scheduledStart, {
-        workDays: outsourcedTask.duration.openDays,
-        latestDepartureTime: provider.latestDepartureTime,
-        receptionTime: provider.receptionTime,
-        transitDays: provider.transitDays,
-        oneWay,
-      });
-      scheduledEnd = dates ? dates.return.toISOString() : placement.scheduledStart;
+    if (outsourcedTask.manualReturn) {
+      scheduledEnd = outsourcedTask.manualReturn;
     } else {
-      scheduledEnd = placement.scheduledStart;
+      const provider = snapshot.providers?.find(p => p.id === outsourcedTask.providerId);
+      if (provider) {
+        const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
+        const dates = calculateOutsourcingDates(placement.scheduledStart, {
+          workDays: outsourcedTask.duration.openDays,
+          latestDepartureTime: provider.latestDepartureTime,
+          receptionTime: provider.receptionTime,
+          transitDays: provider.transitDays,
+          oneWay,
+        });
+        scheduledEnd = dates ? dates.return.toISOString() : placement.scheduledStart;
+      } else {
+        scheduledEnd = placement.scheduledStart;
+      }
     }
   } else {
     scheduledEnd = placement.scheduledStart;

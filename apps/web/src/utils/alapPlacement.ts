@@ -152,13 +152,25 @@ function placeOutsourcedTaskAlap(
   const provider = snapshot.providers?.find(p => p.id === task.providerId);
   if (!provider) return null;
 
+  // Honor manual departure if set
+  if (task.manualDeparture) {
+    return {
+      taskId: task.id,
+      targetId: task.providerId,
+      isOutsourced: true,
+      scheduledStart: task.manualDeparture,
+    };
+  }
+
   const precedenceCeiling = getSuggestedEndForPrecedenceCeiling(task, snapshot);
-  const effectiveCeiling = precedenceCeiling
+
+  // If manualReturn is set, use it as the ceiling for backward calculation
+  const returnCeiling = task.manualReturn ?? (precedenceCeiling
     ? earlierOf(precedenceCeiling, ceiling)
-    : ceiling;
+    : ceiling);
 
   const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
-  const dates = calculateOutsourcingDatesBackward(effectiveCeiling, {
+  const dates = calculateOutsourcingDatesBackward(returnCeiling, {
     workDays: task.duration.openDays,
     latestDepartureTime: provider.latestDepartureTime,
     receptionTime: provider.receptionTime,
@@ -338,19 +350,23 @@ function addSyntheticAssignment(
     scheduledEnd = calculateEndTime(task, placement.scheduledStart, station);
   } else if (task && !isInternalTask(task)) {
     const outsourcedTask = task as OutsourcedTask;
-    const provider = snapshot.providers?.find(p => p.id === outsourcedTask.providerId);
-    if (provider) {
-      const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
-      const dates = calculateOutsourcingDates(placement.scheduledStart, {
-        workDays: outsourcedTask.duration.openDays,
-        latestDepartureTime: provider.latestDepartureTime,
-        receptionTime: provider.receptionTime,
-        transitDays: provider.transitDays,
-        oneWay,
-      });
-      scheduledEnd = dates ? dates.return.toISOString() : placement.scheduledStart;
+    if (outsourcedTask.manualReturn) {
+      scheduledEnd = outsourcedTask.manualReturn;
     } else {
-      scheduledEnd = placement.scheduledStart;
+      const provider = snapshot.providers?.find(p => p.id === outsourcedTask.providerId);
+      if (provider) {
+        const oneWay = isLastTaskOfJob(task.id, snapshot.elements, snapshot.tasks);
+        const dates = calculateOutsourcingDates(placement.scheduledStart, {
+          workDays: outsourcedTask.duration.openDays,
+          latestDepartureTime: provider.latestDepartureTime,
+          receptionTime: provider.receptionTime,
+          transitDays: provider.transitDays,
+          oneWay,
+        });
+        scheduledEnd = dates ? dates.return.toISOString() : placement.scheduledStart;
+      } else {
+        scheduledEnd = placement.scheduledStart;
+      }
     }
   } else {
     scheduledEnd = placement.scheduledStart;

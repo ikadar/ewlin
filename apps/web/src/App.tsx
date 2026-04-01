@@ -47,9 +47,11 @@ import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
+import { getLayoutDimensions, getStationXOffset } from './utils/gridLayout';
 import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
 import { FluxPage } from './pages/FluxPage';
 import { SplitTaskPopover } from './components/SplitTaskPopover';
+import { Minimap } from './components/Minimap';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -82,50 +84,7 @@ const DAY_COUNT = 365;
  *
  * @returns Object with computed pixel values for layout dimensions
  */
-function getLayoutDimensions(): {
-  stationWidth: number;  // w-60 = 15rem
-  gap: number;           // gap-3 = 0.75rem
-  paddingLeft: number;   // px-3 = 0.75rem
-  timelineWidth: number; // w-12 = 3rem
-} {
-  // Get root font-size (defaults to 16px in browsers, 13px in our app)
-  const rootFontSize = typeof window !== 'undefined'
-    ? parseFloat(getComputedStyle(document.documentElement).fontSize)
-    : 13; // SSR fallback
-
-  return {
-    stationWidth: 15 * rootFontSize,    // w-60 = 15rem
-    gap: 0.75 * rootFontSize,           // gap-3 = 0.75rem
-    paddingLeft: 0.75 * rootFontSize,   // px-3 = 0.75rem
-    timelineWidth: 3 * rootFontSize,    // w-12 = 3rem
-  };
-}
-
-// ============================================================================
-// v1: Tirage display mode — variable column width support
-// ============================================================================
-
-/**
- * Calculate a station's X offset and width, accounting for variable column widths.
- * Uses getLayoutDimensions().stationWidth as the default (w-60 = 15rem, font-size-aware).
- * Column width is mode-independent: applies in both Produit and Tirage modes.
- */
-function getStationXOffset(
-  stationIndex: number,
-  stations: import('@flux/types').Station[],
-  catMap: Map<string, import('@flux/types').StationCategory>,
-): { x: number; stationWidth: number } {
-  const { gap, paddingLeft, stationWidth: defaultWidth } = getLayoutDimensions();
-  let x = paddingLeft;
-  for (let i = 0; i < stationIndex; i++) {
-    const cat = catMap.get(stations[i].categoryId);
-    const w = cat?.columnWidth ?? (cat ? getDefaultCategoryWidth(cat.name) : null) ?? defaultWidth;
-    x += w + gap;
-  }
-  const targetCat = catMap.get(stations[stationIndex].categoryId);
-  const stationWidth = targetCat?.columnWidth ?? (targetCat ? getDefaultCategoryWidth(targetCat.name) : null) ?? defaultWidth;
-  return { x, stationWidth };
-}
+// getLayoutDimensions and getStationXOffset imported from ./utils/gridLayout
 
 // ============================================================================
 // Keyboard shortcut handlers (extracted to reduce cognitive complexity S3776)
@@ -491,6 +450,18 @@ function AppContent() {
 
   // Sidebar visibility toggle (Alt+B)
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+
+  // Minimap visibility toggle (Alt+M), persisted
+  const [isMinimapVisible, setIsMinimapVisible] = useState(() =>
+    localStorage.getItem('flux-minimap-visible') !== 'false'
+  );
+  useEffect(() => {
+    localStorage.setItem('flux-minimap-visible', String(isMinimapVisible));
+  }, [isMinimapVisible]);
+
+  // Minimap needs scroll positions as state for re-render
+  const [gridScrollTop, setGridScrollTop] = useState(0);
+  const [gridScrollLeft, setGridScrollLeft] = useState(0);
 
   // v0.4.33: Save job via API (v0.5.4: migrated to RTK Query mutation)
   // v0.5.13b: Supports both create and update modes
@@ -1013,9 +984,11 @@ function AppContent() {
 
   // REQ-09.2: Handle grid scroll to calculate focused date
   // v0.3.47: Also calculate viewport hours for DateStrip indicator
-  const handleGridScroll = useCallback((scrollTop: number) => {
+  const handleGridScroll = useCallback((scrollTop: number, scrollLeft: number) => {
     // Store scrollTop for recalculation on zoom change
     lastScrollTopRef.current = scrollTop;
+    setGridScrollTop(scrollTop);
+    setGridScrollLeft(scrollLeft);
 
     // Debounce: cancel previous timeout and set new one
     if (scrollTimeoutRef.current !== null) {
@@ -1362,6 +1335,13 @@ function AppContent() {
         return;
       }
 
+      // Alt+M: toggle minimap visibility
+      if (isAltLetter(e, 'm')) {
+        e.preventDefault();
+        setIsMinimapVisible(prev => !prev);
+        return;
+      }
+
       // Ctrl+Plus: zoom in
       if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
         e.preventDefault();
@@ -1671,12 +1651,12 @@ function AppContent() {
       }).unwrap();
     } catch { /* ignore */ }
 
-    // Auto-pin/unpin coupling
+    // Auto-pin/unpin coupling — clearing departure always unpins (dates are cleared together)
     const assignment = snapshot.assignments.find((a) => a.taskId === taskId);
     if (assignment) {
       if (departure && !assignment.isPinned) {
         try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
-      } else if (!departure && !task.manualReturn && assignment.isPinned) {
+      } else if (!departure && assignment.isPinned) {
         try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
       }
     }
@@ -1726,12 +1706,12 @@ function AppContent() {
       }).unwrap();
     } catch { /* ignore */ }
 
-    // Auto-pin/unpin coupling
+    // Auto-pin/unpin coupling — clearing return always unpins (dates are cleared together)
     const assignment = snapshot.assignments.find((a) => a.taskId === taskId);
     if (assignment) {
       if (returnDate && !assignment.isPinned) {
         try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
-      } else if (!returnDate && !task.manualDeparture && assignment.isPinned) {
+      } else if (!returnDate && assignment.isPinned) {
         try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
       }
     }
@@ -1819,26 +1799,39 @@ function AppContent() {
     try {
       await togglePin(assignment.taskId).unwrap();
 
-      // If unpinning an outsourced task with manual dates → clear them
+      // If unpinning an outsourced task → clear manual dates, persist, and unassign
       if (assignment.isPinned) {
         const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
-        if (task?.type === 'Outsourced' && (task.manualDeparture || task.manualReturn)) {
-          updateSnapshot((s) => {
-            const idx = s.tasks.findIndex((t) => t.id === assignment.taskId);
-            if (idx === -1) return s;
-            const t = s.tasks[idx];
-            if (t.type !== 'Outsourced') return s;
-            const newTasks = [...s.tasks];
-            newTasks[idx] = { ...t, manualDeparture: undefined, manualReturn: undefined, updatedAt: new Date().toISOString() };
-            return { ...s, tasks: newTasks };
-          });
-          invalidateSnapshot();
+        if (task?.type === 'Outsourced') {
+          if (task.manualDeparture || task.manualReturn) {
+            updateSnapshot((s) => {
+              const idx = s.tasks.findIndex((t) => t.id === assignment.taskId);
+              if (idx === -1) return s;
+              const t = s.tasks[idx];
+              if (t.type !== 'Outsourced') return s;
+              const newTasks = [...s.tasks];
+              newTasks[idx] = { ...t, manualDeparture: undefined, manualReturn: undefined, updatedAt: new Date().toISOString() };
+              return { ...s, tasks: newTasks };
+            });
+            invalidateSnapshot();
+            try {
+              await updateOutsourcingDates({
+                taskId: assignment.taskId,
+                manualDeparture: null,
+                manualReturn: null,
+              }).unwrap();
+            } catch { /* ignore */ }
+          }
+          // Unassign outsourced task so tile goes back to unplaced
+          try {
+            await unassignTask(assignment.taskId).unwrap();
+          } catch { /* ignore */ }
         }
       }
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [snapshot.assignments, snapshot.tasks, togglePin, showToast, invalidateSnapshot]);
+  }, [snapshot.assignments, snapshot.tasks, togglePin, unassignTask, updateOutsourcingDates, showToast, invalidateSnapshot]);
 
   // Handle context menu "Toggle pin" action
   const handleContextMenuTogglePin = useCallback(() => {
@@ -2305,6 +2298,9 @@ function AppContent() {
     onToggleSidebar: useCallback(() => {
       setIsSidebarVisible(prev => !prev);
     }, []),
+    onToggleMinimap: useCallback(() => {
+      setIsMinimapVisible(prev => !prev);
+    }, []),
     onSmartCompact: handleSmartCompact,
     onEvaluateSchedule: useCallback(() => setIsEvaluationOpen(true), []),
     onZoomIn: useCallback(() => {
@@ -2475,6 +2471,28 @@ function AppContent() {
           lateJobIds={lateJobIds}
           shippedJobIds={shippedJobIds}
         />
+        {isMinimapVisible && (
+          <Minimap
+            stations={snapshot.stations}
+            categories={snapshot.categories}
+            assignments={snapshot.assignments}
+            elements={snapshot.elements}
+            jobs={snapshot.jobs}
+            tasks={snapshot.tasks}
+            totalDays={DAY_COUNT}
+            pixelsPerHour={pixelsPerHour}
+            startDate={gridStartDate}
+            startHour={START_HOUR}
+            selectedJobId={deferredSelectedJobId}
+            lateJobIds={lateJobIds}
+            shippedJobIds={shippedJobIds}
+            conflicts={snapshot.conflicts}
+            gridRef={gridRef}
+            scrollTop={gridScrollTop}
+            scrollLeft={gridScrollLeft}
+            theme={theme}
+          />
+        )}
           </div>
           </div>
           </div>
