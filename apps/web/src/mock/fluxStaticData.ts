@@ -20,6 +20,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
   {
     id: '00042',
     client: 'Ducros',
+    referent: null,
     designation: 'Brochure A4 16p Couché Satin',
     sortie: '28/02',
     elements: [
@@ -52,12 +53,14 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
     transporteur: 'Chronopost',
     batDeadline: null,
     parti: { shipped: true, date: '25/02' },
+    facture: { invoiced: true, date: '26/02' },
   },
 
   // ── 00078: Müller AG — 3 elements, all blocking, not shipped ─────────────
   {
     id: '00078',
     client: 'Müller AG',
+    referent: null,
     designation: 'Étiquettes adhésives 500ex',
     sortie: '05/03',
     elements: [
@@ -112,12 +115,14 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
     transporteur: null,
     batDeadline: null,
     parti: { shipped: false, date: null },
+    facture: { invoiced: false, date: null },
   },
 
   // ── 00091: Lefevre & Fils — 2 elements, DHL, not shipped ─────────────────
   {
     id: '00091',
     client: 'Lefevre & Fils',
+    referent: null,
     designation: 'Boîtes carton 350g recto-verso',
     sortie: '03/03',
     elements: [
@@ -157,12 +162,14 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
     transporteur: 'DHL',
     batDeadline: null,
     parti: { shipped: false, date: null },
+    facture: { invoiced: false, date: null },
   },
 
   // ── 00103: Pharma Plus — 1 element, in progress ───────────────────────────
   {
     id: '00103',
     client: 'Pharma Plus',
+    referent: null,
     designation: 'Notice pliée 6 volets 90g',
     sortie: '01/03',
     elements: [
@@ -193,12 +200,14 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
     transporteur: 'TNT',
     batDeadline: null,
     parti: { shipped: false, date: null },
+    facture: { invoiced: false, date: null },
   },
 
   // ── 00117: Editions Vega — 1 element, late offset, shipped ───────────────
   {
     id: '00117',
     client: 'Editions Vega',
+    referent: null,
     designation: 'Réimpression catalogue 2025',
     sortie: '27/02',
     elements: [
@@ -226,5 +235,6 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
     transporteur: 'GLS',
     batDeadline: null,
     parti: { shipped: true, date: '26/02' },
+    facture: { invoiced: false, date: null },
   },
 ];

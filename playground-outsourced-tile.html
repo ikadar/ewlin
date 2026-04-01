@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tuile sous-traitance — Job Details Panel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e4e4e7; font-size: 13px; height: 100vh; display: flex; }
+
+  .controls { width: 260px; flex-shrink: 0; background: #18181b; border-right: 1px solid #27272a; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .controls h1 { font-size: 14px; font-weight: 600; color: #a1a1aa; line-height: 1.3; }
+  .control-label { font-size: 10px; font-weight: 600; color: #52525b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .toggle-row label { font-size: 12px; color: #a1a1aa; cursor: pointer; }
+  .toggle-row input { accent-color: #3b82f6; }
+
+  .preview { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 40px 24px; overflow: auto; gap: 20px; }
+  .panel { width: 320px; background: #111113; border: 1px solid #27272a; border-radius: 6px; overflow: hidden; }
+  .panel-header { padding: 10px 12px; border-bottom: 1px solid #27272a; font-size: 12px; color: #71717a; }
+
+  .tile { border-left: 4px solid; font-size: 13px; }
+  .tile-header { padding: 5px 10px; display: flex; align-items: center; gap: 6px; }
+  .tile-action { font-weight: 500; font-size: 12px; }
+  .tile-body { padding: 4px 10px 8px; }
+  .tile-provider { font-size: 11px; color: #71717a; margin-bottom: 6px; }
+
+  .date-line { display: flex; align-items: center; gap: 0; font-size: 11px; line-height: 1.6; }
+  .date-label { color: #71717a; }
+  .date-calc { color: #71717a; font-family: 'SF Mono','Menlo',monospace; }
+  .date-manual { color: #e4e4e7; font-family: 'SF Mono','Menlo',monospace; }
+  .date-clear { color: #52525b; cursor: pointer; font-size: 12px; margin-left: 4px; line-height: 1; }
+  .date-clear:hover { color: #f87171; }
+  .date-not-calc { color: #52525b; font-style: italic; }
+
+  .dates-link { font-size: 11px; color: #6366f1; cursor: pointer; margin-top: 5px; display: inline-block; }
+  .dates-link:hover { color: #818cf8; text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Tuile sous-traitance</h1>
+
+  <div>
+    <div class="control-label">Prédécesseur</div>
+    <div class="toggle-row">
+      <input type="checkbox" id="predPlaced" checked onchange="render()">
+      <label for="predPlaced">Prédécesseur placé</label>
+    </div>
+  </div>
+
+  <div>
+    <div class="control-label">Position dans le job</div>
+    <div class="toggle-row">
+      <input type="checkbox" id="isTerminal" onchange="render()">
+      <label for="isTerminal">Dernière tâche (aller simple)</label>
+    </div>
+  </div>
+
+  <div>
+    <div class="control-label">Dates manuelles</div>
+    <div class="toggle-row">
+      <input type="checkbox" id="manualDep" onchange="render()">
+      <label for="manualDep">Départ manuel</label>
+    </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="manualRet" onchange="render()">
+      <label for="manualRet">Retour manuel</label>
+    </div>
+  </div>
+</div>
+
+<div class="preview">
+  <div class="panel">
+    <div class="panel-header">Sous-traitance — 00042 Ducros</div>
+    <div id="tile"></div>
+  </div>
+</div>
+
+<script>
+const JOB_COLOR = '#3b82f6';
+const CALC_DEP = '15/04 14:00';
+const CALC_RET = '22/04 10:00';
+const MAN_DEP = '17/04 08:00';
+const MAN_RET = '25/04 10:00';
+
+function render() {
+  const predPlaced = document.getElementById('predPlaced').checked;
+  const isTerminal = document.getElementById('isTerminal').checked;
+  const manualDep = document.getElementById('manualDep').checked;
+  const manualRet = document.getElementById('manualRet').checked;
+
+  let datesHtml = '';
+
+  // --- Departure line ---
+  if (manualDep) {
+    datesHtml += `<div class="date-line">
+      <span class="date-label">Départ&nbsp;</span>
+      <span class="date-manual">${MAN_DEP}</span>
+      <span class="date-clear" title="Supprimer" onclick="document.getElementById('manualDep').checked=false;render()">✕</span>
+    </div>`;
+  } else if (predPlaced) {
+    datesHtml += `<div class="date-line">
+      <span class="date-label">Départ&nbsp;</span>
+      <span class="date-calc">${CALC_DEP}</span>
+    </div>`;
+  } else {
+    datesHtml += `<div class="date-line">
+      <span class="date-label">Départ&nbsp;</span>
+      <span class="date-not-calc">non calculable</span>
+    </div>`;
+  }
+
+  // --- Return line (unless terminal) ---
+  if (!isTerminal) {
+    if (manualRet) {
+      datesHtml += `<div class="date-line">
+        <span class="date-label">Retour&nbsp;</span>
+        <span class="date-manual">${MAN_RET}</span>
+        <span class="date-clear" title="Supprimer" onclick="document.getElementById('manualRet').checked=false;render()">✕</span>
+      </div>`;
+    } else if (predPlaced) {
+      datesHtml += `<div class="date-line">
+        <span class="date-label">Retour&nbsp;</span>
+        <span class="date-calc">${CALC_RET}</span>
+      </div>`;
+    } else {
+      datesHtml += `<div class="date-line">
+        <span class="date-label">Retour&nbsp;</span>
+        <span class="date-not-calc">non calculable</span>
+      </div>`;
+    }
+  } else {
+    datesHtml += `<div class="date-line">
+      <span class="date-label" style="font-style:italic">Aller simple</span>
+    </div>`;
+  }
+
+  // --- Link ---
+  const hasAnyManual = manualDep || (manualRet && !isTerminal);
+  const linkText = hasAnyManual ? 'Modifier les dates' : 'Saisir des dates manuelles';
+  datesHtml += `<a class="dates-link">${linkText}</a>`;
+
+  document.getElementById('tile').innerHTML = `<div class="tile" style="border-left-color:${JOB_COLOR}">
+    <div class="tile-header" style="background:${JOB_COLOR}15">
+      <span class="tile-action" style="color:${JOB_COLOR}">Pelliculage mat</span>
+    </div>
+    <div class="tile-body">
+      <div class="tile-provider">Faco 37 · 3 JO</div>
+      ${datesHtml}
+    </div>
+  </div>`;
+}
+
+render();
+</script>
+</body>
+</html>

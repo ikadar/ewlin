@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Station Schedule Editor — Playground</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: #0f0f0f;
+    --flux-surface: #1a1a1a;
+    --flux-elevated: #242424;
+    --flux-hover: #2c2c2c;
+    --flux-active: #333333;
+    --flux-border: #2a2a2a;
+    --flux-border-light: #3a3a3a;
+    --flux-text-primary: #f0f0f0;
+    --flux-text-secondary: #a0a0a0;
+    --flux-text-tertiary: #707070;
+    --flux-text-muted: #505050;
+    --blue-500: #3b82f6;
+    --blue-600: #2563eb;
+    --blue-400: #60a5fa;
+    --red-400: #f87171;
+    --red-500: #ef4444;
+    --emerald-400: #34d399;
+    --amber-400: #fbbf24;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .playground-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  .controls-panel {
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    padding: 20px;
+    overflow-y: auto;
+    max-height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+
+  .preview-area {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .preview-main {
+    flex: 1;
+    padding: 32px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .preview-container {
+    width: 100%;
+    max-width: 720px;
+  }
+
+  /* ── Controls ── */
+  .control-group {
+    margin-bottom: 20px;
+  }
+  .control-group h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--flux-text-tertiary);
+    margin-bottom: 10px;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .control-row label {
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    flex: 1;
+  }
+
+  .preset-btn {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 6px;
+    color: var(--flux-text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+    border-color: var(--blue-500);
+  }
+  .preset-btn.active {
+    border-color: var(--blue-500);
+    color: var(--flux-text-primary);
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  /* ── Toggle Switch ── */
+  .toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--flux-border-light);
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    border: none;
+  }
+  .toggle.on { background: var(--blue-500); }
+  .toggle .knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.2s;
+  }
+  .toggle.on .knob { transform: translateX(16px); }
+
+  /* ── Segmented Control ── */
+  .segmented {
+    display: inline-flex;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--flux-border-light);
+  }
+  .seg-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: none;
+    cursor: pointer;
+    background: var(--flux-base);
+    color: var(--flux-text-tertiary);
+    transition: all 0.15s;
+  }
+  .seg-btn.active {
+    background: var(--blue-600);
+    color: white;
+  }
+  .seg-btn:not(.active):hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-secondary);
+  }
+
+  /* ── Schedule Editor ── */
+  .editor-section {
+    margin-bottom: 24px;
+  }
+  .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .editor-label {
+    font-size: 14px;
+    color: var(--flux-text-secondary);
+  }
+
+  .schedule-container {
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  /* Day row */
+  .day-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .day-row:last-child { border-bottom: none; }
+  .day-label {
+    width: 80px;
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    flex-shrink: 0;
+  }
+  .day-row .toggle { flex-shrink: 0; }
+
+  .slots-area {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+  }
+
+  .closed-label {
+    font-size: 12px;
+    color: var(--flux-text-muted);
+    font-style: italic;
+  }
+
+  /* Time slot */
+  .time-slot {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 6px;
+    padding: 3px 6px;
+  }
+  .time-slot input[type="time"] {
+    background: transparent;
+    border: none;
+    color: var(--flux-text-primary);
+    font-size: 13px;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+    width: 80px;
+    outline: none;
+  }
+  .time-slot input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.6);
+    cursor: pointer;
+  }
+  .time-sep {
+    color: var(--flux-text-tertiary);
+    font-size: 12px;
+  }
+  .slot-remove {
+    background: none;
+    border: none;
+    color: var(--flux-text-tertiary);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+  }
+  .slot-remove:hover { color: var(--red-400); }
+
+  .add-slot-btn {
+    background: none;
+    border: 1px dashed var(--flux-border-light);
+    color: var(--flux-text-tertiary);
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    transition: all 0.15s;
+  }
+  .add-slot-btn:hover {
+    border-color: var(--flux-text-tertiary);
+    color: var(--flux-text-secondary);
+  }
+
+  .copy-weekdays-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    background: none;
+    border: 1px solid var(--flux-border);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-weekdays-btn:hover {
+    color: var(--flux-text-secondary);
+    border-color: var(--flux-border-light);
+  }
+
+  /* ── Exceptions ── */
+  .exception-card {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+  .exception-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .exception-card input[type="date"] {
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 5px;
+    color: var(--flux-text-primary);
+    font-size: 13px;
+    padding: 4px 8px;
+    outline: none;
+  }
+  .exception-card input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.6);
+    cursor: pointer;
+  }
+  .exception-card select {
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 5px;
+    color: var(--flux-text-primary);
+    font-size: 13px;
+    padding: 4px 8px;
+    outline: none;
+  }
+  .exception-card input[type="text"] {
+    flex: 1;
+    min-width: 120px;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 5px;
+    color: var(--flux-text-primary);
+    font-size: 13px;
+    padding: 4px 8px;
+    outline: none;
+  }
+  .exception-card input[type="text"]::placeholder {
+    color: var(--flux-text-muted);
+  }
+  .exception-remove {
+    background: none;
+    border: none;
+    color: var(--flux-text-tertiary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+  }
+  .exception-remove:hover { color: var(--red-400); }
+
+  .exception-schedule {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--flux-border);
+  }
+  .exception-schedule .day-row {
+    border-bottom: none;
+    padding: 4px 0;
+  }
+  .exception-schedule .day-label {
+    width: auto;
+    font-size: 12px;
+  }
+
+  .add-exception-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+    padding: 8px;
+    font-size: 13px;
+    color: var(--flux-text-tertiary);
+    background: none;
+    border: 1px dashed var(--flux-border-light);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .add-exception-btn:hover {
+    color: var(--flux-text-secondary);
+    border-color: var(--flux-text-tertiary);
+  }
+
+  /* ── JSON textarea ── */
+  .json-textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 10px;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 8px;
+    color: var(--flux-text-primary);
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+    font-size: 12px;
+    resize: vertical;
+    outline: none;
+  }
+  .json-textarea:focus { border-color: var(--flux-text-secondary); }
+  .json-error {
+    color: var(--red-400);
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* ── Prompt output ── */
+  .prompt-area {
+    background: var(--flux-surface);
+    border-top: 1px solid var(--flux-border);
+    padding: 16px 32px;
+  }
+  .prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .prompt-header h4 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--flux-text-tertiary);
+  }
+  .copy-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 5px;
+    color: var(--flux-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+  }
+  .prompt-text {
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  /* ── Type badge for exceptions ── */
+  .type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .type-badge.closed {
+    color: var(--red-400);
+    background: rgba(239, 68, 68, 0.1);
+  }
+  .type-badge.modified {
+    color: var(--amber-400);
+    background: rgba(251, 191, 36, 0.1);
+  }
+
+  /* ── SVG icons ── */
+  .icon { display: inline-flex; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="playground-layout">
+  <!-- ─── Controls Panel ─── -->
+  <div class="controls-panel">
+    <h2 style="font-size:16px; font-weight:600; margin-bottom:20px; color:var(--flux-text-primary);">Éditeur de planning</h2>
+
+    <div class="control-group">
+      <h3>Préréglages</h3>
+      <button class="preset-btn" onclick="applyPreset('standard')">Semaine standard (6h-17h)</button>
+      <button class="preset-btn" onclick="applyPreset('extended')">Horaires étendus (5h-22h)</button>
+      <button class="preset-btn" onclick="applyPreset('24_7')">Exploitation 24/7</button>
+      <button class="preset-btn" onclick="applyPreset('split_shift')">Équipes coupées (6h-12h, 14h-22h)</button>
+      <button class="preset-btn" onclick="applyPreset('minimal')">Lun-Jeu uniquement</button>
+    </div>
+
+    <div class="control-group">
+      <h3>Options d'affichage</h3>
+      <div class="control-row">
+        <label>Afficher les exceptions</label>
+        <button class="toggle on" id="toggle-exceptions" onclick="toggleExceptionsSection()">
+          <span class="knob"></span>
+        </button>
+      </div>
+      <div class="control-row">
+        <label>Libellés compacts</label>
+        <button class="toggle" id="toggle-compact" onclick="toggleCompactLabels()">
+          <span class="knob"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Exemples d'exceptions</h3>
+      <button class="preset-btn" onclick="addSampleExceptions('holiday')">+ Jour férié</button>
+      <button class="preset-btn" onclick="addSampleExceptions('maintenance')">+ Maintenance</button>
+      <button class="preset-btn" onclick="addSampleExceptions('modified')">+ Horaires modifiés</button>
+      <button class="preset-btn" onclick="clearExceptions()">Supprimer toutes les exceptions</button>
+    </div>
+
+    <div class="control-group" style="margin-top:auto; padding-top:16px; border-top:1px solid var(--flux-border);">
+      <p style="font-size:11px; color:var(--flux-text-muted); line-height:1.4;">
+        Aperçu de l'éditeur visuel de planning qui remplacera les champs JSON dans le formulaire Station.
+      </p>
+    </div>
+  </div>
+
+  <!-- ─── Preview Area ─── -->
+  <div class="preview-area">
+    <div class="preview-main">
+      <div class="preview-container">
+
+        <!-- ── Operating Schedule Section ── -->
+        <div class="editor-section">
+          <div class="editor-header">
+            <span class="editor-label">Planning d'exploitation</span>
+            <div class="segmented">
+              <button class="seg-btn active" id="schedule-mode-visual" onclick="setScheduleMode('visual')">Visuel</button>
+              <button class="seg-btn" id="schedule-mode-json" onclick="setScheduleMode('json')">JSON</button>
+            </div>
+          </div>
+
+          <div id="schedule-visual" class="schedule-container">
+            <!-- Rendered by JS -->
+          </div>
+          <div id="schedule-json" style="display:none;">
+            <textarea class="json-textarea" id="schedule-json-textarea" oninput="onScheduleJsonEdit()"></textarea>
+            <div class="json-error" id="schedule-json-error"></div>
+          </div>
+        </div>
+
+        <!-- ── Exceptions Section ── -->
+        <div class="editor-section" id="exceptions-section">
+          <div class="editor-header">
+            <span class="editor-label">Exceptions de planning</span>
+            <div class="segmented">
+              <button class="seg-btn active" id="exceptions-mode-visual" onclick="setExceptionsMode('visual')">Visuel</button>
+              <button class="seg-btn" id="exceptions-mode-json" onclick="setExceptionsMode('json')">JSON</button>
+            </div>
+          </div>
+
+          <div id="exceptions-visual">
+            <!-- Rendered by JS -->
+          </div>
+          <div id="exceptions-json" style="display:none;">
+            <textarea class="json-textarea" id="exceptions-json-textarea" oninput="onExceptionsJsonEdit()"></textarea>
+            <div class="json-error" id="exceptions-json-error"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Prompt Output ── -->
+    <div class="prompt-area">
+      <div class="prompt-header">
+        <h4>Résumé</h4>
+        <button class="copy-btn" onclick="copyPrompt()">Copier</button>
+      </div>
+      <div class="prompt-text" id="prompt-output"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SVG Icons ──
+const ICONS = {
+  x: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+  copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
+  arrow: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>',
+};
+
+// ── State ──
+const DAYS = [
+  { key: 'monday', label: 'Lundi', short: 'Lun' },
+  { key: 'tuesday', label: 'Mardi', short: 'Mar' },
+  { key: 'wednesday', label: 'Mercredi', short: 'Mer' },
+  { key: 'thursday', label: 'Jeudi', short: 'Jeu' },
+  { key: 'friday', label: 'Vendredi', short: 'Ven' },
+  { key: 'saturday', label: 'Samedi', short: 'Sam' },
+  { key: 'sunday', label: 'Dimanche', short: 'Dim' },
+];
+const WEEKDAY_KEYS = ['monday','tuesday','wednesday','thursday','friday'];
+
+const state = {
+  schedule: {
+    monday:    { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
+    tuesday:   { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
+    wednesday: { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
+    thursday:  { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
+    friday:    { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
+    saturday:  { isOperating: false, slots: [] },
+    sunday:    { isOperating: false, slots: [] },
+  },
+  exceptions: [],
+  showExceptions: true,
+  compactLabels: false,
+  scheduleMode: 'visual',
+  exceptionsMode: 'visual',
+  activePreset: 'standard',
+};
+
+let exceptionIdCounter = 1;
+
+// ── Presets ──
+const PRESETS = {
+  standard: () => {
+    const slot = [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }];
+    DAYS.forEach(d => {
+      const isWd = WEEKDAY_KEYS.includes(d.key);
+      state.schedule[d.key] = { isOperating: isWd, slots: isWd ? JSON.parse(JSON.stringify(slot)) : [] };
+    });
+  },
+  extended: () => {
+    const slot = [{ start: '05:00', end: '22:00' }];
+    DAYS.forEach(d => {
+      state.schedule[d.key] = { isOperating: true, slots: JSON.parse(JSON.stringify(slot)) };
+    });
+  },
+  '24_7': () => {
+    DAYS.forEach(d => {
+      state.schedule[d.key] = { isOperating: true, slots: [{ start: '00:00', end: '23:59' }] };
+    });
+  },
+  split_shift: () => {
+    const slot = [{ start: '06:00', end: '12:00' }, { start: '14:00', end: '22:00' }];
+    DAYS.forEach(d => {
+      const isWd = WEEKDAY_KEYS.includes(d.key);
+      state.schedule[d.key] = { isOperating: isWd, slots: isWd ? JSON.parse(JSON.stringify(slot)) : [] };
+    });
+  },
+  minimal: () => {
+    const slot = [{ start: '08:00', end: '16:00' }];
+    const active = ['monday','tuesday','wednesday','thursday'];
+    DAYS.forEach(d => {
+      const on = active.includes(d.key);
+      state.schedule[d.key] = { isOperating: on, slots: on ? JSON.parse(JSON.stringify(slot)) : [] };
+    });
+  },
+};
+
+function applyPreset(name) {
+  PRESETS[name]();
+  state.activePreset = name;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderAll();
+}
+
+// ── Toggles ──
+function toggleExceptionsSection() {
+  state.showExceptions = !state.showExceptions;
+  const btn = document.getElementById('toggle-exceptions');
+  btn.classList.toggle('on', state.showExceptions);
+  document.getElementById('exceptions-section').style.display = state.showExceptions ? '' : 'none';
+  updatePrompt();
+}
+
+function toggleCompactLabels() {
+  state.compactLabels = !state.compactLabels;
+  document.getElementById('toggle-compact').classList.toggle('on', state.compactLabels);
+  renderSchedule();
+}
+
+// ── Mode switching ──
+function setScheduleMode(mode) {
+  state.scheduleMode = mode;
+  document.getElementById('schedule-mode-visual').classList.toggle('active', mode === 'visual');
+  document.getElementById('schedule-mode-json').classList.toggle('active', mode === 'json');
+  document.getElementById('schedule-visual').style.display = mode === 'visual' ? '' : 'none';
+  document.getElementById('schedule-json').style.display = mode === 'json' ? '' : 'none';
+  if (mode === 'json') {
+    document.getElementById('schedule-json-textarea').value = JSON.stringify(state.schedule, null, 2);
+    document.getElementById('schedule-json-error').textContent = '';
+  }
+}
+
+function setExceptionsMode(mode) {
+  state.exceptionsMode = mode;
+  document.getElementById('exceptions-mode-visual').classList.toggle('active', mode === 'visual');
+  document.getElementById('exceptions-mode-json').classList.toggle('active', mode === 'json');
+  document.getElementById('exceptions-visual').style.display = mode === 'visual' ? '' : 'none';
+  document.getElementById('exceptions-json').style.display = mode === 'json' ? '' : 'none';
+  if (mode === 'json') {
+    const apiFormat = state.exceptions.map(e => ({
+      date: e.date, type: e.type, reason: e.reason || null,
+      schedule: e.type === 'MODIFIED' ? e.schedule : null,
+    }));
+    document.getElementById('exceptions-json-textarea').value = JSON.stringify(apiFormat, null, 2);
+    document.getElementById('exceptions-json-error').textContent = '';
+  }
+}
+
+function onScheduleJsonEdit() {
+  try {
+    const parsed = JSON.parse(document.getElementById('schedule-json-textarea').value);
+    state.schedule = parsed;
+    document.getElementById('schedule-json-error').textContent = '';
+    updatePrompt();
+  } catch (e) {
+    document.getElementById('schedule-json-error').textContent = 'JSON invalide';
+  }
+}
+
+function onExceptionsJsonEdit() {
+  try {
+    const parsed = JSON.parse(document.getElementById('exceptions-json-textarea').value);
+    if (!Array.isArray(parsed)) throw new Error('Must be array');
+    state.exceptions = parsed.map(e => ({
+      id: e.id || 'exc-' + (exceptionIdCounter++),
+      date: e.date || '',
+      type: e.type || 'CLOSED',
+      reason: e.reason || '',
+      schedule: e.schedule || { isOperating: true, slots: [{ start: '08:00', end: '17:00' }] },
+    }));
+    document.getElementById('exceptions-json-error').textContent = '';
+    updatePrompt();
+  } catch (e) {
+    document.getElementById('exceptions-json-error').textContent = 'JSON invalide — doit être un tableau';
+  }
+}
+
+// ── Sample Exceptions ──
+function addSampleExceptions(type) {
+  const today = new Date();
+  const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
+  const dateStr = nextWeek.toISOString().split('T')[0];
+
+  if (type === 'holiday') {
+    state.exceptions.push({
+      id: 'exc-' + (exceptionIdCounter++),
+      date: dateStr,
+      type: 'CLOSED',
+      reason: 'Jour férié',
+      schedule: { isOperating: false, slots: [] },
+    });
+  } else if (type === 'maintenance') {
+    state.exceptions.push({
+      id: 'exc-' + (exceptionIdCounter++),
+      date: dateStr,
+      type: 'CLOSED',
+      reason: 'Maintenance planifiée',
+      schedule: { isOperating: false, slots: [] },
+    });
+  } else if (type === 'modified') {
+    state.exceptions.push({
+      id: 'exc-' + (exceptionIdCounter++),
+      date: dateStr,
+      type: 'MODIFIED',
+      reason: 'Demi-journée',
+      schedule: { isOperating: true, slots: [{ start: '08:00', end: '12:00' }] },
+    });
+  }
+  renderAll();
+}
+
+function clearExceptions() {
+  state.exceptions = [];
+  renderAll();
+}
+
+// ── Render: Operating Schedule ──
+function renderSchedule() {
+  const container = document.getElementById('schedule-visual');
+  container.innerHTML = '';
+
+  DAYS.forEach(day => {
+    const ds = state.schedule[day.key];
+    const row = document.createElement('div');
+    row.className = 'day-row';
+
+    const label = state.compactLabels ? day.short : day.label;
+    row.innerHTML = `
+      <span class="day-label">${label}</span>
+      <button class="toggle ${ds.isOperating ? 'on' : ''}" onclick="toggleDay('${day.key}')">
+        <span class="knob"></span>
+      </button>
+      <div class="slots-area" id="slots-${day.key}"></div>
+    `;
+    container.appendChild(row);
+
+    const slotsArea = row.querySelector('.slots-area');
+    if (!ds.isOperating) {
+      slotsArea.innerHTML = '<span class="closed-label">Fermé</span>';
+    } else {
+      ds.slots.forEach((slot, i) => {
+        slotsArea.appendChild(createSlotElement(day.key, i, slot, ds.slots.length));
+      });
+      // Add slot button
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-slot-btn';
+      addBtn.innerHTML = `${ICONS.plus} Ajouter`;
+      addBtn.onclick = () => addSlot(day.key);
+      slotsArea.appendChild(addBtn);
+    }
+  });
+
+  // Copy to weekdays button
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-weekdays-btn';
+  copyBtn.innerHTML = `${ICONS.copy} Copier Lundi vers tous les jours ouvrés`;
+  copyBtn.onclick = copyToWeekdays;
+  container.appendChild(copyBtn);
+}
+
+function createSlotElement(dayKey, index, slot, totalSlots) {
+  const el = document.createElement('div');
+  el.className = 'time-slot';
+  el.innerHTML = `
+    <input type="time" value="${slot.start}" onchange="updateSlot('${dayKey}', ${index}, 'start', this.value)" />
+    <span class="time-sep">${ICONS.arrow}</span>
+    <input type="time" value="${slot.end}" onchange="updateSlot('${dayKey}', ${index}, 'end', this.value)" />
+    ${totalSlots > 1 ? `<button class="slot-remove" onclick="removeSlot('${dayKey}', ${index})">${ICONS.x}</button>` : ''}
+  `;
+  return el;
+}
+
+function toggleDay(dayKey) {
+  const ds = state.schedule[dayKey];
+  ds.isOperating = !ds.isOperating;
+  if (ds.isOperating && ds.slots.length === 0) {
+    ds.slots = [{ start: '08:00', end: '17:00' }];
+  }
+  renderAll();
+}
+
+function updateSlot(dayKey, index, field, value) {
+  state.schedule[dayKey].slots[index][field] = value;
+  updatePrompt();
+}
+
+function addSlot(dayKey) {
+  state.schedule[dayKey].slots.push({ start: '08:00', end: '17:00' });
+  renderAll();
+}
+
+function removeSlot(dayKey, index) {
+  state.schedule[dayKey].slots.splice(index, 1);
+  renderAll();
+}
+
+function copyToWeekdays() {
+  const monday = JSON.parse(JSON.stringify(state.schedule.monday));
+  ['tuesday','wednesday','thursday','friday'].forEach(k => {
+    state.schedule[k] = JSON.parse(JSON.stringify(monday));
+  });
+  renderAll();
+}
+
+// ── Render: Exceptions ──
+function renderExceptions() {
+  const container = document.getElementById('exceptions-visual');
+  container.innerHTML = '';
+
+  state.exceptions.forEach((exc, i) => {
+    const card = document.createElement('div');
+    card.className = 'exception-card';
+
+    const topRow = document.createElement('div');
+    topRow.className = 'exception-top';
+    topRow.innerHTML = `
+      <input type="date" value="${exc.date}" onchange="updateException(${i}, 'date', this.value)" />
+      <select onchange="updateException(${i}, 'type', this.value)">
+        <option value="CLOSED" ${exc.type === 'CLOSED' ? 'selected' : ''}>Fermé</option>
+        <option value="MODIFIED" ${exc.type === 'MODIFIED' ? 'selected' : ''}>Modifié</option>
+      </select>
+      <input type="text" value="${exc.reason}" placeholder="Raison (optionnel)" onchange="updateException(${i}, 'reason', this.value)" />
+      <button class="exception-remove" onclick="removeException(${i})">${ICONS.trash}</button>
+    `;
+    card.appendChild(topRow);
+
+    if (exc.type === 'MODIFIED') {
+      const schedDiv = document.createElement('div');
+      schedDiv.className = 'exception-schedule';
+
+      const schedRow = document.createElement('div');
+      schedRow.className = 'day-row';
+      schedRow.style.borderBottom = 'none';
+
+      const slotsArea = document.createElement('div');
+      slotsArea.className = 'slots-area';
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = `toggle ${exc.schedule.isOperating ? 'on' : ''}`;
+      toggleBtn.innerHTML = '<span class="knob"></span>';
+      toggleBtn.onclick = () => toggleExceptionOperating(i);
+
+      const lbl = document.createElement('span');
+      lbl.className = 'day-label';
+      lbl.style.width = 'auto';
+      lbl.style.fontSize = '12px';
+      lbl.textContent = 'Horaires';
+
+      schedRow.appendChild(lbl);
+      schedRow.appendChild(toggleBtn);
+      schedRow.appendChild(slotsArea);
+
+      if (!exc.schedule.isOperating) {
+        slotsArea.innerHTML = '<span class="closed-label">Fermé</span>';
+      } else {
+        exc.schedule.slots.forEach((slot, si) => {
+          const slotEl = document.createElement('div');
+          slotEl.className = 'time-slot';
+          slotEl.innerHTML = `
+            <input type="time" value="${slot.start}" onchange="updateExceptionSlot(${i}, ${si}, 'start', this.value)" />
+            <span class="time-sep">${ICONS.arrow}</span>
+            <input type="time" value="${slot.end}" onchange="updateExceptionSlot(${i}, ${si}, 'end', this.value)" />
+            ${exc.schedule.slots.length > 1 ? `<button class="slot-remove" onclick="removeExceptionSlot(${i}, ${si})">${ICONS.x}</button>` : ''}
+          `;
+          slotsArea.appendChild(slotEl);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-slot-btn';
+        addBtn.innerHTML = `${ICONS.plus} Ajouter`;
+        addBtn.onclick = () => addExceptionSlot(i);
+        slotsArea.appendChild(addBtn);
+      }
+
+      schedDiv.appendChild(schedRow);
+      card.appendChild(schedDiv);
+    }
+
+    container.appendChild(card);
+  });
+
+  // Add exception button
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-exception-btn';
+  addBtn.innerHTML = `${ICONS.plus} Ajouter une exception`;
+  addBtn.onclick = addException;
+  container.appendChild(addBtn);
+}
+
+function addException() {
+  const today = new Date().toISOString().split('T')[0];
+  state.exceptions.push({
+    id: 'exc-' + (exceptionIdCounter++),
+    date: today,
+    type: 'CLOSED',
+    reason: '',
+    schedule: { isOperating: false, slots: [] },
+  });
+  renderAll();
+}
+
+function removeException(index) {
+  state.exceptions.splice(index, 1);
+  renderAll();
+}
+
+function updateException(index, field, value) {
+  if (field === 'type') {
+    state.exceptions[index].type = value;
+    if (value === 'CLOSED') {
+      state.exceptions[index].schedule = { isOperating: false, slots: [] };
+    } else {
+      state.exceptions[index].schedule = { isOperating: true, slots: [{ start: '08:00', end: '17:00' }] };
+    }
+    renderAll();
+  } else {
+    state.exceptions[index][field] = value;
+    updatePrompt();
+  }
+}
+
+function toggleExceptionOperating(index) {
+  const s = state.exceptions[index].schedule;
+  s.isOperating = !s.isOperating;
+  if (s.isOperating && s.slots.length === 0) {
+    s.slots = [{ start: '08:00', end: '17:00' }];
+  }
+  renderAll();
+}
+
+function updateExceptionSlot(excIndex, slotIndex, field, value) {
+  state.exceptions[excIndex].schedule.slots[slotIndex][field] = value;
+  updatePrompt();
+}
+
+function addExceptionSlot(excIndex) {
+  state.exceptions[excIndex].schedule.slots.push({ start: '08:00', end: '17:00' });
+  renderAll();
+}
+
+function removeExceptionSlot(excIndex, slotIndex) {
+  state.exceptions[excIndex].schedule.slots.splice(slotIndex, 1);
+  renderAll();
+}
+
+// ── Prompt ──
+function updatePrompt() {
+  const parts = [];
+
+  // Summarize schedule
+  const operatingDays = DAYS.filter(d => state.schedule[d.key].isOperating);
+  const closedDays = DAYS.filter(d => !state.schedule[d.key].isOperating);
+
+  if (operatingDays.length === 7) {
+    parts.push('La station fonctionne 7 jours sur 7.');
+  } else if (operatingDays.length === 0) {
+    parts.push('La station est entièrement fermée (aucun jour d\'exploitation).');
+  } else {
+    parts.push(`Jours d'exploitation : ${operatingDays.map(d => d.label).join(', ')}. Fermé : ${closedDays.map(d => d.label).join(', ')}.`);
+  }
+
+  // Summarize time patterns
+  const patterns = new Map();
+  operatingDays.forEach(d => {
+    const key = state.schedule[d.key].slots.map(s => `${s.start}-${s.end}`).join(', ');
+    if (!patterns.has(key)) patterns.set(key, []);
+    patterns.get(key).push(d.label);
+  });
+
+  patterns.forEach((days, pattern) => {
+    if (pattern) {
+      const slots = pattern.split(', ').map(p => {
+        const [s, e] = p.split('-');
+        return `${s} à ${e}`;
+      }).join(' et ');
+      if (days.length === operatingDays.length) {
+        parts.push(`Tous les jours d'exploitation : ${slots}.`);
+      } else {
+        parts.push(`${days.join(', ')} : ${slots}.`);
+      }
+    }
+  });
+
+  // Summarize exceptions
+  if (state.exceptions.length > 0) {
+    const closed = state.exceptions.filter(e => e.type === 'CLOSED');
+    const modified = state.exceptions.filter(e => e.type === 'MODIFIED');
+    if (closed.length > 0) {
+      parts.push(`\nFermetures : ${closed.map(e => `${e.date}${e.reason ? ' (' + e.reason + ')' : ''}`).join(', ')}.`);
+    }
+    if (modified.length > 0) {
+      modified.forEach(e => {
+        const slots = e.schedule.slots.map(s => `${s.start}-${s.end}`).join(', ');
+        parts.push(`Horaires modifiés le ${e.date}${e.reason ? ' (' + e.reason + ')' : ''} : ${slots}.`);
+      });
+    }
+  }
+
+  document.getElementById('prompt-output').textContent = parts.join('\n');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('prompt-output').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copié !';
+    setTimeout(() => { btn.textContent = 'Copier'; }, 1500);
+  });
+}
+
+// ── Render All ──
+function renderAll() {
+  renderSchedule();
+  renderExceptions();
+  updatePrompt();
+}
+
+// ── Init ──
+renderAll();
+// Mark the first preset as active
+document.querySelector('.preset-btn').classList.add('active');
+</script>
+</body>
+</html>

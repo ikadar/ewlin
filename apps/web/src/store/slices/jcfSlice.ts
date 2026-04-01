@@ -26,6 +26,8 @@ export interface JcfState {
   jcfJobId: string;
   /** Client name */
   jcfClient: string;
+  /** Referent (contact person) name */
+  jcfReferent: string;
   /** Template name */
   jcfTemplate: string;
   /** Job title/description */
@@ -62,6 +64,7 @@ const initialState: JcfState = {
   isJcfModalOpen: false,
   jcfJobId: '',
   jcfClient: '',
+  jcfReferent: '',
   jcfTemplate: '',
   jcfIntitule: '',
   jcfQuantity: '',
@@ -94,6 +97,7 @@ const jcfSlice = createSlice({
       state.isJcfModalOpen = false;
       // Reset form on close
       state.jcfClient = '';
+      state.jcfReferent = '';
       state.jcfTemplate = '';
       state.jcfIntitule = '';
       state.jcfQuantity = '';
@@ -112,6 +116,10 @@ const jcfSlice = createSlice({
 
     setJcfClient: (state, action: PayloadAction<string>) => {
       state.jcfClient = action.payload;
+    },
+
+    setJcfReferent: (state, action: PayloadAction<string>) => {
+      state.jcfReferent = action.payload;
     },
 
     setJcfTemplate: (state, action: PayloadAction<string>) => {
@@ -168,6 +176,7 @@ const jcfSlice = createSlice({
 
     resetJcfForm: (state) => {
       state.jcfClient = '';
+      state.jcfReferent = '';
       state.jcfTemplate = '';
       state.jcfIntitule = '';
       state.jcfQuantity = '';
@@ -192,6 +201,7 @@ export const {
   closeJcfModal,
   setJcfJobId,
   setJcfClient,
+  setJcfReferent,
   setJcfTemplate,
   setJcfIntitule,
   setJcfQuantity,

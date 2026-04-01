@@ -19,6 +19,7 @@ const dummyCategories: StationCategoryResponse[] = [
 const singleJob: FluxJob = {
   id: '00042',
   client: 'Ducros',
+  referent: null,
   designation: 'Brochure A4 16p',
   sortie: '28/02',
   elements: [
@@ -38,11 +39,13 @@ const singleJob: FluxJob = {
   ],
   transporteur: 'Chronopost',
   parti: { shipped: true, date: '25/02' },
+  facture: { invoiced: true, date: '26/02' },
 };
 
 const multiJob: FluxJob = {
   id: '00078',
   client: 'Müller AG',
+  referent: null,
   designation: 'Étiquettes adhesives 500ex',
   sortie: '05/03',
   elements: [
@@ -64,6 +67,7 @@ const multiJob: FluxJob = {
   ],
   transporteur: null,
   parti: { shipped: false, date: null },
+  facture: { invoiced: false, date: null },
 };
 
 describe('FluxTable', () => {

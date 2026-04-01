@@ -170,7 +170,7 @@ function calculateOptimisticEndTime(
 export const scheduleApi = createApi({
   reducerPath: 'scheduleApi',
   baseQuery: baseQueryWithFixtureSupport,
-  tagTypes: ['Snapshot', 'ClientSuggestions', 'SavedSchedules'],
+  tagTypes: ['Snapshot', 'ClientSuggestions', 'ReferentSuggestions', 'SavedSchedules'],
 
   endpoints: (builder) => ({
     // ========================================================================
@@ -204,6 +204,16 @@ export const scheduleApi = createApi({
     getClientSuggestions: builder.query<ClientSuggestionsResponse, string>({
       query: (prefix) => `/clients?q=${encodeURIComponent(prefix)}`,
       providesTags: ['ClientSuggestions'],
+    }),
+
+    /**
+     * Get referent name suggestions for autocomplete.
+     *
+     * @param prefix - Search prefix (min 2 chars recommended)
+     */
+    getReferentSuggestions: builder.query<string[], string>({
+      query: (prefix) => `/referents?q=${encodeURIComponent(prefix)}`,
+      providesTags: ['ReferentSuggestions'],
     }),
 
     /**
@@ -866,6 +876,7 @@ export const scheduleApi = createApi({
 export const {
   useGetSnapshotQuery,
   useGetClientSuggestionsQuery,
+  useGetReferentSuggestionsQuery,
   useLookupByReferenceQuery,
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,

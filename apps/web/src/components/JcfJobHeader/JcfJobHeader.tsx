@@ -6,8 +6,9 @@ import { JcfTransporteurSelect } from './JcfTransporteurSelect';
 import { JcfJobPrecedencesAutocomplete } from '../JcfJobPrecedencesAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
 import type { JcfTemplate } from '@flux/types';
-import { useGetClientSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery, useGetShippersQuery } from '../../store';
+import { useGetClientSuggestionsQuery, useGetReferentSuggestionsQuery, useLazyLookupByReferenceQuery, useGetTemplatesQuery, useGetShippersQuery } from '../../store';
 import { useCreateClientMutation } from '../../store';
+import { useCreateReferentMutation } from '../../store';
 import { useDebouncedValue } from '../../hooks';
 
 export interface JcfJobHeaderProps {
@@ -16,6 +17,8 @@ export interface JcfJobHeaderProps {
   onJobIdChange?: (value: string) => void;
   client: string;
   onClientChange: (value: string) => void;
+  referent: string;
+  onReferentChange: (value: string) => void;
   template: string;
   onTemplateChange: (value: string) => void;
   /** Called when user selects a template to apply (v0.4.34) - receives full template data for both element application and workflow extraction */
@@ -52,6 +55,8 @@ export function JcfJobHeader({
   onJobIdChange,
   client,
   onClientChange,
+  referent,
+  onReferentChange,
   template,
   onTemplateChange,
   onTemplateSelect,
@@ -84,6 +89,8 @@ export function JcfJobHeader({
 
   // Auto-persist new client names to the clients table
   const [createClient] = useCreateClientMutation();
+  // Auto-persist new referent names to the referents table
+  const [createReferent] = useCreateReferentMutation();
 
   // Load shippers for transporteur dropdown
   const { data: shippers = [] } = useGetShippersQuery();
@@ -154,6 +161,39 @@ export function JcfJobHeader({
   }, [client, apiClients, createClient]);
 
   const handleClientSelect = () => {
+    setTimeout(() => {
+      document.getElementById('jcf-referent')?.focus();
+    }, 0);
+  };
+
+  // --- Referent autocomplete ---
+
+  const debouncedReferent = useDebouncedValue(referent, 300);
+  const { data: apiReferents = [] } = useGetReferentSuggestionsQuery(debouncedReferent, {
+    skip: debouncedReferent.length === 1,
+  });
+
+  const referentSuggestions: Suggestion[] = useMemo(
+    () => apiReferents.map((name) => ({ label: name, value: name })),
+    [apiReferents]
+  );
+
+  const handleReferentBlur = useCallback(() => {
+    const trimmed = referent.trim();
+    if (!trimmed) return;
+
+    const existsInApi = apiReferents.some(
+      (name) => name.toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (!existsInApi) {
+      createReferent({ name: trimmed }).catch(() => {
+        // Silently ignore errors (e.g. duplicate on race condition)
+      });
+    }
+  }, [referent, apiReferents, createReferent]);
+
+  const handleReferentSelect = () => {
     setTimeout(() => {
       document.getElementById('jcf-template')?.focus();
     }, 0);
@@ -300,6 +340,22 @@ export function JcfJobHeader({
             inputClassName={inputBaseClass}
             onSelect={handleClientSelect}
             onBlur={handleClientBlur}
+          />
+        </div>
+
+        {/* Referent — autocomplete */}
+        <div className="w-[182px]">
+          <label htmlFor="jcf-referent" className={labelClass}>
+            Référent
+          </label>
+          <JcfAutocomplete
+            id="jcf-referent"
+            value={referent}
+            onChange={onReferentChange}
+            suggestions={referentSuggestions}
+            inputClassName={inputBaseClass}
+            onSelect={handleReferentSelect}
+            onBlur={handleReferentBlur}
           />
         </div>
 

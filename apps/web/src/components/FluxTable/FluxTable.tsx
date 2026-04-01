@@ -117,6 +117,8 @@ interface FluxTableProps {
   shippers?: ShipperResponse[];
   /** Toggle a job's shipped (Parti) status. */
   onToggleShipped?: (jobInternalId: string, shipped: boolean) => void;
+  /** Toggle a job's invoiced (Facturé) status. */
+  onToggleInvoiced?: (jobInternalId: string, invoiced: boolean) => void;
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
   /** Job IDs (internal UUIDs) that are late (from schedule snapshot). */
@@ -213,6 +215,14 @@ function FluxTableHeader() {
         >
           Désignation <SortChevron col="designation" active={sortColumn} dir={sortDirection} />
         </th>
+        {/* Référent */}
+        <th
+          className={sortableHeader}
+          title="Référent"
+          onClick={() => onSortChange('referent')}
+        >
+          Référent <SortChevron col="referent" active={sortColumn} dir={sortDirection} />
+        </th>
         {/* Sortie */}
         <th
           className={sortableHeader}
@@ -298,6 +308,13 @@ function FluxTableHeader() {
           title="Statut d'expédition"
         >
           <div className="flex items-center gap-1 whitespace-nowrap">Parti</div>
+        </th>
+        {/* Facturé — not sortable, hover for visual consistency */}
+        <th
+          className={`${headerCell} group cursor-pointer select-none hover:bg-flux-active`}
+          title="Statut de facturation"
+        >
+          <div className="flex items-center gap-1 whitespace-nowrap">Facturé</div>
         </th>
         {/* Actions — frozen right + left shadow */}
         <th
@@ -430,6 +447,11 @@ const FluxTableRow = memo(function FluxTableRow({
         )}
       </td>
 
+      {/* Référent */}
+      <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
+        {job.referent ?? ''}
+      </td>
+
       {/* Sortie */}
       <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
         {job.sortie}
@@ -553,6 +575,29 @@ const FluxTableRow = memo(function FluxTableRow({
         </button>
       </td>
 
+      {/* Facturé — clickable toggle */}
+      <td className="px-2 py-0 whitespace-nowrap">
+        <button
+          type="button"
+          className="flex items-center gap-1.5 cursor-pointer hover:opacity-80"
+          onClick={() => ctx.onToggleInvoiced?.(job.internalId, !job.facture.invoiced)}
+          title={job.facture.invoiced ? 'Marquer comme non facturé' : 'Marquer comme facturé'}
+        >
+          {job.facture.invoiced ? (
+            <>
+              <CircleCheck className="w-4 h-4 text-emerald-500" strokeWidth={2} />
+              {job.facture.date && (
+                <span className="text-flux-text-muted" style={{ fontSize: '11px' }}>
+                  {job.facture.date}
+                </span>
+              )}
+            </>
+          ) : (
+            <Circle className="w-4 h-4 text-zinc-600" strokeWidth={2} />
+          )}
+        </button>
+      </td>
+
       {/* Actions — frozen right */}
       <td
         className={`${stickyCell} right-0 px-4 py-0`}
@@ -633,6 +678,9 @@ function FluxSubRow({
         <span className="text-xs pl-4 text-flux-text-muted">↳ {element.label}</span>
       </td>
 
+      {/* Référent — empty */}
+      <td />
+
       {/* Sortie — empty */}
       <td />
 
@@ -689,6 +737,9 @@ function FluxSubRow({
       {/* Parti — empty */}
       <td />
 
+      {/* Facturé — empty */}
+      <td />
+
       {/* Actions — empty (frozen right placeholder) */}
       <td
         className={`${subRowStickyCell} right-0`}
@@ -721,6 +772,7 @@ export const FluxTable = memo(function FluxTable({
   onUpdateShipper,
   shippers = [],
   onToggleShipped,
+  onToggleInvoiced,
   onStationClick,
   lateJobIds = new Set<string>(),
   conflictJobIds = new Set<string>(),
@@ -740,6 +792,7 @@ export const FluxTable = memo(function FluxTable({
     onUpdateShipper,
     shippers,
     onToggleShipped,
+    onToggleInvoiced,
     expandedJobIds,
     sortColumn,
     sortDirection,
@@ -765,6 +818,7 @@ export const FluxTable = memo(function FluxTable({
             <col style={{ width: '5rem' }} />
             <col style={{ width: '9rem' }} />
             <col style={{ width: '16rem' }} />
+            <col style={{ width: '7rem' }} />
             <col style={{ width: '6rem' }} />
             <col style={{ width: '8.5rem' }} />
             <col style={{ width: '8.5rem' }} />
@@ -776,6 +830,7 @@ export const FluxTable = memo(function FluxTable({
             ))}
             <col style={{ width: '14rem' }} />
             <col style={{ width: '6rem' }} />
+            <col style={{ width: '7rem' }} />
             <col style={{ width: '7rem' }} />
             <col style={{ width: '4rem' }} />
           </colgroup>

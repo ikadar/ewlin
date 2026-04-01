@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinned Tile Indicator — Flux Station Cells</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e4e4e7; font-size: 13px; height: 100vh; display: flex; }
+
+  /* Left panel — controls */
+  .controls { width: 260px; flex-shrink: 0; background: #18181b; border-right: 1px solid #27272a; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+  .controls h1 { font-size: 14px; font-weight: 600; color: #a1a1aa; line-height: 1.3; }
+  .control-group { display: flex; flex-direction: column; gap: 6px; }
+  .control-label { font-size: 11px; font-weight: 600; color: #52525b; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .radio-option { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: background 0.1s; border: 1px solid transparent; }
+  .radio-option:hover { background: #27272a; }
+  .radio-option.active { background: #1e293b; border-color: #1e3a5f; }
+  .radio-option input { accent-color: #3b82f6; }
+  .radio-option .opt-label { font-size: 12px; color: #d4d4d8; }
+  .radio-option .opt-desc { font-size: 10px; color: #52525b; }
+
+  .legend { display: flex; flex-direction: column; gap: 4px; padding: 10px; background: #111113; border-radius: 6px; border: 1px solid #27272a; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #71717a; }
+
+  /* Right panel — preview */
+  .preview { flex: 1; display: flex; flex-direction: column; padding: 24px; overflow: auto; }
+  .preview-header { font-size: 12px; color: #52525b; margin-bottom: 12px; }
+
+  table { border-collapse: collapse; font-size: 13px; }
+  th { text-align: center; font-size: 11px; font-weight: 600; color: #71717a; padding: 6px 4px; border-bottom: 1px solid #27272a; }
+  td { padding: 0; border-bottom: 1px solid #1c1c1f; height: 36px; vertical-align: middle; text-align: center; }
+  td.text-cell { text-align: left; padding: 0 10px; white-space: nowrap; color: #a1a1aa; }
+  td.id-cell { font-family: 'SF Mono','Menlo',monospace; color: #a1a1aa; text-align: left; padding: 0 10px; }
+  td.pin-label { font-size: 10px; color: #d97706; padding: 0 6px; text-align: right; }
+  td.pin-label.none { color: #3f3f46; }
+
+  /* Prompt */
+  .prompt-section { margin-top: auto; padding-top: 20px; border-top: 1px solid #27272a; }
+  .prompt-label { font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .prompt-text { font-size: 12px; line-height: 1.5; color: #d4d4d8; white-space: pre-wrap; min-height: 40px; background: #111113; border: 1px solid #27272a; border-radius: 6px; padding: 10px; }
+  .copy-btn { margin-top: 8px; background: #27272a; border: 1px solid #3f3f46; color: #a1a1aa; padding: 5px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  .copy-btn:hover { background: #3f3f46; color: #e4e4e7; }
+  .copy-btn.copied { background: #166534; border-color: #16a34a; color: #86efac; }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Pinned Tile Indicator</h1>
+
+  <div class="control-group">
+    <div class="control-label">Indicator style</div>
+    <div id="options"></div>
+  </div>
+
+  <div class="control-group">
+    <div class="control-label">Legend</div>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+
+<div class="preview">
+  <div class="preview-header">Preview — Coupe &amp; Pelli are pinned in row 1</div>
+  <div id="table"></div>
+
+  <div class="prompt-section">
+    <div class="prompt-label">Prompt output</div>
+    <div class="prompt-text" id="promptText"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy prompt</button>
+  </div>
+</div>
+
+<script>
+const state = { selected: 'B' };
+
+const amber = 'rgb(245 158 11)';
+const R = 8, C = 2 * Math.PI * R;
+const colors = { planned: 'rgb(156 163 175)', progress: 'rgb(251 146 60)', late: 'rgb(248 113 113)', done: 'rgb(74 222 128)' };
+
+function svg(inner, size=24) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display:inline-block;vertical-align:middle">${inner}</svg>`;
+}
+function dot(color, r=5, op=1) { return `<circle cx="12" cy="12" r="${r}" fill="${color}" fill-opacity="${op}" stroke="#18181b" stroke-width="1.5"/>`; }
+function ring(color, pct) {
+  const off = C*(1-pct/100);
+  return `<circle cx="12" cy="12" r="${R}" fill="none" stroke="${color}" stroke-width="1.5" stroke-opacity="0.12"/>
+    <circle cx="12" cy="12" r="${R}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="${C} ${C}" stroke-dashoffset="${off}" transform="rotate(-90 12 12)"/>
+    <circle cx="12" cy="12" r="3.5" fill="${color}" fill-opacity="0.7"/>`;
+}
+
+function baseInd(s) {
+  if (s.state==='empty') return '';
+  if (s.state==='planned') return dot(colors.planned,5,0.25);
+  if (s.state==='done') return dot(colors.done,5,0.7);
+  return ring(s.state==='late'?colors.late:colors.progress, s.pct||40);
+}
+
+// Pin decorators
+const decorators = {
+  A: (base) => base,
+  B: (base) => `${base}<circle cx="18" cy="6" r="2.5" fill="${amber}"/>`,
+  C: (base) => `<circle cx="12" cy="12" r="10" fill="none" stroke="${amber}" stroke-width="1.5" stroke-opacity="0.6"/>${base}`,
+  D: (base) => `${base}<g transform="translate(15,3) scale(0.35)"><path d="M12 2C9.24 2 7 4.24 7 7c0 1.38.56 2.63 1.46 3.54L12 22l3.54-11.46A5 5 0 0012 2z" fill="${amber}"/></g>`,
+  E: (base) => `${base}<line x1="6" y1="21" x2="18" y2="21" stroke="${amber}" stroke-width="2" stroke-linecap="round"/>`,
+  F: (base) => `<rect x="0" y="0" width="24" height="24" rx="3" fill="${amber}" fill-opacity="0.1"/>${base}`,
+  G: (base, color) => `<rect x="2" y="2" width="20" height="20" fill="${color || amber}" fill-opacity="0.12"/>${base}`,
+};
+
+const STATIONS = [
+  { name: 'Offset', state: 'done', pct: 0, pinned: false },
+  { name: 'Coupe', state: 'progress', pct: 60, pinned: true },
+  { name: 'Pelli', state: 'planned', pct: 0, pinned: true },
+  { name: 'Pliage', state: 'planned', pct: 0, pinned: false },
+  { name: 'Brochure', state: 'empty', pct: 0, pinned: false },
+  { name: 'Emballage', state: 'done', pct: 0, pinned: false },
+];
+
+const OPTIONS = [
+  { key: 'A', label: 'No indicator', desc: 'Status quo' },
+  { key: 'B', label: 'Amber dot', desc: 'Top-right corner' },
+  { key: 'C', label: 'Amber ring', desc: 'Halo around indicator' },
+  { key: 'D', label: 'Micro pin icon', desc: 'Pin shape top-right' },
+  { key: 'E', label: 'Amber underline', desc: 'Bar at bottom' },
+  { key: 'F', label: 'Rounded tint', desc: 'Rounded rect behind' },
+  { key: 'G', label: 'Square tint', desc: 'Sharp square behind' },
+];
+
+function buildCell(s, optKey) {
+  if (s.state === 'empty') return '<td></td>';
+  const base = baseInd(s);
+  const color = colors[s.state] || colors.planned;
+  const inner = s.pinned ? decorators[optKey](base, color) : base;
+  return `<td>${svg(inner)}</td>`;
+}
+
+function render() {
+  // Options
+  document.getElementById('options').innerHTML = OPTIONS.map(o => {
+    const active = state.selected === o.key ? ' active' : '';
+    return `<label class="radio-option${active}" onclick="selectOption('${o.key}')">
+      <input type="radio" name="style" ${state.selected===o.key?'checked':''}>
+      <div><div class="opt-label">${o.key}. ${o.label}</div><div class="opt-desc">${o.desc}</div></div>
+    </label>`;
+  }).join('');
+
+  // Legend
+  document.getElementById('legend').innerHTML = `
+    <div class="legend-item">${svg(dot(colors.planned,5,0.25))} Planned</div>
+    <div class="legend-item">${svg(ring(colors.progress,60))} In progress</div>
+    <div class="legend-item">${svg(ring(colors.late,40))} Late</div>
+    <div class="legend-item">${svg(dot(colors.done,5,0.7))} Done</div>
+    <div class="legend-item" style="margin-top:4px;color:#d97706">${state.selected!=='A' ? svg(decorators[state.selected](dot(colors.planned,5,0.25))) : '—'} Pinned</div>
+  `;
+
+  // Table
+  const noPinStations = STATIONS.map(s => ({ ...s, pinned: false }));
+  const headers = STATIONS.map(s => `<th>${s.name}</th>`).join('');
+  document.getElementById('table').innerHTML = `<table>
+    <colgroup><col style="width:60px"><col style="width:100px"><col style="width:160px"><col style="width:40px">
+    ${STATIONS.map(() => '<col style="width:48px">').join('')}</colgroup>
+    <thead><tr><th style="text-align:left">ID</th><th style="text-align:left">Client</th><th style="text-align:left">Désignation</th><th></th>${headers}</tr></thead>
+    <tbody>
+      <tr><td class="id-cell">00042</td><td class="text-cell">Ducros</td><td class="text-cell">Brochure A4 16p</td><td class="pin-label">2 📌</td>${STATIONS.map(s => buildCell(s, state.selected)).join('')}</tr>
+      <tr><td class="id-cell">00078</td><td class="text-cell">Müller AG</td><td class="text-cell">Étiquettes adhésives</td><td class="pin-label none">—</td>${noPinStations.map(s => buildCell(s, state.selected)).join('')}</tr>
+      <tr><td class="id-cell">00091</td><td class="text-cell">Dupont</td><td class="text-cell">Catalogue 48p</td><td class="pin-label none">—</td>${noPinStations.map(s => buildCell(s, state.selected)).join('')}</tr>
+      <tr><td class="id-cell">00103</td><td class="text-cell">Martin & Fils</td><td class="text-cell">Affiches B2</td><td class="pin-label none">—</td>${noPinStations.map(s => buildCell(s, state.selected)).join('')}</tr>
+    </tbody></table>`;
+
+  updatePrompt();
+}
+
+function selectOption(key) { state.selected = key; render(); }
+
+function updatePrompt() {
+  const prompts = {
+    A: 'Keep the current flux station indicators as-is. No pin visualization in the flux table.',
+    B: `Add a small amber dot (r=2.5) at top-right (cx=18, cy=6) of the station indicator SVG when the task is pinned.\n\nIn FluxStationIndicator.tsx, add an \`isPinned\` boolean prop. When true, append <circle cx="18" cy="6" r="2.5" fill="rgb(245 158 11)"/> after existing shapes.\n\nThread isPinned from FluxStationData (add the field) through FluxTable → station cell → FluxStationIndicator.`,
+    C: `Add an amber halo ring (r=10, stroke-width=1.5, opacity=0.6) around the indicator when pinned.\n\nIn FluxStationIndicator.tsx, when isPinned, prepend <circle cx="12" cy="12" r="10" fill="none" stroke="rgb(245 158 11)" stroke-width="1.5" stroke-opacity="0.6"/> before existing shapes.`,
+    D: `Add a micro pin-shaped SVG icon at top-right when pinned.\n\nIn FluxStationIndicator.tsx, when isPinned, append <g transform="translate(15,3) scale(0.35)"><path d="M12 2C9.24 2 7 4.24 7 7c0 1.38.56 2.63 1.46 3.54L12 22l3.54-11.46A5 5 0 0012 2z" fill="rgb(245 158 11)"/></g>.`,
+    E: `Add an amber underline bar at the bottom of the SVG when pinned.\n\nIn FluxStationIndicator.tsx, when isPinned, append <line x1="6" y1="21" x2="18" y2="21" stroke="rgb(245 158 11)" stroke-width="2" stroke-linecap="round"/>.`,
+    F: `Add an amber background tint (rounded rect, fill-opacity=0.1) behind the indicator when pinned.\n\nIn FluxStationIndicator.tsx, when isPinned, prepend <rect x="0" y="0" width="24" height="24" rx="3" fill="rgb(245 158 11)" fill-opacity="0.1"/> before existing shapes.`,
+    G: `Add an amber square background (sharp corners, fill-opacity=0.12) behind the indicator when pinned.\n\nIn FluxStationIndicator.tsx, when isPinned, prepend <rect x="2" y="2" width="20" height="20" fill="rgb(245 158 11)" fill-opacity="0.12"/> before existing shapes. The 2px inset keeps the square compact within the 24x24 SVG.`,
+  };
+  document.getElementById('promptText').textContent = prompts[state.selected];
+}
+
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('promptText').textContent).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy prompt'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+render();
+</script>
+</body>
+</html>

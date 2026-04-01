@@ -35,6 +35,8 @@ export interface FluxTableContextValue {
   shippers?: ShipperResponse[];
   /** Toggle a job's shipped (Parti) status. */
   onToggleShipped?: (jobInternalId: string, shipped: boolean) => void;
+  /** Toggle a job's invoiced (Facturé) status. */
+  onToggleInvoiced?: (jobInternalId: string, invoiced: boolean) => void;
   /** Open scheduler in new tab scrolled to the given task (F9). */
   onStationClick?: (taskId: string) => void;
   /** Job IDs (internal UUIDs) that are late (from schedule snapshot). */

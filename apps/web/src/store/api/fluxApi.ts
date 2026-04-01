@@ -63,6 +63,7 @@ interface FluxJobApiResponse {
   internalId: string;
   designation: string;
   client: string;
+  referent: string | null;
   /** Workshop exit date in JJ/MM format */
   sortie: string;
   elements: FluxElementApiResponse[];
@@ -71,6 +72,8 @@ interface FluxJobApiResponse {
   shipper: string | null;
   shipped: boolean;
   shippedAt: string | null;
+  invoiced: boolean;
+  invoicedAt: string | null;
   batDeadline: string | null;
 }
 
@@ -99,6 +102,7 @@ function transformFluxJobsResponse(
       internalId: job.internalId,
       designation: job.designation,
       client: job.client,
+      referent: job.referent ?? null,
       sortie: job.sortie,
       elements: job.elements.map((el) => ({
         id: el.id,
@@ -122,6 +126,10 @@ function transformFluxJobsResponse(
       parti: {
         shipped: job.shipped,
         date: job.shippedAt ?? null,
+      },
+      facture: {
+        invoiced: job.invoiced,
+        date: job.invoicedAt ?? null,
       },
     }));
   }
@@ -161,6 +169,13 @@ export interface ToggleJobShippedArg {
   jobInternalId: string;
   /** New shipped state */
   shipped: boolean;
+}
+
+export interface ToggleJobInvoicedArg {
+  /** Job GUID (used in the PUT URL) */
+  jobInternalId: string;
+  /** New invoiced state */
+  invoiced: boolean;
 }
 
 // ============================================================================
@@ -307,7 +322,39 @@ export const fluxApi = createApi({
         }
       },
     }),
+
+    /**
+     * Toggle a job's invoiced (Facturé) status.
+     * Optimistic update: immediately shows CircleCheck + today's date or reverts to Circle.
+     */
+    toggleJobInvoiced: builder.mutation<void, ToggleJobInvoicedArg>({
+      query: ({ jobInternalId, invoiced }) => ({
+        url: `/jobs/${jobInternalId}`,
+        method: 'PUT',
+        body: { invoiced },
+      }),
+      async onQueryStarted({ jobInternalId, invoiced }, { dispatch, queryFulfilled }) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+
+        const patchResult = dispatch(
+          fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
+            const job = draft.find((j) => j.internalId === jobInternalId);
+            if (job) {
+              job.facture = { invoiced, date: invoiced ? `${dd}/${mm}` : null };
+            }
+          }),
+        );
+        try {
+          await queryFulfilled;
+          dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
   }),
 });
 
-export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation } = fluxApi;
+export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation } = fluxApi;

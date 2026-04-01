@@ -12,6 +12,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { scheduleApi } from './api/scheduleApi';
 import { templateApi } from './api/templateApi';
 import { clientApi } from './api/clientApi';
+import { referentApi } from './api/referentApi';
 import { stationCategoryApi } from './api/stationCategoryApi';
 import { formatApi } from './api/formatApi';
 import { impressionPresetApi } from './api/impressionPresetApi';
@@ -38,6 +39,7 @@ export const store = configureStore({
     [scheduleApi.reducerPath]: scheduleApi.reducer,
     [templateApi.reducerPath]: templateApi.reducer,
     [clientApi.reducerPath]: clientApi.reducer,
+    [referentApi.reducerPath]: referentApi.reducer,
     [stationCategoryApi.reducerPath]: stationCategoryApi.reducer,
     [formatApi.reducerPath]: formatApi.reducer,
     [impressionPresetApi.reducerPath]: impressionPresetApi.reducer,
@@ -64,6 +66,7 @@ export const store = configureStore({
       .concat(scheduleApi.middleware)
       .concat(templateApi.middleware)
       .concat(clientApi.middleware)
+      .concat(referentApi.middleware)
       .concat(stationCategoryApi.middleware)
       .concat(formatApi.middleware)
       .concat(impressionPresetApi.middleware)
@@ -113,6 +116,7 @@ export const useAppSelector = useSelector.withTypes<RootState>();
 export {
   useGetSnapshotQuery,
   useGetClientSuggestionsQuery,
+  useGetReferentSuggestionsQuery,
   useLookupByReferenceQuery,
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
@@ -151,6 +155,15 @@ export {
   clientApi,
 } from './api/clientApi';
 export type { ClientResponse } from './api/clientApi';
+
+export {
+  useGetReferentsQuery,
+  useCreateReferentMutation,
+  useUpdateReferentMutation,
+  useDeleteReferentMutation,
+  referentApi,
+} from './api/referentApi';
+export type { ReferentResponse } from './api/referentApi';
 
 export {
   useGetStationCategoriesQuery,
@@ -224,7 +237,7 @@ export {
 } from './api/shipperApi';
 export type { ShipperResponse, ShipperInput } from './api/shipperApi';
 
-export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, fluxApi } from './api/fluxApi';
+export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, fluxApi } from './api/fluxApi';
 
 export { useLoginMutation, useGetMeQuery, authApi } from './api/authApi';
 
@@ -264,6 +277,7 @@ export {
   closeJcfModal,
   setJcfJobId,
   setJcfClient,
+  setJcfReferent,
   setJcfTemplate,
   setJcfIntitule,
   setJcfQuantity,

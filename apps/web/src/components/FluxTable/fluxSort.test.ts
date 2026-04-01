@@ -11,6 +11,7 @@ import type { FluxJob } from './fluxTypes';
 function makeJob(overrides: Partial<FluxJob> & { id: string }): FluxJob {
   return {
     client: 'Client',
+    referent: null,
     designation: 'Designation',
     sortie: '01/01',
     elements: [
@@ -26,6 +27,7 @@ function makeJob(overrides: Partial<FluxJob> & { id: string }): FluxJob {
     ],
     transporteur: null,
     parti: { shipped: false, date: null },
+    facture: { invoiced: false, date: null },
     ...overrides,
   };
 }

@@ -12,6 +12,7 @@ const SETTINGS_ITEMS = [
   { label: 'Sous-traitants',              path: '/settings/providers' },
   { label: 'Transporteurs',              path: '/settings/shippers' },
   { label: 'Clients',                     path: '/settings/clients' },
+  { label: 'Référents',                  path: '/settings/referents' },
   { label: 'Formats',                     path: '/settings/formats' },
   { label: 'Impressions',                 path: '/settings/impression-presets' },
   { label: 'Surfacages',                  path: '/settings/surfacage-presets' },

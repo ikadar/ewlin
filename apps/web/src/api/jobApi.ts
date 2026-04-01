@@ -37,6 +37,7 @@ export interface CreateJobElementRequest {
 export interface CreateJobRequest {
   reference: string;
   client: string;
+  referent?: string;
   description: string;
   workshopExitDate: string;
   batDeadline?: string | null;
@@ -204,6 +205,7 @@ export function transformJcfToRequest(
   shipperId?: string,
   requiredJobs?: string,
   batDeadline?: string,
+  referent?: string,
 ): CreateJobRequest {
   // Parse required jobs: "JOB-001, JOB-002" → ["JOB-001", "JOB-002"]
   const requiredJobReferences = requiredJobs
@@ -221,6 +223,7 @@ export function transformJcfToRequest(
     ...(shipperId ? { shipperId } : {}),
     ...(requiredJobReferences && requiredJobReferences.length > 0 ? { requiredJobReferences } : {}),
     ...(batDeadline ? { batDeadline } : {}),
+    ...(referent ? { referent } : {}),
   };
 }
 

@@ -308,3 +308,57 @@ describe('computeTabCounts — soustraitance', () => {
     expect(counts.soustraitance).toBe(1);
   });
 });
+
+// ── a-facturer tab ──────────────────────────────────────────────────────────
+
+describe('filterByTab — a-facturer (shipped but not invoiced)', () => {
+  const jobs = FLUX_STATIC_JOBS;
+  const ids = (tab: TabId) =>
+    jobs.filter(j => filterByTab(j, tab)).map(j => j.id);
+
+  it('shows jobs that are shipped but not invoiced', () => {
+    const result = ids('a-facturer');
+    // 00042: shipped=true, invoiced=true → excluded
+    // 00117: shipped=true, invoiced=false → included
+    expect(result).toContain('00117');
+    expect(result).not.toContain('00042');
+  });
+
+  it('excludes non-shipped jobs', () => {
+    const result = ids('a-facturer');
+    expect(result).not.toContain('00078');
+    expect(result).not.toContain('00091');
+    expect(result).not.toContain('00103');
+  });
+});
+
+describe('pathnameToTab — a-facturer URL', () => {
+  it('maps /flux/a-facturer to a-facturer', () => {
+    expect(pathnameToTab('/flux/a-facturer')).toBe('a-facturer');
+  });
+});
+
+describe('tabToPathname — a-facturer URL', () => {
+  it('maps a-facturer to /flux/a-facturer', () => {
+    expect(tabToPathname('a-facturer')).toBe('/flux/a-facturer');
+  });
+});
+
+describe('computeTabCounts — a-facturer', () => {
+  const jobs = FLUX_STATIC_JOBS;
+
+  it('no search: a-facturer count = 1 (only 00117 is shipped but not invoiced)', () => {
+    const counts = computeTabCounts(jobs, '');
+    expect(counts['a-facturer']).toBe(1);
+  });
+
+  it('search "GLS": a-facturer = 1 (00117 matches)', () => {
+    const counts = computeTabCounts(jobs, 'GLS');
+    expect(counts['a-facturer']).toBe(1);
+  });
+
+  it('search "Ducros": a-facturer = 0 (00042 is shipped AND invoiced)', () => {
+    const counts = computeTabCounts(jobs, 'Ducros');
+    expect(counts['a-facturer']).toBe(0);
+  });
+});

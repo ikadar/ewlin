@@ -35,6 +35,7 @@ import { SettingsLayout } from './components/SettingsLayout/SettingsLayout';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { StationCategoriesPage } from './pages/StationCategoriesPage';
 import { ClientsPage } from './pages/ClientsPage';
+import { ReferentsPage } from './pages/ReferentsPage';
 import { FormatsPage } from './pages/FormatsPage';
 import { ImpressionPresetsPage } from './pages/ImpressionPresetsPage';
 import { SurfacagePresetsPage } from './pages/SurfacagePresetsPage';
@@ -65,6 +66,7 @@ export function AppRoutes() {
           <Route path="formes" element={null} />
           <Route path="plaques" element={null} />
           <Route path="soustraitance" element={null} />
+          <Route path="a-facturer" element={null} />
         </Route>
 
         {/* Scheduling routes */}
@@ -78,6 +80,7 @@ export function AppRoutes() {
           <Route path="stations" element={<StationsPage />} />
           <Route path="station-categories" element={<StationCategoriesPage />} />
           <Route path="clients" element={<ClientsPage />} />
+          <Route path="referents" element={<ReferentsPage />} />
           <Route path="formats" element={<FormatsPage />} />
           <Route path="impression-presets" element={<ImpressionPresetsPage />} />
           <Route path="surfacage-presets" element={<SurfacagePresetsPage />} />

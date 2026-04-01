@@ -6,7 +6,7 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
-import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
+import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
@@ -52,6 +52,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
   const [updateJobShipper] = useUpdateJobShipperMutation();
   const [toggleJobShipped] = useToggleJobShippedMutation();
+  const [toggleJobInvoiced] = useToggleJobInvoicedMutation();
   const [deleteJob] = useDeleteJobMutation();
   const { data: shippers = [] } = useGetShippersQuery();
   const { data: snapshot } = useGetSnapshotQuery();
@@ -173,6 +174,11 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const handleToggleShipped = useCallback((jobInternalId: string, shipped: boolean) => {
     void toggleJobShipped({ jobInternalId, shipped });
   }, [toggleJobShipped]);
+
+  /** Toggle a job's invoiced (Facturé) status. */
+  const handleToggleInvoiced = useCallback((jobInternalId: string, invoiced: boolean) => {
+    void toggleJobInvoiced({ jobInternalId, invoiced });
+  }, [toggleJobInvoiced]);
 
   /** Toggle expanded state for a multi-element job. */
   const handleToggleExpand = useCallback((jobId: string) => {
@@ -341,6 +347,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               onUpdateShipper={handleUpdateShipper}
               shippers={shippers}
               onToggleShipped={handleToggleShipped}
+              onToggleInvoiced={handleToggleInvoiced}
               onStationClick={handleStationClick}
               lateJobIds={lateJobIds}
               conflictJobIds={conflictJobIds}

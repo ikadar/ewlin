@@ -171,6 +171,7 @@ export interface FluxJob {
   /** Internal GUID from the PHP API. Used for backend mutations (update, delete). */
   internalId?: string;
   client: string;
+  referent: string | null;
   designation: string;
   /** Workshop exit date in JJ/MM format, e.g. "28/02". */
   sortie: string;
@@ -182,6 +183,11 @@ export interface FluxJob {
   parti: {
     shipped: boolean;
     /** Shipment date in JJ/MM format, e.g. "25/02". null if not shipped. */
+    date: string | null;
+  };
+  facture: {
+    invoiced: boolean;
+    /** Invoice date in JJ/MM format, e.g. "25/02". null if not invoiced. */
     date: string | null;
   };
 }

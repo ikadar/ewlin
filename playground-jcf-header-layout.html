@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JCF Header Layout Explorer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #e4e4e7;
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top bar ────────────────────────────────────── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background: #18181b;
+    border-bottom: 1px solid #27272a;
+    flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 14px; font-weight: 600; color: #a1a1aa; }
+  .topbar label { font-size: 12px; color: #71717a; }
+  .topbar input[type="range"] {
+    width: 200px;
+    accent-color: #3b82f6;
+    vertical-align: middle;
+  }
+  .topbar .width-val {
+    font-size: 12px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    color: #a1a1aa;
+    min-width: 45px;
+  }
+
+  /* ── Main content ───────────────────────────────── */
+  .main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+  }
+
+  /* ── Option card ────────────────────────────────── */
+  .option-card {
+    width: 100%;
+    max-width: 1640px;
+    border: 2px solid #27272a;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .option-card:hover { border-color: #3f3f46; }
+  .option-card.selected { border-color: #3b82f6; }
+
+  .option-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: #18181b;
+    border-bottom: 1px solid #27272a;
+  }
+  .option-card.selected .option-header { background: #1e293b; border-bottom-color: #1e3a5f; }
+
+  .option-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: #27272a;
+    color: #a1a1aa;
+  }
+  .option-card.selected .option-badge { background: #1e40af; color: #93c5fd; }
+
+  .option-title { font-size: 13px; font-weight: 500; color: #a1a1aa; }
+  .option-card.selected .option-title { color: #93c5fd; }
+
+  .option-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    background: #27272a;
+    color: #71717a;
+    margin-left: auto;
+  }
+
+  .option-body {
+    padding: 14px;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* ── JCF form mock ──────────────────────────────── */
+  .jcf-container {
+    background: rgba(24,24,27,0.5);
+    border: 1px solid #27272a;
+    border-radius: 3px;
+    padding: 10px;
+    transition: width 0.2s;
+  }
+
+  .jcf-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .jcf-row + .jcf-row { margin-top: 8px; }
+
+  .jcf-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px;
+    border: 1px solid #27272a;
+    border-radius: 3px;
+    position: relative;
+  }
+  .jcf-group-label {
+    position: absolute;
+    top: -7px;
+    left: 8px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #52525b;
+    background: #131316;
+    padding: 0 4px;
+  }
+
+  .jcf-field label {
+    display: block;
+    font-size: 10px;
+    line-height: 13px;
+    color: #71717a;
+    margin-bottom: 3px;
+  }
+  .jcf-field input,
+  .jcf-field select {
+    width: 100%;
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    border-radius: 3px;
+    padding: 5px 7px;
+    color: #e4e4e7;
+    font-size: 13px;
+    outline: none;
+  }
+  .jcf-field input:focus,
+  .jcf-field select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+  }
+  .jcf-field input::placeholder { color: #52525b; }
+  .jcf-field .mono { font-family: 'SF Mono', 'Menlo', monospace; }
+  .jcf-field .right { text-align: right; }
+  .jcf-field .date-wrap {
+    position: relative;
+  }
+  .jcf-field .date-wrap input { padding-right: 26px; }
+  .jcf-field .date-wrap .cal {
+    position: absolute;
+    right: 7px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #71717a;
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  /* ── Prompt section ─────────────────────────────── */
+  .prompt-section {
+    width: 100%;
+    max-width: 1640px;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    padding: 14px;
+    flex-shrink: 0;
+  }
+  .prompt-section .prompt-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+  .prompt-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #d4d4d8;
+    white-space: pre-wrap;
+    min-height: 40px;
+  }
+  .copy-btn {
+    margin-top: 10px;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    color: #a1a1aa;
+    padding: 5px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: #3f3f46; color: #e4e4e7; }
+  .copy-btn.copied { background: #166534; border-color: #16a34a; color: #86efac; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>JCF Header Layout Explorer</h1>
+  <label>Container width:</label>
+  <input type="range" id="widthSlider" min="800" max="1600" value="1280" step="10">
+  <span class="width-val" id="widthVal">1280px</span>
+</div>
+
+<div class="main" id="main"></div>
+
+<div class="prompt-section" id="promptSection" style="margin: 0 20px 16px 20px;">
+  <div class="prompt-label">Prompt output</div>
+  <div class="prompt-text" id="promptText"></div>
+  <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy prompt</button>
+</div>
+
+<script>
+const state = {
+  selected: 'B',
+  width: 1280,
+};
+
+const OPTIONS = {
+  A: {
+    title: 'Current — Single row flex-wrap',
+    tag: 'actuel',
+    render: (w) => `
+      <div class="jcf-container" style="width:${w}px">
+        <div class="jcf-row">
+          ${field('ID', 91, '00347', 'mono')}
+          ${field('Client', 234, 'Ducros SA')}
+          ${field('Template', 234, '', 'Aucun')}
+          ${flexField('Intitulé', 208, 'Brochure A4 16p Couché Satin')}
+          ${field('Quantité', 78, '5 000', 'mono right')}
+          ${field('Transporteur', 156, '', '', 'select')}
+          ${dateField('Deadline', 156, '15/04 14:00')}
+          ${dateField('D.L. BAT', 156, '10/04 10:00')}
+          ${field('Prérequis', 234, '', 'ex: 00341, 00342')}
+        </div>
+      </div>`
+  },
+  B: {
+    title: 'Two rows — Identity / Details',
+    tag: 'recommended',
+    render: (w) => `
+      <div class="jcf-container" style="width:${w}px">
+        <div class="jcf-row">
+          ${field('ID', 91, '00347', 'mono')}
+          ${field('Client', 234, 'Ducros SA')}
+          ${field('Template', 234, '', 'Aucun')}
+          ${flexField('Intitulé', 208, 'Brochure A4 16p Couché Satin')}
+        </div>
+        <div class="jcf-row">
+          ${field('Quantité', 78, '5 000', 'mono right')}
+          ${dateField('Deadline', 156, '15/04 14:00')}
+          ${dateField('D.L. BAT', 156, '10/04 10:00')}
+          ${field('Transporteur', 156, '', '', 'select')}
+          ${field('Prérequis', 234, '', 'ex: 00341, 00342')}
+        </div>
+      </div>`
+  },
+  C: {
+    title: 'Grouped sections — Identification / Production / Logistique',
+    tag: 'structured',
+    render: (w) => `
+      <div class="jcf-container" style="width:${w}px">
+        <div class="jcf-row">
+          <div class="jcf-group" style="flex:1;min-width:400px">
+            <span class="jcf-group-label">Identification</span>
+            ${field('ID', 91, '00347', 'mono')}
+            ${field('Client', 200, 'Ducros SA')}
+            ${flexField('Intitulé', 160, 'Brochure A4 16p Couché Satin')}
+          </div>
+          <div class="jcf-group" style="min-width:260px">
+            <span class="jcf-group-label">Production</span>
+            ${field('Template', 180, '', 'Aucun')}
+            ${field('Quantité', 78, '5 000', 'mono right')}
+            ${field('Prérequis', 200, '', 'ex: 00341, 00342')}
+          </div>
+          <div class="jcf-group" style="min-width:300px">
+            <span class="jcf-group-label">Logistique</span>
+            ${dateField('Deadline', 140, '15/04 14:00')}
+            ${dateField('D.L. BAT', 140, '10/04 10:00')}
+            ${field('Transporteur', 140, '', '', 'select')}
+          </div>
+        </div>
+      </div>`
+  },
+  D: {
+    title: 'Two rows — Semantic grouping',
+    tag: 'compact',
+    render: (w) => `
+      <div class="jcf-container" style="width:${w}px">
+        <div class="jcf-row">
+          ${field('ID', 91, '00347', 'mono')}
+          ${field('Client', 234, 'Ducros SA')}
+          ${flexField('Intitulé', 208, 'Brochure A4 16p Couché Satin')}
+          ${field('Template', 200, '', 'Aucun')}
+        </div>
+        <div class="jcf-row">
+          ${field('Quantité', 78, '5 000', 'mono right')}
+          ${dateField('Deadline', 140, '15/04 14:00')}
+          ${dateField('D.L. BAT', 140, '10/04 10:00')}
+          ${field('Transporteur', 140, '', '', 'select')}
+          ${field('Prérequis', 200, '', 'ex: 00341, 00342')}
+          <div style="flex:1"></div>
+        </div>
+      </div>`
+  },
+};
+
+function field(label, width, value, cls = '', type = 'input') {
+  const style = `width:${width}px`;
+  if (type === 'select') {
+    return `<div class="jcf-field" style="${style}">
+      <label>${label}</label>
+      <select><option value="">—</option><option>Chronopost</option><option>GLS</option><option>DHL</option></select>
+    </div>`;
+  }
+  const extraCls = cls ? ` ${cls}` : '';
+  const ph = cls.includes('mono') ? '' : (value ? '' : `placeholder="${arguments[3] || ''}"`);
+  return `<div class="jcf-field" style="${style}">
+    <label>${label}</label>
+    <input type="text" class="${extraCls}" value="${value}" ${!value ? `placeholder="${arguments[3] || ''}"` : ''} readonly>
+  </div>`;
+}
+
+function flexField(label, minWidth, value) {
+  return `<div class="jcf-field" style="flex:1;min-width:${minWidth}px">
+    <label>${label}</label>
+    <input type="text" value="${value}" readonly>
+  </div>`;
+}
+
+function dateField(label, width, value) {
+  return `<div class="jcf-field" style="width:${width}px">
+    <label>${label}</label>
+    <div class="date-wrap">
+      <input type="text" class="mono" value="${value}" readonly>
+      <span class="cal">&#x1F4C5;</span>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const main = document.getElementById('main');
+  let html = '';
+
+  for (const [key, opt] of Object.entries(OPTIONS)) {
+    const sel = state.selected === key ? ' selected' : '';
+    html += `
+      <div class="option-card${sel}" onclick="selectOption('${key}')">
+        <div class="option-header">
+          <span class="option-badge">${key}</span>
+          <span class="option-title">${opt.title}</span>
+          <span class="option-tag">${opt.tag}</span>
+        </div>
+        <div class="option-body">
+          ${opt.render(state.width)}
+        </div>
+      </div>`;
+  }
+  main.innerHTML = html;
+  updatePrompt();
+}
+
+function selectOption(key) {
+  state.selected = key;
+  render();
+}
+
+function updatePrompt() {
+  const prompts = {
+    A: `Keep the current JCF header layout as-is: all 9 fields in a single flex-wrap row. No changes needed.`,
+    B: `Reorganize the JCF header (JcfJobHeader.tsx) into two rows:
+
+Row 1 (identity): ID (91px), Client (234px), Template (234px), Intitulé (flex-1, min 208px)
+Row 2 (details): Quantité (78px), Deadline (156px), D.L. BAT (156px), Transporteur (156px), Prérequis (234px)
+
+Both rows use flex with gap-[10px] and flex-wrap. The container stays the same (bg-zinc-900/50, border, p-[10px]). Row 2 has margin-top: 8px.`,
+    C: `Reorganize the JCF header (JcfJobHeader.tsx) into three labeled groups inside a single flex-wrap row:
+
+Group "Identification" (flex-1, min 400px): ID (91px), Client (200px), Intitulé (flex-1, min 160px)
+Group "Production" (min 260px): Template (180px), Quantité (78px), Prérequis (200px)
+Group "Logistique" (min 300px): Deadline (140px), D.L. BAT (140px), Transporteur (140px)
+
+Each group is a div with border border-zinc-700, rounded-[3px], p-2, and a floating label (position absolute, top -7px, left 8px, text-[9px] uppercase text-zinc-600, bg matching container). Groups use internal flex gap-[10px] flex-wrap.`,
+    D: `Reorganize the JCF header (JcfJobHeader.tsx) into two rows with semantic grouping:
+
+Row 1 (what): ID (91px), Client (234px), Intitulé (flex-1, min 208px), Template (200px)
+Row 2 (how): Quantité (78px), Deadline (140px), D.L. BAT (140px), Transporteur (140px), Prérequis (200px), spacer (flex-1)
+
+Both rows use flex with gap-[10px] and flex-wrap. Row 2 has margin-top: 8px. Template moves to end of row 1 since it's a secondary field.`,
+  };
+  document.getElementById('promptText').textContent = prompts[state.selected];
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy prompt';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// Width slider
+const slider = document.getElementById('widthSlider');
+const valEl = document.getElementById('widthVal');
+slider.addEventListener('input', () => {
+  state.width = parseInt(slider.value);
+  valEl.textContent = state.width + 'px';
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

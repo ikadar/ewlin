@@ -450,6 +450,7 @@ function AppContent() {
   const [jcfBatDeadline, setJcfBatDeadline] = useState('');
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
+  const [jcfReferent, setJcfReferent] = useState('');
   const [jcfTemplate, setJcfTemplate] = useState('');
   // v0.4.9: Elements table state
   const [jcfElements, setJcfElements] = useState<JcfElement[]>([{ ...DEFAULT_ELEMENT }]);
@@ -508,6 +509,7 @@ function AppContent() {
           body: {
             reference: jcfJobId,
             client: jcfClient,
+            referent: jcfReferent || null,
             description: jcfIntitule,
             workshopExitDate: jcfDeadline,
             batDeadline: jcfBatDeadline || null,
@@ -531,6 +533,7 @@ function AppContent() {
           jcfShipperId || undefined,
           jcfRequiredJobs || undefined,
           jcfBatDeadline || undefined,
+          jcfReferent || undefined,
         );
         await createJob(request).unwrap();
       }
@@ -543,6 +546,7 @@ function AppContent() {
       const fromRoute = (location.state as { from?: string } | null)?.from;
       navigate(fromRoute?.startsWith('/flux') ? fromRoute : '/', { replace: true });
       setJcfClient('');
+      setJcfReferent('');
       setJcfTemplate('');
       setJcfIntitule('');
       setJcfQuantity('');
@@ -561,7 +565,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
+  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -588,6 +592,7 @@ function AppContent() {
     navigate(restoreUrl, { replace: true });
     preJcfSelectedJobIdRef.current = null;
     setJcfClient('');
+    setJcfReferent('');
     setJcfTemplate('');
     setJcfIntitule('');
     setJcfQuantity('');
@@ -746,6 +751,7 @@ function AppContent() {
   const populateJcfFromJob = useCallback((job: Job) => {
     setJcfJobId(job.reference);
     setJcfClient(job.client);
+    setJcfReferent(job.referent ?? '');
     setJcfIntitule(job.description);
     setJcfDeadline(job.workshopExitDate);
     setJcfBatDeadline(job.batDeadline ?? '');
@@ -2514,6 +2520,8 @@ function AppContent() {
           onJobIdChange={isEditMode ? undefined : setJcfJobId}
           client={jcfClient}
           onClientChange={setJcfClient}
+          referent={jcfReferent}
+          onReferentChange={setJcfReferent}
           template={jcfTemplate}
           onTemplateChange={setJcfTemplate}
           onTemplateSelect={isEditMode ? undefined : handleTemplateSelect}

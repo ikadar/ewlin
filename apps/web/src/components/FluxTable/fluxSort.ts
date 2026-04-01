@@ -12,6 +12,7 @@ import { worstPrerequisiteStatus, PREREQUISITE_COLOR_SEVERITY, STATION_STATE_SEV
 export type SortColumn =
   | 'id'
   | 'client'
+  | 'referent'
   | 'designation'
   | 'sortie'
   | 'bat'
@@ -104,6 +105,9 @@ export function sortFluxJobs(
         break;
       case 'client':
         cmp = a.client.localeCompare(b.client);
+        break;
+      case 'referent':
+        cmp = (a.referent ?? '').localeCompare(b.referent ?? '');
         break;
       case 'designation':
         cmp = a.designation.localeCompare(b.designation);

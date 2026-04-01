@@ -11,10 +11,10 @@ import { PREREQUISITE_BADGE_LABEL } from './fluxTypes';
 import { worstPrerequisiteStatus } from './fluxAggregation';
 
 /** Route segment → tab identifier mapping (qa.md K11.1). */
-export type TabId = 'all' | 'bat' | 'papier' | 'formes' | 'plaques' | 'soustraitance';
+export type TabId = 'all' | 'bat' | 'papier' | 'formes' | 'plaques' | 'soustraitance' | 'a-facturer';
 
 /** The ordered list of tabs (left to right). Used for keyboard cycling. */
-export const TAB_IDS: TabId[] = ['all', 'bat', 'papier', 'formes', 'plaques', 'soustraitance'];
+export const TAB_IDS: TabId[] = ['all', 'bat', 'papier', 'formes', 'plaques', 'soustraitance', 'a-facturer'];
 
 /** Maps tab ID to its display label. */
 export const TAB_LABELS: Record<TabId, string> = {
@@ -24,6 +24,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   formes:         'Cdes formes',
   plaques:        'Plaques à produire',
   soustraitance:  'S-T à faire',
+  'a-facturer':   'À facturer',
 };
 
 /** Maps URL pathname to tab ID. Unknown paths default to 'all'. */
@@ -33,6 +34,7 @@ export function pathnameToTab(pathname: string): TabId {
   if (pathname === '/flux/formes')         return 'formes';
   if (pathname === '/flux/plaques')        return 'plaques';
   if (pathname === '/flux/soustraitance')  return 'soustraitance';
+  if (pathname === '/flux/a-facturer')    return 'a-facturer';
   return 'all';
 }
 
@@ -50,6 +52,10 @@ export function tabToPathname(tab: TabId): string {
  */
 export function filterByTab(job: FluxJob, tab: TabId): boolean {
   if (tab === 'all') return true;
+
+  if (tab === 'a-facturer') {
+    return job.parti.shipped === true && job.facture.invoiced === false;
+  }
 
   if (tab === 'soustraitance') {
     // Job visible if at least one element has at least one non-done outsourced task.
@@ -130,7 +136,7 @@ export function computeTabCounts(
   search: string,
 ): Record<TabId, number> {
   const counts: Record<TabId, number> = {
-    all: 0, bat: 0, papier: 0, formes: 0, plaques: 0, soustraitance: 0,
+    all: 0, bat: 0, papier: 0, formes: 0, plaques: 0, soustraitance: 0, 'a-facturer': 0,
   };
   for (const job of jobs) {
     if (!filterBySearch(job, search)) continue;
