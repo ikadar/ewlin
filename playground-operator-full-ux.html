@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operator Progress UX — Full Flow Playground</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --card: #22252f; --border: #2e3240;
+    --text: #e4e6ec; --muted: #8b8fa4; --accent: #3B82F6;
+    --emerald: #10b981; --amber: #f59e0b; --red: #ef4444;
+    --purple: #8b5cf6;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  .mono { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; }
+
+  /* ── TOP BAR ── */
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .topbar h1 { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+  .view-tabs { display: flex; gap: 2px; background: #111318; border-radius: 8px; padding: 2px; margin-left: 16px; }
+  .view-tab { padding: 7px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--muted); transition: all 0.15s; }
+  .view-tab.active { background: var(--accent); color: #fff; }
+  .view-tab:hover:not(.active) { color: var(--text); }
+  .scenario-pills { display: flex; gap: 6px; margin-left: auto; }
+  .pill { padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .pill:hover { border-color: var(--muted); color: var(--text); }
+  .pill.active { border-color: var(--accent); color: var(--accent); background: rgba(59,130,246,0.1); }
+
+  /* ── CONTENT ── */
+  .content { flex: 1; overflow: hidden; position: relative; }
+  .view { position: absolute; inset: 0; display: none; }
+  .view.active { display: flex; }
+
+  /* ════════════════════════════════════════════════
+     VIEW 1: OPERATOR STATION
+     ════════════════════════════════════════════════ */
+  .operator-view { justify-content: center; align-items: stretch; }
+
+  /* Left: station context */
+  .op-sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+  .op-sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); }
+  .op-station-name { font-size: 18px; font-weight: 800; color: #fff; }
+  .op-station-cat { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .op-user-row { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .op-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .op-user-name { font-size: 13px; font-weight: 600; }
+  .op-user-role { font-size: 11px; color: var(--muted); }
+
+  .op-queue-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 14px 16px 6px; }
+  .op-queue-item { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; display: flex; align-items: center; gap: 10px; }
+  .op-queue-item:hover { background: rgba(255,255,255,0.03); }
+  .op-queue-item.current { background: rgba(59,130,246,0.08); border-left: 3px solid var(--accent); }
+  .op-queue-item.done { opacity: 0.4; }
+  .op-q-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .op-q-ref { font-size: 12px; font-weight: 700; }
+  .op-q-time { font-size: 11px; color: var(--muted); font-family: 'SF Mono', monospace; }
+  .op-q-status { font-size: 10px; margin-left: auto; font-weight: 700; }
+
+  /* Center: main task */
+  .op-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px; gap: 16px; align-items: center; }
+  .op-task-hero { width: 100%; max-width: 540px; background: #1a1f2e; border-radius: 14px; border-left: 5px solid var(--accent); overflow: hidden; }
+  .op-hero-header { padding: 18px 20px 12px; }
+  .op-hero-ref { font-size: 20px; font-weight: 800; color: #fff; }
+  .op-hero-client { font-size: 15px; color: var(--accent); font-weight: 600; margin-top: 2px; }
+  .op-hero-desc { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .op-hero-chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .op-chip { padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.06); color: var(--muted); }
+
+  .op-hero-progress { padding: 0 20px 8px; }
+  .op-prog-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .op-prog-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .op-prog-value { font-size: 30px; font-weight: 900; color: #fff; font-family: 'SF Mono', monospace; line-height: 1; }
+  .op-prog-value .dim { font-size: 16px; color: var(--muted); font-weight: 500; }
+  .op-prog-pct { font-size: 22px; font-weight: 800; font-family: 'SF Mono', monospace; }
+  .op-prog-bar { width: 100%; height: 8px; background: #262a3a; border-radius: 4px; overflow: hidden; }
+  .op-prog-fill { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
+
+  .op-hero-time { display: flex; justify-content: space-between; padding: 10px 20px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 12px; color: var(--muted); }
+  .op-hero-time b { color: var(--text); }
+  .time-countdown { font-weight: 800; font-size: 13px; }
+
+  /* Input area */
+  .op-input-area { padding: 14px 20px 18px; background: rgba(0,0,0,0.15); }
+  .op-batch-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .op-batch { flex: 1; height: 50px; border: none; border-radius: 10px; background: #2a3a5a; color: var(--accent); font-size: 17px; font-weight: 800; cursor: pointer; transition: all 0.1s; font-family: 'SF Mono', monospace; }
+  .op-batch:active { transform: scale(0.96); background: #3d5a82; }
+
+  .op-keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; max-width: 240px; margin: 0 auto; }
+  .op-key { height: 52px; border: none; border-radius: 9px; background: #262938; color: #fff; font-size: 20px; font-weight: 700; cursor: pointer; transition: all 0.1s; }
+  .op-key:active { transform: scale(0.95); background: #3a3e52; }
+  .op-key.clear { color: var(--amber); font-size: 15px; font-weight: 800; }
+  .op-key.confirm { background: var(--emerald); }
+  .op-keypad-display { grid-column: 1/-1; height: 40px; background: #111318; border: 2px solid var(--border); border-radius: 7px; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; font-size: 20px; font-weight: 700; font-family: 'SF Mono', monospace; color: var(--text); margin-bottom: 2px; }
+
+  /* Percentage presets */
+  .op-pct-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .op-pct-btn { height: 56px; border: 2px solid transparent; border-radius: 10px; background: #262938; color: #fff; font-size: 18px; font-weight: 800; cursor: pointer; transition: all 0.12s; }
+  .op-pct-btn:active { transform: scale(0.96); }
+  .op-pct-btn.on { border-color: var(--emerald); background: rgba(16,185,129,0.12); color: var(--emerald); }
+
+  /* Complete + alert */
+  .op-complete-row { width: 100%; max-width: 540px; }
+  .op-complete-btn { width: 100%; height: 54px; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .op-complete-btn.ready { background: var(--emerald); color: #fff; }
+  .op-complete-btn.done { background: #1e4a3a; color: var(--emerald); }
+
+  .op-alert { width: 100%; max-width: 540px; border-radius: 12px; padding: 14px 18px; display: none; flex-direction: column; gap: 10px; animation: fadeSlide 0.25s ease; }
+  .op-alert.show { display: flex; }
+  .op-alert.warn { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); }
+  .op-alert.crit { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); }
+  @keyframes fadeSlide { from { opacity:0; transform: translateY(-6px); } }
+  .op-alert-head { display: flex; align-items: center; gap: 8px; }
+  .op-alert-icon { font-size: 18px; }
+  .op-alert-title { font-size: 15px; font-weight: 700; }
+  .op-alert-sub { font-size: 12px; color: var(--muted); }
+  .op-alert-reason { display: flex; gap: 6px; flex-wrap: wrap; }
+  .op-reason-btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.12s; }
+  .op-reason-btn:hover { border-color: var(--muted); }
+  .op-reason-btn.selected { border-color: var(--amber); background: rgba(245,158,11,0.1); color: var(--amber); }
+  .op-signal-btn { width: 100%; height: 46px; border: none; border-radius: 9px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.12s; }
+  .op-alert.warn .op-signal-btn { background: rgba(245,158,11,0.2); color: var(--amber); }
+  .op-alert.crit .op-signal-btn { background: rgba(239,68,68,0.2); color: var(--red); }
+  .op-signal-btn:hover { filter: brightness(1.15); }
+  .op-signal-btn.sent { opacity: 0.5; pointer-events: none; }
+
+  /* ════════════════════════════════════════════════
+     VIEW 2: SCHEDULER GRID  (matches real Flux app)
+     ════════════════════════════════════════════════ */
+  .scheduler-view { flex-direction: column; }
+  .sched-outer { flex: 1; display: flex; height: 100%; overflow: hidden; }
+
+  /* Left nav sidebar (icon rail) */
+  .sched-nav { width: 56px; flex-shrink: 0; background: rgba(26,26,26,0.5); border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; }
+  .sched-nav-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #808080; font-size: 16px; cursor: pointer; transition: all 0.12s; position: relative; }
+  .sched-nav-icon:hover { background: rgba(255,255,255,0.06); color: #d1d1d1; }
+  .sched-nav-icon.active-nav { background: rgba(59,130,246,0.15); color: var(--accent); }
+  .sched-nav-badge { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); display: none; }
+  .sched-nav-badge.show { display: block; animation: pulse 1.5s ease-in-out infinite; }
+
+  /* Jobs sidebar */
+  .sched-jobs { width: 240px; flex-shrink: 0; background: #1a1a1a; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; overflow: hidden; }
+  .sched-jobs-header { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sched-jobs-search { width: 100%; background: #0f0f0f; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 7px 10px; color: #f5f5f5; font-size: 12px; outline: none; }
+  .sched-jobs-search::placeholder { color: #808080; }
+  .sched-jobs-search:focus { border-color: rgba(59,130,246,0.4); }
+  .sched-jobs-list { flex: 1; overflow-y: auto; padding: 4px; }
+  .sched-job-card { padding: 8px 10px; margin: 2px 0; border-radius: 6px; cursor: pointer; transition: all 0.1s; border: 1px solid transparent; }
+  .sched-job-card:hover { background: rgba(255,255,255,0.03); }
+  .sched-job-card.selected { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+  .sched-job-ref { font-size: 12px; font-weight: 600; color: #d1d1d1; }
+  .sched-job-client { font-size: 11px; color: #808080; }
+  .sched-job-desc { font-size: 11px; color: #606060; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Progress dots */
+  .sched-job-dots { display: flex; gap: 3px; margin-top: 4px; }
+  .sched-job-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* Grid area */
+  .sched-grid-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Sticky header row */
+  .sched-header-row { display: flex; background: #1a1a1a; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+  .sched-header-time { width: 48px; flex-shrink: 0; background: #1a1a1a; border-right: 1px solid rgba(255,255,255,0.05); }
+  .sched-header-cols { display: flex; gap: 12px; padding: 0 12px; }
+  .sched-col-header { width: 195px; flex-shrink: 0; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; }
+  .sched-col-name { font-size: 11.375px; font-weight: 500; color: #d1d1d1; }
+  .sched-col-cat { font-size: 10px; color: #808080; }
+
+  /* Scrollable grid body */
+  .sched-grid-body { flex: 1; display: flex; overflow-y: auto; overflow-x: hidden; }
+
+  /* Time gutter */
+  .sched-gutter { width: 48px; flex-shrink: 0; background: rgba(26,26,26,0.5); border-right: 1px solid rgba(255,255,255,0.05); position: relative; }
+  .sched-hour-row { height: 80px; position: relative; }
+  .sched-hour-label { position: absolute; right: 8px; top: -7px; font-size: 11.375px; font-family: 'SF Mono','Fira Code',monospace; color: #606060; }
+  .sched-tick { position: absolute; right: 0; height: 1px; }
+  .sched-tick-15 { width: 8px; background: rgba(63,63,70,0.5); top: 20px; }
+  .sched-tick-30 { width: 12px; background: rgba(82,82,91,0.5); top: 40px; }
+  .sched-tick-45 { width: 8px; background: rgba(63,63,70,0.5); top: 60px; }
+
+  /* Station columns area */
+  .sched-cols-area { flex: 1; display: flex; gap: 12px; padding: 0 12px; background: #0f0f0f; position: relative; }
+  .sched-col { width: 195px; flex-shrink: 0; position: relative; }
+  .sched-col-body { position: relative; }
+
+  /* Hourly grid lines (drawn across columns) */
+  .sched-hourline { height: 80px; border-bottom: 1px solid rgba(82,82,91,0.5); }
+
+  /* Now line */
+  .sched-nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--red); z-index: 10; pointer-events: none; }
+  .sched-nowline::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+
+  /* ── TILES (matching real Flux tile styling) ── */
+  .sched-tile { position: absolute; left: 0; right: 0; cursor: pointer; overflow: hidden; transition: filter 0.15s, opacity 0.15s, box-shadow 0.15s; touch-none; user-select: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), inset 0 -1px 2px rgba(0,0,0,0.04); }
+  .sched-tile:hover { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), inset 0 -1px 2px rgba(0,0,0,0.04), 0 0 0 2px rgba(255,255,255,0.1); }
+
+  /* Tile inner: setup + run sections */
+  .sched-tile-setup { position: absolute; left: 0; right: 0; top: 0; border-bottom: 1px dotted rgba(0,0,0,0.6); }
+  .sched-tile-run { position: absolute; left: 0; right: 0; }
+
+  /* Left color border (the defining Flux tile look) */
+  .sched-tile { border-left: 4px solid; }
+
+  /* Label overlay */
+  .sched-tile-label { position: absolute; inset: 0; z-index: 1; padding: 2px 8px; pointer-events: none; overflow: hidden; display: flex; align-items: flex-start; gap: 6px; }
+  .sched-tile-icons { display: flex; align-items: center; gap: 3px; flex-shrink: 0; margin-top: 1px; }
+  .sched-tile-circle { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+  .sched-tile-circle.incomplete { border-color: #52525b; color: transparent; }
+  .sched-tile-circle.complete { border-color: var(--emerald); color: var(--emerald); background: rgba(16,185,129,0.1); }
+  .sched-tile-pin { font-size: 10px; color: var(--amber); }
+  .sched-tile-text { font-size: 11.375px; font-weight: 500; line-height: 1.3; word-break: break-word; min-width: 0; }
+
+  /* NEW: Progress fill — full-height left-to-right overlay */
+  .sched-tile-progress { position: absolute; top: 0; bottom: 0; left: 4px; right: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .sched-tile-prog-fill { position: absolute; top: 0; bottom: 0; left: 0; transition: width 0.4s ease, background 0.3s; }
+
+  /* NEW: Alert badge on tile */
+  .sched-tile-badge { position: absolute; top: 4px; right: 6px; width: 9px; height: 9px; border-radius: 50%; display: none; z-index: 2; }
+  .sched-tile-badge.show { display: block; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity: 0.4; } }
+
+  /* Right details panel */
+  .sched-details { width: 320px; flex-shrink: 0; background: #1a1a1a; border-left: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; overflow-y: auto; }
+  .sched-details-header { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sched-details-ref { font-size: 15px; font-weight: 700; color: #f5f5f5; }
+  .sched-details-client { font-size: 13px; color: var(--accent); font-weight: 600; margin-top: 2px; }
+  .sched-details-section { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .sched-details-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #808080; margin-bottom: 6px; }
+  .sched-details-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+  .sched-details-row .k { color: #a1a1a1; }
+  .sched-details-row .v { color: #f5f5f5; font-weight: 600; font-family: 'SF Mono',monospace; }
+
+  /* ── DELAY SIGNALS PANEL ── */
+  .signals-panel { width: 320px; background: var(--surface); border-left: 1px solid var(--border); flex-shrink: 0; display: none; flex-direction: column; }
+  .signals-panel.open { display: flex; }
+  .signals-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .signals-header h2 { font-size: 13px; font-weight: 700; }
+  .signals-close { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .signals-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .signal-card { background: var(--card); border-radius: 10px; padding: 14px; margin-bottom: 8px; border-left: 3px solid; }
+  .signal-card.warn { border-color: var(--amber); }
+  .signal-card.crit { border-color: var(--red); }
+  .signal-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .signal-ref { font-size: 13px; font-weight: 700; }
+  .signal-time-ago { font-size: 11px; color: var(--muted); }
+  .signal-station { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .signal-info { font-size: 12px; color: var(--text); margin-bottom: 8px; }
+  .signal-reason-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(245,158,11,0.15); color: var(--amber); margin-bottom: 8px; }
+  .signal-actions { display: flex; gap: 6px; }
+  .signal-act { flex: 1; padding: 8px; border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.12s; }
+  .signal-extend { background: rgba(59,130,246,0.15); color: var(--accent); }
+  .signal-extend:hover { background: rgba(59,130,246,0.25); }
+  .signal-ack { background: rgba(255,255,255,0.05); color: var(--muted); }
+  .signal-ack:hover { background: rgba(255,255,255,0.1); }
+
+  /* Extend popup */
+  .extend-popup { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 8px; display: none; }
+  .extend-popup.show { display: block; }
+  .extend-title { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+  .extend-options { display: flex; gap: 6px; flex-wrap: wrap; }
+  .extend-opt { padding: 8px 14px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.12s; font-family: 'SF Mono', monospace; }
+  .extend-opt:hover { border-color: var(--accent); color: var(--accent); }
+  .extend-opt.applied { background: rgba(16,185,129,0.15); border-color: var(--emerald); color: var(--emerald); pointer-events: none; }
+
+  /* ════════════════════════════════════════════════
+     VIEW 3: FLOW DIAGRAM
+     ════════════════════════════════════════════════ */
+  .flow-view { flex-direction: column; overflow-y: auto; padding: 32px; gap: 24px; align-items: center; }
+  .flow-title { font-size: 18px; font-weight: 800; text-align: center; }
+  .flow-subtitle { font-size: 13px; color: var(--muted); text-align: center; max-width: 520px; line-height: 1.6; }
+
+  .flow-lanes { display: flex; gap: 24px; width: 100%; max-width: 900px; }
+  .flow-lane { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .flow-lane-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); text-align: center; padding: 10px; background: var(--surface); border-radius: 10px 10px 0 0; border: 1px solid var(--border); border-bottom: none; }
+  .flow-step { padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); position: relative; }
+  .flow-step:last-child { border-radius: 0 0 10px 10px; }
+  .flow-step-num { font-size: 10px; font-weight: 800; color: var(--accent); margin-bottom: 4px; }
+  .flow-step-text { font-size: 13px; line-height: 1.5; }
+  .flow-step-detail { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .flow-step.highlight { background: rgba(59,130,246,0.06); border-color: rgba(59,130,246,0.2); }
+  .flow-step.active-step { border-left: 3px solid var(--accent); }
+  .flow-arrow { text-align: center; color: var(--muted); font-size: 16px; padding: 2px 0; }
+  .flow-cross-arrow { position: absolute; right: -36px; top: 50%; transform: translateY(-50%); font-size: 20px; color: var(--amber); z-index: 1; }
+
+  /* ── PROMPT ── */
+  .prompt-bar { background: var(--surface); border-top: 1px solid var(--border); padding: 12px 20px; flex-shrink: 0; display: flex; align-items: flex-start; gap: 16px; }
+  .prompt-content { flex: 1; font-size: 12px; line-height: 1.6; font-family: 'SF Mono', monospace; color: var(--text); white-space: pre-wrap; max-height: 80px; overflow-y: auto; }
+  .copy-btn { padding: 6px 16px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .copy-btn:hover { background: var(--border); color: var(--text); }
+  .copy-btn.ok { background: var(--emerald); border-color: var(--emerald); color: #fff; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <h1>Progress UX</h1>
+  <div class="view-tabs">
+    <button class="view-tab active" onclick="showView('operator')">Operator View</button>
+    <button class="view-tab" onclick="showView('scheduler')">Scheduler View</button>
+    <button class="view-tab" onclick="showView('flow')">Flow Diagram</button>
+  </div>
+  <div class="scenario-pills">
+    <button class="pill active" onclick="loadScenario('idle')">Fresh Start</button>
+    <button class="pill" onclick="loadScenario('progressing')">Mid-Task</button>
+    <button class="pill" onclick="loadScenario('behind')">Behind</button>
+    <button class="pill" onclick="loadScenario('signaled')">Delay Signaled</button>
+    <button class="pill" onclick="loadScenario('extended')">Extended</button>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- ════ OPERATOR VIEW ════ -->
+  <div class="view active" id="view-operator">
+    <div class="operator-view" style="display:flex;height:100%;">
+
+      <!-- Sidebar: queue -->
+      <div class="op-sidebar">
+        <div class="op-sidebar-header">
+          <div class="op-station-name">Komori G37</div>
+          <div class="op-station-cat">Offset Press &middot; Sheet mode</div>
+        </div>
+        <div class="op-user-row">
+          <div class="op-avatar">JP</div>
+          <div>
+            <div class="op-user-name">Jean-Pierre</div>
+            <div class="op-user-role">Operator</div>
+          </div>
+        </div>
+        <div class="op-queue-label">Today's Queue</div>
+
+        <div class="op-queue-item done" id="q0">
+          <div class="op-q-dot" style="background:var(--emerald)"></div>
+          <div>
+            <div class="op-q-ref">REF-0138 &middot; NovaPrint</div>
+            <div class="op-q-time">06:00 – 08:15</div>
+          </div>
+          <div class="op-q-status" style="color:var(--emerald)">&#10003;</div>
+        </div>
+        <div class="op-queue-item current" id="q1">
+          <div class="op-q-dot" style="background:var(--accent)"></div>
+          <div>
+            <div class="op-q-ref">REF-0142 &middot; ACME Corp</div>
+            <div class="op-q-time">08:30 – 11:00</div>
+          </div>
+          <div class="op-q-status" style="color:var(--accent)" id="q1status">IN PROGRESS</div>
+        </div>
+        <div class="op-queue-item" id="q2">
+          <div class="op-q-dot" style="background:var(--purple)"></div>
+          <div>
+            <div class="op-q-ref">REF-0143 &middot; PrintCo</div>
+            <div class="op-q-time">11:15 – 13:00</div>
+          </div>
+          <div class="op-q-status" style="color:var(--muted)">QUEUED</div>
+        </div>
+        <div class="op-queue-item" id="q3">
+          <div class="op-q-dot" style="background:var(--amber)"></div>
+          <div>
+            <div class="op-q-ref">REF-0150 &middot; DesignHQ</div>
+            <div class="op-q-time">14:00 – 15:30</div>
+          </div>
+          <div class="op-q-status" style="color:var(--muted)">QUEUED</div>
+        </div>
+      </div>
+
+      <!-- Main area -->
+      <div class="op-main">
+
+        <!-- Hero card -->
+        <div class="op-task-hero" id="heroCard">
+          <div class="op-hero-header">
+            <div class="op-hero-ref">REF-2024-0142</div>
+            <div class="op-hero-client">ACME Corp</div>
+            <div class="op-hero-desc">Brochure A4 quadri, 170g couch&eacute; mat, recto/verso</div>
+            <div class="op-hero-chips">
+              <span class="op-chip">5,000 sheets</span>
+              <span class="op-chip">CMYK</span>
+              <span class="op-chip">170g</span>
+              <span class="op-chip">63&times;88</span>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="op-hero-progress">
+            <div class="op-prog-row">
+              <div>
+                <div class="op-prog-label">Sheets printed</div>
+                <div class="op-prog-value" id="opVal">0 <span class="dim">/ 5,000</span></div>
+              </div>
+              <div class="op-prog-pct" id="opPct" style="color:var(--emerald)">0%</div>
+            </div>
+            <div class="op-prog-bar">
+              <div class="op-prog-fill" id="opBar" style="width:0%;background:var(--emerald)"></div>
+            </div>
+          </div>
+
+          <!-- Time -->
+          <div class="op-hero-time">
+            <span>Started <b>08:30</b></span>
+            <span>Expected <b id="opExpected">11:00</b></span>
+            <span class="time-countdown" id="opRemaining">2h 30min</span>
+          </div>
+
+          <!-- Input -->
+          <div class="op-input-area">
+            <div class="op-batch-row">
+              <button class="op-batch" onclick="opAdd(100)">+100</button>
+              <button class="op-batch" onclick="opAdd(500)">+500</button>
+              <button class="op-batch" onclick="opAdd(1000)">+1000</button>
+            </div>
+            <div class="op-keypad">
+              <div class="op-keypad-display"><span id="opKeyBuf"></span></div>
+              <button class="op-key" onclick="opKey('7')">7</button>
+              <button class="op-key" onclick="opKey('8')">8</button>
+              <button class="op-key" onclick="opKey('9')">9</button>
+              <button class="op-key" onclick="opKey('4')">4</button>
+              <button class="op-key" onclick="opKey('5')">5</button>
+              <button class="op-key" onclick="opKey('6')">6</button>
+              <button class="op-key" onclick="opKey('1')">1</button>
+              <button class="op-key" onclick="opKey('2')">2</button>
+              <button class="op-key" onclick="opKey('3')">3</button>
+              <button class="op-key clear" onclick="opKeyClear()">CLR</button>
+              <button class="op-key" onclick="opKey('0')">0</button>
+              <button class="op-key confirm" onclick="opKeyConfirm()">&#10003;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Complete button -->
+        <div class="op-complete-row">
+          <button class="op-complete-btn ready" id="opCompleteBtn" onclick="opComplete()">&#10003;&ensp;MARK COMPLETE</button>
+        </div>
+
+        <!-- Alert -->
+        <div class="op-alert" id="opAlert">
+          <div class="op-alert-head">
+            <span class="op-alert-icon" id="opAlertIcon">&#9888;</span>
+            <div>
+              <div class="op-alert-title" id="opAlertTitle">Running late</div>
+              <div class="op-alert-sub" id="opAlertSub"></div>
+            </div>
+          </div>
+          <div class="op-alert-reason" id="opReasons">
+            <button class="op-reason-btn" onclick="pickReason(this,'Slow run')">Slow run</button>
+            <button class="op-reason-btn" onclick="pickReason(this,'Machine issue')">Machine issue</button>
+            <button class="op-reason-btn" onclick="pickReason(this,'Material')">Material</button>
+            <button class="op-reason-btn" onclick="pickReason(this,'Other')">Other</button>
+          </div>
+          <button class="op-signal-btn" id="opSignalBtn" onclick="opSignal()">&#128276;&ensp;Signal Delay to Scheduler</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ SCHEDULER VIEW ════ -->
+  <div class="view" id="view-scheduler">
+    <div class="sched-outer">
+
+      <!-- Left icon rail -->
+      <div class="sched-nav">
+        <div class="sched-nav-icon active-nav" title="Scheduler">&#9783;</div>
+        <div class="sched-nav-icon" title="Flux Table">&#9638;</div>
+        <div class="sched-nav-icon" title="Delay Signals" id="navSignalIcon" onclick="toggleSignals()" style="position:relative;">
+          &#128276;
+          <div class="sched-nav-badge" id="navSignalBadge"></div>
+        </div>
+        <div class="sched-nav-icon" title="Settings" style="margin-top:auto;margin-bottom:12px;">&#9881;</div>
+      </div>
+
+      <!-- Jobs sidebar -->
+      <div class="sched-jobs">
+        <div class="sched-jobs-header">
+          <input class="sched-jobs-search" type="text" placeholder="Search jobs..." readonly>
+        </div>
+        <div class="sched-jobs-list">
+          <div class="sched-job-card" style="opacity:0.4">
+            <div class="sched-job-ref" style="color:#86efac">REF-0138 &middot; NovaPrint</div>
+            <div class="sched-job-desc">Catalogue 2026 A5</div>
+            <div class="sched-job-dots"><div class="sched-job-dot" style="background:#22c55e"></div><div class="sched-job-dot" style="background:#22c55e"></div></div>
+          </div>
+          <div class="sched-job-card selected" id="schedJobCard142">
+            <div class="sched-job-ref" style="color:#93c5fd">REF-0142 &middot; ACME Corp</div>
+            <div class="sched-job-desc">Brochure A4 quadri</div>
+            <div class="sched-job-dots"><div class="sched-job-dot" style="background:#3b82f6"></div><div class="sched-job-dot" style="background:#52525b"></div><div class="sched-job-dot" style="background:#52525b"></div></div>
+          </div>
+          <div class="sched-job-card">
+            <div class="sched-job-ref" style="color:#c4b5fd">REF-0143 &middot; PrintCo</div>
+            <div class="sched-job-desc">Flyer 10x21 4/4</div>
+            <div class="sched-job-dots"><div class="sched-job-dot" style="background:#8b5cf6"></div><div class="sched-job-dot" style="background:#52525b"></div></div>
+          </div>
+          <div class="sched-job-card">
+            <div class="sched-job-ref" style="color:#fcd34d">REF-0150 &middot; DesignHQ</div>
+            <div class="sched-job-desc">Affiche B2 Pantone</div>
+            <div class="sched-job-dots"><div class="sched-job-dot" style="background:#f59e0b"></div></div>
+          </div>
+          <div class="sched-job-card">
+            <div class="sched-job-ref" style="color:#f9a8d4">REF-0140 &middot; MegaPrint</div>
+            <div class="sched-job-desc">Rapport annuel 200p</div>
+            <div class="sched-job-dots"><div class="sched-job-dot" style="background:#ec4899"></div><div class="sched-job-dot" style="background:#52525b"></div><div class="sched-job-dot" style="background:#52525b"></div></div>
+          </div>
+          <div class="sched-job-card">
+            <div class="sched-job-ref" style="color:#a1a1a1">REF-0136 &middot; QuickCut</div>
+            <div class="sched-job-desc">Cartes visite 350g</div>
+            <div class="sched-job-dots"><div class="sched-job-dot" style="background:#10b981"></div><div class="sched-job-dot" style="background:#10b981"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid area -->
+      <div class="sched-grid-wrap">
+        <!-- Sticky column headers -->
+        <div class="sched-header-row">
+          <div class="sched-header-time"></div>
+          <div class="sched-header-cols">
+            <div class="sched-col-header"><span class="sched-col-name">Komori G37</span></div>
+            <div class="sched-col-header"><span class="sched-col-name">Massicot</span></div>
+            <div class="sched-col-header"><span class="sched-col-name">Heidelberg CD</span></div>
+            <div class="sched-col-header"><span class="sched-col-name">Plieuse MBO</span></div>
+          </div>
+        </div>
+
+        <!-- Scrollable grid body -->
+        <div class="sched-grid-body">
+          <!-- Time gutter -->
+          <div class="sched-gutter">
+            <div class="sched-hour-row"><div class="sched-hour-label">06:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">07:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">08:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">09:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">10:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">11:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">12:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">13:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">14:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+            <div class="sched-hour-row"><div class="sched-hour-label">15:00</div><div class="sched-tick sched-tick-15"></div><div class="sched-tick sched-tick-30"></div><div class="sched-tick sched-tick-45"></div></div>
+          </div>
+
+          <!-- Station columns -->
+          <div class="sched-cols-area">
+            <!-- Now line (simulated at 09:30 = 3.5h from 06:00 = 280px) -->
+            <div class="sched-nowline" style="top:280px;"></div>
+
+            <!-- Komori G37 -->
+            <div class="sched-col">
+              <div class="sched-col-body" style="height:800px;">
+                <div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div>
+
+                <!-- REF-0138 (completed) — 06:00-08:15 = 0px, h=180px -->
+                <div class="sched-tile" style="top:0;height:180px;border-color:#22c55e;">
+                  <div class="sched-tile-setup" style="height:20px;background:rgba(34,197,94,0.14);"></div>
+                  <div class="sched-tile-run" style="top:20px;bottom:0;background:rgba(34,197,94,0.09);"></div>
+                  <div class="sched-tile-label">
+                    <div class="sched-tile-icons"><div class="sched-tile-circle complete">&#10003;</div></div>
+                    <div class="sched-tile-text" style="color:#86efac">REF-0138 &middot; NovaPrint</div>
+                  </div>
+                  <div class="sched-tile-progress"><div class="sched-tile-prog-fill" style="width:100%;background:rgba(16,185,129,0.10)"></div></div>
+                </div>
+
+                <!-- REF-0142 (in progress) — 08:30-11:00 = 200px, h=200px -->
+                <div class="sched-tile" id="tile142" style="top:200px;border-color:#3b82f6;" onclick="showView('operator')">
+                  <div class="sched-tile-setup" style="height:20px;background:rgba(59,130,246,0.12);"></div>
+                  <div class="sched-tile-run" style="top:20px;bottom:0;background:rgba(59,130,246,0.12);"></div>
+                  <div class="sched-tile-label">
+                    <div class="sched-tile-icons"><div class="sched-tile-circle incomplete"></div></div>
+                    <div class="sched-tile-text" style="color:#93c5fd">REF-0142 &middot; ACME Corp</div>
+                  </div>
+                  <div class="sched-tile-progress"><div class="sched-tile-prog-fill" id="tile142bar" style="width:0%;background:var(--emerald)"></div></div>
+                  <div class="sched-tile-badge" id="tile142badge"></div>
+                </div>
+
+                <!-- REF-0143 — 11:15-13:00 = 420px, h=140px -->
+                <div class="sched-tile" style="top:420px;height:140px;border-color:#8b5cf6;">
+                  <div class="sched-tile-setup" style="height:14px;background:rgba(139,92,246,0.14);"></div>
+                  <div class="sched-tile-run" style="top:14px;bottom:0;background:rgba(139,92,246,0.09);"></div>
+                  <div class="sched-tile-label">
+                    <div class="sched-tile-icons"><div class="sched-tile-circle incomplete"></div></div>
+                    <div class="sched-tile-text" style="color:#c4b5fd">REF-0143 &middot; PrintCo</div>
+                  </div>
+                  <div class="sched-tile-progress"><div class="sched-tile-prog-fill" style="width:0%"></div></div>
+                </div>
+
+                <!-- REF-0150 — 14:00-15:30 = 640px, h=120px -->
+                <div class="sched-tile" style="top:640px;height:120px;border-color:#f59e0b;">
+                  <div class="sched-tile-setup" style="height:12px;background:rgba(245,158,11,0.14);"></div>
+                  <div class="sched-tile-run" style="top:12px;bottom:0;background:rgba(245,158,11,0.09);"></div>
+                  <div class="sched-tile-label">
+                    <div class="sched-tile-icons"><div class="sched-tile-circle incomplete"></div></div>
+                    <div class="sched-tile-text" style="color:#fcd34d">REF-0150 &middot; DesignHQ</div>
+                  </div>
+                  <div class="sched-tile-progress"><div class="sched-tile-prog-fill" style="width:0%"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Massicot -->
+            <div class="sched-col">
+              <div class="sched-col-body" style="height:800px;">
+                <div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div>
+                <!-- REF-0136 — 07:00-08:00 = 80px, h=80px -->
+                <div class="sched-tile" style="top:80px;height:80px;border-color:#10b981;">
+                  <div class="sched-tile-run" style="top:0;bottom:0;background:rgba(16,185,129,0.09);"></div>
+                  <div class="sched-tile-label">
+                    <div class="sched-tile-icons"><div class="sched-tile-circle incomplete"></div></div>
+                    <div class="sched-tile-text" style="color:#6ee7b7">REF-0136 &middot; QuickCut</div>
+                  </div>
+                  <div class="sched-tile-progress"><div class="sched-tile-prog-fill" style="width:65%;background:rgba(16,185,129,0.10)"></div></div>
+                </div>
+                <!-- REF-0142 element 2 — 12:00-13:00 = 480px, h=80px -->
+                <div class="sched-tile" style="top:480px;height:80px;border-color:#3b82f6;">
+                  <div class="sched-tile-run" style="top:0;bottom:0;background:rgba(59,130,246,0.09);"></div>
+                  <div class="sched-tile-label">
+                    <div class="sched-tile-icons"><div class="sched-tile-circle incomplete"></div></div>
+                    <div class="sched-tile-text" style="color:#93c5fd">REF-0142 &middot; ACME Corp</div>
+                  </div>
+                  <div class="sched-tile-progress"><div class="sched-tile-prog-fill" style="width:0%"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Heidelberg CD -->
+            <div class="sched-col">
+              <div class="sched-col-body" style="height:800px;">
+                <div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div>
+                <!-- REF-0140 — 06:20-09:00 = 27px, h=213px -->
+                <div class="sched-tile" style="top:27px;height:213px;border-color:#ec4899;">
+                  <div class="sched-tile-setup" style="height:24px;background:rgba(236,72,153,0.14);"></div>
+                  <div class="sched-tile-run" style="top:24px;bottom:0;background:rgba(236,72,153,0.09);"></div>
+                  <div class="sched-tile-label">
+                    <div class="sched-tile-icons"><div class="sched-tile-circle incomplete"></div><span class="sched-tile-pin">&#128204;</span></div>
+                    <div class="sched-tile-text" style="color:#f9a8d4">REF-0140 &middot; MegaPrint</div>
+                  </div>
+                  <div class="sched-tile-progress"><div class="sched-tile-prog-fill" style="width:40%;background:rgba(16,185,129,0.10)"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Plieuse MBO -->
+            <div class="sched-col">
+              <div class="sched-col-body" style="height:800px;">
+                <div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div><div class="sched-hourline"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Job details panel -->
+      <div class="sched-details" id="schedDetails">
+        <div class="sched-details-header">
+          <div class="sched-details-ref">REF-2024-0142</div>
+          <div class="sched-details-client">ACME Corp</div>
+        </div>
+        <div class="sched-details-section">
+          <div class="sched-details-label">Job Info</div>
+          <div class="sched-details-row"><span class="k">Description</span><span class="v" style="font-family:inherit">Brochure A4 quadri</span></div>
+          <div class="sched-details-row"><span class="k">Quantity</span><span class="v">5,000</span></div>
+          <div class="sched-details-row"><span class="k">Paper</span><span class="v">170g couch&eacute; mat</span></div>
+          <div class="sched-details-row"><span class="k">Format</span><span class="v">63&times;88</span></div>
+          <div class="sched-details-row"><span class="k">Inking</span><span class="v">CMYK</span></div>
+          <div class="sched-details-row"><span class="k">Deadline</span><span class="v">Apr 3</span></div>
+        </div>
+        <div class="sched-details-section" id="schedProgressSection">
+          <div class="sched-details-label">Progress</div>
+          <div class="sched-details-row"><span class="k">Task 1 &middot; Komori G37</span><span class="v" id="schedProgVal" style="color:var(--emerald)">0%</span></div>
+          <div style="width:100%;height:4px;background:#2a2a2a;border-radius:2px;margin:4px 0 2px;">
+            <div id="schedProgBar" style="height:100%;border-radius:2px;background:var(--emerald);width:0%;transition:width 0.3s,background 0.3s;"></div>
+          </div>
+          <div class="sched-details-row" style="margin-top:4px;"><span class="k">Sheets</span><span class="v" id="schedSheetVal">0 / 5,000</span></div>
+          <div class="sched-details-row" id="schedProjRow" style="display:none;"><span class="k">Projected end</span><span class="v" id="schedProjVal"></span></div>
+        </div>
+        <div class="sched-details-section">
+          <div class="sched-details-label">Tasks</div>
+          <div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;">
+            <span style="color:#93c5fd">1. Offset &middot; Komori G37</span><span style="color:#a1a1a1;font-family:'SF Mono',monospace;">150min</span>
+          </div>
+          <div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;">
+            <span style="color:#93c5fd">2. Coupe &middot; Massicot</span><span style="color:#a1a1a1;font-family:'SF Mono',monospace;">60min</span>
+          </div>
+          <div style="font-size:12px;padding:4px 0;display:flex;justify-content:space-between;">
+            <span style="color:#93c5fd">3. Pliage &middot; Plieuse MBO</span><span style="color:#a1a1a1;font-family:'SF Mono',monospace;">45min</span>
+          </div>
+        </div>
+        <!-- Delay signal card in details panel -->
+        <div class="sched-details-section" id="schedSignalSection" style="display:none;">
+          <div class="sched-details-label" style="color:var(--amber)">&#128276; Delay Signal</div>
+          <div class="signal-card warn" style="margin:0;">
+            <div class="signal-station">Operator: Jean-Pierre</div>
+            <div id="schedSignalReason" class="signal-reason-tag" style="display:none"></div>
+            <div class="signal-info" id="schedSignalInfo"></div>
+            <div class="signal-actions">
+              <button class="signal-act signal-extend" onclick="document.getElementById('schedExtend').classList.toggle('show')">Extend...</button>
+              <button class="signal-act signal-ack" onclick="ackSignal()">Acknowledge</button>
+            </div>
+            <div class="extend-popup" id="schedExtend">
+              <div class="extend-title">Extend by:</div>
+              <div class="extend-options">
+                <button class="extend-opt" onclick="extendTask(15,this)">+15m</button>
+                <button class="extend-opt" onclick="extendTask(30,this)">+30m</button>
+                <button class="extend-opt" onclick="extendTask(45,this)">+45m</button>
+                <button class="extend-opt" onclick="extendTask(60,this)">+1h</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════ FLOW DIAGRAM ════ -->
+  <div class="view" id="view-flow">
+    <div class="flow-view" style="display:flex;flex-direction:column;align-items:center;overflow-y:auto;padding:32px;gap:20px;height:100%;">
+      <div class="flow-title">Progress &amp; Delay Signal Flow</div>
+      <div class="flow-subtitle">
+        Operators report progress from their station tablet. The system projects completion time and alerts when delays are likely. Operators signal the scheduler, who decides how to respond.
+      </div>
+
+      <div class="flow-lanes">
+        <!-- Operator lane -->
+        <div class="flow-lane">
+          <div class="flow-lane-header" style="color:var(--accent)">&#128104;&#8205;&#128295; Operator (Station Tablet)</div>
+          <div class="flow-step active-step">
+            <div class="flow-step-num">STEP 1</div>
+            <div class="flow-step-text"><b>Log in &amp; see queue</b></div>
+            <div class="flow-step-detail">Opens /station/komori-g37 on mounted tablet. Sees today's tasks in order. Current task is highlighted.</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step active-step">
+            <div class="flow-step-num">STEP 2</div>
+            <div class="flow-step-text"><b>Report progress</b></div>
+            <div class="flow-step-detail">Taps +500 each time a stack completes, or types exact counter value via keypad. Progress updates are timestamped and stored.</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step">
+            <div class="flow-step-num">STEP 3</div>
+            <div class="flow-step-text"><b>Alert appears</b></div>
+            <div class="flow-step-detail">System projects finish time from progress rate. If projected finish exceeds expected end by threshold &rarr; amber/red banner slides in.</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step highlight">
+            <div class="flow-step-num">STEP 4</div>
+            <div class="flow-step-text"><b>Signal delay</b></div>
+            <div class="flow-step-detail">Operator picks a reason (slow run, machine issue, material) and taps "Signal Delay to Scheduler". Creates a DelaySignal record.</div>
+            <div class="flow-cross-arrow">&rarr;</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step">
+            <div class="flow-step-num">STEP 5</div>
+            <div class="flow-step-text"><b>Continue working</b></div>
+            <div class="flow-step-detail">Operator keeps reporting progress. Banner shows "Signal sent" confirmation. When task is done, taps "Mark Complete" &rarr; next task auto-loads.</div>
+          </div>
+        </div>
+
+        <!-- System lane -->
+        <div class="flow-lane" style="max-width:120px;min-width:80px;">
+          <div class="flow-lane-header" style="color:var(--muted)">&#9881; System</div>
+          <div class="flow-step" style="text-align:center;">
+            <div class="flow-step-detail">Auth + station binding via URL</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step" style="text-align:center;">
+            <div class="flow-step-detail">Store progress log, compute %</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step" style="text-align:center;">
+            <div class="flow-step-detail">Client-side projection every 60s</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step" style="text-align:center;background:rgba(245,158,11,0.08);">
+            <div class="flow-step-detail">Persist DelaySignal &amp; notify scheduler</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step" style="text-align:center;">
+            <div class="flow-step-detail">Update tile bars + badges on grid</div>
+          </div>
+        </div>
+
+        <!-- Scheduler lane -->
+        <div class="flow-lane">
+          <div class="flow-lane-header" style="color:var(--emerald)">&#128197; Scheduler (Desktop)</div>
+          <div class="flow-step">
+            <div class="flow-step-detail" style="color:var(--muted);text-align:center;">(Working on scheduling grid as usual)</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step">
+            <div class="flow-step-text"><b>See live progress</b></div>
+            <div class="flow-step-detail">Tiles on the grid show a thin progress bar at the bottom. Color shifts from green &rarr; amber &rarr; red as pace falls behind.</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step">
+            <div class="flow-step-text"><b>Pulsing badge appears</b></div>
+            <div class="flow-step-detail">Even without the signal, the scheduler can see tiles at risk via amber/red badges and progress bar colors.</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step highlight">
+            <div class="flow-step-num">NOTIFICATION</div>
+            <div class="flow-step-text"><b>Delay signal received</b></div>
+            <div class="flow-step-detail">Badge count increments. Toast notification appears. Delay Signals panel shows details + operator's reason.</div>
+          </div>
+          <div class="flow-arrow">&darr;</div>
+          <div class="flow-step active-step">
+            <div class="flow-step-num">RESPONSE</div>
+            <div class="flow-step-text"><b>Scheduler decides</b></div>
+            <div class="flow-step-detail"><b>Extend</b> (+15m, +30m, +1h) &mdash; updates task duration, triggers conflict detection for downstream tasks.<br><b>Acknowledge</b> &mdash; dismiss without action.<br><b>Rearrange</b> &mdash; use existing tools to move downstream tasks.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PROMPT -->
+<div class="prompt-bar">
+  <div class="prompt-content" id="promptText"></div>
+  <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+</div>
+
+<script>
+// ── STATE ──
+const S = {
+  view: 'operator',
+  sheets: 0,
+  pct: 0,
+  total: 5000,
+  durationMin: 150,
+  elapsed: 75, // simulated: operator is 75min into task
+  history: [],
+  keyBuf: '',
+  completed: false,
+  signaled: false,
+  reason: '',
+  signalCount: 0,
+  extended: false,
+  extendMin: 0,
+};
+
+// ── VIEW SWITCHING ──
+function showView(v) {
+  S.view = v;
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view-tab').forEach(t => { if(t.textContent.toLowerCase().includes(v.substring(0,4))) t.classList.add('active'); });
+  updatePrompt();
+}
+
+// ── SCENARIOS ──
+function loadScenario(name) {
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Reset
+  S.sheets = 0; S.pct = 0; S.history = []; S.keyBuf = ''; S.completed = false;
+  S.signaled = false; S.reason = ''; S.signalCount = 0; S.extended = false; S.extendMin = 0;
+  document.getElementById('opSignalBtn').classList.remove('sent');
+  document.getElementById('opSignalBtn').innerHTML = '&#128276;&ensp;Signal Delay to Scheduler';
+  document.querySelectorAll('.op-reason-btn').forEach(b => b.classList.remove('selected'));
+
+  switch(name) {
+    case 'idle':
+      S.elapsed = 5;
+      break;
+    case 'progressing':
+      S.elapsed = 75;
+      S.sheets = 2500; S.pct = 50;
+      S.history = [{pct:10,t:15},{pct:30,t:45},{pct:50,t:75}];
+      break;
+    case 'behind':
+      S.elapsed = 110;
+      S.sheets = 1500; S.pct = 30;
+      S.history = [{pct:8,t:20},{pct:18,t:55},{pct:30,t:110}];
+      break;
+    case 'signaled':
+      S.elapsed = 120;
+      S.sheets = 1800; S.pct = 36;
+      S.history = [{pct:8,t:20},{pct:20,t:60},{pct:36,t:120}];
+      S.signaled = true; S.reason = 'Slow run'; S.signalCount = 1;
+      document.getElementById('opSignalBtn').classList.add('sent');
+      document.getElementById('opSignalBtn').textContent = '\u2705  Signal sent — scheduler notified';
+      document.querySelectorAll('.op-reason-btn').forEach(b => { if(b.textContent==='Slow run') b.classList.add('selected'); });
+      break;
+    case 'extended':
+      S.elapsed = 120;
+      S.sheets = 1800; S.pct = 36;
+      S.history = [{pct:8,t:20},{pct:20,t:60},{pct:36,t:120}];
+      S.signaled = true; S.reason = 'Slow run'; S.signalCount = 1;
+      S.extended = true; S.extendMin = 30;
+      S.durationMin = 180; // extended
+      document.getElementById('opSignalBtn').classList.add('sent');
+      document.getElementById('opSignalBtn').textContent = '\u2705  Signal sent — scheduler notified';
+      break;
+  }
+  renderAll();
+  updatePrompt();
+}
+
+// ── OPERATOR INPUT ──
+function opAdd(n) {
+  S.sheets = Math.min(S.sheets + n, S.total);
+  S.pct = Math.round((S.sheets / S.total) * 100);
+  S.history.push({pct: S.pct, t: S.elapsed});
+  if(S.history.length > 10) S.history.shift();
+  renderAll(); updatePrompt();
+}
+function opKey(d) { if(S.keyBuf.length < 6) { S.keyBuf += d; document.getElementById('opKeyBuf').textContent = parseInt(S.keyBuf).toLocaleString(); } }
+function opKeyClear() { S.keyBuf = ''; document.getElementById('opKeyBuf').textContent = ''; }
+function opKeyConfirm() {
+  if(S.keyBuf) {
+    S.sheets = Math.min(parseInt(S.keyBuf), S.total);
+    S.pct = Math.round((S.sheets / S.total) * 100);
+    S.history.push({pct: S.pct, t: S.elapsed});
+    opKeyClear(); renderAll(); updatePrompt();
+  }
+}
+function opComplete() {
+  S.completed = !S.completed;
+  if(S.completed) { S.sheets = S.total; S.pct = 100; }
+  renderAll(); updatePrompt();
+}
+function pickReason(el, reason) {
+  document.querySelectorAll('.op-reason-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  S.reason = reason;
+}
+function opSignal() {
+  S.signaled = true;
+  S.signalCount = 1;
+  const btn = document.getElementById('opSignalBtn');
+  btn.classList.add('sent');
+  btn.textContent = '\u2705  Signal sent — scheduler notified';
+  renderAll(); updatePrompt();
+}
+
+// ── SIGNALS ──
+function toggleSignals() {
+  // Scroll to signal section in details panel
+  const s = document.getElementById('schedSignalSection');
+  if(s) s.scrollIntoView({behavior:'smooth'});
+}
+function extendTask(min, el) {
+  S.extended = true;
+  S.extendMin = min;
+  S.durationMin = 150 + min;
+  document.querySelectorAll('.extend-opt').forEach(b => b.classList.remove('applied'));
+  el.classList.add('applied');
+  renderAll(); updatePrompt();
+}
+
+// ── PROJECTION ──
+function getProj() {
+  if(S.history.length < 2 || S.pct >= 100) return null;
+  const f = S.history[0], l = S.history[S.history.length-1];
+  if(l.t <= f.t) return null;
+  const rate = (l.pct - f.pct) / (l.t - f.t);
+  if(rate <= 0) return { stalled: true };
+  const remain = 100 - S.pct;
+  const projTotal = S.elapsed + remain / rate;
+  return { stalled: false, projTotal: Math.round(projTotal), delay: Math.round(projTotal - S.durationMin), rate };
+}
+
+function timeStr(min) {
+  const h = 8, m = 30;
+  const total = m + min;
+  return String(h + Math.floor(total/60)).padStart(2,'0') + ':' + String(total%60).padStart(2,'0');
+}
+
+// ── RENDER ──
+function renderAll() {
+  renderOperator();
+  renderScheduler();
+}
+
+function renderOperator() {
+  const proj = getProj();
+  let color = 'var(--emerald)';
+  let alertLevel = null;
+
+  if(proj && !proj.stalled && proj.delay > -15) {
+    color = proj.delay > 30 ? 'var(--red)' : 'var(--amber)';
+    alertLevel = proj.delay > 30 ? 'crit' : 'warn';
+  }
+  if(proj && proj.stalled) { color = 'var(--red)'; alertLevel = 'crit'; }
+
+  // Progress
+  document.getElementById('opVal').innerHTML = S.sheets.toLocaleString() + ' <span class="dim">/ ' + S.total.toLocaleString() + '</span>';
+  document.getElementById('opPct').textContent = S.pct + '%';
+  document.getElementById('opPct').style.color = color;
+  document.getElementById('opBar').style.width = S.pct + '%';
+  document.getElementById('opBar').style.background = color;
+
+  // Time
+  const remain = Math.max(S.durationMin - S.elapsed, 0);
+  const rH = Math.floor(remain/60), rM = remain%60;
+  document.getElementById('opRemaining').textContent = (rH > 0 ? rH+'h ':'') + rM + 'min';
+  document.getElementById('opExpected').textContent = timeStr(S.durationMin);
+
+  // Complete
+  const cBtn = document.getElementById('opCompleteBtn');
+  if(S.completed) { cBtn.textContent = '\u2713  COMPLETED'; cBtn.className = 'op-complete-btn done'; }
+  else { cBtn.innerHTML = '&#10003;&ensp;MARK COMPLETE'; cBtn.className = 'op-complete-btn ready'; }
+
+  // Alert
+  const alert = document.getElementById('opAlert');
+  if(alertLevel && !S.completed) {
+    alert.className = 'op-alert show ' + alertLevel;
+    if(proj.stalled) {
+      document.getElementById('opAlertIcon').textContent = '\u26D4';
+      document.getElementById('opAlertTitle').textContent = 'Progress stalled';
+      document.getElementById('opAlertSub').textContent = 'No forward movement detected';
+    } else {
+      document.getElementById('opAlertIcon').textContent = alertLevel === 'crit' ? '\u26D4' : '\u26A0';
+      document.getElementById('opAlertTitle').textContent = 'Running late — est. finish ' + timeStr(proj.projTotal);
+      const sign = proj.delay >= 0 ? '+' : '';
+      document.getElementById('opAlertSub').textContent = sign + proj.delay + ' min vs expected';
+    }
+  } else {
+    alert.className = 'op-alert';
+  }
+
+  // Queue status
+  document.getElementById('q1status').textContent = S.completed ? 'DONE' : 'IN PROGRESS';
+  document.getElementById('q1status').style.color = S.completed ? 'var(--emerald)' : 'var(--accent)';
+}
+
+function renderScheduler() {
+  const proj = getProj();
+  let barColor = 'var(--emerald)';
+  if(proj && !proj.stalled && proj.delay > -15) barColor = proj.delay > 30 ? 'var(--red)' : 'var(--amber)';
+  if(proj && proj.stalled) barColor = 'var(--red)';
+
+  // Tile 142 progress fill
+  const fillColors = {
+    'var(--emerald)': 'rgba(16,185,129,0.10)',
+    'var(--amber)': 'rgba(245,158,11,0.12)',
+    'var(--red)': 'rgba(239,68,68,0.12)',
+  };
+  document.getElementById('tile142bar').style.width = S.pct + '%';
+  document.getElementById('tile142bar').style.background = fillColors[barColor] || fillColors['var(--emerald)'];
+
+  // Tile height (extends if task extended)
+  const baseHeight = 200; // 150min at 80px/hr
+  const extraPx = S.extendMin * (80/60);
+  const tile = document.getElementById('tile142');
+  tile.style.height = (baseHeight + extraPx) + 'px';
+
+  // Badge on tile
+  const badge = document.getElementById('tile142badge');
+  if(S.signaled) {
+    badge.className = 'sched-tile-badge show'; badge.style.background = 'var(--amber)';
+  } else if(proj && ((proj.delay && proj.delay > -15) || proj.stalled)) {
+    badge.className = 'sched-tile-badge show';
+    badge.style.background = proj.delay > 30 || proj.stalled ? 'var(--red)' : 'var(--amber)';
+  } else {
+    badge.className = 'sched-tile-badge';
+  }
+
+  // Nav rail signal badge
+  const navBadge = document.getElementById('navSignalBadge');
+  navBadge.className = S.signalCount > 0 ? 'sched-nav-badge show' : 'sched-nav-badge';
+
+  // Right panel: progress section
+  document.getElementById('schedProgVal').textContent = S.pct + '%';
+  document.getElementById('schedProgVal').style.color = barColor;
+  document.getElementById('schedProgBar').style.width = S.pct + '%';
+  document.getElementById('schedProgBar').style.background = barColor;
+  document.getElementById('schedSheetVal').textContent = S.sheets.toLocaleString() + ' / ' + S.total.toLocaleString();
+
+  // Projected end in details
+  const projRow = document.getElementById('schedProjRow');
+  if(proj && !proj.stalled) {
+    projRow.style.display = 'flex';
+    document.getElementById('schedProjVal').textContent = timeStr(proj.projTotal) + ' (' + (proj.delay>=0?'+':'') + proj.delay + 'm)';
+    document.getElementById('schedProjVal').style.color = barColor;
+  } else {
+    projRow.style.display = 'none';
+  }
+
+  // Signal section in details panel
+  const sigSection = document.getElementById('schedSignalSection');
+  if(S.signaled) {
+    sigSection.style.display = 'block';
+    const r = document.getElementById('schedSignalReason');
+    if(S.reason) { r.style.display = 'inline-block'; r.textContent = S.reason; } else { r.style.display = 'none'; }
+    const info = document.getElementById('schedSignalInfo');
+    const p2 = getProj();
+    info.innerHTML = 'Projected: <b>' + (p2 && !p2.stalled ? timeStr(p2.projTotal) + ' (+' + p2.delay + 'm)' : 'stalled') + '</b><br>Progress: <b>' + S.pct + '%</b>';
+  } else {
+    sigSection.style.display = 'none';
+  }
+}
+
+function ackSignal() {
+  S.signalCount = 0;
+  S.signaled = false;
+  renderAll(); updatePrompt();
+}
+
+// ── PROMPT ──
+function updatePrompt() {
+  const p = [];
+  const v = S.view;
+  if(v === 'operator') {
+    p.push('OPERATOR STATION VIEW (/station/:stationId)');
+    p.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    p.push('Left sidebar: station identity, logged-in operator, today\'s task queue (done/current/upcoming).');
+    p.push('Main area: hero card for current task with job details, progress input, and time countdown.');
+    p.push('Progress: ' + S.pct + '% (' + S.sheets.toLocaleString() + '/' + S.total.toLocaleString() + ' sheets).');
+    const proj = getProj();
+    if(proj && !proj.stalled) p.push('Projection: finish at ' + timeStr(proj.projTotal) + ' (' + (proj.delay>=0?'+':'') + proj.delay + ' min vs expected).');
+    if(S.signaled) p.push('Delay signaled to scheduler with reason: ' + (S.reason || 'none') + '.');
+    if(S.extended) p.push('Task extended by scheduler: +' + S.extendMin + ' min (new end: ' + timeStr(S.durationMin) + ').');
+  } else if(v === 'scheduler') {
+    p.push('SCHEDULER GRID VIEW (existing /scheduler route)');
+    p.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    p.push('Tiles gain a 3px progress bar at the bottom (green/amber/red).');
+    p.push('Pulsing badge appears on tiles that are at-risk or have delay signals.');
+    p.push('Toolbar shows delay signal count badge — click opens the Delay Signals panel.');
+    p.push('Panel shows: task details, operator reason, projected delay, and actions:');
+    p.push('  • Extend (+15m, +30m, +45m, +1h) — modifies runMinutes, triggers conflict detection');
+    p.push('  • Acknowledge — dismiss without schedule change');
+    if(S.signalCount > 0) p.push('Active signals: ' + S.signalCount);
+    if(S.extended) p.push('REF-0142 extended by +' + S.extendMin + 'min. New end: ' + timeStr(S.durationMin) + '. Tile height updated on grid.');
+  } else {
+    p.push('FLOW: Operator reports progress → system projects ETA → alert triggers if late');
+    p.push('→ operator signals delay with reason → scheduler sees notification + badge');
+    p.push('→ scheduler extends task or acknowledges → conflicts auto-detected downstream.');
+  }
+  document.getElementById('promptText').textContent = p.join('\n');
+}
+
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('promptText').textContent).then(() => {
+    const b = document.getElementById('copyBtn');
+    b.textContent = 'Copied!'; b.classList.add('ok');
+    setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('ok'); }, 1500);
+  });
+}
+
+// ── INIT ──
+loadScenario('progressing');
+document.querySelector('.pill:nth-child(2)').classList.add('active');
+document.querySelector('.pill:nth-child(1)').classList.remove('active');
+</script>
+</body>
+</html>

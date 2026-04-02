@@ -8,7 +8,7 @@
  */
 
 import { createApi } from '@reduxjs/toolkit/query/react';
-import { realBaseQuery } from './realBaseQuery';
+import { baseQueryWithReauth } from './baseQueryWithReauth';
 import type { AuthUser } from '../slices/authSlice';
 
 // ============================================================================
@@ -17,6 +17,7 @@ import type { AuthUser } from '../slices/authSlice';
 
 interface LoginResponse {
   token: string;
+  refreshToken: string;
   user: {
     id: string;
     email: string;
@@ -44,9 +45,9 @@ interface UserResponse {
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: realBaseQuery,
+  baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
-    login: builder.mutation<{ token: string; user: AuthUser }, { email: string; password: string }>({
+    login: builder.mutation<{ token: string; refreshToken: string; user: AuthUser }, { email: string; password: string }>({
       query: (body) => ({
         url: '/auth/login',
         method: 'POST',
@@ -54,6 +55,7 @@ export const authApi = createApi({
       }),
       transformResponse: (response: LoginResponse) => ({
         token: response.token,
+        refreshToken: response.refreshToken,
         user: response.user,
       }),
     }),

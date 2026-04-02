@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operator Station View — Playground</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22252f;
+    --border: #2e3240;
+    --text: #e4e6ec;
+    --text-muted: #8b8fa4;
+    --accent: #3B82F6;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --control-bg: #181b24;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── CONTROLS SIDEBAR ── */
+  .controls {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .controls h1 {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .control-group h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .control-row label {
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .control-row .val {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    min-width: 40px;
+    text-align: right;
+  }
+
+  /* Toggle switch */
+  .toggle-row {
+    display: flex;
+    gap: 4px;
+    background: var(--control-bg);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 8px 6px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+    color: var(--text-muted);
+  }
+  .toggle-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    height: 6px;
+  }
+  input[type="number"] {
+    width: 80px;
+    background: var(--control-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .btn-action {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-reset {
+    background: var(--control-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .btn-reset:hover { background: var(--border); }
+
+  /* ── MAIN AREA ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Preview */
+  .preview-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: auto;
+    background: repeating-conic-gradient(#1a1d2720 0% 25%, transparent 0% 50%) 0 0 / 20px 20px;
+  }
+
+  /* Tablet frame */
+  .tablet-frame {
+    width: 520px;
+    min-height: 700px;
+    max-height: 85vh;
+    background: #111318;
+    border-radius: 20px;
+    border: 3px solid #333;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    position: relative;
+  }
+
+  /* Station header */
+  .station-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #181b24;
+    border-bottom: 1px solid #2e3240;
+    flex-shrink: 0;
+  }
+  .station-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .station-clock {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .station-user {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  /* Scrollable body */
+  .station-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Task card */
+  .task-card {
+    background: #1e2130;
+    border-radius: 12px;
+    border-left: 4px solid var(--accent);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .task-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .task-ref {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .task-client {
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .task-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* Progress display */
+  .progress-section { display: flex; flex-direction: column; gap: 8px; }
+  .progress-label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .progress-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .progress-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    line-height: 1;
+  }
+  .progress-value .total {
+    font-size: 16px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .progress-pct {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--emerald);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .progress-bar-track {
+    width: 100%;
+    height: 10px;
+    background: #2a2d3a;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    background: var(--emerald);
+  }
+
+  /* Time info */
+  .time-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .time-remaining {
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* Batch buttons */
+  .batch-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .batch-btn {
+    flex: 1;
+    height: 52px;
+    border: none;
+    border-radius: 10px;
+    background: #2a3a5a;
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .batch-btn:hover { background: #334a6e; }
+  .batch-btn:active { background: #3d5a82; transform: scale(0.97); }
+
+  /* Numeric keypad */
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 260px;
+    margin: 0 auto;
+  }
+  .key-btn {
+    height: 56px;
+    border: none;
+    border-radius: 10px;
+    background: #262938;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .key-btn:hover { background: #2e3240; }
+  .key-btn:active { background: #3a3e52; transform: scale(0.96); }
+  .key-btn.key-clear { color: var(--amber); font-size: 16px; font-weight: 800; }
+  .key-btn.key-confirm { background: var(--emerald); color: #fff; font-size: 20px; }
+  .key-btn.key-confirm:hover { background: #0ea572; }
+
+  .keypad-display {
+    grid-column: 1 / -1;
+    height: 44px;
+    background: #111318;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 14px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-bottom: 2px;
+  }
+  .keypad-display .cursor {
+    animation: blink 1s step-end infinite;
+    color: var(--accent);
+    margin-left: 1px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Percentage presets */
+  .pct-presets {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .pct-btn {
+    height: 56px;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    background: #262938;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .pct-btn:hover { background: #2e3240; }
+  .pct-btn:active { transform: scale(0.96); }
+  .pct-btn.active {
+    border-color: var(--emerald);
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--emerald);
+  }
+  .pct-other-btn {
+    width: 100%;
+    height: 44px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .pct-other-btn:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* Complete button */
+  .complete-btn {
+    width: 100%;
+    height: 56px;
+    border: none;
+    border-radius: 12px;
+    background: var(--emerald);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+  }
+  .complete-btn:hover { background: #0ea572; }
+  .complete-btn:active { transform: scale(0.98); }
+  .complete-btn.completed {
+    background: #1e4a3a;
+    color: var(--emerald);
+  }
+
+  /* Alert banner */
+  .alert-banner {
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideIn 0.3s ease;
+  }
+  .alert-banner.visible { display: flex; }
+  .alert-banner.warning {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+  .alert-banner.critical {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .alert-icon-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .alert-icon {
+    font-size: 18px;
+  }
+  .alert-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .alert-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .alert-btn {
+    width: 100%;
+    height: 44px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .alert-banner.warning .alert-btn {
+    background: rgba(245, 158, 11, 0.25);
+    color: var(--amber);
+  }
+  .alert-banner.critical .alert-btn {
+    background: rgba(239, 68, 68, 0.25);
+    color: var(--red);
+  }
+  .alert-btn:hover { filter: brightness(1.2); }
+
+  /* Up next */
+  .up-next-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 0 2px;
+  }
+  .up-next-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .up-next-card {
+    min-width: 170px;
+    background: #1e2130;
+    border-radius: 10px;
+    padding: 12px;
+    flex-shrink: 0;
+    border-left: 3px solid;
+  }
+  .up-next-ref {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .up-next-client {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .up-next-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  /* ── PROMPT OUTPUT ── */
+  .prompt-area {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    flex-shrink: 0;
+  }
+  .prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .prompt-header h3 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .copy-btn {
+    padding: 5px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: var(--border); color: var(--text); }
+  .copy-btn.copied { background: var(--emerald); border-color: var(--emerald); color: #fff; }
+  .prompt-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: pre-wrap;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <h1>Operator Station</h1>
+
+  <div class="control-group">
+    <h2>Input Mode</h2>
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="modeSheets" onclick="setMode('sheets')">Sheets</button>
+      <button class="toggle-btn" id="modePct" onclick="setMode('percentage')">Percentage</button>
+    </div>
+  </div>
+
+  <div class="control-group" id="sheetsConfig">
+    <h2>Sheet Config</h2>
+    <div class="control-row">
+      <label>Total sheets</label>
+      <input type="number" id="totalSheets" value="5000" min="100" step="100" onchange="updateConfig()">
+    </div>
+    <div class="control-row">
+      <label>Batch buttons</label>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <input type="number" id="batch1" value="100" min="10" step="10" style="width:60px" onchange="updateConfig()">
+      <input type="number" id="batch2" value="500" min="10" step="10" style="width:60px" onchange="updateConfig()">
+      <input type="number" id="batch3" value="1000" min="10" step="10" style="width:60px" onchange="updateConfig()">
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Schedule</h2>
+    <div class="control-row">
+      <label>Duration (min)</label>
+      <input type="number" id="duration" value="150" min="10" max="480" onchange="updateConfig()">
+    </div>
+    <div class="control-row">
+      <label>Alert threshold</label>
+      <span class="val" id="thresholdVal">15 min</span>
+    </div>
+    <input type="range" id="threshold" min="5" max="60" value="15" step="5" oninput="updateConfig()">
+  </div>
+
+  <div class="control-group">
+    <h2>Simulation</h2>
+    <div class="control-row">
+      <label>Simulated elapsed</label>
+      <span class="val" id="elapsedVal">0 min</span>
+    </div>
+    <input type="range" id="elapsed" min="0" max="180" value="0" step="1" oninput="updateElapsed()">
+    <p style="font-size:11px;color:var(--text-muted);line-height:1.4;">Drag to simulate time passing. Alerts trigger when your input pace projects a late finish.</p>
+  </div>
+
+  <div class="control-group">
+    <button class="btn-action btn-reset" onclick="resetAll()">Reset Progress</button>
+  </div>
+
+  <div class="control-group" style="margin-top:auto;">
+    <h2>Presets</h2>
+    <button class="btn-action btn-reset" onclick="loadPreset('onTrack')">On Track (60%)</button>
+    <button class="btn-action btn-reset" onclick="loadPreset('behind')">Behind Schedule</button>
+    <button class="btn-action btn-reset" onclick="loadPreset('critical')">Critical Delay</button>
+    <button class="btn-action btn-reset" onclick="loadPreset('stalled')">Stalled</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="preview-area">
+    <div class="tablet-frame">
+
+      <!-- Header -->
+      <div class="station-header">
+        <span class="station-name">Komori G37</span>
+        <span class="station-clock" id="clock">14:32:05</span>
+        <div class="station-user">JP</div>
+      </div>
+
+      <!-- Body -->
+      <div class="station-body">
+
+        <!-- Current task card -->
+        <div class="task-card">
+          <div>
+            <div class="task-meta">
+              <span class="task-ref">REF-2024-0142</span>
+              <span class="task-client">ACME Corp</span>
+            </div>
+            <div class="task-desc">Brochure A4 quadri, 170g couche mat</div>
+          </div>
+
+          <!-- Progress -->
+          <div class="progress-section">
+            <div class="progress-label-row">
+              <span class="progress-label" id="progressLabel">Sheets printed</span>
+              <span class="progress-pct" id="progressPct">0%</span>
+            </div>
+            <div class="progress-value" id="progressValue">0 <span class="total">/ 5,000</span></div>
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+            </div>
+          </div>
+
+          <!-- Time row -->
+          <div class="time-row">
+            <span>Started: <b>08:30</b></span>
+            <span>Expected: <b id="expectedEnd">11:00</b></span>
+            <span class="time-remaining" id="timeRemaining">2h 30min left</span>
+          </div>
+
+          <!-- Sheet mode input -->
+          <div id="sheetInput">
+            <div class="batch-buttons">
+              <button class="batch-btn" id="batchBtn1" onclick="addSheets(0)">+100</button>
+              <button class="batch-btn" id="batchBtn2" onclick="addSheets(1)">+500</button>
+              <button class="batch-btn" id="batchBtn3" onclick="addSheets(2)">+1000</button>
+            </div>
+            <div style="height:8px"></div>
+            <div class="keypad">
+              <div class="keypad-display"><span id="keypadValue"></span><span class="cursor">|</span></div>
+              <button class="key-btn" onclick="keyPress('7')">7</button>
+              <button class="key-btn" onclick="keyPress('8')">8</button>
+              <button class="key-btn" onclick="keyPress('9')">9</button>
+              <button class="key-btn" onclick="keyPress('4')">4</button>
+              <button class="key-btn" onclick="keyPress('5')">5</button>
+              <button class="key-btn" onclick="keyPress('6')">6</button>
+              <button class="key-btn" onclick="keyPress('1')">1</button>
+              <button class="key-btn" onclick="keyPress('2')">2</button>
+              <button class="key-btn" onclick="keyPress('3')">3</button>
+              <button class="key-btn key-clear" onclick="keyClear()">C</button>
+              <button class="key-btn" onclick="keyPress('0')">0</button>
+              <button class="key-btn key-confirm" onclick="keyConfirm()">&#10003;</button>
+            </div>
+          </div>
+
+          <!-- Percentage mode input -->
+          <div id="pctInput" style="display:none;">
+            <div class="pct-presets">
+              <button class="pct-btn" onclick="setPct(25)">25%</button>
+              <button class="pct-btn" onclick="setPct(50)">50%</button>
+              <button class="pct-btn" onclick="setPct(75)">75%</button>
+              <button class="pct-btn" onclick="setPct(100)">100%</button>
+            </div>
+            <div style="height:8px"></div>
+            <button class="pct-other-btn" id="pctOtherBtn" onclick="togglePctKeypad()">Other...</button>
+            <div id="pctKeypad" style="display:none;margin-top:8px;">
+              <div class="keypad">
+                <div class="keypad-display"><span id="pctKeypadValue"></span><span class="cursor">|</span></div>
+                <button class="key-btn" onclick="pctKeyPress('7')">7</button>
+                <button class="key-btn" onclick="pctKeyPress('8')">8</button>
+                <button class="key-btn" onclick="pctKeyPress('9')">9</button>
+                <button class="key-btn" onclick="pctKeyPress('4')">4</button>
+                <button class="key-btn" onclick="pctKeyPress('5')">5</button>
+                <button class="key-btn" onclick="pctKeyPress('6')">6</button>
+                <button class="key-btn" onclick="pctKeyPress('1')">1</button>
+                <button class="key-btn" onclick="pctKeyPress('2')">2</button>
+                <button class="key-btn" onclick="pctKeyPress('3')">3</button>
+                <button class="key-btn key-clear" onclick="pctKeyClear()">C</button>
+                <button class="key-btn" onclick="pctKeyPress('0')">0</button>
+                <button class="key-btn key-confirm" onclick="pctKeyConfirm()">&#10003;</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Complete button -->
+        <button class="complete-btn" id="completeBtn" onclick="toggleComplete()">&#10003;&ensp;MARK COMPLETE</button>
+
+        <!-- Alert banner -->
+        <div class="alert-banner" id="alertBanner">
+          <div class="alert-icon-row">
+            <span class="alert-icon" id="alertIcon">&#9888;</span>
+            <div>
+              <div class="alert-text" id="alertText">Running late</div>
+              <div class="alert-detail" id="alertDetail"></div>
+            </div>
+          </div>
+          <button class="alert-btn" onclick="signalDelay()">&#128276;&ensp;Signal Delay to Scheduler</button>
+        </div>
+
+        <!-- Up next -->
+        <div class="up-next-label">Up Next</div>
+        <div class="up-next-scroll">
+          <div class="up-next-card" style="border-color:#8b5cf6;">
+            <div class="up-next-ref">REF-2024-0143</div>
+            <div class="up-next-client">PrintCo</div>
+            <div class="up-next-time">14:30 – 16:00</div>
+          </div>
+          <div class="up-next-card" style="border-color:#f59e0b;">
+            <div class="up-next-ref">REF-2024-0150</div>
+            <div class="up-next-client">DesignHQ</div>
+            <div class="up-next-time">16:00 – 17:30</div>
+          </div>
+          <div class="up-next-card" style="border-color:#10b981;">
+            <div class="up-next-ref">REF-2024-0155</div>
+            <div class="up-next-client">FlyerMax</div>
+            <div class="up-next-time">17:30 – 18:15</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt output -->
+  <div class="prompt-area">
+    <div class="prompt-header">
+      <h3>Generated Prompt</h3>
+      <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+    </div>
+    <div class="prompt-text" id="promptText"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+const state = {
+  mode: 'sheets',          // 'sheets' | 'percentage'
+  totalSheets: 5000,
+  batchValues: [100, 500, 1000],
+  durationMin: 150,
+  thresholdMin: 15,
+  elapsedMin: 0,
+
+  currentSheets: 0,
+  currentPct: 0,
+  isCompleted: false,
+
+  keypadBuffer: '',
+  pctKeypadBuffer: '',
+  pctKeypadOpen: false,
+
+  // Progress history: [{pct, elapsedMin}]
+  history: [],
+  delaySignaled: false,
+};
+
+// ── CLOCK ──
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── MODE ──
+function setMode(mode) {
+  state.mode = mode;
+  document.getElementById('modeSheets').classList.toggle('active', mode === 'sheets');
+  document.getElementById('modePct').classList.toggle('active', mode === 'percentage');
+  document.getElementById('sheetInput').style.display = mode === 'sheets' ? 'block' : 'none';
+  document.getElementById('pctInput').style.display = mode === 'percentage' ? 'block' : 'none';
+  document.getElementById('sheetsConfig').style.display = mode === 'sheets' ? 'flex' : 'none';
+
+  if (mode === 'sheets') {
+    document.getElementById('progressLabel').textContent = 'Sheets printed';
+  } else {
+    document.getElementById('progressLabel').textContent = 'Progress';
+  }
+  renderProgress();
+  updatePrompt();
+}
+
+// ── CONFIG ──
+function updateConfig() {
+  state.totalSheets = parseInt(document.getElementById('totalSheets').value) || 5000;
+  state.batchValues = [
+    parseInt(document.getElementById('batch1').value) || 100,
+    parseInt(document.getElementById('batch2').value) || 500,
+    parseInt(document.getElementById('batch3').value) || 1000,
+  ];
+  state.durationMin = parseInt(document.getElementById('duration').value) || 150;
+  state.thresholdMin = parseInt(document.getElementById('threshold').value);
+
+  document.getElementById('thresholdVal').textContent = state.thresholdMin + ' min';
+  document.getElementById('elapsed').max = state.durationMin + 60;
+
+  // Update batch button labels
+  document.getElementById('batchBtn1').textContent = '+' + state.batchValues[0];
+  document.getElementById('batchBtn2').textContent = '+' + state.batchValues[1];
+  document.getElementById('batchBtn3').textContent = '+' + state.batchValues[2];
+
+  // Update expected end
+  const startH = 8, startM = 30;
+  const endM = startM + state.durationMin;
+  const endH = startH + Math.floor(endM / 60);
+  const endMM = endM % 60;
+  document.getElementById('expectedEnd').textContent =
+    String(endH).padStart(2, '0') + ':' + String(endMM).padStart(2, '0');
+
+  renderProgress();
+  updatePrompt();
+}
+
+// ── ELAPSED SIMULATION ──
+function updateElapsed() {
+  state.elapsedMin = parseInt(document.getElementById('elapsed').value);
+  document.getElementById('elapsedVal').textContent = state.elapsedMin + ' min';
+  renderProgress();
+  updatePrompt();
+}
+
+// ── SHEET INPUT ──
+function addSheets(idx) {
+  state.currentSheets = Math.min(state.currentSheets + state.batchValues[idx], state.totalSheets);
+  state.currentPct = Math.round((state.currentSheets / state.totalSheets) * 100);
+  recordProgress();
+  renderProgress();
+  updatePrompt();
+
+  // Visual feedback
+  const btn = document.getElementById('batchBtn' + (idx + 1));
+  btn.style.background = '#3d5a82';
+  setTimeout(() => btn.style.background = '', 150);
+}
+
+function keyPress(digit) {
+  if (state.keypadBuffer.length < 6) {
+    state.keypadBuffer += digit;
+    document.getElementById('keypadValue').textContent = formatNum(parseInt(state.keypadBuffer));
+  }
+}
+
+function keyClear() {
+  state.keypadBuffer = '';
+  document.getElementById('keypadValue').textContent = '';
+}
+
+function keyConfirm() {
+  if (state.keypadBuffer) {
+    const val = parseInt(state.keypadBuffer);
+    state.currentSheets = Math.min(Math.max(val, 0), state.totalSheets);
+    state.currentPct = Math.round((state.currentSheets / state.totalSheets) * 100);
+    recordProgress();
+    renderProgress();
+    updatePrompt();
+    keyClear();
+  }
+}
+
+// ── PERCENTAGE INPUT ──
+function setPct(pct) {
+  state.currentPct = pct;
+  state.currentSheets = Math.round((pct / 100) * state.totalSheets);
+  recordProgress();
+  renderProgress();
+  updatePrompt();
+
+  // Highlight active
+  document.querySelectorAll('.pct-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.textContent) === pct);
+  });
+}
+
+function togglePctKeypad() {
+  state.pctKeypadOpen = !state.pctKeypadOpen;
+  document.getElementById('pctKeypad').style.display = state.pctKeypadOpen ? 'block' : 'none';
+  document.getElementById('pctOtherBtn').textContent = state.pctKeypadOpen ? 'Hide keypad' : 'Other...';
+}
+
+function pctKeyPress(digit) {
+  if (state.pctKeypadBuffer.length < 3) {
+    state.pctKeypadBuffer += digit;
+    document.getElementById('pctKeypadValue').textContent = state.pctKeypadBuffer + '%';
+  }
+}
+
+function pctKeyClear() {
+  state.pctKeypadBuffer = '';
+  document.getElementById('pctKeypadValue').textContent = '';
+}
+
+function pctKeyConfirm() {
+  if (state.pctKeypadBuffer) {
+    const val = Math.min(parseInt(state.pctKeypadBuffer), 100);
+    state.currentPct = val;
+    state.currentSheets = Math.round((val / 100) * state.totalSheets);
+    recordProgress();
+    renderProgress();
+    updatePrompt();
+    pctKeyClear();
+    document.querySelectorAll('.pct-btn').forEach(b => {
+      b.classList.toggle('active', parseInt(b.textContent) === val);
+    });
+  }
+}
+
+// ── COMPLETE ──
+function toggleComplete() {
+  state.isCompleted = !state.isCompleted;
+  const btn = document.getElementById('completeBtn');
+  if (state.isCompleted) {
+    btn.textContent = '\u2713  COMPLETED';
+    btn.classList.add('completed');
+    state.currentPct = 100;
+    state.currentSheets = state.totalSheets;
+  } else {
+    btn.textContent = '\u2713  MARK COMPLETE';
+    btn.classList.remove('completed');
+  }
+  renderProgress();
+  updatePrompt();
+}
+
+// ── PROGRESS HISTORY ──
+function recordProgress() {
+  state.history.push({ pct: state.currentPct, elapsed: state.elapsedMin });
+  // Keep last 10
+  if (state.history.length > 10) state.history.shift();
+}
+
+// ── PROJECTION ──
+function getProjection() {
+  if (state.history.length < 2 || state.currentPct >= 100) return null;
+
+  const first = state.history[0];
+  const last = state.history[state.history.length - 1];
+
+  if (last.elapsed <= first.elapsed) return null;
+
+  const rate = (last.pct - first.pct) / (last.elapsed - first.elapsed); // pct per min
+  if (rate <= 0) return { stalled: true, projectedEnd: null, delayMin: null };
+
+  const remainPct = 100 - state.currentPct;
+  const remainMin = remainPct / rate;
+  const projectedTotalMin = state.elapsedMin + remainMin;
+  const delayMin = Math.round(projectedTotalMin - state.durationMin);
+
+  return {
+    stalled: false,
+    projectedTotalMin: Math.round(projectedTotalMin),
+    delayMin,
+    rate: rate.toFixed(2),
+  };
+}
+
+// ── RENDER ──
+function renderProgress() {
+  const pct = state.currentPct;
+  const bar = document.getElementById('progressBar');
+  const pctEl = document.getElementById('progressPct');
+  const valEl = document.getElementById('progressValue');
+
+  bar.style.width = pct + '%';
+  pctEl.textContent = pct + '%';
+
+  // Projection + color
+  const proj = getProjection();
+  let barColor = 'var(--emerald)';
+  let pctColor = 'var(--emerald)';
+
+  if (proj) {
+    if (proj.stalled) {
+      barColor = 'var(--red)';
+      pctColor = 'var(--red)';
+    } else if (proj.delayMin > 30) {
+      barColor = 'var(--red)';
+      pctColor = 'var(--red)';
+    } else if (proj.delayMin > -state.thresholdMin) {
+      barColor = 'var(--amber)';
+      pctColor = 'var(--amber)';
+    }
+  }
+
+  bar.style.background = barColor;
+  pctEl.style.color = pctColor;
+
+  if (state.mode === 'sheets') {
+    valEl.innerHTML = formatNum(state.currentSheets) + ' <span class="total">/ ' + formatNum(state.totalSheets) + '</span>';
+  } else {
+    valEl.innerHTML = pct + '<span class="total">%</span>';
+  }
+
+  // Time remaining
+  const remainMin = Math.max(state.durationMin - state.elapsedMin, 0);
+  const rH = Math.floor(remainMin / 60);
+  const rM = remainMin % 60;
+  document.getElementById('timeRemaining').textContent =
+    (rH > 0 ? rH + 'h ' : '') + rM + 'min left';
+
+  // Alert
+  renderAlert(proj);
+}
+
+function renderAlert(proj) {
+  const banner = document.getElementById('alertBanner');
+
+  if (!proj || state.isCompleted || state.currentPct >= 100) {
+    banner.classList.remove('visible');
+    return;
+  }
+
+  if (proj.stalled) {
+    banner.className = 'alert-banner visible critical';
+    document.getElementById('alertIcon').textContent = '\u26D4';
+    document.getElementById('alertText').textContent = 'Progress stalled';
+    document.getElementById('alertDetail').textContent = 'No forward progress detected. Is there an issue?';
+    return;
+  }
+
+  const triggerAt = -state.thresholdMin; // alert when delay > -threshold (i.e., within threshold of end)
+  if (proj.delayMin > triggerAt) {
+    banner.classList.add('visible');
+
+    const severity = proj.delayMin > 30 ? 'critical' : 'warning';
+    banner.className = 'alert-banner visible ' + severity;
+
+    // Calculate projected end time
+    const startH = 8, startM = 30;
+    const projEndM = startM + proj.projectedTotalMin;
+    const projH = startH + Math.floor(projEndM / 60);
+    const projMM = projEndM % 60;
+    const projTime = String(projH).padStart(2, '0') + ':' + String(projMM).padStart(2, '0');
+
+    const sign = proj.delayMin >= 0 ? '+' : '';
+    document.getElementById('alertIcon').textContent = severity === 'critical' ? '\u26D4' : '\u26A0';
+    document.getElementById('alertText').textContent = 'Running late \u2014 est. finish ' + projTime;
+    document.getElementById('alertDetail').textContent =
+      sign + proj.delayMin + ' min vs expected \u00b7 Rate: ' + proj.rate + '%/min';
+  } else {
+    banner.classList.remove('visible');
+  }
+}
+
+function signalDelay() {
+  state.delaySignaled = true;
+  const btn = event.target;
+  btn.textContent = '\u2705  Delay signaled to scheduler';
+  btn.style.opacity = '0.6';
+  btn.style.pointerEvents = 'none';
+  setTimeout(() => {
+    btn.innerHTML = '&#128276;&ensp;Signal Delay to Scheduler';
+    btn.style.opacity = '';
+    btn.style.pointerEvents = '';
+    state.delaySignaled = false;
+  }, 3000);
+  updatePrompt();
+}
+
+// ── PRESETS ──
+function loadPreset(name) {
+  resetAll();
+  switch (name) {
+    case 'onTrack':
+      state.elapsedMin = 90;
+      state.currentSheets = 3000;
+      state.currentPct = 60;
+      state.history = [
+        { pct: 10, elapsed: 15 },
+        { pct: 30, elapsed: 45 },
+        { pct: 60, elapsed: 90 },
+      ];
+      break;
+    case 'behind':
+      state.elapsedMin = 100;
+      state.currentSheets = 1500;
+      state.currentPct = 30;
+      state.history = [
+        { pct: 5, elapsed: 20 },
+        { pct: 15, elapsed: 60 },
+        { pct: 30, elapsed: 100 },
+      ];
+      break;
+    case 'critical':
+      state.elapsedMin = 120;
+      state.currentSheets = 1000;
+      state.currentPct = 20;
+      state.history = [
+        { pct: 5, elapsed: 30 },
+        { pct: 10, elapsed: 60 },
+        { pct: 20, elapsed: 120 },
+      ];
+      break;
+    case 'stalled':
+      state.elapsedMin = 80;
+      state.currentSheets = 1200;
+      state.currentPct = 24;
+      state.history = [
+        { pct: 24, elapsed: 50 },
+        { pct: 24, elapsed: 80 },
+      ];
+      break;
+  }
+  document.getElementById('elapsed').value = state.elapsedMin;
+  document.getElementById('elapsedVal').textContent = state.elapsedMin + ' min';
+  renderProgress();
+  updatePrompt();
+}
+
+function resetAll() {
+  state.currentSheets = 0;
+  state.currentPct = 0;
+  state.isCompleted = false;
+  state.history = [];
+  state.elapsedMin = 0;
+  state.keypadBuffer = '';
+  state.pctKeypadBuffer = '';
+  state.delaySignaled = false;
+
+  document.getElementById('elapsed').value = 0;
+  document.getElementById('elapsedVal').textContent = '0 min';
+  document.getElementById('keypadValue').textContent = '';
+  document.getElementById('pctKeypadValue').textContent = '';
+  document.getElementById('completeBtn').textContent = '\u2713  MARK COMPLETE';
+  document.getElementById('completeBtn').classList.remove('completed');
+  document.querySelectorAll('.pct-btn').forEach(b => b.classList.remove('active'));
+
+  renderProgress();
+  updatePrompt();
+}
+
+// ── PROMPT ──
+function updatePrompt() {
+  const parts = [];
+
+  parts.push('Implement an Operator Station View at route `/station/:stationId` with the following configuration:');
+
+  parts.push(`\nInput mode: ${state.mode === 'sheets' ? 'Sheet count' : 'Percentage'} (configured per StationCategory.progressMode).`);
+
+  if (state.mode === 'sheets') {
+    parts.push(`Sheet batch buttons: [+${state.batchValues.join('], [+')}] plus a numeric keypad for exact entry.`);
+    if (state.totalSheets !== 5000) {
+      parts.push(`Total sheets for this task: ${formatNum(state.totalSheets)} (from element.spec.qteFeuilles).`);
+    }
+  } else {
+    parts.push('Percentage presets: [25%] [50%] [75%] [100%] plus an "Other" button revealing a numeric keypad (0-100).');
+  }
+
+  parts.push(`\nAlert threshold: ${state.thresholdMin} minutes before expected end.`);
+  parts.push('Alert severity: amber when within threshold, red when projected delay exceeds 30 minutes.');
+  parts.push('Stalled detection: when progress rate drops to zero, show a distinct "Progress stalled" alert.');
+  parts.push('\nDelay response: request-based. Operator taps "Signal Delay to Scheduler" which creates a DelaySignal record. Operators cannot extend tasks directly.');
+
+  parts.push('\nTouch targets: minimum 48x48px for all buttons, 64x64px for keypad keys.');
+  parts.push('Design: dark theme, large typography for glanceability, job color accent on card border.');
+
+  document.getElementById('promptText').textContent = parts.join('\n');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// ── UTILS ──
+function formatNum(n) {
+  return n.toLocaleString('en-US').replace(/,/g, ',');
+}
+
+// ── INIT ──
+updateConfig();
+renderProgress();
+updatePrompt();
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { mockBaseQuery } from './mockBaseQuery';
 import { realBaseQuery } from './realBaseQuery';
+import { baseQueryWithReauth } from './baseQueryWithReauth';
 
 // ============================================================================
 // Fixture/Mock Detection
@@ -111,11 +112,11 @@ export const baseQueryWithFixtureSupport: BaseQueryFn<
     return mockBaseQuery(args, api, extraOptions);
   }
 
-  // Production mode: use real API
+  // Production mode: use real API with automatic token refresh
   if (import.meta.env.DEV) {
     console.log(`[API] Real API: ${typeof args === 'string' ? args : args.url}`);
   }
-  return realBaseQuery(args, api, extraOptions);
+  return baseQueryWithReauth(args, api, extraOptions);
 };
 
 // ============================================================================

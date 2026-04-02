@@ -38,6 +38,7 @@ export interface UseCommandsOptions {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onOpenSaveLoad?: () => void;
+  onToggleMinimap?: () => void;
   onClearJobAssignments?: () => void;
   onPinAllJobTiles?: () => void;
   onClearAllAssignments?: () => void;
@@ -97,6 +98,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     shortcuts: [
       { label: 'PRODUIT / TIRAGE', keys: ['Alt', 'A'] },
       { label: 'Panneau latéral', keys: ['Alt', 'B'] },
+      { label: 'Minimap', keys: ['Alt', 'M'] },
     ],
   },
   {
@@ -163,6 +165,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onAsapPlacement,
     onAlapPlacement,
     onAutoPlaceAll,
+    onToggleMinimap,
   } = options;
 
   return useMemo(() => {
@@ -225,6 +228,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     if (onToggleSidebar) {
       commands.push({ id: 'toggle-sidebar', label: 'Afficher/masquer le panneau lateral', category: 'Affichage', shortcut: 'Alt+B', keywords: 'sidebar panneau lateral masquer afficher', icon: 'panel-left', action: onToggleSidebar });
     }
+    if (onToggleMinimap) {
+      commands.push({ id: 'toggle-minimap', label: 'Afficher/masquer la minimap', category: 'Affichage', shortcut: 'Alt+M', keywords: 'minimap minicarte vue miniature overview survol', icon: 'map', action: onToggleMinimap });
+    }
 
     // Scheduler-specific: Grille (zoom)
     if (onZoomIn) {
@@ -241,5 +247,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onToggleMinimap, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }

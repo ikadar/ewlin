@@ -14,7 +14,6 @@ import { fetchBaseQuery } from '@reduxjs/toolkit/query';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { normalizeError } from './errorNormalization';
 import type { AuthState } from '../slices/authSlice';
-import { logout } from '../slices/authSlice';
 import { muteMercure } from '../../hooks/mercureMute';
 
 // ============================================================================
@@ -58,9 +57,10 @@ function prepareHeaders(headers: Headers, { getState }: { getState: () => unknow
 // ============================================================================
 
 /**
- * Internal fetch base query with standard configuration
+ * Internal fetch base query with standard configuration.
+ * Exported for use by baseQueryWithReauth (refresh call bypasses realBaseQuery wrapper).
  */
-const baseFetchQuery = fetchBaseQuery({
+export const baseFetchQuery = fetchBaseQuery({
   baseUrl: getApiBaseUrl(),
   prepareHeaders,
   // Credentials for CORS (if needed)
@@ -103,10 +103,8 @@ export const realBaseQuery: BaseQueryFn<
       }
     }
 
-    // On 401: dispatch logout → clears sessionStorage → RequireAuth redirects
-    if (result.error && typeof result.error === 'object' && 'status' in result.error && result.error.status === 401) {
-      api.dispatch(logout());
-    }
+    // 401 handling is done by baseQueryWithReauth wrapper (silent token refresh).
+    // This base query only normalizes errors and logs.
 
     // Normalize errors
     if (result.error) {

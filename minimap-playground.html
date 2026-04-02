@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Scheduler — Minimap Playground</title>
+<style>
+  /* ── Reset & Base ─────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 13px; }
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    font-weight: 500;
+    background: rgb(15, 15, 15);
+    color: rgb(245, 245, 245);
+    -webkit-font-smoothing: antialiased;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Scrollbar ────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgb(80, 80, 80); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(110, 110, 110); }
+  * { scrollbar-width: thin; scrollbar-color: rgb(80, 80, 80) transparent; }
+
+  /* ── Layout ───────────────────────────────────────── */
+  .top-bar {
+    background: rgb(26, 26, 26);
+    border-bottom: 1px solid rgb(42, 42, 42);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    min-height: 48px;
+  }
+  .top-bar h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgb(209, 209, 209);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Controls Panel (left) ────────────────────────── */
+  .controls {
+    width: 240px;
+    flex-shrink: 0;
+    background: rgb(26, 26, 26);
+    border-right: 1px solid rgb(42, 42, 42);
+    padding: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .control-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgb(161, 161, 161);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .control-group .value {
+    font-size: 11px;
+    color: rgb(128, 128, 128);
+    font-family: "JetBrains Mono", monospace;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgb(42, 42, 42);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: rgb(59, 130, 246);
+    cursor: pointer;
+  }
+  .btn-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid rgb(58, 58, 58);
+    background: rgb(36, 36, 36);
+    color: rgb(209, 209, 209);
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: rgb(44, 44, 44); }
+  .btn.active {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: rgb(147, 197, 253);
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .toggle-row span { font-size: 12px; color: rgb(209, 209, 209); }
+  .toggle {
+    width: 36px; height: 20px;
+    background: rgb(52, 52, 52);
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: rgba(59, 130, 246, 0.6); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: rgb(220, 220, 220);
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(16px); }
+
+  /* ── Presets ──────────────────────────────────────── */
+  .presets {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgb(42, 42, 42);
+  }
+  .presets h3 {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgb(128, 128, 128);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .preset-btn {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid rgb(42, 42, 42);
+    background: rgb(26, 26, 26);
+    color: rgb(209, 209, 209);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover {
+    background: rgb(36, 36, 36);
+    border-color: rgb(58, 58, 58);
+  }
+
+  /* ── Grid Area (center) ───────────────────────────── */
+  .grid-wrapper {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+  .scheduler-viewport {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+  .scheduler-canvas {
+    display: inline-flex;
+    flex-direction: column;
+    min-width: 100%;
+  }
+
+  /* ── Station Headers ──────────────────────────────── */
+  .station-headers {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgb(26, 26, 26);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .timeline-placeholder {
+    width: 48px;
+    flex-shrink: 0;
+    position: sticky;
+    left: 0;
+    z-index: 31;
+    background: rgb(26, 26, 26);
+  }
+  .station-header {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 11.375px;
+    font-weight: 600;
+    color: rgb(161, 161, 161);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── Grid Content ─────────────────────────────────── */
+  .grid-content {
+    display: flex;
+    position: relative;
+  }
+  .timeline-col {
+    width: 48px;
+    flex-shrink: 0;
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    background: rgb(15, 15, 15);
+  }
+  .hour-marker {
+    height: 80px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 0 6px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9.75px;
+    color: rgb(128, 128, 128);
+    position: relative;
+  }
+  .hour-marker::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 1px;
+    background: rgba(63, 63, 70, 0.5);
+  }
+  .stations-area {
+    display: flex;
+    gap: 1px;
+    position: relative;
+  }
+  .station-col {
+    flex-shrink: 0;
+    background: rgb(10, 10, 10);
+    position: relative;
+  }
+  .hour-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 1px;
+    background: rgba(63, 63, 70, 0.5);
+  }
+  .tile {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: 3px;
+    border-left: 3px solid;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2px 6px;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: default;
+    transition: opacity 0.15s;
+  }
+  .tile:hover { opacity: 0.85; }
+  .tile-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .now-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: rgb(239, 68, 68);
+    z-index: 15;
+    pointer-events: none;
+  }
+  .now-line-label {
+    position: absolute;
+    left: -48px;
+    top: -7px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    color: rgb(248, 113, 113);
+    background: rgb(26, 26, 26);
+    padding: 1px 4px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  /* ── Minimap ──────────────────────────────────────── */
+  .minimap-container {
+    flex-shrink: 0;
+    position: relative;
+    border-left: 1px solid rgb(42, 42, 42);
+    overflow: hidden;
+    transition: width 0.25s ease, opacity 0.25s ease;
+  }
+  .minimap-container.collapsed {
+    width: 12px !important;
+    cursor: pointer;
+  }
+  .minimap-container.collapsed:hover {
+    width: var(--minimap-w) !important;
+  }
+  .minimap-container.collapsed .minimap-inner { opacity: 0; transition: opacity 0.2s; }
+  .minimap-container.collapsed:hover .minimap-inner { opacity: 1; }
+  .minimap-collapse-tab {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 40px;
+    background: rgb(36, 36, 36);
+    border-right: 1px solid rgb(58, 58, 58);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: rgb(128, 128, 128);
+    z-index: 5;
+  }
+  .minimap-mode-toggle {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 15;
+    padding: 2px 6px;
+    font-size: 9px;
+    font-weight: 600;
+    color: rgb(128, 128, 128);
+    background: rgba(26, 26, 26, 0.85);
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .minimap-container:hover .minimap-mode-toggle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .minimap-mode-toggle:hover {
+    color: rgb(209, 209, 209);
+    border-color: rgb(80, 80, 80);
+  }
+  .minimap-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+  .minimap-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .minimap-viewport-rect {
+    position: absolute;
+    border: 1.5px solid white;
+    border-radius: 1px;
+    pointer-events: auto;
+    cursor: grab;
+    transition: border-color 0.15s;
+    z-index: 10;
+  }
+  .minimap-viewport-rect:active { cursor: grabbing; }
+  .minimap-viewport-rect-fill {
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .minimap-now-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgb(239, 68, 68);
+    box-shadow: 0 0 4px 1px rgba(239, 68, 68, 0.6);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* ── Prompt Output ────────────────────────────────── */
+  .prompt-bar {
+    background: rgb(26, 26, 26);
+    border-top: 1px solid rgb(42, 42, 42);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    min-height: 44px;
+  }
+  .prompt-text {
+    flex: 1;
+    font-size: 12px;
+    color: rgb(209, 209, 209);
+    line-height: 1.5;
+    font-family: "JetBrains Mono", monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .copy-btn {
+    padding: 5px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    border: 1px solid rgb(58, 58, 58);
+    background: rgb(36, 36, 36);
+    color: rgb(209, 209, 209);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: rgb(44, 44, 44); }
+  .copy-btn.copied { background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4); color: rgb(110, 231, 183); }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="top-bar">
+  <h1>Flux Minimap Playground</h1>
+  <span style="font-size:11px;color:rgb(128,128,128)">Scroll the grid, drag the minimap viewport, tweak controls on the left</span>
+</div>
+
+<!-- Main -->
+<div class="main-area">
+
+  <!-- Controls -->
+  <div class="controls" id="controls">
+    <div class="control-group">
+      <label>Minimap Width</label>
+      <input type="range" id="ctrl-width" min="40" max="200" value="80">
+      <span class="value" id="val-width">80px</span>
+    </div>
+
+    <div class="control-group">
+      <label>Minimap Opacity</label>
+      <input type="range" id="ctrl-opacity" min="30" max="100" value="80">
+      <span class="value" id="val-opacity">0.80</span>
+    </div>
+
+    <div class="control-group">
+      <label>Viewport Color</label>
+      <div class="btn-row">
+        <button class="btn active" data-vp-color="white">White</button>
+        <button class="btn" data-vp-color="blue">Blue</button>
+        <button class="btn" data-vp-color="emerald">Emerald</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>Tile Rendering</label>
+      <div class="btn-row">
+        <button class="btn active" data-render="tiles">Individual</button>
+        <button class="btn" data-render="density">Heatmap</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>Minimap Background</label>
+      <div class="btn-row">
+        <button class="btn active" data-bg="match">Match Grid</button>
+        <button class="btn" data-bg="lighter">Lighter</button>
+        <button class="btn" data-bg="darker">Darker</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="toggle-row">
+        <span>Show Minimap</span>
+        <div class="toggle on" id="toggle-visible"></div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="toggle-row">
+        <span>Collapsible</span>
+        <div class="toggle" id="toggle-collapsible"></div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>Station Column Width</label>
+      <input type="range" id="ctrl-col-width" min="120" max="320" value="200">
+      <span class="value" id="val-col-width">200px</span>
+    </div>
+
+    <div class="control-group">
+      <label>Visible Days</label>
+      <input type="range" id="ctrl-days" min="14" max="60" value="30">
+      <span class="value" id="val-days">30 days</span>
+    </div>
+
+    <!-- Presets -->
+    <div class="presets">
+      <h3>Presets</h3>
+      <button class="preset-btn" data-preset="compact">Compact — 50px, heatmap, collapsible</button>
+      <button class="preset-btn" data-preset="detailed">Detailed — 140px, individual tiles</button>
+      <button class="preset-btn" data-preset="subtle">Subtle — 60px, low opacity, emerald</button>
+      <button class="preset-btn" data-preset="maxinfo">Max Info — 200px, individual, always visible</button>
+    </div>
+  </div>
+
+  <!-- Grid + Minimap -->
+  <div class="grid-wrapper">
+    <div class="scheduler-viewport" id="scheduler-viewport">
+      <div class="scheduler-canvas" id="scheduler-canvas">
+        <!-- station headers -->
+        <div class="station-headers" id="station-headers"></div>
+        <!-- grid content -->
+        <div class="grid-content" id="grid-content">
+          <div class="timeline-col" id="timeline-col"></div>
+          <div class="stations-area" id="stations-area"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Minimap -->
+    <div class="minimap-container" id="minimap-container">
+      <div class="minimap-collapse-tab" id="collapse-tab">&#9664;</div>
+      <button class="minimap-mode-toggle" id="minimap-mode-toggle">Heatmap</button>
+      <div class="minimap-inner" id="minimap-inner">
+        <canvas class="minimap-canvas" id="minimap-canvas"></canvas>
+        <div class="minimap-now-line" id="minimap-now-line"></div>
+        <div class="minimap-viewport-rect" id="minimap-viewport-rect">
+          <div class="minimap-viewport-rect-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prompt bar -->
+<div class="prompt-bar">
+  <div class="prompt-text" id="prompt-text"></div>
+  <button class="copy-btn" id="copy-btn">Copy Prompt</button>
+</div>
+
+<script>
+// ── Configuration ────────────────────────────────────
+const STATIONS = [
+  'Offset 1', 'Offset 2', 'Numérique', 'Finition 1', 'Finition 2',
+  'Massicot', 'Pliage', 'Reliure', 'Emballage'
+];
+
+const TILE_STATES = [
+  { name: 'default',   border: 'rgb(59,130,246)',  bg: 'rgba(59,130,246,0.12)',  miniColor: 'rgb(59,130,246)' },
+  { name: 'completed', border: 'rgb(34,197,94)',   bg: 'rgba(34,197,94,0.09)',   miniColor: 'rgb(34,197,94)' },
+  { name: 'shipped',   border: 'rgb(16,185,129)',  bg: 'rgba(16,185,129,0.09)',  miniColor: 'rgb(16,185,129)' },
+  { name: 'late',      border: 'rgb(239,68,68)',   bg: 'rgba(239,68,68,0.09)',   miniColor: 'rgb(239,68,68)' },
+  { name: 'conflict',  border: 'rgb(245,158,11)',  bg: 'rgba(245,158,11,0.09)',  miniColor: 'rgb(245,158,11)' },
+];
+
+const PIXELS_PER_HOUR = 80;
+const HOURS_PER_DAY = 24;
+const DAY_HEIGHT = PIXELS_PER_HOUR * HOURS_PER_DAY;
+const VP_COLORS = {
+  white:   { border: 'rgba(255,255,255,0.8)', fill: 'rgba(255,255,255,0.06)' },
+  blue:    { border: 'rgba(59,130,246,0.8)',  fill: 'rgba(59,130,246,0.08)' },
+  emerald: { border: 'rgba(16,185,129,0.8)',  fill: 'rgba(16,185,129,0.08)' },
+};
+const MINIMAP_BG = {
+  match:   'rgb(10,10,10)',
+  lighter: 'rgb(26,26,26)',
+  darker:  'rgb(5,5,5)',
+};
+
+const DEFAULTS = {
+  width: 80, opacity: 0.80, vpColor: 'white', render: 'tiles',
+  bg: 'match', visible: true, collapsible: false, colWidth: 200, days: 30,
+};
+
+const state = { ...DEFAULTS };
+let tiles = []; // generated tile data
+
+// ── DOM refs ─────────────────────────────────────────
+const viewport = document.getElementById('scheduler-viewport');
+const canvas = document.getElementById('scheduler-canvas');
+const headersEl = document.getElementById('station-headers');
+const timelineCol = document.getElementById('timeline-col');
+const stationsArea = document.getElementById('stations-area');
+const gridContent = document.getElementById('grid-content');
+const minimapContainer = document.getElementById('minimap-container');
+const minimapInner = document.getElementById('minimap-inner');
+const minimapCanvas = document.getElementById('minimap-canvas');
+const minimapCtx = minimapCanvas.getContext('2d');
+const vpRect = document.getElementById('minimap-viewport-rect');
+const minimapNowLine = document.getElementById('minimap-now-line');
+const promptText = document.getElementById('prompt-text');
+const copyBtn = document.getElementById('copy-btn');
+const collapseTab = document.getElementById('collapse-tab');
+
+// ── Tile generation ──────────────────────────────────
+function generateTiles() {
+  tiles = [];
+  const rng = mulberry32(42); // deterministic seed
+  for (let si = 0; si < STATIONS.length; si++) {
+    // busier earlier stations
+    const density = si < 3 ? 0.6 : si < 6 ? 0.4 : 0.25;
+    for (let d = 0; d < state.days; d++) {
+      // some days lighter
+      const dayFactor = (d % 7 >= 5) ? 0.3 : 1.0; // weekends lighter
+      let cursor = 6 * PIXELS_PER_HOUR; // start at 06:00
+      const dayEnd = (6 + 16) * PIXELS_PER_HOUR; // work until ~22:00
+      while (cursor < dayEnd) {
+        if (rng() > density * dayFactor) {
+          cursor += PIXELS_PER_HOUR * (0.5 + rng() * 2);
+          continue;
+        }
+        const durationH = 0.5 + rng() * 3; // 0.5h to 3.5h
+        const height = durationH * PIXELS_PER_HOUR;
+        const tileState = TILE_STATES[Math.floor(rng() * TILE_STATES.length)];
+        const topInDay = cursor;
+        tiles.push({
+          station: si,
+          day: d,
+          top: d * DAY_HEIGHT + topInDay,
+          height,
+          state: tileState,
+          label: `Job ${Math.floor(rng() * 9000 + 1000)}`,
+        });
+        cursor += height + PIXELS_PER_HOUR * (0.25 + rng() * 0.75);
+      }
+    }
+  }
+}
+
+function mulberry32(seed) {
+  let t = seed;
+  return function() {
+    t = (t + 0x6D2B79F5) | 0;
+    let x = Math.imul(t ^ (t >>> 15), 1 | t);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ── Build grid DOM ───────────────────────────────────
+function buildGrid() {
+  const totalHeight = state.days * DAY_HEIGHT;
+
+  // Headers
+  headersEl.innerHTML = '';
+  const placeholder = document.createElement('div');
+  placeholder.className = 'timeline-placeholder';
+  headersEl.appendChild(placeholder);
+  STATIONS.forEach(name => {
+    const h = document.createElement('div');
+    h.className = 'station-header';
+    h.style.width = state.colWidth + 'px';
+    h.textContent = name;
+    headersEl.appendChild(h);
+  });
+
+  // Timeline
+  timelineCol.innerHTML = '';
+  timelineCol.style.height = totalHeight + 'px';
+  for (let d = 0; d < state.days; d++) {
+    for (let h = 0; h < HOURS_PER_DAY; h++) {
+      const marker = document.createElement('div');
+      marker.className = 'hour-marker';
+      const hour = (6 + h) % 24;
+      marker.textContent = String(hour).padStart(2, '0') + ':00';
+      marker.style.top = (d * DAY_HEIGHT + h * PIXELS_PER_HOUR) + 'px';
+      marker.style.position = 'absolute';
+      marker.style.width = '48px';
+      marker.style.height = PIXELS_PER_HOUR + 'px';
+      timelineCol.appendChild(marker);
+    }
+  }
+
+  // Station columns
+  stationsArea.innerHTML = '';
+  stationsArea.style.height = totalHeight + 'px';
+  const colEls = [];
+  for (let si = 0; si < STATIONS.length; si++) {
+    const col = document.createElement('div');
+    col.className = 'station-col';
+    col.style.width = state.colWidth + 'px';
+    col.style.height = totalHeight + 'px';
+
+    // hour grid lines
+    for (let d = 0; d < state.days; d++) {
+      for (let h = 0; h < HOURS_PER_DAY; h++) {
+        const line = document.createElement('div');
+        line.className = 'hour-line';
+        line.style.top = (d * DAY_HEIGHT + h * PIXELS_PER_HOUR) + 'px';
+        col.appendChild(line);
+      }
+    }
+    colEls.push(col);
+    stationsArea.appendChild(col);
+  }
+
+  // Place tiles
+  tiles.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.style.top = t.top + 'px';
+    el.style.height = Math.max(t.height, 12) + 'px';
+    el.style.borderLeftColor = t.state.border;
+    el.style.background = t.state.bg;
+    if (t.height >= 24) {
+      const lbl = document.createElement('div');
+      lbl.className = 'tile-label';
+      lbl.textContent = t.label;
+      el.appendChild(lbl);
+    }
+    colEls[t.station].appendChild(el);
+  });
+
+  // Now line (day 2, 14:30)
+  const nowTop = 2 * DAY_HEIGHT + (14.5 - 6) * PIXELS_PER_HOUR + 6 * PIXELS_PER_HOUR;
+  const existingNow = stationsArea.querySelector('.now-line');
+  if (existingNow) existingNow.remove();
+  const nowLine = document.createElement('div');
+  nowLine.className = 'now-line';
+  nowLine.style.top = nowTop + 'px';
+  const nowLabel = document.createElement('div');
+  nowLabel.className = 'now-line-label';
+  nowLabel.textContent = '14:30';
+  nowLine.appendChild(nowLabel);
+  stationsArea.appendChild(nowLine);
+
+  // Scroll to ~day 2 morning on initial build
+  viewport.scrollTop = 2 * DAY_HEIGHT + 6 * PIXELS_PER_HOUR;
+}
+
+// ── Minimap rendering ────────────────────────────────
+function renderMinimap() {
+  const containerHeight = minimapContainer.clientHeight;
+  const containerWidth = state.width;
+  minimapCanvas.width = containerWidth * devicePixelRatio;
+  minimapCanvas.height = containerHeight * devicePixelRatio;
+  minimapCanvas.style.width = containerWidth + 'px';
+  minimapCanvas.style.height = containerHeight + 'px';
+  minimapCtx.scale(devicePixelRatio, devicePixelRatio);
+
+  // background
+  minimapCtx.fillStyle = MINIMAP_BG[state.bg];
+  minimapCtx.fillRect(0, 0, containerWidth, containerHeight);
+
+  const totalHeight = state.days * DAY_HEIGHT;
+  const totalWidth = STATIONS.length * state.colWidth;
+  const scaleY = containerHeight / totalHeight;
+  const scaleX = containerWidth / totalWidth;
+
+  if (state.render === 'tiles') {
+    // Individual tiles
+    tiles.forEach(t => {
+      const x = t.station * state.colWidth * scaleX;
+      const w = state.colWidth * scaleX - 0.5;
+      const y = t.top * scaleY;
+      const h = Math.max(t.height * scaleY, 0.5);
+      minimapCtx.fillStyle = t.state.miniColor;
+      minimapCtx.globalAlpha = 0.7;
+      minimapCtx.fillRect(x + 0.25, y, Math.max(w, 1), Math.max(h, 0.5));
+    });
+    minimapCtx.globalAlpha = 1;
+  } else {
+    // Density heatmap
+    const bucketH = DAY_HEIGHT / 8; // 3-hour buckets
+    const numBuckets = Math.ceil(totalHeight / bucketH);
+    for (let si = 0; si < STATIONS.length; si++) {
+      for (let b = 0; b < numBuckets; b++) {
+        const bucketTop = b * bucketH;
+        const bucketBottom = bucketTop + bucketH;
+        let coverage = 0;
+        tiles.forEach(t => {
+          if (t.station !== si) return;
+          const tileBottom = t.top + t.height;
+          const overlap = Math.max(0, Math.min(tileBottom, bucketBottom) - Math.max(t.top, bucketTop));
+          coverage += overlap;
+        });
+        const density = Math.min(coverage / bucketH, 1);
+        if (density > 0.01) {
+          const x = si * state.colWidth * scaleX;
+          const w = state.colWidth * scaleX - 0.5;
+          const y = bucketTop * scaleY;
+          const h = bucketH * scaleY;
+          // Interpolate blue→amber→red by density
+          const r = Math.round(59 + density * 180);
+          const g = Math.round(130 - density * 62);
+          const b2 = Math.round(246 - density * 178);
+          minimapCtx.fillStyle = `rgba(${r},${g},${b2},${0.15 + density * 0.55})`;
+          minimapCtx.fillRect(x + 0.25, y, Math.max(w, 1), h);
+        }
+      }
+    }
+  }
+
+  // Day separator lines
+  minimapCtx.strokeStyle = 'rgba(63,63,70,0.3)';
+  minimapCtx.lineWidth = 0.5;
+  for (let d = 1; d < state.days; d++) {
+    const y = d * DAY_HEIGHT * scaleY;
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(0, y);
+    minimapCtx.lineTo(containerWidth, y);
+    minimapCtx.stroke();
+  }
+
+  // Station separator lines
+  for (let si = 1; si < STATIONS.length; si++) {
+    const x = si * state.colWidth * scaleX;
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(x, 0);
+    minimapCtx.lineTo(x, containerHeight);
+    minimapCtx.stroke();
+  }
+
+  // Now line in minimap
+  const nowTop = 2 * DAY_HEIGHT + 14.5 * PIXELS_PER_HOUR;
+  minimapNowLine.style.top = (nowTop * scaleY) + 'px';
+}
+
+// ── Viewport rect sync ──────────────────────────────
+function syncViewportRect() {
+  const totalHeight = state.days * DAY_HEIGHT;
+  const totalWidth = STATIONS.length * state.colWidth + 48; // +timeline
+  const containerHeight = minimapContainer.clientHeight;
+  const containerWidth = state.width;
+  const scaleY = containerHeight / totalHeight;
+  const scaleX = containerWidth / (totalWidth - 48);
+
+  const y = viewport.scrollTop * scaleY;
+  const h = viewport.clientHeight * scaleY;
+  const x = (viewport.scrollLeft > 48 ? viewport.scrollLeft - 48 : 0) * scaleX;
+  // visible width minus timeline column
+  const visibleContentWidth = viewport.clientWidth - 48;
+  const w = Math.min(visibleContentWidth * scaleX, containerWidth);
+
+  vpRect.style.top = y + 'px';
+  vpRect.style.height = Math.max(h, 4) + 'px';
+  vpRect.style.left = x + 'px';
+  vpRect.style.width = Math.max(w, 4) + 'px';
+
+  const vpColor = VP_COLORS[state.vpColor];
+  vpRect.style.borderColor = vpColor.border;
+  vpRect.querySelector('.minimap-viewport-rect-fill').style.background = vpColor.fill;
+}
+
+// ── Minimap drag ─────────────────────────────────────
+let dragging = false;
+let dragOffsetY = 0;
+let dragOffsetX = 0;
+
+vpRect.addEventListener('mousedown', e => {
+  dragging = true;
+  dragOffsetY = e.clientY - vpRect.getBoundingClientRect().top;
+  dragOffsetX = e.clientX - vpRect.getBoundingClientRect().left;
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const containerRect = minimapInner.getBoundingClientRect();
+  const totalHeight = state.days * DAY_HEIGHT;
+  const totalWidth = STATIONS.length * state.colWidth;
+  const containerHeight = minimapContainer.clientHeight;
+  const containerWidth = state.width;
+  const scaleY = containerHeight / totalHeight;
+  const scaleX = containerWidth / totalWidth;
+
+  const relY = e.clientY - containerRect.top - dragOffsetY;
+  const relX = e.clientX - containerRect.left - dragOffsetX;
+  viewport.scrollTop = relY / scaleY;
+  viewport.scrollLeft = (relX / scaleX) + 48;
+  syncViewportRect();
+});
+
+document.addEventListener('mouseup', () => { dragging = false; });
+
+// Click to jump
+minimapInner.addEventListener('click', e => {
+  if (e.target === vpRect || vpRect.contains(e.target)) return;
+  const containerRect = minimapInner.getBoundingClientRect();
+  const totalHeight = state.days * DAY_HEIGHT;
+  const totalWidth = STATIONS.length * state.colWidth;
+  const containerHeight = minimapContainer.clientHeight;
+  const containerWidth = state.width;
+  const scaleY = containerHeight / totalHeight;
+  const scaleX = containerWidth / totalWidth;
+
+  const relY = e.clientY - containerRect.top;
+  const relX = e.clientX - containerRect.left;
+  // center viewport on click position
+  viewport.scrollTop = (relY / scaleY) - viewport.clientHeight / 2;
+  viewport.scrollLeft = (relX / scaleX) - viewport.clientWidth / 2 + 48;
+});
+
+// ── Scroll sync ──────────────────────────────────────
+viewport.addEventListener('scroll', () => {
+  syncViewportRect();
+});
+
+// ── Controls wiring ──────────────────────────────────
+function updateAll() {
+  minimapContainer.style.width = state.visible ? state.width + 'px' : '0px';
+  minimapContainer.style.setProperty('--minimap-w', state.width + 'px');
+  minimapContainer.style.opacity = state.visible ? state.opacity : 0;
+  minimapContainer.classList.toggle('collapsed', state.collapsible && state.visible);
+  collapseTab.style.display = state.collapsible ? 'flex' : 'none';
+
+  renderMinimap();
+  syncViewportRect();
+  updatePrompt();
+  if (typeof syncModeToggleLabel === 'function') syncModeToggleLabel();
+}
+
+// Width slider
+const ctrlWidth = document.getElementById('ctrl-width');
+ctrlWidth.addEventListener('input', () => {
+  state.width = +ctrlWidth.value;
+  document.getElementById('val-width').textContent = state.width + 'px';
+  updateAll();
+});
+
+// Opacity slider
+const ctrlOpacity = document.getElementById('ctrl-opacity');
+ctrlOpacity.addEventListener('input', () => {
+  state.opacity = +ctrlOpacity.value / 100;
+  document.getElementById('val-opacity').textContent = state.opacity.toFixed(2);
+  updateAll();
+});
+
+// VP color buttons
+document.querySelectorAll('[data-vp-color]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-vp-color]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.vpColor = btn.dataset.vpColor;
+    updateAll();
+  });
+});
+
+// Render mode buttons
+document.querySelectorAll('[data-render]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-render]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.render = btn.dataset.render;
+    updateAll();
+  });
+});
+
+// BG buttons
+document.querySelectorAll('[data-bg]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-bg]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.bg = btn.dataset.bg;
+    updateAll();
+  });
+});
+
+// Toggles
+document.getElementById('toggle-visible').addEventListener('click', function() {
+  state.visible = !state.visible;
+  this.classList.toggle('on', state.visible);
+  updateAll();
+});
+document.getElementById('toggle-collapsible').addEventListener('click', function() {
+  state.collapsible = !state.collapsible;
+  this.classList.toggle('on', state.collapsible);
+  updateAll();
+});
+
+// Column width
+const ctrlColWidth = document.getElementById('ctrl-col-width');
+ctrlColWidth.addEventListener('input', () => {
+  state.colWidth = +ctrlColWidth.value;
+  document.getElementById('val-col-width').textContent = state.colWidth + 'px';
+  // rebuild grid
+  generateTiles();
+  buildGrid();
+  updateAll();
+});
+
+// Days
+const ctrlDays = document.getElementById('ctrl-days');
+ctrlDays.addEventListener('input', () => {
+  state.days = +ctrlDays.value;
+  document.getElementById('val-days').textContent = state.days + ' days';
+  generateTiles();
+  buildGrid();
+  updateAll();
+});
+
+// Presets
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const presets = {
+      compact:  { width: 50, opacity: 0.75, vpColor: 'white', render: 'density', bg: 'darker', collapsible: true, visible: true },
+      detailed: { width: 140, opacity: 0.85, vpColor: 'blue', render: 'tiles', bg: 'match', collapsible: false, visible: true },
+      subtle:   { width: 60, opacity: 0.5, vpColor: 'emerald', render: 'tiles', bg: 'lighter', collapsible: false, visible: true },
+      maxinfo:  { width: 200, opacity: 0.90, vpColor: 'white', render: 'tiles', bg: 'match', collapsible: false, visible: true },
+    };
+    const p = presets[btn.dataset.preset];
+    Object.assign(state, p);
+    // sync controls
+    ctrlWidth.value = state.width;
+    document.getElementById('val-width').textContent = state.width + 'px';
+    ctrlOpacity.value = state.opacity * 100;
+    document.getElementById('val-opacity').textContent = state.opacity.toFixed(2);
+    document.querySelectorAll('[data-vp-color]').forEach(b => b.classList.toggle('active', b.dataset.vpColor === state.vpColor));
+    document.querySelectorAll('[data-render]').forEach(b => b.classList.toggle('active', b.dataset.render === state.render));
+    document.querySelectorAll('[data-bg]').forEach(b => b.classList.toggle('active', b.dataset.bg === state.bg));
+    document.getElementById('toggle-visible').classList.toggle('on', state.visible);
+    document.getElementById('toggle-collapsible').classList.toggle('on', state.collapsible);
+    updateAll();
+  });
+});
+
+// ── Prompt output ────────────────────────────────────
+function updatePrompt() {
+  const parts = [];
+  parts.push(`${state.width}px wide 2D minimap strip on the right edge of the scheduling grid`);
+
+  if (state.render !== DEFAULTS.render) {
+    parts.push(state.render === 'density' ? 'density heatmap rendering' : 'individual tile rendering');
+  }
+  if (state.opacity !== DEFAULTS.opacity) {
+    parts.push(`opacity ${state.opacity.toFixed(2)}`);
+  }
+  if (state.vpColor !== DEFAULTS.vpColor) {
+    parts.push(`${state.vpColor} viewport rectangle`);
+  }
+  if (state.bg !== DEFAULTS.bg) {
+    parts.push(`${state.bg} background`);
+  }
+  if (state.collapsible) {
+    parts.push('collapsible on hover');
+  }
+
+  const prompt = `Implement a ${parts.join(', ')}. The minimap shows all stations (X) and all days (Y) compressed. It includes a draggable viewport rectangle that syncs with grid scroll position. Clicking anywhere on the minimap jumps the grid to that position.`;
+  promptText.textContent = prompt;
+}
+
+// Copy
+copyBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(promptText.textContent).then(() => {
+    copyBtn.textContent = 'Copied!';
+    copyBtn.classList.add('copied');
+    setTimeout(() => {
+      copyBtn.textContent = 'Copy Prompt';
+      copyBtn.classList.remove('copied');
+    }, 1500);
+  });
+});
+
+// ── Minimap mode toggle (on the minimap itself) ─────
+const minimapModeToggle = document.getElementById('minimap-mode-toggle');
+function syncModeToggleLabel() {
+  minimapModeToggle.textContent = state.render === 'tiles' ? 'Densité' : 'Tuiles';
+}
+minimapModeToggle.addEventListener('click', () => {
+  state.render = state.render === 'tiles' ? 'density' : 'tiles';
+  document.querySelectorAll('[data-render]').forEach(b => b.classList.toggle('active', b.dataset.render === state.render));
+  syncModeToggleLabel();
+  updateAll();
+});
+
+// ── Resize observer ──────────────────────────────────
+const ro = new ResizeObserver(() => { renderMinimap(); syncViewportRect(); });
+ro.observe(minimapContainer);
+ro.observe(viewport);
+
+// ── Init ─────────────────────────────────────────────
+generateTiles();
+buildGrid();
+updateAll();
+</script>
+</body>
+</html>

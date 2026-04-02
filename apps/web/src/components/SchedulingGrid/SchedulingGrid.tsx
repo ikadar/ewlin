@@ -30,6 +30,10 @@ export interface SchedulingGridHandle {
   getViewportWidth: () => number;
   /** Scroll to both X and Y positions at once */
   scrollTo: (x: number, y: number, behavior?: ScrollBehavior) => void;
+  /** Get total scrollable width */
+  getScrollWidth: () => number;
+  /** Get total scrollable height */
+  getScrollHeight: () => number;
 }
 
 interface CachedTileData {
@@ -90,8 +94,8 @@ export interface SchedulingGridProps {
   conflicts?: ScheduleConflict[];
   /** Station groups for capacity visualization (REQ-18) */
   groups?: StationGroup[];
-  /** REQ-09.2: Callback when grid scrolls (for DateStrip sync) */
-  onScroll?: (scrollTop: number) => void;
+  /** REQ-09.2: Callback when grid scrolls (for DateStrip + Minimap sync) */
+  onScroll?: (scrollTop: number, scrollLeft: number) => void;
   /** v0.3.46: Total number of days for virtual scrolling (default: 365) */
   totalDays?: number;
   /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
@@ -223,6 +227,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       scrollTo: (x: number, y: number, behavior: ScrollBehavior = 'smooth') => {
         scrollContainerRef.current?.scrollTo({ left: x, top: y, behavior });
       },
+      getScrollWidth: () => scrollContainerRef.current?.scrollWidth ?? 0,
+      getScrollHeight: () => scrollContainerRef.current?.scrollHeight ?? 0,
     }));
 
   // Update current time every minute
@@ -245,7 +251,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     const handleScroll = () => {
       const newScrollTop = container.scrollTop;
       setScrollTop(newScrollTop);
-      onScroll?.(newScrollTop);
+      onScroll?.(newScrollTop, container.scrollLeft);
     };
 
     const handleResize = () => {
