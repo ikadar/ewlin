@@ -306,7 +306,8 @@ Repeat until sum(ART) = 0:
             has LAST exceeded → rollback (degraded KO), break sub-loop
           - Compute productivity:
             - Setup phase: min(attention_received / attentionFull, 1.0) — proportional
-            - Run phase (masked time): maskedProductivity — fixed per machine (e.g. 0.95)
+            - Run phase (normal): min(attention_received / attentionRun, 1.0) — proportional, operator stays
+            - Run phase (masked time, if maskedTimeEnabled): maskedProductivity — fixed, operator freed
           - Decrement ART by tick × productivity
         End sub-loop when ART = 0
   End-of-timestep: recalculate operator attention across all machines
@@ -434,6 +435,7 @@ New nullable columns on existing `stations` table:
 ```
 stations (existing table)
   + attention_full: float, nullable, default null
+  + attention_run: float, nullable, default null
   + masked_time_enabled: tinyint(1), not null, default 0
   + attention_masked: float, nullable, default null
   + masked_productivity: float, nullable, default null
@@ -447,10 +449,11 @@ stations (existing table)
 ```
 operators (new table)
   id: guid PK
-  name: varchar(100) UNIQUE
-  total_attention: float, default 1.0
+  first_name: varchar(50), not null
+  last_name: varchar(50), not null
+  role: varchar(100), nullable
   operating_schedule: json, nullable
-  exceptions: json, nullable
+  schedule_exceptions: json, nullable
   created_at: datetime_immutable
   updated_at: datetime_immutable
 
@@ -630,6 +633,9 @@ Rust engine exposes only: `POST /compute` (called by PHP API, not by frontend).
 | Productivity in degraded mode | ART decrements by tick × productivity | productivity = min(attention_received / attention_required, 1.0) |
 | Masked time productivity | Fixed per-machine value (maskedProductivity) | Not proportional to attention ratio — small fixed loss (e.g. 0.95) for freeing operator |
 | Station availability | Driven by operator schedules | Machines have no independent availability schedule — available when an operator is available |
+| Operator totalAttention | Always 1.0, not configurable | Operator attention budget is constant. Part-time = fewer hours (schedule), not less attention |
+| Operator identity | firstName + lastName + role | Split from single `name` field. Role is optional (e.g. "Conducteur offset") |
+| Run phase productivity (no masked time) | Proportional: min(attention_received / attentionRun, 1.0) | Uses `attentionRun` field on station — separate from masked time attention |
 
 ---
 
