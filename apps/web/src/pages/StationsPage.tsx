@@ -106,14 +106,14 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   });
 
   // Operator-algorithm attributes
-  const [attentionFull, setAttentionFull] = useState(initial?.attentionFull != null ? String(initial.attentionFull) : '');
-  const [attentionRun, setAttentionRun] = useState(initial?.attentionRun != null ? String(initial.attentionRun) : '');
+  const [attentionFull, setAttentionFull] = useState(String(initial?.attentionFull ?? 1));
+  const [attentionRun, setAttentionRun] = useState(String(initial?.attentionRun ?? 1));
   const [maskedTimeEnabled, setMaskedTimeEnabled] = useState(initial?.maskedTimeEnabled ?? false);
-  const [attentionMasked, setAttentionMasked] = useState(initial?.attentionMasked != null ? String(initial.attentionMasked) : '');
-  const [maskedProductivity, setMaskedProductivity] = useState(initial?.maskedProductivity != null ? String(initial.maskedProductivity) : '');
-  const [tickMinutes, setTickMinutes] = useState(initial?.tickMinutes != null ? String(initial.tickMinutes) : '');
-  const [peremptionThresholdMinutes, setPeremptionThresholdMinutes] = useState(initial?.peremptionThresholdMinutes != null ? String(initial.peremptionThresholdMinutes) : '');
-  const [maxChunkMinutes, setMaxChunkMinutes] = useState(initial?.maxChunkMinutes != null ? String(initial.maxChunkMinutes) : '');
+  const [attentionMasked, setAttentionMasked] = useState(String(initial?.attentionMasked ?? 1));
+  const [maskedProductivity, setMaskedProductivity] = useState(initial?.maskedProductivity != null ? String(initial.maskedProductivity) : '0.95');
+  const [tickMinutes, setTickMinutes] = useState(String(initial?.tickMinutes ?? 15));
+  const [peremptionHours, setPeremptionHours] = useState(String(initial?.peremptionThresholdMinutes != null ? initial.peremptionThresholdMinutes / 60 : 2));
+  const [maxChunkHours, setMaxChunkHours] = useState(String(initial?.maxChunkMinutes != null ? initial.maxChunkMinutes / 60 : 7));
 
   // Mode toggles (visual vs JSON)
   const [scheduleJsonMode, setScheduleJsonMode] = useState(false);
@@ -217,8 +217,8 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
       attentionMasked: maskedTimeEnabled && attentionMasked.trim() ? parseFloat(attentionMasked) : null,
       maskedProductivity: maskedTimeEnabled && maskedProductivity.trim() ? parseFloat(maskedProductivity) : null,
       tickMinutes: tickMinutes.trim() ? parseInt(tickMinutes, 10) : null,
-      peremptionThresholdMinutes: peremptionThresholdMinutes.trim() ? parseInt(peremptionThresholdMinutes, 10) : null,
-      maxChunkMinutes: maxChunkMinutes.trim() ? parseInt(maxChunkMinutes, 10) : null,
+      peremptionThresholdMinutes: peremptionHours.trim() ? Math.round(parseFloat(peremptionHours) * 60) : null,
+      maxChunkMinutes: maxChunkHours.trim() ? Math.round(parseFloat(maxChunkHours) * 60) : null,
     });
   };
 
@@ -446,29 +446,23 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
             <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">Algorithme opérateur</p>
 
             {/* Attention calage + roulage (always visible) */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-2 gap-4 mb-3">
               <div>
-                <label className="block text-xs text-flux-text-secondary mb-1">
-                  Attention calage <span className="text-flux-text-muted text-[10px]">(attentionFull)</span>
-                </label>
+                <label className="block text-sm text-flux-text-secondary mb-1">Attention calage</label>
                 <input
                   type="number" step="0.1" min="0" max="2"
                   value={attentionFull}
                   onChange={(e) => setAttentionFull(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                  placeholder="Ex : 1.0"
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
               </div>
               <div>
-                <label className="block text-xs text-flux-text-secondary mb-1">
-                  Attention roulage <span className="text-flux-text-muted text-[10px]">(attentionRun)</span>
-                </label>
+                <label className="block text-sm text-flux-text-secondary mb-1">Attention roulage</label>
                 <input
                   type="number" step="0.1" min="0" max="2"
                   value={attentionRun}
                   onChange={(e) => setAttentionRun(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                  placeholder="Ex : 0.7"
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
               </div>
             </div>
@@ -487,70 +481,55 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
 
             {/* Masked time fields (only when switch enabled) */}
             {maskedTimeEnabled && (
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-2 gap-4 mb-3">
                 <div>
-                  <label className="block text-xs text-flux-text-secondary mb-1">
-                    Attention temps masqué <span className="text-flux-text-muted text-[10px]">(attentionMasked)</span>
-                  </label>
+                  <label className="block text-sm text-flux-text-secondary mb-1">Attention temps masqué</label>
                   <input
                     type="number" step="0.1" min="0" max="2"
                     value={attentionMasked}
                     onChange={(e) => setAttentionMasked(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                    placeholder="Ex : 0.3"
+                    className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-flux-text-secondary mb-1">
-                    Productivité masquée <span className="text-flux-text-muted text-[10px]">(maskedProductivity)</span>
-                  </label>
+                  <label className="block text-sm text-flux-text-secondary mb-1">Productivité masquée</label>
                   <input
                     type="number" step="0.05" min="0" max="1"
                     value={maskedProductivity}
                     onChange={(e) => setMaskedProductivity(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                    placeholder="Ex : 0.95"
+                    className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                   />
                 </div>
               </div>
             )}
 
             {/* Timing fields */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs text-flux-text-secondary mb-1">
-                  Pas de temps <span className="text-flux-text-muted text-[10px]">(min)</span>
-                </label>
+                <label className="block text-sm text-flux-text-secondary mb-1">Pas de temps (min)</label>
                 <input
                   type="number" min="1"
                   value={tickMinutes}
                   onChange={(e) => setTickMinutes(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                  placeholder="Ex : 5"
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
               </div>
               <div>
-                <label className="block text-xs text-flux-text-secondary mb-1">
-                  Seuil péremption <span className="text-flux-text-muted text-[10px]">(min)</span>
-                </label>
+                <label className="block text-sm text-flux-text-secondary mb-1">Seuil péremption (h)</label>
                 <input
-                  type="number" min="1"
-                  value={peremptionThresholdMinutes}
-                  onChange={(e) => setPeremptionThresholdMinutes(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                  placeholder="Ex : 60"
+                  type="number" step="0.5" min="0"
+                  value={peremptionHours}
+                  onChange={(e) => setPeremptionHours(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
               </div>
               <div>
-                <label className="block text-xs text-flux-text-secondary mb-1">
-                  Durée max chunk <span className="text-flux-text-muted text-[10px]">(min)</span>
-                </label>
+                <label className="block text-sm text-flux-text-secondary mb-1">Durée max chunk (h)</label>
                 <input
-                  type="number" min="1"
-                  value={maxChunkMinutes}
-                  onChange={(e) => setMaxChunkMinutes(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                  placeholder="Ex : 420"
+                  type="number" step="0.5" min="0"
+                  value={maxChunkHours}
+                  onChange={(e) => setMaxChunkHours(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
               </div>
             </div>
