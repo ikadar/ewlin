@@ -628,3 +628,13 @@ Rust engine exposes only: `POST /compute` (called by PHP API, not by frontend).
 | Backward pass operator check | Checks operator availability | At least one qualified operator on shift — static schedule check, no forward-pass dependency |
 | Calage scoring formula | Count of matched SimilarityCriteria | Reuses existing SimilarityCriterion system per station category |
 | Productivity in degraded mode | ART decrements by tick × productivity | productivity = min(attention_received / attention_required, 1.0) |
+| Masked time productivity | Fixed per-machine value (maskedProductivity) | Not proportional to attention ratio — small fixed loss (e.g. 0.95) for freeing operator |
+| Station availability | Driven by operator schedules | Machines have no independent availability schedule — available when an operator is available |
+
+---
+
+## 9. Post-Implementation Cleanup
+
+| Task | Description |
+|------|-------------|
+| Update @flux/schedule-validator | The validator currently uses station operating schedules for conflict detection. Once the operator scheduling algorithm is in place, update the validator to use operator schedules instead of (or in addition to) station schedules for availability checks. |
