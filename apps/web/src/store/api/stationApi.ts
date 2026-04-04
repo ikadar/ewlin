@@ -20,6 +20,7 @@ export interface StationResponse {
   operatingSchedule: Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }> | null;
   scheduleExceptions: Array<{ date: string; type: string; schedule: unknown; reason: string | null }> | null;
   attentionFull: number | null;
+  attentionRun: number | null;
   maskedTimeEnabled: boolean;
   attentionMasked: number | null;
   maskedProductivity: number | null;
@@ -40,6 +41,7 @@ export interface StationInput {
   operatingSchedule: Record<string, unknown> | null;
   scheduleExceptions: unknown[] | null;
   attentionFull?: number | null;
+  attentionRun?: number | null;
   maskedTimeEnabled?: boolean;
   attentionMasked?: number | null;
   maskedProductivity?: number | null;

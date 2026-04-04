@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playground — Station Algo Config v2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --elevated: #242424;
+    --hover: #2c2c2c;
+    --border: #2a2a2a;
+    --border-light: #3a3a3a;
+    --text-primary: #f5f5f5;
+    --text-secondary: #d1d1d1;
+    --text-muted: #808080;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --radius: 6px;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Controls panel ── */
+  .controls {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .controls h2 {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 8px; }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .control-row label { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
+
+  .control-row select,
+  .control-row input[type="number"] {
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 4px 8px;
+    width: 80px;
+    text-align: right;
+  }
+  .control-row select { width: 130px; text-align: left; }
+  .control-row input:focus, .control-row select:focus { outline: none; border-color: var(--accent); }
+
+  .preset-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .preset-btn {
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { background: var(--hover); color: var(--text-primary); }
+  .preset-btn.active { border-color: var(--accent); color: var(--accent); }
+
+  .toggle-row { display: flex; align-items: center; gap: 8px; }
+  .toggle-row input[type="checkbox"] { accent-color: var(--accent); }
+  .toggle-row label { font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+
+  .divider { border-top: 1px solid var(--border); margin: 4px 0; }
+
+  /* ── Right side ── */
+  .right { display: flex; flex-direction: column; overflow: hidden; }
+
+  .preview {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    overflow-y: auto;
+  }
+
+  /* ── Modal mock ── */
+  .modal-mock {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 24px;
+    width: 100%;
+    max-width: 640px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .modal-mock h3 { font-size: 15px; font-weight: 500; margin-bottom: 16px; }
+  .form-fields { display: flex; flex-direction: column; gap: 12px; }
+
+  .fake-field {
+    height: 36px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    opacity: 0.35;
+  }
+  .fake-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ── Section separator ── */
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding-top: 4px;
+  }
+
+  /* ── Form rows ── */
+  .algo-row { display: grid; gap: 12px; }
+  .algo-row.cols-2 { grid-template-columns: 1fr 1fr; }
+  .algo-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .algo-row.cols-1 { grid-template-columns: 1fr; }
+
+  .algo-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  .algo-field label .hint { font-size: 10px; color: var(--text-muted); }
+
+  .algo-field input[type="number"] {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .algo-field input::placeholder { color: var(--text-muted); }
+  .algo-field input:focus { outline: none; border-color: var(--text-muted); }
+
+  /* ── Switch ── */
+  .switch-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+
+  .switch {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .switch .slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+  .switch input:checked + .slider { background: var(--green); border-color: var(--green); }
+  .switch input:checked + .slider::before { left: 18px; background: white; }
+
+  .switch-label { font-size: 13px; color: var(--text-secondary); }
+
+  .masked-fields {
+    transition: all 0.2s;
+    overflow: hidden;
+  }
+  .masked-fields.hidden { opacity: 0.3; pointer-events: none; max-height: 0; margin: 0; padding: 0; }
+  .masked-fields.visible { opacity: 1; max-height: 200px; }
+
+  /* ── Footer ── */
+  .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .btn {
+    padding: 7px 16px;
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-secondary { background: var(--elevated); color: var(--text-secondary); }
+  .btn-primary { background: var(--accent); color: white; font-weight: 500; }
+
+  /* ── Prompt ── */
+  .prompt-area {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 80px;
+  }
+  .prompt-text { flex: 1; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+  .copy-btn {
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { background: var(--hover); color: var(--text-primary); }
+  .copy-btn.copied { border-color: var(--green); color: var(--green); }
+</style>
+</head>
+<body>
+
+<!-- ══════ Controls ══════ -->
+<div class="controls">
+  <div>
+    <h2>Presets machine</h2>
+    <div class="preset-bar">
+      <button class="preset-btn" onclick="applyPreset('offset')">Presse offset</button>
+      <button class="preset-btn" onclick="applyPreset('bigOffset')">Grande Komori</button>
+      <button class="preset-btn" onclick="applyPreset('folder')">Plieuse</button>
+      <button class="preset-btn" onclick="applyPreset('cutter')">Massicot</button>
+      <button class="preset-btn" onclick="applyPreset('shipping')">Expédition</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Attention</h2>
+    <div class="control-row">
+      <label>Attention calage</label>
+      <input type="number" id="ctl-attFull" min="0" max="2" step="0.1" value="1.0" oninput="sync()">
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Temps masqué</h2>
+    <div class="toggle-row">
+      <input type="checkbox" id="ctl-maskedEnabled" checked onchange="sync()">
+      <label for="ctl-maskedEnabled">Temps masqué possible</label>
+    </div>
+    <div class="control-row">
+      <label>Attention roulage</label>
+      <input type="number" id="ctl-attMasked" min="0" max="2" step="0.1" value="0.3" oninput="sync()">
+    </div>
+    <div class="control-row">
+      <label>Productivité masquée</label>
+      <input type="number" id="ctl-maskedProd" min="0" max="1" step="0.05" value="0.95" oninput="sync()">
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Temporel</h2>
+    <div class="control-row">
+      <label>Pas de temps (min)</label>
+      <input type="number" id="ctl-tick" min="1" step="1" value="5" oninput="sync()">
+    </div>
+    <div class="control-row">
+      <label>Seuil péremption (min)</label>
+      <input type="number" id="ctl-peremption" min="1" step="1" value="60" oninput="sync()">
+    </div>
+    <div class="control-row">
+      <label>Durée max chunk (min)</label>
+      <input type="number" id="ctl-chunk" min="1" step="1" value="420" oninput="sync()">
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <h2>Layout</h2>
+    <div class="control-row">
+      <label>Colonnes timing</label>
+      <select id="ctl-timeCols" onchange="sync()">
+        <option value="3" selected>3 colonnes</option>
+        <option value="2">2 colonnes</option>
+      </select>
+    </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="ctl-showHints" checked onchange="sync()">
+      <label for="ctl-showHints">Noms techniques en gris</label>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ Right ══════ -->
+<div class="right">
+  <div class="preview">
+    <div class="modal-mock">
+      <h3>Modifier la station — Komori G37</h3>
+      <div class="form-fields">
+        <!-- Existing fields (fake) -->
+        <div class="fake-field-row"><div class="fake-field"></div><div class="fake-field"></div></div>
+        <div class="fake-field"></div>
+        <div class="fake-field-row"><div class="fake-field"></div><div class="fake-field"></div></div>
+
+        <!-- Separator -->
+        <div class="section-label" id="section-label">Algorithme opérateur</div>
+
+        <!-- Attention calage (always visible) -->
+        <div class="algo-row cols-2" id="attention-row">
+          <div class="algo-field">
+            <label>Attention calage <span class="hint" id="h-attFull">(attentionFull)</span></label>
+            <input type="number" id="p-attFull" step="0.1" min="0" max="2" placeholder="Ex : 1.0">
+          </div>
+          <div></div>
+        </div>
+
+        <!-- Masked time switch + fields -->
+        <div class="switch-row">
+          <label class="switch">
+            <input type="checkbox" id="p-maskedSwitch" checked onchange="toggleMasked()">
+            <span class="slider"></span>
+          </label>
+          <span class="switch-label">Temps masqué possible</span>
+        </div>
+
+        <div class="masked-fields visible" id="masked-fields">
+          <div class="algo-row cols-2">
+            <div class="algo-field">
+              <label>Attention roulage <span class="hint" id="h-attMasked">(attentionMasked)</span></label>
+              <input type="number" id="p-attMasked" step="0.1" min="0" max="2" placeholder="Ex : 0.3">
+            </div>
+            <div class="algo-field">
+              <label>Productivité masquée <span class="hint" id="h-maskedProd">(maskedProductivity)</span></label>
+              <input type="number" id="p-maskedProd" step="0.05" min="0" max="1" placeholder="Ex : 0.95">
+            </div>
+          </div>
+        </div>
+
+        <!-- Timing fields -->
+        <div class="algo-row" id="timing-row">
+          <div class="algo-field">
+            <label>Pas de temps <span class="hint" id="h-tick">(min)</span></label>
+            <input type="number" id="p-tick" min="1" placeholder="Ex : 5">
+          </div>
+          <div class="algo-field">
+            <label>Seuil péremption <span class="hint" id="h-peremption">(min)</span></label>
+            <input type="number" id="p-peremption" min="1" placeholder="Ex : 60">
+          </div>
+          <div class="algo-field">
+            <label>Durée max chunk <span class="hint" id="h-chunk">(min)</span></label>
+            <input type="number" id="p-chunk" min="1" placeholder="Ex : 420">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary">Annuler</button>
+          <button class="btn btn-primary">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt -->
+  <div class="prompt-area">
+    <div class="prompt-text" id="prompt-text"></div>
+    <button class="copy-btn" id="copy-btn" onclick="copyPrompt()">Copier</button>
+  </div>
+</div>
+
+<script>
+const PRESETS = {
+  offset:    { attFull: 1.0, masked: true,  attMasked: 0.3, maskedProd: 0.95, tick: 5,  peremption: 60,  chunk: 420 },
+  bigOffset: { attFull: 1.5, masked: true,  attMasked: 0.5, maskedProd: 0.90, tick: 5,  peremption: 60,  chunk: 420 },
+  folder:    { attFull: 0.8, masked: true,  attMasked: 0.2, maskedProd: 0.95, tick: 10, peremption: 30,  chunk: 240 },
+  cutter:    { attFull: 1.0, masked: false, attMasked: 0,   maskedProd: 0,    tick: 5,  peremption: 15,  chunk: 120 },
+  shipping:  { attFull: 2.0, masked: false, attMasked: 0,   maskedProd: 0,    tick: 30, peremption: 120, chunk: 480 },
+};
+
+let state = { ...PRESETS.offset, timeCols: '3', showHints: true };
+
+function sync() {
+  state.attFull = parseFloat(document.getElementById('ctl-attFull').value) || 0;
+  state.masked = document.getElementById('ctl-maskedEnabled').checked;
+  state.attMasked = parseFloat(document.getElementById('ctl-attMasked').value) || 0;
+  state.maskedProd = parseFloat(document.getElementById('ctl-maskedProd').value) || 0;
+  state.tick = parseInt(document.getElementById('ctl-tick').value) || 1;
+  state.peremption = parseInt(document.getElementById('ctl-peremption').value) || 1;
+  state.chunk = parseInt(document.getElementById('ctl-chunk').value) || 1;
+  state.timeCols = document.getElementById('ctl-timeCols').value;
+  state.showHints = document.getElementById('ctl-showHints').checked;
+  render();
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  document.getElementById('ctl-attFull').value = p.attFull;
+  document.getElementById('ctl-maskedEnabled').checked = p.masked;
+  document.getElementById('ctl-attMasked').value = p.attMasked;
+  document.getElementById('ctl-maskedProd').value = p.maskedProd;
+  document.getElementById('ctl-tick').value = p.tick;
+  document.getElementById('ctl-peremption').value = p.peremption;
+  document.getElementById('ctl-chunk').value = p.chunk;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  sync();
+}
+
+function toggleMasked() {
+  document.getElementById('ctl-maskedEnabled').checked = document.getElementById('p-maskedSwitch').checked;
+  sync();
+}
+
+function render() {
+  // Values
+  document.getElementById('p-attFull').value = state.attFull;
+  document.getElementById('p-attMasked').value = state.attMasked;
+  document.getElementById('p-maskedProd').value = state.maskedProd;
+  document.getElementById('p-tick').value = state.tick;
+  document.getElementById('p-peremption').value = state.peremption;
+  document.getElementById('p-chunk').value = state.chunk;
+
+  // Masked switch
+  document.getElementById('p-maskedSwitch').checked = state.masked;
+  const mf = document.getElementById('masked-fields');
+  mf.className = state.masked ? 'masked-fields visible' : 'masked-fields hidden';
+
+  // Timing cols
+  document.getElementById('timing-row').className = `algo-row cols-${state.timeCols}`;
+
+  // Hints
+  document.querySelectorAll('.hint').forEach(el => el.style.display = state.showHints ? '' : 'none');
+
+  updatePrompt();
+}
+
+function updatePrompt() {
+  const parts = [];
+  parts.push(`attentionFull: ${state.attFull}`);
+  if (state.masked) {
+    parts.push(`masked time enabled — attentionMasked: ${state.attMasked}, maskedProductivity: ${state.maskedProd}`);
+  } else {
+    parts.push('no masked time');
+  }
+  parts.push(`tickMinutes: ${state.tick}, peremptionThresholdMinutes: ${state.peremption}, maxChunkMinutes: ${state.chunk}`);
+
+  let text = `Station algo config: ${parts.join('; ')}.`;
+  if (state.timeCols !== '3') text += ` Timing fields in ${state.timeCols} columns.`;
+  if (!state.showHints) text += ' No technical hints.';
+
+  document.getElementById('prompt-text').textContent = text;
+}
+
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('prompt-text').textContent);
+  const btn = document.getElementById('copy-btn');
+  btn.textContent = 'Copié !';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 1500);
+}
+
+render();
+</script>
+</body>
+</html>

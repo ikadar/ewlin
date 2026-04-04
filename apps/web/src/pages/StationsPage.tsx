@@ -107,6 +107,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
 
   // Operator-algorithm attributes
   const [attentionFull, setAttentionFull] = useState(initial?.attentionFull != null ? String(initial.attentionFull) : '');
+  const [attentionRun, setAttentionRun] = useState(initial?.attentionRun != null ? String(initial.attentionRun) : '');
   const [maskedTimeEnabled, setMaskedTimeEnabled] = useState(initial?.maskedTimeEnabled ?? false);
   const [attentionMasked, setAttentionMasked] = useState(initial?.attentionMasked != null ? String(initial.attentionMasked) : '');
   const [maskedProductivity, setMaskedProductivity] = useState(initial?.maskedProductivity != null ? String(initial.maskedProductivity) : '');
@@ -211,6 +212,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
       operatingSchedule,
       scheduleExceptions,
       attentionFull: attentionFull.trim() ? parseFloat(attentionFull) : null,
+      attentionRun: attentionRun.trim() ? parseFloat(attentionRun) : null,
       maskedTimeEnabled,
       attentionMasked: maskedTimeEnabled && attentionMasked.trim() ? parseFloat(attentionMasked) : null,
       maskedProductivity: maskedTimeEnabled && maskedProductivity.trim() ? parseFloat(maskedProductivity) : null,
@@ -443,18 +445,32 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
           <div className="pt-2 border-t border-flux-border">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">Algorithme opérateur</p>
 
-            {/* Attention calage */}
-            <div className="mb-3">
-              <label className="block text-xs text-flux-text-secondary mb-1">
-                Attention calage <span className="text-flux-text-muted text-[10px]">(attentionFull)</span>
-              </label>
-              <input
-                type="number" step="0.1" min="0" max="2"
-                value={attentionFull}
-                onChange={(e) => setAttentionFull(e.target.value)}
-                className="w-40 px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
-                placeholder="Ex : 1.0"
-              />
+            {/* Attention calage + roulage (always visible) */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs text-flux-text-secondary mb-1">
+                  Attention calage <span className="text-flux-text-muted text-[10px]">(attentionFull)</span>
+                </label>
+                <input
+                  type="number" step="0.1" min="0" max="2"
+                  value={attentionFull}
+                  onChange={(e) => setAttentionFull(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                  placeholder="Ex : 1.0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-flux-text-secondary mb-1">
+                  Attention roulage <span className="text-flux-text-muted text-[10px]">(attentionRun)</span>
+                </label>
+                <input
+                  type="number" step="0.1" min="0" max="2"
+                  value={attentionRun}
+                  onChange={(e) => setAttentionRun(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                  placeholder="Ex : 0.7"
+                />
+              </div>
             </div>
 
             {/* Masked time switch */}
@@ -469,12 +485,12 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               <span className="text-sm text-flux-text-secondary">Temps masqué possible</span>
             </div>
 
-            {/* Masked time fields (only visible when enabled) */}
+            {/* Masked time fields (only when switch enabled) */}
             {maskedTimeEnabled && (
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs text-flux-text-secondary mb-1">
-                    Attention roulage <span className="text-flux-text-muted text-[10px]">(attentionMasked)</span>
+                    Attention temps masqué <span className="text-flux-text-muted text-[10px]">(attentionMasked)</span>
                   </label>
                   <input
                     type="number" step="0.1" min="0" max="2"
