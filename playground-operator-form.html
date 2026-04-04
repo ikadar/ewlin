@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operator Form — Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --elevated: #242424;
+    --hover: #2c2c2c;
+    --border: #2a2a2a;
+    --border-light: #3a3a3a;
+    --text-primary: #f5f5f5;
+    --text-secondary: #d1d1d1;
+    --text-muted: #808080;
+    --accent: #3b82f6;
+    --green: #22c55e;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── LAYOUT ── */
+  .playground-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    height: 100vh;
+  }
+
+  /* ── CONTROLS PANEL ── */
+  .controls-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .controls-panel h1 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 8px; }
+
+  .control-group h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .preset-btn {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { background: var(--hover); border-color: var(--border-light); color: var(--text-primary); }
+  .preset-btn.active { border-color: var(--accent); color: var(--text-primary); background: rgba(59,130,246,0.08); }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .control-row label { font-size: 13px; color: var(--text-secondary); }
+
+  .ctrl-select {
+    padding: 4px 8px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: inherit;
+  }
+
+  .ctrl-toggle {
+    position: relative;
+    width: 36px; height: 20px;
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .ctrl-toggle.on { background: var(--accent); border-color: var(--accent); }
+  .ctrl-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .ctrl-toggle.on::after { transform: translateX(16px); }
+
+  /* ── PREVIEW AREA ── */
+  .preview-area {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .preview-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  /* ── MODAL PREVIEW ── */
+  .modal-backdrop {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 640px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 20px 24px 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .modal-body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* ── FORM INPUTS ── */
+  .form-section { display: flex; flex-direction: column; gap: 10px; }
+
+  .form-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .field-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .form-field { display: flex; flex-direction: column; gap: 4px; }
+  .form-field label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+
+  .form-input {
+    padding: 7px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text-muted); }
+
+  /* ── SKILLS ── */
+  .skills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    max-height: 280px;
+  }
+
+  .skill-category-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 8px 0 4px;
+  }
+  .skill-category-label:first-child { padding-top: 0; }
+
+  .skill-row {
+    display: grid;
+    grid-template-columns: 20px 100px 1fr 50px;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    min-height: 32px;
+  }
+
+  .skill-checkbox {
+    width: 16px; height: 16px;
+    appearance: none;
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .skill-checkbox:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .skill-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 5px;
+    width: 4px; height: 8px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .skill-name {
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.15s;
+  }
+  .skill-name.active { color: var(--text-primary); font-weight: 600; }
+
+  .skill-slider-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Native range slider — styled with CSS */
+  .prof-slider {
+    --pct: 0%;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 24px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+  }
+  .prof-slider:focus { outline: none; }
+  .prof-slider::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--text-secondary) 0%, var(--text-secondary) var(--pct), var(--elevated) var(--pct), var(--elevated) 100%);
+  }
+  .prof-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    border: 2px solid var(--surface);
+    margin-top: -5.5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor: grab;
+  }
+  .prof-slider::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.2);
+  }
+  .prof-slider::-moz-range-track {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--elevated);
+    border: none;
+  }
+  .prof-slider::-moz-range-progress {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--text-secondary);
+  }
+  .prof-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    border: 2px solid var(--surface);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor: grab;
+  }
+
+  .skill-value {
+    font-size: 12px;
+    font-family: 'Inter', monospace;
+    min-width: 36px;
+    text-align: right;
+    padding: 2px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+  }
+  .skill-value:hover { background: var(--elevated); }
+  .skill-value-input {
+    width: 44px;
+    padding: 2px 4px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    color: var(--text-primary);
+    text-align: right;
+    outline: none;
+  }
+
+  /* ── SCHEDULE ── */
+  .schedule-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .schedule-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 32px;
+    padding: 4px 0;
+  }
+
+  .schedule-day {
+    font-size: 13px;
+    font-weight: 500;
+    width: 64px;
+    flex-shrink: 0;
+    padding-top: 4px;
+    color: var(--text-secondary);
+  }
+  .schedule-day.off { color: var(--text-muted); }
+
+  .day-toggle {
+    position: relative;
+    width: 32px; height: 18px;
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .day-toggle.on { background: var(--green); border-color: var(--green); }
+  .day-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .day-toggle.on::after { transform: translateX(14px); }
+
+  .schedule-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .slot-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .time-input {
+    width: 64px;
+    padding: 4px 6px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    color: var(--text-primary);
+    outline: none;
+    text-align: center;
+  }
+  .time-input:focus { border-color: var(--accent); }
+
+  .slot-sep { font-size: 12px; color: var(--text-muted); }
+
+  .slot-remove {
+    width: 20px; height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .slot-remove:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+
+  .slot-add {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s;
+    align-self: flex-start;
+  }
+  .slot-add:hover { color: var(--accent); }
+
+  .schedule-off-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    padding-top: 4px;
+  }
+
+  /* ── EXCEPTIONS ── */
+  .absences-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+  }
+  .absences-placeholder span { font-size: 13px; color: var(--text-muted); font-style: italic; }
+
+  .btn-add-absence {
+    padding: 5px 12px;
+    background: none;
+    border: 1px dashed var(--border-light);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-add-absence:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── FOOTER BUTTONS ── */
+  .btn {
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+  }
+  .btn-cancel {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .btn-cancel:hover { background: var(--hover); color: var(--text-primary); }
+  .btn-save {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-save:hover { background: #2563eb; }
+
+  /* ── PROMPT OUTPUT ── */
+  .prompt-output {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 16px 24px;
+    flex-shrink: 0;
+  }
+  .prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .prompt-header span {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .btn-copy {
+    padding: 4px 10px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-copy:hover { color: var(--text-primary); border-color: var(--border-light); }
+  .btn-copy.copied { color: var(--green); border-color: var(--green); }
+
+  .prompt-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-height: 120px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="playground-layout">
+
+  <!-- ── CONTROLS PANEL ── -->
+  <div class="controls-panel">
+    <h1>Operator Form</h1>
+
+    <div class="control-group">
+      <h2>Presets</h2>
+      <button class="preset-btn active" onclick="applyPreset('jean')">Jean (pressiste)</button>
+      <button class="preset-btn" onclick="applyPreset('marie')">Marie (fa&ccedil;onnage)</button>
+      <button class="preset-btn" onclick="applyPreset('empty')">Nouveau (vide)</button>
+    </div>
+
+    <div class="control-group">
+      <h2>Layout</h2>
+      <div class="control-row">
+        <label>Skills max-height</label>
+        <select class="ctrl-select" id="ctrl-skills-height" onchange="updateSkillsHeight()">
+          <option value="200">200px</option>
+          <option value="280" selected>280px</option>
+          <option value="360">360px</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h2>Display</h2>
+      <div class="control-row">
+        <label>Field hints</label>
+        <div class="ctrl-toggle on" id="ctrl-hints" onclick="toggleHints()"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PREVIEW AREA ── -->
+  <div class="preview-area">
+    <div class="preview-main">
+      <div class="modal-backdrop">
+        <div class="modal">
+          <div class="modal-header">Cr&eacute;er un op&eacute;rateur</div>
+          <div class="modal-body" id="modal-body">
+
+            <!-- Section 1: Name + Attention -->
+            <div class="form-section">
+              <div class="form-grid-2">
+                <div class="form-field">
+                  <div class="field-hint">Identifiant</div>
+                  <label>Nom</label>
+                  <input type="text" class="form-input" id="field-name" value="Jean" oninput="generatePrompt()">
+                </div>
+                <div class="form-field">
+                  <div class="field-hint">Facteur global</div>
+                  <label>Attention totale</label>
+                  <input type="number" class="form-input" id="field-attention" value="1" step="0.1" min="0" max="2" oninput="generatePrompt()">
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 2: Skills -->
+            <div class="form-section">
+              <div class="form-section-title">Comp&eacute;tences machines</div>
+              <div class="skills-list" id="skills-list"></div>
+            </div>
+
+            <!-- Section 3: Schedule -->
+            <div class="form-section">
+              <div class="form-section-title">Horaires de travail</div>
+              <div class="schedule-list" id="schedule-list"></div>
+            </div>
+
+            <!-- Section 4: Exceptions -->
+            <div class="form-section">
+              <div class="form-section-title">Absences</div>
+              <div class="absences-placeholder">
+                <span>Aucune absence</span>
+                <button class="btn-add-absence">+ Ajouter une absence</button>
+              </div>
+            </div>
+
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-cancel">Annuler</button>
+            <button class="btn btn-save">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prompt output -->
+    <div class="prompt-output">
+      <div class="prompt-header">
+        <span>Prompt output</span>
+        <button class="btn-copy" id="btn-copy" onclick="copyPrompt()">Copy</button>
+      </div>
+      <div class="prompt-text" id="prompt-text"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──
+const STATIONS = [
+  { category: 'Impression', name: 'Komori G37', key: 'komori_g37' },
+  { category: 'Impression', name: 'Komori G40', key: 'komori_g40' },
+  { category: 'Fa\u00e7onnage', name: 'MBO T45', key: 'mbo_t45' },
+  { category: 'Fa\u00e7onnage', name: 'Polar 115', key: 'polar_115' },
+  { category: 'Fa\u00e7onnage', name: 'Stahl TH56', key: 'stahl_th56' },
+  { category: 'Exp\u00e9dition', name: 'Exp\u00e9dition', key: 'expedition' },
+];
+
+const DAYS = [
+  { key: 'lun', label: 'Lundi' },
+  { key: 'mar', label: 'Mardi' },
+  { key: 'mer', label: 'Mercredi' },
+  { key: 'jeu', label: 'Jeudi' },
+  { key: 'ven', label: 'Vendredi' },
+  { key: 'sam', label: 'Samedi' },
+  { key: 'dim', label: 'Dimanche' },
+];
+
+const DEFAULT_SLOTS = [
+  { start: '06:00', end: '12:00' },
+  { start: '13:00', end: '17:00' },
+];
+
+// ── STATE ──
+let skills = {};
+STATIONS.forEach(s => { skills[s.key] = 0; });
+
+let schedule = {};
+DAYS.forEach((d, i) => {
+  schedule[d.key] = {
+    on: i < 5,
+    slots: i < 5 ? JSON.parse(JSON.stringify(DEFAULT_SLOTS)) : [],
+  };
+});
+
+let showHints = true;
+
+// ── HELPERS ──
+function snap(v) {
+  if (v < 0.05) return 0;
+  if (v > 0.92 && v < 1.08) return 1.0;
+  return Math.round(v * 20) / 20;
+}
+
+function profColor(v) {
+  if (v === 0) return '#808080';
+  if (v < 0.8) return '#fb923c';
+  if (v <= 1.05) return '#4ade80';
+  return '#fbbf24';
+}
+
+// ── SKILLS RENDERING ──
+function renderSkills() {
+  const container = document.getElementById('skills-list');
+  container.innerHTML = '';
+  let lastCat = '';
+
+  STATIONS.forEach(station => {
+    if (station.category !== lastCat) {
+      lastCat = station.category;
+      const catLabel = document.createElement('div');
+      catLabel.className = 'skill-category-label';
+      catLabel.textContent = station.category;
+      container.appendChild(catLabel);
+    }
+
+    const val = skills[station.key];
+    const color = profColor(val);
+    const isActive = val > 0;
+
+    const row = document.createElement('div');
+    row.className = 'skill-row';
+
+    // Checkbox
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'skill-checkbox';
+    cb.checked = isActive;
+    cb.onchange = () => {
+      skills[station.key] = cb.checked ? 1.0 : 0;
+      renderSkills();
+      generatePrompt();
+    };
+
+    // Name
+    const nameEl = document.createElement('span');
+    nameEl.className = 'skill-name' + (isActive ? ' active' : '');
+    nameEl.textContent = station.name;
+
+    // Native range slider (styled via CSS)
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.className = 'prof-slider';
+    slider.min = '0';
+    slider.max = '1.5';
+    slider.step = '0.01';
+    slider.value = String(val);
+    slider.style.setProperty('--pct', (val / 1.5 * 100) + '%');
+    slider.oninput = () => {
+      const snapped = snap(parseFloat(slider.value));
+      skills[station.key] = snapped;
+      slider.value = String(snapped);
+      slider.style.setProperty('--pct', (snapped / 1.5 * 100) + '%');
+      const newActive = snapped > 0;
+      cb.checked = newActive;
+      nameEl.className = 'skill-name' + (newActive ? ' active' : '');
+      valueEl.textContent = snapped.toFixed(2);
+    };
+    slider.onchange = () => {
+      generatePrompt();
+    };
+
+    // Value display
+    const valueEl = document.createElement('span');
+    valueEl.className = 'skill-value';
+    valueEl.textContent = val.toFixed(2);
+    valueEl.onclick = (e) => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'skill-value-input';
+      input.value = val.toFixed(2);
+      valueEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const commit = () => {
+        let parsed = parseFloat(input.value);
+        if (isNaN(parsed)) parsed = 0;
+        parsed = Math.max(0, Math.min(1.5, parsed));
+        parsed = snap(parsed);
+        skills[station.key] = parsed;
+        renderSkills();
+        generatePrompt();
+      };
+
+      input.onblur = commit;
+      input.onkeydown = (ev) => {
+        if (ev.key === 'Enter') commit();
+        if (ev.key === 'Escape') { renderSkills(); }
+      };
+    };
+
+    row.appendChild(cb);
+    row.appendChild(nameEl);
+    row.appendChild(slider);
+    row.appendChild(valueEl);
+    container.appendChild(row);
+  });
+}
+
+// ── SCHEDULE RENDERING ──
+function renderSchedule() {
+  const container = document.getElementById('schedule-list');
+  container.innerHTML = '';
+
+  DAYS.forEach(day => {
+    const data = schedule[day.key];
+    const row = document.createElement('div');
+    row.className = 'schedule-row';
+
+    // Day name
+    const dayName = document.createElement('div');
+    dayName.className = 'schedule-day' + (data.on ? '' : ' off');
+    dayName.textContent = day.label;
+
+    // Toggle
+    const toggle = document.createElement('div');
+    toggle.className = 'day-toggle' + (data.on ? ' on' : '');
+    toggle.onclick = () => {
+      data.on = !data.on;
+      if (data.on && data.slots.length === 0) {
+        data.slots = JSON.parse(JSON.stringify(DEFAULT_SLOTS));
+      }
+      renderSchedule();
+      generatePrompt();
+    };
+
+    // Slots
+    const slotsContainer = document.createElement('div');
+    slotsContainer.className = 'schedule-slots';
+
+    if (data.on) {
+      data.slots.forEach((slot, idx) => {
+        const slotRow = document.createElement('div');
+        slotRow.className = 'slot-row';
+
+        const startInput = document.createElement('input');
+        startInput.type = 'time';
+        startInput.className = 'time-input';
+        startInput.value = slot.start;
+        startInput.onchange = () => {
+          slot.start = startInput.value;
+          generatePrompt();
+        };
+
+        const sep = document.createElement('span');
+        sep.className = 'slot-sep';
+        sep.textContent = '\u2013';
+
+        const endInput = document.createElement('input');
+        endInput.type = 'time';
+        endInput.className = 'time-input';
+        endInput.value = slot.end;
+        endInput.onchange = () => {
+          slot.end = endInput.value;
+          generatePrompt();
+        };
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'slot-remove';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.onclick = () => {
+          data.slots.splice(idx, 1);
+          if (data.slots.length === 0) data.on = false;
+          renderSchedule();
+          generatePrompt();
+        };
+
+        slotRow.appendChild(startInput);
+        slotRow.appendChild(sep);
+        slotRow.appendChild(endInput);
+        slotRow.appendChild(removeBtn);
+        slotsContainer.appendChild(slotRow);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'slot-add';
+      addBtn.textContent = '+ Ajouter cr\u00e9neau';
+      addBtn.onclick = () => {
+        data.slots.push({ start: '08:00', end: '12:00' });
+        renderSchedule();
+        generatePrompt();
+      };
+      slotsContainer.appendChild(addBtn);
+    } else {
+      const off = document.createElement('div');
+      off.className = 'schedule-off-label';
+      off.textContent = 'Repos';
+      slotsContainer.appendChild(off);
+    }
+
+    row.appendChild(toggle);
+    row.appendChild(dayName);
+    row.appendChild(slotsContainer);
+    container.appendChild(row);
+  });
+}
+
+// ── PRESETS ──
+const PRESETS = {
+  jean: {
+    name: 'Jean',
+    attention: 1,
+    skills: { komori_g37: 1.0, komori_g40: 0.85, mbo_t45: 0.5, polar_115: 0, stahl_th56: 0, expedition: 0 },
+    schedule: () => {
+      const s = {};
+      DAYS.forEach((d, i) => {
+        s[d.key] = {
+          on: i < 5,
+          slots: i < 5 ? JSON.parse(JSON.stringify(DEFAULT_SLOTS)) : [],
+        };
+      });
+      return s;
+    },
+  },
+  marie: {
+    name: 'Marie',
+    attention: 1,
+    skills: { komori_g37: 0, komori_g40: 0, mbo_t45: 1.0, polar_115: 1.0, stahl_th56: 0.95, expedition: 0 },
+    schedule: () => {
+      const s = {};
+      DAYS.forEach((d, i) => {
+        s[d.key] = {
+          on: i < 5,
+          slots: i < 5 ? JSON.parse(JSON.stringify(DEFAULT_SLOTS)) : [],
+        };
+      });
+      return s;
+    },
+  },
+  empty: {
+    name: '',
+    attention: 1,
+    skills: { komori_g37: 0, komori_g40: 0, mbo_t45: 0, polar_115: 0, stahl_th56: 0, expedition: 0 },
+    schedule: () => {
+      const s = {};
+      DAYS.forEach((d, i) => {
+        s[d.key] = {
+          on: i < 5,
+          slots: i < 5 ? JSON.parse(JSON.stringify(DEFAULT_SLOTS)) : [],
+        };
+      });
+      return s;
+    },
+  },
+};
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  document.getElementById('field-name').value = p.name;
+  document.getElementById('field-attention').value = p.attention;
+  skills = { ...p.skills };
+  schedule = p.schedule();
+
+  document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+
+  renderSkills();
+  renderSchedule();
+  generatePrompt();
+}
+
+// ── CONTROLS ──
+function updateSkillsHeight() {
+  const val = document.getElementById('ctrl-skills-height').value;
+  document.getElementById('skills-list').style.maxHeight = val + 'px';
+}
+
+function toggleHints() {
+  const el = document.getElementById('ctrl-hints');
+  showHints = !showHints;
+  el.classList.toggle('on', showHints);
+  document.querySelectorAll('.field-hint').forEach(h => {
+    h.style.display = showHints ? 'block' : 'none';
+  });
+}
+
+// ── PROMPT GENERATION ──
+function generatePrompt() {
+  const name = document.getElementById('field-name').value || '(sans nom)';
+  const attention = parseFloat(document.getElementById('field-attention').value) || 1;
+
+  const lines = [];
+  lines.push(`Op\u00e9rateur "${name}"`);
+
+  if (attention !== 1) {
+    lines.push(`Attention totale: ${attention} (${attention > 1 ? 'au-dessus' : 'en dessous'} de la normale)`);
+  }
+
+  // Skills
+  const activeSkills = STATIONS.filter(s => skills[s.key] > 0);
+  if (activeSkills.length > 0) {
+    const skillParts = activeSkills.map(s => {
+      const v = skills[s.key];
+      let suffix = '';
+      if (v < 0.8) suffix = ' (d\u00e9butant)';
+      else if (v >= 0.8 && v <= 1.05) suffix = '';
+      else suffix = ' (expert)';
+      return `${s.name}: ${v.toFixed(2)}${suffix}`;
+    });
+    lines.push(`Comp\u00e9tences: ${skillParts.join(', ')}`);
+  } else {
+    lines.push('Aucune comp\u00e9tence machine assign\u00e9e');
+  }
+
+  // Schedule differences from default
+  const scheduleParts = [];
+  const defaultOn = ['lun', 'mar', 'mer', 'jeu', 'ven'];
+  const defaultOff = ['sam', 'dim'];
+  const defaultSlotStr = '06:00-12:00,13:00-17:00';
+
+  DAYS.forEach(day => {
+    const data = schedule[day.key];
+    const isDefaultOn = defaultOn.includes(day.key);
+    const isDefaultOff = defaultOff.includes(day.key);
+
+    if (isDefaultOn && !data.on) {
+      scheduleParts.push(`${day.label}: repos (non standard)`);
+    } else if (isDefaultOff && data.on) {
+      const slots = data.slots.map(s => `${s.start}-${s.end}`).join(', ');
+      scheduleParts.push(`${day.label}: ${slots} (ajout\u00e9)`);
+    } else if (data.on) {
+      const slotStr = data.slots.map(s => `${s.start}-${s.end}`).join(',');
+      if (slotStr !== defaultSlotStr) {
+        const slots = data.slots.map(s => `${s.start}-${s.end}`).join(', ');
+        scheduleParts.push(`${day.label}: ${slots}`);
+      }
+    }
+  });
+
+  if (scheduleParts.length > 0) {
+    lines.push(`Horaires modifi\u00e9s: ${scheduleParts.join(' | ')}`);
+  } else {
+    lines.push('Horaires: standard (lun-ven 06:00-12:00 + 13:00-17:00)');
+  }
+
+  document.getElementById('prompt-text').textContent = lines.join('\n');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('prompt-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// ── INIT ──
+renderSkills();
+renderSchedule();
+generatePrompt();
+</script>
+</body>
+</html>
