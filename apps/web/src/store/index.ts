@@ -19,6 +19,7 @@ import { impressionPresetApi } from './api/impressionPresetApi';
 import { surfacagePresetApi } from './api/surfacagePresetApi';
 import { feuilleFormatApi } from './api/feuilleFormatApi';
 import { stationApi } from './api/stationApi';
+import { operatorApi } from './api/operatorApi';
 import { providerApi } from './api/providerApi';
 import { shipperApi } from './api/shipperApi';
 import { fluxApi } from './api/fluxApi';
@@ -46,6 +47,7 @@ export const store = configureStore({
     [surfacagePresetApi.reducerPath]: surfacagePresetApi.reducer,
     [feuilleFormatApi.reducerPath]: feuilleFormatApi.reducer,
     [stationApi.reducerPath]: stationApi.reducer,
+    [operatorApi.reducerPath]: operatorApi.reducer,
     [providerApi.reducerPath]: providerApi.reducer,
     [shipperApi.reducerPath]: shipperApi.reducer,
     [fluxApi.reducerPath]: fluxApi.reducer,
@@ -73,6 +75,7 @@ export const store = configureStore({
       .concat(surfacagePresetApi.middleware)
       .concat(feuilleFormatApi.middleware)
       .concat(stationApi.middleware)
+      .concat(operatorApi.middleware)
       .concat(providerApi.middleware)
       .concat(shipperApi.middleware)
       .concat(fluxApi.middleware)
@@ -218,6 +221,16 @@ export {
   stationApi,
 } from './api/stationApi';
 export type { StationResponse, StationInput } from './api/stationApi';
+
+export {
+  useGetOperatorsQuery,
+  useCreateOperatorMutation,
+  useUpdateOperatorMutation,
+  useDeleteOperatorMutation,
+  useReplaceSkillsMutation,
+  operatorApi,
+} from './api/operatorApi';
+export type { OperatorResponse, OperatorInput, OperatorSkillResponse } from './api/operatorApi';
 
 export {
   useGetProvidersQuery,

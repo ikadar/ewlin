@@ -8,6 +8,7 @@ const ADMIN_ITEMS = [
 
 const SETTINGS_ITEMS = [
   { label: 'Stations',                    path: '/settings/stations' },
+  { label: 'Opérateurs',                  path: '/settings/operators' },
   { label: 'Catégories de stations',      path: '/settings/station-categories' },
   { label: 'Sous-traitants',              path: '/settings/providers' },
   { label: 'Transporteurs',              path: '/settings/shippers' },

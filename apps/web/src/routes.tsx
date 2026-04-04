@@ -44,6 +44,7 @@ import { StationsPage } from './pages/StationsPage';
 import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { ShippersPage } from './pages/ShippersPage';
+import OperatorsPage from './pages/OperatorsPage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
 import { UserGroupsPage } from './pages/UserGroupsPage';
@@ -78,6 +79,7 @@ export function AppRoutes() {
         <Route path="/settings" element={<RequirePermission permission={['settings.view', 'admin.users']}><SettingsLayout /></RequirePermission>}>
           <Route index element={<Navigate to="/settings/stations" replace />} />
           <Route path="stations" element={<StationsPage />} />
+          <Route path="operators" element={<OperatorsPage />} />
           <Route path="station-categories" element={<StationCategoriesPage />} />
           <Route path="clients" element={<ClientsPage />} />
           <Route path="referents" element={<ReferentsPage />} />
