@@ -18,30 +18,14 @@ import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
 import { useGetSnapshotQuery } from '../store';
 import type { StationResponse, StationInput } from '../store/api/stationApi';
 import {
-  OperatingScheduleEditor,
-  ExceptionsEditor,
   FluxSelect,
 } from '../components/ScheduleEditor';
-import type { OperatingSchedule, ScheduleExceptionInput, DaySchedule } from '../components/ScheduleEditor';
-import { generateId } from '../utils/generateId';
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 const STATUS_OPTIONS = ['Available', 'InUse', 'Maintenance', 'OutOfService'] as const;
-
-const DEFAULT_OPERATING_SCHEDULE = {
-  monday:    { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
-  tuesday:   { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
-  wednesday: { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
-  thursday:  { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
-  friday:    { isOperating: true,  slots: [{ start: '06:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
-  saturday:  { isOperating: false, slots: [] },
-  sunday:    { isOperating: false, slots: [] },
-};
-
-const DEFAULT_SCHEDULE_JSON = JSON.stringify(DEFAULT_OPERATING_SCHEDULE, null, 2);
 
 // ============================================================================
 // Status Badge
@@ -89,21 +73,6 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   const [groupId, setGroupId] = useState(initial?.groupId ?? groups[0]?.id ?? '');
   const [capacity, setCapacity] = useState(String(initial?.capacity ?? 1));
   const [displayOrder, setDisplayOrder] = useState(String(initial?.displayOrder ?? 0));
-  // Visual mode state
-  const [scheduleData, setScheduleData] = useState<OperatingSchedule>(
-    (initial?.operatingSchedule as unknown as OperatingSchedule) ?? DEFAULT_OPERATING_SCHEDULE
-  );
-  const [exceptionsData, setExceptionsData] = useState<ScheduleExceptionInput[]>(() => {
-    if (!initial?.scheduleExceptions?.length) return [];
-    return initial.scheduleExceptions.map((e) => ({
-      id: generateId(),
-      date: (e as { date: string }).date ?? '',
-      reason: ((e as { reason: string | null }).reason ?? ''),
-      schedule: ((e as { type: string }).type === 'MODIFIED' && (e as { schedule: DaySchedule | null }).schedule)
-        ? (e as { schedule: DaySchedule }).schedule
-        : { isOperating: false, slots: [] },
-    }));
-  });
 
   // Operator-algorithm attributes
   const [attentionFull, setAttentionFull] = useState(String(initial?.attentionFull ?? 1));
@@ -115,16 +84,6 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   const [peremptionHours, setPeremptionHours] = useState(String(initial?.peremptionThresholdMinutes != null ? initial.peremptionThresholdMinutes / 60 : 2));
   const [maxChunkHours, setMaxChunkHours] = useState(String(initial?.maxChunkMinutes != null ? initial.maxChunkMinutes / 60 : 7));
 
-  // Mode toggles (visual vs JSON)
-  const [scheduleJsonMode, setScheduleJsonMode] = useState(false);
-  const [exceptionsJsonMode, setExceptionsJsonMode] = useState(false);
-
-  // JSON fallback state
-  const [scheduleJson, setScheduleJson] = useState('');
-  const [exceptionsJson, setExceptionsJson] = useState('');
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
-  const [exceptionsError, setExceptionsError] = useState<string | null>(null);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isSaving) onCancel();
@@ -133,74 +92,11 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isSaving, onCancel]);
 
-  const validateScheduleJson = (value: string): boolean => {
-    if (value.trim() === '') {
-      setScheduleError(null);
-      return true;
-    }
-    try {
-      JSON.parse(value);
-      setScheduleError(null);
-      return true;
-    } catch {
-      setScheduleError('JSON invalide');
-      return false;
-    }
-  };
-
-  const validateExceptionsJson = (value: string): boolean => {
-    if (value.trim() === '') {
-      setExceptionsError(null);
-      return true;
-    }
-    try {
-      const parsed = JSON.parse(value);
-      if (!Array.isArray(parsed)) {
-        setExceptionsError('Doit être un tableau JSON');
-        return false;
-      }
-      setExceptionsError(null);
-      return true;
-    } catch {
-      setExceptionsError('JSON invalide');
-      return false;
-    }
-  };
-
-  const canSave =
-    name.trim() !== '' &&
-    (!scheduleJsonMode || scheduleError === null) &&
-    (!exceptionsJsonMode || exceptionsError === null);
+  const canSave = name.trim() !== '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSave) return;
-
-    let operatingSchedule: Record<string, unknown> | null;
-    let scheduleExceptions: unknown[] | null;
-
-    if (scheduleJsonMode) {
-      const valid = validateScheduleJson(scheduleJson);
-      if (!valid) return;
-      operatingSchedule = scheduleJson.trim() ? (JSON.parse(scheduleJson) as Record<string, unknown>) : null;
-    } else {
-      operatingSchedule = scheduleData as unknown as Record<string, unknown>;
-    }
-
-    if (exceptionsJsonMode) {
-      const valid = validateExceptionsJson(exceptionsJson);
-      if (!valid) return;
-      scheduleExceptions = exceptionsJson.trim() ? (JSON.parse(exceptionsJson) as unknown[]) : null;
-    } else {
-      scheduleExceptions = exceptionsData.length > 0
-        ? exceptionsData.map((exc) => ({
-            date: exc.date,
-            type: exc.schedule.isOperating ? 'MODIFIED' : 'CLOSED',
-            reason: exc.reason || null,
-            schedule: exc.schedule.isOperating ? exc.schedule : null,
-          }))
-        : null;
-    }
 
     await onSave({
       name: name.trim(),
@@ -209,8 +105,8 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
       groupId,
       capacity: parseInt(capacity, 10) || 1,
       displayOrder: parseInt(displayOrder, 10) || 0,
-      operatingSchedule,
-      scheduleExceptions,
+      operatingSchedule: null,
+      scheduleExceptions: null,
       attentionFull: attentionFull.trim() ? parseFloat(attentionFull) : null,
       attentionRun: attentionRun.trim() ? parseFloat(attentionRun) : null,
       maskedTimeEnabled,
@@ -300,145 +196,6 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
                 className="w-full"
               />
             </div>
-          </div>
-
-          {/* Row 4: Operating Schedule */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-sm text-flux-text-secondary">Planning d'exploitation</label>
-              <div className="inline-flex rounded-md overflow-hidden border border-flux-border-light">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (scheduleJsonMode) {
-                      // Switching to visual: try to parse current JSON
-                      try {
-                        const parsed = JSON.parse(scheduleJson);
-                        setScheduleData(parsed as OperatingSchedule);
-                        setScheduleJsonMode(false);
-                        setScheduleError(null);
-                      } catch {
-                        setScheduleError('JSON invalide — impossible de basculer en mode visuel');
-                      }
-                    }
-                  }}
-                  className={`px-3 py-0.5 text-xs transition-colors ${!scheduleJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
-                >
-                  Visuel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!scheduleJsonMode) {
-                      setScheduleJson(JSON.stringify(scheduleData, null, 2));
-                      setScheduleJsonMode(true);
-                      setScheduleError(null);
-                    }
-                  }}
-                  className={`px-3 py-0.5 text-xs transition-colors ${scheduleJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
-                >
-                  JSON
-                </button>
-              </div>
-            </div>
-            {scheduleJsonMode ? (
-              <>
-                <textarea
-                  rows={10}
-                  value={scheduleJson}
-                  onChange={(e) => {
-                    setScheduleJson(e.target.value);
-                    setScheduleError(null);
-                  }}
-                  onBlur={() => validateScheduleJson(scheduleJson)}
-                  className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${scheduleError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
-                  placeholder="{}"
-                  spellCheck={false}
-                />
-                {scheduleError && (
-                  <p className="mt-1 text-xs text-red-400">{scheduleError}</p>
-                )}
-              </>
-            ) : (
-              <OperatingScheduleEditor value={scheduleData} onChange={setScheduleData} />
-            )}
-          </div>
-
-          {/* Row 5: Exceptions */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-sm text-flux-text-secondary">Exceptions de planning</label>
-              <div className="inline-flex rounded-md overflow-hidden border border-flux-border-light">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (exceptionsJsonMode) {
-                      try {
-                        const parsed = JSON.parse(exceptionsJson);
-                        if (!Array.isArray(parsed)) throw new Error();
-                        setExceptionsData(
-                          parsed.map((e: Record<string, unknown>) => ({
-                            id: generateId(),
-                            date: (e.date as string) ?? '',
-                            reason: (e.reason as string) ?? '',
-                            schedule: (e.type === 'MODIFIED' && e.schedule)
-                              ? (e.schedule as DaySchedule)
-                              : { isOperating: false, slots: [] },
-                          }))
-                        );
-                        setExceptionsJsonMode(false);
-                        setExceptionsError(null);
-                      } catch {
-                        setExceptionsError('JSON invalide — impossible de basculer en mode visuel');
-                      }
-                    }
-                  }}
-                  className={`px-3 py-0.5 text-xs transition-colors ${!exceptionsJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
-                >
-                  Visuel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!exceptionsJsonMode) {
-                      const apiFormat = exceptionsData.map((exc) => ({
-                        date: exc.date,
-                        type: exc.schedule.isOperating ? 'MODIFIED' : 'CLOSED',
-                        reason: exc.reason || null,
-                        schedule: exc.schedule.isOperating ? exc.schedule : null,
-                      }));
-                      setExceptionsJson(JSON.stringify(apiFormat, null, 2));
-                      setExceptionsJsonMode(true);
-                      setExceptionsError(null);
-                    }
-                  }}
-                  className={`px-3 py-0.5 text-xs transition-colors ${exceptionsJsonMode ? 'bg-blue-600 text-white' : 'bg-flux-base text-flux-text-tertiary hover:text-flux-text-secondary'}`}
-                >
-                  JSON
-                </button>
-              </div>
-            </div>
-            {exceptionsJsonMode ? (
-              <>
-                <textarea
-                  rows={5}
-                  value={exceptionsJson}
-                  onChange={(e) => {
-                    setExceptionsJson(e.target.value);
-                    setExceptionsError(null);
-                  }}
-                  onBlur={() => validateExceptionsJson(exceptionsJson)}
-                  className={`w-full px-3 py-2 bg-flux-base border rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none font-mono text-xs resize-y ${exceptionsError ? 'border-red-500 focus:border-red-400' : 'border-flux-border-light focus:border-flux-text-secondary'}`}
-                  placeholder="[]"
-                  spellCheck={false}
-                />
-                {exceptionsError && (
-                  <p className="mt-1 text-xs text-red-400">{exceptionsError}</p>
-                )}
-              </>
-            ) : (
-              <ExceptionsEditor value={exceptionsData} onChange={setExceptionsData} />
-            )}
           </div>
 
           {/* Operator Algorithm Fields */}
