@@ -105,6 +105,15 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
     }));
   });
 
+  // Operator-algorithm attributes
+  const [attentionFull, setAttentionFull] = useState(initial?.attentionFull != null ? String(initial.attentionFull) : '');
+  const [maskedTimeEnabled, setMaskedTimeEnabled] = useState(initial?.maskedTimeEnabled ?? false);
+  const [attentionMasked, setAttentionMasked] = useState(initial?.attentionMasked != null ? String(initial.attentionMasked) : '');
+  const [maskedProductivity, setMaskedProductivity] = useState(initial?.maskedProductivity != null ? String(initial.maskedProductivity) : '');
+  const [tickMinutes, setTickMinutes] = useState(initial?.tickMinutes != null ? String(initial.tickMinutes) : '');
+  const [peremptionThresholdMinutes, setPeremptionThresholdMinutes] = useState(initial?.peremptionThresholdMinutes != null ? String(initial.peremptionThresholdMinutes) : '');
+  const [maxChunkMinutes, setMaxChunkMinutes] = useState(initial?.maxChunkMinutes != null ? String(initial.maxChunkMinutes) : '');
+
   // Mode toggles (visual vs JSON)
   const [scheduleJsonMode, setScheduleJsonMode] = useState(false);
   const [exceptionsJsonMode, setExceptionsJsonMode] = useState(false);
@@ -201,6 +210,13 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
       displayOrder: parseInt(displayOrder, 10) || 0,
       operatingSchedule,
       scheduleExceptions,
+      attentionFull: attentionFull.trim() ? parseFloat(attentionFull) : null,
+      maskedTimeEnabled,
+      attentionMasked: maskedTimeEnabled && attentionMasked.trim() ? parseFloat(attentionMasked) : null,
+      maskedProductivity: maskedTimeEnabled && maskedProductivity.trim() ? parseFloat(maskedProductivity) : null,
+      tickMinutes: tickMinutes.trim() ? parseInt(tickMinutes, 10) : null,
+      peremptionThresholdMinutes: peremptionThresholdMinutes.trim() ? parseInt(peremptionThresholdMinutes, 10) : null,
+      maxChunkMinutes: maxChunkMinutes.trim() ? parseInt(maxChunkMinutes, 10) : null,
     });
   };
 
@@ -421,6 +437,107 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
             ) : (
               <ExceptionsEditor value={exceptionsData} onChange={setExceptionsData} />
             )}
+          </div>
+
+          {/* Operator Algorithm Fields */}
+          <div className="pt-2 border-t border-flux-border">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">Algorithme opérateur</p>
+
+            {/* Attention calage */}
+            <div className="mb-3">
+              <label className="block text-xs text-flux-text-secondary mb-1">
+                Attention calage <span className="text-flux-text-muted text-[10px]">(attentionFull)</span>
+              </label>
+              <input
+                type="number" step="0.1" min="0" max="2"
+                value={attentionFull}
+                onChange={(e) => setAttentionFull(e.target.value)}
+                className="w-40 px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                placeholder="Ex : 1.0"
+              />
+            </div>
+
+            {/* Masked time switch */}
+            <div className="flex items-center gap-2.5 mb-3">
+              <button
+                type="button"
+                onClick={() => setMaskedTimeEnabled(!maskedTimeEnabled)}
+                className={`relative w-9 h-5 rounded-full transition-colors ${maskedTimeEnabled ? 'bg-green-500' : 'bg-flux-elevated border border-flux-border-light'}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${maskedTimeEnabled ? 'left-[18px] bg-white' : 'left-0.5 bg-flux-text-muted'}`} />
+              </button>
+              <span className="text-sm text-flux-text-secondary">Temps masqué possible</span>
+            </div>
+
+            {/* Masked time fields (only visible when enabled) */}
+            {maskedTimeEnabled && (
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs text-flux-text-secondary mb-1">
+                    Attention roulage <span className="text-flux-text-muted text-[10px]">(attentionMasked)</span>
+                  </label>
+                  <input
+                    type="number" step="0.1" min="0" max="2"
+                    value={attentionMasked}
+                    onChange={(e) => setAttentionMasked(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                    placeholder="Ex : 0.3"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-flux-text-secondary mb-1">
+                    Productivité masquée <span className="text-flux-text-muted text-[10px]">(maskedProductivity)</span>
+                  </label>
+                  <input
+                    type="number" step="0.05" min="0" max="1"
+                    value={maskedProductivity}
+                    onChange={(e) => setMaskedProductivity(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                    placeholder="Ex : 0.95"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Timing fields */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-flux-text-secondary mb-1">
+                  Pas de temps <span className="text-flux-text-muted text-[10px]">(min)</span>
+                </label>
+                <input
+                  type="number" min="1"
+                  value={tickMinutes}
+                  onChange={(e) => setTickMinutes(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                  placeholder="Ex : 5"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-flux-text-secondary mb-1">
+                  Seuil péremption <span className="text-flux-text-muted text-[10px]">(min)</span>
+                </label>
+                <input
+                  type="number" min="1"
+                  value={peremptionThresholdMinutes}
+                  onChange={(e) => setPeremptionThresholdMinutes(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                  placeholder="Ex : 60"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-flux-text-secondary mb-1">
+                  Durée max chunk <span className="text-flux-text-muted text-[10px]">(min)</span>
+                </label>
+                <input
+                  type="number" min="1"
+                  value={maxChunkMinutes}
+                  onChange={(e) => setMaxChunkMinutes(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-sm focus:outline-none focus:border-flux-text-secondary"
+                  placeholder="Ex : 420"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Footer */}

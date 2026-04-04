@@ -164,8 +164,10 @@ Language for the compute engine: **Rust**. At 1,000-2,000 actions, interactive s
 
 | Attribute | Type | Example | Purpose |
 |-----------|------|---------|---------|
-| `attentionFull` | float | 1.0 | Attention required during setup phase |
-| `attentionMasked` | float | 0.3 | Attention required during run phase |
+| `attentionFull` | float | 1.0 | Attention required during setup phase (1.5+ = multi-operator) |
+| `maskedTimeEnabled` | boolean | true | Whether this machine supports masked time |
+| `attentionMasked` | float | 0.3 | Attention required during run phase (monitoring only) |
+| `maskedProductivity` | float | 0.95 | Fixed productivity during masked time (small loss, big gain) |
 | `tickMinutes` | smallint | 5 | Machine-specific time granularity |
 | `peremptionThresholdMinutes` | smallint | 60 | Setup expires after this idle gap |
 | `maxChunkMinutes` | smallint | 420 | Pre-split threshold (7h default) |
@@ -302,9 +304,10 @@ Repeat until sum(ART) = 0:
             - If SPR = 0 → re-setup needed, add setup_time back to ART
           - LAST safety check: if another action on this machine
             has LAST exceeded → rollback (degraded KO), break sub-loop
-          - Compute productivity = min(attention_received / attention_required, 1.0)
+          - Compute productivity:
+            - Setup phase: min(attention_received / attentionFull, 1.0) — proportional
+            - Run phase (masked time): maskedProductivity — fixed per machine (e.g. 0.95)
           - Decrement ART by tick × productivity
-            (nominal: full tick; degraded: proportional to attention deficit)
         End sub-loop when ART = 0
   End-of-timestep: recalculate operator attention across all machines
     If attention freed → switch degraded actions to nominal mode
@@ -431,7 +434,9 @@ New nullable columns on existing `stations` table:
 ```
 stations (existing table)
   + attention_full: float, nullable, default null
+  + masked_time_enabled: tinyint(1), not null, default 0
   + attention_masked: float, nullable, default null
+  + masked_productivity: float, nullable, default null
   + tick_minutes: smallint, nullable, default null
   + peremption_threshold_minutes: smallint, nullable, default null
   + max_chunk_minutes: smallint, nullable, default null

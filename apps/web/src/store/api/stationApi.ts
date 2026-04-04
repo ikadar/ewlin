@@ -19,6 +19,13 @@ export interface StationResponse {
   displayOrder: number;
   operatingSchedule: Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }> | null;
   scheduleExceptions: Array<{ date: string; type: string; schedule: unknown; reason: string | null }> | null;
+  attentionFull: number | null;
+  maskedTimeEnabled: boolean;
+  attentionMasked: number | null;
+  maskedProductivity: number | null;
+  tickMinutes: number | null;
+  peremptionThresholdMinutes: number | null;
+  maxChunkMinutes: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +39,13 @@ export interface StationInput {
   displayOrder: number;
   operatingSchedule: Record<string, unknown> | null;
   scheduleExceptions: unknown[] | null;
+  attentionFull?: number | null;
+  maskedTimeEnabled?: boolean;
+  attentionMasked?: number | null;
+  maskedProductivity?: number | null;
+  tickMinutes?: number | null;
+  peremptionThresholdMinutes?: number | null;
+  maxChunkMinutes?: number | null;
 }
 
 export const stationApi = createApi({
