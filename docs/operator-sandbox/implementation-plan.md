@@ -174,6 +174,8 @@ Language for the compute engine: **Rust**. At 1,000-2,000 actions, interactive s
 
 **UI:** Extend the existing station management UI — add a new section or tab for operator-algorithm configuration (attention levels, tick, peremption threshold, max chunk). Simple form fields.
 
+**⚠ UI/UX gate:** Before implementing frontend changes, create a **playground** to validate the station config section layout with Julien.
+
 **Validation criteria:**
 - All 15 stations have their new attributes configured
 - Values make domain sense (press needs attention 1.0, folder needs 0.8, etc.)
@@ -215,7 +217,9 @@ Skills = which machines this operator can run. Each operator has a list of stati
 
 1. **Operator list page:** Table with name, number of skills, schedule summary (e.g., "Mon-Fri 06:00-16:00"). Add/edit/delete actions.
 2. **Operator detail form:** Name, total attention (default 1.0), weekly operating schedule, exceptions. Reuse the existing operating schedule editor component (same structure as stations).
-3. **Skill management:** Within the operator detail form — select stations from the existing station list, set proficiency per station (default 1.0). Visual: checklist of stations with proficiency input per checked station.
+3. **Skill management:** Within the operator detail form — select stations from the existing station list, set proficiency per station. Visual: sliders with magnetic snap to 0 and 1, grouped by station category, sorted alphabetically. Editable value field.
+
+**⚠ UI/UX gate:** Before implementing frontend changes, create a **playground** to validate the operator form layout (especially the proficiency sliders and skill management UX) with Julien.
 
 **Validation criteria:**
 - 10-15 operators created with real names
@@ -330,6 +334,8 @@ Repeat until sum(ART) = 0:
 
 **Statistics panel:**
 - Machine utilization, operator utilization, deadline status
+
+**⚠ UI/UX gate:** Before implementing frontend changes, create **playgrounds** to validate: (1) enriched station Gantt tile overlays, (2) operator Gantt layout and attention visualization, (3) statistics panel layout. Validate each with Julien.
 
 **Validation criteria:**
 - Algorithm produces a complete schedule for 1,000+ actions in < 10 seconds
