@@ -71,6 +71,11 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         }
     }
 
+    // TODO: Cross-reference operators across overlapping masked-time assignments.
+    // Currently disabled — the naive approach is too aggressive (adds operators to ALL
+    // temporally overlapping tasks). The correct fix requires tracking masked-time
+    // operator presence in the forward pass grid, not in post-processing.
+
     let mut warnings = Vec::new();
 
     // Check for unplaced tasks
@@ -102,6 +107,62 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
 /// - OR-ing is_degraded
 /// - Averaging effective_productivity
 /// - OR-ing is_masked_time
+/// Cross-reference operators across overlapping assignments.
+/// For each pair of overlapping assignments (A, B):
+///   If A has operator X and B doesn't → add X to B's operators (and vice versa)
+/// This ensures that when an operator monitors a masked station while working
+/// on another, BOTH assignments list that operator.
+fn cross_reference_operators(assignments: &mut Vec<ComputedAssignment>) {
+    // Collect operator IDs per assignment index
+    let n = assignments.len();
+    let mut additions: Vec<(usize, OperatorAssignment)> = Vec::new();
+
+    for i in 0..n {
+        for j in (i + 1)..n {
+            // Check time overlap
+            let overlap = assignments[i].scheduled_start < assignments[j].scheduled_end
+                && assignments[j].scheduled_start < assignments[i].scheduled_end;
+            if !overlap {
+                continue;
+            }
+
+            // For each operator in assignment i, check if missing from j
+            for op in &assignments[i].operators {
+                let already_in_j = assignments[j]
+                    .operators
+                    .iter()
+                    .any(|o| o.operator_id == op.operator_id);
+                if !already_in_j {
+                    additions.push((j, op.clone()));
+                }
+            }
+
+            // For each operator in assignment j, check if missing from i
+            for op in &assignments[j].operators {
+                let already_in_i = assignments[i]
+                    .operators
+                    .iter()
+                    .any(|o| o.operator_id == op.operator_id);
+                if !already_in_i {
+                    additions.push((i, op.clone()));
+                }
+            }
+        }
+    }
+
+    // Apply additions
+    for (idx, op) in additions {
+        // Avoid duplicates (may have been added from multiple overlaps)
+        let already = assignments[idx]
+            .operators
+            .iter()
+            .any(|o| o.operator_id == op.operator_id);
+        if !already {
+            assignments[idx].operators.push(op);
+        }
+    }
+}
+
 fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<ComputedAssignment> {
     // Group chunk assignments by their task_id prefix (chunk 1 keeps the original task_id)
     // We identify chunks by task_id containing "_chunk_"
