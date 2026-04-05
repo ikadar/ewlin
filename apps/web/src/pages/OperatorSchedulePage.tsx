@@ -273,6 +273,18 @@ export default function OperatorSchedulePage() {
   }, []);
   const nowPosition = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
 
+  // Precompute overlap info for all operators (must be before early returns — hooks rule)
+  const allOverlapInfos = useMemo(() => {
+    const map = new Map<string, Map<string, { isMasked: boolean; hasOverlap: boolean }>>();
+    for (const op of operators) {
+      const opAssignments = assignmentsByOperator.get(op.id) ?? [];
+      map.set(op.id, computeOverlapInfo(opAssignments));
+    }
+    return map;
+  }, [operators, assignmentsByOperator]);
+
+  const currentOverlapInfo = useRef<Map<string, { isMasked: boolean; hasOverlap: boolean }> | null>(null);
+
   // ---- Loading / error ----
   if (isLoading) {
     return (
@@ -308,8 +320,18 @@ export default function OperatorSchedulePage() {
 
     // Tile state
     const isLate = lateJobIds.has(job.id) || (!assignment.isCompleted && new Date(assignment.scheduledEnd) < now);
-    const hasConflict = false; // Read-only view, no conflict rendering needed
+    const hasConflict = false;
     const tileState = computeTileState(false, isLate, hasConflict, false, assignment.isCompleted);
+
+    // Overlap layout: side-by-side for masked time overlaps
+    const overlapInfo = currentOverlapInfo.current?.get(assignment.taskId);
+    const hasOverlap = overlapInfo?.hasOverlap ?? false;
+    const isMaskedSide = overlapInfo?.isMasked ?? false;
+
+    // Override props for side-by-side layout
+    const overrideLeft = hasOverlap ? (isMaskedSide ? '0' : 'calc(48% + 4px)') : undefined;
+    const overrideWidth = hasOverlap ? '48%' : undefined;
+    const overrideOpacity = hasOverlap && isMaskedSide ? 0.6 : undefined;
 
     return (
       <Tile
@@ -328,6 +350,9 @@ export default function OperatorSchedulePage() {
         pixelsPerHour={pixelsPerHour}
         isPicked={false}
         isPickingActive={false}
+        overrideLeft={overrideLeft}
+        overrideWidth={overrideWidth}
+        overrideOpacity={overrideOpacity}
         isBlocked={false}
         operatorNames={stationName}
       />
@@ -436,6 +461,8 @@ export default function OperatorSchedulePage() {
 
                   {operators.map((op) => {
                     const opAssignments = assignmentsByOperator.get(op.id) ?? [];
+                    // Set overlap info for this operator's renderTile calls
+                    currentOverlapInfo.current = allOverlapInfos.get(op.id) ?? null;
                     return (
                       <OperatorColumn
                         key={op.id}
@@ -531,69 +558,32 @@ export default function OperatorSchedulePage() {
 // ============================================================================
 
 /**
- * Render tiles with side-by-side layout when tasks overlap during masked time.
- * Masked tile (muted, 48% width, left) + active tile (full opacity, 48% width, right).
- * Non-overlapping tiles render at full width.
+ * Compute overlap info for assignments in one operator column.
+ * Returns a map of taskId → { hasOverlap, isMasked } for tile width overrides.
  */
-function renderTilesWithOverlapLayout(
-  assignments: TaskAssignment[],
-  renderTile: (assignment: TaskAssignment) => React.ReactNode,
-  pixelsPerHour: number,
-  gridStartDate: Date,
-): React.ReactNode[] {
-  if (assignments.length === 0) return [];
-
-  // Parse start/end times for overlap detection
+function computeOverlapInfo(assignments: TaskAssignment[]): Map<string, { isMasked: boolean; hasOverlap: boolean }> {
   const parsed = assignments.map(a => ({
-    assignment: a,
+    taskId: a.taskId,
     startMs: new Date(a.scheduledStart).getTime(),
     endMs: new Date(a.scheduledEnd).getTime(),
     isMasked: a.isMaskedTime ?? false,
   }));
 
-  // Find which assignments overlap with others
-  const overlapSet = new Set<string>();
+  const result = new Map<string, { isMasked: boolean; hasOverlap: boolean }>();
+  for (const p of parsed) {
+    result.set(p.taskId, { isMasked: p.isMasked, hasOverlap: false });
+  }
 
   for (let i = 0; i < parsed.length; i++) {
     for (let j = i + 1; j < parsed.length; j++) {
-      const a = parsed[i], b = parsed[j];
-      if (a.startMs < b.endMs && b.startMs < a.endMs) {
-        overlapSet.add(a.assignment.taskId);
-        overlapSet.add(b.assignment.taskId);
+      if (parsed[i].startMs < parsed[j].endMs && parsed[j].startMs < parsed[i].endMs) {
+        result.get(parsed[i].taskId)!.hasOverlap = true;
+        result.get(parsed[j].taskId)!.hasOverlap = true;
       }
     }
   }
 
-  return parsed.map(({ assignment, isMasked }) => {
-    const hasOverlap = overlapSet.has(assignment.taskId);
-
-    if (!hasOverlap) {
-      // No overlap: full width, normal rendering
-      return renderTile(assignment);
-    }
-
-    // Overlapping: wrap tile in a container that constrains width and position
-    // Masked tile goes left (48%), active tile goes right (48%), 4px gap
-    const isMaskedSide = isMasked;
-
-    return (
-      <div
-        key={`overlap-wrap-${assignment.taskId}`}
-        className="absolute top-0 bottom-0 pointer-events-none"
-        style={{
-          left: isMaskedSide ? '0' : 'calc(48% + 4px)',
-          width: '48%',
-        }}
-      >
-        <div
-          className="relative w-full h-full pointer-events-auto"
-          style={{ opacity: isMaskedSide ? 0.6 : 1 }}
-        >
-          {renderTile(assignment)}
-        </div>
-      </div>
-    );
-  });
+  return result;
 }
 
 // ============================================================================
@@ -700,8 +690,8 @@ function OperatorColumn({
         />
       ))}
 
-      {/* Tiles — with side-by-side layout for overlapping masked time */}
-      {renderTilesWithOverlapLayout(assignments, renderTile, pixelsPerHour, gridStartDate)}
+      {/* Tiles */}
+      {assignments.map(renderTile)}
     </div>
   );
 }

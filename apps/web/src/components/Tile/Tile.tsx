@@ -64,6 +64,10 @@ export interface TileProps {
   tileState?: TileState;
   /** Comma-separated operator names assigned to this tile */
   operatorNames?: string;
+  /** Override left/right/width for side-by-side masked time layout */
+  overrideLeft?: string;
+  overrideWidth?: string;
+  overrideOpacity?: number;
 }
 
 /**
@@ -106,6 +110,9 @@ export const Tile = memo(function Tile({
   tirageLabel,
   tileState = 'default',
   operatorNames,
+  overrideLeft,
+  overrideWidth,
+  overrideOpacity,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
@@ -207,8 +214,10 @@ export const Tile = memo(function Tile({
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
-        left: 0,
-        right: 0,
+        left: overrideLeft ?? 0,
+        width: overrideWidth ?? undefined,
+        right: overrideWidth ? undefined : 0,
+        opacity: overrideOpacity ?? undefined,
         ...pickStyle,
       }}
       onClick={handleClick}
