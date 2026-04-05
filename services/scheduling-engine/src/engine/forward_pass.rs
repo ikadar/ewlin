@@ -10,6 +10,7 @@ pub struct StationAttrs {
     pub attention_full: f64,
     pub attention_run: f64,
     pub masked_time_enabled: bool,
+    pub attention_masked: f64,
     pub masked_productivity: f64,
 }
 
@@ -401,7 +402,8 @@ fn schedule_action_to_completion(
         let attention_needed = if in_setup {
             attrs.attention_full
         } else if attrs.masked_time_enabled {
-            0.0 // Masked time: no operator needed during run
+            // Masked time: reduced attention (e.g. 0.3), operator monitors but is partially freed
+            attrs.attention_masked
         } else {
             attrs.attention_run
         };

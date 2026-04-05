@@ -48,6 +48,7 @@ pub fn run_with_fbi(
             attention_full: s.effective_attention_full(),
             attention_run: s.effective_attention_run(),
             masked_time_enabled: s.masked_time_enabled,
+            attention_masked: s.effective_attention_masked(),
             masked_productivity: s.effective_masked_productivity(),
         })
         .collect();
