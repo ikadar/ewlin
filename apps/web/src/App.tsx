@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
 import { useTheme } from './contexts/ThemeContext';
 import { ZOOM_LEVELS } from './utils/zoom';
-import { Save, ClipboardCopy } from 'lucide-react';
+import { Save, ClipboardCopy, Cpu } from 'lucide-react';
 import { buildDebugPayload } from './utils/debugExport';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
@@ -23,7 +23,8 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable, useComputeScheduleMutation } from './store';
+import type { ComputeScheduleResult } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
@@ -286,6 +287,12 @@ function AppContent() {
     [snapshotData],
   );
 
+  // Filter stations to only show Available ones in the Gantt grid
+  const activeStations = useMemo(
+    () => snapshot.stations.filter(s => s.status === 'Available'),
+    [snapshot.stations],
+  );
+
   // Derive poste presets from snapshot stations (single source of truth)
   const snapshotPostes = useMemo(
     () => stationsToPostes(snapshot.stations, snapshot.categories),
@@ -315,6 +322,8 @@ function AppContent() {
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
+  const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
+  const [computeResult, setComputeResult] = useState<ComputeScheduleResult | null>(null);
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -1153,6 +1162,16 @@ function AppContent() {
     }
   }, [snapshot, showToast]);
 
+  // Handle compute schedule (full scheduling engine)
+  const handleComputeSchedule = useCallback(async () => {
+    try {
+      const result = await computeSchedule().unwrap();
+      setComputeResult(result);
+    } catch (err) {
+      console.error('Compute failed:', err);
+    }
+  }, [computeSchedule]);
+
   // Handle mass unschedule all tiles (CTRL+ALT+Z)
   const handleMassUnscheduleConfirm = useCallback(async () => {
     if (!massUnscheduleConfirm) return;
@@ -1489,12 +1508,12 @@ function AppContent() {
 
     // Calculate X position from station index (accounts for variable column widths)
     const stationId = assignment.targetId;
-    const stationIndex = snapshot.stations.findIndex((s) => s.id === stationId);
+    const stationIndex = activeStations.findIndex((s) => s.id === stationId);
 
     let scrollTargetX = gridRef.current.getScrollX(); // Default: keep current X
 
     if (stationIndex >= 0) {
-      const { x: stationX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
+      const { x: stationX } = getStationXOffset(stationIndex, activeStations, categoryMap);
       scrollTargetX = Math.max(0, stationX);
     }
 
@@ -1509,7 +1528,7 @@ function AppContent() {
       scrollTargetX,
       scrollTargetY,
     });
-  }, [snapshot.stations, categoryMap, pixelsPerHour, gridStartDate]);
+  }, [activeStations, categoryMap, pixelsPerHour, gridStartDate]);
 
   // F9: Deep-link from Flux dashboard — ?task= URL param → scroll to task
   useEffect(() => {
@@ -1976,14 +1995,14 @@ function AppContent() {
       // Scroll to target station column (for internal tasks)
       if (task.type === 'Internal') {
         const targetStationId = task.stationId;
-        const stationIndex = snapshot.stations.findIndex((s) => s.id === targetStationId);
+        const stationIndex = activeStations.findIndex((s) => s.id === targetStationId);
         if (stationIndex >= 0) {
-          const { x: targetX } = getStationXOffset(stationIndex, snapshot.stations, categoryMap);
+          const { x: targetX } = getStationXOffset(stationIndex, activeStations, categoryMap);
           gridRef.current.scrollToX(targetX, 'smooth');
         }
       }
     }
-  }, [pickActions, snapshot.stations, categoryMap]);
+  }, [pickActions, activeStations, categoryMap]);
 
   // v0.3.57: Handle pick from grid (reschedule existing task)
   // No scroll needed as user is already at tile location
@@ -2433,7 +2452,7 @@ function AppContent() {
         />
         <SchedulingGrid
           ref={gridRef}
-          stations={snapshot.stations}
+          stations={activeStations}
           categories={snapshot.categories}
           jobs={snapshot.jobs}
           tasks={snapshot.tasks}
@@ -2471,10 +2490,11 @@ function AppContent() {
           displayMode={displayMode}
           lateJobIds={lateJobIds}
           shippedJobIds={shippedJobIds}
+          operators={snapshot.operators}
         />
         {isMinimapVisible && (
           <Minimap
-            stations={snapshot.stations}
+            stations={activeStations}
             categories={snapshot.categories}
             assignments={snapshot.assignments}
             elements={snapshot.elements}
@@ -2638,6 +2658,60 @@ function AppContent() {
 
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
+
+      {/* Compute Schedule FAB */}
+      <button
+        onClick={handleComputeSchedule}
+        disabled={isComputingSchedule}
+        className="fixed bottom-[184px] right-6 z-40 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white shadow-lg transition-all flex items-center justify-center"
+        aria-label="Calculer le planning"
+        title="Calculer le planning"
+        data-testid="compute-schedule-fab"
+      >
+        {isComputingSchedule ? (
+          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        ) : (
+          <Cpu size={20} />
+        )}
+      </button>
+
+      {/* Compute result modal */}
+      {computeResult && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setComputeResult(null)}
+          onKeyDown={e => { if (e.key === 'Escape') setComputeResult(null); }}
+          tabIndex={-1}
+          ref={el => el?.focus()}
+        >
+          <div
+            className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
+            style={{ width: '24rem' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-flux-text-primary font-semibold mb-4">
+              Calcul terminé
+            </h2>
+            <div className="space-y-2 text-sm text-flux-text-secondary mb-6">
+              <p>Tâches placées : <span className="text-flux-text-primary font-mono">{computeResult.placedCount}</span></p>
+              <p>Tâches non placées : <span className="text-flux-text-primary font-mono">{computeResult.unplacedCount}</span></p>
+              <p>Temps de calcul : <span className="text-flux-text-primary font-mono">{computeResult.computeMs}ms</span></p>
+              {computeResult.summary && (
+                <p className="pt-2 text-flux-text-muted">{computeResult.summary}</p>
+              )}
+            </div>
+            <div className="flex justify-end">
+              <button
+                className="px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                onClick={() => setComputeResult(null)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Debug Export FAB — copy snapshot to clipboard */}
       <button

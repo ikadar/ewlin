@@ -1,4 +1,4 @@
-import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element, Operator } from '@flux/types';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
 import { isInternalTask, getDeadlineDate, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
@@ -51,6 +51,7 @@ interface CachedTileData {
   blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined;
   tirageLabel: string | undefined;
   pixelsPerHour: number;
+  operatorNames: string | undefined;
 }
 
 export interface SchedulingGridProps {
@@ -132,6 +133,8 @@ export interface SchedulingGridProps {
   lateJobIds?: Set<string>;
   /** Set of job IDs that are shipped (highest priority tile coloring) */
   shippedJobIds?: Set<string>;
+  /** All operators (for operator name display on tiles) */
+  operators?: Operator[];
 }
 
 /**
@@ -183,6 +186,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       displayMode,
       lateJobIds,
       shippedJobIds,
+      operators,
     },
     ref
   ) {
@@ -430,6 +434,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return grouped;
   }, [assignments, stations, startDate, virtualScroll.visibleRange]);
 
+  // Operator name lookup map (for displaying operator names on tiles)
+  const operatorNameMap = useMemo(() => {
+    if (!operators || operators.length === 0) return new Map<string, string>();
+    return new Map(operators.map(op => [op.id, `${op.firstName} ${op.lastName}`]));
+  }, [operators]);
+
   // Step 1d: Pre-compute per-tile render data (independent of selectedJobId)
   const tileDataCache = useMemo(() => {
     const cache = new Map<string, CachedTileData>();
@@ -482,6 +492,15 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         const hasConflict = conflictTaskIds.has(task.id);
         const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocking?.blocked ?? false, assignment.isCompleted);
 
+        // Operator names (comma-separated)
+        let operatorNames: string | undefined;
+        if (assignment.operators && assignment.operators.length > 0 && operatorNameMap.size > 0) {
+          operatorNames = assignment.operators
+            .map(op => operatorNameMap.get(op.operatorId))
+            .filter(Boolean)
+            .join(', ') || undefined;
+        }
+
         cache.set(assignment.id, {
           jobId: job.id, element, task, job, top,
           showSwapUp, showSwapDown, similarityResults,
@@ -490,6 +509,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           blockingInfo: blocking?.blockingInfo,
           tirageLabel: rawTirageLabel || undefined,
           pixelsPerHour,
+          operatorNames,
         });
       });
     }
@@ -497,7 +517,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   }, [assignmentsByStation, taskMap, jobMap, elementMap, elementBlockingCache,
       elementsByJobId, stationMap, categoryMap, assemblyStationIds,
       startHour, pixelsPerHour, startDate, shippedJobIds, lateJobIds,
-      conflictTaskIds, now]);
+      conflictTaskIds, now, operatorNameMap]);
 
   // Calculate departure marker position (if selected job has workshopExitDate)
   // Multi-day: show marker regardless of day (REQ-15)
@@ -664,6 +684,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         blockingInfo={cached.blockingInfo}
                         displayMode={displayMode}
                         tirageLabel={cached.tirageLabel}
+                        operatorNames={cached.operatorNames}
                       />
                     );
                   })}

@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
@@ -30,7 +30,8 @@ export function Sidebar() {
   const fromRoute = (location.state as { from?: string } | null)?.from;
   const isJcfFromFlux = location.pathname === '/job/new' && fromRoute?.startsWith('/flux');
   const isFlux = location.pathname.startsWith('/flux') || isJcfFromFlux;
-  const isScheduler = !isSettings && !isFlux;
+  const isOperatorSchedule = location.pathname === '/operator-schedule';
+  const isScheduler = !isSettings && !isFlux && !isOperatorSchedule;
 
   // Close menu on outside click
   useEffect(() => {
@@ -80,6 +81,12 @@ export function Sidebar() {
             label="Flux de production"
             isActive={isFlux}
             onClick={() => navigate('/flux')}
+          />
+          <SidebarButton
+            icon={Users}
+            label="Planning opérateurs"
+            isActive={isOperatorSchedule}
+            onClick={() => navigate('/operator-schedule')}
           />
         </div>
 

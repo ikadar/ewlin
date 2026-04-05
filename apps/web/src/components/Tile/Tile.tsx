@@ -62,6 +62,8 @@ export interface TileProps {
   tirageLabel?: string;
   /** State-based tile color */
   tileState?: TileState;
+  /** Comma-separated operator names assigned to this tile */
+  operatorNames?: string;
 }
 
 /**
@@ -103,6 +105,7 @@ export const Tile = memo(function Tile({
   displayMode,
   tirageLabel,
   tileState = 'default',
+  operatorNames,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
@@ -292,6 +295,11 @@ export const Tile = memo(function Tile({
             </>
           )}
         </div>
+        {operatorNames && (
+          <div className="text-[9px] text-zinc-400 truncate mt-0.5 leading-tight">
+            {operatorNames}
+          </div>
+        )}
       </div>
 
       {/* Swap buttons (visible on hover) */}
@@ -348,7 +356,8 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.blockingInfo !== next.blockingInfo ||
     prev.displayMode !== next.displayMode ||
     prev.tirageLabel !== next.tirageLabel ||
-    prev.tileState !== next.tileState
+    prev.tileState !== next.tileState ||
+    prev.operatorNames !== next.operatorNames
   );
 }
 

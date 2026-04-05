@@ -144,9 +144,10 @@ export {
   useSaveScheduleMutation,
   useLoadScheduleMutation,
   useDeleteSavedScheduleMutation,
+  useComputeScheduleMutation,
   scheduleApi,
 } from './api/scheduleApi';
-export type { SavedScheduleItem } from './api/scheduleApi';
+export type { SavedScheduleItem, ComputeScheduleResult } from './api/scheduleApi';
 
 export { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation, templateApi } from './api/templateApi';
 

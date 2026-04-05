@@ -866,8 +866,34 @@ export const scheduleApi = createApi({
       }),
       invalidatesTags: ['SavedSchedules'],
     }),
+
+    /**
+     * Trigger full schedule computation via the scheduling engine.
+     *
+     * Real mode: POST /schedule/compute
+     *
+     * No optimistic update — waits for server response then refetches snapshot.
+     */
+    computeSchedule: builder.mutation<ComputeScheduleResult, void>({
+      query: () => ({ url: '/schedule/compute', method: 'POST' }),
+      invalidatesTags: ['Snapshot'],
+    }),
   }),
 });
+
+/**
+ * Result returned by the schedule computation endpoint.
+ */
+export interface ComputeScheduleResult {
+  /** Number of tasks placed by the engine */
+  placedCount: number;
+  /** Number of tasks that could not be placed */
+  unplacedCount: number;
+  /** Computation time in milliseconds */
+  computeMs: number;
+  /** Human-readable summary */
+  summary?: string;
+}
 
 // ============================================================================
 // Export Hooks
@@ -901,4 +927,5 @@ export const {
   useSaveScheduleMutation,
   useLoadScheduleMutation,
   useDeleteSavedScheduleMutation,
+  useComputeScheduleMutation,
 } = scheduleApi;

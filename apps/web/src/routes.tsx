@@ -45,6 +45,7 @@ import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { ShippersPage } from './pages/ShippersPage';
 import OperatorsPage from './pages/OperatorsPage';
+import OperatorSchedulePage from './pages/OperatorSchedulePage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
 import { UserGroupsPage } from './pages/UserGroupsPage';
@@ -74,6 +75,9 @@ export function AppRoutes() {
         <Route path="/" element={<App />} />
         <Route path="/job/new" element={<App />} />
         <Route path="/job/:jobId" element={<App />} />
+
+        {/* Operator schedule Gantt view */}
+        <Route path="/operator-schedule" element={<OperatorSchedulePage />} />
 
         {/* Settings routes — SettingsLayout provides the w-72 submenu */}
         <Route path="/settings" element={<RequirePermission permission={['settings.view', 'admin.users']}><SettingsLayout /></RequirePermission>}>
