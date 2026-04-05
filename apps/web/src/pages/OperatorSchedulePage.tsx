@@ -527,6 +527,76 @@ export default function OperatorSchedulePage() {
 }
 
 // ============================================================================
+// Overlap layout for masked-time side-by-side tiles
+// ============================================================================
+
+/**
+ * Render tiles with side-by-side layout when tasks overlap during masked time.
+ * Masked tile (muted, 48% width, left) + active tile (full opacity, 48% width, right).
+ * Non-overlapping tiles render at full width.
+ */
+function renderTilesWithOverlapLayout(
+  assignments: TaskAssignment[],
+  renderTile: (assignment: TaskAssignment) => React.ReactNode,
+  pixelsPerHour: number,
+  gridStartDate: Date,
+): React.ReactNode[] {
+  if (assignments.length === 0) return [];
+
+  // Parse start/end times for overlap detection
+  const parsed = assignments.map(a => ({
+    assignment: a,
+    startMs: new Date(a.scheduledStart).getTime(),
+    endMs: new Date(a.scheduledEnd).getTime(),
+    isMasked: a.isMaskedTime ?? false,
+  }));
+
+  // Find which assignments overlap with others
+  const overlapSet = new Set<string>();
+
+  for (let i = 0; i < parsed.length; i++) {
+    for (let j = i + 1; j < parsed.length; j++) {
+      const a = parsed[i], b = parsed[j];
+      if (a.startMs < b.endMs && b.startMs < a.endMs) {
+        overlapSet.add(a.assignment.taskId);
+        overlapSet.add(b.assignment.taskId);
+      }
+    }
+  }
+
+  return parsed.map(({ assignment, isMasked }) => {
+    const hasOverlap = overlapSet.has(assignment.taskId);
+
+    if (!hasOverlap) {
+      // No overlap: full width, normal rendering
+      return renderTile(assignment);
+    }
+
+    // Overlapping: wrap tile in a container that constrains width and position
+    // Masked tile goes left (48%), active tile goes right (48%), 4px gap
+    const isMaskedSide = isMasked;
+
+    return (
+      <div
+        key={`overlap-wrap-${assignment.taskId}`}
+        className="absolute top-0 bottom-0 pointer-events-none"
+        style={{
+          left: isMaskedSide ? '0' : 'calc(48% + 4px)',
+          width: '48%',
+        }}
+      >
+        <div
+          className="relative w-full h-full pointer-events-auto"
+          style={{ opacity: isMaskedSide ? 0.6 : 1 }}
+        >
+          {renderTile(assignment)}
+        </div>
+      </div>
+    );
+  });
+}
+
+// ============================================================================
 // OperatorColumn sub-component
 // ============================================================================
 
@@ -630,8 +700,8 @@ function OperatorColumn({
         />
       ))}
 
-      {/* Tiles */}
-      {assignments.map(renderTile)}
+      {/* Tiles — with side-by-side layout for overlapping masked time */}
+      {renderTilesWithOverlapLayout(assignments, renderTile, pixelsPerHour, gridStartDate)}
     </div>
   );
 }

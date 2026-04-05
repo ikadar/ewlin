@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operator Masked Time — Layout Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --elevated: #242424;
+    --border: #3a3a3a;
+    --text: #f5f5f5;
+    --muted: #808080;
+    --px-per-hour: 60;
+    --col-width: 240;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .header p {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── Main layout ── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Left panel ── */
+  .left-panel {
+    width: 280px;
+    min-width: 280px;
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  /* Preset buttons */
+  .presets {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .preset-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover {
+    background: var(--elevated);
+    border-color: #555;
+  }
+  .preset-btn.active {
+    background: #2563eb20;
+    border-color: #2563eb;
+    color: #93b4f5;
+  }
+  .preset-btn .preset-icon {
+    width: 28px;
+    height: 18px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Mini-icons for preset buttons */
+  .preset-icon.split-33-67 {
+    display: flex;
+  }
+  .preset-icon.split-33-67 .left { width: 33%; background: #3b82f640; border-right: 1px dashed #3b82f680; }
+  .preset-icon.split-33-67 .right { width: 67%; background: #10b98140; }
+
+  .preset-icon.split-50-50 {
+    display: flex;
+  }
+  .preset-icon.split-50-50 .left { width: 50%; background: #3b82f640; border-right: 1px dashed #3b82f680; }
+  .preset-icon.split-50-50 .right { width: 50%; background: #10b98140; }
+
+  .preset-icon.overlap {
+    position: relative;
+  }
+  .preset-icon.overlap .back { position: absolute; inset: 0; background: #3b82f630; }
+  .preset-icon.overlap .front { position: absolute; inset: 2px 0 2px 6px; background: #10b98180; border-radius: 2px; }
+
+  .preset-icon.side-gap {
+    display: flex;
+    gap: 2px;
+    padding: 0 1px;
+  }
+  .preset-icon.side-gap .left { flex: 1; background: #3b82f640; border-radius: 2px; }
+  .preset-icon.side-gap .right { flex: 1; background: #10b98140; border-radius: 2px; }
+
+  /* Slider */
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .slider-group label {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .slider-group label span {
+    color: var(--text);
+    font-weight: 500;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #2563eb;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  input[type="range"]:disabled {
+    opacity: 0.3;
+  }
+  input[type="range"]:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+  }
+
+  /* Checkbox */
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #2563eb;
+    cursor: pointer;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .legend-swatch {
+    width: 24px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* ── Right panel (preview + prompt) ── */
+  .right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Preview area */
+  .preview-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .preview-container {
+    display: flex;
+    gap: 0;
+    position: relative;
+  }
+
+  /* Timeline */
+  .timeline {
+    width: 48px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .timeline-hour {
+    position: absolute;
+    right: 8px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    transform: translateY(-6px);
+  }
+  .timeline-line {
+    position: absolute;
+    right: 0;
+    width: 4px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Column */
+  .operator-column {
+    width: 240px;
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .column-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--elevated);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .column-header .name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .column-header .role {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .column-body {
+    position: relative;
+  }
+
+  /* Hatched areas (lunch, off-hours) */
+  .hatched-zone {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 3px,
+      #ffffff06 3px,
+      #ffffff06 4px
+    );
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .hatched-label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 9px;
+    font-weight: 500;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  /* Task tiles */
+  .task-tile {
+    position: absolute;
+    border-radius: 4px;
+    padding: 4px 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    cursor: default;
+    transition: left 0.3s ease, width 0.3s ease, opacity 0.3s ease;
+    z-index: 5;
+  }
+  .task-tile .tile-job {
+    font-size: 9px;
+    font-weight: 600;
+    opacity: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .task-tile .tile-desc {
+    font-size: 8px;
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+  .task-tile .tile-station {
+    font-size: 8px;
+    opacity: 0.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: auto;
+  }
+  .task-tile .tile-badge {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    font-size: 8px;
+    opacity: 0.7;
+  }
+  .task-tile .tile-attention {
+    position: absolute;
+    bottom: 3px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    opacity: 0.8;
+    background: #00000040;
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+
+  /* Prompt area */
+  .prompt-area {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    background: var(--surface);
+  }
+  .prompt-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .prompt-text {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #ccc;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 60px;
+    white-space: pre-wrap;
+  }
+  .copy-btn {
+    margin-top: 8px;
+    padding: 6px 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover {
+    background: #1d4ed8;
+  }
+  .copy-btn.copied {
+    background: #16a34a;
+  }
+
+  /* Hour gridlines */
+  .hour-gridline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--border);
+    opacity: 0.3;
+    z-index: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Operator Masked Time — Layout Explorer</h1>
+  <p>Explore how overlapping tasks display when an operator monitors a running machine while doing active work on another.</p>
+</div>
+
+<div class="main">
+  <!-- Left panel: controls + legend -->
+  <div class="left-panel">
+
+    <div>
+      <div class="section-label">Display Mode</div>
+      <div class="presets">
+        <button class="preset-btn active" data-mode="split-33-67" onclick="setMode('split-33-67')">
+          <div class="preset-icon split-33-67"><div class="left"></div><div class="right"></div></div>
+          Split 33/67
+        </button>
+        <button class="preset-btn" data-mode="split-50-50" onclick="setMode('split-50-50')">
+          <div class="preset-icon split-50-50"><div class="left"></div><div class="right"></div></div>
+          Split 50/50
+        </button>
+        <button class="preset-btn" data-mode="overlap" onclick="setMode('overlap')">
+          <div class="preset-icon overlap"><div class="back"></div><div class="front"></div></div>
+          Overlap
+        </button>
+        <button class="preset-btn" data-mode="side-gap" onclick="setMode('side-gap')">
+          <div class="preset-icon side-gap"><div class="left"></div><div class="right"></div></div>
+          Side by side with gap
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Options</div>
+      <div class="slider-group" id="slider-group">
+        <label>Masked column width <span id="ratio-value">33%</span></label>
+        <input type="range" id="ratio-slider" min="20" max="50" value="33" oninput="onRatioChange(this.value)">
+      </div>
+      <div style="margin-top: 12px;">
+        <label class="checkbox-group">
+          <input type="checkbox" id="show-attention" onchange="onAttentionToggle(this.checked)">
+          Show attention values
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Legend</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background: #3b82f6;"></div>
+          Komori (offset press)
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background: #10b981;"></div>
+          Polar (cutting)
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background: #f59e0b;"></div>
+          MBO (folding)
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background: #a855f7;"></div>
+          Carton (packaging)
+        </div>
+        <div class="legend-item" style="margin-top: 4px;">
+          <div class="legend-swatch" style="background: #3b82f640; border-left: 2px dashed #3b82f6; border-radius: 0;"></div>
+          Masked (monitoring)
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background: repeating-linear-gradient(-45deg, transparent, transparent 2px, #ffffff10 2px, #ffffff10 3px); border: 1px solid #3a3a3a;"></div>
+          Off-hours / Break
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: 1;"></div>
+
+    <div style="font-size: 10px; color: #555; line-height: 1.5;">
+      Paul Pressac's schedule for a single workday. Masked time = machine runs autonomously while operator does other work.
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div class="preview-area" id="preview-area">
+      <div class="preview-container">
+        <!-- Timeline -->
+        <div class="timeline" id="timeline"></div>
+        <!-- Operator column -->
+        <div class="operator-column" id="operator-column">
+          <div class="column-header">
+            <div class="name">Paul Pressac</div>
+            <div class="role">Conducteur offset / Finition</div>
+          </div>
+          <div class="column-body" id="column-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prompt output -->
+    <div class="prompt-area">
+      <div class="prompt-label">Prompt Output</div>
+      <div class="prompt-text" id="prompt-text"></div>
+      <button class="copy-btn" id="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+const DEFAULTS = {
+  mode: 'split-33-67',
+  maskedRatio: 33,
+  showAttention: false
+};
+
+const state = {
+  mode: 'split-33-67',
+  maskedRatio: 33,
+  showAttention: false
+};
+
+// ── Constants ──
+const TIMELINE_START = 5;  // 05:00
+const TIMELINE_END = 18;   // 18:00
+const PX_PER_HOUR = 60;
+const COL_WIDTH = 240;
+const COL_PAD = 4;
+const WORK_START = 6;
+const WORK_END = 17;
+const LUNCH_START = 12;
+const LUNCH_END = 13;
+
+const STATION_COLORS = {
+  'Komori':  { bg: '#3b82f6', text: '#bfdbfe' },
+  'Polar':   { bg: '#10b981', text: '#a7f3d0' },
+  'MBO':     { bg: '#f59e0b', text: '#fde68a' },
+  'Carton':  { bg: '#a855f7', text: '#e9d5ff' }
+};
+
+// ── Task data ──
+const tasks = [
+  { id: 't1', job: 'J-004', desc: 'Brochure setup',     station: 'Komori', start: 6,    end: 7,    attention: 1.0, type: 'active' },
+  { id: 't2', job: 'J-004', desc: 'Brochure run',        station: 'Komori', start: 7,    end: 11,   attention: 0.3, type: 'masked' },
+  { id: 't3', job: 'J-001', desc: 'Carte de visite',     station: 'Polar',  start: 7,    end: 8.5,  attention: 0.7, type: 'active' },
+  { id: 't4', job: 'J-003', desc: 'Depliant pliage',     station: 'MBO',    start: 9,    end: 11,   attention: 0.7, type: 'active' },
+  { id: 't5', job: 'J-002', desc: 'Flyer setup',         station: 'Komori', start: 11,   end: 12,   attention: 1.0, type: 'active' },
+  { id: 't6', job: 'J-003', desc: 'Depliant run',        station: 'MBO',    start: 13,   end: 15,   attention: 0.3, type: 'masked' },
+  { id: 't7', job: 'J-006', desc: 'Etiquettes',          station: 'Carton', start: 13,   end: 14.5, attention: 0.5, type: 'active' }
+];
+
+// ── Helpers ──
+function hourToY(hour) {
+  return (hour - TIMELINE_START) * PX_PER_HOUR;
+}
+
+function formatHour(h) {
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+}
+
+function tasksOverlapAt(h) {
+  return tasks.filter(t => t.start <= h && t.end > h);
+}
+
+// Check if two tasks overlap in time
+function overlaps(a, b) {
+  return a.start < b.end && b.start < a.end;
+}
+
+// ── Rendering ──
+function buildTimeline() {
+  const el = document.getElementById('timeline');
+  const totalHeight = (TIMELINE_END - TIMELINE_START) * PX_PER_HOUR;
+  el.style.height = totalHeight + 'px';
+  el.innerHTML = '';
+
+  for (let h = TIMELINE_START; h <= TIMELINE_END; h++) {
+    const y = hourToY(h);
+    const label = document.createElement('div');
+    label.className = 'timeline-hour';
+    label.style.top = y + 'px';
+    label.textContent = formatHour(h);
+    el.appendChild(label);
+
+    const line = document.createElement('div');
+    line.className = 'timeline-line';
+    line.style.top = y + 'px';
+    el.appendChild(line);
+  }
+}
+
+function renderColumn() {
+  const body = document.getElementById('column-body');
+  const totalHeight = (TIMELINE_END - TIMELINE_START) * PX_PER_HOUR;
+  body.style.height = totalHeight + 'px';
+  body.innerHTML = '';
+
+  // Hour gridlines
+  for (let h = TIMELINE_START; h <= TIMELINE_END; h++) {
+    const line = document.createElement('div');
+    line.className = 'hour-gridline';
+    line.style.top = hourToY(h) + 'px';
+    body.appendChild(line);
+  }
+
+  // Hatched zones: before work, lunch, after work
+  addHatchedZone(body, TIMELINE_START, WORK_START, '');
+  addHatchedZone(body, LUNCH_START, LUNCH_END, 'Lunch');
+  addHatchedZone(body, WORK_END, TIMELINE_END, '');
+
+  // Render task tiles
+  tasks.forEach(task => {
+    renderTask(body, task);
+  });
+}
+
+function addHatchedZone(parent, startH, endH, label) {
+  const zone = document.createElement('div');
+  zone.className = 'hatched-zone';
+  zone.style.top = hourToY(startH) + 'px';
+  zone.style.height = (endH - startH) * PX_PER_HOUR + 'px';
+  if (label) {
+    const lbl = document.createElement('div');
+    lbl.className = 'hatched-label';
+    lbl.textContent = label;
+    zone.appendChild(lbl);
+  }
+  parent.appendChild(zone);
+}
+
+function renderTask(parent, task) {
+  const color = STATION_COLORS[task.station];
+  const isMasked = task.type === 'masked';
+
+  // Find overlapping tasks
+  const overlapping = tasks.filter(t => t.id !== task.id && overlaps(t, task));
+  const hasOverlap = overlapping.length > 0;
+
+  // Determine positioning based on mode
+  let left, width, opacity, borderStyle, zIndex;
+  const pad = COL_PAD;
+
+  if (!hasOverlap) {
+    // Full width - no overlap
+    left = pad;
+    width = COL_WIDTH - pad * 2;
+    opacity = isMasked ? 0.6 : 1;
+    borderStyle = 'solid';
+    zIndex = 5;
+  } else if (state.mode === 'split-33-67' || state.mode === 'split-50-50') {
+    const ratio = (state.mode === 'split-33-67') ? state.maskedRatio / 100 : 0.5;
+    const usable = COL_WIDTH - pad * 2;
+    if (isMasked) {
+      left = pad;
+      width = usable * ratio;
+      opacity = 0.6;
+      borderStyle = 'dashed';
+      zIndex = 5;
+    } else {
+      left = pad + (COL_WIDTH - pad * 2) * ((state.mode === 'split-33-67') ? state.maskedRatio / 100 : 0.5);
+      width = (COL_WIDTH - pad * 2) * (1 - ((state.mode === 'split-33-67') ? state.maskedRatio / 100 : 0.5));
+      opacity = 1;
+      borderStyle = 'solid';
+      zIndex = 5;
+    }
+  } else if (state.mode === 'overlap') {
+    left = pad;
+    width = COL_WIDTH - pad * 2;
+    if (isMasked) {
+      opacity = 0.3;
+      borderStyle = 'dashed';
+      zIndex = 4;
+    } else {
+      opacity = 1;
+      borderStyle = 'solid';
+      zIndex = 6;
+    }
+  } else if (state.mode === 'side-gap') {
+    const usable = COL_WIDTH - pad * 2 - 4; // 4px gap
+    if (isMasked) {
+      left = pad;
+      width = usable * 0.48;
+      opacity = 0.6;
+      borderStyle = 'dashed';
+      zIndex = 5;
+    } else {
+      left = pad + usable * 0.48 + 4;
+      width = usable * 0.52;
+      opacity = 1;
+      borderStyle = 'solid';
+      zIndex = 5;
+    }
+  }
+
+  const tile = document.createElement('div');
+  tile.className = 'task-tile';
+  tile.style.top = hourToY(task.start) + 'px';
+  tile.style.height = (task.end - task.start) * PX_PER_HOUR + 'px';
+  tile.style.left = left + 'px';
+  tile.style.width = width + 'px';
+  tile.style.opacity = opacity;
+  tile.style.background = color.bg + (isMasked ? '25' : '30');
+  tile.style.borderLeft = '3px ' + borderStyle + ' ' + color.bg;
+  tile.style.color = color.text;
+  tile.style.zIndex = zIndex;
+
+  // Job label
+  const jobEl = document.createElement('div');
+  jobEl.className = 'tile-job';
+  jobEl.textContent = task.job;
+  tile.appendChild(jobEl);
+
+  // Description
+  const tileHeight = (task.end - task.start) * PX_PER_HOUR;
+  if (tileHeight >= 30) {
+    const descEl = document.createElement('div');
+    descEl.className = 'tile-desc';
+    descEl.textContent = task.desc;
+    tile.appendChild(descEl);
+  }
+
+  // Station label (if enough height)
+  if (tileHeight >= 50) {
+    const stationEl = document.createElement('div');
+    stationEl.className = 'tile-station';
+    stationEl.textContent = task.station;
+    tile.appendChild(stationEl);
+  }
+
+  // Masked badge
+  if (isMasked) {
+    const badge = document.createElement('div');
+    badge.className = 'tile-badge';
+    badge.textContent = '\uD83D\uDC41';
+    tile.appendChild(badge);
+  }
+
+  // Attention value
+  if (state.showAttention) {
+    const att = document.createElement('div');
+    att.className = 'tile-attention';
+    att.textContent = task.attention.toFixed(1);
+    tile.appendChild(att);
+  }
+
+  parent.appendChild(tile);
+}
+
+// ── Controls ──
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+
+  const slider = document.getElementById('ratio-slider');
+  const sliderGroup = document.getElementById('slider-group');
+  if (mode === 'split-33-67') {
+    slider.disabled = false;
+    sliderGroup.style.opacity = '1';
+  } else if (mode === 'split-50-50') {
+    slider.disabled = true;
+    sliderGroup.style.opacity = '0.4';
+  } else {
+    slider.disabled = true;
+    sliderGroup.style.opacity = '0.4';
+  }
+
+  if (mode === 'split-50-50') {
+    state.maskedRatio = 50;
+    slider.value = 50;
+    document.getElementById('ratio-value').textContent = '50%';
+  } else if (mode === 'split-33-67') {
+    // Keep current ratio
+  }
+
+  updateAll();
+}
+
+function onRatioChange(val) {
+  state.maskedRatio = parseInt(val);
+  document.getElementById('ratio-value').textContent = val + '%';
+  updateAll();
+}
+
+function onAttentionToggle(checked) {
+  state.showAttention = checked;
+  updateAll();
+}
+
+// ── Prompt ──
+function updatePrompt() {
+  const parts = [];
+
+  parts.push('For the operator schedule column, display overlapping masked-time tasks using the following layout:');
+
+  if (state.mode === 'split-33-67') {
+    parts.push(`\nWhen a machine is in its run phase (masked time) and the operator has parallel active work, split the column horizontally. The left sub-column (${state.maskedRatio}% width) shows the masked/monitoring task with muted opacity (0.6), a dashed left border, and an eye icon badge. The right sub-column (${100 - state.maskedRatio}% width) shows the active task at full opacity with a solid border.`);
+  } else if (state.mode === 'split-50-50') {
+    parts.push('\nWhen tasks overlap during masked time, split the column into two equal halves (50/50). Left half: masked task with muted styling, dashed border, eye badge. Right half: active task at full opacity.');
+  } else if (state.mode === 'overlap') {
+    parts.push('\nWhen tasks overlap during masked time, render both tiles at full column width. The masked task sits behind at 30% opacity with a dashed border. The active task renders on top at full opacity. This layered approach emphasizes the active work while the monitoring task is visually "behind".');
+  } else if (state.mode === 'side-gap') {
+    parts.push('\nWhen tasks overlap during masked time, place them side by side with a 4px gap. The masked task (48% width, left side) has muted opacity and a dashed border. The active task (48% width, right side) has full opacity. The gap creates clear visual separation.');
+  }
+
+  parts.push('\nWhen only one task occupies a time slot, it takes the full column width regardless of mode.');
+
+  if (state.showAttention) {
+    parts.push('\nDisplay attention values (0.0-1.0) on each tile as a badge in the bottom-right corner. Masked tasks typically show 0.3 (monitoring only), active tasks show 0.5-1.0.');
+  }
+
+  parts.push('\nUse distinct station colors: Komori = blue, Polar = emerald, MBO = amber, Carton = purple. Lunch break and off-hours use a hatched overlay pattern.');
+
+  document.getElementById('prompt-text').textContent = parts.join('');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('prompt-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy Prompt';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// ── Main update ──
+function updateAll() {
+  renderColumn();
+  updatePrompt();
+}
+
+// ── Init ──
+buildTimeline();
+updateAll();
+</script>
+
+</body>
+</html>
