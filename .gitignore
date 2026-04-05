@@ -62,3 +62,4 @@ Thumbs.db
 coverage/
 .nyc_output/
 .claude-marketplace/
+services/scheduling-engine/target/
