@@ -59,27 +59,48 @@
 
 ### Why we rolled back
 
-After implementing Phase 1C (operator Gantt), Phase 2 (Rust engine), and the compute pipeline, we realized the views were disconnected:
-- The station Gantt and operator Gantt were independent pages with no shared data
-- Computed assignments were either not persisted or persisted without operator info
-- The data flow from engine → DB → snapshot → frontend was not designed, just cobbled together
+After implementing Phase 1C (operator Gantt), Phase 2 (Rust engine), and the compute pipeline, we realized the system was incoherent:
+- Station Gantt and operator Gantt were independent pages with no shared data source
+- Computed assignments were persisted without operator info (the `operators[]` from the engine was discarded)
+- The data flow from engine → DB → snapshot → frontend was not designed upfront, just cobbled together
+- The persistence step (saving computed assignments as TaskAssignment records) wasn't in the original plan — it was discovered during implementation
+- Station filtering (hide Maintenance stations) was an afterthought
 
-Julien asked to roll back to Phase 1B (test data) and redesign properly.
+Julien asked to roll back to Phase 1B (test data) and redesign the architecture before reimplementing.
 
-### Unified model decision
+### Key decisions after rethink
 
-**`operatorId` on TaskAssignment** (not a separate entity):
-- One operator per task for MVP — sufficient for the scheduling algorithm
-- Both Gantt views read from the same TaskAssignment data
-- Station view groups by `targetId`, operator view groups by `operatorId`
-- Simpler than a separate OperatorAssignment table
-- Nullable: manual assignments (pre-compute) have no operator
+**1. `operators` array on TaskAssignment** (not a single operatorId, not a separate entity):
+- Array of `{operatorId, attention}` — supports multi-operator machines (Hohner needs 2 operators)
+- Stored in the existing JSON column on the Schedule entity — zero DB migration
+- Both Gantt views derive from the same TaskAssignment data
+- Empty array = no operator assigned (manual placement or outsourced task)
+- Backward compatible: existing assignments without `operators` default to empty array
 
-**`operators[]` in ScheduleSnapshot**:
+**2. `operators[]` in ScheduleSnapshot**:
 - Single snapshot feeds all views (station Gantt, operator Gantt, flux)
 - No separate API call for operator data in scheduling context
+- The snapshot is the ONLY data source for all scheduling views
 
-**Toggle, not separate pages**:
-- "Stations | Opérateurs" tab bar in the toolbar
-- Same timeline, zoom, scroll — columns change
-- Both views react to the same snapshot updates
+**3. Two pages, not a toggle** (revised from initial "toggle" idea):
+- The SchedulingGrid component is 700+ lines, deeply coupled to stations (StationColumn, StationHeader, drag & drop, pick & place, virtual scroll)
+- Making it generic for both stations and operators is a risky, large refactor
+- Two separate pages sharing reusable sub-components (TimelineColumn, Tile, UnavailabilityOverlay) is cleaner
+- Both pages read the same snapshot → always synchronized
+- Navigation via sidebar buttons
+- "Calculer" button on both pages → snapshot updates → both pages reflect the change
+
+**4. Compute replaces the schedule (no confirmation)**:
+- "Calculer" clears non-pinned, non-completed assignments (same as Ctrl+Alt+Z) then inserts computed ones
+- Pinned and completed tiles are preserved
+- No confirmation dialog — the user expects the compute to produce a new schedule
+
+**5. Multi-operator tile display**:
+- Operator names comma-separated on the tile: "Paul, Emma"
+- Station Gantt tiles show operator names; operator Gantt tiles show station name
+- A task with 2 operators appears as a tile in BOTH operator columns
+
+**6. Validator unchanged for MVP**:
+- Existing validator checks station conflicts (capacity, availability, precedence)
+- Operator double-booking is handled by the Rust engine, not the validator
+- Post-MVP: add operator conflict type to the validator
