@@ -54,3 +54,32 @@
 3. **Real data first** — no minimal demo with hardcoded data
 4. **Pre-split approach** preserved as agreed in the analysis
 5. **Proficiency UI** = slider with magnetic snap, not checkbox, grouped by category
+
+## Architectural rethink (2026-04-05)
+
+### Why we rolled back
+
+After implementing Phase 1C (operator Gantt), Phase 2 (Rust engine), and the compute pipeline, we realized the views were disconnected:
+- The station Gantt and operator Gantt were independent pages with no shared data
+- Computed assignments were either not persisted or persisted without operator info
+- The data flow from engine → DB → snapshot → frontend was not designed, just cobbled together
+
+Julien asked to roll back to Phase 1B (test data) and redesign properly.
+
+### Unified model decision
+
+**`operatorId` on TaskAssignment** (not a separate entity):
+- One operator per task for MVP — sufficient for the scheduling algorithm
+- Both Gantt views read from the same TaskAssignment data
+- Station view groups by `targetId`, operator view groups by `operatorId`
+- Simpler than a separate OperatorAssignment table
+- Nullable: manual assignments (pre-compute) have no operator
+
+**`operators[]` in ScheduleSnapshot**:
+- Single snapshot feeds all views (station Gantt, operator Gantt, flux)
+- No separate API call for operator data in scheduling context
+
+**Toggle, not separate pages**:
+- "Stations | Opérateurs" tab bar in the toolbar
+- Same timeline, zoom, scroll — columns change
+- Both views react to the same snapshot updates

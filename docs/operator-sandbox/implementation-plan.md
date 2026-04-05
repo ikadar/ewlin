@@ -315,31 +315,44 @@ Repeat until sum(ART) = 0:
   T = T + 1
 ```
 
-#### 2.4 — Schedule output
-- Assignments compatible with existing TaskAssignment structure, enriched with operator info
-- Statistics: makespan, utilization per machine, utilization per operator, deadline violations, degraded mode occurrences
+#### 2.4 — Schedule output and persistence
 
-#### 2.6 — UI: Computed schedule viewer
+The Rust engine returns `ComputedAssignment[]` with operator info. The PHP API persists them:
 
-**Station Gantt (enriched):**
-- "Compute Schedule" button → calls PHP API → Rust engine → displays result
-- Gantt reuses existing SchedulingGrid, fed with computed assignments
-- New overlays on tiles:
-  - Operator name(s) on each tile
-  - Visual distinction: setup phase vs run phase
-  - Color indicator for degraded mode
+1. Clear non-pinned, non-completed assignments from the Schedule entity
+2. For each computed assignment: create `TaskAssignment` with `operatorId` set
+3. Update task statuses to Assigned
+4. Flush to DB
 
-**Operator Gantt (new screen):**
-- Same structure as the existing station SchedulingGrid, but one column per operator
-- Each time slot shows: which machine the operator is on, which action, setup/run phase
-- Attention level visualization per slot (e.g., fill bar or opacity — 0.3 = light, 1.0 = full)
-- Degraded mode indicator on affected slots
-- Free slots visible (unallocated attention = available capacity)
+**Key data model decision:** `operatorId` (nullable) is added directly to the `TaskAssignment` value object. This is the simplest change that enables both Gantt views to read from the same data. One operator per task for MVP.
+
+**No separate OperatorAssignment entity** — both station and operator Gantt views derive from the same `TaskAssignment` data in the Schedule entity. The `assignments` array in the snapshot includes `operatorId` for each item.
+
+**Snapshot extension:** `operators[]` (all operators with skills + schedules) is added to the `ScheduleSnapshot` DTO so the frontend has operator data without a separate fetch.
+
+#### 2.6 — UI: Unified station/operator views
+
+**Single page with toggle:** The scheduling view has a tab bar "Stations | Opérateurs" in the toolbar. Both views share the same timeline, zoom, and scroll position.
+
+**Station view (default, enhanced):**
+- Groups assignments by `targetId` (station) — existing behavior
+- Each tile shows an **operator badge** (first name or initials) from `assignment.operatorId`
+- If `operatorId` is null, no badge (manual assignment without operator)
+- Only active stations shown (status=Available)
+
+**Operator view (new):**
+- Same SchedulingGrid component but columns = operators instead of stations
+- Groups assignments by `operatorId`
+- Each tile shows the **station name** instead of operator name
+- Operator availability overlay (hatched for non-working hours, same as station UnavailabilityOverlay)
+- Assignments with `operatorId=null` do not appear in this view
+
+**"Calculer" button:** Blue FAB that triggers `POST /api/v1/schedule/compute`. Shows result modal with stats. Both views refresh automatically via snapshot invalidation.
 
 **Statistics panel:**
 - Machine utilization, operator utilization, deadline status
 
-**⚠ UI/UX gate:** Before implementing frontend changes, create **playgrounds** to validate: (1) enriched station Gantt tile overlays, (2) operator Gantt layout and attention visualization, (3) statistics panel layout. Validate each with Julien.
+**⚠ UI/UX gate:** Before implementing frontend changes, create **playgrounds** to validate: (1) tile with operator badge, (2) operator Gantt layout, (3) station/operator toggle. Validate each with Julien.
 
 **Validation criteria:**
 - Algorithm produces a complete schedule for 1,000+ actions in < 10 seconds
@@ -480,7 +493,37 @@ scheduling_constraints (new table)
   updated_at: datetime_immutable
 ```
 
-### 6.4 — Schedule Output (Rust engine response, not persisted as-is)
+### 6.4 — TaskAssignment extension (operatorId)
+
+The existing `TaskAssignment` value object (stored as JSON in the `Schedule` entity) gains a nullable `operatorId`:
+
+```
+TaskAssignment (existing VO, extended) {
+  taskId: string
+  targetId: string          // station or provider ID
+  isOutsourced: boolean
+  scheduledStart: datetime
+  scheduledEnd: datetime
+  operatorId: string|null   // ← NEW: operator assigned by the scheduling engine
+  isCompleted: boolean
+  isPinned: boolean
+}
+```
+
+No DB migration needed — assignments are stored as JSON in the Schedule entity. The new field is nullable for backward compatibility with existing assignments.
+
+### 6.5 — ScheduleSnapshot extension (operators)
+
+The ScheduleSnapshot DTO gains `operators[]` so both Gantt views have all the data they need:
+
+```
+ScheduleSnapshot {
+  // existing: stations, categories, groups, providers, jobs, elements, tasks, assignments, conflicts, lateJobs
+  operators: Operator[]     // ← NEW: all operators with skills + schedules
+}
+```
+
+### 6.6 — Schedule Output (Rust engine response)
 
 ```
 // Rust engine input
@@ -636,6 +679,11 @@ Rust engine exposes only: `POST /compute` (called by PHP API, not by frontend).
 | Operator totalAttention | Always 1.0, not configurable | Operator attention budget is constant. Part-time = fewer hours (schedule), not less attention |
 | Operator identity | firstName + lastName + role | Split from single `name` field. Role is optional (e.g. "Conducteur offset") |
 | Run phase productivity (no masked time) | Proportional: min(attention_received / attentionRun, 1.0) | Uses `attentionRun` field on station — separate from masked time attention |
+| Operator on TaskAssignment | Nullable `operatorId` on existing TaskAssignment VO | One operator per task (MVP). Both Gantt views read from the same data. No separate entity needed yet. |
+| Single snapshot for all views | `operators[]` added to ScheduleSnapshot | Station Gantt, operator Gantt, and flux page all read from one snapshot. No separate operator fetch. |
+| Station/Operator toggle | Tab bar on the main scheduling view | Not a separate route — same page, same timeline, same scroll. Columns switch from stations to operators. |
+| Compute → persist | PHP clears non-pinned assignments, creates new ones with operatorId | Schedule entity is the single source of truth. Engine output is persisted, not transient. |
+| Validator unchanged for MVP | Engine handles operator conflicts | Validator continues to check station-level conflicts only. Operator double-booking is prevented by the engine. |
 
 ---
 
