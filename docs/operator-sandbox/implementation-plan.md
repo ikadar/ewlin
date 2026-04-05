@@ -279,15 +279,23 @@ Content-Type: application/json
 #### 2.3 — Forward pass (chronological scheduling)
 The full algorithm as described in the PDF:
 
+**Guarantee: the algorithm places 100% of tasks.** It runs until `sum(ART) = 0` — no early exit, no "unscheduled tasks". The grid is **dynamic** (starts at 14 days, extends by 7 as needed). The schedule duration is exactly as long as needed — no arbitrary cutoff. Tasks may be late, but they are ALL placed.
+
 ```
 T = 0
-Repeat until sum(ART) = 0:
+Repeat until sum(ART) = 0:       // ← NEVER exits early. All tasks placed.
   Repeat until no eligible action can be assigned:
     Score eligible actions:
-      score = calage bonus (count of matched SimilarityCriteria between
-              the action's element spec and the last action on this machine,
-              using the station category's criteria list)
-      If LAST = T → score = 9999 (deadline emergency)
+      // Continuous urgency (replaces binary LAST=T → 9999)
+      slack = LAST - T - remaining_ART
+      If slack <= 0: urgency = 10000 + |slack|     // Late: more late = more urgent
+      Else: urgency = (1 - slack / horizon) × 1000 // Approaching: gradual escalation
+      
+      // Job-level urgency boost
+      job_slack = job_deadline - T - sum(remaining_ART for all tasks in job)
+      If job_slack < 0: job_boost = |job_slack| × 50
+      
+      score = urgency + job_boost + calage_bonus
     Sort by score DESC
     For each eligible action (in score order):
       Check: machine available? operator available? attention sufficient?
@@ -741,6 +749,11 @@ Rust engine exposes only: `POST /compute` (called by PHP API, not by frontend).
 | Compute: no confirmation | "Calculer" immediately replaces the schedule | Non-pinned/non-completed assignments are cleared. Pinned and completed tiles are preserved. |
 | Validator unchanged for MVP | Engine handles operator conflicts | Validator continues to check station-level conflicts only. Operator double-booking is prevented by the engine. |
 | Multi-operator tile display | Operator names comma-separated | "Paul, Emma" on the tile. Station Gantt shows operator names; operator Gantt shows station name. |
+| 100% placement guarantee | Algorithm NEVER leaves tasks unscheduled | Runs until sum(ART)=0. Dynamic grid (starts 14 days, grows by 7 as needed). Tasks may be late but are ALL placed. |
+| Dynamic schedule duration | No fixed horizon — schedule is as long as needed | Grid extends automatically when tasks remain. Result could be 3 days or 45 days. No arbitrary cutoff. |
+| Scoring: continuous urgency | Replaces binary LAST=T → 9999 | Gradual escalation: urgency = f(slack). Late tasks get urgency > 10000 proportional to how late they are. |
+| Scoring: job-level urgency | Job slack propagates to all remaining tasks | If a job is globally behind, ALL its remaining tasks get boosted — not just the one whose LAST approaches. |
+| Masked time visual | Badge icon on tile (not pattern/opacity) | Small icon (👁) in corner of tile during masked time run phase. Discreet, low visual noise. |
 
 ---
 
