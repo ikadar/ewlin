@@ -87,12 +87,13 @@ impl ScheduleGrid {
         &mut self,
         operator: usize,
         t: usize,
-        station: usize,
+        _station: usize,
         attention: f64,
     ) {
         if t < self.num_ticks && operator < self.num_operators {
-            self.operator_station[operator * self.num_ticks + t] = Some(station);
-            self.operator_attention[operator * self.num_ticks + t] = attention;
+            // ADD attention (not set) — an operator can work on multiple stations
+            // at the same tick (e.g., monitoring a masked station + active work on another)
+            self.operator_attention[operator * self.num_ticks + t] += attention;
         }
     }
 
