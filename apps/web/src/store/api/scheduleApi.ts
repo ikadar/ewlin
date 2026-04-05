@@ -885,14 +885,26 @@ export const scheduleApi = createApi({
  * Result returned by the schedule computation endpoint.
  */
 export interface ComputeScheduleResult {
-  /** Number of tasks placed by the engine */
-  placedCount: number;
-  /** Number of tasks that could not be placed */
-  unplacedCount: number;
-  /** Computation time in milliseconds */
-  computeMs: number;
-  /** Human-readable summary */
-  summary?: string;
+  assignments: Array<{
+    taskId: string;
+    stationId: string;
+    scheduledStart: string;
+    scheduledEnd: string;
+    operators: Array<{ operatorId: string; from: string; to: string; attention: number }>;
+    isDegraded: boolean;
+    effectiveProductivity: number;
+  }>;
+  stats: {
+    makespanMinutes: number;
+    totalTasks: number;
+    scheduledTasks: number;
+    deadlineViolations: number;
+    lateTaskCount: number;
+    totalLatenessMinutes: number;
+  };
+  warnings: Array<{ taskId: string | null; message: string }>;
+  fbiIterations: number;
+  computeTimeMs: number;
 }
 
 // ============================================================================

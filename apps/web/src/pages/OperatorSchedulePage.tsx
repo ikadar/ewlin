@@ -402,11 +402,15 @@ export default function OperatorSchedulePage() {
               Calcul terminé
             </h2>
             <div className="space-y-2 text-sm text-flux-text-secondary mb-6">
-              <p>Tâches placées : <span className="text-flux-text-primary font-mono">{computeResult.placedCount}</span></p>
-              <p>Tâches non placées : <span className="text-flux-text-primary font-mono">{computeResult.unplacedCount}</span></p>
-              <p>Temps de calcul : <span className="text-flux-text-primary font-mono">{computeResult.computeMs}ms</span></p>
-              {computeResult.summary && (
-                <p className="pt-2 text-flux-text-muted">{computeResult.summary}</p>
+              <p>Tâches placées : <span className="text-flux-text-primary font-mono">{computeResult.stats.scheduledTasks} / {computeResult.stats.totalTasks}</span></p>
+              <p>Retard : <span className="text-flux-text-primary font-mono">{computeResult.stats.lateTaskCount} tâche(s), {computeResult.stats.totalLatenessMinutes}min</span></p>
+              <p>Temps de calcul : <span className="text-flux-text-primary font-mono">{computeResult.computeTimeMs}ms</span></p>
+              {computeResult.warnings.length > 0 && (
+                <div className="pt-2 border-t border-flux-border mt-2">
+                  {computeResult.warnings.slice(0, 3).map((w, i) => (
+                    <p key={i} className="text-amber-400 text-xs">{w.message}</p>
+                  ))}
+                </div>
               )}
             </div>
             <div className="flex justify-end">
