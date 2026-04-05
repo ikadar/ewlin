@@ -261,5 +261,6 @@ export function createOutsourcingDragFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

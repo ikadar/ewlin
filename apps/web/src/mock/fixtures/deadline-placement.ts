@@ -105,5 +105,6 @@ export function createDeadlinePlacementFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

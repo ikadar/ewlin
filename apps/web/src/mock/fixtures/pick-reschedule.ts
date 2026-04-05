@@ -224,5 +224,6 @@ export function createPickRescheduleFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

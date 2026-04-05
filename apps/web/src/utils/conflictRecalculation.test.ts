@@ -105,6 +105,7 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
     assignments: [],
     conflicts: [],
     lateJobs: [],
+    operators: [],
     ...overrides,
   };
 }

@@ -146,5 +146,6 @@ export function createDatestripRedesignFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

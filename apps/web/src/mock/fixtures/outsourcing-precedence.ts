@@ -402,5 +402,6 @@ export function createOutsourcingPrecedenceFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

@@ -81,5 +81,6 @@ export function createZoomSnappingFixture(): ScheduleSnapshot {
     assignments: [],
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

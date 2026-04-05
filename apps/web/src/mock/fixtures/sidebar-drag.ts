@@ -90,5 +90,6 @@ export function createSidebarDragFixture(): ScheduleSnapshot {
     assignments: [], // No assignments - task is unscheduled
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

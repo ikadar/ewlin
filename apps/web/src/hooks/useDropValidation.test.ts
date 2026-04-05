@@ -104,6 +104,7 @@ const mockSnapshot: ScheduleSnapshot = {
   providers: [],
   lateJobs: [],
   conflicts: [],
+  operators: [],
 };
 
 describe('useDropValidation', () => {

@@ -309,5 +309,6 @@ export function createOutsourcingMiniFormFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

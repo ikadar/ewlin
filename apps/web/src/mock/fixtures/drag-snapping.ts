@@ -83,5 +83,6 @@ export function createDragSnappingFixture(): ScheduleSnapshot {
     assignments: [],
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

@@ -91,5 +91,6 @@ export function createPrecedenceFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

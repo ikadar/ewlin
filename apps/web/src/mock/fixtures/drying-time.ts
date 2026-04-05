@@ -96,5 +96,6 @@ export function createDryingTimeFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

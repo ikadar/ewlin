@@ -281,6 +281,7 @@ function AppContent() {
         assignments: [],
         conflicts: [],
         lateJobs: [],
+        operators: [],
       },
     [snapshotData],
   );

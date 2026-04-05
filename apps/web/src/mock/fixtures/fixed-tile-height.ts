@@ -162,5 +162,6 @@ export function createFixedTileHeightFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

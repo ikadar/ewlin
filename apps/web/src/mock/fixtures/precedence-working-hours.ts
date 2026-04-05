@@ -156,5 +156,6 @@ export function createPrecedenceWorkingHoursFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

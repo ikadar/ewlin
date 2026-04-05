@@ -93,5 +93,6 @@ export function createAltBypassFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

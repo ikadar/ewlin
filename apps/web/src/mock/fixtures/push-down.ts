@@ -175,5 +175,6 @@ export function createPushDownFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

@@ -22,6 +22,7 @@ const emptySnapshot: ScheduleSnapshot = {
   assignments: [],
   conflicts: [],
   lateJobs: [],
+  operators: [],
 };
 
 // Mock the snapshot module

@@ -330,5 +330,6 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

@@ -179,5 +179,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

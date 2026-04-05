@@ -274,5 +274,6 @@ export function createFormeDateTrackingFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

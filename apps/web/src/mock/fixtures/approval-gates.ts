@@ -186,5 +186,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
     assignments: [],
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

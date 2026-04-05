@@ -62,6 +62,7 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
     assignments: assignmentData.assignments,
     conflicts: assignmentData.conflicts,
     lateJobs,
+    operators: [],
   };
 
   return snapshot;

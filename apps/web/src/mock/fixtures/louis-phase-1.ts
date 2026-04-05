@@ -72,5 +72,6 @@ export function createLouisPhase1Fixture(): ScheduleSnapshot {
         assignments: [],
         conflicts: [],
         lateJobs: [],
+        operators: [],
     };
 }

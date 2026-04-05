@@ -169,5 +169,6 @@ export function createContextMenuFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

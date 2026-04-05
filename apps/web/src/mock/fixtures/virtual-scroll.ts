@@ -176,5 +176,6 @@ export function createVirtualScrollFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

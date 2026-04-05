@@ -191,6 +191,7 @@ export function baseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'elements' | 'ta
     categories,
     groups,
     providers,
+    operators: [],
   };
 }
 

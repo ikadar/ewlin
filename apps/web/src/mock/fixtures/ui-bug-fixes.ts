@@ -188,5 +188,6 @@ export function createUiBugFixesFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

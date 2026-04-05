@@ -198,5 +198,6 @@ export function createPickPlaceFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

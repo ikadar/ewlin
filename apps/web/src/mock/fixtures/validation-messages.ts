@@ -152,5 +152,6 @@ export function createValidationMessagesFixture(): ScheduleSnapshot {
     assignments,
     conflicts: [],
     lateJobs: [],
+    operators: [],
   };
 }

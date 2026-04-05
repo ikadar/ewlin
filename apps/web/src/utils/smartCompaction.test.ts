@@ -40,6 +40,7 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
     assignments: [],
     lateJobs: [],
     conflicts: [],
+    operators: [],
     ...overrides,
   };
 }
