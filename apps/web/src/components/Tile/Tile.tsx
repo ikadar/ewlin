@@ -298,7 +298,13 @@ export const Tile = memo(function Tile({
         {operatorNames && (
           <div className="text-[9px] text-zinc-400 truncate mt-0.5 leading-tight">
             {operatorNames}
+            {assignment.isMaskedTime && (
+              <span className="text-[9px] text-amber-400 ml-1" title="Temps masqué">👁</span>
+            )}
           </div>
+        )}
+        {!operatorNames && assignment.isMaskedTime && (
+          <div className="text-[9px] text-amber-400 mt-0.5 leading-tight" title="Temps masqué">👁</div>
         )}
       </div>
 

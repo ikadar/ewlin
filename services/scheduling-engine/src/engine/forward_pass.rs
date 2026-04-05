@@ -29,6 +29,8 @@ pub struct Action {
     pub end_tick: Option<usize>,
     pub assigned_operators: Vec<(usize, f64)>, // [(operator_idx, attention)]
     pub start_tick: Option<usize>,
+    /// Chunk info: Some((chunk_number, total_chunks, original_task_id)) for pre-split chunks
+    pub chunk_info: Option<(u32, u32, String)>,
 }
 
 /// Manages operator availability with dynamic extension
@@ -499,6 +501,7 @@ fn schedule_action_to_completion(
         setup_end: setup_end_minutes.map(|m| super::format_minutes(m, start_date)),
         is_degraded,
         effective_productivity: (avg_productivity * 100.0).round() / 100.0,
+        is_masked_time: false, // Set in post-processing by compute()
     })
 }
 

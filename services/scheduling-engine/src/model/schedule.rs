@@ -73,6 +73,9 @@ pub struct ComputedAssignment {
     pub is_degraded: bool,
     #[serde(default = "default_productivity")]
     pub effective_productivity: f64,
+    /// True if the task ran in masked time mode on its station
+    #[serde(default)]
+    pub is_masked_time: bool,
 }
 
 fn default_productivity() -> f64 {
