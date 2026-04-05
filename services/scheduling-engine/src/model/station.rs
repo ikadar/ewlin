@@ -18,6 +18,12 @@ pub struct StationInput {
     pub category_id: Option<String>,
     #[serde(default)]
     pub similarity_criteria: Option<Vec<SimilarityCriterion>>,
+    /// Whether this station is a press (requires drying time after printing)
+    #[serde(default)]
+    pub is_press: bool,
+    /// Drying time in minutes after printing on this station (default: 240 = 4h)
+    #[serde(default = "default_drying_time")]
+    pub drying_time_minutes: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +33,8 @@ pub struct SimilarityCriterion {
     pub name: Option<String>,
     pub field_path: Option<String>,
 }
+
+fn default_drying_time() -> u32 { 240 }
 
 impl StationInput {
     pub fn effective_tick_minutes(&self) -> u32 {

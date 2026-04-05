@@ -25,6 +25,7 @@ pub struct Action {
     pub eat: u32,  // Elapsed Action Time (in ticks)
     pub last: u64, // LAST value in ticks
     pub predecessor_idx: Option<usize>,
+    pub predecessor_gap_ticks: u32, // Drying time gap after predecessor (e.g. 4h after printing)
     pub end_tick: Option<usize>,
     pub assigned_operators: Vec<(usize, f64)>, // [(operator_idx, attention)]
     pub start_tick: Option<usize>,
@@ -261,9 +262,10 @@ pub fn run_forward_pass(
 
                 // Predecessor must be done (end_tick set) and finished by now
                 if let Some(pred_idx) = action.predecessor_idx {
+                    let gap = actions[i].predecessor_gap_ticks as usize;
                     match actions[pred_idx].end_tick {
-                        Some(pred_end) if pred_end <= t => {} // OK
-                        _ => continue,                        // Not ready
+                        Some(pred_end) if pred_end + gap <= t => {} // OK (including drying time)
+                        _ => continue,                              // Not ready
                     }
                 }
 

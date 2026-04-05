@@ -102,6 +102,7 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
     // Build actions from jobs
     let mut actions = build_actions(
         &request.jobs,
+        &request.stations,
         &station_id_to_idx,
         tick_minutes,
         &last_values,
@@ -164,6 +165,7 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
 
 fn build_actions(
     jobs: &[JobInput],
+    stations: &[StationInput],
     station_id_to_idx: &HashMap<String, usize>,
     tick_minutes: u32,
     last_values: &HashMap<String, u64>,
@@ -193,6 +195,19 @@ fn build_actions(
                     .as_ref()
                     .and_then(|pid| task_id_to_action_idx.get(pid).copied());
 
+                // Drying time: if predecessor is on a press, add drying gap
+                let predecessor_gap_ticks = match predecessor_idx {
+                    Some(pred_idx) => {
+                        let pred_station = actions[pred_idx].station_idx;
+                        if pred_station < stations.len() && stations[pred_station].is_press {
+                            minutes_to_ticks(stations[pred_station].drying_time_minutes, tick_minutes)
+                        } else {
+                            0
+                        }
+                    }
+                    None => 0,
+                };
+
                 let last = last_values.get(&task.id).copied().unwrap_or(u64::MAX);
 
                 let idx = actions.len();
@@ -207,6 +222,7 @@ fn build_actions(
                     eat: 0,
                     last,
                     predecessor_idx,
+                    predecessor_gap_ticks,
                     end_tick: None,
                     assigned_operators: Vec::new(),
                     start_tick: None,
