@@ -238,7 +238,15 @@ fn remap_assignments(
     raw_assignments
         .into_iter()
         .map(|mut a| {
-            // Remap operator IDs: forward_pass stores indices as strings like "op_idx:3"
+            // Remap station ID: forward_pass stores indices as "station_idx:N"
+            if let Some(idx_str) = a.station_id.strip_prefix("station_idx:") {
+                if let Ok(idx) = idx_str.parse::<usize>() {
+                    if idx < stations.len() {
+                        a.station_id = stations[idx].id.clone();
+                    }
+                }
+            }
+            // Remap operator IDs: forward_pass stores indices as "op_idx:N"
             a.operators = a
                 .operators
                 .into_iter()
