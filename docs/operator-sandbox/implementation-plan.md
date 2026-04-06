@@ -266,15 +266,47 @@ Content-Type: application/json
 }
 ```
 
-#### 2.2 — Backward pass (LAST computation)
-- Sort jobs by deadline DESC
-- For each job, reverse the element → task dependency chain
-- Walk backward from deadline, compute LAST for each action accounting for:
-  - Machine operating schedule (skip closed slots)
-  - Operator availability (at least one qualified operator on shift)
-  - Task duration (setup + run)
-  - Predecessor chain
-  - Outsourced tasks as delay nodes (precedence gap, no machine/operator)
+#### 2.2 — Backward pass (LAST computation) — Reverse Forward Pass
+
+The backward pass is a **reverse forward pass**: same grid, same operator/attention mechanics, running backward from deadlines toward t=0. It produces a `HashMap<task_id, LAST_tick>` giving the latest allowable start tick for each task.
+
+**Deadline priority tiers** control the processing order. Jobs are grouped by `deadlinePriority`:
+
+| Tier | Value | Meaning | Backward pass behavior |
+|------|-------|---------|------------------------|
+| `imperative` | 0 | Contractual, penalties if late | Placed FIRST — reserves the best capacity |
+| `important` | 1 | Client expects, commercial risk | Placed SECOND — works around imperative reservations |
+| `standard` | 2 | Normal target (default) | Placed THIRD |
+| `flexible` | 3 | Fill work, no real deadline | Gets whatever capacity remains |
+
+Within each tier, tasks are scored by **dynamic critical ratio**:
+
+```
+remaining_chain_work = ART(task) + ART(predecessors not yet placed)
+available_working_ticks = working ticks from current reverse-tick to t=0
+    (counting only ticks where qualified operators are available for this station)
+ratio = remaining_chain_work / available_working_ticks
+
+score = if ratio >= 1.0: 10000 + (ratio - 1.0) × 1000   // infeasible
+        else: ratio × 1000                                 // tighter = higher
+score += calage_bonus (+100 if same job preceded on this station)
+```
+
+The backward pass inner loop mirrors the forward pass: score → pick best → place backward (occupy grid + operator attention) → re-score at same tick → advance (decrement t) when nothing more fits.
+
+**Key properties:**
+- The grid captures inter-job contention: when Job A's press task occupies ticks 90-100, Job B must place earlier
+- Operator attention is committed on the grid: degraded mode (partial attention) is modeled exactly
+- The scoring is dynamic: recalculated at each tick as the grid fills and remaining work changes
+- The forward pass is UNCHANGED — it sees only LAST values and scores by urgency as before
+- Imperative jobs get realistic (not overly pessimistic) LAST values because they're placed first
+
+**FBI feedback (iteration N ≥ 2):** The backward pass receives `end_ticks` from the previous forward pass and blends them with the ratio-based LAST using progressive damping:
+```
+alpha = 0.0 (iter 1), 0.5 (iter 2), 0.7 (iter 3), 0.8 (iter 4+)
+LAST = alpha × prev_forward_end + (1-alpha) × ratio_based_LAST
+```
+This converges toward a fixed point where backward and forward passes agree on task timing.
 
 #### 2.3 — Forward pass (chronological scheduling)
 The full algorithm as described in the PDF:
@@ -441,9 +473,10 @@ Single snapshot feeds station Gantt, operator Gantt, and flux page. No separate 
 
 #### 3.2 — FBI (Feedback-Based Improvement, inside Rust engine)
 - Run the full algorithm (backward + forward)
-- Collect actual durations from the schedule (including degraded mode slowdowns, re-setups)
-- Feed actual durations back as inputs to run N+1
-- The backward pass recomputes LAST with realistic durations → different priorities → different schedule
+- Collect actual end_ticks and durations from the forward pass
+- Feed back to the backward pass on iteration N+1:
+  - **Duration overrides:** actual durations replace planned durations when degraded mode made tasks slower
+  - **End_tick feedback (D-mechanism):** the backward pass blends its ratio-based LAST with the previous forward pass's actual end_ticks using progressive damping: α=0.5 (iter 2), 0.7 (iter 3), 0.8 (iter 4+). This converges toward a fixed point where both passes agree on task timing.
 - Repeat until convergence (< 1% change in makespan) or max 5 iterations
 
 #### 3.3 — UI enhancements
@@ -514,6 +547,18 @@ stations (existing table)
   + peremption_threshold_minutes: smallint, nullable, default null
   + max_chunk_minutes: smallint, nullable, default null
 ```
+
+### 6.1b — Deadline Priority on Jobs
+
+New column on existing `jobs` table:
+
+```
+jobs (existing table)
+  + deadline_priority: tinyint, not null, default 2
+    -- 0=imperative, 1=important, 2=standard, 3=flexible
+```
+
+Passed to the Rust engine as `deadlinePriority` on `JobInput`. The backward pass uses this to determine the processing order: imperative jobs are placed first on the backward grid, reserving the best operator/station capacity. The forward pass does not use this field — it scores purely by LAST-based urgency.
 
 ### 6.2 — Operator (Phase 1B)
 

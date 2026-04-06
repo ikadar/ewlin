@@ -9,6 +9,7 @@ use super::grid::ScheduleGrid;
 pub struct StationAttrs {
     pub attention_full: f64,
     pub attention_run: f64,
+    pub max_run_attention: f64,
     pub masked_time_enabled: bool,
     pub attention_masked: f64,
     pub masked_productivity: f64,
@@ -32,6 +33,8 @@ pub struct Action {
     pub start_tick: Option<usize>,
     /// Chunk info: Some((chunk_number, total_chunks, original_task_id)) for pre-split chunks
     pub chunk_info: Option<(u32, u32, String)>,
+    /// Deadline priority tier: 0=imperative, 1=important, 2=standard, 3=flexible
+    pub deadline_priority: u8,
 }
 
 /// Manages operator availability with dynamic extension
@@ -152,7 +155,7 @@ struct ScoredAction {
 
 /// Find operators capable of staffing a station at tick t.
 /// Returns Vec<(operator_idx, attention_to_give)> or empty if insufficient.
-fn find_operators_for_station(
+pub fn find_operators_for_station(
     grid: &ScheduleGrid,
     t: usize,
     station_idx: usize,
@@ -382,6 +385,8 @@ fn schedule_action_to_completion(
     actions[action_idx].start_tick = Some(start_t);
     actions[action_idx].assigned_operators = initial_operators.to_vec();
 
+    let mut work_accumulator: f64 = 0.0;
+
     while actions[action_idx].art > 0 {
         // Ensure grid is large enough
         if current_t >= grid.num_ticks {
@@ -399,13 +404,63 @@ fn schedule_action_to_completion(
 
         // Find operators for this tick
         let in_setup = actions[action_idx].eat < setup_ticks;
+
+        // Masked time pre-fill: when setup ends on a masked station,
+        // pre-fill the entire run phase and return immediately.
+        // This frees operator attention for the main loop to assign other tasks.
+        if !in_setup && attrs.masked_time_enabled {
+            let work_ticks = actions[action_idx].art as usize;
+            // Masked productivity < 1.0 means the machine runs slower.
+            // E.g., 90min of work at productivity 0.95 takes ceil(90/0.95) = 95min.
+            let actual_ticks = if attrs.masked_productivity > 0.001 {
+                ((work_ticks as f64) / attrs.masked_productivity).ceil() as usize
+            } else {
+                work_ticks
+            };
+
+            // Ensure grid can hold all actual ticks
+            while current_t + actual_ticks > grid.num_ticks {
+                grid.grow(grow_ticks);
+                operator_availability.extend(grow_ticks);
+            }
+
+            // Lock operators for masked monitoring at current tick
+            let masked_ops = find_operators_for_station(
+                grid, current_t, station_idx,
+                attrs.attention_masked, operator_skills, operator_availability,
+            );
+
+            // Pre-fill station and operator grids for the stretched duration
+            for delta in 0..actual_ticks {
+                let fill_t = current_t + delta;
+                grid.assign_station(station_idx, fill_t, action_idx);
+                for &(op_idx, attn) in &masked_ops {
+                    if operator_availability.is_available(op_idx, fill_t) {
+                        grid.assign_operator(op_idx, fill_t, station_idx, attn);
+                    }
+                }
+                tick_operator_log.push((fill_t, masked_ops.clone()));
+            }
+
+            // Mark action as complete
+            actions[action_idx].eat += actual_ticks as u32;
+            actions[action_idx].art = 0;
+            total_productivity += attrs.masked_productivity * actual_ticks as f64;
+            ticks_counted += actual_ticks as u32;
+            current_t += actual_ticks - 1;
+
+            if attrs.masked_productivity < 0.99 {
+                is_degraded = true;
+            }
+
+            break; // Exit sub-loop, action complete
+        }
+
         let attention_needed = if in_setup {
             attrs.attention_full
-        } else if attrs.masked_time_enabled {
-            // Masked time: reduced attention (e.g. 0.3), operator monitors but is partially freed
-            attrs.attention_masked
         } else {
-            attrs.attention_run
+            // Non-masked run phase: request max for parallelizable stations
+            attrs.max_run_attention
         };
 
         let operators_this_tick = if attention_needed > 0.001 {
@@ -434,7 +489,9 @@ fn schedule_action_to_completion(
         } else if attrs.masked_time_enabled {
             attrs.masked_productivity
         } else {
-            (total_attention / attrs.attention_run.max(0.001)).min(1.0)
+            // Speed scales with operators, capped at max_run_attention / attention_run
+            (total_attention / attrs.attention_run.max(0.001))
+                .min(attrs.max_run_attention / attrs.attention_run.max(0.001))
         };
 
         if productivity < 0.001 && attention_needed > 0.001 {
@@ -443,7 +500,7 @@ fn schedule_action_to_completion(
             continue;
         }
 
-        if productivity < 0.99 {
+        if total_attention < attrs.attention_run - 0.001 {
             is_degraded = true;
         }
 
@@ -457,9 +514,12 @@ fn schedule_action_to_completion(
 
         tick_operator_log.push((current_t, operators_this_tick));
 
-        // Decrement ART (1 tick of work done if productivity > 0)
-        actions[action_idx].art -= 1;
-        actions[action_idx].eat += 1;
+        // Decrement ART: speed > 1.0 on parallelizable stations (multiple operators)
+        work_accumulator += productivity;
+        let work_done = work_accumulator.floor() as u32;
+        work_accumulator -= work_done as f64;
+        actions[action_idx].art = actions[action_idx].art.saturating_sub(work_done);
+        actions[action_idx].eat += 1; // wall-clock ticks still +1
         total_productivity += productivity;
         ticks_counted += 1;
 

@@ -47,6 +47,7 @@ pub fn run_with_fbi(
         .map(|s| StationAttrs {
             attention_full: s.effective_attention_full(),
             attention_run: s.effective_attention_run(),
+            max_run_attention: s.effective_max_run_attention(),
             masked_time_enabled: s.masked_time_enabled,
             attention_masked: s.effective_attention_masked(),
             masked_productivity: s.effective_masked_productivity(),
@@ -93,8 +94,14 @@ pub fn run_with_fbi(
     for iteration in 0..effective_max {
         iteration_count = iteration + 1;
 
-        // Compute LAST values (with overridden durations if available)
-        let last_values = compute_last_values(jobs, tick_minutes, start_date);
+        // Compute LAST values using reverse forward pass
+        let initial_ticks_for_last = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
+        let last_values = compute_last_values(
+            jobs, stations, operators,
+            &station_attrs, &operator_skills,
+            tick_minutes, start_date,
+            initial_ticks_for_last,
+        );
 
         // Build actions
         let mut actions = build_actions(
@@ -119,7 +126,11 @@ pub fn run_with_fbi(
             }
 
             // Recompute LAST values with realistic durations
-            recompute_last_values(&mut actions, jobs, tick_minutes, start_date);
+            recompute_last_values(
+                &mut actions, jobs, stations, operators,
+                &station_attrs, &operator_skills,
+                tick_minutes, start_date, horizon_days,
+            );
         }
 
         // Pre-split
@@ -208,19 +219,26 @@ pub fn run_with_fbi(
     (best_assignments, best_actions, best_stats, iteration_count)
 }
 
-/// Recompute LAST values in-place on actions using their current durations.
-/// Walks backward through predecessor chains to set LAST values that reflect
-/// actual (potentially degraded) durations.
+/// Recompute LAST values in-place on actions using the reverse forward pass.
 fn recompute_last_values(
     actions: &mut Vec<Action>,
     jobs: &[JobInput],
+    stations: &[StationInput],
+    operators: &[OperatorInput],
+    station_attrs: &[StationAttrs],
+    operator_skills: &[Vec<(usize, f64)>],
     tick_minutes: u32,
     start_date: NaiveDate,
+    horizon_days: u32,
 ) {
-    // Rebuild LAST values using backward pass with current action durations
-    let last_values = compute_last_values(jobs, tick_minutes, start_date);
+    let initial_ticks = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
+    let last_values = compute_last_values(
+        jobs, stations, operators,
+        station_attrs, operator_skills,
+        tick_minutes, start_date,
+        initial_ticks,
+    );
 
-    // For each action, adjust LAST based on duration changes
     for action in actions.iter_mut() {
         if let Some(&base_last) = last_values.get(&action.task_id) {
             action.last = base_last;

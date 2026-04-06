@@ -7,6 +7,10 @@ pub struct StationInput {
     pub name: String,
     pub attention_full: Option<f64>,
     pub attention_run: Option<f64>,
+    /// Max useful attention during run phase for parallelizable (labor-paced) stations.
+    /// When > attentionRun, extra operators speed up the task proportionally.
+    /// Default = attentionRun (machine-paced, no benefit from extra operators).
+    pub max_run_attention: Option<f64>,
     #[serde(default)]
     pub masked_time_enabled: bool,
     pub attention_masked: Option<f64>,
@@ -59,6 +63,12 @@ impl StationInput {
         } else {
             1.0
         }
+    }
+
+    pub fn effective_max_run_attention(&self) -> f64 {
+        self.max_run_attention
+            .unwrap_or_else(|| self.effective_attention_run())
+            .max(self.effective_attention_run()) // can't be less than attention_run
     }
 
     pub fn effective_peremption(&self) -> u32 {

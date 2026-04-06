@@ -64,6 +64,8 @@ export interface TileProps {
   tileState?: TileState;
   /** Comma-separated operator names assigned to this tile */
   operatorNames?: string;
+  /** Operator attention value for bottom-right badge (operator view) */
+  operatorAttention?: number;
   /** Override left/right/width for side-by-side masked time layout */
   overrideLeft?: string;
   overrideWidth?: string;
@@ -110,6 +112,7 @@ export const Tile = memo(function Tile({
   tirageLabel,
   tileState = 'default',
   operatorNames,
+  operatorAttention,
   overrideLeft,
   overrideWidth,
   overrideOpacity,
@@ -307,15 +310,16 @@ export const Tile = memo(function Tile({
         {operatorNames && (
           <div className="text-[9px] text-zinc-400 truncate mt-0.5 leading-tight">
             {operatorNames}
-            {assignment.isMaskedTime && (
-              <span className="text-[9px] text-amber-400 ml-1" title="Temps masqué">👁</span>
-            )}
           </div>
         )}
-        {!operatorNames && assignment.isMaskedTime && (
-          <div className="text-[9px] text-amber-400 mt-0.5 leading-tight" title="Temps masqué">👁</div>
-        )}
       </div>
+
+      {/* Attention badge (bottom-right, operator view) */}
+      {operatorAttention !== undefined && (
+        <div className="absolute bottom-1 right-1 z-10 text-[8px] font-semibold text-zinc-200 bg-zinc-800 border border-zinc-600 rounded-sm px-1.5 py-px leading-tight pointer-events-none">
+          {operatorAttention}
+        </div>
+      )}
 
       {/* Swap buttons (visible on hover) */}
       <SwapButtons

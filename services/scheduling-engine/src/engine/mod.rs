@@ -58,23 +58,57 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
     // Merge chunks back: only report the ORIGINAL task_id in assignments
     assignments = merge_chunk_assignments(assignments);
 
-    // Set is_masked_time flag on assignments
-    for assignment in &mut assignments {
-        if let Some(&masked) = station_masked_time.get(&assignment.station_id) {
-            // masked_time = true if station has masked_time_enabled and task has a run phase
-            // (setup_end being different from scheduled_end means there's a run phase)
-            let has_run_phase = match &assignment.setup_end {
-                Some(setup_end) => setup_end != &assignment.scheduled_end,
-                None => true, // No setup means the whole thing is run
+    // Set is_masked_time flag: true only if the station supports masked time AND
+    // the operator actually works on another task concurrently (effective parallelism).
+    // A task on a masked station where the operator has no concurrent work is NOT masked time.
+    {
+        // Build operator → list of (assignment_index, start, end) for overlap detection
+        let mut op_assignments: HashMap<String, Vec<(usize, String, String)>> = HashMap::new();
+        for (i, a) in assignments.iter().enumerate() {
+            for op in &a.operators {
+                op_assignments.entry(op.operator_id.clone()).or_default()
+                    .push((i, a.scheduled_start.clone(), a.scheduled_end.clone()));
+            }
+        }
+
+        for i in 0..assignments.len() {
+            let is_on_masked_station = station_masked_time
+                .get(&assignments[i].station_id)
+                .copied()
+                .unwrap_or(false);
+
+            let has_run_phase = match &assignments[i].setup_end {
+                Some(setup_end) => setup_end != &assignments[i].scheduled_end,
+                None => true,
             };
-            assignment.is_masked_time = masked && has_run_phase;
+
+            if !is_on_masked_station || !has_run_phase {
+                assignments[i].is_masked_time = false;
+                continue;
+            }
+
+            // Check if ANY operator on this assignment also works on another task
+            // that overlaps in time (effective parallelism)
+            let mut has_concurrent = false;
+            for op in &assignments[i].operators {
+                if let Some(op_tasks) = op_assignments.get(&op.operator_id) {
+                    for (j, start_j, end_j) in op_tasks {
+                        if *j == i { continue; } // same task
+                        // Time overlap check
+                        if assignments[i].scheduled_start < *end_j
+                            && *start_j < assignments[i].scheduled_end
+                        {
+                            has_concurrent = true;
+                            break;
+                        }
+                    }
+                }
+                if has_concurrent { break; }
+            }
+
+            assignments[i].is_masked_time = has_concurrent;
         }
     }
-
-    // TODO: Cross-reference operators across overlapping masked-time assignments.
-    // Currently disabled — the naive approach is too aggressive (adds operators to ALL
-    // temporally overlapping tasks). The correct fix requires tracking masked-time
-    // operator presence in the forward pass grid, not in post-processing.
 
     let mut warnings = Vec::new();
 
@@ -297,6 +331,7 @@ pub fn build_actions(
                     assigned_operators: Vec::new(),
                     start_tick: None,
                     chunk_info: None,
+                    deadline_priority: job.deadline_priority,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);

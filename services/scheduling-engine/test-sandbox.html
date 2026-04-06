@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algorithm Test Sandbox</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --elevated: #242424;
+    --border: #3a3a3a; --text: #f5f5f5; --muted: #808080;
+    --accent: #3b82f6; --green: #22c55e; --red: #ef4444; --amber: #f59e0b;
+  }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; display: flex; height: 100vh; overflow: hidden; }
+
+  .btn { background: var(--accent); color: white; border: none; border-radius: 5px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Sidebar nav ── */
+  .sidebar { width: 210px; min-width: 210px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-header { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
+  .sidebar-header h1 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .sidebar-status { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 8px; }
+  .nav-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .nav-item { display: flex; align-items: center; gap: 6px; padding: 5px 14px; font-size: 11px; cursor: pointer; color: var(--muted); transition: background 0.1s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid transparent; }
+  .nav-item:hover { background: rgba(255,255,255,0.04); }
+  .nav-item.active { background: rgba(59,130,246,0.1); color: var(--text); border-left-color: var(--accent); }
+  .nav-icon { font-size: 12px; flex-shrink: 0; width: 16px; text-align: center; }
+  .nav-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); flex-shrink: 0; width: 18px; }
+  .nav-name { overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Main content ── */
+  .main-content { flex: 1; overflow-y: auto; }
+  .scenarios { padding: 24px; display: flex; flex-direction: column; gap: 20px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── A/B strip labels ── */
+  .ab-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 20px 2px; }
+  .ab-label-baseline { color: var(--muted); }
+  .ab-label-feature { color: var(--accent); }
+  .ab-separator { border-top: 1px dashed var(--border); margin: 4px 20px; }
+  .delta-section { padding: 6px 20px 10px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+  .delta-item { color: var(--muted); }
+  .delta-item b { font-weight: 600; }
+  .delta-pos { color: var(--green); }
+  .delta-neg { color: var(--amber); }
+  .delta-neutral { color: var(--muted); }
+
+  /* ── Panel ── */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .panel.loading { opacity: 0.5; }
+  .panel-header { padding: 16px 20px 0; }
+  .panel-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 3px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-pass { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-fail { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-pending { background: rgba(128,128,128,0.15); color: var(--muted); }
+  .badge-error { background: rgba(239,68,68,0.25); color: var(--red); }
+  .panel-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .panel-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; max-width: 800px; }
+
+  /* ── Setup tables ── */
+  .setup-section { padding: 0 20px 12px; border-bottom: 1px solid var(--border); }
+  .setup-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .setup-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+  .setup-table { font-size: 11px; border-collapse: collapse; background: var(--elevated); border-radius: 5px; overflow: hidden; }
+  .setup-table th { text-align: left; padding: 4px 10px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .setup-table td { padding: 3px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .setup-table tr:last-child td { border-bottom: none; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+  .tag { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .tag-masked { background: rgba(245,158,11,0.2); color: var(--amber); }
+  .tag-press { background: rgba(239,68,68,0.2); color: var(--red); }
+
+  /* ── Gantt ── */
+  .gantt-section { padding: 10px 20px; }
+  .gantt-section + .gantt-section { border-top: 1px solid var(--border); }
+  .gantt-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .gantt-container { overflow-x: auto; }
+  .gantt-grid { position: relative; }
+  .gantt-row { display: flex; align-items: stretch; position: relative; margin-bottom: 2px; }
+  .gantt-row-label { width: 90px; min-width: 90px; font-size: 11px; font-weight: 500; display: flex; align-items: center; padding-right: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gantt-row-track { flex: 1; position: relative; background: rgba(255,255,255,0.015); border-radius: 3px; }
+  .time-ruler { display: flex; margin-left: 90px; position: relative; height: 16px; margin-bottom: 2px; }
+  .time-tick { position: absolute; font-size: 9px; color: var(--muted); font-family: 'JetBrains Mono', monospace; transform: translateX(-50%); }
+  .time-tick::after { content: ''; position: absolute; left: 50%; top: 12px; width: 1px; height: 4px; background: var(--border); }
+  .gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.035); pointer-events: none; z-index: 0; }
+
+  .gantt-bar { position: absolute; top: 1px; bottom: 1px; border-radius: 2px; display: flex; align-items: center; overflow: hidden; cursor: default; z-index: 1; }
+  .gantt-bar:hover { filter: brightness(1.25); z-index: 10; }
+  .gantt-bar-label { font-size: 9px; font-weight: 600; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5); pointer-events: none; }
+  .gantt-bar .setup-part { height: 100%; border-right: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+  .gantt-bar .run-part { height: 100%; flex: 1; display: flex; align-items: center; }
+  .gantt-bar.masked-bar { border: 1.5px solid var(--amber); }
+  .gantt-bar.stacked-top { top: 1px; bottom: calc(50% + 1px); }
+  .gantt-bar.stacked-bottom { top: calc(50% + 1px); bottom: 1px; }
+
+  /* ── Stats + Checks ── */
+  .stats-section { padding: 8px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .stat { font-size: 11px; color: var(--muted); }
+  .stat b { color: var(--text); font-weight: 600; }
+  .checks-section { padding: 6px 20px 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .check { display: flex; align-items: center; gap: 4px; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+  .check-pass { color: var(--green); }
+  .check-fail { color: var(--red); }
+
+  .error-msg { padding: 12px 20px; color: var(--red); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Tooltip ── */
+  .tooltip { display: none; position: fixed; background: #111; border: 1px solid var(--border); border-radius: 5px; padding: 6px 10px; font-size: 10px; line-height: 1.5; color: var(--text); z-index: 1000; pointer-events: none; max-width: 240px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+  .tooltip .tt-label { font-weight: 600; margin-bottom: 2px; }
+  .tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; }
+  .tooltip .tt-key { color: var(--muted); }
+  .tooltip .tt-val { font-family: 'JetBrains Mono', monospace; font-size: 9px; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>Algorithm Test Sandbox</h1>
+    <button class="btn" style="width:100%" id="run-all-btn" onclick="runAll()">Run All</button>
+    <div class="sidebar-status" id="global-status">Ready</div>
+  </div>
+  <div class="nav-list" id="nav-list"></div>
+</div>
+<div class="main-content" id="main-content">
+  <div class="scenarios" id="scenarios"></div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// Config
+// ════════════════════════════════════════════════════════════
+const ENGINE_URL = 'http://localhost:3003/compute';
+const PX_PER_MIN = 1;
+const BAR_HEIGHT = 20;
+const JOB_COLORS = ['#3b82f6','#8b5cf6','#06b6d4','#f59e0b','#ef4444','#22c55e','#ec4899','#6366f1','#14b8a6','#e11d48'];
+
+// Default Mon-Fri 06:00-12:00 + 13:00-17:00 schedule
+const DEFAULT_SCHEDULE = (() => {
+  const day = { slots: [{ start: "06:00", end: "12:00" }, { start: "13:00", end: "17:00" }] };
+  return { monday: day, tuesday: day, wednesday: day, thursday: day, friday: day };
+})();
+
+// ════════════════════════════════════════════════════════════
+// Scenarios
+// ════════════════════════════════════════════════════════════
+const SCENARIOS = [
+  // ── 1. Basic Sequencing ──
+  {
+    name: "Basic Sequencing",
+    description: "Tasks within the same element must run in sequence order. Task 2 (Polar) cannot start before task 1 (Komori) finishes.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+        { name: "Polar 137", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0), Polar 137 (0.5)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(30+120) → Polar 137(15+60)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+        { id: "polar", name: "Polar 137" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+          { stationId: "polar", proficiency: 0.5 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 30, runMinutes: 120, sequenceOrder: 0 },
+          { id: "t2", stationId: "polar", setupMinutes: 15, runMinutes: 60, sequenceOrder: 1 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "t2 starts after t1", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 't1');
+        const a2 = r.assignments.find(a => a.taskId === 't2');
+        return a1 && a2 && a2.scheduledStart >= a1.scheduledEnd;
+      }},
+    ],
+  },
+
+  // ── 2. Masked Time Parallelism ──
+  {
+    name: "Masked Time Parallelism",
+    description: "When MBO M80 enters masked time (attention 0.3), Florence's freed 0.7 attention is used to work on Carton concurrently. Both tasks should overlap in time for Florence.",
+    baselineLabel: "Masked time OFF",
+    featureLabel: "Masked time ON",
+    setup: {
+      stations: [
+        { name: "MBO M80", tags: ["masked"] },
+        { name: "Carton", tags: [] },
+      ],
+      operators: [
+        { name: "Florence Plisson", skills: "MBO M80 (1.0), Carton (0.7)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "MBO M80(15+90)" },
+        { ref: "S-002", tasks: "Carton(10+30)" },
+      ],
+    },
+    baseline: {
+      stations: [
+        { id: "mbo", name: "MBO M80", maskedTimeEnabled: false, attentionFull: 1.0, attentionRun: 1.0 },
+        { id: "carton", name: "Carton", attentionFull: 1.0, attentionRun: 0.5 },
+      ],
+      operators: [
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "mbo", proficiency: 1.0 },
+          { stationId: "carton", proficiency: 0.7 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "mbo", setupMinutes: 15, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+        { id: "j2", reference: "S-002", deadline: "2026-04-20T17:00:00", elements: [{ id: "e2", tasks: [
+          { id: "t2", stationId: "carton", setupMinutes: 10, runMinutes: 30, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    request: {
+      stations: [
+        { id: "mbo", name: "MBO M80", maskedTimeEnabled: true, attentionMasked: 0.3, attentionFull: 1.0, attentionRun: 1.0, maskedProductivity: 0.95 },
+        { id: "carton", name: "Carton", attentionFull: 1.0, attentionRun: 0.5 },
+      ],
+      operators: [
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "mbo", proficiency: 1.0 },
+          { stationId: "carton", proficiency: 0.7 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "mbo", setupMinutes: 15, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+        { id: "j2", reference: "S-002", deadline: "2026-04-20T17:00:00", elements: [{ id: "e2", tasks: [
+          { id: "t2", stationId: "carton", setupMinutes: 10, runMinutes: 30, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "maskedAssignments > 0", fn: r => r.assignments.filter(a => a.isMaskedTime).length > 0 },
+      { label: "operatorOverlaps > 0", fn: r => countOverlaps(r) > 0 },
+    ],
+  },
+
+  // ── 3. Drying Time Gap ──
+  {
+    name: "Drying Time Gap",
+    description: "After printing on a press station (isPress=true, dryingTime=240min), the next task in the same element must wait 4 hours before starting.",
+    baselineLabel: "No drying (isPress=false)",
+    featureLabel: "With drying (4h gap)",
+    baseline: {
+      stations: [
+        { id: "komori", name: "Komori G40", isPress: false },
+        { id: "polar", name: "Polar 137" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+          { stationId: "polar", proficiency: 0.5 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-22T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 30, runMinutes: 60, sequenceOrder: 0 },
+          { id: "t2", stationId: "polar", setupMinutes: 15, runMinutes: 45, sequenceOrder: 1 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: ["press"] },
+        { name: "Polar 137", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0), Polar 137 (0.5)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(30+60) → [4h drying] → Polar 137(15+45)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40", isPress: true, dryingTimeMinutes: 240 },
+        { id: "polar", name: "Polar 137" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+          { stationId: "polar", proficiency: 0.5 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-22T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 30, runMinutes: 60, sequenceOrder: 0 },
+          { id: "t2", stationId: "polar", setupMinutes: 15, runMinutes: 45, sequenceOrder: 1 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "gap >= 240min", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 't1');
+        const a2 = r.assignments.find(a => a.taskId === 't2');
+        if (!a1 || !a2) return false;
+        const gap = (new Date(a2.scheduledStart) - new Date(a1.scheduledEnd)) / 60000;
+        return gap >= 240;
+      }},
+    ],
+  },
+
+  // ── 4. Multi-Operator Station ──
+  {
+    name: "Multi-Operator Station",
+    description: "Hohner bindery requires attentionFull=2.0 — a single operator can't staff it alone. Two operators must be assigned simultaneously.",
+    baselineLabel: "attentionFull=1.0 (1 op enough)",
+    featureLabel: "attentionFull=2.0 (needs 2 ops)",
+    baseline: {
+      stations: [
+        { id: "hohner", name: "Hohner", attentionFull: 1.0, attentionRun: 1.0 },
+      ],
+      operators: [
+        { id: "emma", firstName: "Emma", lastName: "Picard", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 1.0 },
+        ]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 0.8 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "hohner", setupMinutes: 20, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    setup: {
+      stations: [
+        { name: "Hohner", tags: [] },
+      ],
+      operators: [
+        { name: "Emma Picard", skills: "Hohner (1.0)" },
+        { name: "Florence Plisson", skills: "Hohner (0.8)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Hohner(20+90)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "hohner", name: "Hohner", attentionFull: 2.0, attentionRun: 2.0 },
+      ],
+      operators: [
+        { id: "emma", firstName: "Emma", lastName: "Picard", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 1.0 },
+        ]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 0.8 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "hohner", setupMinutes: 20, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "2 operators on task", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        return a && a.operators.length >= 2;
+      }},
+    ],
+  },
+
+  // ── 5. Deadline Pressure ──
+  {
+    name: "Deadline Pressure",
+    description: "Three jobs compete for one station. J1 has an impossible deadline (already passed). The engine should place all tasks but report lateness for J1.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(15+60) — deadline: yesterday" },
+        { ref: "S-002", tasks: "Komori G40(15+60) — deadline: +5d" },
+        { ref: "S-003", tasks: "Komori G40(15+60) — deadline: +7d" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: new Date(Date.now() - 86400000).toISOString().slice(0,19), elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+        { id: "j2", reference: "S-002", deadline: new Date(Date.now() + 5*86400000).toISOString().slice(0,19), elements: [{ id: "e2", tasks: [
+          { id: "t2", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+        { id: "j3", reference: "S-003", deadline: new Date(Date.now() + 7*86400000).toISOString().slice(0,19), elements: [{ id: "e3", tasks: [
+          { id: "t3", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 14, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "lateTaskCount > 0", fn: r => r.stats.lateTaskCount > 0 },
+      { label: "S-001 placed first", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 't1');
+        const a2 = r.assignments.find(a => a.taskId === 't2');
+        return a1 && a2 && a1.scheduledStart <= a2.scheduledStart;
+      }},
+    ],
+  },
+
+  // ── 6. Calage Bonus (Same-Job Consecutive Scheduling) ──
+  {
+    name: "Calage Bonus",
+    description: "When two jobs use the same station, the engine should prefer scheduling tasks from the same job back-to-back (+100 score bonus) to minimize setup changes (calage).",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(15+60), Komori G40(15+60)" },
+        { ref: "S-002", tasks: "Komori G40(15+60)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [
+          { id: "e1a", tasks: [{ id: "t1a", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 }]},
+          { id: "e1b", tasks: [{ id: "t1b", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 }]},
+        ]},
+        { id: "j2", reference: "S-002", deadline: "2026-04-20T17:00:00", elements: [{ id: "e2", tasks: [
+          { id: "t2", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "S-001 tasks consecutive (no t2 between them)", fn: r => {
+        const a1a = r.assignments.find(a => a.taskId === 't1a');
+        const a1b = r.assignments.find(a => a.taskId === 't1b');
+        const a2 = r.assignments.find(a => a.taskId === 't2');
+        if (!a1a || !a1b || !a2) return false;
+        // t1a and t1b must be adjacent — t2 must NOT be between them
+        const sorted = [a1a, a1b, a2].sort((a,b) => a.scheduledStart.localeCompare(b.scheduledStart));
+        const idxA = sorted.findIndex(a => a.taskId === 't1a');
+        const idxB = sorted.findIndex(a => a.taskId === 't1b');
+        return Math.abs(idxA - idxB) === 1; // adjacent in any order
+      }},
+    ],
+  },
+
+  // ── 7. Operator Availability (Lunch Break) ──
+  {
+    name: "Operator Availability — Lunch Gap",
+    description: "Operator works 10:00-12:00 + 13:00-17:00. A 135min task starting at 10:00 must pause at 12:00 (lunch) and resume at 13:00, stretching wall-clock duration to 195min.",
+    setup: {
+      stations: [
+        { name: "Polar 137", tags: [] },
+      ],
+      operators: [
+        { name: "Muriel Masson", skills: "Polar 137 (1.0) — schedule: 10:00-12:00 + 13:00-17:00" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Polar 137(15+120) — 135min work, must cross lunch" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "polar", name: "Polar 137" },
+      ],
+      operators: [
+        { id: "muriel", firstName: "Muriel", lastName: "Masson", operatingSchedule: (() => {
+          const day = { slots: [{ start: "10:00", end: "12:00" }, { start: "13:00", end: "17:00" }] };
+          return { monday: day, tuesday: day, wednesday: day, thursday: day, friday: day };
+        })(), skills: [
+          { stationId: "polar", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "polar", setupMinutes: 15, runMinutes: 120, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "duration > 135min (lunch stretch)", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        if (!a) return false;
+        const dur = (new Date(a.scheduledEnd) - new Date(a.scheduledStart)) / 60000;
+        return dur > 135;
+      }},
+    ],
+  },
+
+  // ── 8. Degraded Mode (Insufficient Operators) ──
+  {
+    name: "Degraded Mode — Insufficient Attention",
+    description: "Hohner needs attentionFull=2.0 but only one operator (Emma) is available. The task is placed in degraded mode: productivity = 1.0/2.0 = 0.5.",
+    baselineLabel: "2 operators (Emma + Florence) → full attention",
+    featureLabel: "1 operator (Emma alone) → degraded",
+    baseline: {
+      stations: [
+        { id: "hohner", name: "Hohner", attentionFull: 2.0, attentionRun: 2.0 },
+      ],
+      operators: [
+        { id: "emma", firstName: "Emma", lastName: "Picard", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 1.0 },
+        ]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 0.8 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "hohner", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    setup: {
+      stations: [
+        { name: "Hohner", tags: [] },
+      ],
+      operators: [
+        { name: "Emma Picard", skills: "Hohner (1.0) — alone, can only give 1.0 of 2.0 needed" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Hohner(15+60) — needs attnFull=2.0" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "hohner", name: "Hohner", attentionFull: 2.0, attentionRun: 2.0 },
+      ],
+      operators: [
+        { id: "emma", firstName: "Emma", lastName: "Picard", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "hohner", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "isDegraded", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        return a && a.isDegraded === true;
+      }},
+      { label: "productivity < 1.0", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        return a && a.effectiveProductivity < 1.0;
+      }},
+    ],
+  },
+
+  // ── 9. Pre-Split Long Tasks ──
+  {
+    name: "Pre-Split Long Tasks",
+    description: "A task exceeding maxChunkMinutes (default 420 = 7h) is split into chunks. Chunks should run consecutively and merge back into one assignment.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(30+540) — 9h run, will be split" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40", maxChunkMinutes: 420 },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-22T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 30, runMinutes: 540, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 14, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "merged back to 1 assignment", fn: r => {
+        return r.assignments.filter(a => a.taskId === 't1').length === 1;
+      }},
+      { label: "total duration ≈ 570min", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        if (!a) return false;
+        const dur = (new Date(a.scheduledEnd) - new Date(a.scheduledStart)) / 60000;
+        return dur >= 500; // approximate, includes lunch breaks spanning
+      }},
+    ],
+  },
+
+  // ── 10. FBI Convergence ──
+  {
+    name: "FBI Convergence",
+    description: "Feedback-Based Improvement: with 3 competing jobs on 1 station, the backward pass (LAST computation) should inform the forward pass to produce a near-optimal ordering. FBI iterations should converge (< 1% makespan change).",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+        { name: "Polar 137", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0), Polar 137 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(20+90) → Polar 137(10+45) — deadline +2d" },
+        { ref: "S-002", tasks: "Komori G40(15+60) → Polar 137(10+30) — deadline +3d" },
+        { ref: "S-003", tasks: "Komori G40(25+120) → Polar 137(15+60) — deadline +4d" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+        { id: "polar", name: "Polar 137" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+          { stationId: "polar", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: new Date(Date.now() + 2*86400000).toISOString().slice(0,19), elements: [{ id: "e1", tasks: [
+          { id: "t1a", stationId: "komori", setupMinutes: 20, runMinutes: 90, sequenceOrder: 0 },
+          { id: "t1b", stationId: "polar", setupMinutes: 10, runMinutes: 45, sequenceOrder: 1 },
+        ]}]},
+        { id: "j2", reference: "S-002", deadline: new Date(Date.now() + 3*86400000).toISOString().slice(0,19), elements: [{ id: "e2", tasks: [
+          { id: "t2a", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+          { id: "t2b", stationId: "polar", setupMinutes: 10, runMinutes: 30, sequenceOrder: 1 },
+        ]}]},
+        { id: "j3", reference: "S-003", deadline: new Date(Date.now() + 4*86400000).toISOString().slice(0,19), elements: [{ id: "e3", tasks: [
+          { id: "t3a", stationId: "komori", setupMinutes: 25, runMinutes: 120, sequenceOrder: 0 },
+          { id: "t3b", stationId: "polar", setupMinutes: 15, runMinutes: 60, sequenceOrder: 1 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 14, fbiMaxIterations: 5 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "0 late", fn: r => r.stats.lateTaskCount === 0 },
+      { label: "FBI ran ≥ 2 iterations", fn: r => r.fbiIterations >= 2 },
+    ],
+  },
+
+  // ── 11. Masked Time + Drying Combined ──
+  {
+    name: "Masked Time + Drying Combined",
+    description: "A job goes through: press (drying 4h) → masked folding. During the 4h drying wait, the operator should be free. During masked folding, the operator monitors with reduced attention.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: ["press"] },
+        { name: "MBO M80", tags: ["masked"] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0), MBO M80 (0.8)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(30+60) → [4h drying] → MBO M80(15+90)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40", isPress: true, dryingTimeMinutes: 240 },
+        { id: "mbo", name: "MBO M80", maskedTimeEnabled: true, attentionMasked: 0.3, maskedProductivity: 0.95 },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+          { stationId: "mbo", proficiency: 0.8 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-22T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 30, runMinutes: 60, sequenceOrder: 0 },
+          { id: "t2", stationId: "mbo", setupMinutes: 15, runMinutes: 90, sequenceOrder: 1 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 14, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "drying gap ≥ 240min", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 't1');
+        const a2 = r.assignments.find(a => a.taskId === 't2');
+        if (!a1 || !a2) return false;
+        return (new Date(a2.scheduledStart) - new Date(a1.scheduledEnd)) / 60000 >= 240;
+      }},
+      { label: "MBO is masked", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't2');
+        return a && a.isMaskedTime === true;
+      }},
+    ],
+  },
+
+  // ── 12. Masked Parallelism with 3 Concurrent Tasks ──
+  {
+    name: "Masked Parallelism — Triple Overlap",
+    description: "Two masked stations (MBO + SBG) monitored simultaneously by one operator (total attention 0.3+0.3=0.6), while a third task runs on Carton using the remaining 0.4.",
+    baselineLabel: "All stations non-masked",
+    featureLabel: "MBO + SBG masked",
+    baseline: {
+      stations: [
+        { id: "mbo", name: "MBO M80", maskedTimeEnabled: false, attentionFull: 1.0, attentionRun: 1.0 },
+        { id: "sbg", name: "SBG", maskedTimeEnabled: false, attentionFull: 1.0, attentionRun: 1.0 },
+        { id: "carton", name: "Carton", attentionFull: 0.4, attentionRun: 0.4 },
+      ],
+      operators: [
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "mbo", proficiency: 1.0 },
+          { stationId: "sbg", proficiency: 0.8 },
+          { stationId: "carton", proficiency: 0.7 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "mbo", setupMinutes: 15, runMinutes: 120, sequenceOrder: 0 },
+        ]}]},
+        { id: "j2", reference: "S-002", deadline: "2026-04-20T17:00:00", elements: [{ id: "e2", tasks: [
+          { id: "t2", stationId: "sbg", setupMinutes: 10, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+        { id: "j3", reference: "S-003", deadline: "2026-04-20T17:00:00", elements: [{ id: "e3", tasks: [
+          { id: "t3", stationId: "carton", setupMinutes: 5, runMinutes: 30, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    setup: {
+      stations: [
+        { name: "MBO M80", tags: ["masked"] },
+        { name: "SBG", tags: ["masked"] },
+        { name: "Carton", tags: [] },
+      ],
+      operators: [
+        { name: "Florence Plisson", skills: "MBO M80 (1.0), SBG (0.8), Carton (0.7)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "MBO M80(15+120)" },
+        { ref: "S-002", tasks: "SBG(10+90)" },
+        { ref: "S-003", tasks: "Carton(5+30) — needs ≤ 0.4 attention" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "mbo", name: "MBO M80", maskedTimeEnabled: true, attentionMasked: 0.3, maskedProductivity: 0.95 },
+        { id: "sbg", name: "SBG", maskedTimeEnabled: true, attentionMasked: 0.3, maskedProductivity: 0.95 },
+        { id: "carton", name: "Carton", attentionFull: 0.4, attentionRun: 0.4 },
+      ],
+      operators: [
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "mbo", proficiency: 1.0 },
+          { stationId: "sbg", proficiency: 0.8 },
+          { stationId: "carton", proficiency: 0.7 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "mbo", setupMinutes: 15, runMinutes: 120, sequenceOrder: 0 },
+        ]}]},
+        { id: "j2", reference: "S-002", deadline: "2026-04-20T17:00:00", elements: [{ id: "e2", tasks: [
+          { id: "t2", stationId: "sbg", setupMinutes: 10, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+        { id: "j3", reference: "S-003", deadline: "2026-04-20T17:00:00", elements: [{ id: "e3", tasks: [
+          { id: "t3", stationId: "carton", setupMinutes: 5, runMinutes: 30, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "≥ 2 masked", fn: r => r.assignments.filter(a => a.isMaskedTime).length >= 2 },
+      { label: "≥ 2 overlaps", fn: r => countOverlaps(r) >= 2 },
+    ],
+  },
+
+  // ── 13. Operator Skill Routing ──
+  {
+    name: "Operator Skill Routing",
+    description: "Two operators, two stations. Paul can only work Komori, Florence can only work Polar. Each task must be assigned to the correct operator based on skill.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+        { name: "Polar 137", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0)" },
+        { name: "Florence Plisson", skills: "Polar 137 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(15+60)" },
+        { ref: "S-002", tasks: "Polar 137(10+45)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+        { id: "polar", name: "Polar 137" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+        ]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "polar", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+        { id: "j2", reference: "S-002", deadline: "2026-04-20T17:00:00", elements: [{ id: "e2", tasks: [
+          { id: "t2", stationId: "polar", setupMinutes: 10, runMinutes: 45, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "Paul on Komori", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        return a && a.operators.some(o => o.operatorId === 'paul');
+      }},
+      { label: "Florence on Polar", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't2');
+        return a && a.operators.some(o => o.operatorId === 'florence');
+      }},
+      { label: "parallel (both at same time)", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 't1');
+        const a2 = r.assignments.find(a => a.taskId === 't2');
+        if (!a1 || !a2) return false;
+        return a1.scheduledStart < a2.scheduledEnd && a2.scheduledStart < a1.scheduledEnd;
+      }},
+    ],
+  },
+
+  // ── 13b. Proficiency-Based Operator Selection ──
+  {
+    name: "Proficiency-Based Selection",
+    description: "Three operators can work on Komori: Paul (1.0), Florence (0.8), Théo (0.5). The engine should pick Paul (highest proficiency) for the task.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0)" },
+        { name: "Florence Plisson", skills: "Komori G40 (0.8)" },
+        { name: "Théo Typin", skills: "Komori G40 (0.5)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Komori G40(15+60)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+        ]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 0.8 },
+        ]},
+        { id: "theo", firstName: "Théo", lastName: "Typin", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 0.5 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "komori", setupMinutes: 15, runMinutes: 60, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "Paul selected (prof 1.0)", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        return a && a.operators.length === 1 && a.operators[0].operatorId === 'paul';
+      }},
+    ],
+  },
+
+  // ── 14. Dynamic Grid Growth ──
+  {
+    name: "Dynamic Grid Growth",
+    description: "10 jobs × 8.5h each = 85h of work on one station. One operator works 10h/day → 8.5 working days needed. The initial 7-day horizon must grow dynamically.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001 to S-010", tasks: "10 × Komori G40(30+480) — 85h total, > 7 working days" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        ...[1,2,3,4,5,6,7,8,9,10].map(i => ({
+          id: `j${i}`, reference: `S-${String(i).padStart(3,'0')}`, deadline: "2026-04-30T17:00:00",
+          elements: [{ id: `e${i}`, tasks: [
+            { id: `t${i}`, stationId: "komori", setupMinutes: 30, runMinutes: 480, sequenceOrder: 0 },
+          ]}],
+        })),
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "all placed", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "makespan > 7 days (6720min)", fn: r => r.stats.makespanMinutes > 6720 },
+    ],
+  },
+
+  // ── 15. Masked Productivity (Fixed per Machine) ──
+  {
+    name: "Masked Productivity — Fixed Value",
+    description: "Masked productivity is a fixed per-station value (0.95), NOT proportional to attention. The effectiveProductivity of a masked assignment should reflect the station's maskedProductivity value.",
+    baselineLabel: "maskedProductivity=1.0 (no loss)",
+    featureLabel: "maskedProductivity=0.80",
+    baseline: {
+      stations: [
+        { id: "mbo", name: "MBO M80", maskedTimeEnabled: true, attentionMasked: 0.3, maskedProductivity: 1.0 },
+      ],
+      operators: [
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "mbo", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "mbo", setupMinutes: 15, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    setup: {
+      stations: [
+        { name: "MBO M80", tags: ["masked"] },
+      ],
+      operators: [
+        { name: "Florence Plisson", skills: "MBO M80 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "MBO M80(15+90) — maskedProductivity=0.80" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "mbo", name: "MBO M80", maskedTimeEnabled: true, attentionMasked: 0.3, maskedProductivity: 0.80 },
+      ],
+      operators: [
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "mbo", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "mbo", setupMinutes: 15, runMinutes: 90, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "isMaskedTime", fn: r => r.assignments.some(a => a.isMaskedTime) },
+      { label: "productivity ≈ 0.80-0.90", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        return a && a.effectiveProductivity >= 0.75 && a.effectiveProductivity <= 0.95;
+      }},
+    ],
+  },
+
+  // ── 16. Multi-Element Job ──
+  {
+    name: "Multi-Element Job",
+    description: "A single job with 2 elements (Cover + Interior). Each element has its own task sequence. Elements are independent and can run in parallel if operators/stations allow.",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+        { name: "Polar 137", tags: [] },
+        { name: "MBO M80", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0), Polar 137 (0.5)" },
+        { name: "Florence Plisson", skills: "Komori G40 (0.8), MBO M80 (1.0)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Cover: Komori G40(20+60) → Polar 137(10+30)  |  Interior: Komori G40(30+120) → MBO M80(15+90)" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+        { id: "polar", name: "Polar 137" },
+        { id: "mbo", name: "MBO M80" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+          { stationId: "polar", proficiency: 0.5 },
+        ]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 0.8 },
+          { stationId: "mbo", proficiency: 1.0 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-22T17:00:00", elements: [
+          { id: "cover", name: "Cover", tasks: [
+            { id: "c1", stationId: "komori", setupMinutes: 20, runMinutes: 60, sequenceOrder: 0 },
+            { id: "c2", stationId: "polar", setupMinutes: 10, runMinutes: 30, sequenceOrder: 1 },
+          ]},
+          { id: "interior", name: "Interior", tasks: [
+            { id: "i1", stationId: "komori", setupMinutes: 30, runMinutes: 120, sequenceOrder: 0 },
+            { id: "i2", stationId: "mbo", setupMinutes: 15, runMinutes: 90, sequenceOrder: 1 },
+          ]},
+        ]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "all 4 tasks placed", fn: r => r.stats.scheduledTasks === 4 },
+      { label: "c2 after c1", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 'c1');
+        const a2 = r.assignments.find(a => a.taskId === 'c2');
+        return a1 && a2 && a2.scheduledStart >= a1.scheduledEnd;
+      }},
+      { label: "i2 after i1", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 'i1');
+        const a2 = r.assignments.find(a => a.taskId === 'i2');
+        return a1 && a2 && a2.scheduledStart >= a1.scheduledEnd;
+      }},
+      { label: "elements overlap (parallel)", fn: r => {
+        const cover = r.assignments.filter(a => ['c1','c2'].includes(a.taskId));
+        const interior = r.assignments.filter(a => ['i1','i2'].includes(a.taskId));
+        if (cover.length < 1 || interior.length < 1) return false;
+        const cEnd = Math.max(...cover.map(a => new Date(a.scheduledEnd).getTime()));
+        const cStart = Math.min(...cover.map(a => new Date(a.scheduledStart).getTime()));
+        const iEnd = Math.max(...interior.map(a => new Date(a.scheduledEnd).getTime()));
+        const iStart = Math.min(...interior.map(a => new Date(a.scheduledStart).getTime()));
+        return cStart < iEnd && iStart < cEnd;
+      }},
+    ],
+  },
+
+  // ── 17. Multi-Element Job with Sequential Binding ──
+  {
+    name: "Multi-Element + Sequential Binding",
+    description: "A single job with 3 elements: Cover (print→cut), Interior (print), and Binding (assemble). Binding is sequenced AFTER Interior (sequenceOrder ensures print finishes first on Komori before binding can use it — same station forces ordering).",
+    setup: {
+      stations: [
+        { name: "Komori G40", tags: [] },
+        { name: "Polar 137", tags: [] },
+        { name: "Hohner", tags: [] },
+      ],
+      operators: [
+        { name: "Paul Pressac", skills: "Komori G40 (1.0), Polar 137 (0.5)" },
+        { name: "Emma Picard", skills: "Hohner (1.0), Polar 137 (0.8)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Cover: Komori(20+60)→Polar(10+30) | Interior: Komori(30+90) | Binding: Hohner(20+60) after Interior" },
+      ],
+    },
+    request: {
+      stations: [
+        { id: "komori", name: "Komori G40" },
+        { id: "polar", name: "Polar 137" },
+        { id: "hohner", name: "Hohner" },
+      ],
+      operators: [
+        { id: "paul", firstName: "Paul", lastName: "Pressac", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "komori", proficiency: 1.0 },
+          { stationId: "polar", proficiency: 0.5 },
+        ]},
+        { id: "emma", firstName: "Emma", lastName: "Picard", operatingSchedule: DEFAULT_SCHEDULE, skills: [
+          { stationId: "hohner", proficiency: 1.0 },
+          { stationId: "polar", proficiency: 0.8 },
+        ]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-22T17:00:00", elements: [
+          { id: "cover", name: "Cover", tasks: [
+            { id: "c1", stationId: "komori", setupMinutes: 20, runMinutes: 60, sequenceOrder: 0 },
+            { id: "c2", stationId: "polar", setupMinutes: 10, runMinutes: 30, sequenceOrder: 1 },
+          ]},
+          { id: "interior", name: "Interior", tasks: [
+            { id: "i1", stationId: "komori", setupMinutes: 30, runMinutes: 90, sequenceOrder: 0 },
+            { id: "b1", stationId: "hohner", setupMinutes: 20, runMinutes: 60, sequenceOrder: 1 },
+          ]},
+        ]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    expect: [
+      { label: "all 4 tasks placed", fn: r => r.stats.scheduledTasks === 4 },
+      { label: "c2 after c1", fn: r => {
+        const a1 = r.assignments.find(a => a.taskId === 'c1');
+        const a2 = r.assignments.find(a => a.taskId === 'c2');
+        return a1 && a2 && a2.scheduledStart >= a1.scheduledEnd;
+      }},
+      { label: "binding after interior print", fn: r => {
+        const i1 = r.assignments.find(a => a.taskId === 'i1');
+        const b1 = r.assignments.find(a => a.taskId === 'b1');
+        return i1 && b1 && b1.scheduledStart >= i1.scheduledEnd;
+      }},
+      { label: "Emma on Hohner", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 'b1');
+        return a && a.operators.some(o => o.operatorId === 'emma');
+      }},
+    ],
+  },
+
+  // ── 19. Parallelizable Station ──
+  {
+    name: "Parallelizable Station (Labor-Paced)",
+    description: "Carton with maxRunAttention=3.0: extra idle operators speed up the task proportionally. 3 operators available → run time divided by 3. Machine-paced stations (maxRunAttention=attentionRun) are unaffected.",
+    baselineLabel: "maxRunAttention=1.0 (machine-paced, default)",
+    featureLabel: "maxRunAttention=3.0 (labor-paced, 3 ops available)",
+    baseline: {
+      stations: [
+        { id: "carton", name: "Carton", attentionFull: 1.0, attentionRun: 1.0 },
+      ],
+      operators: [
+        { id: "emma", firstName: "Emma", lastName: "Picard", operatingSchedule: DEFAULT_SCHEDULE, skills: [{ stationId: "carton", proficiency: 1.0 }]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [{ stationId: "carton", proficiency: 0.8 }]},
+        { id: "muriel", firstName: "Muriel", lastName: "Masson", operatingSchedule: DEFAULT_SCHEDULE, skills: [{ stationId: "carton", proficiency: 0.7 }]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "carton", setupMinutes: 15, runMinutes: 120, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    request: {
+      stations: [
+        { id: "carton", name: "Carton", attentionFull: 1.0, attentionRun: 1.0, maxRunAttention: 3.0 },
+      ],
+      operators: [
+        { id: "emma", firstName: "Emma", lastName: "Picard", operatingSchedule: DEFAULT_SCHEDULE, skills: [{ stationId: "carton", proficiency: 1.0 }]},
+        { id: "florence", firstName: "Florence", lastName: "Plisson", operatingSchedule: DEFAULT_SCHEDULE, skills: [{ stationId: "carton", proficiency: 0.8 }]},
+        { id: "muriel", firstName: "Muriel", lastName: "Masson", operatingSchedule: DEFAULT_SCHEDULE, skills: [{ stationId: "carton", proficiency: 0.7 }]},
+      ],
+      jobs: [
+        { id: "j1", reference: "S-001", deadline: "2026-04-20T17:00:00", elements: [{ id: "e1", tasks: [
+          { id: "t1", stationId: "carton", setupMinutes: 15, runMinutes: 120, sequenceOrder: 0 },
+        ]}]},
+      ],
+      options: { tickMinutes: 15, horizonDays: 7, fbiMaxIterations: 3 },
+    },
+    setup: {
+      stations: [
+        { name: "Carton", tags: [] },
+      ],
+      operators: [
+        { name: "Emma Picard", skills: "Carton (1.0)" },
+        { name: "Florence Plisson", skills: "Carton (0.8)" },
+        { name: "Muriel Masson", skills: "Carton (0.7)" },
+      ],
+      jobs: [
+        { ref: "S-001", tasks: "Carton(15+120) — 3 operators, maxRunAttention=3.0" },
+      ],
+    },
+    expect: [
+      { label: "allPlaced", fn: r => r.stats.scheduledTasks === r.stats.totalTasks },
+      { label: "run time < 60min (faster than 120min)", fn: r => {
+        const a = r.assignments.find(a => a.taskId === 't1');
+        if (!a) return false;
+        const dur = (new Date(a.scheduledEnd) - new Date(a.scheduledStart)) / 60000;
+        return dur < 75; // 15min setup + ~40min run (120/3) = ~55min total
+      }},
+    ],
+  },
+];
+
+// ════════════════════════════════════════════════════════════
+// Helpers
+// ════════════════════════════════════════════════════════════
+function countOverlaps(result) {
+  const byOp = {};
+  for (const a of result.assignments) {
+    for (const op of a.operators) {
+      const key = op.operatorId;
+      if (!byOp[key]) byOp[key] = [];
+      byOp[key].push({ start: new Date(a.scheduledStart).getTime(), end: new Date(a.scheduledEnd).getTime() });
+    }
+  }
+  let n = 0;
+  for (const tasks of Object.values(byOp)) {
+    for (let i = 0; i < tasks.length; i++)
+      for (let j = i+1; j < tasks.length; j++)
+        if (tasks[i].start < tasks[j].end && tasks[j].start < tasks[i].end) n++;
+  }
+  return n;
+}
+
+function minutesSinceBase(isoStr, baseMs) {
+  return Math.round((new Date(isoStr).getTime() - baseMs) / 60000);
+}
+
+function fmtMin(m) {
+  if (m < 0) m = 0;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${h}:${String(mm).padStart(2,'0')}`;
+}
+
+function px(min) { return min * PX_PER_MIN; }
+
+// ════════════════════════════════════════════════════════════
+// Run scenarios
+// ════════════════════════════════════════════════════════════
+const results = new Map(); // index → { result, baselineResult, error }
+
+async function fetchCompute(request) {
+  const resp = await fetch(ENGINE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+  return resp.json();
+}
+
+async function runScenario(index) {
+  const s = SCENARIOS[index];
+  try {
+    const result = await fetchCompute(s.request);
+    let baselineResult = null;
+    if (s.baseline) {
+      baselineResult = await fetchCompute(s.baseline);
+    }
+    results.set(index, { result, baselineResult, error: null });
+  } catch (e) {
+    results.set(index, { result: null, baselineResult: null, error: e.message });
+  }
+  renderScenario(index);
+  updateNav();
+}
+
+async function runAll() {
+  const btn = document.getElementById('run-all-btn');
+  btn.disabled = true;
+  document.getElementById('global-status').textContent = 'Running...';
+  results.clear();
+  renderAll();
+
+  for (let i = 0; i < SCENARIOS.length; i++) {
+    await runScenario(i);
+  }
+
+  const totalChecks = [...results.entries()].reduce((acc, [i, r]) => {
+    if (!r.result) return acc;
+    return acc + SCENARIOS[i].expect.filter(e => e.fn(r.result)).length;
+  }, 0);
+  const totalExpects = SCENARIOS.reduce((acc, s) => acc + s.expect.length, 0);
+  const passCount = SCENARIOS.filter((s, i) => {
+    const r = results.get(i);
+    return r && r.result && s.expect.every(e => e.fn(r.result));
+  }).length;
+
+  document.getElementById('global-status').textContent = `${passCount}/${SCENARIOS.length} pass · ${totalChecks}/${totalExpects} checks`;
+  btn.disabled = false;
+}
+
+function getScenarioStatus(index) {
+  const r = results.get(index);
+  if (!r) return 'pending';
+  if (r.error) return 'error';
+  const s = SCENARIOS[index];
+  return s.expect.every(e => e.fn(r.result)) ? 'pass' : 'fail';
+}
+
+// ════════════════════════════════════════════════════════════
+// Rendering
+// ════════════════════════════════════════════════════════════
+function renderAll() {
+  const container = document.getElementById('scenarios');
+  container.innerHTML = SCENARIOS.map((s, i) => `<div class="panel" id="panel-${i}"></div>`).join('');
+  SCENARIOS.forEach((_, i) => renderScenario(i));
+  buildNav();
+  setupScrollSpy();
+}
+
+function buildNav() {
+  const nav = document.getElementById('nav-list');
+  nav.innerHTML = SCENARIOS.map((s, i) => {
+    const icon = { pending: '&#x23F3;', pass: '&#x2705;', fail: '&#x274C;', error: '&#x26A0;' }[getScenarioStatus(i)];
+    return `<div class="nav-item" data-index="${i}" id="nav-${i}" onclick="scrollToPanel(${i})">
+      <span class="nav-icon">${icon}</span>
+      <span class="nav-num">${i+1}.</span>
+      <span class="nav-name">${s.name}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateNav() {
+  SCENARIOS.forEach((s, i) => {
+    const el = document.getElementById(`nav-${i}`);
+    if (!el) return;
+    const icon = { pending: '&#x23F3;', pass: '&#x2705;', fail: '&#x274C;', error: '&#x26A0;' }[getScenarioStatus(i)];
+    el.querySelector('.nav-icon').innerHTML = icon;
+  });
+}
+
+function scrollToPanel(index) {
+  const panel = document.getElementById(`panel-${index}`);
+  if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setupScrollSpy() {
+  const main = document.getElementById('main-content');
+  main.addEventListener('scroll', () => {
+    let activeIdx = 0;
+    const scrollTop = main.scrollTop + 60;
+    for (let i = SCENARIOS.length - 1; i >= 0; i--) {
+      const el = document.getElementById(`panel-${i}`);
+      if (el && el.offsetTop <= scrollTop) { activeIdx = i; break; }
+    }
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const nav = document.getElementById(`nav-${activeIdx}`);
+    if (nav) nav.classList.add('active');
+  });
+}
+
+function renderScenario(index) {
+  const panel = document.getElementById(`panel-${index}`);
+  const s = SCENARIOS[index];
+  const r = results.get(index);
+
+  if (!r) {
+    panel.innerHTML = renderPanelPending(s, index);
+    return;
+  }
+  if (r.error) {
+    panel.innerHTML = renderPanelError(s, index, r.error);
+    return;
+  }
+
+  if (s.baseline && r.baselineResult) {
+    panel.innerHTML = renderPanelAB(s, index, r.result, r.baselineResult);
+  } else {
+    panel.innerHTML = renderPanelResult(s, index, r.result);
+  }
+  panel.querySelectorAll('.gantt-bar').forEach(bar => {
+    bar.addEventListener('mouseenter', showTooltip);
+    bar.addEventListener('mouseleave', hideTooltip);
+    bar.addEventListener('mousemove', moveTooltip);
+  });
+}
+
+function renderPanelPending(s, idx) {
+  return `
+    <div class="panel-header">
+      <div class="panel-badge badge-pending">PENDING</div>
+      <div class="panel-title">${idx+1}. ${s.name}</div>
+      <div class="panel-desc">${s.description}</div>
+    </div>
+    ${renderSetup(s)}`;
+}
+
+function renderPanelError(s, idx, error) {
+  return `
+    <div class="panel-header">
+      <div class="panel-badge badge-error">ERROR</div>
+      <div class="panel-title">${idx+1}. ${s.name}</div>
+      <div class="panel-desc">${s.description}</div>
+    </div>
+    ${renderSetup(s)}
+    <div class="error-msg">${error}</div>`;
+}
+
+function renderPanelResult(s, idx, result) {
+  const checks = s.expect.map(e => ({ label: e.label, pass: e.fn(result) }));
+  const allPass = checks.every(c => c.pass);
+
+  // Compute Gantt data: find earliest assignment start as base
+  const allStarts = result.assignments.map(a => new Date(a.scheduledStart).getTime());
+  const allEnds = result.assignments.map(a => new Date(a.scheduledEnd).getTime());
+  if (allStarts.length === 0) {
+    return renderPanelPending(s, idx) + `<div class="error-msg">No assignments returned</div>`;
+  }
+  const baseMs = Math.min(...allStarts);
+  const maxMin = Math.max(...allEnds.map(e => Math.round((e - baseMs)/60000)), 60);
+  const trackW = px(maxMin) + 20;
+
+  // Map assignment data to minutes relative to base
+  const mapped = result.assignments.map((a, ai) => ({
+    ...a,
+    startMin: minutesSinceBase(a.scheduledStart, baseMs),
+    endMin: minutesSinceBase(a.scheduledEnd, baseMs),
+    setupEndMin: a.setupEnd ? minutesSinceBase(a.setupEnd, baseMs) : minutesSinceBase(a.scheduledStart, baseMs),
+    jobIndex: s.request.jobs.findIndex(j => j.elements.some(e => e.tasks.some(t => t.id === a.taskId))),
+    stationIndex: s.request.stations.findIndex(st => st.id === a.stationId),
+  }));
+
+  // Build operator assignment lookup
+  const opAssignments = {};
+  for (const a of mapped) {
+    for (const op of a.operators) {
+      if (!opAssignments[op.operatorId]) opAssignments[op.operatorId] = [];
+      opAssignments[op.operatorId].push({
+        ...a,
+        opFrom: minutesSinceBase(op.from, baseMs),
+        opTo: minutesSinceBase(op.to, baseMs),
+        opAttention: op.attention,
+      });
+    }
+  }
+
+  return `
+    <div class="panel-header">
+      <div class="panel-badge ${allPass ? 'badge-pass' : 'badge-fail'}">${allPass ? '&#x2705; PASS' : '&#x274C; FAIL'}</div>
+      <div class="panel-title">${idx+1}. ${s.name}</div>
+      <div class="panel-desc">${s.description}</div>
+    </div>
+    ${renderSetup(s)}
+    <div class="gantt-section">
+      <div class="gantt-label">Station Gantt</div>
+      <div class="gantt-container">
+        ${renderRuler(maxMin, trackW)}
+        <div class="gantt-grid" style="width:${trackW+90}px">
+          ${renderGridlines(maxMin, trackW)}
+          ${s.request.stations.map((st, si) => {
+            const bars = mapped.filter(a => a.stationIndex === si);
+            return renderRow(st.name, bars, trackW, false);
+          }).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="gantt-section">
+      <div class="gantt-label">Operator Gantt</div>
+      <div class="gantt-container">
+        ${renderRuler(maxMin, trackW)}
+        <div class="gantt-grid" style="width:${trackW+90}px">
+          ${renderGridlines(maxMin, trackW)}
+          ${s.request.operators.map(op => {
+            const bars = (opAssignments[op.id] || []);
+            return renderOperatorRow(op.firstName, bars, trackW);
+          }).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="stats-section">
+      <div class="stat"><b>${result.stats.scheduledTasks}</b>/${result.stats.totalTasks} placed</div>
+      <div class="stat"><b>${result.assignments.filter(a=>a.isMaskedTime).length}</b> masked</div>
+      <div class="stat"><b>${countOverlaps(result)}</b> overlaps</div>
+      <div class="stat"><b>${result.stats.lateTaskCount}</b> late</div>
+      <div class="stat">makespan <b>${result.stats.makespanMinutes}</b>m</div>
+      <div class="stat">FBI <b>${result.fbiIterations}</b></div>
+      <div class="stat"><b>${result.computeTimeMs}</b>ms</div>
+    </div>
+    <div class="checks-section">
+      ${checks.map(c => `<div class="check ${c.pass?'check-pass':'check-fail'}"><span>${c.pass?'&#x2713;':'&#x2717;'}</span> ${c.label}</div>`).join('')}
+    </div>`;
+}
+
+function renderPanelAB(s, idx, featureResult, baselineResult) {
+  const checks = s.expect.map(e => ({ label: e.label, pass: e.fn(featureResult) }));
+  const allPass = checks.every(c => c.pass);
+
+  // Delta summary
+  const bm = baselineResult.stats.makespanMinutes;
+  const fm = featureResult.stats.makespanMinutes;
+  const bo = countOverlaps(baselineResult);
+  const fo = countOverlaps(featureResult);
+  const bMasked = baselineResult.assignments.filter(a => a.isMaskedTime).length;
+  const fMasked = featureResult.assignments.filter(a => a.isMaskedTime).length;
+  const bLate = baselineResult.stats.lateTaskCount;
+  const fLate = featureResult.stats.lateTaskCount;
+
+  function deltaStr(label, bv, fv) {
+    const diff = fv - bv;
+    const cls = diff === 0 ? 'delta-neutral' : (diff > 0 ? 'delta-pos' : 'delta-neg');
+    const sign = diff > 0 ? '+' : '';
+    return `<span class="delta-item ${cls}">${label}: ${bv} → <b>${fv}</b> (${sign}${diff})</span>`;
+  }
+
+  return `
+    <div class="panel-header">
+      <div class="panel-badge ${allPass ? 'badge-pass' : 'badge-fail'}">${allPass ? '&#x2705; PASS' : '&#x274C; FAIL'}</div>
+      <div class="panel-title">${idx+1}. ${s.name}</div>
+      <div class="panel-desc">${s.description}</div>
+    </div>
+    ${renderSetup(s)}
+    <div class="ab-label ab-label-baseline">${s.baselineLabel || 'Baseline'} — ${baselineResult.computeTimeMs}ms</div>
+    ${renderGanttStrip(s, s.baseline || s.request, baselineResult)}
+    <div class="ab-separator"></div>
+    <div class="ab-label ab-label-feature">${s.featureLabel || 'With Feature'} — ${featureResult.computeTimeMs}ms</div>
+    ${renderGanttStrip(s, s.request, featureResult)}
+    <div class="delta-section">
+      ${deltaStr('makespan', bm, fm)}
+      ${deltaStr('overlaps', bo, fo)}
+      ${deltaStr('masked', bMasked, fMasked)}
+      ${deltaStr('late', bLate, fLate)}
+    </div>
+    <div class="checks-section">
+      ${checks.map(c => `<div class="check ${c.pass?'check-pass':'check-fail'}"><span>${c.pass?'&#x2713;':'&#x2717;'}</span> ${c.label}</div>`).join('')}
+    </div>`;
+}
+
+function renderGanttStrip(scenario, request, result) {
+  const allStarts = result.assignments.map(a => new Date(a.scheduledStart).getTime());
+  const allEnds = result.assignments.map(a => new Date(a.scheduledEnd).getTime());
+  if (allStarts.length === 0) return `<div class="error-msg">No assignments</div>`;
+
+  const baseMs = Math.min(...allStarts);
+  const maxMin = Math.max(...allEnds.map(e => Math.round((e - baseMs)/60000)), 60);
+  const trackW = px(maxMin) + 20;
+
+  const mapped = result.assignments.map(a => ({
+    ...a,
+    startMin: minutesSinceBase(a.scheduledStart, baseMs),
+    endMin: minutesSinceBase(a.scheduledEnd, baseMs),
+    setupEndMin: a.setupEnd ? minutesSinceBase(a.setupEnd, baseMs) : minutesSinceBase(a.scheduledStart, baseMs),
+    jobIndex: request.jobs.findIndex(j => j.elements.some(e => e.tasks.some(t => t.id === a.taskId))),
+    stationIndex: request.stations.findIndex(st => st.id === a.stationId),
+  }));
+
+  const opAssignments = {};
+  for (const a of mapped) {
+    for (const op of a.operators) {
+      if (!opAssignments[op.operatorId]) opAssignments[op.operatorId] = [];
+      opAssignments[op.operatorId].push({
+        ...a,
+        opFrom: minutesSinceBase(op.from, baseMs),
+        opTo: minutesSinceBase(op.to, baseMs),
+        opAttention: op.attention,
+      });
+    }
+  }
+
+  return `
+    <div class="gantt-section" style="border-top:none">
+      <div class="gantt-label">Stations</div>
+      <div class="gantt-container">
+        ${renderRuler(maxMin, trackW)}
+        <div class="gantt-grid" style="width:${trackW+90}px">
+          ${renderGridlines(maxMin, trackW)}
+          ${request.stations.map((st, si) => renderRow(st.name, mapped.filter(a => a.stationIndex === si), trackW)).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="gantt-section">
+      <div class="gantt-label">Operators</div>
+      <div class="gantt-container">
+        ${renderRuler(maxMin, trackW)}
+        <div class="gantt-grid" style="width:${trackW+90}px">
+          ${renderGridlines(maxMin, trackW)}
+          ${request.operators.map(op => renderOperatorRow(op.firstName, opAssignments[op.id] || [], trackW)).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="stats-section">
+      <div class="stat"><b>${result.stats.scheduledTasks}</b>/${result.stats.totalTasks} placed</div>
+      <div class="stat"><b>${result.assignments.filter(a=>a.isMaskedTime).length}</b> masked</div>
+      <div class="stat"><b>${countOverlaps(result)}</b> overlaps</div>
+      <div class="stat"><b>${result.stats.lateTaskCount}</b> late</div>
+      <div class="stat">makespan <b>${result.stats.makespanMinutes}</b>m</div>
+    </div>`;
+}
+
+function renderSetup(s) {
+  return `
+    <div class="setup-section">
+      <div class="setup-label">Setup</div>
+      <div class="setup-grid">
+        <table class="setup-table">
+          <tr><th>Station</th><th>Config</th></tr>
+          ${s.setup.stations.map(st => `<tr><td><b>${st.name}</b> ${st.tags.map(t => `<span class="tag tag-${t}">${t}</span>`).join(' ')}</td><td class="mono">${stationConfig(st, s)}</td></tr>`).join('')}
+        </table>
+        <table class="setup-table">
+          <tr><th>Operator</th><th>Skills</th></tr>
+          ${s.setup.operators.map(op => `<tr><td><b>${op.name}</b></td><td class="mono">${op.skills}</td></tr>`).join('')}
+        </table>
+        <table class="setup-table">
+          <tr><th>Job</th><th>Tasks</th></tr>
+          ${s.setup.jobs.map((j, i) => `<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${JOB_COLORS[i]};margin-right:4px;vertical-align:middle"></span><b>${j.ref}</b></td><td class="mono">${j.tasks}</td></tr>`).join('')}
+        </table>
+      </div>
+    </div>`;
+}
+
+function stationConfig(setupSt, s) {
+  const reqSt = s.request.stations.find(r => r.name === setupSt.name);
+  if (!reqSt) return '—';
+  const parts = [];
+  if (reqSt.attentionFull && reqSt.attentionFull !== 1) parts.push(`attnFull=${reqSt.attentionFull}`);
+  if (reqSt.attentionRun && reqSt.attentionRun !== 1) parts.push(`attnRun=${reqSt.attentionRun}`);
+  if (reqSt.maskedTimeEnabled) parts.push(`masked(${reqSt.attentionMasked})`);
+  if (reqSt.isPress) parts.push(`press drying=${reqSt.dryingTimeMinutes}m`);
+  return parts.length ? parts.join(', ') : 'default';
+}
+
+function renderRuler(maxMin, trackW) {
+  const interval = maxMin > 300 ? 60 : 30;
+  let ticks = '';
+  for (let m = 0; m <= maxMin; m += interval)
+    ticks += `<div class="time-tick" style="left:${px(m)}px">${fmtMin(m)}</div>`;
+  return `<div class="time-ruler" style="width:${trackW}px">${ticks}</div>`;
+}
+
+function renderGridlines(maxMin, trackW) {
+  const interval = maxMin > 300 ? 60 : 30;
+  let lines = '';
+  for (let m = 0; m <= maxMin; m += interval)
+    lines += `<div class="gridline" style="left:${90+px(m)}px"></div>`;
+  return lines;
+}
+
+function renderRow(label, assignments, trackW, isOperator) {
+  const h = BAR_HEIGHT;
+  const bars = assignments.map(a => {
+    const left = px(a.startMin);
+    const width = Math.max(px(a.endMin - a.startMin), 2);
+    const setupW = px(a.setupEndMin - a.startMin);
+    const color = JOB_COLORS[a.jobIndex % JOB_COLORS.length];
+    const masked = a.isMaskedTime;
+    const jobRef = SCENARIOS.flatMap(s => s.request.jobs).find(j => j.elements.some(e => e.tasks.some(t => t.id === a.taskId)))?.reference || a.taskId;
+
+    return `<div class="gantt-bar ${masked?'masked-bar':''}" style="left:${left}px;width:${width}px;background:${color};"
+      data-tt-job="${jobRef}" data-tt-station="${a.stationId}" data-tt-start="${a.scheduledStart}" data-tt-end="${a.scheduledEnd}" data-tt-masked="${masked}" data-tt-attention="">
+      ${setupW > 0 ? `<div class="setup-part" style="width:${setupW}px;background:repeating-linear-gradient(-45deg,${color}44,${color}44 2px,${color}88 2px,${color}88 4px);"></div>` : ''}
+      <div class="run-part"><span class="gantt-bar-label">${jobRef}${masked?' &#x1F441;':''}</span></div>
+    </div>`;
+  });
+  return `<div class="gantt-row" style="height:${h+2}px"><div class="gantt-row-label">${label}</div><div class="gantt-row-track" style="width:${trackW}px">${bars.join('')}</div></div>`;
+}
+
+function renderOperatorRow(label, bars, trackW) {
+  // Check overlaps for stacking
+  const hasOverlap = bars.length > 1 && bars.some((a,i) => bars.some((b,j) => i<j && a.opFrom < b.opTo && b.opFrom < a.opTo));
+  const h = hasOverlap ? BAR_HEIGHT + 8 : BAR_HEIGHT;
+
+  // Simple stacking: assign overlapping bars to top/bottom
+  const stacks = bars.map(() => '');
+  if (hasOverlap) {
+    const sorted = bars.map((b,i)=>({b,i})).sort((a,b)=>a.b.opFrom-b.b.opFrom);
+    sorted.forEach((s,si) => {
+      if (si === 0) stacks[s.i] = 'stacked-top';
+      else {
+        const prev = sorted[si-1];
+        if (s.b.opFrom < prev.b.opTo) stacks[s.i] = 'stacked-bottom';
+        else stacks[s.i] = 'stacked-top';
+      }
+    });
+  }
+
+  const barHtml = bars.map((a, idx) => {
+    const left = px(a.opFrom);
+    const width = Math.max(px(a.opTo - a.opFrom), 2);
+    const color = JOB_COLORS[a.jobIndex % JOB_COLORS.length];
+    const opacity = 0.3 + a.opAttention * 0.7;
+    const masked = a.isMaskedTime;
+    const jobRef = SCENARIOS.flatMap(s => s.request.jobs).find(j => j.elements.some(e => e.tasks.some(t => t.id === a.taskId)))?.reference || a.taskId;
+
+    return `<div class="gantt-bar ${stacks[idx]} ${masked?'masked-bar':''}" style="left:${left}px;width:${width}px;background:${color};opacity:${opacity};"
+      data-tt-job="${jobRef}" data-tt-station="${a.stationId}" data-tt-start="${a.scheduledStart}" data-tt-end="${a.scheduledEnd}" data-tt-masked="${masked}" data-tt-attention="${a.opAttention}">
+      <div class="run-part"><span class="gantt-bar-label">${jobRef} (${a.opAttention})${masked?' &#x1F441;':''}</span></div>
+    </div>`;
+  });
+
+  return `<div class="gantt-row" style="height:${h+2}px"><div class="gantt-row-label">${label}</div><div class="gantt-row-track" style="width:${trackW}px">${barHtml.join('')}</div></div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// Tooltip
+// ════════════════════════════════════════════════════════════
+const tooltipEl = document.getElementById('tooltip');
+function showTooltip(e) {
+  const d = e.currentTarget.dataset;
+  const durMin = Math.round((new Date(d.ttEnd) - new Date(d.ttStart)) / 60000);
+  const durH = Math.floor(durMin / 60);
+  const durM = durMin % 60;
+  const durStr = durH > 0 ? `${durH}h${durM > 0 ? String(durM).padStart(2,'0') : ''}` : `${durM}min`;
+  let html = `<div class="tt-label">${d.ttJob} — ${d.ttStation}</div>`;
+  html += `<div class="tt-row"><span class="tt-key">Start</span><span class="tt-val">${d.ttStart}</span></div>`;
+  html += `<div class="tt-row"><span class="tt-key">End</span><span class="tt-val">${d.ttEnd}</span></div>`;
+  html += `<div class="tt-row"><span class="tt-key">Duration</span><span class="tt-val">${durStr} (${durMin}min)</span></div>`;
+  if (d.ttAttention) html += `<div class="tt-row"><span class="tt-key">Attention</span><span class="tt-val">${d.ttAttention}</span></div>`;
+  if (d.ttMasked === 'true') html += `<div class="tt-row"><span class="tt-key">Masked</span><span class="tt-val" style="color:var(--amber)">yes</span></div>`;
+  tooltipEl.innerHTML = html;
+  tooltipEl.style.display = 'block';
+}
+function hideTooltip() { tooltipEl.style.display = 'none'; }
+function moveTooltip(e) { tooltipEl.style.left = (e.clientX+12)+'px'; tooltipEl.style.top = (e.clientY+12)+'px'; }
+
+// ════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════
+renderAll();
+</script>
+</body>
+</html>
