@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Cpu } from 'lucide-react';
 import { useGetSnapshotQuery, useComputeScheduleMutation } from '../store';
 import type { ComputeScheduleResult } from '../store';
+import { isCtrlAltLetter } from '../utils/keyboardLayout';
 import { isInternalTask } from '@flux/types';
 import type {
   Operator,
@@ -40,11 +41,13 @@ import {
   computeTileState,
   timeToYPosition,
 } from '../components';
+import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
-import { useVirtualScroll, isAssignmentVisible } from '../hooks';
+import { useVirtualScroll, isAssignmentVisible, useMassUnschedule } from '../hooks';
+import { MassUnscheduleDialog } from '../components/MassUnscheduleDialog';
 
 // ============================================================================
 // Constants (matching App.tsx)
@@ -185,6 +188,7 @@ export default function OperatorSchedulePage() {
   const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
   const [computeResult, setComputeResult] = useState<ComputeScheduleResult | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const massUnschedule = useMassUnschedule(snapshotData);
   const [pixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -272,6 +276,8 @@ export default function OperatorSchedulePage() {
     return m;
   }, [snapshot.jobs]);
 
+  const selectedJob = selectedJobId ? jobMap.get(selectedJobId) ?? null : null;
+
   const elementMap = useMemo(
     () => new Map(snapshot.elements.map((e) => [e.id, e])),
     [snapshot.elements],
@@ -342,6 +348,34 @@ export default function OperatorSchedulePage() {
       console.error('Compute failed:', err);
     }
   }, [computeSchedule]);
+
+  // ---- Keyboard navigation: Alt+Up/Down to cycle jobs ----
+  const orderedJobIds = useMemo(() => snapshot.jobs.map(j => j.id), [snapshot.jobs]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Alt+Z: mass unschedule
+      if (isCtrlAltLetter(e, 'z')) {
+        e.preventDefault();
+        massUnschedule.trigger();
+        return;
+      }
+
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault();
+      if (orderedJobIds.length === 0) return;
+      const direction = e.key === 'ArrowUp' ? -1 : 1;
+      if (!selectedJobId) {
+        setSelectedJobId(orderedJobIds[0]);
+        return;
+      }
+      const idx = orderedJobIds.indexOf(selectedJobId);
+      const newIdx = (idx + direction + orderedJobIds.length) % orderedJobIds.length;
+      setSelectedJobId(orderedJobIds[newIdx]);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedJobId, orderedJobIds, setSelectedJobId, massUnschedule]);
 
   // ---- Now line ----
   const [now, setNow] = useState(() => new Date());
@@ -456,6 +490,22 @@ export default function OperatorSchedulePage() {
         />
       </div>
 
+      {/* ---- Job Details Panel (between sidebar and grid) ---- */}
+      {selectedJob && (
+        <div className="shrink-0">
+          <JobDetailsPanel
+            job={selectedJob}
+            tasks={snapshot.tasks}
+            elements={snapshot.elements}
+            assignments={snapshot.assignments}
+            stations={snapshot.stations}
+            onClose={() => setSelectedJobId(null)}
+            lateJobIds={lateJobIds}
+            snapshotOperators={snapshot.operators}
+          />
+        </div>
+      )}
+
       {/* ---- Main content ---- */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Grid area */}
@@ -557,7 +607,7 @@ export default function OperatorSchedulePage() {
       <button
         onClick={handleComputeSchedule}
         disabled={isComputingSchedule}
-        className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white shadow-lg transition-all flex items-center justify-center"
+        className="fixed bottom-24 right-6 z-40 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white shadow-lg transition-all flex items-center justify-center"
         aria-label="Calculer le planning"
         title="Calculer le planning"
         data-testid="compute-schedule-fab-operator"
@@ -568,6 +618,17 @@ export default function OperatorSchedulePage() {
           <Cpu size={20} />
         )}
       </button>
+
+      {/* ---- Mass unschedule confirmation dialog ---- */}
+      {massUnschedule.confirmState && (
+        <MassUnscheduleDialog
+          state={massUnschedule.confirmState}
+          getClearableCount={massUnschedule.getClearableCount}
+          onConfirm={massUnschedule.confirm}
+          onDismiss={massUnschedule.dismiss}
+          onUpdate={massUnschedule.setConfirmState}
+        />
+      )}
 
       {/* ---- Compute result modal ---- */}
       {computeResult && (
@@ -701,11 +762,16 @@ function computeTileSlices(
         sawtoothTop: false, sawtoothBottom: false,
       });
     } else {
-      for (const a of active) {
+      // Sort so masked tasks come first (left), then by start time
+      const sorted = [...active].sort((x, y) =>
+        x.isMasked === y.isMasked ? x.startMs - y.startMs : x.isMasked ? -1 : 1
+      );
+      for (let idx = 0; idx < sorted.length; idx++) {
+        const a = sorted[idx];
         rawSlices.push({
           assignmentId: a.id, taskId: a.taskId,
           from: new Date(sliceStart), to: new Date(sliceEnd),
-          position: a.isMasked ? 'left' : 'right', isMasked: a.isMasked,
+          position: idx === 0 ? 'left' : 'right', isMasked: a.isMasked,
           sawtoothTop: false, sawtoothBottom: false,
         });
       }
