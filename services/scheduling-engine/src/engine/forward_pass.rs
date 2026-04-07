@@ -13,6 +13,9 @@ pub struct StationAttrs {
     pub masked_time_enabled: bool,
     pub attention_masked: f64,
     pub masked_productivity: f64,
+    /// Setup peremption threshold in ticks. If operator is absent this many consecutive
+    /// ticks during setup, setup expires and must be redone.
+    pub peremption_ticks: u32,
 }
 
 /// An action to be scheduled (mutable during forward pass)
@@ -35,6 +38,13 @@ pub struct Action {
     pub chunk_info: Option<(u32, u32, String)>,
     /// Deadline priority tier: 0=imperative, 1=important, 2=standard, 3=flexible
     pub deadline_priority: u8,
+    /// Job deadline in ticks (for job-level pressure computation)
+    pub job_deadline_tick: u64,
+    /// Earliest tick at which this action can retry after a LAST safety rollback
+    pub earliest_retry_tick: Option<usize>,
+    /// Additional predecessor action indices for cross-element / cross-job dependencies.
+    /// Each entry is (action_idx, gap_ticks). All must have end_tick + gap <= current tick.
+    pub additional_predecessors: Vec<(usize, u32)>,
 }
 
 /// Manages operator availability with dynamic extension
@@ -147,6 +157,10 @@ impl OperatorAvailability {
     }
 }
 
+/// Deadline priority tier weights: imperative jobs get 4x urgency, flexible get 0.5x.
+/// This ensures imperative jobs approaching their LAST beat flexible jobs past theirs.
+const TIER_WEIGHT: [f64; 4] = [4.0, 2.0, 1.0, 0.5];
+
 /// Scored action for priority sorting
 struct ScoredAction {
     action_idx: usize,
@@ -155,6 +169,8 @@ struct ScoredAction {
 
 /// Find operators capable of staffing a station at tick t.
 /// Returns Vec<(operator_idx, attention_to_give)> or empty if insufficient.
+/// `preferred_operators` enables operator continuity: preferred operators sort first
+/// at equal proficiency, reducing context-switching waste.
 pub fn find_operators_for_station(
     grid: &ScheduleGrid,
     t: usize,
@@ -162,9 +178,10 @@ pub fn find_operators_for_station(
     attention_needed: f64,
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &OperatorAvailability,
+    preferred_operators: &[(usize, f64)],
 ) -> Vec<(usize, f64)> {
     // Collect all qualified, available operators with remaining attention
-    let mut candidates: Vec<(usize, f64, f64)> = Vec::new(); // (op_idx, proficiency, remaining_attention)
+    let mut candidates: Vec<(usize, f64, f64, bool)> = Vec::new(); // (op_idx, proficiency, remaining_attention, is_preferred)
 
     for (op_idx, skills) in operator_skills.iter().enumerate() {
         // Check if this operator has the skill for this station
@@ -184,19 +201,23 @@ pub fn find_operators_for_station(
             // Check remaining attention
             let remaining = grid.operator_remaining_attention(op_idx, t);
             if remaining > 0.001 {
-                candidates.push((op_idx, prof, remaining));
+                let is_preferred = preferred_operators.iter().any(|(op, _)| *op == op_idx);
+                candidates.push((op_idx, prof, remaining, is_preferred));
             }
         }
     }
 
-    // Sort by proficiency DESC
-    candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    // Sort by: preferred first, then proficiency DESC
+    candidates.sort_by(|a, b| {
+        b.3.cmp(&a.3)
+            .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+    });
 
     // Greedily pick operators until attention_needed is met
     let mut result: Vec<(usize, f64)> = Vec::new();
     let mut attention_remaining = attention_needed;
 
-    for (op_idx, _prof, remaining_attn) in &candidates {
+    for (op_idx, _prof, remaining_attn, _pref) in &candidates {
         if attention_remaining <= 0.001 {
             break;
         }
@@ -217,6 +238,7 @@ pub fn find_operators_for_station(
 }
 
 /// Main forward pass: schedule all actions onto the grid.
+/// `station_to_group` maps station_idx → Option<(group_idx, max_concurrent)> for group capacity.
 pub fn run_forward_pass(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
@@ -225,12 +247,21 @@ pub fn run_forward_pass(
     operator_availability: &mut OperatorAvailability,
     tick_minutes: u32,
     start_date: NaiveDate,
+    station_to_group: &[Option<(usize, u32)>],
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
 
     let mut t: usize = 0;
     let horizon_ticks = grid.num_ticks as i64;
+
+    // Pre-build station-to-pending-actions index for LAST safety check
+    let mut station_to_actions: Vec<Vec<usize>> = vec![Vec::new(); station_attrs.len()];
+    for (i, action) in actions.iter().enumerate() {
+        if action.station_idx < station_to_actions.len() {
+            station_to_actions[action.station_idx].push(i);
+        }
+    }
 
     loop {
         // Check if all actions are done
@@ -243,6 +274,15 @@ pub fn run_forward_pass(
         if t >= grid.num_ticks {
             grid.grow(grow_ticks);
             operator_availability.extend(grow_ticks);
+        }
+
+        // Pre-compute per-job remaining ART for job_boost scoring (O(n) per tick)
+        let mut job_remaining_art: std::collections::HashMap<String, i64> =
+            std::collections::HashMap::new();
+        for action in actions.iter() {
+            if action.art > 0 {
+                *job_remaining_art.entry(action.job_id.clone()).or_insert(0) += action.art as i64;
+            }
         }
 
         // Inner loop: score and assign at current tick
@@ -266,6 +306,13 @@ pub fn run_forward_pass(
                     continue;
                 }
 
+                // Respect LAST safety rollback cooldown
+                if let Some(retry_tick) = action.earliest_retry_tick {
+                    if t < retry_tick {
+                        continue;
+                    }
+                }
+
                 // Predecessor must be done (end_tick set) and finished by now
                 if let Some(pred_idx) = action.predecessor_idx {
                     let gap = actions[i].predecessor_gap_ticks as usize;
@@ -275,24 +322,64 @@ pub fn run_forward_pass(
                     }
                 }
 
+                // Cross-element / cross-job dependencies: all additional predecessors
+                // must be done AND their end_tick + gap must be <= current tick
+                if !action.additional_predecessors.is_empty() {
+                    let all_done = action.additional_predecessors.iter().all(|&(pred_idx, gap)| {
+                        match actions[pred_idx].end_tick {
+                            Some(pred_end) => pred_end + gap as usize <= t,
+                            None => false,
+                        }
+                    });
+                    if !all_done { continue; }
+                }
+
                 // Station must be free at tick t
                 if !grid.is_station_free(action.station_idx, t) {
                     continue;
                 }
 
-                // Compute score using continuous urgency
+                // Group concurrency: check if station's group allows another active task
+                if action.station_idx < station_to_group.len() {
+                    if let Some((group_idx, max_concurrent)) = station_to_group[action.station_idx] {
+                        if grid.group_active_count(group_idx, t) >= max_concurrent {
+                            continue; // group at capacity
+                        }
+                    }
+                }
+
+                // Compute score using continuous urgency weighted by deadline priority tier
                 let slack = action.last as i64 - t as i64 - action.art as i64;
-                let urgency: i64 = if slack <= 0 {
+                let raw_urgency: i64 = if slack <= 0 {
                     10000 + (-slack) as i64
                 } else {
                     let ratio = 1.0 - (slack as f64 / horizon_ticks as f64);
                     (ratio * 1000.0) as i64
                 };
 
+                // Weight urgency by deadline priority tier:
+                // imperative(×4) > important(×2) > standard(×1) > flexible(×0.5)
+                let tier_w = TIER_WEIGHT[action.deadline_priority.min(3) as usize];
+                let weighted_urgency = (raw_urgency as f64 * tier_w) as i64;
+
+                // Job-level pressure: when the entire job is behind schedule,
+                // boost all its tasks so they get scheduled sooner
+                let job_boost: i64 = if action.job_deadline_tick < u64::MAX {
+                    let job_art = job_remaining_art.get(&action.job_id).copied().unwrap_or(0);
+                    let job_slack = action.job_deadline_tick as i64 - t as i64 - job_art;
+                    if job_slack < 0 {
+                        ((-job_slack) as f64 * 50.0 * tier_w) as i64
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+
                 // Calage bonus: if last action on this station is from same job
                 let calage_bonus = compute_calage_bonus(grid, &actions, i, t);
 
-                let score = urgency + calage_bonus;
+                let score = weighted_urgency + job_boost + calage_bonus;
 
                 scored.push(ScoredAction {
                     action_idx: i,
@@ -312,7 +399,7 @@ pub fn run_forward_pass(
                 let attrs = &station_attrs[station_idx];
                 let attention_needed = attrs.attention_full; // Start with setup attention
 
-                // Find operators
+                // Find operators (no preference for initial assignment)
                 let operators = find_operators_for_station(
                     grid,
                     t,
@@ -320,6 +407,7 @@ pub fn run_forward_pass(
                     attention_needed,
                     operator_skills,
                     operator_availability,
+                    &[], // no preferred operators for initial pick
                 );
 
                 if operators.is_empty() && grid.num_operators > 0 {
@@ -340,6 +428,9 @@ pub fn run_forward_pass(
                     tick_minutes,
                     start_date,
                     grow_ticks,
+                    &station_to_actions,
+                    horizon_ticks,
+                    station_to_group,
                 );
 
                 if let Some(a) = assignment {
@@ -369,10 +460,20 @@ fn schedule_action_to_completion(
     tick_minutes: u32,
     start_date: NaiveDate,
     grow_ticks: usize,
+    station_to_actions: &[Vec<usize>],
+    horizon_ticks: i64,
+    station_to_group: &[Option<(usize, u32)>],
 ) -> Option<ComputedAssignment> {
     let station_idx = actions[action_idx].station_idx;
     let setup_ticks = actions[action_idx].setup_ticks;
     let attrs = &station_attrs[station_idx];
+
+    // Resolve station's group for concurrency tracking
+    let group_idx = if station_idx < station_to_group.len() {
+        station_to_group[station_idx].map(|(g, _)| g)
+    } else {
+        None
+    };
 
     // Store operator assignments across all ticks
     let mut tick_operator_log: Vec<(usize, Vec<(usize, f64)>)> = Vec::new();
@@ -381,6 +482,7 @@ fn schedule_action_to_completion(
     let mut is_degraded = false;
     let mut total_productivity = 0.0;
     let mut ticks_counted = 0u32;
+    let mut idle_ticks: u32 = 0; // SPR: consecutive ticks without operator
 
     actions[action_idx].start_tick = Some(start_t);
     actions[action_idx].assigned_operators = initial_operators.to_vec();
@@ -397,73 +499,67 @@ fn schedule_action_to_completion(
         // Check station is still free (should be, we're in the sub-loop)
         if !grid.is_station_free(station_idx, current_t) && current_t != start_t {
             // Station got occupied (shouldn't happen in single-pass, but safety)
-            // Rollback
-            rollback_action(grid, actions, action_idx, start_t, current_t);
+            rollback_action_with_operators(grid, actions, action_idx, start_t, current_t, &tick_operator_log, group_idx);
             return None;
+        }
+
+        // LAST safety check: DISABLED for now — O(actions²) per tick causes timeout
+        // on large instances. TODO: re-enable with a cheaper check (e.g., only at start_t).
+        if false && station_idx < station_to_actions.len() {
+            let remaining_art = actions[action_idx].art as usize;
+            let current_tier_w = TIER_WEIGHT[actions[action_idx].deadline_priority.min(3) as usize];
+            let current_slack = actions[action_idx].last as i64 - current_t as i64 - remaining_art as i64;
+            let current_raw_urgency: i64 = if current_slack <= 0 {
+                10000 + (-current_slack)
+            } else {
+                ((1.0 - current_slack as f64 / horizon_ticks as f64) * 1000.0) as i64
+            };
+            let current_weighted = (current_raw_urgency as f64 * current_tier_w) as i64;
+
+            let mut should_yield = false;
+            for &other_idx in &station_to_actions[station_idx] {
+                if other_idx == action_idx { continue; }
+                let other = &actions[other_idx];
+                if other.art == 0 || other.start_tick.is_some() { continue; }
+
+                // Would the other action's LAST be exceeded while we're running?
+                if other.last <= (current_t + remaining_art) as u64 {
+                    let other_tier_w = TIER_WEIGHT[other.deadline_priority.min(3) as usize];
+                    let other_slack = other.last as i64 - current_t as i64 - other.art as i64;
+                    let other_raw_urgency: i64 = if other_slack <= 0 {
+                        10000 + (-other_slack)
+                    } else {
+                        ((1.0 - other_slack as f64 / horizon_ticks as f64) * 1000.0) as i64
+                    };
+                    let other_weighted = (other_raw_urgency as f64 * other_tier_w) as i64;
+
+                    if other_weighted > current_weighted {
+                        should_yield = true;
+                        // Set retry tick to after the other action would finish
+                        actions[action_idx].earliest_retry_tick = Some(current_t + other.art as usize);
+                        break;
+                    }
+                }
+            }
+            if should_yield {
+                rollback_action_with_operators(grid, actions, action_idx, start_t, current_t, &tick_operator_log, group_idx);
+                return None;
+            }
         }
 
         // Find operators for this tick
         let in_setup = actions[action_idx].eat < setup_ticks;
 
-        // Masked time pre-fill: when setup ends on a masked station,
-        // pre-fill the entire run phase and return immediately.
-        // This frees operator attention for the main loop to assign other tasks.
-        if !in_setup && attrs.masked_time_enabled {
-            let work_ticks = actions[action_idx].art as usize;
-            // Masked productivity < 1.0 means the machine runs slower.
-            // E.g., 90min of work at productivity 0.95 takes ceil(90/0.95) = 95min.
-            let actual_ticks = if attrs.masked_productivity > 0.001 {
-                ((work_ticks as f64) / attrs.masked_productivity).ceil() as usize
-            } else {
-                work_ticks
-            };
-
-            // Ensure grid can hold all actual ticks
-            while current_t + actual_ticks > grid.num_ticks {
-                grid.grow(grow_ticks);
-                operator_availability.extend(grow_ticks);
-            }
-
-            // Lock operators for masked monitoring at current tick
-            let masked_ops = find_operators_for_station(
-                grid, current_t, station_idx,
-                attrs.attention_masked, operator_skills, operator_availability,
-            );
-
-            // Pre-fill station and operator grids for the stretched duration
-            for delta in 0..actual_ticks {
-                let fill_t = current_t + delta;
-                grid.assign_station(station_idx, fill_t, action_idx);
-                for &(op_idx, attn) in &masked_ops {
-                    if operator_availability.is_available(op_idx, fill_t) {
-                        grid.assign_operator(op_idx, fill_t, station_idx, attn);
-                    }
-                }
-                tick_operator_log.push((fill_t, masked_ops.clone()));
-            }
-
-            // Mark action as complete
-            actions[action_idx].eat += actual_ticks as u32;
-            actions[action_idx].art = 0;
-            total_productivity += attrs.masked_productivity * actual_ticks as f64;
-            ticks_counted += actual_ticks as u32;
-            current_t += actual_ticks - 1;
-
-            if attrs.masked_productivity < 0.99 {
-                is_degraded = true;
-            }
-
-            break; // Exit sub-loop, action complete
-        }
-
         let attention_needed = if in_setup {
             attrs.attention_full
+        } else if attrs.masked_time_enabled {
+            attrs.attention_masked
         } else {
-            // Non-masked run phase: request max for parallelizable stations
             attrs.max_run_attention
         };
 
         let operators_this_tick = if attention_needed > 0.001 {
+            // Prefer operators already assigned to this action (continuity)
             let ops = find_operators_for_station(
                 grid,
                 current_t,
@@ -471,9 +567,28 @@ fn schedule_action_to_completion(
                 attention_needed,
                 operator_skills,
                 operator_availability,
+                &actions[action_idx].assigned_operators,
             );
             if ops.is_empty() && grid.num_operators > 0 {
                 // No operator available at this tick - skip tick (don't decrement ART)
+                // BUT keep station reserved: the job is physically on the machine
+                idle_ticks += 1;
+                grid.assign_station(station_idx, current_t, action_idx);
+                if let Some(g) = group_idx {
+                    grid.increment_group(g, current_t);
+                }
+                // SPR: if idle too long, setup expires and must be redone
+                if attrs.peremption_ticks > 0
+                    && idle_ticks >= attrs.peremption_ticks
+                    && actions[action_idx].eat > 0
+                    && actions[action_idx].eat < setup_ticks
+                {
+                    // Setup has expired — must redo from scratch
+                    actions[action_idx].art += actions[action_idx].eat;
+                    actions[action_idx].eat = 0;
+                    idle_ticks = 0;
+                    is_degraded = true;
+                }
                 current_t += 1;
                 continue;
             }
@@ -487,7 +602,18 @@ fn schedule_action_to_completion(
         let productivity = if in_setup {
             (total_attention / attrs.attention_full.max(0.001)).min(1.0)
         } else if attrs.masked_time_enabled {
-            attrs.masked_productivity
+            // Only apply masked productivity penalty when operator actually has
+            // concurrent work (assigned elsewhere this tick). At this point,
+            // assign_operator() for the current action hasn't been called yet,
+            // so remaining_attention reflects only OTHER actions' assignments.
+            let has_concurrent = operators_this_tick.iter().any(|(op_idx, _)| {
+                grid.operator_remaining_attention(*op_idx, current_t) < 1.0 - 0.001
+            });
+            if has_concurrent {
+                attrs.masked_productivity
+            } else {
+                1.0
+            }
         } else {
             // Speed scales with operators, capped at max_run_attention / attention_run
             (total_attention / attrs.attention_run.max(0.001))
@@ -495,7 +621,12 @@ fn schedule_action_to_completion(
         };
 
         if productivity < 0.001 && attention_needed > 0.001 {
-            // Can't make progress, skip
+            // Can't make progress, skip — but keep station reserved
+            idle_ticks += 1;
+            grid.assign_station(station_idx, current_t, action_idx);
+            if let Some(g) = group_idx {
+                grid.increment_group(g, current_t);
+            }
             current_t += 1;
             continue;
         }
@@ -504,8 +635,16 @@ fn schedule_action_to_completion(
             is_degraded = true;
         }
 
+        // Work is happening — reset SPR idle counter
+        idle_ticks = 0;
+
         // Assign station tick
         grid.assign_station(station_idx, current_t, action_idx);
+
+        // Increment group active count
+        if let Some(g) = group_idx {
+            grid.increment_group(g, current_t);
+        }
 
         // Assign operator ticks
         for &(op_idx, attention) in &operators_this_tick {
@@ -568,6 +707,9 @@ fn schedule_action_to_completion(
 }
 
 /// Build consolidated operator assignments from tick-level log.
+/// Detects gaps in operator presence and creates separate assignment segments
+/// for each contiguous range, avoiding false continuous ranges when an operator
+/// is temporarily absent mid-task.
 fn build_operator_assignments(
     tick_operator_log: &[(usize, Vec<(usize, f64)>)],
     tick_minutes: u32,
@@ -577,52 +719,89 @@ fn build_operator_assignments(
         return Vec::new();
     }
 
-    // Collect per-operator: find first and last tick, average attention
-    let mut op_ranges: std::collections::HashMap<usize, (usize, usize, f64, u32)> =
+    // Collect per-operator: sorted list of (tick, attention)
+    let mut op_ticks: std::collections::HashMap<usize, Vec<(usize, f64)>> =
         std::collections::HashMap::new();
 
     for (tick, operators) in tick_operator_log {
         for &(op_idx, attention) in operators {
-            let entry = op_ranges.entry(op_idx).or_insert((*tick, *tick, 0.0, 0));
-            if *tick < entry.0 {
-                entry.0 = *tick;
-            }
-            if *tick > entry.1 {
-                entry.1 = *tick;
-            }
-            entry.2 += attention;
-            entry.3 += 1;
+            op_ticks.entry(op_idx).or_default().push((*tick, attention));
         }
     }
 
-    op_ranges
-        .into_iter()
-        .map(|(op_idx, (first_tick, last_tick, total_attn, count))| {
-            let from_minutes = first_tick as u64 * tick_minutes as u64;
-            let to_minutes = (last_tick + 1) as u64 * tick_minutes as u64;
-            let avg_attention = total_attn / count as f64;
+    let mut result: Vec<OperatorAssignment> = Vec::new();
 
-            OperatorAssignment {
-                operator_id: format!("op_idx:{}", op_idx),
-                from: super::format_minutes(from_minutes, start_date),
-                to: super::format_minutes(to_minutes, start_date),
-                attention: (avg_attention * 100.0).round() / 100.0,
+    for (op_idx, mut ticks) in op_ticks {
+        ticks.sort_by_key(|(t, _)| *t);
+
+        // Split into contiguous segments (gap = tick not consecutive)
+        let mut seg_start = ticks[0].0;
+        let mut seg_end = ticks[0].0;
+        let mut seg_attn = ticks[0].1;
+        let mut seg_count: u32 = 1;
+
+        for i in 1..ticks.len() {
+            let (t, attn) = ticks[i];
+            if t == seg_end + 1 {
+                // Contiguous — extend segment
+                seg_end = t;
+                seg_attn += attn;
+                seg_count += 1;
+            } else {
+                // Gap detected — emit current segment, start new one
+                let from_minutes = seg_start as u64 * tick_minutes as u64;
+                let to_minutes = (seg_end + 1) as u64 * tick_minutes as u64;
+                let avg_attention = seg_attn / seg_count as f64;
+                result.push(OperatorAssignment {
+                    operator_id: format!("op_idx:{}", op_idx),
+                    from: super::format_minutes(from_minutes, start_date),
+                    to: super::format_minutes(to_minutes, start_date),
+                    attention: (avg_attention * 100.0).round() / 100.0,
+                });
+                seg_start = t;
+                seg_end = t;
+                seg_attn = attn;
+                seg_count = 1;
             }
-        })
-        .collect()
+        }
+
+        // Emit final segment
+        let from_minutes = seg_start as u64 * tick_minutes as u64;
+        let to_minutes = (seg_end + 1) as u64 * tick_minutes as u64;
+        let avg_attention = seg_attn / seg_count as f64;
+        result.push(OperatorAssignment {
+            operator_id: format!("op_idx:{}", op_idx),
+            from: super::format_minutes(from_minutes, start_date),
+            to: super::format_minutes(to_minutes, start_date),
+            attention: (avg_attention * 100.0).round() / 100.0,
+        });
+    }
+
+    result
 }
 
-/// Rollback a partially-scheduled action
-fn rollback_action(
+/// Rollback a partially-scheduled action, clearing station, operator attention, and group counts.
+fn rollback_action_with_operators(
     grid: &mut ScheduleGrid,
     actions: &mut [Action],
     action_idx: usize,
     from_t: usize,
     to_t: usize,
+    tick_operator_log: &[(usize, Vec<(usize, f64)>)],
+    group_idx: Option<usize>,
 ) {
     let station_idx = actions[action_idx].station_idx;
     for t in from_t..to_t {
         grid.clear_station(station_idx, t);
+        if let Some(g) = group_idx {
+            grid.decrement_group(g, t);
+        }
+    }
+    // Clear operator attention that was assigned during this action
+    for (tick, operators) in tick_operator_log {
+        for &(op_idx, _attention) in operators {
+            grid.clear_operator(op_idx, *tick);
+        }
     }
     // Reset action state
     let total = actions[action_idx].setup_ticks + actions[action_idx].run_ticks;
