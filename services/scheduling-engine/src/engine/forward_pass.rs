@@ -207,10 +207,14 @@ pub fn find_operators_for_station(
         }
     }
 
-    // Sort by: preferred first, then proficiency DESC
+    // Sort by: preferred first, then composite score (availability + proficiency)
+    const PROFICIENCY_WEIGHT: f64 = 0.5;
+    let score = |prof: f64, remaining: f64| -> f64 {
+        remaining * (1.0 - PROFICIENCY_WEIGHT) + prof * PROFICIENCY_WEIGHT
+    };
     candidates.sort_by(|a, b| {
         b.3.cmp(&a.3)
-            .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+            .then(score(b.1, b.2).partial_cmp(&score(a.1, a.2)).unwrap_or(std::cmp::Ordering::Equal))
     });
 
     // Greedily pick operators until attention_needed is met
@@ -550,9 +554,11 @@ fn schedule_action_to_completion(
         // Find operators for this tick
         let in_setup = actions[action_idx].eat < setup_ticks;
 
+        let is_masked_run = !in_setup && attrs.masked_time_enabled;
+
         let attention_needed = if in_setup {
             attrs.attention_full
-        } else if attrs.masked_time_enabled {
+        } else if is_masked_run {
             attrs.attention_masked
         } else {
             attrs.max_run_attention
@@ -592,7 +598,12 @@ fn schedule_action_to_completion(
                 current_t += 1;
                 continue;
             }
-            ops
+            // Masked-time run: machine runs autonomously, one operator max
+            if is_masked_run && ops.len() > 1 {
+                vec![ops[0]]
+            } else {
+                ops
+            }
         } else {
             Vec::new()
         };
@@ -601,19 +612,8 @@ fn schedule_action_to_completion(
         let total_attention: f64 = operators_this_tick.iter().map(|(_, a)| a).sum();
         let productivity = if in_setup {
             (total_attention / attrs.attention_full.max(0.001)).min(1.0)
-        } else if attrs.masked_time_enabled {
-            // Only apply masked productivity penalty when operator actually has
-            // concurrent work (assigned elsewhere this tick). At this point,
-            // assign_operator() for the current action hasn't been called yet,
-            // so remaining_attention reflects only OTHER actions' assignments.
-            let has_concurrent = operators_this_tick.iter().any(|(op_idx, _)| {
-                grid.operator_remaining_attention(*op_idx, current_t) < 1.0 - 0.001
-            });
-            if has_concurrent {
-                attrs.masked_productivity
-            } else {
-                1.0
-            }
+        } else if is_masked_run {
+            attrs.masked_productivity
         } else {
             // Speed scales with operators, capped at max_run_attention / attention_run
             (total_attention / attrs.attention_run.max(0.001))
@@ -631,7 +631,8 @@ fn schedule_action_to_completion(
             continue;
         }
 
-        if total_attention < attrs.attention_run - 0.001 {
+        let min_attention = if is_masked_run { attrs.attention_masked } else { attrs.attention_run };
+        if total_attention < min_attention - 0.001 {
             is_degraded = true;
         }
 

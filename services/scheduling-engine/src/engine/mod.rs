@@ -2,6 +2,7 @@ mod backward_pass;
 pub mod fbi;
 mod forward_pass;
 mod grid;
+pub mod moore;
 pub mod pre_split;
 
 use std::collections::HashMap;
@@ -44,8 +45,8 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         .map(|s| (s.id.clone(), s.masked_time_enabled))
         .collect();
 
-    // Run FBI loop (or single pass if fbi_max_iterations <= 1)
-    let (mut assignments, actions, stats, fbi_iterations) = fbi::run_with_fbi(
+    // Run FBI loop with optional multi-start (TierFirst + EDD orderings)
+    let (mut assignments, mut actions, mut stats, mut fbi_iterations) = fbi::run_with_multi_start_fbi(
         &request.jobs,
         &request.stations,
         &request.operators,
@@ -53,60 +54,109 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         options.horizon_days,
         fbi_max_iterations,
         start_date,
+        options.multi_start,
+        &request.station_groups,
     );
+
+    // Moore escape hatch: DISABLED for now — adds full FBI re-runs.
+    // TODO: re-enable once base performance is validated.
+    let elapsed_ms = start_time.elapsed().as_millis() as u64;
+    if false && stats.late_job_count > 0 && elapsed_ms < 8000 {
+        if let Some((moore_assignments, moore_actions, moore_stats, moore_iters)) = moore::moore_escape(
+            &request.jobs,
+            &request.stations,
+            &request.operators,
+            &actions,
+            &stats,
+            tick_minutes,
+            options.horizon_days,
+            fbi_max_iterations,
+            start_date,
+            2, // max_attempts
+            &request.station_groups,
+        ) {
+            assignments = moore_assignments;
+            actions = moore_actions;
+            stats = moore_stats;
+            fbi_iterations += moore_iters;
+        }
+    }
 
     // Merge chunks back: only report the ORIGINAL task_id in assignments
     assignments = merge_chunk_assignments(assignments);
 
-    // Set is_masked_time flag: true only if the station supports masked time AND
-    // the operator actually works on another task concurrently (effective parallelism).
-    // A task on a masked station where the operator has no concurrent work is NOT masked time.
+    // Post-processing: set is_masked_time flag and fix operator attention.
+    // For ALL tasks: if operator has no concurrent work, attention = 1.0
+    // (the grid uses lower values for scheduling flexibility, but the operator
+    // was fully dedicated — that's what we report).
     {
-        // Build operator → list of (assignment_index, start, end) for overlap detection
+        // Build operator → list of (assignment_index, op_from, op_to) for overlap detection
+        // Uses the OPERATOR's own from/to, not the task's scheduled_start/end
         let mut op_assignments: HashMap<String, Vec<(usize, String, String)>> = HashMap::new();
         for (i, a) in assignments.iter().enumerate() {
             for op in &a.operators {
                 op_assignments.entry(op.operator_id.clone()).or_default()
-                    .push((i, a.scheduled_start.clone(), a.scheduled_end.clone()));
+                    .push((i, op.from.clone(), op.to.clone()));
             }
         }
 
         for i in 0..assignments.len() {
-            let is_on_masked_station = station_masked_time
-                .get(&assignments[i].station_id)
-                .copied()
-                .unwrap_or(false);
+            // Collect per-operator: has concurrent on OTHER tasks? overlaps with sibling on SAME task?
+            let num_ops = assignments[i].operators.len();
+            let mut op_flags: Vec<(bool, bool)> = Vec::with_capacity(num_ops); // (has_external_concurrent, has_sibling_overlap)
 
-            let has_run_phase = match &assignments[i].setup_end {
-                Some(setup_end) => setup_end != &assignments[i].scheduled_end,
-                None => true,
-            };
-
-            if !is_on_masked_station || !has_run_phase {
-                assignments[i].is_masked_time = false;
-                continue;
-            }
-
-            // Check if ANY operator on this assignment also works on another task
-            // that overlaps in time (effective parallelism)
-            let mut has_concurrent = false;
-            for op in &assignments[i].operators {
+            for op_idx in 0..num_ops {
+                let op = &assignments[i].operators[op_idx];
+                // Check concurrent work on OTHER tasks
+                let mut has_external = false;
                 if let Some(op_tasks) = op_assignments.get(&op.operator_id) {
-                    for (j, start_j, end_j) in op_tasks {
-                        if *j == i { continue; } // same task
-                        // Time overlap check
-                        if assignments[i].scheduled_start < *end_j
-                            && *start_j < assignments[i].scheduled_end
-                        {
-                            has_concurrent = true;
+                    for (j, from_j, to_j) in op_tasks {
+                        if *j == i { continue; }
+                        if op.from < *to_j && *from_j < op.to {
+                            has_external = true;
                             break;
                         }
                     }
                 }
-                if has_concurrent { break; }
+                // Check overlap with other operators on the SAME task
+                let mut has_sibling = false;
+                for other_idx in 0..num_ops {
+                    if other_idx == op_idx { continue; }
+                    let other = &assignments[i].operators[other_idx];
+                    if op.from < other.to && other.from < op.to {
+                        has_sibling = true;
+                        break;
+                    }
+                }
+                op_flags.push((has_external, has_sibling));
             }
 
-            assignments[i].is_masked_time = has_concurrent;
+            // Apply attention overrides
+            for (op_idx, (has_external, has_sibling)) in op_flags.iter().enumerate() {
+                if !has_external && !has_sibling {
+                    // Sole operator on this task during their period, no external work → 1.0
+                    assignments[i].operators[op_idx].attention = 1.0;
+                }
+            }
+
+            // is_masked_time: on masked stations with a run phase
+            let is_on_masked_station = station_masked_time
+                .get(&assignments[i].station_id)
+                .copied()
+                .unwrap_or(false);
+            let has_run_phase = match &assignments[i].setup_end {
+                Some(setup_end) => setup_end != &assignments[i].scheduled_end,
+                None => true,
+            };
+            assignments[i].is_masked_time = is_on_masked_station && has_run_phase;
+
+            // For masked-time tasks: remove operators who are only present during setup
+            // (their to <= setup_end). They're not part of the masked run phase.
+            if assignments[i].is_masked_time {
+                if let Some(setup_end) = &assignments[i].setup_end.clone() {
+                    assignments[i].operators.retain(|op| op.to > *setup_end);
+                }
+            }
         }
     }
 
@@ -273,11 +323,20 @@ pub fn build_actions(
     station_id_to_idx: &HashMap<String, usize>,
     tick_minutes: u32,
     last_values: &HashMap<String, u64>,
+    start_date: chrono::NaiveDate,
 ) -> Vec<Action> {
     let mut actions: Vec<Action> = Vec::new();
     let mut task_id_to_action_idx: HashMap<String, usize> = HashMap::new();
 
     for job in jobs {
+        // Compute job deadline in ticks for job-level pressure scoring
+        let job_deadline_tick = job
+            .deadline
+            .as_ref()
+            .and_then(|d| parse_deadline_minutes(d, start_date))
+            .map(|minutes| minutes / tick_minutes as u64)
+            .unwrap_or(u64::MAX);
+
         for element in &job.elements {
             // Sort tasks by sequence_order
             let mut sorted_tasks = element.tasks.clone();
@@ -332,10 +391,93 @@ pub fn build_actions(
                     start_tick: None,
                     chunk_info: None,
                     deadline_priority: job.deadline_priority,
+                    job_deadline_tick,
+                    earliest_retry_tick: None,
+                    additional_predecessors: Vec::new(),
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);
                 prev_task_id = Some(task.id.clone());
+            }
+        }
+    }
+
+    // Wire up cross-element dependencies (BR-ELEM-004: finish-to-start).
+    // For each element with prerequisite_element_ids, link its first action
+    // to the last action of each prerequisite element.
+    {
+        // Build element_id → (first_action_idx, last_action_idx) map
+        let mut element_first_action: HashMap<String, usize> = HashMap::new();
+        let mut element_last_action: HashMap<String, usize> = HashMap::new();
+        for job in jobs {
+            for element in &job.elements {
+                for task in &element.tasks {
+                    if let Some(&action_idx) = task_id_to_action_idx.get(&task.id) {
+                        element_last_action.insert(element.id.clone(), action_idx);
+                        element_first_action.entry(element.id.clone()).or_insert(action_idx);
+                    }
+                }
+            }
+        }
+
+        // Link dependencies
+        for job in jobs {
+            for element in &job.elements {
+                if element.prerequisite_element_ids.is_empty() {
+                    continue;
+                }
+                if let Some(&first_action_idx) = element_first_action.get(&element.id) {
+                    for prereq_id in &element.prerequisite_element_ids {
+                        if let Some(&last_action_idx) = element_last_action.get(prereq_id) {
+                            // Drying time: if the prerequisite's last task is on a press
+                            let pred_station = actions[last_action_idx].station_idx;
+                            let gap = if pred_station < stations.len() && stations[pred_station].is_press {
+                                minutes_to_ticks(stations[pred_station].drying_time_minutes, tick_minutes)
+                            } else {
+                                0
+                            };
+
+                            if actions[first_action_idx].predecessor_idx.is_none() {
+                                actions[first_action_idx].predecessor_idx = Some(last_action_idx);
+                                // Use max gap (cross-element gap or existing intra-element gap)
+                                actions[first_action_idx].predecessor_gap_ticks =
+                                    actions[first_action_idx].predecessor_gap_ticks.max(gap);
+                            } else {
+                                actions[first_action_idx].additional_predecessors.push((last_action_idx, gap));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Wire up cross-job dependencies (BR-JOB-006: finish-to-start).
+    // For each job with required_job_ids, find its first action and link it to
+    // the last actions of all required jobs.
+    let mut job_id_to_last_action: HashMap<String, usize> = HashMap::new();
+    let mut job_id_to_first_action: HashMap<String, usize> = HashMap::new();
+    for (i, action) in actions.iter().enumerate() {
+        job_id_to_last_action.insert(action.job_id.clone(), i); // last seen = last action
+        job_id_to_first_action.entry(action.job_id.clone()).or_insert(i); // first seen = first action
+    }
+
+    for job in jobs {
+        if job.required_job_ids.is_empty() {
+            continue;
+        }
+        if let Some(&first_action_idx) = job_id_to_first_action.get(&job.id) {
+            for req_job_id in &job.required_job_ids {
+                if let Some(&last_action_idx) = job_id_to_last_action.get(req_job_id) {
+                    // If the first action already has a predecessor (intra-element),
+                    // add as additional predecessor
+                    if actions[first_action_idx].predecessor_idx.is_some() {
+                        actions[first_action_idx].additional_predecessors.push((last_action_idx, 0));
+                    } else {
+                        // Use the primary predecessor slot
+                        actions[first_action_idx].predecessor_idx = Some(last_action_idx);
+                    }
+                }
             }
         }
     }
@@ -411,6 +553,11 @@ pub fn compute_stats(
     let mut late_task_count: u32 = 0;
     let mut total_lateness_minutes: u64 = 0;
 
+    // Late job tracking (deduplicated by job_id)
+    let mut late_jobs: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut weighted_lateness_minutes: u64 = 0;
+    let tier_weights: [f64; 4] = [4.0, 2.0, 1.0, 0.5];
+
     // Build job deadline map
     let job_deadlines: HashMap<String, u64> = jobs
         .iter()
@@ -428,7 +575,13 @@ pub fn compute_stats(
                 if end_minutes > deadline_minutes {
                     deadline_violations += 1;
                     late_task_count += 1;
-                    total_lateness_minutes += end_minutes - deadline_minutes;
+                    let lateness = end_minutes - deadline_minutes;
+                    total_lateness_minutes += lateness;
+
+                    // Deduplicated late job count + weighted lateness
+                    late_jobs.insert(action.job_id.clone());
+                    let w = tier_weights[action.deadline_priority.min(3) as usize];
+                    weighted_lateness_minutes += (lateness as f64 * w) as u64;
                 }
             }
         }
@@ -441,10 +594,12 @@ pub fn compute_stats(
         deadline_violations,
         late_task_count,
         total_lateness_minutes,
+        late_job_count: late_jobs.len() as u32,
+        weighted_lateness_minutes,
     }
 }
 
-fn parse_deadline_minutes(deadline: &str, start_date: chrono::NaiveDate) -> Option<u64> {
+pub fn parse_deadline_minutes(deadline: &str, start_date: chrono::NaiveDate) -> Option<u64> {
     // Try parsing as "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS"
     if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(deadline, "%Y-%m-%dT%H:%M:%S") {
         let days = (dt.date() - start_date).num_days();
