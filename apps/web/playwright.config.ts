@@ -22,7 +22,7 @@ export default defineConfig({
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     env: {
-      VITE_USE_MOCK: 'true',
+      VITE_USE_MOCK: 'false',
     },
   },
 });

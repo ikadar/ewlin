@@ -28,6 +28,8 @@ pub struct StationInput {
     /// Drying time in minutes after printing on this station (default: 240 = 4h)
     #[serde(default = "default_drying_time")]
     pub drying_time_minutes: u32,
+    pub max_operators: Option<u32>,
+    pub capacity: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,5 +79,18 @@ impl StationInput {
 
     pub fn effective_max_chunk(&self) -> u32 {
         self.max_chunk_minutes.unwrap_or(420)
+    }
+
+    pub fn effective_capacity(&self) -> u32 {
+        self.capacity.unwrap_or(1).max(1)
+    }
+
+    pub fn effective_max_operators(&self) -> u32 {
+        self.max_operators.unwrap_or_else(|| {
+            // Must allow enough operators to meet attention_run
+            let run_ops = self.effective_attention_run().ceil() as u32;
+            let max_run_ops = self.effective_max_run_attention().ceil() as u32;
+            run_ops.max(max_run_ops).max(1)
+        })
     }
 }

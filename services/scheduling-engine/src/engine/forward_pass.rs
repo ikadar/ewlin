@@ -16,6 +16,7 @@ pub struct StationAttrs {
     /// Setup peremption threshold in ticks. If operator is absent this many consecutive
     /// ticks during setup, setup expires and must be redone.
     pub peremption_ticks: u32,
+    pub max_operators: u32,
 }
 
 /// An action to be scheduled (mutable during forward pass)
@@ -179,6 +180,7 @@ pub fn find_operators_for_station(
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &OperatorAvailability,
     preferred_operators: &[(usize, f64)],
+    max_operators: u32,
 ) -> Vec<(usize, f64)> {
     // Collect all qualified, available operators with remaining attention
     let mut candidates: Vec<(usize, f64, f64, bool)> = Vec::new(); // (op_idx, proficiency, remaining_attention, is_preferred)
@@ -222,22 +224,15 @@ pub fn find_operators_for_station(
     let mut attention_remaining = attention_needed;
 
     for (op_idx, _prof, remaining_attn, _pref) in &candidates {
-        if attention_remaining <= 0.001 {
-            break;
-        }
+        if attention_remaining <= 0.001 { break; }
+        if result.len() >= max_operators as usize { break; }
         let give = remaining_attn.min(attention_remaining);
         result.push((*op_idx, give));
         attention_remaining -= give;
     }
 
-    if attention_remaining > 0.001 {
-        // Not enough operators to meet attention requirement
-        // Return what we have anyway -- degraded mode
-        if result.is_empty() {
-            return Vec::new();
-        }
-    }
-
+    // Return what we found — caller decides whether to proceed based on
+    // total attention vs. required threshold.
     result
 }
 
@@ -267,10 +262,18 @@ pub fn run_forward_pass(
         }
     }
 
+    let mut main_loop_idle: usize = 0;
+    let forward_pass_deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+
     loop {
         // Check if all actions are done
         let total_art: u64 = actions.iter().map(|a| a.art as u64).sum();
         if total_art == 0 {
+            break;
+        }
+
+        // Time limit: if forward pass exceeds 30 seconds, stop and return what we have
+        if std::time::Instant::now() >= forward_pass_deadline {
             break;
         }
 
@@ -280,7 +283,15 @@ pub fn run_forward_pass(
             operator_availability.extend(grow_ticks);
         }
 
-        // Pre-compute per-job remaining ART for job_boost scoring (O(n) per tick)
+        // Quick check: skip scoring entirely if no station has capacity at this tick
+        let any_station_free = (0..station_attrs.len()).any(|s| grid.is_station_free(s, t));
+        if !any_station_free {
+            main_loop_idle += 1;
+            t += 1;
+            continue;
+        }
+
+        // Pre-compute per-job remaining ART for job_boost scoring
         let mut job_remaining_art: std::collections::HashMap<String, i64> =
             std::collections::HashMap::new();
         for action in actions.iter() {
@@ -289,7 +300,6 @@ pub fn run_forward_pass(
             }
         }
 
-        // Inner loop: score and assign at current tick
         let mut assigned_something = true;
         while assigned_something {
             assigned_something = false;
@@ -401,7 +411,15 @@ pub fn run_forward_pass(
 
                 // Determine attention needed
                 let attrs = &station_attrs[station_idx];
-                let attention_needed = attrs.attention_full; // Start with setup attention
+                // If no setup phase, we go straight to run — check run attention
+                let action_setup = actions[action_idx].setup_ticks;
+                let attention_needed = if action_setup > 0 {
+                    attrs.attention_full
+                } else if attrs.masked_time_enabled {
+                    attrs.attention_masked
+                } else {
+                    attrs.attention_run
+                };
 
                 // Find operators (no preference for initial assignment)
                 let operators = find_operators_for_station(
@@ -412,14 +430,19 @@ pub fn run_forward_pass(
                     operator_skills,
                     operator_availability,
                     &[], // no preferred operators for initial pick
+                    attrs.max_operators,
                 );
 
-                if operators.is_empty() && grid.num_operators > 0 {
-                    // No operators available, try next candidate
-                    continue;
+                // Don't start if attention is insufficient at this tick
+                if grid.num_operators > 0 {
+                    let total_att: f64 = operators.iter().map(|(_, a)| a).sum();
+                    if total_att < attention_needed - 0.001 {
+                        continue;
+                    }
                 }
 
                 // Found operators (or no operators needed) -- schedule to completion
+                eprintln!("[START] t={} task={} station_idx={}", t, &actions[action_idx].task_id[..8], station_idx);
                 let assignment = schedule_action_to_completion(
                     grid,
                     actions,
@@ -440,11 +463,15 @@ pub fn run_forward_pass(
                 if let Some(a) = assignment {
                     assignments.push(a);
                     assigned_something = true;
+                    main_loop_idle = 0; // A task was placed — reset idle counter
                     break; // Re-score at same tick
                 }
             }
         }
 
+        if !assigned_something {
+            main_loop_idle += 1;
+        }
         t += 1;
     }
 
@@ -469,8 +496,40 @@ fn schedule_action_to_completion(
     station_to_group: &[Option<(usize, u32)>],
 ) -> Option<ComputedAssignment> {
     let station_idx = actions[action_idx].station_idx;
-    let setup_ticks = actions[action_idx].setup_ticks;
     let attrs = &station_attrs[station_idx];
+
+    // Chunk re-setup: if this is chunk 2+ and a different job ran on this station,
+    // the calage is broken — restore the original setup time.
+    if let Some((chunk_n, _, _)) = &actions[action_idx].chunk_info {
+        if *chunk_n > 1 && actions[action_idx].setup_ticks == 0 {
+            let job_id = actions[action_idx].job_id.clone();
+            let mut needs_re_setup = false;
+            if start_t > 0 {
+                for check_t in (0..start_t).rev() {
+                    if let Some(prev_action_idx) = grid.station_action_at(station_idx, check_t) {
+                        if prev_action_idx < actions.len() && actions[prev_action_idx].job_id != job_id {
+                            needs_re_setup = true;
+                        }
+                        break;
+                    }
+                }
+            }
+            if needs_re_setup {
+                let mut pred_idx = actions[action_idx].predecessor_idx;
+                let mut original_setup = 0u32;
+                while let Some(p) = pred_idx {
+                    if actions[p].setup_ticks > 0 { original_setup = actions[p].setup_ticks; break; }
+                    pred_idx = actions[p].predecessor_idx;
+                }
+                if original_setup > 0 {
+                    actions[action_idx].setup_ticks = original_setup;
+                    actions[action_idx].art += original_setup;
+                }
+            }
+        }
+    }
+
+    let setup_ticks = actions[action_idx].setup_ticks;
 
     // Resolve station's group for concurrency tracking
     let group_idx = if station_idx < station_to_group.len() {
@@ -483,7 +542,7 @@ fn schedule_action_to_completion(
     let mut tick_operator_log: Vec<(usize, Vec<(usize, f64)>)> = Vec::new();
 
     let mut current_t = start_t;
-    let mut is_degraded = false;
+    let is_degraded = false; // kept for ComputedAssignment struct compatibility
     let mut total_productivity = 0.0;
     let mut ticks_counted = 0u32;
     let mut idle_ticks: u32 = 0; // SPR: consecutive ticks without operator
@@ -492,6 +551,11 @@ fn schedule_action_to_completion(
     actions[action_idx].assigned_operators = initial_operators.to_vec();
 
     let mut work_accumulator: f64 = 0.0;
+    let mut stall_ticks_total: u32 = 0;
+    let subloop_start = std::time::Instant::now();
+    let mut loop_iterations: u64 = 0;
+    let mut find_ops_cumulative = std::time::Duration::ZERO;
+    let mut grid_ops_cumulative = std::time::Duration::ZERO;
 
     while actions[action_idx].art > 0 {
         // Ensure grid is large enough
@@ -500,11 +564,13 @@ fn schedule_action_to_completion(
             operator_availability.extend(grow_ticks);
         }
 
-        // Check station is still free (should be, we're in the sub-loop)
-        if !grid.is_station_free(station_idx, current_t) && current_t != start_t {
-            // Station got occupied (shouldn't happen in single-pass, but safety)
-            rollback_action_with_operators(grid, actions, action_idx, start_t, current_t, &tick_operator_log, group_idx);
-            return None;
+        // Check if another task occupies this station at this tick.
+        // Skip forward — do NOT reserve the station, just advance.
+        if let Some(occupant) = grid.station_action_at(station_idx, current_t) {
+            if occupant != action_idx && current_t != start_t {
+                current_t += 1;
+                continue; // skip tick occupied by another task
+            }
         }
 
         // LAST safety check: DISABLED for now — O(actions²) per tick causes timeout
@@ -553,7 +619,6 @@ fn schedule_action_to_completion(
 
         // Find operators for this tick
         let in_setup = actions[action_idx].eat < setup_ticks;
-
         let is_masked_run = !in_setup && attrs.masked_time_enabled;
 
         let attention_needed = if in_setup {
@@ -564,43 +629,71 @@ fn schedule_action_to_completion(
             attrs.max_run_attention
         };
 
+        loop_iterations += 1;
+        if loop_iterations % 1000 == 0 {
+            eprintln!("[TICK-{:>6}] task={} iter={} elapsed={:?} stalls={} find_ops={:?} grid_ops={:?}",
+                current_t, &actions[action_idx].task_id[..8.min(actions[action_idx].task_id.len())],
+                loop_iterations, subloop_start.elapsed(), stall_ticks_total,
+                find_ops_cumulative, grid_ops_cumulative);
+        }
+
+        let find_ops_t0 = std::time::Instant::now();
         let operators_this_tick = if attention_needed > 0.001 {
-            // Prefer operators already assigned to this action (continuity)
-            let ops = find_operators_for_station(
-                grid,
-                current_t,
-                station_idx,
-                attention_needed,
-                operator_skills,
-                operator_availability,
-                &actions[action_idx].assigned_operators,
+            let mut ops = find_operators_for_station(
+                grid, current_t, station_idx, attention_needed,
+                operator_skills, operator_availability,
+                &actions[action_idx].assigned_operators, attrs.max_operators,
             );
-            if ops.is_empty() && grid.num_operators > 0 {
-                // No operator available at this tick - skip tick (don't decrement ART)
-                // BUT keep station reserved: the job is physically on the machine
-                idle_ticks += 1;
-                grid.assign_station(station_idx, current_t, action_idx);
-                if let Some(g) = group_idx {
-                    grid.increment_group(g, current_t);
+            // Non-masked: if preferred can't provide full attention, try a fresh operator.
+            if !is_masked_run {
+                let min_att = if in_setup { attrs.attention_full } else { attrs.attention_run };
+                let total_att: f64 = ops.iter().map(|(_, a)| a).sum();
+                if total_att < min_att - 0.001 {
+                    let fresh = find_operators_for_station(
+                        grid, current_t, station_idx, attention_needed,
+                        operator_skills, operator_availability,
+                        &[], attrs.max_operators,
+                    );
+                    let fresh_att: f64 = fresh.iter().map(|(_, a)| a).sum();
+                    if fresh_att > total_att + 0.001 {
+                        ops = fresh;
+                    }
                 }
-                // SPR: if idle too long, setup expires and must be redone
-                if attrs.peremption_ticks > 0
-                    && idle_ticks >= attrs.peremption_ticks
-                    && actions[action_idx].eat > 0
-                    && actions[action_idx].eat < setup_ticks
-                {
-                    // Setup has expired — must redo from scratch
-                    actions[action_idx].art += actions[action_idx].eat;
-                    actions[action_idx].eat = 0;
-                    idle_ticks = 0;
-                    is_degraded = true;
-                }
-                current_t += 1;
-                continue;
             }
-            // Masked-time run: machine runs autonomously, one operator max
-            if is_masked_run && ops.len() > 1 {
-                vec![ops[0]]
+            if ops.is_empty() && grid.num_operators > 0 {
+                // No qualified operator at all — handled by the unified
+                // stall block below (total_attention=0 < min_attention).
+                // Fall through; the stall block will reserve station + advance tick.
+            }
+            // Masked-time run: 1 operator monitors, must meet attention_masked threshold
+            if is_masked_run {
+                // Magnetism: if a preferred operator meets the threshold, keep them
+                let preferred = &actions[action_idx].assigned_operators;
+                let preferred_ok = if !preferred.is_empty() {
+                    let pref_idx = preferred[0].0;
+                    ops.iter().find(|(idx, att)| *idx == pref_idx && *att >= attrs.attention_masked - 0.001)
+                        .copied()
+                } else {
+                    None
+                };
+                if let Some(op) = preferred_ok {
+                    vec![op]
+                } else {
+                    // No preferred or preferred can't meet threshold — pick best
+                    let best = ops.iter()
+                        .filter(|(_, att)| *att >= attrs.attention_masked - 0.001)
+                        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                    if let Some(&op) = best {
+                        vec![op]
+                    } else {
+                    // No single operator meets masked threshold — stall
+                    idle_ticks += 1; stall_ticks_total += 1;
+                    grid.assign_station(station_idx, current_t, action_idx);
+                    if let Some(g) = group_idx { grid.increment_group(g, current_t); }
+                    current_t += 1;
+                    continue;
+                    }
+                }
             } else {
                 ops
             }
@@ -608,38 +701,95 @@ fn schedule_action_to_completion(
             Vec::new()
         };
 
-        // Compute productivity for this tick
+        find_ops_cumulative += find_ops_t0.elapsed();
+
         let total_attention: f64 = operators_this_tick.iter().map(|(_, a)| a).sum();
+
+        // Check if attention is sufficient for the current phase.
+        // If not: stall — reserve the station (no other task can use it) but
+        // do NO work, don't log operators, don't advance work_accumulator.
+        let min_attention = if in_setup {
+            attrs.attention_full
+        } else if is_masked_run {
+            attrs.attention_masked
+        } else {
+            attrs.attention_run
+        };
+
+        if total_attention < min_attention - 0.001 {
+            idle_ticks += 1;
+            stall_ticks_total += 1;
+            grid.assign_station(station_idx, current_t, action_idx);
+            if let Some(g) = group_idx {
+                grid.increment_group(g, current_t);
+            }
+            // Peremption: if setup stalls too long, reset setup progress
+            if attrs.peremption_ticks > 0
+                && idle_ticks >= attrs.peremption_ticks
+                && actions[action_idx].eat > 0
+                && actions[action_idx].eat < setup_ticks
+            {
+                actions[action_idx].art += actions[action_idx].eat;
+                actions[action_idx].eat = 0;
+                idle_ticks = 0;
+            }
+
+            // Skip ahead: if no qualified operator is even available (schedule-wise)
+            // at this tick, jump to the next tick where enough operators overlap.
+            let qualified_available_count: usize = operator_skills.iter().enumerate()
+                .filter(|(op_idx, skills)| {
+                    skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+                        && operator_availability.is_available(*op_idx, current_t)
+                })
+                .count();
+
+            if (qualified_available_count as f64) < min_attention - 0.001 {
+                // Not enough qualified operators even on schedule — skip ahead
+                // to next tick where enough are on schedule (scan up to 7 days)
+                let max_skip = 7 * 24 * 60 / tick_minutes as usize;
+                let mut skip_to = current_t + 1;
+                while skip_to < current_t + max_skip {
+                    if skip_to >= grid.num_ticks {
+                        grid.grow(grow_ticks);
+                        operator_availability.extend(grow_ticks);
+                    }
+                    let avail_count: usize = operator_skills.iter().enumerate()
+                        .filter(|(op_idx, skills)| {
+                            skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+                                && operator_availability.is_available(*op_idx, skip_to)
+                        })
+                        .count();
+                    if avail_count as f64 >= min_attention - 0.001 {
+                        break;
+                    }
+                    // Reserve station for skipped ticks
+                    grid.assign_station(station_idx, skip_to, action_idx);
+                    if let Some(g) = group_idx {
+                        grid.increment_group(g, skip_to);
+                    }
+                    skip_to += 1;
+                }
+                current_t = skip_to;
+            } else {
+                current_t += 1;
+            }
+            continue;
+        }
+
+        // Attention is sufficient — compute productivity
         let productivity = if in_setup {
             (total_attention / attrs.attention_full.max(0.001)).min(1.0)
         } else if is_masked_run {
             attrs.masked_productivity
         } else {
-            // Speed scales with operators, capped at max_run_attention / attention_run
             (total_attention / attrs.attention_run.max(0.001))
                 .min(attrs.max_run_attention / attrs.attention_run.max(0.001))
         };
 
-        if productivity < 0.001 && attention_needed > 0.001 {
-            // Can't make progress, skip — but keep station reserved
-            idle_ticks += 1;
-            grid.assign_station(station_idx, current_t, action_idx);
-            if let Some(g) = group_idx {
-                grid.increment_group(g, current_t);
-            }
-            current_t += 1;
-            continue;
-        }
-
-        let min_attention = if is_masked_run { attrs.attention_masked } else { attrs.attention_run };
-        if total_attention < min_attention - 0.001 {
-            is_degraded = true;
-        }
-
-        // Work is happening — reset SPR idle counter
         idle_ticks = 0;
 
         // Assign station tick
+        let grid_t0 = std::time::Instant::now();
         grid.assign_station(station_idx, current_t, action_idx);
 
         // Increment group active count
@@ -651,6 +801,7 @@ fn schedule_action_to_completion(
         for &(op_idx, attention) in &operators_this_tick {
             grid.assign_operator(op_idx, current_t, station_idx, attention);
         }
+        grid_ops_cumulative += grid_t0.elapsed();
 
         tick_operator_log.push((current_t, operators_this_tick));
 
@@ -668,6 +819,13 @@ fn schedule_action_to_completion(
         }
 
         current_t += 1;
+    }
+
+    let subloop_elapsed = subloop_start.elapsed();
+    let total_ticks = current_t - start_t;
+    if subloop_elapsed.as_millis() > 50 || stall_ticks_total > 100 {
+        eprintln!("[SUBLOOP] task={} station_idx={} elapsed={:?} total_ticks={} stall_ticks={} start={} end={}",
+            &actions[action_idx].task_id, station_idx, subloop_elapsed, total_ticks, stall_ticks_total, start_t, current_t);
     }
 
     let end_t = current_t + 1; // end_tick is exclusive (first free tick after)

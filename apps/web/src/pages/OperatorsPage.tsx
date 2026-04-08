@@ -836,8 +836,9 @@ export default function OperatorsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-flux-hover">
                   <tr className="bg-flux-hover border-b border-flux-border text-flux-text-secondary">
+                    <th className="text-left px-4 py-3 font-medium">Prénom</th>
                     <th className="text-left px-4 py-3 font-medium">Nom</th>
-                    <th className="text-left px-4 py-3 font-medium">Attention</th>
+                    <th className="text-left px-4 py-3 font-medium">Fonction</th>
                     <th className="text-left px-4 py-3 font-medium">Compétences</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -845,7 +846,7 @@ export default function OperatorsPage() {
                 <tbody>
                   {filteredOperators.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="text-center text-flux-text-muted py-12">
+                      <td colSpan={5} className="text-center text-flux-text-muted py-12">
                         Aucun opérateur trouvé
                       </td>
                     </tr>
@@ -855,8 +856,9 @@ export default function OperatorsPage() {
                       key={operator.id}
                       className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
                     >
-                      <td className="px-4 py-3 text-flux-text-primary font-medium">{operator.firstName} {operator.lastName}</td>
-                      <td className="px-4 py-3 text-flux-text-secondary">{operator.totalAttention}</td>
+                      <td className="px-4 py-3 text-flux-text-primary font-medium">{operator.firstName}</td>
+                      <td className="px-4 py-3 text-flux-text-primary">{operator.lastName}</td>
+                      <td className="px-4 py-3 text-flux-text-secondary">{operator.role || <span className="text-flux-text-muted italic">—</span>}</td>
                       <td className="px-4 py-3 text-flux-text-secondary">
                         {operator.skills.length > 0
                           ? operator.skills

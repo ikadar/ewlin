@@ -50,6 +50,13 @@ export interface TaskTileProps {
   onTogglePin?: (assignmentId: string) => void;
   /** Callback when right-clicking a scheduled tile (context menu) */
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
+  /** Operator assignments for this task */
+  operatorAssignments?: Array<{
+    name: string;
+    attention: number;
+    from?: string;
+    to?: string;
+  }>;
 }
 
 /** Visual style config per tile state */
@@ -124,6 +131,7 @@ export const TaskTile = memo(function TaskTile({
   onToggleOutsourcedDone,
   onTogglePin,
   onContextMenu,
+  operatorAssignments,
 }: TaskTileProps) {
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
@@ -289,7 +297,7 @@ export const TaskTile = memo(function TaskTile({
         <button
           ref={tileRef}
           type="button"
-          className={`h-8 pt-0.5 px-2 text-sm border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full`}
+          className={`min-h-[2rem] pt-0.5 px-2 text-sm border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full`}
           style={tileInlineStyle}
           data-testid={`task-tile-${task.id}`}
           onClick={handleClick}
@@ -334,6 +342,23 @@ export const TaskTile = memo(function TaskTile({
               {formatScheduledTime(assignment.scheduledStart)}
             </span>
           </div>
+          {operatorAssignments && operatorAssignments.length > 0 && (
+            <div className="px-1.5 pb-1.5 flex flex-col gap-0.5">
+              {operatorAssignments.map((op, i) => {
+                const fromStr = op.from ? new Date(op.from).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+                const toStr = op.to ? new Date(op.to).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+                const timeRange = fromStr && toStr ? `${fromStr}–${toStr}` : '';
+                return (
+                  <div key={i} className="flex items-center gap-1.5 bg-zinc-800/60 rounded px-1.5 py-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                    <span className="text-[10px] text-zinc-300 truncate flex-1">{op.name}</span>
+                    <span className="text-[9px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
+                    <span className="text-[8px] font-semibold text-zinc-400 bg-zinc-700 rounded-sm px-1 py-px shrink-0">{op.attention}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </button>
         {showRecallTip && (
           <div

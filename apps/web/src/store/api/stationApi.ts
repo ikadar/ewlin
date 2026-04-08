@@ -27,6 +27,7 @@ export interface StationResponse {
   tickMinutes: number | null;
   peremptionThresholdMinutes: number | null;
   maxChunkMinutes: number | null;
+  maxOperators: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +49,7 @@ export interface StationInput {
   tickMinutes?: number | null;
   peremptionThresholdMinutes?: number | null;
   maxChunkMinutes?: number | null;
+  maxOperators?: number | null;
 }
 
 export const stationApi = createApi({

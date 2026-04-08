@@ -15,6 +15,8 @@ pub struct JobInput {
     #[serde(default = "default_deadline_priority")]
     pub deadline_priority: u8,
     pub elements: Vec<ElementInput>,
+    #[serde(default)]
+    pub required_job_ids: Vec<String>,
 }
 
 fn default_deadline_priority() -> u8 {
@@ -30,6 +32,8 @@ pub struct ElementInput {
     pub tasks: Vec<TaskInput>,
     #[serde(default)]
     pub spec: Option<serde_json::Value>,
+    #[serde(default)]
+    pub prerequisite_element_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

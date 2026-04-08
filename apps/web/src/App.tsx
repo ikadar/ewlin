@@ -23,13 +23,14 @@ import type { SchedulingGridHandle, TaskMarker } from './components';
 import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useClearAllAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable, useComputeScheduleMutation } from './store';
+import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable, useComputeScheduleMutation } from './store';
 import type { ComputeScheduleResult } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
 import { Toast } from './components/Toast';
-import { useToast } from './hooks';
+import { useToast, useMassUnschedule } from './hooks';
+import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
@@ -315,7 +316,7 @@ function AppContent() {
   const [updateJob] = useUpdateJobMutation();
   const [deleteJob] = useDeleteJobMutation();
   const [clearJobAssignments] = useClearJobAssignmentsMutation();
-  const [clearAllAssignments] = useClearAllAssignmentsMutation();
+
   const [autoPlaceJob] = useAutoPlaceJobMutation();
   const [autoPlaceJobAlap] = useAutoPlaceJobAlapMutation();
   const [saveSchedule] = useSaveScheduleMutation();
@@ -446,13 +447,8 @@ function AppContent() {
   const [jcfSaveError, setJcfSaveError] = useState<string | null>(null);
   // Schedule save/load modal
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
-  // Mass unschedule confirmation dialog
-  const [massUnscheduleConfirm, setMassUnscheduleConfirm] = useState<{
-    count: number;
-    includeInProgress: boolean;
-    fuseSplits: boolean;
-    includePinned: boolean;
-  } | null>(null);
+  // Mass unschedule (shared hook)
+  const massUnschedule = useMassUnschedule(snapshotData);
   // Auto-place V1 modal
   const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
   // Command Center (global — provided by RootLayout)
@@ -1000,31 +996,26 @@ function AppContent() {
     setGridScrollTop(scrollTop);
     setGridScrollLeft(scrollLeft);
 
-    // Debounce: cancel previous timeout and set new one
+    // Calculate viewport synchronously for immediate indicator update
+    const currentPixelsPerHour = pixelsPerHourRef.current;
+    const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
+
+    // Viewport hours — update immediately (no debounce)
+    const startHourFromGridStart = scrollTop / currentPixelsPerHour;
+    const endHourFromGridStart = (scrollTop + viewportHeight) / currentPixelsPerHour;
+    setViewportStartHour(startHourFromGridStart);
+    setViewportEndHour(endHourFromGridStart);
+
+    // Focused date — can use rAF since it's less time-critical
     if (scrollTimeoutRef.current !== null) {
       cancelAnimationFrame(scrollTimeoutRef.current);
     }
-
     scrollTimeoutRef.current = requestAnimationFrame(() => {
-      // Use ref to get current pixelsPerHour (avoids stale closure on zoom change)
-      const currentPixelsPerHour = pixelsPerHourRef.current;
-
-      // Calculate focused date from scroll position
-      // The focused date is the one visible at the center of the viewport
-      const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
       const centerY = scrollTop + viewportHeight / 2;
       const hoursFromStart = centerY / currentPixelsPerHour;
       const focusedTime = new Date(gridStartDate);
       focusedTime.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
       setFocusedDate(focusedTime);
-
-      // v0.3.47: Calculate viewport hours from grid start (not clamped to single day)
-      // This allows viewport indicator to span multiple days
-      const startHourFromGridStart = scrollTop / currentPixelsPerHour;
-      const endHourFromGridStart = (scrollTop + viewportHeight) / currentPixelsPerHour;
-
-      setViewportStartHour(startHourFromGridStart);
-      setViewportEndHour(endHourFromGridStart);
     });
   }, [gridStartDate]);
 
@@ -1127,18 +1118,6 @@ function AppContent() {
     }
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
 
-  // Count clearable tiles for mass unschedule confirmation
-  const getClearableCount = useCallback((includeInProgress = false, includePinned = false) => {
-    if (!snapshotData) return 0;
-    const now = new Date().toISOString();
-    return snapshotData.assignments.filter((a) => {
-      if (a.isCompleted) return false;
-      if (!includePinned && a.isPinned) return false;
-      if (!includeInProgress && a.scheduledStart <= now && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
-      return true;
-    }).length;
-  }, [snapshotData]);
-
   // Debug export: copy full snapshot to clipboard
   const handleDebugExport = useCallback(async () => {
     try {
@@ -1172,56 +1151,17 @@ function AppContent() {
     }
   }, [computeSchedule]);
 
-  // Handle mass unschedule all tiles (CTRL+ALT+Z)
+  // Handle mass unschedule confirm with toast
   const handleMassUnscheduleConfirm = useCallback(async () => {
-    if (!massUnscheduleConfirm) return;
-    const { includeInProgress, fuseSplits, includePinned } = massUnscheduleConfirm;
-    setMassUnscheduleConfirm(null);
     try {
-      const result = await clearAllAssignments({ includeInProgress, fuseSplits, includePinned }).unwrap();
-      showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
-
-      // Fuse split groups that are now fully unassigned
-      if (fuseSplits && snapshotData) {
-        const now = new Date().toISOString();
-        const splitGroups = new Map<string, string[]>();
-        for (const task of snapshotData.tasks) {
-          if (task.type === 'Internal') {
-            const it = task as InternalTask;
-            if (it.splitGroupId) {
-              const group = splitGroups.get(it.splitGroupId) || [];
-              group.push(it.id);
-              splitGroups.set(it.splitGroupId, group);
-            }
-          }
-        }
-        for (const [, memberIds] of splitGroups) {
-          const allCleared = memberIds.every((id) => {
-            const a = snapshotData.assignments.find((asn) => asn.taskId === id);
-            if (!a) return true;
-            if (a.isCompleted) return false;
-            if (!includeInProgress && a.scheduledStart <= now
-                && (!a.scheduledEnd || a.scheduledEnd > now)) return false;
-            return true;
-          });
-          if (allCleared) {
-            try { await fuseTask(memberIds[0]).unwrap(); } catch { /* skip */ }
-          }
-        }
+      const result = await massUnschedule.confirm();
+      if (result) {
+        showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
       }
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [massUnscheduleConfirm, clearAllAssignments, fuseTask, snapshotData, showToast]);
-
-  // Trigger mass unschedule confirmation dialog
-  const triggerMassUnschedule = useCallback(() => {
-    // Open dialog if there are ANY non-completed tiles (including in-progress and pinned)
-    const countAll = getClearableCount(true, true);
-    if (countAll > 0) {
-      setMassUnscheduleConfirm({ count: getClearableCount(), includeInProgress: false, fuseSplits: false, includePinned: false });
-    }
-  }, [getClearableCount]);
+  }, [massUnschedule, showToast]);
 
   // Auto-save schedule before any autoplace operation
   const autoSaveBeforeAutoplace = useCallback(async () => {
@@ -1330,7 +1270,7 @@ function AppContent() {
       // Ctrl+Alt+Z: mass unschedule all clearable tiles
       if (isCtrlAltLetter(e, 'z')) {
         e.preventDefault();
-        triggerMassUnschedule();
+        massUnschedule.trigger();
         return;
       }
 
@@ -1436,7 +1376,7 @@ function AppContent() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, triggerMassUnschedule, handleAutoPlaceAll]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleAutoPlaceAll]);
 
   // Handle swap in a given direction using two rescheduleTask mutations
   const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
@@ -2340,7 +2280,7 @@ function AppContent() {
     }, []),
     onClearJobAssignments: handleClearJobAssignments,
     onPinAllJobTiles: selectedJobId ? handlePinAllJobTiles : undefined,
-    onClearAllAssignments: triggerMassUnschedule,
+    onClearAllAssignments: massUnschedule.trigger,
     onAsapPlacement: handleAsapPlacement,
     onAlapPlacement: handleAlapPlacement,
     onAutoPlaceAll: handleAutoPlaceAll,
@@ -2738,66 +2678,14 @@ function AppContent() {
       </button>
 
       {/* Mass unschedule confirmation dialog */}
-      {massUnscheduleConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center"
-             style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-             onClick={() => setMassUnscheduleConfirm(null)}
-             onKeyDown={e => { if (e.key === 'Escape') setMassUnscheduleConfirm(null); }}
-             tabIndex={-1}
-             ref={el => el?.focus()}>
-          <div className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
-               style={{ width: '28rem' }}
-               onClick={e => e.stopPropagation()}>
-            <h2 className="text-flux-text-primary font-semibold mb-2">
-              Effacer toutes les tuiles ?
-            </h2>
-            <p className="text-flux-text-secondary mb-1" style={{ fontSize: '13px' }}>
-              Les tuiles terminées seront toujours conservées.
-            </p>
-            <p className="text-flux-text-primary font-mono mb-4" style={{ fontSize: '13px' }}>
-              {getClearableCount(massUnscheduleConfirm.includeInProgress, massUnscheduleConfirm.includePinned)} tuile(s) à effacer
-            </p>
-            <div className="flex flex-col gap-2 mb-6">
-              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={massUnscheduleConfirm.includeInProgress}
-                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, includeInProgress: e.target.checked } : prev)}
-                  className="accent-red-600"
-                />
-                Inclure les tuiles en cours d'exécution
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={massUnscheduleConfirm.fuseSplits}
-                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, fuseSplits: e.target.checked } : prev)}
-                  className="accent-red-600"
-                />
-                Fusionner les tuiles splittées
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={massUnscheduleConfirm.includePinned}
-                  onChange={(e) => setMassUnscheduleConfirm((prev) => prev ? { ...prev, includePinned: e.target.checked } : prev)}
-                  className="accent-red-600"
-                />
-                Inclure les tuiles épinglées
-              </label>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
-                      onClick={() => setMassUnscheduleConfirm(null)}>
-                Annuler
-              </button>
-              <button className="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
-                      onClick={handleMassUnscheduleConfirm}>
-                Tout effacer
-              </button>
-            </div>
-          </div>
-        </div>
+      {massUnschedule.confirmState && (
+        <MassUnscheduleDialog
+          state={massUnschedule.confirmState}
+          getClearableCount={massUnschedule.getClearableCount}
+          onConfirm={handleMassUnscheduleConfirm}
+          onDismiss={massUnschedule.dismiss}
+          onUpdate={massUnschedule.setConfirmState}
+        />
       )}
 
       {/* Schedule Evaluation modal */}

@@ -3,11 +3,13 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 
 use crate::model::schedule::{
-    ComputedAssignment, ScheduleStats,
+    ComputedAssignment, ScheduleStats, StationGroupInput,
 };
 use crate::model::station::StationInput;
 use crate::model::operator::OperatorInput;
 use crate::model::job::JobInput;
+
+use super::backward_pass::BackwardOrdering;
 
 use super::backward_pass::compute_last_values;
 use super::forward_pass::{run_forward_pass, Action, OperatorAvailability, StationAttrs};
@@ -51,6 +53,12 @@ pub fn run_with_fbi(
             masked_time_enabled: s.masked_time_enabled,
             attention_masked: s.effective_attention_masked(),
             masked_productivity: s.effective_masked_productivity(),
+            peremption_ticks: if s.effective_peremption() > 0 && tick_minutes > 0 {
+                (s.effective_peremption() + tick_minutes - 1) / tick_minutes
+            } else {
+                0
+            },
+            max_operators: s.effective_max_operators(),
         })
         .collect();
 
@@ -82,6 +90,8 @@ pub fn run_with_fbi(
         deadline_violations: 0,
         late_task_count: 0,
         total_lateness_minutes: 0,
+        late_job_count: 0,
+        weighted_lateness_minutes: 0,
     };
     let mut prev_makespan: u64 = u64::MAX;
     let mut iteration_count: u32 = 0;
@@ -110,6 +120,7 @@ pub fn run_with_fbi(
             &station_id_to_idx,
             tick_minutes,
             &last_values,
+            start_date,
         );
 
         // Apply duration overrides from previous iteration
@@ -149,6 +160,8 @@ pub fn run_with_fbi(
         );
 
         // Run forward pass
+        // No station groups in base FBI (empty mapping)
+        let station_to_group: Vec<Option<(usize, u32)>> = vec![None; num_stations];
         let assignments = run_forward_pass(
             &mut grid,
             &mut actions,
@@ -157,6 +170,7 @@ pub fn run_with_fbi(
             &mut operator_availability,
             tick_minutes,
             start_date,
+            &station_to_group,
         );
 
         // Remap and compute stats
@@ -243,5 +257,62 @@ fn recompute_last_values(
         if let Some(&base_last) = last_values.get(&action.task_id) {
             action.last = base_last;
         }
+    }
+}
+
+/// Run FBI with a specific backward ordering and station groups.
+/// Delegates to `run_with_fbi` (ordering and groups are not yet wired into the
+/// backward pass, so this is a thin wrapper that keeps the call-sites compiling).
+pub fn run_with_fbi_ordering(
+    jobs: &[JobInput],
+    stations: &[StationInput],
+    operators: &[OperatorInput],
+    tick_minutes: u32,
+    horizon_days: u32,
+    max_iterations: u32,
+    start_date: NaiveDate,
+    _ordering: BackwardOrdering,
+    _station_groups: &[StationGroupInput],
+) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date)
+}
+
+/// Multi-start FBI: optionally run with both TierFirst and EDD orderings and
+/// return the best result.  When `multi_start` is false, behaves like plain FBI.
+pub fn run_with_multi_start_fbi(
+    jobs: &[JobInput],
+    stations: &[StationInput],
+    operators: &[OperatorInput],
+    tick_minutes: u32,
+    horizon_days: u32,
+    max_iterations: u32,
+    start_date: NaiveDate,
+    multi_start: bool,
+    station_groups: &[StationGroupInput],
+) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
+    let (a1, act1, s1, i1) = run_with_fbi_ordering(
+        jobs, stations, operators,
+        tick_minutes, horizon_days, max_iterations, start_date,
+        BackwardOrdering::TierFirst, station_groups,
+    );
+
+    if !multi_start {
+        return (a1, act1, s1, i1);
+    }
+
+    let (a2, act2, s2, i2) = run_with_fbi_ordering(
+        jobs, stations, operators,
+        tick_minutes, horizon_days, max_iterations, start_date,
+        BackwardOrdering::EarliestDeadline, station_groups,
+    );
+
+    // Pick the result with fewer late jobs, then less weighted lateness, then shorter makespan
+    let score1 = (s1.late_job_count, s1.weighted_lateness_minutes, s1.makespan_minutes);
+    let score2 = (s2.late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+
+    if score2 < score1 {
+        (a2, act2, s2, i1 + i2)
+    } else {
+        (a1, act1, s1, i1 + i2)
     }
 }

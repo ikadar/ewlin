@@ -17,3 +17,6 @@ export { useDebouncedValue } from './useDebouncedValue';
 export { useTooltipDelay } from './useTooltipDelay';
 
 export { useHasPermission } from './useHasPermission';
+
+export { useMassUnschedule } from './useMassUnschedule';
+export type { MassUnscheduleState } from './useMassUnschedule';

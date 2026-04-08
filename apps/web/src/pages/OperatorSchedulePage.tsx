@@ -252,7 +252,7 @@ export default function OperatorSchedulePage() {
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleResize);
-    handleScroll(); // initial sync
+    requestAnimationFrame(() => handleScroll()); // initial sync after layout
 
     return () => {
       container.removeEventListener('scroll', handleScroll);
@@ -260,13 +260,17 @@ export default function OperatorSchedulePage() {
     };
   }, [pixelsPerHour, gridStartDate]);
 
-  // Scroll to current time on mount
+  // Scroll to current time on mount (use rAF to ensure scroll listener is attached first)
   useEffect(() => {
     if (!scrollContainerRef.current) return;
-    const now = new Date();
-    const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
-    const vh = scrollContainerRef.current.clientHeight;
-    scrollContainerRef.current.scrollTop = Math.max(0, y - vh / 3);
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      const now = new Date();
+      const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
+      const vh = container.clientHeight;
+      container.scrollTop = Math.max(0, y - vh / 3);
+    });
   }, [pixelsPerHour, gridStartDate]);
 
   // ---- Data lookups ----
@@ -427,7 +431,13 @@ export default function OperatorSchedulePage() {
 
     // Find assignment for this slice (to get operator attention)
     const assignment = snapshot.assignments.find(a => a.id === slice.assignmentId);
-    const opRef = assignment?.operators?.find(o => o.operatorId === operatorId);
+    // Match operator segment by ID AND time overlap (an operator can have multiple
+    // segments with different attention values: concurrent vs solo periods)
+    const opRef = assignment?.operators?.find(o =>
+      o.operatorId === operatorId &&
+      new Date(o.from) < slice.to &&
+      new Date(o.to) > slice.from
+    ) ?? assignment?.operators?.find(o => o.operatorId === operatorId);
     const operatorAttention = opRef?.attention;
 
     const isLate = lateJobIds.has(job.id) || (!assignment?.isCompleted && new Date(slice.to) < now);
@@ -930,13 +940,13 @@ function OperatorColumn({
     const lines: number[] = [];
     const startDay = visibleDayRange.start;
     const endDay = visibleDayRange.end;
-    for (let dayIndex = startDay; dayIndex <= endDay && dayIndex < numberOfDays; dayIndex++) {
+    for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
       for (let h = 0; h < 24; h++) {
         lines.push((dayIndex * 24 + h) * pixelsPerHour);
       }
     }
     return lines;
-  }, [visibleDayRange, numberOfDays, pixelsPerHour]);
+  }, [visibleDayRange, pixelsPerHour]);
 
   // Unavailability overlays (only visible range)
   const overlays = useMemo(() => {
@@ -944,7 +954,7 @@ function OperatorColumn({
     const endDay = visibleDayRange.end;
     const elements: React.ReactNode[] = [];
 
-    for (let dayIndex = startDay; dayIndex <= endDay && dayIndex < numberOfDays; dayIndex++) {
+    for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
       const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
       const daySchedule = getOperatorDaySchedule(operator, currentDate);
       const dayYOffset = dayIndex * 24 * pixelsPerHour;
@@ -961,7 +971,7 @@ function OperatorColumn({
       );
     }
     return elements;
-  }, [operator, gridStartDate, pixelsPerHour, visibleDayRange, numberOfDays]);
+  }, [operator, gridStartDate, pixelsPerHour, visibleDayRange]);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Background click only (not tile clicks which stopPropagation)

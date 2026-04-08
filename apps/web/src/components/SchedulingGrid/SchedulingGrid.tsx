@@ -166,7 +166,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       groups = [],
       onScroll,
       totalDays = 365,
-      bufferDays = 3,
+      bufferDays = 7,
       // v0.3.54: Pick & Place props
       isPicking = false,
       pickTargetStationId,

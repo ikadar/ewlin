@@ -83,6 +83,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   const [tickMinutes, setTickMinutes] = useState(String(initial?.tickMinutes ?? 15));
   const [peremptionHours, setPeremptionHours] = useState(String(initial?.peremptionThresholdMinutes != null ? initial.peremptionThresholdMinutes / 60 : 2));
   const [maxChunkHours, setMaxChunkHours] = useState(String(initial?.maxChunkMinutes != null ? initial.maxChunkMinutes / 60 : 7));
+  const [maxOperators, setMaxOperators] = useState(String(initial?.maxOperators ?? 1));
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,6 +116,7 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
       tickMinutes: tickMinutes.trim() ? parseInt(tickMinutes, 10) : null,
       peremptionThresholdMinutes: peremptionHours.trim() ? Math.round(parseFloat(peremptionHours) * 60) : null,
       maxChunkMinutes: maxChunkHours.trim() ? Math.round(parseFloat(maxChunkHours) * 60) : null,
+      maxOperators: maxOperators.trim() ? parseInt(maxOperators, 10) : null,
     });
   };
 
@@ -286,6 +288,15 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
                   type="number" step="0.5" min="0"
                   value={maxChunkHours}
                   onChange={(e) => setMaxChunkHours(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Max opérateurs</label>
+                <input
+                  type="number" step="1" min="1"
+                  value={maxOperators}
+                  onChange={(e) => setMaxOperators(e.target.value)}
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
               </div>

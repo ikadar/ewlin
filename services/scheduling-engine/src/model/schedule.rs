@@ -6,6 +6,19 @@ use super::station::StationInput;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StationGroupInput {
+    pub id: String,
+    pub station_ids: Vec<String>,
+    #[serde(default = "default_max_concurrent")]
+    pub max_concurrent: u32,
+}
+
+fn default_max_concurrent() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ComputeRequest {
     pub stations: Vec<StationInput>,
     #[serde(default)]
@@ -13,6 +26,8 @@ pub struct ComputeRequest {
     pub jobs: Vec<JobInput>,
     #[serde(default)]
     pub options: Option<ComputeOptions>,
+    #[serde(default)]
+    pub station_groups: Vec<StationGroupInput>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +39,8 @@ pub struct ComputeOptions {
     pub tick_minutes: u32,
     #[serde(default = "default_fbi_max_iterations")]
     pub fbi_max_iterations: u32,
+    #[serde(default)]
+    pub multi_start: bool,
 }
 
 impl Default for ComputeOptions {
@@ -32,6 +49,7 @@ impl Default for ComputeOptions {
             horizon_days: default_horizon_days(),
             tick_minutes: default_tick_minutes(),
             fbi_max_iterations: default_fbi_max_iterations(),
+            multi_start: false,
         }
     }
 }
@@ -100,6 +118,10 @@ pub struct ScheduleStats {
     pub deadline_violations: u32,
     pub late_task_count: u32,
     pub total_lateness_minutes: u64,
+    #[serde(default)]
+    pub late_job_count: u32,
+    #[serde(default)]
+    pub weighted_lateness_minutes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

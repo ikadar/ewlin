@@ -9,6 +9,15 @@ use crate::model::station::StationInput;
 use super::forward_pass::{OperatorAvailability, StationAttrs};
 use super::grid::ScheduleGrid;
 
+/// Ordering strategy for the backward pass.
+#[derive(Debug, Clone, Copy)]
+pub enum BackwardOrdering {
+    /// Process jobs by deadline priority tier first (imperative before flexible).
+    TierFirst,
+    /// Process jobs by earliest deadline first (EDD).
+    EarliestDeadline,
+}
+
 /// Compute LAST values using a reverse forward pass.
 ///
 /// Runs backward from each task's deadline toward t=0, using the same grid,
@@ -233,6 +242,9 @@ fn run_backward_tier(
             actions[ai].deadline_ticks = effective_deadline.min(actions[ai].deadline_ticks);
         }
 
+        // Sort eligible by deadline ascending (EDD within tier)
+        eligible.sort_by_key(|&i| actions[i].deadline_ticks);
+
         // Place each eligible action backward from its effective deadline
         for &ai in &eligible {
             let last = place_backward(
@@ -298,6 +310,8 @@ fn place_backward(
             attention_needed,
             operator_skills,
             operator_availability,
+            &[], // no preferred operators in backward pass
+            attrs.max_operators,
         );
 
         if operators.is_empty() && grid.num_operators > 0 {

@@ -15,6 +15,9 @@ pub struct ScheduleGrid {
     operator_station: Vec<Option<usize>>,
     /// operator_attention[operator * num_ticks + tick] -> attention level
     operator_attention: Vec<f64>,
+    /// group_active[group * num_ticks + tick] -> active station count in that group
+    num_groups: usize,
+    group_active: Vec<u32>,
 }
 
 impl ScheduleGrid {
@@ -32,6 +35,8 @@ impl ScheduleGrid {
             station_ticks: vec![None; num_stations * num_ticks],
             operator_station: vec![None; num_operators * num_ticks],
             operator_attention: vec![0.0; num_operators * num_ticks],
+            num_groups: 0,
+            group_active: Vec::new(),
         }
     }
 
@@ -63,6 +68,17 @@ impl ScheduleGrid {
         }
         self.operator_station = new_operator_station;
         self.operator_attention = new_operator_attention;
+
+        // Rebuild group_active
+        if self.num_groups > 0 {
+            let mut new_group_active = vec![0u32; self.num_groups * new_num_ticks];
+            for g in 0..self.num_groups {
+                for t in 0..old_num_ticks {
+                    new_group_active[g * new_num_ticks + t] = self.group_active[g * old_num_ticks + t];
+                }
+            }
+            self.group_active = new_group_active;
+        }
 
         self.num_ticks = new_num_ticks;
     }
@@ -126,6 +142,35 @@ impl ScheduleGrid {
         if t < self.num_ticks && operator < self.num_operators {
             self.operator_station[operator * self.num_ticks + t] = None;
             self.operator_attention[operator * self.num_ticks + t] = 0.0;
+        }
+    }
+
+    /// Initialize group tracking with the given number of groups.
+    pub fn init_groups(&mut self, num_groups: usize) {
+        self.num_groups = num_groups;
+        self.group_active = vec![0u32; num_groups * self.num_ticks];
+    }
+
+    /// Get the number of active stations in a group at tick t.
+    pub fn group_active_count(&self, group: usize, t: usize) -> u32 {
+        if group >= self.num_groups || t >= self.num_ticks {
+            return 0;
+        }
+        self.group_active[group * self.num_ticks + t]
+    }
+
+    /// Increment the active count for a group at tick t.
+    pub fn increment_group(&mut self, group: usize, t: usize) {
+        if group < self.num_groups && t < self.num_ticks {
+            self.group_active[group * self.num_ticks + t] += 1;
+        }
+    }
+
+    /// Decrement the active count for a group at tick t.
+    pub fn decrement_group(&mut self, group: usize, t: usize) {
+        if group < self.num_groups && t < self.num_ticks {
+            self.group_active[group * self.num_ticks + t] =
+                self.group_active[group * self.num_ticks + t].saturating_sub(1);
         }
     }
 }

@@ -45,6 +45,14 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         .map(|s| (s.id.clone(), s.masked_time_enabled))
         .collect();
 
+    // Debug: log station attention values as received
+    for s in &request.stations {
+        if s.masked_time_enabled {
+            eprintln!("[STATION] {} masked=true attention_masked={:?} productivity={:?}",
+                s.name, s.attention_masked, s.masked_productivity);
+        }
+    }
+
     // Run FBI loop with optional multi-start (TierFirst + EDD orderings)
     let (mut assignments, mut actions, mut stats, mut fbi_iterations) = fbi::run_with_multi_start_fbi(
         &request.jobs,
@@ -149,6 +157,8 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
                 None => true,
             };
             assignments[i].is_masked_time = is_on_masked_station && has_run_phase;
+            let ops_str: Vec<String> = assignments[i].operators.iter().map(|op| format!("{}@{}", &op.operator_id[..8.min(op.operator_id.len())], op.attention)).collect();
+            eprintln!("[ASSIGN] task={} station={} masked={} ops=[{}]", &assignments[i].task_id, &assignments[i].station_id, assignments[i].is_masked_time, ops_str.join(", "));
 
             // For masked-time tasks: remove operators who are only present during setup
             // (their to <= setup_end). They're not part of the masked run phase.
@@ -157,6 +167,10 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
                     assignments[i].operators.retain(|op| op.to > *setup_end);
                 }
             }
+
+            // No degraded-mode filtering needed: find_operators_for_station now
+            // returns empty when attention_needed is not met, so all operators
+            // in the assignment genuinely contributed.
         }
     }
 

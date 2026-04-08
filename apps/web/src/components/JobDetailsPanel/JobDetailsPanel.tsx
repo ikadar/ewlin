@@ -69,6 +69,8 @@ export interface JobDetailsPanelProps {
   allJobs?: Job[];
   /** Callback when a dependency job chip is clicked */
   onSelectJob?: (jobId: string) => void;
+  /** Operators from snapshot (for displaying names on assignments) */
+  snapshotOperators?: Array<{ id: string; firstName: string; lastName: string }>;
 }
 
 /** Format workshop exit date as DD/MM/YYYY a HHhMM */
@@ -132,6 +134,7 @@ export function JobDetailsPanel({
   onFuseTask,
   allJobs,
   onSelectJob,
+  snapshotOperators,
 }: JobDetailsPanelProps) {
   // Memoize data filtering for this job
   const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
@@ -237,7 +240,7 @@ export function JobDetailsPanel({
     : undefined;
 
   return (
-    <div className="w-80 shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col" data-testid="job-details-panel">
+    <div className="w-80 shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col h-full" data-testid="job-details-panel">
       {/* Compact info header */}
       <div className="px-3 pt-3 pb-3 border-b border-white/5 space-y-1">
         {/* Line 1: reference - client + close button */}
@@ -338,6 +341,7 @@ export function JobDetailsPanel({
         onToggleOutsourcedDone={onToggleOutsourcedDone}
         onTogglePin={onTogglePin}
         onContextMenu={handleTileContextMenu}
+        snapshotOperators={snapshotOperators}
       />
 
       {contextMenu && (

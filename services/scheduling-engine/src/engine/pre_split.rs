@@ -107,6 +107,9 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 start_tick: None,
                 chunk_info: Some((chunk_n + 1, num_chunks, original_task_id.clone())),
                 deadline_priority: action.deadline_priority,
+                job_deadline_tick: action.job_deadline_tick,
+                earliest_retry_tick: None,
+                additional_predecessors: Vec::new(),
             });
 
             prev_chunk_idx = Some(idx);
@@ -148,5 +151,8 @@ pub fn clone_action(a: &Action) -> Action {
         start_tick: a.start_tick,
         chunk_info: a.chunk_info.clone(),
         deadline_priority: a.deadline_priority,
+        job_deadline_tick: a.job_deadline_tick,
+        earliest_retry_tick: a.earliest_retry_tick,
+        additional_predecessors: a.additional_predecessors.clone(),
     }
 }

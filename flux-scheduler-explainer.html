@@ -1,0 +1,3089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Scheduler — How Automated Scheduling Works</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-card-hover: #222633;
+  --bg-nav: #161922;
+  --border: #2a2e3d;
+  --text: #e2e4ea;
+  --text-dim: #8b8fa3;
+  --text-bright: #ffffff;
+  --accent: #6c8cff;
+  --accent-dim: #4a5f99;
+  --tier-imperative: #ff4d6a;
+  --tier-important: #ff9f43;
+  --tier-standard: #6c8cff;
+  --tier-flexible: #6b7280;
+  --green: #34d399;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+  --pink: #f472b6;
+  --orange: #fb923c;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  --radius: 10px;
+  --nav-width: 260px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ── LAYOUT ── */
+.app { display: flex; height: 100vh; }
+
+nav {
+  width: var(--nav-width);
+  min-width: var(--nav-width);
+  background: var(--bg-nav);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.nav-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: -0.3px;
+}
+
+.nav-header .subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.nav-items { padding: 12px 8px; flex: 1; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.nav-item:hover { background: var(--bg-card); color: var(--text); }
+.nav-item.active { background: var(--accent); color: white; }
+.nav-item .nav-num {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  font-size: 11px; font-weight: 700;
+  background: var(--border);
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.nav-item.active .nav-num { background: rgba(255,255,255,0.2); color: white; }
+
+.nav-legend {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.nav-legend h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  color: var(--text-dim);
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+main {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.section {
+  display: none;
+  padding: 40px 48px 80px;
+  max-width: 1100px;
+  animation: fadeIn 0.3s ease;
+}
+
+.section.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section-header {
+  margin-bottom: 36px;
+}
+
+.section-header .section-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.section-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: -0.5px;
+}
+
+.section-header .section-desc {
+  font-size: 15px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  max-width: 680px;
+}
+
+/* ── CARDS ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+  transition: border-color 0.15s;
+}
+
+.card:hover { border-color: var(--accent-dim); }
+
+.card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card p, .card li {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.card ul { padding-left: 20px; }
+.card li { margin-bottom: 4px; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.card-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+/* ── BADGE ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-imperative { background: rgba(255,77,106,0.15); color: var(--tier-imperative); }
+.badge-important { background: rgba(255,159,67,0.15); color: var(--tier-important); }
+.badge-standard { background: rgba(108,140,255,0.15); color: var(--tier-standard); }
+.badge-flexible { background: rgba(107,114,128,0.15); color: var(--tier-flexible); }
+.badge-green { background: rgba(52,211,153,0.15); color: var(--green); }
+.badge-red { background: rgba(248,113,113,0.15); color: var(--red); }
+.badge-purple { background: rgba(167,139,250,0.15); color: var(--purple); }
+.badge-cyan { background: rgba(34,211,238,0.15); color: var(--cyan); }
+.badge-pink { background: rgba(244,114,182,0.15); color: var(--pink); }
+.badge-orange { background: rgba(251,146,60,0.15); color: var(--orange); }
+
+/* ── SVG DIAGRAMS ── */
+.diagram-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 24px 0;
+  overflow-x: auto;
+}
+
+.diagram-container svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* ── PIPELINE DIAGRAM ── */
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 20px 0;
+}
+
+.pipeline-box {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  text-align: center;
+  min-width: 140px;
+  transition: all 0.2s;
+}
+
+.pipeline-box:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.pipeline-box .pipe-icon {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.pipeline-box .pipe-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.pipeline-box .pipe-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.pipeline-arrow {
+  font-size: 24px;
+  color: var(--accent-dim);
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+/* ── HIERARCHY DIAGRAM ── */
+.hierarchy {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.h-level {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.h-node {
+  border: 2px solid;
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  min-width: 120px;
+  text-align: center;
+  position: relative;
+}
+
+.h-node .h-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.h-node .h-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.h-node .h-detail {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.h-connector {
+  width: 2px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 auto;
+}
+
+/* ── CONSTRAINT CARDS ── */
+.constraint-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  transition: all 0.15s;
+  cursor: default;
+}
+
+.constraint-card:hover {
+  border-color: var(--accent-dim);
+  background: var(--bg-card-hover);
+}
+
+.constraint-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.constraint-content h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 4px;
+}
+
+.constraint-content p {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.constraint-example {
+  margin-top: 10px;
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.constraint-example .ex-valid,
+.constraint-example .ex-invalid {
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ex-valid { background: rgba(52,211,153,0.1); color: var(--green); }
+.ex-invalid { background: rgba(248,113,113,0.1); color: var(--red); }
+
+/* ── ALGORITHM STEPS ── */
+.algo-step {
+  margin-bottom: 32px;
+}
+
+.algo-step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.algo-step-num {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: white;
+  flex-shrink: 0;
+}
+
+.algo-step-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.algo-step-subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* ── GANTT MINI ── */
+.gantt-mini {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+
+.gantt-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.gantt-label {
+  width: 100px;
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 12px;
+}
+
+.gantt-track {
+  flex: 1;
+  height: 28px;
+  position: relative;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+}
+
+.gantt-bar {
+  position: absolute;
+  height: 100%;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+  transition: all 0.5s ease;
+}
+
+.gantt-bar.setup {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent, transparent 3px,
+    rgba(255,255,255,0.1) 3px,
+    rgba(255,255,255,0.1) 6px
+  );
+}
+
+.gantt-time-axis {
+  display: flex;
+  margin-left: 100px;
+  margin-top: 8px;
+}
+
+.gantt-time-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ── SCORING DASHBOARD ── */
+.score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.score-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+}
+
+.score-rank {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.score-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text-bright);
+  font-family: var(--mono);
+}
+
+.score-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.score-detail {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  font-style: italic;
+}
+
+/* ── ATTENTION VISUAL ── */
+.attention-visual {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 20px 0;
+}
+
+.att-operator {
+  text-align: center;
+}
+
+.att-bar-container {
+  width: 60px;
+  height: 200px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  margin: 12px auto;
+}
+
+.att-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 0 0 7px 7px;
+  transition: height 0.5s ease;
+}
+
+.att-bar-label {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  bottom: 4px;
+}
+
+.att-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.att-detail {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ── FLOW STEPS ── */
+.flow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  padding-left: 28px;
+}
+
+.flow-steps::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 20px;
+  bottom: 20px;
+  width: 2px;
+  background: var(--border);
+}
+
+.flow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 0;
+  position: relative;
+}
+
+.flow-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  margin-left: -28px;
+}
+
+.flow-content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.flow-content p {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* ── FORMULA BOX ── */
+.formula-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 2;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.formula-box .f-keyword { color: var(--purple); font-weight: 600; }
+.formula-box .f-value { color: var(--cyan); }
+.formula-box .f-comment { color: var(--text-dim); font-style: italic; }
+.formula-box .f-operator { color: var(--yellow); }
+.formula-box .f-highlight { color: var(--tier-imperative); font-weight: 700; }
+
+/* ── INFO BOX ── */
+.info-box {
+  background: rgba(108,140,255,0.08);
+  border: 1px solid rgba(108,140,255,0.2);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.info-box.warning {
+  background: rgba(251,191,36,0.08);
+  border-color: rgba(251,191,36,0.2);
+}
+
+.info-box.success {
+  background: rgba(52,211,153,0.08);
+  border-color: rgba(52,211,153,0.2);
+}
+
+.info-icon { font-size: 18px; flex-shrink: 0; }
+
+/* ── COMPARISON TABLE ── */
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.compare-table th {
+  text-align: left;
+  padding: 10px 16px;
+  background: var(--bg);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.compare-table tr:hover td {
+  background: rgba(255,255,255,0.02);
+}
+
+/* ── INTERACTIVE ANIMATION ── */
+.anim-controls {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.anim-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+  font-family: var(--font);
+}
+
+.anim-btn:hover { border-color: var(--accent); color: var(--accent); }
+.anim-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* ── TIER INDICATOR ── */
+.tier-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.tier-weight {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 800;
+  min-width: 50px;
+  text-align: right;
+}
+
+.tier-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+  min-width: 100px;
+}
+
+.tier-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.tier-bar {
+  height: 6px;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* ── MASKED TIME VISUAL ── */
+.masked-timeline {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+  position: relative;
+}
+
+.masked-phase {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  border-radius: 4px;
+  position: relative;
+}
+
+.masked-phase .phase-att {
+  position: absolute;
+  bottom: -18px;
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ── TABS inside section ── */
+.inner-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.inner-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  margin-bottom: -1px;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: var(--font);
+}
+
+.inner-tab:hover { color: var(--text); }
+.inner-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.inner-panel { display: none; }
+.inner-panel.active { display: block; }
+
+/* ── CONNECTOR ARROWS ── */
+.arrow-down {
+  text-align: center;
+  padding: 8px 0;
+  color: var(--text-dim);
+  font-size: 20px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  nav { width: 56px; min-width: 56px; }
+  .nav-header h1, .nav-header .subtitle, .nav-item span:not(.nav-num), .nav-legend { display: none; }
+  .nav-item { justify-content: center; padding: 10px; }
+  .section { padding: 24px 20px 60px; }
+  .score-grid { grid-template-columns: 1fr; }
+}
+
+/* Animation for bars appearing */
+@keyframes growRight {
+  from { width: 0; }
+}
+
+.gantt-bar.animate {
+  animation: growRight 0.6s ease forwards;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse { animation: pulse 2s ease infinite; }
+
+/* Tooltip */
+[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2a2e3d;
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  margin-bottom: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Speed gauge */
+.gauge {
+  width: 120px;
+  height: 60px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 32px 0;
+}
+
+.highlight { color: var(--accent); font-weight: 600; }
+
+.sub-section { margin-bottom: 32px; }
+.sub-section h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+
+/* FBI iteration visual */
+.fbi-iter {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  margin: 16px 0;
+}
+
+.fbi-iter-card {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.fbi-iter-card h5 {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-bright);
+}
+
+.fbi-iter-card .fbi-metric {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.fbi-iter-card .fbi-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Multi-start compare */
+.ms-compare {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.ms-result {
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+}
+
+.ms-result.winner { border-color: var(--green); }
+
+.ms-vs {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- NAVIGATION -->
+  <nav>
+    <div class="nav-header">
+      <h1>Flux Scheduler</h1>
+      <div class="subtitle">How automated scheduling works</div>
+    </div>
+    <div class="nav-items">
+      <div class="nav-item active" onclick="showSection(0)">
+        <span class="nav-num">1</span>
+        <span>The Big Picture</span>
+      </div>
+      <div class="nav-item" onclick="showSection(1)">
+        <span class="nav-num">2</span>
+        <span>Data Model & Vocabulary</span>
+      </div>
+      <div class="nav-item" onclick="showSection(2)">
+        <span class="nav-num">3</span>
+        <span>Constraints & Rules</span>
+      </div>
+      <div class="nav-item" onclick="showSection(3)">
+        <span class="nav-num">4</span>
+        <span>The Algorithm</span>
+      </div>
+      <div class="nav-item" onclick="showSection(4)">
+        <span class="nav-num">5</span>
+        <span>Operators & Attention</span>
+      </div>
+      <div class="nav-item" onclick="showSection(5)">
+        <span class="nav-num">6</span>
+        <span>Scoring & Quality</span>
+      </div>
+      <div class="nav-item" onclick="showSection(6)">
+        <span class="nav-num">7</span>
+        <span>Complete Pipeline</span>
+      </div>
+    </div>
+    <div class="nav-legend">
+      <h4>Priority Legend</h4>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--tier-imperative)"></div> Imperative (4x)</div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--tier-important)"></div> Important (2x)</div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--tier-standard)"></div> Standard (1x)</div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--tier-flexible)"></div> Flexible (0.5x)</div>
+      <div style="margin-top:12px">
+        <h4>Status</h4>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--green)"></div> Valid / On time</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--red)"></div> Violated / Late</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--yellow)"></div> Warning / Degraded</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main id="mainContent">
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SECTION 1: THE BIG PICTURE                             -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section active" id="sec-0">
+      <div class="section-header">
+        <div class="section-num">Section 1</div>
+        <h2>The Big Picture</h2>
+        <p class="section-desc">The Flux Scheduler takes all your print orders, machines, and operators as input, and produces a complete production schedule in milliseconds.</p>
+      </div>
+
+      <div class="diagram-container">
+        <svg viewBox="0 0 960 340" width="100%" style="max-width:960px">
+          <!-- INPUT GROUP -->
+          <rect x="10" y="10" width="280" height="320" rx="12" fill="none" stroke="#2a2e3d" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <text x="150" y="38" text-anchor="middle" fill="#8b8fa3" font-size="11" font-weight="700" letter-spacing="1">INPUTS</text>
+
+          <!-- Jobs -->
+          <rect x="30" y="55" width="240" height="60" rx="8" fill="#1e2130"/>
+          <rect x="30" y="55" width="4" height="60" rx="2" fill="#6c8cff"/>
+          <text x="52" y="78" fill="#e2e4ea" font-size="14" font-weight="700">Jobs (Print Orders)</text>
+          <text x="52" y="100" fill="#8b8fa3" font-size="11">Deadlines, priorities, dependencies</text>
+          <text x="232" y="92" fill="#6c8cff" font-size="22" text-anchor="middle">&#128196;</text>
+
+          <!-- Machines -->
+          <rect x="30" y="125" width="240" height="60" rx="8" fill="#1e2130"/>
+          <rect x="30" y="125" width="4" height="60" rx="2" fill="#a78bfa"/>
+          <text x="52" y="148" fill="#e2e4ea" font-size="14" font-weight="700">Stations (Machines)</text>
+          <text x="52" y="170" fill="#8b8fa3" font-size="11">Schedules, attention, groups</text>
+          <text x="232" y="162" fill="#a78bfa" font-size="22" text-anchor="middle">&#9881;</text>
+
+          <!-- Operators -->
+          <rect x="30" y="195" width="240" height="60" rx="8" fill="#1e2130"/>
+          <rect x="30" y="195" width="4" height="60" rx="2" fill="#34d399"/>
+          <text x="52" y="218" fill="#e2e4ea" font-size="14" font-weight="700">Operators (Workers)</text>
+          <text x="52" y="240" fill="#8b8fa3" font-size="11">Skills, schedules, availability</text>
+          <text x="232" y="232" fill="#34d399" font-size="22" text-anchor="middle">&#128119;</text>
+
+          <!-- Constraints -->
+          <rect x="30" y="265" width="240" height="55" rx="8" fill="#1e2130"/>
+          <rect x="30" y="265" width="4" height="55" rx="2" fill="#fbbf24"/>
+          <text x="52" y="288" fill="#e2e4ea" font-size="14" font-weight="700">Constraints & Rules</text>
+          <text x="52" y="305" fill="#8b8fa3" font-size="11">Capacity, precedence, gates</text>
+          <text x="232" y="298" fill="#fbbf24" font-size="22" text-anchor="middle">&#128274;</text>
+
+          <!-- ARROW 1 -->
+          <line x1="300" y1="170" x2="345" y2="170" stroke="#4a5f99" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+          <!-- ENGINE -->
+          <rect x="355" y="60" width="250" height="220" rx="14" fill="#1a1d27" stroke="#6c8cff" stroke-width="2"/>
+          <text x="480" y="95" text-anchor="middle" fill="#6c8cff" font-size="12" font-weight="700" letter-spacing="1">SCHEDULING ENGINE</text>
+
+          <rect x="375" y="112" width="210" height="36" rx="6" fill="rgba(108,140,255,0.1)"/>
+          <text x="480" y="135" text-anchor="middle" fill="#8b8fa3" font-size="12">&#x21A9; Backward Pass (LAST)</text>
+
+          <text x="480" y="160" text-anchor="middle" fill="#4a5f99" font-size="14">&#8595;</text>
+
+          <rect x="375" y="168" width="210" height="36" rx="6" fill="rgba(108,140,255,0.1)"/>
+          <text x="480" y="191" text-anchor="middle" fill="#8b8fa3" font-size="12">&#x21AA; Forward Pass (Schedule)</text>
+
+          <text x="480" y="218" text-anchor="middle" fill="#4a5f99" font-size="14">&#8595;</text>
+
+          <rect x="375" y="224" width="210" height="36" rx="6" fill="rgba(108,140,255,0.1)"/>
+          <text x="480" y="247" text-anchor="middle" fill="#8b8fa3" font-size="12">&#128260; Feedback Iteration</text>
+
+          <!-- ARROW 2 -->
+          <line x1="615" y1="170" x2="660" y2="170" stroke="#4a5f99" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+          <!-- OUTPUT GROUP -->
+          <rect x="670" y="10" width="280" height="320" rx="12" fill="none" stroke="#2a2e3d" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <text x="810" y="38" text-anchor="middle" fill="#8b8fa3" font-size="11" font-weight="700" letter-spacing="1">OUTPUTS</text>
+
+          <!-- Gantt -->
+          <rect x="690" y="55" width="240" height="90" rx="8" fill="#1e2130"/>
+          <rect x="690" y="55" width="4" height="90" rx="2" fill="#34d399"/>
+          <text x="712" y="78" fill="#e2e4ea" font-size="14" font-weight="700">Production Schedule</text>
+          <text x="712" y="97" fill="#8b8fa3" font-size="11">Every task placed on a machine</text>
+          <text x="712" y="115" fill="#8b8fa3" font-size="11">with time slot + operator(s)</text>
+          <text x="896" y="98" fill="#34d399" font-size="26" text-anchor="middle">&#128197;</text>
+
+          <!-- Stats -->
+          <rect x="690" y="155" width="240" height="70" rx="8" fill="#1e2130"/>
+          <rect x="690" y="155" width="4" height="70" rx="2" fill="#22d3ee"/>
+          <text x="712" y="178" fill="#e2e4ea" font-size="14" font-weight="700">Quality Score</text>
+          <text x="712" y="200" fill="#8b8fa3" font-size="11">Late jobs, lateness, makespan</text>
+          <text x="896" y="192" fill="#22d3ee" font-size="26" text-anchor="middle">&#127942;</text>
+
+          <!-- Warnings -->
+          <rect x="690" y="235" width="240" height="70" rx="8" fill="#1e2130"/>
+          <rect x="690" y="235" width="4" height="70" rx="2" fill="#fbbf24"/>
+          <text x="712" y="258" fill="#e2e4ea" font-size="14" font-weight="700">Warnings</text>
+          <text x="712" y="280" fill="#8b8fa3" font-size="11">Unplaced tasks, degraded modes</text>
+          <text x="896" y="272" fill="#fbbf24" font-size="26" text-anchor="middle">&#9888;</text>
+
+          <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#4a5f99"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+
+      <div class="info-box success">
+        <span class="info-icon">&#9889;</span>
+        <div><strong>Key fact:</strong> The engine computes a complete schedule for 1,000+ tasks across 15 machines with operators in <strong>under 1 second</strong>. It can be re-run anytime with updated data — making it a planning assistant, not a one-shot decision.</div>
+      </div>
+
+      <div class="card">
+        <h3>What problem does this solve?</h3>
+        <p>In a print shop with 15 machines, hundreds of active orders, and a team of operators with different skills and schedules, manually creating an optimal production schedule is practically impossible. The Flux Scheduler automates this by:</p>
+        <ul style="margin-top:12px">
+          <li><strong>Respecting all constraints</strong> — machine availability, operator skills, task sequences, drying times, group capacity limits</li>
+          <li><strong>Prioritizing deadlines</strong> — imperative orders get scheduled first; the system fights to meet every deadline</li>
+          <li><strong>Optimizing operators</strong> — assigning the right person to each machine at each moment, accounting for skill levels, attention splitting, and autonomous machine operation</li>
+          <li><strong>Self-correcting</strong> — the algorithm iterates multiple times, feeding real durations back to improve accuracy</li>
+          <li><strong>Comparing strategies</strong> — it tries two different approaches and picks the better result</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SECTION 2: DATA MODEL                                  -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-1">
+      <div class="section-header">
+        <div class="section-num">Section 2</div>
+        <h2>Data Model &mdash; The Vocabulary</h2>
+        <p class="section-desc">Everything the scheduler works with. Understanding these concepts is key to understanding the algorithm.</p>
+      </div>
+
+      <!-- JOB HIERARCHY -->
+      <div class="sub-section">
+        <h3>&#128209; The Job Hierarchy</h3>
+        <p style="margin-bottom:16px;color:var(--text-dim);font-size:14px">Every print order follows this structure: Job &rarr; Elements &rarr; Tasks</p>
+
+        <div class="diagram-container">
+          <svg viewBox="0 0 780 400" width="100%" style="max-width:780px">
+            <!-- JOB -->
+            <rect x="240" y="10" width="300" height="70" rx="10" fill="#1e2130" stroke="#6c8cff" stroke-width="2"/>
+            <text x="260" y="37" fill="#6c8cff" font-size="11" font-weight="700">JOB</text>
+            <text x="260" y="57" fill="#e2e4ea" font-size="14" font-weight="700">Catalogue Printemps 2026</text>
+            <text x="500" y="37" fill="#ff4d6a" font-size="11" font-weight="600" text-anchor="end">Deadline: April 15</text>
+            <text x="500" y="55" fill="#ff9f43" font-size="11" font-weight="600" text-anchor="end">Priority: Important (2x)</text>
+
+            <!-- Lines down -->
+            <line x1="310" y1="80" x2="310" y2="110" stroke="#2a2e3d" stroke-width="2"/>
+            <line x1="470" y1="80" x2="470" y2="110" stroke="#2a2e3d" stroke-width="2"/>
+
+            <!-- Connector -->
+            <line x1="310" y1="110" x2="470" y2="110" stroke="#2a2e3d" stroke-width="2"/>
+
+            <!-- ELEMENT 1: Cover -->
+            <rect x="80" y="120" width="220" height="60" rx="8" fill="#1e2130" stroke="#a78bfa" stroke-width="1.5"/>
+            <line x1="190" y1="110" x2="190" y2="120" stroke="#2a2e3d" stroke-width="2"/>
+            <line x1="190" y1="110" x2="310" y2="110" stroke="#2a2e3d" stroke-width="2"/>
+            <text x="100" y="145" fill="#a78bfa" font-size="10" font-weight="700">ELEMENT</text>
+            <text x="100" y="163" fill="#e2e4ea" font-size="13" font-weight="600">Cover</text>
+            <text x="270" y="155" fill="#8b8fa3" font-size="11" text-anchor="end">3 tasks</text>
+
+            <!-- ELEMENT 2: Interior -->
+            <rect x="350" y="120" width="220" height="60" rx="8" fill="#1e2130" stroke="#a78bfa" stroke-width="1.5"/>
+            <line x1="460" y1="110" x2="460" y2="120" stroke="#2a2e3d" stroke-width="2"/>
+            <text x="370" y="145" fill="#a78bfa" font-size="10" font-weight="700">ELEMENT</text>
+            <text x="370" y="163" fill="#e2e4ea" font-size="13" font-weight="600">Interior Pages</text>
+            <text x="540" y="155" fill="#8b8fa3" font-size="11" text-anchor="end">4 tasks</text>
+
+            <!-- Dependency arrow Cover → Binding -->
+            <!-- ELEMENT 3: Binding (depends on both) -->
+            <rect x="215" y="290" width="220" height="60" rx="8" fill="#1e2130" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="235" y="315" fill="#a78bfa" font-size="10" font-weight="700">ELEMENT</text>
+            <text x="235" y="333" fill="#e2e4ea" font-size="13" font-weight="600">Binding</text>
+            <text x="405" y="325" fill="#8b8fa3" font-size="11" text-anchor="end">2 tasks</text>
+
+            <!-- Dependency lines -->
+            <line x1="190" y1="180" x2="190" y2="240" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 3"/>
+            <line x1="460" y1="180" x2="460" y2="240" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 3"/>
+            <line x1="190" y1="240" x2="460" y2="240" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 3"/>
+            <line x1="325" y1="240" x2="325" y2="290" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arrowYellow)"/>
+            <text x="330" y="258" fill="#fbbf24" font-size="10" font-weight="600">must finish first</text>
+
+            <!-- TASKS under Cover -->
+            <g transform="translate(80, 198)">
+              <rect x="0" y="0" width="68" height="30" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1"/>
+              <text x="34" y="19" text-anchor="middle" fill="#6c8cff" font-size="10" font-weight="600">Print</text>
+            </g>
+            <text x="155" y="217" fill="#4a5f99" font-size="16">&rarr;</text>
+            <g transform="translate(168, 198)">
+              <rect x="0" y="0" width="55" height="30" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1"/>
+              <text x="27" y="19" text-anchor="middle" fill="#6c8cff" font-size="10" font-weight="600">Cut</text>
+            </g>
+            <text x="230" y="217" fill="#4a5f99" font-size="16">&rarr;</text>
+            <g transform="translate(243, 198)">
+              <rect x="0" y="0" width="55" height="30" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1"/>
+              <text x="27" y="19" text-anchor="middle" fill="#6c8cff" font-size="10" font-weight="600">Fold</text>
+            </g>
+
+            <!-- TASKS under Interior -->
+            <g transform="translate(350, 198)">
+              <rect x="0" y="0" width="50" height="30" rx="5" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1"/>
+              <text x="25" y="19" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="600">Print</text>
+            </g>
+            <text x="407" y="217" fill="#4a5f99" font-size="14">&rarr;</text>
+            <g transform="translate(418, 198)">
+              <rect x="0" y="0" width="38" height="30" rx="5" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1"/>
+              <text x="19" y="19" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="600">Dry</text>
+            </g>
+            <text x="462" y="217" fill="#4a5f99" font-size="14">&rarr;</text>
+            <g transform="translate(474, 198)">
+              <rect x="0" y="0" width="38" height="30" rx="5" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1"/>
+              <text x="19" y="19" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="600">Cut</text>
+            </g>
+            <text x="518" y="217" fill="#4a5f99" font-size="14">&rarr;</text>
+            <g transform="translate(530, 198)">
+              <rect x="0" y="0" width="38" height="30" rx="5" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1"/>
+              <text x="19" y="19" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="600">Fold</text>
+            </g>
+
+            <!-- Task label -->
+            <text x="140" y="248" fill="#8b8fa3" font-size="10" font-style="italic">Tasks execute in strict sequence within each element</text>
+
+            <!-- TASKS under Binding -->
+            <g transform="translate(215, 365)">
+              <rect x="0" y="0" width="95" height="30" rx="5" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1"/>
+              <text x="47" y="19" text-anchor="middle" fill="#34d399" font-size="10" font-weight="600">Assemble</text>
+            </g>
+            <text x="317" y="384" fill="#4a5f99" font-size="16">&rarr;</text>
+            <g transform="translate(330, 365)">
+              <rect x="0" y="0" width="105" height="30" rx="5" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1"/>
+              <text x="52" y="19" text-anchor="middle" fill="#34d399" font-size="10" font-weight="600">Stitch &amp; Trim</text>
+            </g>
+
+            <defs>
+              <marker id="arrowYellow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#fbbf24"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+      </div>
+
+      <!-- PRIORITY TIERS -->
+      <div class="sub-section">
+        <h3>&#127919; Priority Tiers</h3>
+        <p style="margin-bottom:16px;color:var(--text-dim);font-size:14px">Each job has a priority tier that determines how aggressively the scheduler fights to meet its deadline.</p>
+
+        <div class="tier-row">
+          <div class="tier-weight" style="color:var(--tier-imperative)">4&times;</div>
+          <div class="tier-name" style="color:var(--tier-imperative)">Imperative</div>
+          <div class="tier-desc">Contractual deadlines, financial penalties. The scheduler treats these as non-negotiable.</div>
+          <div class="tier-bar" style="width:200px;background:var(--tier-imperative)"></div>
+        </div>
+        <div class="tier-row">
+          <div class="tier-weight" style="color:var(--tier-important)">2&times;</div>
+          <div class="tier-name" style="color:var(--tier-important)">Important</div>
+          <div class="tier-desc">Key clients, strategic orders. Strong deadline pressure, but can yield to imperative.</div>
+          <div class="tier-bar" style="width:100px;background:var(--tier-important)"></div>
+        </div>
+        <div class="tier-row">
+          <div class="tier-weight" style="color:var(--tier-standard)">1&times;</div>
+          <div class="tier-name" style="color:var(--tier-standard)">Standard</div>
+          <div class="tier-desc">Normal production orders. The default priority level.</div>
+          <div class="tier-bar" style="width:50px;background:var(--tier-standard)"></div>
+        </div>
+        <div class="tier-row">
+          <div class="tier-weight" style="color:var(--tier-flexible)">0.5&times;</div>
+          <div class="tier-name" style="color:var(--tier-flexible)">Flexible</div>
+          <div class="tier-desc">Internal orders, samples, tests. Can wait if capacity is needed elsewhere.</div>
+          <div class="tier-bar" style="width:25px;background:var(--tier-flexible)"></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- STATION, OPERATOR, GROUP -->
+      <div class="sub-section">
+        <h3>&#9881;&#65039; Stations, Operators & Groups</h3>
+        <div class="card-grid">
+          <div class="card">
+            <h3><span style="color:var(--purple)">&#9881;</span> Station (Machine)</h3>
+            <p>A physical machine in the workshop. Each station has:</p>
+            <ul>
+              <li><strong>Operating schedule</strong> &mdash; when it's available (e.g., Mon-Fri 8h-17h)</li>
+              <li><strong>Attention required</strong> &mdash; how much operator focus it needs (setup vs. run)</li>
+              <li><strong>Masked-time capable</strong> &mdash; can it run autonomously after setup?</li>
+              <li><strong>Group membership</strong> &mdash; capacity limits shared with similar machines</li>
+              <li><strong>Max chunk duration</strong> &mdash; longest continuous run before forced break (default 7h)</li>
+              <li><strong>Drying time</strong> &mdash; mandatory gap after printing (4h for offset presses)</li>
+              <li><strong>Setup peremption</strong> &mdash; how long before an interrupted setup expires (default 2h)</li>
+              <li><strong>Capacity</strong> &mdash; how many tasks can run simultaneously (default 1). Multi-capacity stations like Carton (table work) allow one independent task per available operator.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3><span style="color:var(--green)">&#128119;</span> Operator (Worker)</h3>
+            <p>A human operator who runs machines. Each operator has:</p>
+            <ul>
+              <li><strong>Skills</strong> &mdash; which machines they can operate, with a proficiency level (0 to 1)</li>
+              <li><strong>Weekly schedule</strong> &mdash; working hours per day</li>
+              <li><strong>Absences</strong> &mdash; vacations, sick leave, appointments</li>
+              <li><strong>Attention budget = 1.0</strong> &mdash; total focus capacity to split across tasks</li>
+            </ul>
+            <div class="info-box" style="margin-top:12px">
+              <span class="info-icon">&#128161;</span>
+              <div>Proficiency 1.0 = full speed. Proficiency 0.7 = 70% speed. The scheduler factors this in when choosing who to assign.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3><span style="color:var(--cyan)">&#128279;</span> Station Group</h3>
+          <p>A logical grouping of related machines (e.g., "All offset presses") with a <strong>maximum concurrent limit</strong>. For example, if the group allows max 2 concurrent tasks, only 2 presses in the group can run simultaneously &mdash; even if there are 4 presses in the group. This models shared resources like ink supply, ventilation, or operator availability.</p>
+        </div>
+      </div>
+
+      <!-- TASK ANATOMY -->
+      <div class="sub-section">
+        <h3>&#128295; Anatomy of a Task</h3>
+        <div class="diagram-container">
+          <svg viewBox="0 0 700 120" width="100%" style="max-width:700px">
+            <!-- Setup phase -->
+            <rect x="50" y="30" width="180" height="50" rx="6" fill="rgba(255,159,67,0.2)" stroke="#ff9f43" stroke-width="1.5"/>
+            <pattern id="setupHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,159,67,0.15)" stroke-width="3"/>
+            </pattern>
+            <rect x="50" y="30" width="180" height="50" rx="6" fill="url(#setupHatch)"/>
+            <text x="140" y="60" text-anchor="middle" fill="#ff9f43" font-size="13" font-weight="700">SETUP</text>
+
+            <!-- Run phase -->
+            <rect x="230" y="30" width="350" height="50" rx="6" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+            <text x="405" y="60" text-anchor="middle" fill="#6c8cff" font-size="13" font-weight="700">RUN (Production)</text>
+
+            <!-- Labels -->
+            <text x="140" y="102" text-anchor="middle" fill="#ff9f43" font-size="11">Prepare machine</text>
+            <text x="140" y="115" text-anchor="middle" fill="#8b8fa3" font-size="10">Full operator attention</text>
+            <text x="405" y="102" text-anchor="middle" fill="#6c8cff" font-size="11">Actual production work</text>
+            <text x="405" y="115" text-anchor="middle" fill="#8b8fa3" font-size="10">Full or masked attention</text>
+
+            <!-- Duration labels -->
+            <text x="140" y="22" text-anchor="middle" fill="#8b8fa3" font-size="10">e.g., 45 min</text>
+            <text x="405" y="22" text-anchor="middle" fill="#8b8fa3" font-size="10">e.g., 180 min</text>
+
+            <!-- Total bracket -->
+            <line x1="50" y1="10" x2="580" y2="10" stroke="#4a5f99" stroke-width="1"/>
+            <line x1="50" y1="7" x2="50" y2="13" stroke="#4a5f99" stroke-width="1"/>
+            <line x1="580" y1="7" x2="580" y2="13" stroke="#4a5f99" stroke-width="1"/>
+            <text x="640" y="14" fill="#4a5f99" font-size="10" font-weight="600">Total: 225 min</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SECTION 3: CONSTRAINTS                                 -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-2">
+      <div class="section-header">
+        <div class="section-num">Section 3</div>
+        <h2>Constraints &mdash; The Rules</h2>
+        <p class="section-desc">The scheduler must respect all of these rules when placing tasks. They represent physical reality &mdash; machines can't be in two places at once, ink needs time to dry, operators need skills.</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(108,140,255,0.15)">&#9203;</div>
+          <div class="constraint-content">
+            <h4>1. Task Sequence</h4>
+            <p>Tasks within an element must execute in strict order. You can't fold a cover before printing it.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Print &rarr; Cut &rarr; Fold</div>
+              <div class="ex-invalid">&#10007; Fold &rarr; Print &rarr; Cut</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(167,139,250,0.15)">&#128279;</div>
+          <div class="constraint-content">
+            <h4>2. Element Dependencies</h4>
+            <p>Some elements depend on others. The binding element can't start until both the cover and interior elements are completely finished (last task of each).</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Cover done + Interior done &rarr; Binding starts</div>
+              <div class="ex-invalid">&#10007; Binding starts while Cover still printing</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(244,114,182,0.15)">&#128218;</div>
+          <div class="constraint-content">
+            <h4>3. Job Dependencies</h4>
+            <p>Entire jobs can depend on other jobs. If Job B requires Job A, <em>all</em> tasks of Job A must finish before <em>any</em> task of Job B can begin.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Insert Job complete &rarr; Catalogue Job starts</div>
+              <div class="ex-invalid">&#10007; Catalogue starts while Insert still in progress</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(251,191,36,0.15)">&#9748;</div>
+          <div class="constraint-content">
+            <h4>4. Drying Time</h4>
+            <p>After printing on an offset press, ink needs <strong>4 hours to dry</strong> before the next operation (cutting, folding, binding) can begin. This is a hard physical constraint.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Print ends 10:00 &rarr; Cut starts 14:00 (+4h)</div>
+              <div class="ex-invalid">&#10007; Print ends 10:00 &rarr; Cut starts 11:00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(167,139,250,0.15)">&#9881;</div>
+          <div class="constraint-content">
+            <h4>5. Station Capacity</h4>
+            <p>Each station has a capacity: how many tasks can run on it simultaneously. Most machines have capacity 1 (one task at a time). Multi-capacity stations like Carton (table work) can run several independent tasks in parallel &mdash; one per operator.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Carton (capacity 3): 3 tasks with 3 operators</div>
+              <div class="ex-invalid">&#10007; Massicot (capacity 1): only 1 task at a time</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(34,211,238,0.15)">&#128202;</div>
+          <div class="constraint-content">
+            <h4>6. Group Capacity</h4>
+            <p>Station groups enforce a maximum number of concurrent tasks <strong>across all machines</strong> in the group. This is separate from per-station capacity. If "All Presses" group has max 2, only 2 presses in the group can run simultaneously.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Press A + Press B running (2 of max 2)</div>
+              <div class="ex-invalid">&#10007; Press A + B + C running (3 of max 2)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(52,211,153,0.15)">&#128197;</div>
+          <div class="constraint-content">
+            <h4>7. Operating Hours</h4>
+            <p>Tasks are only scheduled during a machine's operating hours. A task can span non-working time (overnight, weekend) but work only progresses during open hours.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Scheduled within Mon-Fri 8h-17h</div>
+              <div class="ex-invalid">&#10007; Scheduled on Saturday when machine is off</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(255,159,67,0.15)">&#127891;</div>
+          <div class="constraint-content">
+            <h4>8. Operator Skills</h4>
+            <p>An operator can only be assigned to a machine they're trained on. Each skill has a proficiency level (0-1) that affects speed.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Marc (skilled on Komori) &rarr; assigned to Komori</div>
+              <div class="ex-invalid">&#10007; Julie (no press skill) &rarr; assigned to Komori</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(34,211,153,0.15)">&#128197;</div>
+          <div class="constraint-content">
+            <h4>9. Operator Availability</h4>
+            <p>Operators have their own schedules and declared absences (vacations, medical, etc.). The scheduler cannot assign an operator outside their working hours or during an absence.</p>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(248,113,113,0.15)">&#9201;</div>
+          <div class="constraint-content">
+            <h4>10. Setup Peremption</h4>
+            <p>If an operator is interrupted during the setup phase and doesn't return within <strong>2 hours</strong> (configurable per machine), the setup expires and must restart from scratch. Ink dries, temperatures shift, paper humidity changes &mdash; the machine is no longer ready.</p>
+            <div class="constraint-example">
+              <div class="ex-valid">&#10003; Setup interrupted 30 min &rarr; resume OK</div>
+              <div class="ex-invalid">&#10007; Setup interrupted 3 hours &rarr; must redo setup</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint-card">
+          <div class="constraint-icon" style="background:rgba(251,191,36,0.15)">&#9989;</div>
+          <div class="constraint-content">
+            <h4>11. Approval Gates</h4>
+            <p>Before an element can be scheduled, all its prerequisites must be ready:</p>
+            <ul style="margin-top:8px;font-size:13px;color:var(--text-dim)">
+              <li><strong>Paper</strong> &mdash; must be in stock or delivered (not still "to order" or "ordered")</li>
+              <li><strong>BAT (Bon &agrave; Tirer)</strong> &mdash; proof must be approved by client</li>
+              <li><strong>Plates</strong> &mdash; printing plates must be ready (not still "to make")</li>
+              <li><strong>Formes</strong> &mdash; die-cutting forms must be delivered (not still "to order")</li>
+            </ul>
+            <p style="margin-top:8px;font-size:12px;color:var(--yellow)">&#9888; Currently warnings only &mdash; the scheduler will place tasks but flag the missing prerequisites.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SECTION 4: THE ALGORITHM                               -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-3">
+      <div class="section-header">
+        <div class="section-num">Section 4</div>
+        <h2>The Algorithm &mdash; Step by Step</h2>
+        <p class="section-desc">How the engine turns chaos into a production schedule. Four phases, each building on the previous one.</p>
+      </div>
+
+      <!-- Inner tabs for each step -->
+      <div class="inner-tabs">
+        <button class="inner-tab active" onclick="showAlgoStep(0)">Step 0: Pre-Split</button>
+        <button class="inner-tab" onclick="showAlgoStep(1)">Step 1: Backward Pass</button>
+        <button class="inner-tab" onclick="showAlgoStep(2)">Step 2: Forward Pass</button>
+        <button class="inner-tab" onclick="showAlgoStep(3)">Step 3: FBI Loop</button>
+        <button class="inner-tab" onclick="showAlgoStep(4)">Step 4: Multi-Start</button>
+      </div>
+
+      <!-- STEP 0: PRE-SPLIT -->
+      <div class="inner-panel active" id="algo-0">
+        <div class="algo-step">
+          <div class="algo-step-header">
+            <div class="algo-step-num" style="background:var(--tier-flexible)">0</div>
+            <div>
+              <div class="algo-step-title">Pre-Split (Chunking)</div>
+              <div class="algo-step-subtitle">Prevent machine monopolization by splitting long tasks</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Why split?</h3>
+            <p>A task that runs for 14 hours would monopolize a machine for nearly two full working days. This blocks other urgent jobs from using that machine. The solution: <strong>split long tasks into chunks</strong> (max 7 hours each by default).</p>
+          </div>
+
+          <div class="card">
+            <h3>How it works</h3>
+            <ul>
+              <li>Any task longer than <strong>7 hours (setup + run combined)</strong> is split into sequential chunks</li>
+              <li><strong>Chunk 1</strong> keeps the original setup time (the machine needs to be prepared once)</li>
+              <li><strong>Chunks 2, 3, ...</strong> have zero setup time (the machine is already "calé" &mdash; configured for this job)</li>
+              <li>Chunks are linked by precedence: chunk 2 can't start before chunk 1 finishes</li>
+              <li>After scheduling, chunks are <strong>merged back</strong> into the original task for display</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Why is setup not repeated between chunks?</h3>
+            <p>Setup means <em>preparing the machine for a specific job</em>: loading the right paper, setting ink levels, aligning plates, calibrating. Once done, this configuration (<strong>calage</strong>) persists on the machine. If chunk 1 and chunk 2 run back-to-back on the same machine, the machine is still set up from chunk 1 &mdash; no need to redo it.</p>
+            <p style="margin-top:8px">To make chunks stay together, the scoring formula includes a <strong>calage bonus (+100 points)</strong> for any task that continues the same job on the same machine. This strongly encourages the scheduler to place chunk 2 right after chunk 1, before switching to another job.</p>
+          </div>
+
+          <div class="card" style="border-color:var(--green)">
+            <h3>&#128260; What if another job runs between two chunks?</h3>
+            <p>If an urgent job (e.g., an imperative order with a score of 10,000+) outweighs the calage bonus, the scheduler <em>may</em> insert a different job between chunk 1 and chunk 2 of the same task.</p>
+            <p style="margin-top:8px">When that happens, the other job <strong>changes the machine configuration</strong> (different paper, ink, plates). The engine <strong>detects this automatically</strong>: before starting chunk 2, it checks if the last action on the station was from a different job. If so, it <strong>restores the original setup time</strong> to chunk 2 by walking back through the predecessor chain to chunk 1 and copying its setup duration.</p>
+
+            <div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap">
+              <div class="constraint-example" style="flex:1">
+                <div class="ex-valid" style="flex:1;flex-direction:column;align-items:flex-start;padding:12px">
+                  <strong>Ideal case: chunks stay together</strong>
+                  <span style="margin-top:4px;font-size:12px">Chunk 1 (with setup) &rarr; Chunk 2 (no setup needed)<br>Machine stays configured. No time lost.</span>
+                </div>
+              </div>
+              <div class="constraint-example" style="flex:1">
+                <div class="ex-valid" style="flex:1;flex-direction:column;align-items:flex-start;padding:12px">
+                  <strong>Interrupted: another job between chunks</strong>
+                  <span style="margin-top:4px;font-size:12px">Chunk 1 &rarr; <em>Urgent Job X</em> &rarr; Chunk 2 (setup automatically restored)<br>Engine re-adds the setup. Schedule stays realistic.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="info-box success" style="margin-top:16px">
+              <span class="info-icon">&#9889;</span>
+              <div><strong>How it works:</strong> At the start of every chunk 2+, the engine looks backward on the station timeline. If the previous occupant was a different job, the calage is broken &mdash; so it walks the predecessor chain to chunk 1, reads the original setup duration, and adds it back. The FBI loop then accounts for the longer actual duration in subsequent iterations.</div>
+            </div>
+          </div>
+
+          <div class="diagram-container">
+            <svg viewBox="0 0 740 280" width="100%" style="max-width:740px">
+              <!-- Before -->
+              <text x="20" y="25" fill="#8b8fa3" font-size="11" font-weight="700">BEFORE</text>
+              <rect x="20" y="35" width="80" height="40" rx="5" fill="rgba(255,159,67,0.2)" stroke="#ff9f43" stroke-width="1.5"/>
+              <text x="60" y="60" text-anchor="middle" fill="#ff9f43" font-size="10" font-weight="600">Setup 1h</text>
+              <rect x="100" y="35" width="540" height="40" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+              <text x="370" y="60" text-anchor="middle" fill="#6c8cff" font-size="12" font-weight="600">Run 14 hours (monopolizes machine!)</text>
+
+              <!-- Arrow -->
+              <text x="370" y="100" text-anchor="middle" fill="#34d399" font-size="16">&#8595; IDEAL: chunks stay together</text>
+
+              <!-- After - ideal -->
+              <text x="20" y="125" fill="#34d399" font-size="11" font-weight="700">AFTER (IDEAL)</text>
+              <rect x="20" y="135" width="60" height="35" rx="5" fill="rgba(255,159,67,0.2)" stroke="#ff9f43" stroke-width="1.5"/>
+              <text x="50" y="157" text-anchor="middle" fill="#ff9f43" font-size="9" font-weight="600">Setup</text>
+              <rect x="80" y="135" width="230" height="35" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+              <text x="195" y="157" text-anchor="middle" fill="#6c8cff" font-size="10" font-weight="600">Chunk 1 (7h)</text>
+
+              <text x="318" y="157" fill="#34d399" font-size="14">&rarr;</text>
+
+              <rect x="330" y="135" width="230" height="35" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+              <text x="445" y="157" text-anchor="middle" fill="#6c8cff" font-size="10" font-weight="600">Chunk 2 (7h, no setup)</text>
+              <text x="580" y="148" fill="#34d399" font-size="10" font-weight="600">&#10003; Machine still</text>
+              <text x="580" y="161" fill="#34d399" font-size="10" font-weight="600">configured</text>
+
+              <!-- After - interrupted (with re-setup) -->
+              <text x="20" y="200" fill="#34d399" font-size="11" font-weight="700">AFTER (INTERRUPTED &mdash; SETUP RESTORED)</text>
+              <rect x="20" y="210" width="60" height="35" rx="5" fill="rgba(255,159,67,0.2)" stroke="#ff9f43" stroke-width="1.5"/>
+              <text x="50" y="232" text-anchor="middle" fill="#ff9f43" font-size="9" font-weight="600">Setup</text>
+              <rect x="80" y="210" width="150" height="35" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+              <text x="155" y="232" text-anchor="middle" fill="#6c8cff" font-size="10" font-weight="600">Chunk 1 (7h)</text>
+
+              <rect x="240" y="210" width="100" height="35" rx="5" fill="rgba(248,113,113,0.25)" stroke="#f87171" stroke-width="1.5"/>
+              <text x="290" y="228" text-anchor="middle" fill="#f87171" font-size="9" font-weight="700">Urgent Job X</text>
+              <text x="290" y="241" text-anchor="middle" fill="#f87171" font-size="8">(breaks calage)</text>
+
+              <rect x="350" y="210" width="60" height="35" rx="5" fill="rgba(255,159,67,0.2)" stroke="#ff9f43" stroke-width="1.5"/>
+              <text x="380" y="228" text-anchor="middle" fill="#ff9f43" font-size="9" font-weight="600">Re-setup</text>
+              <text x="380" y="241" text-anchor="middle" fill="#34d399" font-size="7" font-weight="600">auto-restored</text>
+
+              <rect x="410" y="210" width="180" height="35" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+              <text x="500" y="232" text-anchor="middle" fill="#6c8cff" font-size="10" font-weight="600">Chunk 2 (7h)</text>
+
+              <text x="610" y="224" fill="#34d399" font-size="10" font-weight="600">&#10003; Realistic</text>
+              <text x="610" y="237" fill="#34d399" font-size="10" font-weight="600">duration</text>
+
+              <text x="20" y="270" fill="#8b8fa3" font-size="10" font-style="italic">The calage bonus (+100) discourages this scenario. If it does happen, the engine detects the broken calage and adds setup back automatically.</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 1: BACKWARD PASS -->
+      <div class="inner-panel" id="algo-1">
+        <div class="algo-step">
+          <div class="algo-step-header">
+            <div class="algo-step-num" style="background:var(--purple)">1</div>
+            <div>
+              <div class="algo-step-title">Backward Pass &mdash; Computing LAST</div>
+              <div class="algo-step-subtitle">Latest Allowable Start Time: when is the drop-dead date for each task?</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Purpose</h3>
+            <p>Before scheduling forward, the engine computes the <strong>absolute latest each task can start</strong> without causing its job to miss the deadline. This is called the <strong>LAST</strong> (Latest Allowable Start Time). Think of it as a countdown clock for each task.</p>
+          </div>
+
+          <div class="card">
+            <h3>How it works</h3>
+            <p>The engine works <strong>backward from each deadline</strong>:</p>
+            <div class="flow-steps" style="margin-top:16px">
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--tier-imperative)">1</div>
+                <div class="flow-content">
+                  <h4>Start at the job's deadline</h4>
+                  <p>e.g., April 15 at 14:00 &mdash; this is the anchor point from which everything is computed backward.</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--purple)">2</div>
+                <div class="flow-content">
+                  <h4>Place the last task backward, tick by tick</h4>
+                  <p>Starting from the deadline, walk backward. At each tick, check: is the station free? Is the group below its concurrent limit?</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--orange)">3</div>
+                <div class="flow-content">
+                  <h4>Check operator availability at each tick <span class="badge badge-green" style="margin-left:6px;cursor:pointer" onclick="showSection(4)">&#128065; detailed in Section 5</span></h4>
+                  <p>The backward pass uses the <strong>same operator selection engine</strong> as the forward pass. At each tick, it checks whether a qualified operator is available with sufficient attention &mdash; accounting for setup vs. run phase and masked-time mode. Ticks with no available operator are <strong>skipped</strong>, pushing the LAST earlier. This means operator scarcity directly tightens drop-dead dates.</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--cyan)">4</div>
+                <div class="flow-content">
+                  <h4>Chain through predecessors</h4>
+                  <p>Move to the previous task in the element. Its deadline is now its successor's LAST. Walk backward through it the same way (station free + operator available). Repeat for every task in the chain.</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--yellow)">5</div>
+                <div class="flow-content">
+                  <h4>Account for drying time</h4>
+                  <p>If a predecessor is a printing task, subtract an additional 4-hour drying gap before the successor's LAST.</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--green)">6</div>
+                <div class="flow-content">
+                  <h4>Respect operating hours &amp; group capacity</h4>
+                  <p>Skip non-working ticks (nights, weekends). If the station's group is at max concurrent capacity at a tick, skip it &mdash; the task can't run there.</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--accent)">7</div>
+                <div class="flow-content">
+                  <h4>Result: every task has a LAST</h4>
+                  <p>A hard date that says: <em>"if this task hasn't started by here, the job will be late."</em> The forward pass uses these to prioritize urgent work.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="diagram-container">
+            <svg viewBox="0 0 780 200" width="100%" style="max-width:780px">
+              <!-- Timeline -->
+              <line x1="40" y1="100" x2="740" y2="100" stroke="#2a2e3d" stroke-width="2"/>
+
+              <!-- Deadline marker -->
+              <line x1="700" y1="70" x2="700" y2="130" stroke="#ff4d6a" stroke-width="2" stroke-dasharray="4 3"/>
+              <text x="700" y="60" text-anchor="middle" fill="#ff4d6a" font-size="11" font-weight="700">DEADLINE</text>
+              <text x="700" y="148" text-anchor="middle" fill="#ff4d6a" font-size="10">Apr 15, 14:00</text>
+
+              <!-- Task 3: Binding (last) -->
+              <rect x="560" y="82" width="120" height="36" rx="5" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1.5"/>
+              <text x="620" y="105" text-anchor="middle" fill="#34d399" font-size="11" font-weight="600">Bind (3h)</text>
+              <text x="560" y="75" fill="#34d399" font-size="10">LAST: Apr 14, 11:00</text>
+
+              <!-- Arrow -->
+              <line x1="540" y1="100" x2="555" y2="100" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3 2"/>
+              <text x="547" y="80" fill="#fbbf24" font-size="18">&larr;</text>
+
+              <!-- Drying gap -->
+              <rect x="440" y="86" width="100" height="28" rx="4" fill="rgba(251,191,36,0.08)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 2"/>
+              <text x="490" y="104" text-anchor="middle" fill="#fbbf24" font-size="10">Drying 4h</text>
+
+              <!-- Task 2: Cut -->
+              <rect x="310" y="82" width="120" height="36" rx="5" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+              <text x="370" y="105" text-anchor="middle" fill="#6c8cff" font-size="11" font-weight="600">Cut (2h)</text>
+              <text x="310" y="75" fill="#6c8cff" font-size="10">LAST: Apr 13, 13:00</text>
+
+              <line x1="290" y1="100" x2="305" y2="100" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3 2"/>
+              <text x="297" y="80" fill="#fbbf24" font-size="18">&larr;</text>
+
+              <!-- Task 1: Print -->
+              <rect x="100" y="82" width="180" height="36" rx="5" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1.5"/>
+              <text x="190" y="105" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="600">Print (5h setup+run)</text>
+              <text x="100" y="75" fill="#a78bfa" font-size="10">LAST: Apr 13, 8:00</text>
+
+              <!-- Direction arrow -->
+              <text x="390" y="170" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="600">&larr; &larr; &larr; Engine walks BACKWARD from deadline &larr; &larr; &larr;</text>
+
+              <!-- Now marker -->
+              <line x1="60" y1="70" x2="60" y2="130" stroke="#34d399" stroke-width="2" stroke-dasharray="4 3"/>
+              <text x="60" y="60" text-anchor="middle" fill="#34d399" font-size="11" font-weight="700">NOW</text>
+              <text x="60" y="148" text-anchor="middle" fill="#34d399" font-size="10">Apr 7</text>
+            </svg>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <h3>Ordering Strategy: Tier + Earliest Deadline</h3>
+            <p>The backward pass combines <strong>two sorting criteria</strong>:</p>
+            <ol style="margin-top:8px">
+              <li><strong>Primary sort: by priority tier</strong> &mdash; imperative jobs first, then important, then standard, then flexible. This <strong>reserves machine capacity</strong> for high-priority jobs.</li>
+              <li><strong>Secondary sort: by deadline (EDD)</strong> &mdash; within each tier, jobs are processed <strong>earliest deadline first</strong>. The job due soonest reserves capacity before one due later.</li>
+            </ol>
+            <div class="info-box" style="margin-top:12px">
+              <span class="info-icon">&#128161;</span>
+              <div>This means all imperative jobs are placed first (sorted by deadline among themselves), then all important jobs (sorted by deadline), and so on. The result: priority-based capacity reservation with deadline-awareness within each priority level.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: FORWARD PASS -->
+      <div class="inner-panel" id="algo-2">
+        <div class="algo-step">
+          <div class="algo-step-header">
+            <div class="algo-step-num" style="background:var(--accent)">2</div>
+            <div>
+              <div class="algo-step-title">Forward Pass &mdash; Building the Schedule</div>
+              <div class="algo-step-subtitle">Actually placing tasks on the timeline, tick by tick</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>The Core Loop — Two Phases Per Tick</h3>
+            <p>The engine advances through time in small increments called <strong>"ticks"</strong>. Each station can define its own tick granularity (e.g., 5 min for a fast digital press, 30 min for a slow offset press &mdash; default 15 min). The engine computes the finest common granularity (GCD) and uses that as the global time step.</p>
+            <p style="margin-top:8px">At each tick, the engine runs <strong>two phases</strong>: first it starts new tasks, then it processes all tasks that are already running. This means multiple tasks run concurrently and compete for operators at every tick.</p>
+          </div>
+
+          <div class="card">
+            <h3>Phase 1: Start new tasks</h3>
+            <div class="flow-steps" style="margin-top:16px">
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--purple)">1</div>
+                <div class="flow-content">
+                  <h4>Identify eligible tasks</h4>
+                  <p>A task is eligible to start if: all predecessors are complete (including drying gaps), its machine has capacity, the machine group is below its concurrent limit, and it hasn't started yet.</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--cyan)">2</div>
+                <div class="flow-content">
+                  <h4>Score and sort</h4>
+                  <p>Every eligible task gets an urgency score (detailed below). The most urgent task starts first. If it can find an operator for setup, it begins and joins the pool of active tasks.</p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--green)">3</div>
+                <div class="flow-content">
+                  <h4>Repeat at the same tick</h4>
+                  <p>After starting a task, re-score — another task may now be eligible on a different machine. Continue until no more tasks can start at this tick.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <h3>Phase 2: Process all active tasks <span class="badge badge-green" style="margin-left:6px;cursor:pointer" onclick="showSection(4)">&#128065; operator details in Section 5</span></h3>
+            <p style="margin-bottom:12px">Every task that is currently running is processed at this tick. Active tasks are <strong>sorted by priority</strong> — more urgent tasks get first pick of operators.</p>
+            <div class="flow-steps" style="margin-top:8px">
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--orange)">1</div>
+                <div class="flow-content">
+                  <h4>Allocate operators globally</h4>
+                  <p>For each active task (highest priority first), find the best available operators from the <strong>shared pool</strong>. The full operator selection engine runs: skills, proficiency, attention budgets, continuity, masked-time fallback with switch threshold.</p>
+                  <ul style="margin-top:6px;font-size:13px">
+                    <li><strong>Full attention</strong> &mdash; operator gives 100% &rarr; full speed</li>
+                    <li><strong>Masked mode</strong> &mdash; operator monitors at reduced attention &rarr; per-station speed (e.g., 95%)</li>
+                    <li><strong>Waiting</strong> &mdash; no operator available &rarr; task stalls this tick</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-dot" style="background:var(--pink)">2</div>
+                <div class="flow-content">
+                  <h4>Compute productivity and advance work</h4>
+                  <p>Each task's remaining work decreases based on the attention it received. Tasks that finish are removed from the active pool, freeing their station and operator for the next tick.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="info-box" style="margin-top:16px">
+              <span class="info-icon">&#128161;</span>
+              <div><strong>Why this matters:</strong> Because ALL active tasks compete for operators at every tick, the engine naturally handles:
+                <ul style="margin-top:4px;margin-bottom:0">
+                  <li><strong>Parallel masked execution</strong> &mdash; one operator splits attention across two masked machines simultaneously</li>
+                  <li><strong>Mid-execution handoffs</strong> &mdash; when a colleague becomes free, they take over a task automatically</li>
+                  <li><strong>Dynamic mode switching</strong> &mdash; a task can go from masked (95%) to full (100%) the instant an operator has nothing else to do</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="sub-section" style="margin-top:24px">
+            <h3>&#127919; The Scoring Formula</h3>
+            <p style="color:var(--text-dim);font-size:14px;margin-bottom:12px">How the engine decides which task is most urgent at any given moment:</p>
+
+            <div class="formula-box">
+              <span class="f-comment">// How much time is left before the drop-dead date?</span><br>
+              <span class="f-keyword">slack</span> <span class="f-operator">=</span> LAST <span class="f-operator">-</span> current_time <span class="f-operator">-</span> remaining_work<br><br>
+
+              <span class="f-comment">// Convert slack into urgency</span><br>
+              <span class="f-keyword">if</span> slack <span class="f-operator">&le;</span> <span class="f-value">0</span> &rarr; urgency <span class="f-operator">=</span> <span class="f-highlight">10,000 + overdue amount</span> <span class="f-comment">// EMERGENCY!</span><br>
+              <span class="f-keyword">if</span> slack <span class="f-operator">&gt;</span> <span class="f-value">0</span> &rarr; urgency <span class="f-operator">=</span> <span class="f-value">(1 - slack/horizon) &times; 1,000</span> <span class="f-comment">// proportional</span><br><br>
+
+              <span class="f-comment">// Apply priority multiplier</span><br>
+              score <span class="f-operator">=</span> urgency <span class="f-operator">&times;</span> <span class="f-keyword">tier_weight</span> <span class="f-comment">// 4&times; imperative, 2&times; important, 1&times; standard, 0.5&times; flexible</span><br><br>
+
+              <span class="f-comment">// Bonus: is the entire job behind schedule?</span><br>
+              <span class="f-keyword">if</span> job_behind <span class="f-operator">&rarr;</span> score <span class="f-operator">+=</span> <span class="f-value">overdue &times; 50 &times; tier_weight</span> <span class="f-comment">// massive boost</span><br><br>
+
+              <span class="f-comment">// Bonus: continuing the same job on this machine?</span><br>
+              <span class="f-keyword">if</span> same_job_on_machine <span class="f-operator">&rarr;</span> score <span class="f-operator">+=</span> <span class="f-value">100</span> <span class="f-comment">// minimize changeover (calage)</span>
+            </div>
+
+            <div class="info-box" style="margin-top:16px">
+              <span class="info-icon">&#128161;</span>
+              <div><strong>Key insight:</strong> A task with zero slack (at its drop-dead date) gets an emergency score of 10,000+, which <em>always</em> beats a task with positive slack (max 1,000). This means the scheduler will interrupt normal work to rescue a task about to miss its deadline.</div>
+            </div>
+          </div>
+
+          <!-- Animated Gantt Example -->
+          <div class="sub-section" style="margin-top:24px">
+            <h3>&#128200; Visual Example</h3>
+            <p style="color:var(--text-dim);font-size:14px;margin-bottom:12px">Watch the forward pass build a schedule tick by tick. Three machines, three jobs with different priorities.</p>
+
+            <div class="anim-controls">
+              <button class="anim-btn active" onclick="resetGanttAnim()">&#8634; Reset</button>
+              <button class="anim-btn" onclick="stepGanttAnim()">&#9654; Next Tick</button>
+              <button class="anim-btn" onclick="playGanttAnim()">&#9654;&#9654; Play All</button>
+            </div>
+
+            <div class="gantt-mini" id="ganttDemo">
+              <div class="gantt-row">
+                <div class="gantt-label">Komori G37</div>
+                <div class="gantt-track" id="gt-komori" style="position:relative"></div>
+              </div>
+              <div class="gantt-row">
+                <div class="gantt-label">Massicot</div>
+                <div class="gantt-track" id="gt-massicot" style="position:relative"></div>
+              </div>
+              <div class="gantt-row">
+                <div class="gantt-label">Plieuse</div>
+                <div class="gantt-track" id="gt-plieuse" style="position:relative"></div>
+              </div>
+              <div style="display:flex;margin-left:100px;margin-top:8px;justify-content:space-between;padding-right:4px">
+                <span style="font-size:10px;color:var(--text-dim)">8:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">9:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">10:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">11:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">12:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">13:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">14:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">15:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">16:00</span>
+                <span style="font-size:10px;color:var(--text-dim)">17:00</span>
+              </div>
+            </div>
+            <div id="ganttNarration" style="font-size:13px;color:var(--text-dim);min-height:40px;padding:8px 0">
+              Press "Next Tick" to step through the scheduling process, or "Play All" to watch it animate.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: FBI LOOP -->
+      <div class="inner-panel" id="algo-3">
+        <div class="algo-step">
+          <div class="algo-step-header">
+            <div class="algo-step-num" style="background:var(--green)">3</div>
+            <div>
+              <div class="algo-step-title">Feedback-Based Iteration (FBI Loop)</div>
+              <div class="algo-step-subtitle">Self-correcting through multiple passes</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>The Problem</h3>
+            <p>The first forward pass uses <strong>estimated durations</strong> (setup + run time as declared). But in reality, some tasks may run in <strong>degraded mode</strong> (slower, because no operator was available). That means the actual duration is longer than estimated, which cascades &mdash; downstream tasks start late, potentially missing deadlines.</p>
+          </div>
+
+          <div class="card">
+            <h3>The Solution: Iterate</h3>
+            <p>The FBI loop fixes this by feeding real durations back:</p>
+            <ol style="margin-top:8px">
+              <li><strong>Run backward pass</strong> &rarr; compute LAST values (drop-dead dates)</li>
+              <li><strong>Run forward pass</strong> &rarr; build actual schedule</li>
+              <li><strong>Check:</strong> did any tasks take longer than estimated? (degraded mode)</li>
+              <li><strong>If yes:</strong> feed actual durations back into backward pass</li>
+              <li><strong>Re-run</strong> backward + forward with corrected durations</li>
+              <li><strong>Repeat</strong> until stable (< 1% change) or max 3 iterations</li>
+            </ol>
+          </div>
+
+          <div style="margin:24px 0">
+            <div class="fbi-iter" id="fbiVisual">
+              <div class="fbi-iter-card">
+                <h5 style="color:var(--purple)">Iteration 1</h5>
+                <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">Uses estimated durations</p>
+                <div class="fbi-metric" style="color:var(--red)">3</div>
+                <div class="fbi-label">late jobs</div>
+                <div style="margin-top:8px">
+                  <div class="fbi-metric" style="color:var(--text-dim);font-size:16px">48h</div>
+                  <div class="fbi-label">total lateness</div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;color:var(--accent-dim);font-size:24px;padding:0 8px">
+                &#8594;
+              </div>
+
+              <div class="fbi-iter-card">
+                <h5 style="color:var(--cyan)">Iteration 2</h5>
+                <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">Corrected for degraded tasks</p>
+                <div class="fbi-metric" style="color:var(--yellow)">1</div>
+                <div class="fbi-label">late jobs</div>
+                <div style="margin-top:8px">
+                  <div class="fbi-metric" style="color:var(--text-dim);font-size:16px">12h</div>
+                  <div class="fbi-label">total lateness</div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;color:var(--accent-dim);font-size:24px;padding:0 8px">
+                &#8594;
+              </div>
+
+              <div class="fbi-iter-card" style="border-color:var(--green)">
+                <h5 style="color:var(--green)">Iteration 3 &#10003;</h5>
+                <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">Converged (&lt;1% change)</p>
+                <div class="fbi-metric" style="color:var(--green)">0</div>
+                <div class="fbi-label">late jobs</div>
+                <div style="margin-top:8px">
+                  <div class="fbi-metric" style="color:var(--text-dim);font-size:16px">0h</div>
+                  <div class="fbi-label">total lateness</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-box success">
+            <span class="info-icon">&#9889;</span>
+            <div><strong>Why this works:</strong> By feeding real durations back, the backward pass computes more realistic LAST values, which makes the forward pass prioritize the right tasks earlier. Each iteration gets closer to reality. Typically, 2-3 iterations are enough to converge.</div>
+          </div>
+
+          <div class="diagram-container">
+            <svg viewBox="0 0 600 220" width="100%" style="max-width:600px">
+              <!-- Backward -->
+              <rect x="40" y="40" width="160" height="60" rx="10" fill="#1e2130" stroke="#a78bfa" stroke-width="2"/>
+              <text x="120" y="65" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="700">Backward Pass</text>
+              <text x="120" y="82" text-anchor="middle" fill="#8b8fa3" font-size="10">Compute LAST values</text>
+
+              <!-- Arrow right -->
+              <line x1="205" y1="70" x2="240" y2="70" stroke="#4a5f99" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+              <!-- Forward -->
+              <rect x="245" y="40" width="160" height="60" rx="10" fill="#1e2130" stroke="#6c8cff" stroke-width="2"/>
+              <text x="325" y="65" text-anchor="middle" fill="#6c8cff" font-size="12" font-weight="700">Forward Pass</text>
+              <text x="325" y="82" text-anchor="middle" fill="#8b8fa3" font-size="10">Build schedule</text>
+
+              <!-- Arrow right -->
+              <line x1="410" y1="70" x2="445" y2="70" stroke="#4a5f99" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+              <!-- Check -->
+              <rect x="450" y="30" width="110" height="80" rx="10" fill="#1e2130" stroke="#fbbf24" stroke-width="2"/>
+              <text x="505" y="58" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700">Converged?</text>
+              <text x="505" y="75" text-anchor="middle" fill="#8b8fa3" font-size="10">&lt;1% change</text>
+              <text x="505" y="95" text-anchor="middle" fill="#34d399" font-size="10" font-weight="600">Yes &rarr; Done!</text>
+
+              <!-- Feedback loop arrow -->
+              <path d="M 505 115 L 505 170 L 120 170 L 120 105" fill="none" stroke="#ff9f43" stroke-width="2" marker-end="url(#arrowOrange)" stroke-dasharray="6 3"/>
+              <text x="310" y="188" text-anchor="middle" fill="#ff9f43" font-size="11" font-weight="600">&#128260; No &rarr; Feed actual durations back</text>
+
+              <defs>
+                <marker id="arrowOrange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                  <polygon points="0 0, 8 3, 0 6" fill="#ff9f43"/>
+                </marker>
+              </defs>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: MULTI-START -->
+      <div class="inner-panel" id="algo-4">
+        <div class="algo-step">
+          <div class="algo-step-header">
+            <div class="algo-step-num" style="background:var(--pink)">4</div>
+            <div>
+              <div class="algo-step-title">Multi-Start &mdash; Try Two Strategies, Pick the Best</div>
+              <div class="algo-step-subtitle">Because different orderings can produce different results</div>
+            </div>
+          </div>
+
+          <div class="info-box warning" style="margin-bottom:16px">
+            <span class="info-icon">&#9888;</span>
+            <div><strong>Multi-start is disabled by default</strong> (it doubles compute time). When disabled, only Tier+EDD runs. It can be enabled via the <code>multi_start</code> option in the compute request. It is also skipped if Tier+EDD already produced zero late jobs.</div>
+          </div>
+
+          <div class="card">
+            <h3>Why a second strategy?</h3>
+            <p>The default strategy (Tier+EDD) reserves capacity for high-priority jobs first. But sometimes this over-constrains the schedule &mdash; a lower-priority job with a very tight deadline might get pushed too late because all capacity was reserved for higher-tier jobs that actually had plenty of slack. The pure-EDD alternative ignores tiers entirely and just goes by deadline, which can sometimes find a globally better solution. When enabled, the engine <strong>tries both and keeps the winner</strong>.</p>
+          </div>
+
+          <div class="ms-compare">
+            <div class="ms-result">
+              <h4 style="color:var(--tier-imperative);font-size:14px;margin-bottom:12px">Strategy A: Tier + EDD</h4>
+              <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px">By priority tier, then by deadline within each tier.</p>
+              <div style="margin-bottom:8px">
+                <span style="font-size:24px;font-weight:800;font-family:var(--mono);color:var(--yellow)">2</span>
+                <span style="font-size:12px;color:var(--text-dim)"> late jobs</span>
+              </div>
+              <div style="margin-bottom:8px">
+                <span style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--text-dim)">24h</span>
+                <span style="font-size:12px;color:var(--text-dim)"> weighted lateness</span>
+              </div>
+              <div>
+                <span style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--text-dim)">12d</span>
+                <span style="font-size:12px;color:var(--text-dim)"> makespan</span>
+              </div>
+            </div>
+
+            <div class="ms-vs">VS</div>
+
+            <div class="ms-result winner">
+              <h4 style="color:var(--tier-standard);font-size:14px;margin-bottom:12px">Strategy B: Pure EDD &#127942;</h4>
+              <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px">All jobs by deadline only, ignoring priority tiers.</p>
+              <div style="margin-bottom:8px">
+                <span style="font-size:24px;font-weight:800;font-family:var(--mono);color:var(--green)">1</span>
+                <span style="font-size:12px;color:var(--text-dim)"> late job</span>
+              </div>
+              <div style="margin-bottom:8px">
+                <span style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--text-dim)">8h</span>
+                <span style="font-size:12px;color:var(--text-dim)"> weighted lateness</span>
+              </div>
+              <div>
+                <span style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--text-dim)">13d</span>
+                <span style="font-size:12px;color:var(--text-dim)"> makespan</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:20px">
+            <h3>How the winner is chosen</h3>
+            <p>Comparison is <strong>lexicographic</strong> &mdash; the first criterion that differs decides:</p>
+            <table class="compare-table">
+              <tr><th>#</th><th>Criterion</th><th>Strategy A</th><th>Strategy B</th><th>Winner</th></tr>
+              <tr>
+                <td>1</td>
+                <td><strong>Late job count</strong> (fewer = better)</td>
+                <td style="color:var(--yellow)">2</td>
+                <td style="color:var(--green)">1</td>
+                <td style="color:var(--green)">B wins here &#10003;</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Weighted lateness (lower = better)</td>
+                <td style="color:var(--text-dim)">24h</td>
+                <td style="color:var(--text-dim)">8h</td>
+                <td style="color:var(--text-dim)">(already decided)</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Makespan (shorter = better)</td>
+                <td style="color:var(--text-dim)">12d</td>
+                <td style="color:var(--text-dim)">13d</td>
+                <td style="color:var(--text-dim)">(already decided)</td>
+              </tr>
+            </table>
+            <div class="info-box" style="margin-top:12px">
+              <span class="info-icon">&#128161;</span>
+              <div><strong>Key:</strong> Strategy B wins even though its makespan is longer (13d vs 12d), because it has fewer late jobs. <em>Fewer late jobs always beats shorter total time.</em> Meeting deadlines is more important than finishing fast.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SECTION 5: OPERATORS & ATTENTION                       -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-4">
+      <div class="section-header">
+        <div class="section-num">Section 5</div>
+        <h2>Operators &mdash; Attention &amp; Masked Time</h2>
+        <p class="section-desc">This is where 90%+ of scheduling complexity lives. The engine models operator focus as a numerical resource — split, shared, and re-evaluated at every tick.</p>
+      </div>
+
+      <!-- 5A: OPERATOR SELECTION -->
+      <div class="sub-section">
+        <h3>&#127919; 5A. How the Engine Chooses Operators</h3>
+        <div class="card">
+          <h3>The selection pipeline (runs at every tick, for every active task)</h3>
+          <div class="flow-steps" style="margin-top:16px">
+            <div class="flow-step">
+              <div class="flow-dot" style="background:var(--purple)">1</div>
+              <div class="flow-content">
+                <h4>Filter candidates</h4>
+                <p>From all operators, keep only those who: have a <strong>skill</strong> for this station (proficiency &gt; 0), are <strong>available</strong> at this tick (within their schedule, not absent), and have <strong>remaining attention</strong> &gt; 0 (not fully committed elsewhere).</p>
+              </div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-dot" style="background:var(--cyan)">2</div>
+              <div class="flow-content">
+                <h4>Prefer continuity</h4>
+                <p>Operators already assigned to this task from a previous tick are <strong>ranked first</strong>, regardless of score. This avoids handoff overhead and setup re-familiarization.</p>
+              </div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-dot" style="background:var(--green)">3</div>
+              <div class="flow-content">
+                <h4>Filter by attention &amp; score</h4>
+                <p>Operators whose available attention is <strong>less than the station requires</strong> are discarded &mdash; regardless of proficiency. An operator with 0.3 free cannot work a station needing 1.0. Remaining candidates are scored:</p>
+                <div class="formula-box" style="margin:8px 0">
+                  <span class="f-keyword">score</span> <span class="f-operator">=</span> <span class="f-value">remaining_attention</span> <span class="f-operator">&times;</span> 50% <span class="f-operator">+</span> <span class="f-value">proficiency</span> <span class="f-operator">&times;</span> 50%
+                </div>
+                <p style="font-size:13px;color:var(--text-dim)">This balances two goals: prefer operators with more attention to give (less fragmentation) AND operators who are better at this machine (faster work).</p>
+              </div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-dot" style="background:var(--pink)">4</div>
+              <div class="flow-content">
+                <h4>Allocate greedily, up to max_operators</h4>
+                <p>Take operators in score order, allocating their attention until the station's need is met. Stop when: attention is satisfied, OR the station's <strong>max_operators</strong> cap is reached (physical limit on how many people can work the machine).</p>
+              </div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-dot" style="background:var(--red)">5</div>
+              <div class="flow-content">
+                <h4>Handle insufficient attention</h4>
+                <p><strong>Non-masked machine:</strong> cannot operate with partial attention &rarr; task stalls (waits).<br>
+                <strong>Masked-capable machine:</strong> falls back to masked mode if at least <code>attention_masked</code> is available (hard minimum, not "best effort"). If even that threshold isn't met &rarr; task stalls.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5B: MAX OPERATORS -->
+      <div class="sub-section">
+        <h3>&#128101; 5B. Max Operators Per Station</h3>
+        <div class="card">
+          <p>Each station has a <strong>physical limit</strong> on how many operators can work on it simultaneously (space, safety, ergonomics). The engine enforces this as a hard cap.</p>
+          <table class="compare-table" style="margin-top:12px">
+            <tr><th>Station type</th><th>Default max_operators</th><th>Rationale</th></tr>
+            <tr>
+              <td>Machine-paced (e.g., Massicot)</td>
+              <td><strong>1</strong></td>
+              <td>max_run_attention = attention_run &rarr; ceil(1.0/1.0) = 1. One operator, machine sets the speed.</td>
+            </tr>
+            <tr>
+              <td>Operator-paced (e.g., Hohner)</td>
+              <td><strong>2-3</strong></td>
+              <td>max_run_attention &gt; attention_run &rarr; ceil(2.0/1.0) = 2. More operators = faster, up to the cap.</td>
+            </tr>
+            <tr>
+              <td>Masked mode (any masked station)</td>
+              <td><strong>1</strong></td>
+              <td>Autonomous operation &mdash; only one operator monitors. Always 1 during masked run, regardless of station max.</td>
+            </tr>
+          </table>
+          <p style="margin-top:12px;font-size:13px;color:var(--text-dim)">This is configurable per station. Even if 5 operators are free, a Massicot will only accept 1.</p>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5B2: MULTI-CAPACITY STATIONS -->
+      <div class="sub-section">
+        <h3>&#128295; 5B&frac12;. Multi-Capacity Stations (Table Work)</h3>
+        <div class="card">
+          <h3>N operators &rarr; N independent tasks on the same station</h3>
+          <p>This is <strong>different from multi-operator machines</strong> (where N operators work together on 1 task). On a multi-capacity station, each operator handles their own independent task at their own work position.</p>
+
+          <div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap">
+            <div style="flex:1;min-width:250px;background:var(--bg);padding:16px;border-radius:8px;border:1px solid var(--border)">
+              <strong style="color:var(--purple)">Multi-Operator Machine</strong>
+              <p style="margin-top:6px;font-size:13px;color:var(--text-dim)">e.g., Hohner (attention_run = 2.0)</p>
+              <p style="margin-top:4px;font-size:13px">2 operators &rarr; <strong>1 task</strong> at 100% speed</p>
+              <p style="font-size:12px;color:var(--text-dim)">Shared machine setup (calage applies)</p>
+            </div>
+            <div style="flex:1;min-width:250px;background:var(--bg);padding:16px;border-radius:8px;border:1px solid var(--cyan)">
+              <strong style="color:var(--cyan)">Multi-Capacity Station</strong>
+              <p style="margin-top:6px;font-size:13px;color:var(--text-dim)">e.g., Carton table (capacity = 3)</p>
+              <p style="margin-top:4px;font-size:13px">3 operators &rarr; <strong>3 tasks</strong> in parallel</p>
+              <p style="font-size:12px;color:var(--text-dim)">Independent positions (no shared calage)</p>
+            </div>
+          </div>
+
+          <div class="info-box" style="margin-top:16px">
+            <span class="info-icon">&#128161;</span>
+            <div><strong>Key differences:</strong> On multi-capacity stations, there is no shared machine setup &mdash; so calage bonus does not apply (no setup alignment benefit) and chunk re-setup does not apply (no calage to break). Each work position is independent.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5C: ATTENTION MODEL -->
+      <div class="sub-section">
+        <h3>&#128065; 5C. The Attention Model</h3>
+        <div class="card">
+          <p>Every operator has a total <strong>attention budget of 1.0</strong> (100% of their focus). Each station declares how much attention it needs, per phase:</p>
+          <table class="compare-table" style="margin-top:12px">
+            <tr><th>Parameter</th><th>Phase</th><th>Typical value</th><th>Description</th></tr>
+            <tr>
+              <td><code>attention_full</code></td>
+              <td><span class="badge badge-orange">Setup</span></td>
+              <td>1.0</td>
+              <td>Attention needed during setup. Can be &lt; 1.0 for machines with simple setup. Per-station.</td>
+            </tr>
+            <tr>
+              <td><code>attention_run</code></td>
+              <td><span class="badge badge-standard">Run</span></td>
+              <td>1.0</td>
+              <td>Baseline attention for normal operation. The minimum for the machine to run at full speed.</td>
+            </tr>
+            <tr>
+              <td><code>max_run_attention</code></td>
+              <td><span class="badge badge-standard">Run</span></td>
+              <td>= attention_run</td>
+              <td>Max useful attention (operator-paced stations). Extra operators speed up to this ceiling.</td>
+            </tr>
+            <tr>
+              <td><code>attention_masked</code></td>
+              <td><span class="badge badge-green">Masked run</span></td>
+              <td>0.5</td>
+              <td>Hard minimum for masked mode. If operator can't give at least this much, machine <strong>cannot run masked</strong>.</td>
+            </tr>
+            <tr>
+              <td><code>masked_productivity</code></td>
+              <td><span class="badge badge-green">Masked run</span></td>
+              <td>0.95</td>
+              <td>Speed during masked mode. Per-station (e.g., SBG = 0.95, another press = 0.70). Not proportional to attention.</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5D: MASKED TIME -->
+      <div class="sub-section">
+        <h3>&#129302; 5D. Masked Time &mdash; Autonomous Machine Operation</h3>
+        <div class="card">
+          <h3>Machines either run at full speed, run masked, or wait</h3>
+          <p>A non-masked machine <strong>cannot operate with partial attention</strong>. Either the operator is fully present (100%), or the machine waits. Only masked-capable machines accept reduced attention.</p>
+
+          <div style="margin-top:20px;display:flex;gap:24px;flex-wrap:wrap">
+            <div style="text-align:center;flex:1;min-width:200px">
+              <div style="font-size:14px;color:var(--green);font-weight:600;margin-bottom:8px">Full Attention</div>
+              <div style="background:var(--bg);border-radius:8px;padding:16px">
+                <div style="font-size:11px;color:var(--text-dim)">Any machine</div>
+                <div style="font-size:28px;font-weight:800;color:var(--green);font-family:var(--mono)">100%</div>
+                <div style="margin-top:4px;font-size:12px;color:var(--text-dim)">Operator present, full speed</div>
+              </div>
+            </div>
+            <div style="text-align:center;flex:1;min-width:200px">
+              <div style="font-size:14px;color:var(--cyan);font-weight:600;margin-bottom:8px">Masked Mode</div>
+              <div style="background:var(--bg);border-radius:8px;padding:16px;border:1px solid var(--cyan)">
+                <div style="font-size:11px;color:var(--text-dim)">Masked-capable only</div>
+                <div style="font-size:28px;font-weight:800;color:var(--cyan);font-family:var(--mono)">95%</div>
+                <div style="margin-top:4px;font-size:12px;color:var(--text-dim)">Per-station value<br>1 operator monitors</div>
+              </div>
+            </div>
+            <div style="text-align:center;flex:1;min-width:200px">
+              <div style="font-size:14px;color:var(--red);font-weight:600;margin-bottom:8px">Waiting</div>
+              <div style="background:var(--bg);border-radius:8px;padding:16px;border:1px solid var(--red)">
+                <div style="font-size:11px;color:var(--text-dim)">Insufficient attention</div>
+                <div style="font-size:28px;font-weight:800;color:var(--red);font-family:var(--mono)">0%</div>
+                <div style="margin-top:4px;font-size:12px;color:var(--text-dim)">Task stalls<br>until operator is free</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-box" style="margin-top:16px">
+            <span class="info-icon">&#128161;</span>
+            <div><strong>Key:</strong> <code>attention_masked</code> is a <strong>hard threshold</strong>, not "best effort." If the SBG requires 0.5 attention for masked mode and the operator only has 0.49 free, the SBG <em>cannot operate</em> &mdash; it waits.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5E: DYNAMIC TRANSITIONS -->
+      <div class="sub-section">
+        <h3>&#128260; 5E. Dynamic Transitions &mdash; Tick-by-Tick Re-evaluation</h3>
+        <div class="card">
+          <h3>Tasks can switch between masked and full mode mid-execution</h3>
+          <p>The engine doesn't decide "this task runs masked" once and stick with it. It <strong>re-evaluates operator availability at every single tick</strong>. The logic at each tick:</p>
+          <ol style="margin-top:8px">
+            <li><strong>Try full attention with current operator</strong> &mdash; can the assigned operator give <code>attention_run</code>? If yes &rarr; full speed (100%). Continuity preserved.</li>
+            <li><strong>Evaluate the gain from switching</strong> &mdash; if the current operator can't give full attention, compute the productivity gain: <code>1.0 - masked_productivity</code>.
+              <ul style="margin-top:4px">
+                <li><strong>Small gain (&lt;10%)</strong> &mdash; e.g., masked at 95% vs full at 100%. Not worth switching operators. Keep current operator, go to masked mode.</li>
+                <li><strong>Large gain (&ge;10%)</strong> &mdash; e.g., masked at 70% vs full at 100%. Try a <strong>different fully-available operator</strong>. If one exists and is qualified &rarr; switch to them at full speed. If not &rarr; fall to masked with current.</li>
+              </ul>
+            </li>
+            <li><strong>Fall back to masked</strong> &mdash; keep current operator at <code>attention_masked</code> &rarr; masked mode (per-station productivity).</li>
+            <li><strong>Stall</strong> &mdash; if even masked threshold isn't met &rarr; task waits.</li>
+          </ol>
+          <div class="info-box" style="margin-top:12px">
+            <span class="info-icon">&#128161;</span>
+            <div><strong>Why a threshold?</strong> Switching operators has a real cost &mdash; handoff communication, re-familiarization. A 5% speed gain (95% &rarr; 100%) isn't worth the disruption. A 30% gain (70% &rarr; 100%) is. The 10% threshold balances continuity against idle operator waste.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3>Example: Marc operates SBG + MBO XL alone (both masked-capable)</h3>
+          <p style="font-size:13px;color:var(--text-dim)">Both machines need setup (1.0 attention each). Both are masked-capable (SBG: 0.95, MBO XL: 0.95). Marc is the only qualified operator for both. Setup requires full attention &rarr; he must do them one after the other.</p>
+        </div>
+
+        <div class="diagram-container">
+          <svg viewBox="0 0 820 340" width="100%" style="max-width:820px">
+            <!-- Time labels -->
+            <text x="100" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">8:00</text>
+            <text x="210" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">9:00</text>
+            <text x="320" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">10:00</text>
+            <text x="430" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">11:00</text>
+            <text x="540" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">12:00</text>
+            <text x="650" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">13:00</text>
+            <text x="760" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">14:00</text>
+
+            <!-- Station timelines -->
+            <line x1="100" y1="48" x2="780" y2="48" stroke="#2a2e3d" stroke-width="1"/>
+            <line x1="100" y1="108" x2="780" y2="108" stroke="#2a2e3d" stroke-width="1"/>
+
+            <text x="15" y="48" fill="#a78bfa" font-size="11" font-weight="600">SBG</text>
+            <text x="15" y="62" fill="#8b8fa3" font-size="8">masked, 0.95</text>
+            <text x="15" y="108" fill="#6c8cff" font-size="11" font-weight="600">MBO XL</text>
+            <text x="15" y="122" fill="#8b8fa3" font-size="8">masked, 0.95</text>
+
+            <!-- SBG: Setup 8:00-9:00 -->
+            <rect x="100" y="33" width="110" height="28" rx="4" fill="rgba(255,159,67,0.3)" stroke="#ff9f43" stroke-width="1.5"/>
+            <text x="155" y="51" text-anchor="middle" fill="#ff9f43" font-size="9" font-weight="600">SETUP (1.0)</text>
+
+            <!-- SBG: Stalls 9:00-10:00 (Marc setting up MBO XL, 0 attention for SBG) -->
+            <rect x="210" y="33" width="110" height="28" rx="4" fill="rgba(248,113,113,0.1)" stroke="#f87171" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="265" y="47" text-anchor="middle" fill="#f87171" font-size="8" font-weight="600">STALLS</text>
+            <text x="265" y="57" text-anchor="middle" fill="#8b8fa3" font-size="7">Marc busy on MBO XL setup</text>
+
+            <!-- SBG: Run masked 10:00-13:00 -->
+            <rect x="320" y="33" width="330" height="28" rx="4" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1.5"/>
+            <text x="485" y="51" text-anchor="middle" fill="#34d399" font-size="9" font-weight="600">RUN MASKED (0.5, 95%)</text>
+
+            <!-- SBG: Run full 13:00-14:00 -->
+            <rect x="650" y="33" width="110" height="28" rx="4" fill="rgba(108,140,255,0.2)" stroke="#6c8cff" stroke-width="1.5"/>
+            <text x="705" y="51" text-anchor="middle" fill="#6c8cff" font-size="9" font-weight="600">FULL (1.0, 100%)</text>
+
+            <!-- MBO XL: Waits 8:00-9:00 -->
+            <rect x="100" y="93" width="110" height="28" rx="4" fill="rgba(248,113,113,0.1)" stroke="#f87171" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="155" y="107" text-anchor="middle" fill="#f87171" font-size="8" font-weight="600">WAITS</text>
+            <text x="155" y="117" text-anchor="middle" fill="#8b8fa3" font-size="7">Marc on SBG setup</text>
+
+            <!-- MBO XL: Setup 9:00-10:00 -->
+            <rect x="210" y="93" width="110" height="28" rx="4" fill="rgba(255,159,67,0.3)" stroke="#ff9f43" stroke-width="1.5"/>
+            <text x="265" y="111" text-anchor="middle" fill="#ff9f43" font-size="9" font-weight="600">SETUP (1.0)</text>
+
+            <!-- MBO XL: Run masked 10:00-13:00 -->
+            <rect x="320" y="93" width="330" height="28" rx="4" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1.5"/>
+            <text x="485" y="111" text-anchor="middle" fill="#34d399" font-size="9" font-weight="600">RUN MASKED (0.5, 95%)</text>
+
+            <!-- Operator attention -->
+            <text x="15" y="170" fill="#34d399" font-size="11" font-weight="700">Marc</text>
+
+            <!-- Marc: 8:00-9:00 SBG setup (purple = SBG) -->
+            <rect x="100" y="178" width="110" height="25" rx="4" fill="rgba(167,139,250,0.5)"/>
+            <text x="155" y="195" text-anchor="middle" fill="white" font-size="8" font-weight="600">1.0 &rarr; SBG setup</text>
+
+            <!-- Marc: 9:00-10:00 MBO XL setup (blue = MBO XL) -->
+            <rect x="210" y="178" width="110" height="25" rx="4" fill="rgba(108,140,255,0.5)"/>
+            <text x="265" y="195" text-anchor="middle" fill="white" font-size="8" font-weight="600">1.0 &rarr; MBO XL setup</text>
+
+            <!-- Marc: 10:00-13:00 split (purple = SBG, blue = MBO XL) -->
+            <rect x="320" y="178" width="330" height="12" rx="2" fill="rgba(167,139,250,0.5)"/>
+            <rect x="320" y="190" width="330" height="13" rx="2" fill="rgba(108,140,255,0.5)"/>
+            <text x="485" y="188" text-anchor="middle" fill="white" font-size="8" font-weight="600">0.5 SBG (masked)</text>
+            <text x="485" y="200" text-anchor="middle" fill="white" font-size="8" font-weight="600">0.5 MBO XL (masked)</text>
+
+            <!-- Marc: 13:00-14:00 full SBG (purple = SBG) -->
+            <rect x="650" y="178" width="110" height="25" rx="4" fill="rgba(167,139,250,0.5)"/>
+            <text x="705" y="195" text-anchor="middle" fill="white" font-size="8" font-weight="600">1.0 &rarr; SBG full</text>
+
+            <!-- Annotations -->
+            <text x="100" y="238" fill="#ff9f43" font-size="10" font-weight="600">&#9733; 8:00-10:00: Setups are sequential (each needs 1.0). SBG first, then MBO XL. The other machine stalls.</text>
+            <text x="100" y="256" fill="#34d399" font-size="10" font-weight="600">&#9733; 10:00-13:00: Both run masked. Marc splits 0.5 + 0.5. Both machines at 95%. All his attention is used.</text>
+            <text x="100" y="274" fill="#6c8cff" font-size="10" font-weight="600">&#9733; 13:00: MBO XL done. Marc gives 1.0 to SBG &rarr; exits masked, finishes at 100%.</text>
+            <text x="100" y="292" fill="#8b8fa3" font-size="10">Masked mode only activates because Marc genuinely has no free attention &mdash; it's all allocated. The engine never wastes attention.</text>
+          </svg>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3>What if Julie becomes available mid-execution?</h3>
+          <p style="font-size:13px;color:var(--text-dim)">Same scenario, but Julie (skilled on MBO XL) finishes another task at 11:00 and becomes idle.</p>
+        </div>
+
+        <div class="diagram-container">
+          <svg viewBox="0 0 820 340" width="100%" style="max-width:820px">
+            <text x="100" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">8:00</text>
+            <text x="210" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">9:00</text>
+            <text x="320" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">10:00</text>
+            <text x="430" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">11:00</text>
+            <text x="540" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">12:00</text>
+            <text x="650" y="18" fill="#8b8fa3" font-size="10" text-anchor="middle">13:00</text>
+
+            <line x1="100" y1="48" x2="670" y2="48" stroke="#2a2e3d" stroke-width="1"/>
+            <line x1="100" y1="108" x2="670" y2="108" stroke="#2a2e3d" stroke-width="1"/>
+
+            <text x="15" y="48" fill="#a78bfa" font-size="11" font-weight="600">SBG</text>
+            <text x="15" y="108" fill="#6c8cff" font-size="11" font-weight="600">MBO XL</text>
+
+            <!-- SBG: Setup 8-9, stall 9-10, masked 10-11, FULL 11-13 -->
+            <rect x="100" y="33" width="110" height="28" rx="4" fill="rgba(255,159,67,0.3)" stroke="#ff9f43" stroke-width="1.5"/>
+            <text x="155" y="51" text-anchor="middle" fill="#ff9f43" font-size="9" font-weight="600">SETUP</text>
+            <rect x="210" y="33" width="110" height="28" rx="4" fill="rgba(248,113,113,0.1)" stroke="#f87171" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="265" y="51" text-anchor="middle" fill="#f87171" font-size="8" font-weight="600">STALLS</text>
+            <rect x="320" y="33" width="110" height="28" rx="4" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1.5"/>
+            <text x="375" y="51" text-anchor="middle" fill="#34d399" font-size="9" font-weight="600">MASKED 95%</text>
+            <rect x="430" y="33" width="220" height="28" rx="4" fill="rgba(167,139,250,0.25)" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="540" y="51" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="600">FULL 100% (Marc alone)</text>
+
+            <!-- MBO XL: wait 8-9, setup 9-10, masked 10-11, FULL with Julie 11-12 -->
+            <rect x="100" y="93" width="110" height="28" rx="4" fill="rgba(248,113,113,0.1)" stroke="#f87171" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="155" y="111" text-anchor="middle" fill="#f87171" font-size="8" font-weight="600">WAITS</text>
+            <rect x="210" y="93" width="110" height="28" rx="4" fill="rgba(255,159,67,0.3)" stroke="#ff9f43" stroke-width="1.5"/>
+            <text x="265" y="111" text-anchor="middle" fill="#ff9f43" font-size="9" font-weight="600">SETUP</text>
+            <rect x="320" y="93" width="110" height="28" rx="4" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1.5"/>
+            <text x="375" y="111" text-anchor="middle" fill="#34d399" font-size="9" font-weight="600">MASKED 95%</text>
+            <rect x="430" y="93" width="110" height="28" rx="4" fill="rgba(108,140,255,0.25)" stroke="#6c8cff" stroke-width="1.5"/>
+            <text x="485" y="111" text-anchor="middle" fill="#6c8cff" font-size="9" font-weight="600">FULL 100% (Julie)</text>
+
+            <!-- Operator bars -->
+            <text x="15" y="170" fill="#a78bfa" font-size="10" font-weight="700">Marc</text>
+            <text x="15" y="224" fill="#6c8cff" font-size="10" font-weight="700">Julie</text>
+
+            <!-- Marc -->
+            <rect x="100" y="160" width="110" height="20" rx="3" fill="rgba(167,139,250,0.5)"/>
+            <text x="155" y="174" text-anchor="middle" fill="white" font-size="7" font-weight="600">1.0 SBG setup</text>
+            <rect x="210" y="160" width="110" height="20" rx="3" fill="rgba(108,140,255,0.5)"/>
+            <text x="265" y="174" text-anchor="middle" fill="white" font-size="7" font-weight="600">1.0 MBO XL setup</text>
+            <rect x="320" y="160" width="110" height="10" rx="2" fill="rgba(167,139,250,0.5)"/>
+            <rect x="320" y="170" width="110" height="10" rx="2" fill="rgba(108,140,255,0.5)"/>
+            <text x="375" y="168" text-anchor="middle" fill="white" font-size="6" font-weight="600">0.5 SBG</text>
+            <text x="375" y="178" text-anchor="middle" fill="white" font-size="6" font-weight="600">0.5 MBO</text>
+            <rect x="430" y="160" width="220" height="20" rx="3" fill="rgba(167,139,250,0.5)"/>
+            <text x="540" y="174" text-anchor="middle" fill="white" font-size="7" font-weight="600">1.0 SBG full</text>
+
+            <!-- Julie -->
+            <rect x="100" y="214" width="330" height="20" rx="3" fill="rgba(107,114,128,0.2)" stroke="#4a5f99" stroke-width="1" stroke-dasharray="3 2"/>
+            <text x="265" y="228" text-anchor="middle" fill="#8b8fa3" font-size="7">busy elsewhere</text>
+            <rect x="430" y="214" width="110" height="20" rx="3" fill="rgba(108,140,255,0.5)"/>
+            <text x="485" y="228" text-anchor="middle" fill="white" font-size="7" font-weight="600">1.0 MBO XL full</text>
+            <rect x="540" y="214" width="110" height="20" rx="3" fill="rgba(107,114,128,0.2)" stroke="#4a5f99" stroke-width="1" stroke-dasharray="3 2"/>
+            <text x="595" y="228" text-anchor="middle" fill="#8b8fa3" font-size="7">free</text>
+
+            <!-- Handoff arrow -->
+            <line x1="430" y1="145" x2="430" y2="155" stroke="#34d399" stroke-width="2"/>
+            <text x="432" y="143" fill="#34d399" font-size="9" font-weight="700">&#9733; Julie arrives &rarr; handoff</text>
+
+            <text x="100" y="260" fill="#34d399" font-size="10" font-weight="600">&#9733; 10:00-11:00: Marc splits 0.5/0.5. Both at 95%. Julie is busy elsewhere.</text>
+            <text x="100" y="278" fill="#6c8cff" font-size="10" font-weight="600">&#9733; 11:00: Julie becomes free. Engine hands MBO XL to Julie (1.0), Marc goes full on SBG (1.0).</text>
+            <text x="100" y="296" fill="#8b8fa3" font-size="10">Both machines switch from 95% to 100% the instant a colleague is available. No manual intervention needed.</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5F: MULTI-OPERATOR -->
+      <div class="sub-section">
+        <h3>&#128101; 5F. Multi-Operator Machines</h3>
+        <div class="card">
+          <p>Some machines need or benefit from multiple operators. The engine handles two types, both capped by <code>max_operators</code>:</p>
+          <div class="card-grid" style="margin-top:12px">
+            <div style="background:var(--bg);padding:16px;border-radius:8px;border:1px solid var(--border)">
+              <strong style="color:var(--purple)">Machine-Paced</strong>
+              <p style="margin-top:6px;font-size:13px;color:var(--text-dim)">The machine sets the speed. Extra operators beyond the minimum provide no benefit. Example: a Massicot cutter.</p>
+              <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">max_run_attention = attention_run &rarr; max_operators = 1</div>
+            </div>
+            <div style="background:var(--bg);padding:16px;border-radius:8px;border:1px solid var(--border)">
+              <strong style="color:var(--green)">Operator-Paced</strong>
+              <p style="margin-top:6px;font-size:13px;color:var(--text-dim)">More operators = faster. Productivity scales linearly up to <code>max_run_attention</code>, capped at <code>max_operators</code> people.</p>
+              <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">max_run_attention = 2.0 &rarr; max_operators = 2 &rarr; up to 200% speed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5G: SETUP PEREMPTION -->
+      <div class="sub-section">
+        <h3>&#9201; 5G. Setup Peremption</h3>
+        <div class="card">
+          <p>If an operator starts setting up a machine but gets pulled away, the setup can <strong>expire</strong> if the operator is gone too long.</p>
+          <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap">
+            <div class="constraint-example" style="flex:1">
+              <div class="ex-valid" style="flex:1;flex-direction:column;align-items:flex-start;padding:12px">
+                <strong>Short interruption (&lt;2h)</strong>
+                <span style="margin-top:4px;font-size:12px">Operator returns, resumes where they left off. No time lost.</span>
+              </div>
+            </div>
+            <div class="constraint-example" style="flex:1">
+              <div class="ex-invalid" style="flex:1;flex-direction:column;align-items:flex-start;padding:12px">
+                <strong>Long interruption (&gt;2h)</strong>
+                <span style="margin-top:4px;font-size:12px">Setup expired! Ink dried, temperature shifted. Must restart from scratch.</span>
+              </div>
+            </div>
+          </div>
+          <p style="margin-top:12px;font-size:13px;color:var(--text-dim)">The threshold is configurable per machine (default: 120 minutes).</p>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5H: FBI FEEDBACK -->
+      <div class="sub-section">
+        <h3>&#128260; 5H. FBI Feedback for Operator Issues</h3>
+        <div class="card">
+          <p>When tasks stall waiting for operators, or run slower in masked mode, the <strong>FBI loop</strong> catches it:</p>
+          <ul style="margin-top:8px">
+            <li>If a task's actual duration &gt; planned duration (because it ran masked part of the time, or stalled waiting) &rarr; the feedback loop records the real duration</li>
+            <li>Next iteration: backward pass uses the longer duration to compute tighter LAST values</li>
+            <li>Forward pass then prioritizes the task earlier, reducing the chance of stalling again</li>
+          </ul>
+          <p style="margin-top:8px;font-size:13px;color:var(--text-dim)">This is how the scheduler self-corrects for operator scarcity: it learns from the first pass that certain tasks need to start earlier to account for operator bottlenecks.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SECTION 6: SCORING                                     -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-5">
+      <div class="section-header">
+        <div class="section-num">Section 6</div>
+        <h2>Scoring &mdash; How Quality is Measured</h2>
+        <p class="section-desc">After producing a schedule, the engine scores it to measure quality. These metrics determine which schedule wins in multi-start comparisons.</p>
+      </div>
+
+      <div class="score-grid">
+        <div class="score-card" style="border-top:3px solid var(--tier-imperative)">
+          <div class="score-rank" style="color:var(--tier-imperative)">#1 Primary</div>
+          <div class="score-value">0</div>
+          <div class="score-label">Late Jobs</div>
+          <div class="score-detail">How many jobs miss their deadline?<br>Fewer is always better, regardless of everything else.</div>
+        </div>
+        <div class="score-card" style="border-top:3px solid var(--tier-important)">
+          <div class="score-rank" style="color:var(--tier-important)">#2 Secondary</div>
+          <div class="score-value">0h</div>
+          <div class="score-label">Weighted Lateness</div>
+          <div class="score-detail">Sum of (hours late &times; priority weight).<br>An imperative job 1h late = 4h weighted.</div>
+        </div>
+        <div class="score-card" style="border-top:3px solid var(--tier-standard)">
+          <div class="score-rank" style="color:var(--tier-standard)">#3 Tertiary</div>
+          <div class="score-value">12d</div>
+          <div class="score-label">Makespan</div>
+          <div class="score-detail">Total calendar time from first task to last.<br>Shorter = more efficient use of resources.</div>
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-top:24px">
+        <span class="info-icon">&#128161;</span>
+        <div><strong>Lexicographic comparison</strong> means criterion #1 always trumps #2, which always trumps #3. A schedule with 0 late jobs and a 15-day makespan is <em>always</em> better than one with 1 late job and a 10-day makespan. Meeting deadlines is the top priority.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="sub-section">
+        <h3>&#128202; Additional Statistics</h3>
+        <div class="card-grid-3">
+          <div class="card">
+            <h3>Tasks Placed</h3>
+            <p>How many of the total tasks were successfully assigned to machines and time slots. Ideally 100%.</p>
+          </div>
+          <div class="card">
+            <h3>Deadline Violations</h3>
+            <p>Individual tasks (not jobs) that end after their job's deadline. A single late task makes the whole job late.</p>
+          </div>
+          <div class="card">
+            <h3>Compute Time</h3>
+            <p>How long the engine took to produce the schedule. Typically under 1 second for 1000+ tasks.</p>
+          </div>
+          <div class="card">
+            <h3>FBI Iterations</h3>
+            <p>How many feedback loops were needed before converging. Usually 2-3 out of the max 3 allowed.</p>
+          </div>
+          <div class="card">
+            <h3>Degraded Tasks</h3>
+            <p>Tasks that ran with insufficient operator attention. The schedule works, but these tasks took longer than ideal.</p>
+          </div>
+          <div class="card">
+            <h3>Warnings</h3>
+            <p>Tasks that couldn't be placed at all (unresolvable conflicts), missing approval gates, or other anomalies.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="sub-section">
+        <h3>&#127942; Weighted Lateness Explained</h3>
+        <div class="card">
+          <p>Not all late jobs are equal. An imperative job 2 hours late is much worse than a flexible job 2 hours late. The weighted lateness formula accounts for this:</p>
+          <div class="formula-box" style="margin-top:12px">
+            <span class="f-keyword">weighted_lateness</span> <span class="f-operator">=</span> <span class="f-value">hours_late</span> <span class="f-operator">&times;</span> <span class="f-keyword">tier_weight</span><br><br>
+            <span class="f-comment">// Examples:</span><br>
+            Imperative job, 2h late: <span class="f-value">2</span> <span class="f-operator">&times;</span> <span class="f-highlight">4</span> <span class="f-operator">=</span> <span class="f-value">8</span> weighted hours<br>
+            Important job, 2h late: <span class="f-value">2</span> <span class="f-operator">&times;</span> <span style="color:var(--tier-important)">2</span> <span class="f-operator">=</span> <span class="f-value">4</span> weighted hours<br>
+            Standard job, 2h late: <span class="f-value">2</span> <span class="f-operator">&times;</span> <span style="color:var(--tier-standard)">1</span> <span class="f-operator">=</span> <span class="f-value">2</span> weighted hours<br>
+            Flexible job, 2h late: <span class="f-value">2</span> <span class="f-operator">&times;</span> <span style="color:var(--tier-flexible)">0.5</span> <span class="f-operator">=</span> <span class="f-value">1</span> weighted hour
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SECTION 7: COMPLETE PIPELINE                           -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-6">
+      <div class="section-header">
+        <div class="section-num">Section 7</div>
+        <h2>The Complete Pipeline</h2>
+        <p class="section-desc">End-to-end: from creating a job to seeing it on the Gantt chart. Here's how every piece connects.</p>
+      </div>
+
+      <div class="flow-steps" style="padding-left:32px">
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--accent);margin-left:-32px">1</div>
+          <div class="flow-content">
+            <h4>User creates jobs in the web interface</h4>
+            <p>Production planners enter print orders: reference, client, deadline, elements (cover, interior, binding), tasks for each element (print, cut, fold), setup/run times, station assignment, and priority tier.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--purple);margin-left:-32px">2</div>
+          <div class="flow-content">
+            <h4>Data stored in the database</h4>
+            <p>Jobs, elements, tasks, stations, operators, and their relationships are stored in a PostgreSQL database via the PHP/Symfony backend API. This is the single source of truth.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--green);margin-left:-32px">3</div>
+          <div class="flow-content">
+            <h4>User clicks "Calculer" (Compute)</h4>
+            <p>On the scheduling page, the planner clicks the compute button. This triggers the automatic scheduling process. Any existing non-pinned, non-completed assignments are cleared to make way for the fresh schedule.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--cyan);margin-left:-32px">4</div>
+          <div class="flow-content">
+            <h4>Backend assembles the compute request</h4>
+            <p>The PHP API gathers all stations (with schedules, attention profiles, masked-time config), all operators (with skills, schedules, absences), all active jobs (with elements, tasks, dependencies), and station groups &mdash; then packages it into a single compute request.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--orange);margin-left:-32px">5</div>
+          <div class="flow-content">
+            <h4>Request sent to the Rust scheduling engine</h4>
+            <p>The packaged data is sent as a POST request to the standalone Rust scheduling engine (a separate high-performance service). This is where the heavy computation happens.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--tier-imperative);margin-left:-32px">6</div>
+          <div class="flow-content">
+            <h4>Engine runs the full algorithm</h4>
+            <p>The Rust engine executes the complete scheduling pipeline:</p>
+            <div style="margin-top:8px;margin-left:8px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="badge badge-flexible">0</span>
+                <span style="font-size:13px">Pre-Split long tasks into chunks</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="badge badge-purple">1</span>
+                <span style="font-size:13px">Backward pass: compute LAST values (drop-dead dates)</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="badge badge-standard">2</span>
+                <span style="font-size:13px">Forward pass: place tasks tick by tick with operator assignment</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="badge badge-green">3</span>
+                <span style="font-size:13px">FBI loop: iterate with real durations until convergence</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="badge badge-pink">4</span>
+                <span style="font-size:13px">Multi-start: try TierFirst + EDD, pick winner</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="badge badge-cyan">5</span>
+                <span style="font-size:13px">Post-process: merge chunks, compute attention splits</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--yellow);margin-left:-32px">7</div>
+          <div class="flow-content">
+            <h4>Result returned to the backend</h4>
+            <p>The engine returns the complete schedule: every task assignment (machine + time slot + operator(s)), quality scores (late jobs, lateness, makespan), and any warnings (unplaced tasks, degraded mode flags).</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--accent);margin-left:-32px">8</div>
+          <div class="flow-content">
+            <h4>Assignments saved to database</h4>
+            <p>The PHP API saves each task assignment to the Schedule entity (a versioned JSON document). The schedule version increments, ensuring consistency.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--purple);margin-left:-32px">9</div>
+          <div class="flow-content">
+            <h4>Frontend renders the Gantt chart</h4>
+            <p>The web interface fetches the updated snapshot and renders two views:</p>
+            <ul style="margin-top:4px">
+              <li><strong>Station Gantt</strong> &mdash; one column per machine, tasks as colored blocks</li>
+              <li><strong>Operator Gantt</strong> &mdash; one column per operator, showing where each person works</li>
+            </ul>
+            <p style="margin-top:4px">Both views derive from the same data and are always synchronized.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-dot" style="background:var(--green);margin-left:-32px">10</div>
+          <div class="flow-content">
+            <h4>Planner reviews and adjusts</h4>
+            <p>The planner can manually adjust the schedule: drag tasks to different time slots, pin important assignments (protected from re-computation), mark tasks as complete, or re-run the engine with different parameters. The scheduler is a tool that assists human decision-making, not a replacement for it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- TECHNICAL ARCHITECTURE (brief) -->
+      <div class="sub-section">
+        <h3>&#127959; Technical Architecture</h3>
+        <p style="color:var(--text-dim);font-size:14px;margin-bottom:16px">For the technically curious &mdash; here's what's under the hood:</p>
+
+        <div class="diagram-container">
+          <svg viewBox="0 0 800 180" width="100%" style="max-width:800px">
+            <!-- React Frontend -->
+            <rect x="10" y="30" width="170" height="80" rx="10" fill="#1e2130" stroke="#6c8cff" stroke-width="1.5"/>
+            <text x="95" y="58" text-anchor="middle" fill="#6c8cff" font-size="12" font-weight="700">React Frontend</text>
+            <text x="95" y="78" text-anchor="middle" fill="#8b8fa3" font-size="10">Gantt chart, drag &amp; drop</text>
+            <text x="95" y="92" text-anchor="middle" fill="#8b8fa3" font-size="10">TypeScript + RTK Query</text>
+
+            <line x1="185" y1="70" x2="220" y2="70" stroke="#4a5f99" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+            <text x="202" y="62" fill="#4a5f99" font-size="9">HTTP</text>
+
+            <!-- PHP API -->
+            <rect x="225" y="30" width="170" height="80" rx="10" fill="#1e2130" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="310" y="58" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="700">PHP/Symfony API</text>
+            <text x="310" y="78" text-anchor="middle" fill="#8b8fa3" font-size="10">Business logic, CRUD</text>
+            <text x="310" y="92" text-anchor="middle" fill="#8b8fa3" font-size="10">Doctrine ORM</text>
+
+            <line x1="400" y1="70" x2="435" y2="70" stroke="#4a5f99" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+            <text x="417" y="62" fill="#4a5f99" font-size="9">POST</text>
+
+            <!-- Rust Engine -->
+            <rect x="440" y="20" width="170" height="100" rx="10" fill="#1e2130" stroke="#ff9f43" stroke-width="2"/>
+            <text x="525" y="50" text-anchor="middle" fill="#ff9f43" font-size="12" font-weight="700">Rust Engine</text>
+            <text x="525" y="68" text-anchor="middle" fill="#8b8fa3" font-size="10">Scheduling algorithm</text>
+            <text x="525" y="82" text-anchor="middle" fill="#8b8fa3" font-size="10">High-performance</text>
+            <text x="525" y="96" text-anchor="middle" fill="#8b8fa3" font-size="10">&lt;1 sec for 1000+ tasks</text>
+
+            <!-- DB -->
+            <rect x="225" y="130" width="170" height="40" rx="10" fill="#1e2130" stroke="#34d399" stroke-width="1.5"/>
+            <text x="310" y="155" text-anchor="middle" fill="#34d399" font-size="12" font-weight="700">PostgreSQL</text>
+            <line x1="310" y1="110" x2="310" y2="125" stroke="#4a5f99" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+            <!-- Validator -->
+            <rect x="640" y="30" width="150" height="80" rx="10" fill="#1e2130" stroke="#22d3ee" stroke-width="1.5"/>
+            <text x="715" y="58" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="700">Validator</text>
+            <text x="715" y="78" text-anchor="middle" fill="#8b8fa3" font-size="10">7 constraint checks</text>
+            <text x="715" y="92" text-anchor="middle" fill="#8b8fa3" font-size="10">TypeScript shared lib</text>
+
+            <line x1="95" y1="110" x2="95" y2="140" stroke="#4a5f99" stroke-width="1" stroke-dasharray="3 2"/>
+            <line x1="95" y1="140" x2="635" y2="140" stroke="#4a5f99" stroke-width="1" stroke-dasharray="3 2"/>
+            <line x1="635" y1="140" x2="635" y2="110" stroke="#4a5f99" stroke-width="1" stroke-dasharray="3 2"/>
+            <line x1="635" y1="110" x2="640" y2="70" stroke="#4a5f99" stroke-width="1" stroke-dasharray="3 2"/>
+            <text x="380" y="155" text-anchor="middle" fill="#4a5f99" font-size="9">Shared validation (frontend + backend)</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="sub-section">
+        <h3>&#128221; Key Design Decisions</h3>
+        <div class="card-grid">
+          <div class="card">
+            <h3>Greedy with global operator allocation</h3>
+            <p>The algorithm is <strong>greedy</strong> &mdash; it makes the best local decision at each tick without backtracking. But it allocates operators <strong>globally across all concurrent tasks</strong> at every tick, not per-task in isolation. Higher-priority tasks get first pick. This enables parallel masked execution and mid-execution handoffs while remaining fast enough for real-time use. The FBI loop compensates for any remaining suboptimality.</p>
+          </div>
+          <div class="card">
+            <h3>Per-station tick granularity</h3>
+            <p>Each station can define its own scheduling precision (default 15 min). A fast digital press might use 5-minute ticks for fine-grained scheduling, while a slow offset press might use 30-minute ticks. The engine computes the GCD (greatest common divisor) of all station ticks as the global time step, and snaps each task's duration to its station's own granularity.</p>
+          </div>
+          <div class="card">
+            <h3>Always real data</h3>
+            <p>The engine works with real production data from the database &mdash; never mock or test data. This ensures the schedule reflects actual shop floor reality.</p>
+          </div>
+          <div class="card">
+            <h3>Compute replaces, not merges</h3>
+            <p>Each computation <strong>replaces</strong> the existing schedule (except pinned and completed tasks). This avoids complex merge logic and gives a clean, globally-optimized result each time.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── NAVIGATION ──
+function showSection(idx) {
+  document.querySelectorAll('.section').forEach((s, i) => {
+    s.classList.toggle('active', i === idx);
+  });
+  document.querySelectorAll('.nav-item').forEach((n, i) => {
+    n.classList.toggle('active', i === idx);
+  });
+  document.getElementById('mainContent').scrollTop = 0;
+}
+
+// ── ALGO INNER TABS ──
+function showAlgoStep(idx) {
+  document.querySelectorAll('#sec-3 .inner-tab').forEach((t, i) => {
+    t.classList.toggle('active', i === idx);
+  });
+  document.querySelectorAll('#sec-3 .inner-panel').forEach((p, i) => {
+    p.classList.toggle('active', i === idx);
+  });
+}
+
+// ── GANTT ANIMATION ──
+const ganttSteps = [
+  {
+    machine: 'gt-komori',
+    left: 0, width: 22,
+    color: 'var(--tier-imperative)', label: 'Setup',
+    hatch: true,
+    narration: 'T=8:00 — Job A (Imperative, 4×) scores highest. Operator Marc sets up the Komori press. Full attention needed.'
+  },
+  {
+    machine: 'gt-komori',
+    left: 22, width: 44,
+    color: 'var(--tier-imperative)', label: 'Job A: Print',
+    narration: 'T=9:00 — Komori setup done. Job A printing begins (masked time). Marc\'s attention drops to 0.5.'
+  },
+  {
+    machine: 'gt-massicot',
+    left: 22, width: 33,
+    color: 'var(--tier-important)', label: 'Job B: Cut',
+    narration: 'T=9:00 — Marc has 0.5 attention free. Job B (Important, 2×) needs the Massicot. Marc operates both machines simultaneously!'
+  },
+  {
+    machine: 'gt-plieuse',
+    left: 22, width: 22,
+    color: 'var(--tier-standard)', label: 'Job C: Fold',
+    narration: 'T=9:00 — Julie (no press skill, but folding expert) starts Job C on the Plieuse. Parallel execution across 3 machines.'
+  },
+  {
+    machine: 'gt-plieuse',
+    left: 44, width: 22,
+    color: 'var(--tier-important)', label: 'Job B: Fold',
+    narration: 'T=11:00 — Job C folding done. Job B cutting also done on Massicot. Job B folding starts next on the Plieuse (same operator Julie).'
+  },
+  {
+    machine: 'gt-massicot',
+    left: 66, width: 22,
+    color: 'var(--tier-imperative)', label: 'Job A: Cut',
+    narration: 'T=13:00 — Job A printing finished on Komori. After the 4h drying gap (if applicable), Job A cutting begins on Massicot. Deadline pressure keeps it prioritized.'
+  },
+  {
+    machine: 'gt-plieuse',
+    left: 66, width: 22,
+    color: 'var(--tier-imperative)', label: 'Job A: Fold',
+    narration: 'T=13:00 — In parallel, Job A folding can start on the Plieuse. All 3 machines productive, all 3 jobs progressing. Schedule complete!'
+  }
+];
+
+let ganttStep = 0;
+let ganttPlaying = false;
+
+function resetGanttAnim() {
+  ganttStep = 0;
+  ganttPlaying = false;
+  ['gt-komori', 'gt-massicot', 'gt-plieuse'].forEach(id => {
+    document.getElementById(id).innerHTML = '';
+  });
+  document.getElementById('ganttNarration').textContent = 'Press "Next Tick" to step through the scheduling process, or "Play All" to watch it animate.';
+}
+
+function addGanttBar(step) {
+  const track = document.getElementById(step.machine);
+  const bar = document.createElement('div');
+  bar.className = 'gantt-bar animate';
+  bar.style.left = step.left + '%';
+  bar.style.width = step.width + '%';
+  bar.style.background = step.color;
+  bar.textContent = step.label;
+  if (step.hatch) {
+    bar.style.background = `repeating-linear-gradient(45deg, ${step.color}, ${step.color} 3px, rgba(255,255,255,0.15) 3px, rgba(255,255,255,0.15) 6px)`;
+  }
+  track.appendChild(bar);
+  document.getElementById('ganttNarration').innerHTML = step.narration;
+}
+
+function stepGanttAnim() {
+  if (ganttStep < ganttSteps.length) {
+    addGanttBar(ganttSteps[ganttStep]);
+    ganttStep++;
+  } else {
+    document.getElementById('ganttNarration').innerHTML = '<strong style="color:var(--green)">Schedule complete!</strong> All tasks placed across 3 machines with 2 operators. Notice how masked time allowed Marc to run 2 machines simultaneously.';
+  }
+}
+
+function playGanttAnim() {
+  if (ganttPlaying) return;
+  ganttPlaying = true;
+  resetGanttAnim();
+  let i = 0;
+  function next() {
+    if (i < ganttSteps.length) {
+      addGanttBar(ganttSteps[i]);
+      i++;
+      setTimeout(next, 1200);
+    } else {
+      ganttPlaying = false;
+      document.getElementById('ganttNarration').innerHTML = '<strong style="color:var(--green)">Schedule complete!</strong> All tasks placed across 3 machines with 2 operators. Notice how masked time allowed Marc to run 2 machines simultaneously.';
+    }
+  }
+  next();
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  const active = document.querySelector('.nav-item.active');
+  const items = [...document.querySelectorAll('.nav-item')];
+  const idx = items.indexOf(active);
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (idx < items.length - 1) showSection(idx + 1);
+  } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (idx > 0) showSection(idx - 1);
+  }
+});
+</script>
+
+</body>
+</html>
