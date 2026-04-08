@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux - Audit Production Jobs</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232736;
+    --border: #2e3345;
+    --text: #e1e4ed;
+    --text-dim: #8b90a0;
+    --accent: #6c8cff;
+    --accent-dim: #3d5299;
+    --green: #4ade80;
+    --green-dim: #166534;
+    --orange: #fb923c;
+    --orange-dim: #7c4a1e;
+    --red: #f87171;
+    --red-dim: #7f1d1d;
+    --cyan: #67e8f9;
+    --purple: #c084fc;
+    --yellow: #fbbf24;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Layout */
+  .app { display: flex; height: 100vh; }
+  .sidebar {
+    width: 320px;
+    min-width: 320px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+  }
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar-header span { color: var(--text-dim); font-weight: 400; font-size: 12px; }
+  .job-list { flex: 1; overflow-y: auto; }
+  .job-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .job-item:hover { background: var(--surface2); }
+  .job-item.active { background: var(--accent-dim); border-left: 3px solid var(--accent); }
+  .job-item .ref { font-weight: 600; font-size: 14px; }
+  .job-item .client { color: var(--text-dim); font-size: 12px; }
+  .job-item .desc { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+  .job-item .meta { display: flex; gap: 12px; margin-top: 6px; font-size: 11px; }
+  .job-item .meta .tag {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .tag-ok { background: var(--green-dim); color: var(--green); }
+  .tag-late { background: var(--red-dim); color: var(--red); }
+  .tag-partial { background: var(--orange-dim); color: var(--orange); }
+
+  .main { flex: 1; overflow-y: auto; padding: 24px 32px; }
+  .main h1 { font-size: 20px; margin-bottom: 4px; }
+  .main .subtitle { color: var(--text-dim); margin-bottom: 24px; font-size: 13px; }
+
+  /* Summary cards */
+  .summary-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    min-width: 160px;
+    flex: 1;
+  }
+  .card .label { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .card .value { font-size: 22px; font-weight: 700; }
+  .card .detail { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+
+  /* Task table */
+  .section { margin-bottom: 28px; }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .badge {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--surface2);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  .station-name { font-weight: 600; white-space: nowrap; }
+  .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; }
+  .dim { color: var(--text-dim); }
+
+  /* Duration bar */
+  .duration-bar-container { position: relative; height: 20px; margin-top: 4px; }
+  .duration-bar {
+    height: 100%;
+    border-radius: 3px;
+    position: absolute;
+    top: 0;
+    opacity: 0.85;
+  }
+  .bar-setup { background: var(--orange); }
+  .bar-run { background: var(--accent); }
+  .bar-idle { background: #444; }
+  .bar-legend { display: flex; gap: 12px; font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+  .bar-legend span { display: flex; align-items: center; gap: 4px; }
+  .bar-legend .dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* Operator sub-table */
+  .op-table { width: 100%; margin: -4px 0; }
+  .op-table td { padding: 3px 8px; font-size: 12px; border-bottom: none; vertical-align: middle; }
+  .op-name { font-weight: 500; white-space: nowrap; }
+  .attention-bar {
+    display: inline-block;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--accent);
+    vertical-align: middle;
+  }
+  .attention-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  /* Timeline mini-gantt */
+  .gantt-container {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    border: 1px solid var(--border);
+  }
+  .gantt-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .gantt-header .title { font-size: 12px; font-weight: 600; }
+  .gantt-header .range { font-size: 11px; color: var(--text-dim); }
+  .gantt-row { display: flex; align-items: center; margin-bottom: 4px; }
+  .gantt-label { width: 100px; font-size: 11px; color: var(--text-dim); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gantt-track { flex: 1; height: 18px; background: var(--bg); border-radius: 3px; position: relative; overflow: hidden; }
+  .gantt-block {
+    position: absolute;
+    height: 100%;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: white;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 3px;
+  }
+  .gantt-block.setup { background: var(--orange); opacity: 0.9; }
+  .gantt-block.run { background: var(--accent); opacity: 0.9; }
+  .gantt-block.masked { background: var(--purple); opacity: 0.9; }
+  .gantt-block.idle { background: #444; opacity: 0.5; }
+  .gantt-time-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--text-dim); margin-top: 2px; padding-left: 100px; }
+
+  /* Delta indicators */
+  .delta { font-size: 11px; font-weight: 600; }
+  .delta.positive { color: var(--red); }
+  .delta.negative { color: var(--green); }
+  .delta.neutral { color: var(--text-dim); }
+
+  /* Masked badge */
+  .masked-badge {
+    background: #5b21b6;
+    color: var(--purple);
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      Audit Production <span id="job-count"></span>
+    </div>
+    <div class="job-list" id="job-list"></div>
+  </div>
+  <div class="main" id="main-content">
+    <div class="empty-state">Selectionner un job dans la liste</div>
+  </div>
+</div>
+
+<script>
+// === EMBEDDED DATA (from /api/v1/schedule/snapshot) ===
+const SNAPSHOT = {"version": 83593, "generatedAt": "2026-04-08T14:58:47+00:00", "stations": [{"id": "d5eae78d-2ad7-49f1-b092-1ee51ac6686f", "name": "Horizon", "status": "Available", "categoryId": "a7b5ca8d-b9f2-58c4-82b7-2704fa3aa9eb", "groupId": "3cfc1e9d-8871-5a2e-a025-9f4735f3beb3", "capacity": 1, "displayOrder": 0, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "e9cdf888-6644-4cc7-940a-da412238227f", "name": "MBO M", "status": "Available", "categoryId": "e421db17-2742-5373-8bc2-5add73b4eabc", "groupId": "633b901f-a7d7-5167-a7f6-4af2aa5abf7f", "capacity": 1, "displayOrder": 0, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "a463c370-eb28-402f-a90f-de8239bb476e", "name": "MBO XS", "status": "Available", "categoryId": "e421db17-2742-5373-8bc2-5add73b4eabc", "groupId": "633b901f-a7d7-5167-a7f6-4af2aa5abf7f", "capacity": 1, "displayOrder": 0, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "name": "Ryobi 528", "status": "Available", "categoryId": "80a9bbb8-a595-5ddb-9e93-1ab8e3f0859c", "groupId": "349a3d3f-0b66-5b16-9fa7-064f701ac618", "capacity": 1, "displayOrder": 0, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "9bafa7ac-cd16-4753-9a80-4bacd592bd71", "name": "Table", "status": "Available", "categoryId": "dd69ab16-124c-41e5-91df-07c9a4587c73", "groupId": "545e3020-df2e-5dfd-99f5-edf0481889de", "capacity": 1, "displayOrder": 0, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "a2ac888f-e0ed-5732-9322-9457250fd67a", "name": "Komori G40", "status": "Available", "categoryId": "80a9bbb8-a595-5ddb-9e93-1ab8e3f0859c", "groupId": "349a3d3f-0b66-5b16-9fa7-064f701ac618", "capacity": 1, "displayOrder": 5, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "05:00", "end": "21:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "21:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "21:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "05:00", "end": "21:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "05:00", "end": "21:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "name": "Polar 137", "status": "Available", "categoryId": "d6827ec1-e7ff-5f62-945d-445ae073018b", "groupId": "7e3d735a-7a8d-5e4e-8b85-5d2dcb510f4f", "capacity": 1, "displayOrder": 30, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "thursday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "friday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "cf967458-262d-585e-abc3-47591b62b6b2", "name": "SBG", "status": "Available", "categoryId": "8e1457ec-41f2-5c62-aa92-f42117aad338", "groupId": "720413d6-01e1-5e40-a795-fed2b7c0d591", "capacity": 1, "displayOrder": 50, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "thursday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "friday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "d7791452-b1de-57ff-9d7a-4c56742217f0", "name": "MBO XL", "status": "Available", "categoryId": "e421db17-2742-5373-8bc2-5add73b4eabc", "groupId": "633b901f-a7d7-5167-a7f6-4af2aa5abf7f", "capacity": 1, "displayOrder": 80, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "e44fd61a-b390-5313-b0ff-564d8ef3857d", "name": "Hohner", "status": "Available", "categoryId": "c785f0e8-099b-5db7-9898-6f96f2dd3371", "groupId": "604349c7-1df6-59e0-96db-72de2e1651e8", "capacity": 1, "displayOrder": 90, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "05:00", "end": "19:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}, {"id": "a261eb5d-d315-56a9-b59b-764d6bdb25f4", "name": "Carton", "status": "Available", "categoryId": "aadfbfde-70bd-502c-a520-ddae622b9dc1", "groupId": "545e3020-df2e-5dfd-99f5-edf0481889de", "capacity": 1, "displayOrder": 130, "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "exceptions": []}], "categories": [{"id": "696b4767-ab03-56e4-9f28-a16c5aea33ba", "name": "Pelliculeuses", "description": null, "similarityCriteria": [{"code": "paper_type", "name": "Même type de papier", "fieldPath": "papier"}, {"code": "paper_format", "name": "Même format", "fieldPath": "format"}], "columnWidth": null}, {"id": "80a9bbb8-a595-5ddb-9e93-1ab8e3f0859c", "name": "Presses Offset", "description": null, "similarityCriteria": [{"code": "paper_type", "name": "Même type de papier", "fieldPath": "papier"}, {"code": "paper_format", "name": "Même format", "fieldPath": "format"}, {"code": "inking", "name": "Même encrage", "fieldPath": "impression"}], "columnWidth": null}, {"id": "8e1457ec-41f2-5c62-aa92-f42117aad338", "name": "Typographie", "description": null, "similarityCriteria": [], "columnWidth": null}, {"id": "a7b5ca8d-b9f2-58c4-82b7-2704fa3aa9eb", "name": "Assembleuses", "description": null, "similarityCriteria": [{"code": "paper_weight", "name": "Même grammage", "fieldPath": "papier"}, {"code": "paper_format", "name": "Même format", "fieldPath": "format"}], "columnWidth": null}, {"id": "aadfbfde-70bd-502c-a520-ddae622b9dc1", "name": "Conditionnement", "description": null, "similarityCriteria": [{"code": "paper_weight", "name": "Même grammage", "fieldPath": "papier"}, {"code": "paper_format", "name": "Même format", "fieldPath": "format"}], "columnWidth": null}, {"id": "c785f0e8-099b-5db7-9898-6f96f2dd3371", "name": "Encarteuses-Piqueuses", "description": null, "similarityCriteria": [{"code": "paper_weight", "name": "Même grammage", "fieldPath": "papier"}, {"code": "paper_format", "name": "Même format", "fieldPath": "format"}], "columnWidth": null}, {"id": "cdc7dabe-539b-5841-9f24-1f5a87cc6f5c", "name": "Assembleuses-Piqueuses", "description": null, "similarityCriteria": [{"code": "paper_weight", "name": "Même grammage", "fieldPath": "papier"}, {"code": "paper_format", "name": "Même format", "fieldPath": "format"}], "columnWidth": null}, {"id": "d6827ec1-e7ff-5f62-945d-445ae073018b", "name": "Massicots", "description": null, "similarityCriteria": [{"code": "paper_format", "name": "Même format", "fieldPath": "format"}], "columnWidth": null}, {"id": "dd69ab16-124c-41e5-91df-07c9a4587c73", "name": "Travail de table", "description": null, "similarityCriteria": [], "columnWidth": null}, {"id": "e421db17-2742-5373-8bc2-5add73b4eabc", "name": "Plieuses", "description": null, "similarityCriteria": [{"code": "paper_weight", "name": "Même grammage", "fieldPath": "papier"}, {"code": "paper_format", "name": "Même format", "fieldPath": "format"}], "columnWidth": null}], "groups": [{"id": "0ad478aa-4ad6-516c-b83f-595d1247482c", "name": "Pelliculeuses", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "349a3d3f-0b66-5b16-9fa7-064f701ac618", "name": "Presses Offset", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "3cfc1e9d-8871-5a2e-a025-9f4735f3beb3", "name": "Assembleuses", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "545e3020-df2e-5dfd-99f5-edf0481889de", "name": "Conditionnement", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "604349c7-1df6-59e0-96db-72de2e1651e8", "name": "Encarteuses-Piqueuses", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "633b901f-a7d7-5167-a7f6-4af2aa5abf7f", "name": "Plieuses", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "71a7eecb-fe8c-5b52-9bd2-8a3626329338", "name": "Reliure DCC (ext.)", "maxConcurrent": 999, "isOutsourcedProviderGroup": true}, {"id": "720413d6-01e1-5e40-a795-fed2b7c0d591", "name": "Typographie", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "7e3d735a-7a8d-5e4e-8b85-5d2dcb510f4f", "name": "Massicots", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}, {"id": "c8149a35-8fe0-52a2-9dc3-846e64833bba", "name": "Assembleuses-Piqueuses", "maxConcurrent": 10, "isOutsourcedProviderGroup": false}], "providers": [{"id": "594fc4fb-37f3-5b65-86c2-bf5772ab3339", "name": "Clément", "status": "Inactive", "supportedActionTypes": ["Reliure dos carré collé"], "latestDepartureTime": "14:00", "receptionTime": "09:00", "transitDays": 3, "groupId": "71a7eecb-fe8c-5b52-9bd2-8a3626329338"}], "jobs": [{"id": "77d3a351-63a7-4f21-aa04-b90934ca5139", "reference": "5003", "client": "Mairie", "description": "Cartes de visite", "status": "Planned", "workshopExitDate": "2026-04-14T14:00", "quantity": null, "fullyScheduled": false, "color": "#FDD835", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["adfea53a-6c5f-421b-bd17-820e2b9adb38"], "taskIds": ["5d46cda5-bec3-4772-8495-bf1e365e5a0d"], "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:12:56+00:00"}, {"id": "f0bbe94a-bff5-4b03-af93-0af7e2f90645", "reference": "5009", "client": "Nestlé", "description": "Boîtes présentoir", "status": "Planned", "workshopExitDate": "2026-04-14T14:00", "quantity": null, "fullyScheduled": false, "color": "#546E7A", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["9cdbe4d2-48c1-49b4-be64-07a805a7b982"], "taskIds": ["9a472418-c471-4895-a5ae-aa1a45f2842c"], "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "144d5379-7410-4b16-8d9a-51c6c20c5056", "reference": "5001", "client": "Sanofi", "description": "Flyers A4 quadri", "status": "Planned", "workshopExitDate": "2026-04-15T14:00", "quantity": null, "fullyScheduled": false, "color": "#8E24AA", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["c905c40e-a970-4676-a72f-b2666e61b689"], "taskIds": ["08a916fc-1bd4-4bfa-b510-601a0bdb06c6"], "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:12:56+00:00"}, {"id": "15195b15-7599-4fba-999c-845dbe17c507", "reference": "5006", "client": "Total", "description": "Poster plié A1", "status": "Planned", "workshopExitDate": "2026-04-15T14:00", "quantity": null, "fullyScheduled": false, "color": "#FB8C00", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["d2a89fe6-4750-4177-85db-e9f60fab170d"], "taskIds": ["fa450bea-2712-4959-8f5b-58618c1b5e3c", "d297d30c-dc36-4e38-b961-5cf6150f9db0"], "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "24175997-4fec-4d8d-b351-62d3bf79cf2b", "reference": "5002", "client": "Airbus", "description": "Brochure 8 pages", "status": "Planned", "workshopExitDate": "2026-04-16T14:00", "quantity": null, "fullyScheduled": false, "color": "#546E7A", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["d76b9e5f-0d86-459b-8cb9-c35d6180dab1"], "taskIds": ["ac331f87-6c53-476f-a813-5befd14e6de0", "e57f466f-9463-4e4a-8289-3adb2584e59f", "b28e31d5-9b00-4e6f-a3cb-f6ce1167ae54"], "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:12:56+00:00"}, {"id": "b8996e32-9461-47df-a4c1-3dfb250090b7", "reference": "5007", "client": "Orange", "description": "Livret piqué 16p", "status": "Planned", "workshopExitDate": "2026-04-16T14:00", "quantity": null, "fullyScheduled": false, "color": "#E53935", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["3f327a90-5b75-49c3-8655-cf23117884a5"], "taskIds": ["6196daeb-d349-4f0e-b87f-03a438272744", "ef9c8197-52e0-418b-867c-4c4ad2ed267e"], "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "9d526301-1f4c-42c3-9fbd-0519cdf5c178", "reference": "5004", "client": "EDF", "description": "Dépliant 3 volets", "status": "Planned", "workshopExitDate": "2026-04-17T14:00", "quantity": null, "fullyScheduled": false, "color": "#6D4C41", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["f0c376a1-09b8-4999-a15f-e9d9542533bf"], "taskIds": ["a8a450b6-ffd1-4efa-a04a-b64f54b84aa5", "ae7e56f8-5f0a-48ac-a558-ff63a9ced9fc", "07882962-bbef-47f4-9697-7071f6af92b9"], "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "9f88c366-aa5f-4e91-9edb-c36309fd6730", "reference": "5010", "client": "Dior", "description": "Chemises à rabats", "status": "Planned", "workshopExitDate": "2026-04-17T14:00", "quantity": null, "fullyScheduled": false, "color": "#6D4C41", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["3433de11-6790-4906-97b8-1355b3533c78"], "taskIds": ["c011ec70-d95e-4cdb-b589-130b40a65fdc", "b1b804ff-633c-44c6-b792-d04ff7a26316", "f849d28a-33f0-4fce-b63e-bd9d2931d76e"], "createdAt": "2026-04-08T14:12:58+00:00", "updatedAt": "2026-04-08T14:12:58+00:00"}, {"id": "43fb28af-2908-481d-8586-5a9463fd9cf6", "reference": "5005", "client": "SNCF", "description": "Catalogue agrafé 32p", "status": "Planned", "workshopExitDate": "2026-04-18T14:00", "quantity": null, "fullyScheduled": false, "color": "#8E24AA", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["3b83b8a2-5300-4870-ac9b-324feacb8169"], "taskIds": ["7fec15c0-e9cc-4b4e-948a-ef4d75f7440f", "83ab3e9a-2fde-4793-aff5-c462fca7c17f"], "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "c73bf557-9418-4ae8-a8b4-83099c76a66a", "reference": "5008", "client": "BNP", "description": "Rapport annuel 64p", "status": "Planned", "workshopExitDate": "2026-04-21T14:00", "quantity": null, "fullyScheduled": false, "color": "#D81B60", "paperType": null, "paperFormat": null, "paperWeight": null, "inking": null, "shipped": false, "shippedAt": null, "batDeadline": null, "shipperId": null, "shipperName": null, "notes": null, "requiredJobIds": [], "comments": [], "elementIds": ["0ab48f04-0751-4060-9699-3a8f7b08b540"], "taskIds": ["42798b73-a595-49a8-a027-6f0789b77a13", "948c41be-2bc3-4777-be5e-f11ec32d9fe9"], "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}], "elements": [{"id": "adfea53a-6c5f-421b-bd17-820e2b9adb38", "jobId": "77d3a351-63a7-4f21-aa04-b90934ca5139", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["5d46cda5-bec3-4772-8495-bf1e365e5a0d"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:12:56+00:00"}, {"id": "9cdbe4d2-48c1-49b4-be64-07a805a7b982", "jobId": "f0bbe94a-bff5-4b03-af93-0af7e2f90645", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["9a472418-c471-4895-a5ae-aa1a45f2842c"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "c905c40e-a970-4676-a72f-b2666e61b689", "jobId": "144d5379-7410-4b16-8d9a-51c6c20c5056", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["08a916fc-1bd4-4bfa-b510-601a0bdb06c6"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:12:56+00:00"}, {"id": "d2a89fe6-4750-4177-85db-e9f60fab170d", "jobId": "15195b15-7599-4fba-999c-845dbe17c507", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["fa450bea-2712-4959-8f5b-58618c1b5e3c", "d297d30c-dc36-4e38-b961-5cf6150f9db0"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "d76b9e5f-0d86-459b-8cb9-c35d6180dab1", "jobId": "24175997-4fec-4d8d-b351-62d3bf79cf2b", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["ac331f87-6c53-476f-a813-5befd14e6de0", "e57f466f-9463-4e4a-8289-3adb2584e59f", "b28e31d5-9b00-4e6f-a3cb-f6ce1167ae54"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:12:56+00:00"}, {"id": "3f327a90-5b75-49c3-8655-cf23117884a5", "jobId": "b8996e32-9461-47df-a4c1-3dfb250090b7", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["6196daeb-d349-4f0e-b87f-03a438272744", "ef9c8197-52e0-418b-867c-4c4ad2ed267e"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "f0c376a1-09b8-4999-a15f-e9d9542533bf", "jobId": "9d526301-1f4c-42c3-9fbd-0519cdf5c178", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["a8a450b6-ffd1-4efa-a04a-b64f54b84aa5", "ae7e56f8-5f0a-48ac-a558-ff63a9ced9fc", "07882962-bbef-47f4-9697-7071f6af92b9"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "3433de11-6790-4906-97b8-1355b3533c78", "jobId": "9f88c366-aa5f-4e91-9edb-c36309fd6730", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["c011ec70-d95e-4cdb-b589-130b40a65fdc", "b1b804ff-633c-44c6-b792-d04ff7a26316", "f849d28a-33f0-4fce-b63e-bd9d2931d76e"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:58+00:00", "updatedAt": "2026-04-08T14:12:58+00:00"}, {"id": "3b83b8a2-5300-4870-ac9b-324feacb8169", "jobId": "43fb28af-2908-481d-8586-5a9463fd9cf6", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["7fec15c0-e9cc-4b4e-948a-ef4d75f7440f", "83ab3e9a-2fde-4793-aff5-c462fca7c17f"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}, {"id": "0ab48f04-0751-4060-9699-3a8f7b08b540", "jobId": "c73bf557-9418-4ae8-a8b4-83099c76a66a", "name": "ELT", "label": null, "prerequisiteElementIds": [], "taskIds": ["42798b73-a595-49a8-a027-6f0789b77a13", "948c41be-2bc3-4777-be5e-f11ec32d9fe9"], "spec": null, "paperStatus": "none", "batStatus": "none", "plateStatus": "none", "formeStatus": "none", "isBlocked": false, "paperOrderedAt": null, "paperDeliveredAt": null, "filesReceivedAt": null, "batSentAt": null, "batApprovedAt": null, "formeOrderedAt": null, "formeDeliveredAt": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:12:57+00:00"}], "tasks": [{"id": "5d46cda5-bec3-4772-8495-bf1e365e5a0d", "elementId": "adfea53a-6c5f-421b-bd17-820e2b9adb38", "jobId": "77d3a351-63a7-4f21-aa04-b90934ca5139", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "duration": {"setupMinutes": 15, "runMinutes": 30}}, {"id": "9a472418-c471-4895-a5ae-aa1a45f2842c", "elementId": "9cdbe4d2-48c1-49b4-be64-07a805a7b982", "jobId": "f0bbe94a-bff5-4b03-af93-0af7e2f90645", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a261eb5d-d315-56a9-b59b-764d6bdb25f4", "duration": {"setupMinutes": 15, "runMinutes": 60}}, {"id": "08a916fc-1bd4-4bfa-b510-601a0bdb06c6", "elementId": "c905c40e-a970-4676-a72f-b2666e61b689", "jobId": "144d5379-7410-4b16-8d9a-51c6c20c5056", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "duration": {"setupMinutes": 20, "runMinutes": 60}}, {"id": "fa450bea-2712-4959-8f5b-58618c1b5e3c", "elementId": "d2a89fe6-4750-4177-85db-e9f60fab170d", "jobId": "15195b15-7599-4fba-999c-845dbe17c507", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "duration": {"setupMinutes": 15, "runMinutes": 40}}, {"id": "d297d30c-dc36-4e38-b961-5cf6150f9db0", "elementId": "d2a89fe6-4750-4177-85db-e9f60fab170d", "jobId": "15195b15-7599-4fba-999c-845dbe17c507", "sequenceOrder": 1, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "d7791452-b1de-57ff-9d7a-4c56742217f0", "duration": {"setupMinutes": 10, "runMinutes": 30}}, {"id": "ac331f87-6c53-476f-a813-5befd14e6de0", "elementId": "d76b9e5f-0d86-459b-8cb9-c35d6180dab1", "jobId": "24175997-4fec-4d8d-b351-62d3bf79cf2b", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "duration": {"setupMinutes": 20, "runMinutes": 90}}, {"id": "e57f466f-9463-4e4a-8289-3adb2584e59f", "elementId": "d76b9e5f-0d86-459b-8cb9-c35d6180dab1", "jobId": "24175997-4fec-4d8d-b351-62d3bf79cf2b", "sequenceOrder": 1, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "duration": {"setupMinutes": 10, "runMinutes": 20}}, {"id": "b28e31d5-9b00-4e6f-a3cb-f6ce1167ae54", "elementId": "d76b9e5f-0d86-459b-8cb9-c35d6180dab1", "jobId": "24175997-4fec-4d8d-b351-62d3bf79cf2b", "sequenceOrder": 2, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:56+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "e9cdf888-6644-4cc7-940a-da412238227f", "duration": {"setupMinutes": 15, "runMinutes": 45}}, {"id": "6196daeb-d349-4f0e-b87f-03a438272744", "elementId": "3f327a90-5b75-49c3-8655-cf23117884a5", "jobId": "b8996e32-9461-47df-a4c1-3dfb250090b7", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "duration": {"setupMinutes": 20, "runMinutes": 80}}, {"id": "ef9c8197-52e0-418b-867c-4c4ad2ed267e", "elementId": "3f327a90-5b75-49c3-8655-cf23117884a5", "jobId": "b8996e32-9461-47df-a4c1-3dfb250090b7", "sequenceOrder": 1, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "e44fd61a-b390-5313-b0ff-564d8ef3857d", "duration": {"setupMinutes": 10, "runMinutes": 40}}, {"id": "a8a450b6-ffd1-4efa-a04a-b64f54b84aa5", "elementId": "f0c376a1-09b8-4999-a15f-e9d9542533bf", "jobId": "9d526301-1f4c-42c3-9fbd-0519cdf5c178", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "duration": {"setupMinutes": 15, "runMinutes": 45}}, {"id": "ae7e56f8-5f0a-48ac-a558-ff63a9ced9fc", "elementId": "f0c376a1-09b8-4999-a15f-e9d9542533bf", "jobId": "9d526301-1f4c-42c3-9fbd-0519cdf5c178", "sequenceOrder": 1, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "duration": {"setupMinutes": 10, "runMinutes": 15}}, {"id": "07882962-bbef-47f4-9697-7071f6af92b9", "elementId": "f0c376a1-09b8-4999-a15f-e9d9542533bf", "jobId": "9d526301-1f4c-42c3-9fbd-0519cdf5c178", "sequenceOrder": 2, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a463c370-eb28-402f-a90f-de8239bb476e", "duration": {"setupMinutes": 10, "runMinutes": 30}}, {"id": "c011ec70-d95e-4cdb-b589-130b40a65fdc", "elementId": "3433de11-6790-4906-97b8-1355b3533c78", "jobId": "9f88c366-aa5f-4e91-9edb-c36309fd6730", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:58+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "duration": {"setupMinutes": 15, "runMinutes": 40}}, {"id": "b1b804ff-633c-44c6-b792-d04ff7a26316", "elementId": "3433de11-6790-4906-97b8-1355b3533c78", "jobId": "9f88c366-aa5f-4e91-9edb-c36309fd6730", "sequenceOrder": 1, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:58+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "duration": {"setupMinutes": 10, "runMinutes": 15}}, {"id": "f849d28a-33f0-4fce-b63e-bd9d2931d76e", "elementId": "3433de11-6790-4906-97b8-1355b3533c78", "jobId": "9f88c366-aa5f-4e91-9edb-c36309fd6730", "sequenceOrder": 2, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:58+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "9bafa7ac-cd16-4753-9a80-4bacd592bd71", "duration": {"setupMinutes": 0, "runMinutes": 45}}, {"id": "7fec15c0-e9cc-4b4e-948a-ef4d75f7440f", "elementId": "3b83b8a2-5300-4870-ac9b-324feacb8169", "jobId": "43fb28af-2908-481d-8586-5a9463fd9cf6", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "duration": {"setupMinutes": 25, "runMinutes": 120}}, {"id": "83ab3e9a-2fde-4793-aff5-c462fca7c17f", "elementId": "3b83b8a2-5300-4870-ac9b-324feacb8169", "jobId": "43fb28af-2908-481d-8586-5a9463fd9cf6", "sequenceOrder": 1, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "cf967458-262d-585e-abc3-47591b62b6b2", "duration": {"setupMinutes": 15, "runMinutes": 60}}, {"id": "42798b73-a595-49a8-a027-6f0789b77a13", "elementId": "0ab48f04-0751-4060-9699-3a8f7b08b540", "jobId": "c73bf557-9418-4ae8-a8b4-83099c76a66a", "sequenceOrder": 0, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "duration": {"setupMinutes": 30, "runMinutes": 150}}, {"id": "948c41be-2bc3-4777-be5e-f11ec32d9fe9", "elementId": "0ab48f04-0751-4060-9699-3a8f7b08b540", "jobId": "c73bf557-9418-4ae8-a8b4-83099c76a66a", "sequenceOrder": 1, "status": "Assigned", "comment": null, "createdAt": "2026-04-08T14:12:57+00:00", "updatedAt": "2026-04-08T14:30:35+00:00", "type": "Internal", "stationId": "d5eae78d-2ad7-49f1-b092-1ee51ac6686f", "duration": {"setupMinutes": 20, "runMinutes": 90}}], "assignments": [{"id": "a8a450b6-ffd1-4efa-a04a-b64f54b84aa5", "taskId": "a8a450b6-ffd1-4efa-a04a-b64f54b84aa5", "targetId": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "isOutsourced": false, "scheduledStart": "2026-04-08T08:00:00+02:00", "scheduledEnd": "2026-04-08T09:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "99dafad5-b9d8-4956-8a98-fd5b08b5d1fb", "attention": 1, "from": "2026-04-08T08:00:00", "to": "2026-04-08T09:00:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "e57f466f-9463-4e4a-8289-3adb2584e59f", "taskId": "e57f466f-9463-4e4a-8289-3adb2584e59f", "targetId": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "isOutsourced": false, "scheduledStart": "2026-04-08T11:00:00+02:00", "scheduledEnd": "2026-04-08T11:45:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "d5fe6c3d-599b-4b64-be23-ff46f628885c", "attention": 1, "from": "2026-04-08T11:00:00", "to": "2026-04-08T11:45:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "6196daeb-d349-4f0e-b87f-03a438272744", "taskId": "6196daeb-d349-4f0e-b87f-03a438272744", "targetId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "isOutsourced": false, "scheduledStart": "2026-04-08T12:30:00+02:00", "scheduledEnd": "2026-04-08T14:30:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "5b55dd73-e1b7-4943-9315-d109a453bd90", "attention": 1, "from": "2026-04-08T13:00:00", "to": "2026-04-08T14:30:00"}, {"operatorId": "637bdd3f-3b32-4073-b32e-7b75d72bc2c5", "attention": 1, "from": "2026-04-08T12:30:00", "to": "2026-04-08T13:00:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "9a472418-c471-4895-a5ae-aa1a45f2842c", "taskId": "9a472418-c471-4895-a5ae-aa1a45f2842c", "targetId": "a261eb5d-d315-56a9-b59b-764d6bdb25f4", "isOutsourced": false, "scheduledStart": "2026-04-08T10:00:00+02:00", "scheduledEnd": "2026-04-08T11:15:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "ba4af449-5c1d-4f61-bdba-c2ffcfbe1585", "attention": 1, "from": "2026-04-08T10:00:00", "to": "2026-04-08T11:15:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "7fec15c0-e9cc-4b4e-948a-ef4d75f7440f", "taskId": "7fec15c0-e9cc-4b4e-948a-ef4d75f7440f", "targetId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "isOutsourced": false, "scheduledStart": "2026-04-08T10:00:00+02:00", "scheduledEnd": "2026-04-08T12:30:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "637bdd3f-3b32-4073-b32e-7b75d72bc2c5", "attention": 1, "from": "2026-04-08T10:00:00", "to": "2026-04-08T12:30:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "f849d28a-33f0-4fce-b63e-bd9d2931d76e", "taskId": "f849d28a-33f0-4fce-b63e-bd9d2931d76e", "targetId": "9bafa7ac-cd16-4753-9a80-4bacd592bd71", "isOutsourced": false, "scheduledStart": "2026-04-08T12:30:00+02:00", "scheduledEnd": "2026-04-08T13:15:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "ba4af449-5c1d-4f61-bdba-c2ffcfbe1585", "attention": 1, "from": "2026-04-08T12:30:00", "to": "2026-04-08T13:15:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "08a916fc-1bd4-4bfa-b510-601a0bdb06c6", "taskId": "08a916fc-1bd4-4bfa-b510-601a0bdb06c6", "targetId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "isOutsourced": false, "scheduledStart": "2026-04-08T15:30:00+02:00", "scheduledEnd": "2026-04-08T17:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "5b55dd73-e1b7-4943-9315-d109a453bd90", "attention": 1, "from": "2026-04-08T15:30:00", "to": "2026-04-08T17:00:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "b1b804ff-633c-44c6-b792-d04ff7a26316", "taskId": "b1b804ff-633c-44c6-b792-d04ff7a26316", "targetId": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "isOutsourced": false, "scheduledStart": "2026-04-08T12:00:00+02:00", "scheduledEnd": "2026-04-08T12:30:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "d5fe6c3d-599b-4b64-be23-ff46f628885c", "attention": 1, "from": "2026-04-08T12:00:00", "to": "2026-04-08T12:30:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "948c41be-2bc3-4777-be5e-f11ec32d9fe9", "taskId": "948c41be-2bc3-4777-be5e-f11ec32d9fe9", "targetId": "d5eae78d-2ad7-49f1-b092-1ee51ac6686f", "isOutsourced": false, "scheduledStart": "2026-04-08T14:00:00+02:00", "scheduledEnd": "2026-04-08T17:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "61273295-501f-4d54-a2ca-8009c4fa2e88", "attention": 1, "from": "2026-04-08T14:30:00", "to": "2026-04-08T17:00:00"}], "isMaskedTime": true, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "d297d30c-dc36-4e38-b961-5cf6150f9db0", "taskId": "d297d30c-dc36-4e38-b961-5cf6150f9db0", "targetId": "d7791452-b1de-57ff-9d7a-4c56742217f0", "isOutsourced": false, "scheduledStart": "2026-04-09T06:00:00+02:00", "scheduledEnd": "2026-04-09T07:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "cef13efe-4a46-4761-9b92-bb762ec1b8e0", "attention": 1, "from": "2026-04-09T06:00:00", "to": "2026-04-09T07:00:00"}], "isMaskedTime": true, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "07882962-bbef-47f4-9697-7071f6af92b9", "taskId": "07882962-bbef-47f4-9697-7071f6af92b9", "targetId": "a463c370-eb28-402f-a90f-de8239bb476e", "isOutsourced": false, "scheduledStart": "2026-04-08T13:30:00+02:00", "scheduledEnd": "2026-04-08T14:30:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "61273295-501f-4d54-a2ca-8009c4fa2e88", "attention": 1, "from": "2026-04-08T13:30:00", "to": "2026-04-08T14:30:00"}], "isMaskedTime": true, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "c011ec70-d95e-4cdb-b589-130b40a65fdc", "taskId": "c011ec70-d95e-4cdb-b589-130b40a65fdc", "targetId": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "isOutsourced": false, "scheduledStart": "2026-04-08T07:00:00+02:00", "scheduledEnd": "2026-04-08T08:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "99dafad5-b9d8-4956-8a98-fd5b08b5d1fb", "attention": 1, "from": "2026-04-08T07:00:00", "to": "2026-04-08T08:00:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "42798b73-a595-49a8-a027-6f0789b77a13", "taskId": "42798b73-a595-49a8-a027-6f0789b77a13", "targetId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "isOutsourced": false, "scheduledStart": "2026-04-08T07:00:00+02:00", "scheduledEnd": "2026-04-08T10:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "637bdd3f-3b32-4073-b32e-7b75d72bc2c5", "attention": 1, "from": "2026-04-08T07:00:00", "to": "2026-04-08T10:00:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "5d46cda5-bec3-4772-8495-bf1e365e5a0d", "taskId": "5d46cda5-bec3-4772-8495-bf1e365e5a0d", "targetId": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "isOutsourced": false, "scheduledStart": "2026-04-08T09:00:00+02:00", "scheduledEnd": "2026-04-08T09:45:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "99dafad5-b9d8-4956-8a98-fd5b08b5d1fb", "attention": 1, "from": "2026-04-08T09:00:00", "to": "2026-04-08T09:45:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "83ab3e9a-2fde-4793-aff5-c462fca7c17f", "taskId": "83ab3e9a-2fde-4793-aff5-c462fca7c17f", "targetId": "cf967458-262d-585e-abc3-47591b62b6b2", "isOutsourced": false, "scheduledStart": "2026-04-09T07:30:00+02:00", "scheduledEnd": "2026-04-09T09:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "d5fe6c3d-599b-4b64-be23-ff46f628885c", "attention": 1, "from": "2026-04-09T07:30:00", "to": "2026-04-09T09:00:00"}], "isMaskedTime": true, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "b28e31d5-9b00-4e6f-a3cb-f6ce1167ae54", "taskId": "b28e31d5-9b00-4e6f-a3cb-f6ce1167ae54", "targetId": "e9cdf888-6644-4cc7-940a-da412238227f", "isOutsourced": false, "scheduledStart": "2026-04-08T11:45:00+02:00", "scheduledEnd": "2026-04-08T13:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "cef13efe-4a46-4761-9b92-bb762ec1b8e0", "attention": 1, "from": "2026-04-08T12:00:00", "to": "2026-04-08T13:00:00"}], "isMaskedTime": true, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "ef9c8197-52e0-418b-867c-4c4ad2ed267e", "taskId": "ef9c8197-52e0-418b-867c-4c4ad2ed267e", "targetId": "e44fd61a-b390-5313-b0ff-564d8ef3857d", "isOutsourced": false, "scheduledStart": "2026-04-08T18:30:00+02:00", "scheduledEnd": "2026-04-09T06:15:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "61273295-501f-4d54-a2ca-8009c4fa2e88", "attention": 1, "from": "2026-04-08T18:30:00", "to": "2026-04-08T18:45:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "fa450bea-2712-4959-8f5b-58618c1b5e3c", "taskId": "fa450bea-2712-4959-8f5b-58618c1b5e3c", "targetId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "isOutsourced": false, "scheduledStart": "2026-04-08T14:30:00+02:00", "scheduledEnd": "2026-04-08T15:30:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "5b55dd73-e1b7-4943-9315-d109a453bd90", "attention": 1, "from": "2026-04-08T14:30:00", "to": "2026-04-08T15:30:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "ae7e56f8-5f0a-48ac-a558-ff63a9ced9fc", "taskId": "ae7e56f8-5f0a-48ac-a558-ff63a9ced9fc", "targetId": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "isOutsourced": false, "scheduledStart": "2026-04-08T13:00:00+02:00", "scheduledEnd": "2026-04-08T13:30:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "d5fe6c3d-599b-4b64-be23-ff46f628885c", "attention": 1, "from": "2026-04-08T13:00:00", "to": "2026-04-08T13:30:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}, {"id": "ac331f87-6c53-476f-a813-5befd14e6de0", "taskId": "ac331f87-6c53-476f-a813-5befd14e6de0", "targetId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "isOutsourced": false, "scheduledStart": "2026-04-08T05:00:00+02:00", "scheduledEnd": "2026-04-08T07:00:00+02:00", "isCompleted": false, "completedAt": null, "isPinned": false, "pinnedAt": null, "operators": [{"operatorId": "637bdd3f-3b32-4073-b32e-7b75d72bc2c5", "attention": 1, "from": "2026-04-08T05:00:00", "to": "2026-04-08T07:00:00"}], "isMaskedTime": false, "createdAt": "2026-04-08T14:58:47+00:00", "updatedAt": "2026-04-08T14:58:47+00:00"}], "conflicts": [], "lateJobs": [], "lookbackDays": 14, "operators": [{"id": "d2c777ce-4923-452b-970b-bcfe52698da1", "firstName": "Halim", "lastName": "Afri", "role": "Façonnier", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "05:00", "end": "12:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "12:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "12:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "05:00", "end": "12:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "05:00", "end": "12:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "e44fd61a-b390-5313-b0ff-564d8ef3857d", "proficiency": 1}, {"stationId": "a463c370-eb28-402f-a90f-de8239bb476e", "proficiency": 1}, {"stationId": "d7791452-b1de-57ff-9d7a-4c56742217f0", "proficiency": 1}, {"stationId": "e9cdf888-6644-4cc7-940a-da412238227f", "proficiency": 1}]}, {"id": "d5fe6c3d-599b-4b64-be23-ff46f628885c", "firstName": "Frédéric", "lastName": "Courtois", "role": "Massicotier", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "thursday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "friday": {"isOperating": true, "slots": [{"start": "07:30", "end": "14:30"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "111fa92a-e4c1-5b6e-af3d-c7952c90289d", "proficiency": 1}, {"stationId": "cf967458-262d-585e-abc3-47591b62b6b2", "proficiency": 1}]}, {"id": "637bdd3f-3b32-4073-b32e-7b75d72bc2c5", "firstName": "Guilian", "lastName": "Martin", "role": "Conducteur offset", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "05:00", "end": "13:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "13:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "05:00", "end": "13:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "05:00", "end": "13:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "05:00", "end": "13:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "proficiency": 1}]}, {"id": "ba4af449-5c1d-4f61-bdba-c2ffcfbe1585", "firstName": "Antoine", "lastName": "Oscari", "role": "Expéditions", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "10:00", "end": "17:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "a261eb5d-d315-56a9-b59b-764d6bdb25f4", "proficiency": 1}, {"stationId": "9bafa7ac-cd16-4753-9a80-4bacd592bd71", "proficiency": 1}]}, {"id": "61273295-501f-4d54-a2ca-8009c4fa2e88", "firstName": "Christophe", "lastName": "Rometter", "role": "Façonnier", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "13:00", "end": "19:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "e9cdf888-6644-4cc7-940a-da412238227f", "proficiency": 1}, {"stationId": "d5eae78d-2ad7-49f1-b092-1ee51ac6686f", "proficiency": 1}, {"stationId": "d7791452-b1de-57ff-9d7a-4c56742217f0", "proficiency": 1}, {"stationId": "a463c370-eb28-402f-a90f-de8239bb476e", "proficiency": 1}, {"stationId": "e44fd61a-b390-5313-b0ff-564d8ef3857d", "proficiency": 1}]}, {"id": "99dafad5-b9d8-4956-8a98-fd5b08b5d1fb", "firstName": "Bertrand", "lastName": "Tanchot", "role": "Conducteur offset", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "07:00", "end": "14:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "cdc1eec6-7b23-42d5-9c0b-608205fe40f1", "proficiency": 1}]}, {"id": "5b55dd73-e1b7-4943-9315-d109a453bd90", "firstName": "Nicolas", "lastName": "Tombois", "role": "Conducteur", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "13:00", "end": "21:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "13:00", "end": "21:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "13:00", "end": "21:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "13:00", "end": "21:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "13:00", "end": "21:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "a2ac888f-e0ed-5732-9322-9457250fd67a", "proficiency": 1}]}, {"id": "cef13efe-4a46-4761-9b92-bb762ec1b8e0", "firstName": "Ludovic", "lastName": "Valdenaire", "role": "Façonnier", "operatingSchedule": {"monday": {"isOperating": true, "slots": [{"start": "06:00", "end": "13:00"}]}, "tuesday": {"isOperating": true, "slots": [{"start": "06:00", "end": "13:00"}]}, "wednesday": {"isOperating": true, "slots": [{"start": "06:00", "end": "13:00"}]}, "thursday": {"isOperating": true, "slots": [{"start": "06:00", "end": "13:00"}]}, "friday": {"isOperating": true, "slots": [{"start": "06:00", "end": "13:00"}]}, "saturday": {"isOperating": false, "slots": []}, "sunday": {"isOperating": false, "slots": []}}, "skills": [{"stationId": "a463c370-eb28-402f-a90f-de8239bb476e", "proficiency": 1}, {"stationId": "e44fd61a-b390-5313-b0ff-564d8ef3857d", "proficiency": 1}, {"stationId": "d7791452-b1de-57ff-9d7a-4c56742217f0", "proficiency": 1}, {"stationId": "e9cdf888-6644-4cc7-940a-da412238227f", "proficiency": 1}]}]};
+
+// === DATA PROCESSING ===
+const stationMap = Object.fromEntries(SNAPSHOT.stations.map(s => [s.id, s]));
+const operatorMap = Object.fromEntries(SNAPSHOT.operators.map(o => [o.id, o]));
+const taskMap = Object.fromEntries(SNAPSHOT.tasks.map(t => [t.id, t]));
+const elementMap = Object.fromEntries(SNAPSHOT.elements.map(e => [e.id, e]));
+const assignmentByTask = Object.fromEntries(SNAPSHOT.assignments.map(a => [a.taskId, a]));
+
+// Build proficiency lookup: proficiencyMap[operatorId][stationId] = proficiency
+const proficiencyMap = {};
+SNAPSHOT.operators.forEach(op => {
+  proficiencyMap[op.id] = {};
+  (op.skills || []).forEach(sk => {
+    proficiencyMap[op.id][sk.stationId] = sk.proficiency;
+  });
+});
+
+function parseDate(s) { return new Date(s); }
+function formatTime(d) {
+  if (!(d instanceof Date) || isNaN(d)) return '??:??';
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+function formatDate(d) {
+  if (!(d instanceof Date) || isNaN(d)) return '??';
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+}
+function formatDateTime(d) { return formatDate(d) + ' ' + formatTime(d); }
+function diffMinutes(a, b) { return Math.round((b - a) / 60000); }
+function fmtDuration(mins) {
+  if (mins < 60) return mins + 'min';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? h + 'h' + String(m).padStart(2, '0') : h + 'h';
+}
+
+// Build enriched job data
+const jobs = SNAPSHOT.jobs.map(job => {
+  const jobElements = SNAPSHOT.elements.filter(e => e.jobId === job.id);
+  const jobTasks = SNAPSHOT.tasks.filter(t => t.jobId === job.id).sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+
+  let theoreticalTotal = 0;
+  let productionTotal = 0;
+  let allScheduled = true;
+
+  const enrichedTasks = jobTasks.map(task => {
+    const assignment = assignmentByTask[task.id];
+    const station = stationMap[task.stationId];
+    const setupMin = task.duration?.setupMinutes || 0;
+    const runMin = task.duration?.runMinutes || 0;
+    const theoreticalMin = setupMin + runMin;
+    theoreticalTotal += theoreticalMin;
+
+    let productionMin = theoreticalMin; // default if no assignment
+    let proficiency = 1;
+    let operators = [];
+    let scheduledStart = null;
+    let scheduledEnd = null;
+    let calendarMin = 0;
+    let isMasked = false;
+
+    if (assignment) {
+      scheduledStart = parseDate(assignment.scheduledStart);
+      scheduledEnd = parseDate(assignment.scheduledEnd);
+      calendarMin = diffMinutes(scheduledStart, scheduledEnd);
+      isMasked = assignment.isMaskedTime;
+
+      operators = (assignment.operators || []).map(op => {
+        const opData = operatorMap[op.operatorId];
+        const from = parseDate(op.from);
+        const to = parseDate(op.to);
+        const opProf = proficiencyMap[op.operatorId]?.[task.stationId] || 1;
+        return {
+          id: op.operatorId,
+          name: opData ? opData.firstName + ' ' + opData.lastName : op.operatorId.slice(0, 8),
+          role: opData?.role || '',
+          attention: op.attention,
+          proficiency: opProf,
+          from, to,
+          durationMin: diffMinutes(from, to),
+        };
+      });
+
+      // Production time = theoretical / effective proficiency
+      // If multiple operators, use weighted average proficiency by duration
+      if (operators.length > 0) {
+        const totalOpMinutes = operators.reduce((s, o) => s + o.durationMin, 0);
+        if (totalOpMinutes > 0) {
+          proficiency = operators.reduce((s, o) => s + o.proficiency * (o.durationMin / totalOpMinutes), 0);
+        } else {
+          proficiency = operators[0].proficiency;
+        }
+      }
+      productionMin = Math.round(theoreticalMin / proficiency);
+      productionTotal += productionMin;
+    } else {
+      allScheduled = false;
+    }
+
+    const delta = productionMin - theoreticalMin;
+
+    return {
+      id: task.id,
+      sequenceOrder: task.sequenceOrder,
+      station: station?.name || '?',
+      stationId: task.stationId,
+      setupMin, runMin, theoreticalMin,
+      productionMin, calendarMin, delta, proficiency,
+      operators,
+      scheduledStart, scheduledEnd,
+      isMasked,
+      isScheduled: !!assignment,
+      status: task.status,
+    };
+  });
+
+  const deadline = parseDate(job.workshopExitDate + ':00');
+  const lastEnd = enrichedTasks.filter(t => t.scheduledEnd).map(t => t.scheduledEnd).sort((a, b) => b - a)[0];
+  const isLate = lastEnd && lastEnd > deadline;
+  const allDone = enrichedTasks.every(t => t.isScheduled);
+
+  return {
+    id: job.id,
+    reference: job.reference,
+    client: job.client,
+    description: job.description,
+    color: job.color,
+    deadline,
+    workshopExitDate: job.workshopExitDate,
+    tasks: enrichedTasks,
+    elements: jobElements,
+    theoreticalTotal,
+    productionTotal,
+    deltaTotal: productionTotal - theoreticalTotal,
+    isLate,
+    allScheduled: allDone,
+    lastEnd,
+  };
+}).sort((a, b) => a.reference.localeCompare(b.reference, undefined, { numeric: true }));
+
+// === RENDER SIDEBAR ===
+const jobListEl = document.getElementById('job-list');
+document.getElementById('job-count').textContent = `${jobs.length} jobs`;
+
+jobs.forEach((job, i) => {
+  const el = document.createElement('div');
+  el.className = 'job-item';
+  el.dataset.index = i;
+
+  const statusTag = job.isLate ? '<span class="tag tag-late">En retard</span>' :
+                    job.allScheduled ? '<span class="tag tag-ok">OK</span>' :
+                    '<span class="tag tag-partial">Partiel</span>';
+
+  el.innerHTML = `
+    <div class="ref">#${job.reference} <span style="color:var(--text-dim);font-weight:400">${job.client}</span></div>
+    <div class="desc">${job.description}</div>
+    <div class="meta">
+      ${statusTag}
+      <span style="color:var(--text-dim)">${job.tasks.length} taches</span>
+      <span style="color:var(--text-dim)">${fmtDuration(job.theoreticalTotal)} theo.</span>
+    </div>
+  `;
+  el.addEventListener('click', () => selectJob(i));
+  jobListEl.appendChild(el);
+});
+
+// === RENDER JOB DETAIL ===
+let selectedIndex = -1;
+
+function selectJob(index) {
+  selectedIndex = index;
+  document.querySelectorAll('.job-item').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  renderJobDetail(jobs[index]);
+}
+
+function renderJobDetail(job) {
+  const main = document.getElementById('main-content');
+
+  // Compute gantt time range
+  const allStarts = job.tasks.filter(t => t.scheduledStart).map(t => t.scheduledStart);
+  const allEnds = job.tasks.filter(t => t.scheduledEnd).map(t => t.scheduledEnd);
+  const ganttMin = allStarts.length ? new Date(Math.min(...allStarts)) : new Date();
+  const ganttMax = allEnds.length ? new Date(Math.max(...allEnds)) : new Date();
+  const ganttRange = ganttMax - ganttMin || 1;
+
+  const efficiencyPct = job.productionTotal > 0 ? Math.round(job.theoreticalTotal / job.productionTotal * 100) : 100;
+  const deltaClass = job.deltaTotal > 0 ? 'positive' : job.deltaTotal < 0 ? 'negative' : 'neutral';
+  const deltaSign = job.deltaTotal > 0 ? '+' : '';
+
+  main.innerHTML = `
+    <h1>#${job.reference} - ${job.client}</h1>
+    <div class="subtitle">${job.description} &mdash; Deadline: ${formatDateTime(job.deadline)}</div>
+
+    <div class="summary-row">
+      <div class="card">
+        <div class="label">Duree theorique</div>
+        <div class="value">${fmtDuration(job.theoreticalTotal)}</div>
+        <div class="detail">Setup + Run a competence 1</div>
+      </div>
+      <div class="card">
+        <div class="label">Temps de production</div>
+        <div class="value">${fmtDuration(job.productionTotal)}</div>
+        <div class="detail">Theo. / competence operateur</div>
+      </div>
+      <div class="card">
+        <div class="label">Delta production</div>
+        <div class="value delta ${deltaClass}">${deltaSign}${fmtDuration(Math.abs(job.deltaTotal))}</div>
+        <div class="detail">${efficiencyPct}% d'efficacite</div>
+      </div>
+      <div class="card">
+        <div class="label">Statut</div>
+        <div class="value" style="font-size:16px">${job.isLate ? '<span style="color:var(--red)">En retard</span>' : job.allScheduled ? '<span style="color:var(--green)">Planifie</span>' : '<span style="color:var(--orange)">Partiel</span>'}</div>
+        <div class="detail">${job.tasks.filter(t => t.isScheduled).length}/${job.tasks.length} taches planifiees</div>
+      </div>
+    </div>
+
+    <!-- Mini Gantt -->
+    <div class="section">
+      <div class="section-title">Timeline <span class="badge">${formatDateTime(ganttMin)} - ${formatDateTime(ganttMax)}</span></div>
+      <div class="gantt-container">
+        ${job.tasks.filter(t => t.isScheduled).map(task => {
+          const leftPct = ((task.scheduledStart - ganttMin) / ganttRange * 100).toFixed(2);
+          const widthPct = Math.max(((task.scheduledEnd - task.scheduledStart) / ganttRange * 100), 1).toFixed(2);
+          const setupPct = task.theoreticalMin > 0 ? (task.setupMin / task.theoreticalMin * 100) : 0;
+          const blockClass = task.isMasked ? 'masked' : 'run';
+          return `
+            <div class="gantt-row">
+              <div class="gantt-label" title="${task.station}">${task.station}</div>
+              <div class="gantt-track">
+                ${task.setupMin > 0 ? `<div class="gantt-block setup" style="left:${leftPct}%;width:${(widthPct * setupPct / 100).toFixed(2)}%" title="Setup ${task.setupMin}min"></div>` : ''}
+                <div class="gantt-block ${blockClass}" style="left:${(parseFloat(leftPct) + (parseFloat(widthPct) * setupPct / 100)).toFixed(2)}%;width:${(widthPct * (100 - setupPct) / 100).toFixed(2)}%" title="Run ${task.runMin}min">${task.station}</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+        <div class="gantt-time-axis">
+          <span>${formatDateTime(ganttMin)}</span>
+          <span>${formatDateTime(new Date(ganttMin.getTime() + ganttRange / 2))}</span>
+          <span>${formatDateTime(ganttMax)}</span>
+        </div>
+        <div class="bar-legend" style="margin-top:8px;padding-left:100px">
+          <span><span class="dot" style="background:var(--orange)"></span> Setup</span>
+          <span><span class="dot" style="background:var(--accent)"></span> Run</span>
+          <span><span class="dot" style="background:var(--purple)"></span> Masked</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task detail table -->
+    <div class="section">
+      <div class="section-title">Detail des taches <span class="badge">${job.tasks.length} taches</span></div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Station</th>
+            <th>Setup</th>
+            <th>Run</th>
+            <th>Theo.</th>
+            <th>Debut</th>
+            <th>Fin</th>
+            <th>Calendaire</th>
+            <th>Production</th>
+            <th>Delta</th>
+            <th>Operateurs</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${job.tasks.map((task, ti) => `
+            <tr>
+              <td class="dim">${ti + 1}</td>
+              <td>
+                <span class="station-name">${task.station}</span>
+                ${task.isMasked ? '<span class="masked-badge">MASKED</span>' : ''}
+              </td>
+              <td class="mono">${task.setupMin}min</td>
+              <td class="mono">${task.runMin}min</td>
+              <td class="mono" style="font-weight:600">${fmtDuration(task.theoreticalMin)}</td>
+              <td class="mono">${task.isScheduled ? formatDateTime(task.scheduledStart) : '<span class="dim">-</span>'}</td>
+              <td class="mono">${task.isScheduled ? formatDateTime(task.scheduledEnd) : '<span class="dim">-</span>'}</td>
+              <td class="mono dim">${task.isScheduled ? fmtDuration(task.calendarMin) : '-'}</td>
+              <td class="mono" style="font-weight:600">${task.isScheduled ? fmtDuration(task.productionMin) : '-'}</td>
+              <td>
+                ${task.isScheduled ? `<span class="delta ${task.delta > 0 ? 'positive' : task.delta < 0 ? 'negative' : 'neutral'}">${task.delta > 0 ? '+' : ''}${task.delta}min</span>${task.proficiency !== 1 ? ` <span class="dim" style="font-size:10px">(comp. ${task.proficiency.toFixed(2)})</span>` : ''}` : ''}
+              </td>
+              <td>
+                ${task.operators.length > 0 ? `
+                  <table class="op-table">
+                    ${task.operators.map(op => `
+                      <tr>
+                        <td class="op-name">${op.name}</td>
+                        <td class="mono dim">${formatTime(op.from)} - ${formatTime(op.to)}</td>
+                        <td class="mono">${fmtDuration(op.durationMin)}</td>
+                        <td>
+                          <span class="attention-bar" style="width:${Math.round(op.attention * 40)}px"></span>
+                          <span class="attention-value">${Math.round(op.attention * 100)}%</span>
+                        </td>
+                        <td class="mono dim" title="Competence">comp. ${op.proficiency.toFixed(1)}</td>
+                      </tr>
+                    `).join('')}
+                  </table>
+                ` : '<span class="dim">Aucun</span>'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Efficiency analysis -->
+    <div class="section">
+      <div class="section-title">Analyse</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px">
+        ${job.tasks.filter(t => t.isScheduled && t.delta > 0).length > 0 ? `
+          <div style="margin-bottom:12px">
+            <strong style="color:var(--orange)">Taches avec surtemps de production :</strong>
+            <ul style="margin-top:4px;padding-left:20px;color:var(--text-dim)">
+              ${job.tasks.filter(t => t.isScheduled && t.delta > 0).map(t => `
+                <li><strong>${t.station}</strong>: +${t.delta}min (production ${fmtDuration(t.productionMin)} vs theo. ${fmtDuration(t.theoreticalMin)})
+                  ${t.proficiency < 1 ? ` - competence ${t.proficiency.toFixed(2)} (x${(1/t.proficiency).toFixed(1)} plus lent)` : ''}
+                  ${t.isMasked ? ' - temps masque' : ''}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : '<div style="color:var(--green);margin-bottom:8px">Aucun surtemps - tous les operateurs a competence 1</div>'}
+        ${job.tasks.filter(t => !t.isScheduled).length > 0 ? `
+          <div style="color:var(--red)">
+            <strong>Taches non planifiees :</strong>
+            ${job.tasks.filter(t => !t.isScheduled).map(t => t.station).join(', ')}
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Auto-select first job
+if (jobs.length > 0) selectJob(0);
+</script>
+
+</body>
+</html>
