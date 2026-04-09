@@ -38,6 +38,11 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
     let tick_minutes = options.tick_minutes;
     let fbi_max_iterations = options.fbi_max_iterations;
 
+    // Validate concurrent groups (Phase 1 ingestion only — these warnings
+    // are informational; the algorithm does not yet use the field).
+    let mut concurrent_group_warnings =
+        validate_concurrent_groups(&request.operators, &request.stations);
+
     // Build station masked_time lookup for post-processing
     let station_masked_time: HashMap<String, bool> = request
         .stations
@@ -175,6 +180,7 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
     }
 
     let mut warnings = Vec::new();
+    warnings.append(&mut concurrent_group_warnings);
 
     // Check for unplaced tasks
     let unplaced: u32 = actions.iter().filter(|a| a.end_tick.is_none()).count() as u32;
@@ -194,6 +200,62 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         fbi_iterations,
         compute_time_ms,
     }
+}
+
+/// Validate operator concurrent groups against the request snapshot.
+///
+/// Returns a list of warnings (one per invalid group). Validation is
+/// non-blocking: invalid groups are reported but the engine still runs.
+/// In Phase 1 the engine ignores the field entirely; Phase 2 will use it
+/// to drive operator pairing in masked time.
+///
+/// Checks performed:
+/// - Group shape (delegated to ConcurrentGroupInput::validate)
+/// - Both station IDs exist in the request's stations list
+/// - Both stations are in the operator's own skills
+fn validate_concurrent_groups(
+    operators: &[crate::model::operator::OperatorInput],
+    stations: &[crate::model::station::StationInput],
+) -> Vec<Warning> {
+    let mut warnings = Vec::new();
+
+    let station_ids: std::collections::HashSet<&str> =
+        stations.iter().map(|s| s.id.as_str()).collect();
+
+    for operator in operators {
+        let skill_station_ids: std::collections::HashSet<&str> =
+            operator.skills.iter().map(|s| s.station_id.as_str()).collect();
+
+        for group in &operator.concurrent_groups {
+            if let Err(msg) = group.validate(&operator.id) {
+                warnings.push(Warning { task_id: None, message: msg });
+                continue;
+            }
+
+            for station_id in &group.station_ids {
+                if !station_ids.contains(station_id.as_str()) {
+                    warnings.push(Warning {
+                        task_id: None,
+                        message: format!(
+                            "operator {}: concurrent group references unknown station {}",
+                            operator.id, station_id
+                        ),
+                    });
+                }
+                if !skill_station_ids.contains(station_id.as_str()) {
+                    warnings.push(Warning {
+                        task_id: None,
+                        message: format!(
+                            "operator {}: concurrent group references station {} but operator has no skill on it",
+                            operator.id, station_id
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
+    warnings
 }
 
 /// Merge chunk assignments back into single assignments per original task.
