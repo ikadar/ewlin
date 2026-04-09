@@ -15,8 +15,9 @@ import {
   useUpdateOperatorMutation,
   useDeleteOperatorMutation,
   useReplaceSkillsMutation,
+  useReplaceConcurrentGroupsMutation,
 } from '../store/api/operatorApi';
-import type { OperatorResponse, OperatorSkillResponse } from '../store/api/operatorApi';
+import type { OperatorResponse, OperatorSkillResponse, ConcurrentGroupPayload } from '../store/api/operatorApi';
 import { useGetStationsQuery } from '../store/api/stationApi';
 import type { StationResponse } from '../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
@@ -310,6 +311,190 @@ function SkillRow({ station, initialProficiency, onProficiencyCommit }: SkillRow
 }
 
 // ============================================================================
+// Concurrent Groups Section
+// ============================================================================
+
+/**
+ * Local representation of a concurrent group while editing in the modal.
+ *
+ * Existing groups carry their server-side id; new groups (created in this
+ * session) use a synthetic key starting with `new:` so React can track them.
+ * The id is dropped before sending to the bulk-replace endpoint.
+ */
+interface DraftGroup {
+  key: string;
+  stationIds: [string, string];
+  productivity: [number, number];  // aligned with stationIds
+}
+
+interface ConcurrentGroupsSectionProps {
+  /** Stations the operator currently has a skill on (groups can only pair these). */
+  skilledStations: StationResponse[];
+  groups: DraftGroup[];
+  onChange: (groups: DraftGroup[]) => void;
+}
+
+function ConcurrentGroupsSection({ skilledStations, groups, onChange }: ConcurrentGroupsSectionProps) {
+  const stationName = useCallback(
+    (id: string) => skilledStations.find((s) => s.id === id)?.name ?? id,
+    [skilledStations],
+  );
+
+  /** Canonical key for a pair (sorted), used for duplicate detection. */
+  const pairKey = (a: string, b: string) => [a, b].sort().join('|');
+
+  const addGroup = () => {
+    onChange([
+      ...groups,
+      {
+        key: `new:${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        stationIds: ['', ''],
+        productivity: [0.9, 0.9],
+      },
+    ]);
+  };
+
+  const updateGroup = (idx: number, patch: Partial<DraftGroup>) => {
+    const next = [...groups];
+    next[idx] = { ...next[idx], ...patch };
+    onChange(next);
+  };
+
+  const removeGroup = (idx: number) => {
+    onChange(groups.filter((_, i) => i !== idx));
+  };
+
+  const isPairComplete = (g: DraftGroup) => g.stationIds[0] !== '' && g.stationIds[1] !== '' && g.stationIds[0] !== g.stationIds[1];
+
+  const isDuplicate = (g: DraftGroup, idx: number) => {
+    if (!isPairComplete(g)) return false;
+    const key = pairKey(g.stationIds[0], g.stationIds[1]);
+    return groups.some((other, i) => i !== idx && isPairComplete(other) && pairKey(other.stationIds[0], other.stationIds[1]) === key);
+  };
+
+  if (skilledStations.length < 2) {
+    return (
+      <div className="pt-2 border-t border-flux-border">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">
+          Groupes concurrents
+        </p>
+        <p className="text-xs text-flux-text-muted italic">
+          L'opérateur doit avoir au moins 2 compétences pour configurer un groupe concurrent.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-2 border-t border-flux-border">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted">
+          Groupes concurrents
+        </p>
+        <span className="text-[10px] text-flux-text-muted">
+          Paires de machines que l'opérateur peut conduire simultanément
+        </span>
+      </div>
+
+      {groups.length > 0 && (
+        <div className="flex flex-col gap-2 mb-3">
+          {groups.map((group, idx) => {
+            const duplicate = isDuplicate(group, idx);
+            return (
+              <div
+                key={group.key}
+                className={`p-3 bg-flux-base rounded border ${duplicate ? 'border-red-500' : 'border-flux-border'}`}
+              >
+                <div className="grid grid-cols-[1fr_60px_1fr_60px_24px] items-center gap-2">
+                  {[0, 1].map((slot) => {
+                    const stationId = group.stationIds[slot];
+                    return (
+                      <div key={slot} className="contents">
+                        <select
+                          value={stationId}
+                          onChange={(e) => {
+                            const nextIds = [...group.stationIds] as [string, string];
+                            nextIds[slot] = e.target.value;
+                            updateGroup(idx, { stationIds: nextIds });
+                          }}
+                          className="px-2 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                        >
+                          <option value="">— choisir —</option>
+                          {skilledStations.map((s) => (
+                            <option
+                              key={s.id}
+                              value={s.id}
+                              disabled={s.id === group.stationIds[1 - slot]}
+                            >
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="1.5"
+                          value={group.productivity[slot]}
+                          disabled={!stationId}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (Number.isFinite(v)) {
+                              const nextProd = [...group.productivity] as [number, number];
+                              nextProd[slot] = Math.max(0, Math.min(1.5, v));
+                              updateGroup(idx, { productivity: nextProd });
+                            }
+                          }}
+                          className="px-1 py-[5px] text-xs font-mono bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary text-center focus:outline-none focus:border-flux-text-secondary disabled:opacity-50"
+                          title="Productivité effective sur cette machine quand l'opérateur est sur cette paire"
+                        />
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => removeGroup(idx)}
+                    className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none"
+                    title="Supprimer ce groupe"
+                  >
+                    ×
+                  </button>
+                </div>
+                {duplicate && (
+                  <p className="mt-1.5 text-[10px] text-red-400">
+                    Cette paire existe déjà dans un autre groupe.
+                  </p>
+                )}
+                {isPairComplete(group) && (
+                  <p className="mt-1.5 text-[10px] text-flux-text-muted">
+                    En mode partagé : {stationName(group.stationIds[0])} à {group.productivity[0].toFixed(2)},{' '}
+                    {stationName(group.stationIds[1])} à {group.productivity[1].toFixed(2)}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={addGroup}
+        className="w-full py-2 text-xs text-flux-text-muted border border-dashed border-flux-border-light rounded hover:border-blue-500 hover:text-blue-500 transition-colors"
+      >
+        + Ajouter un groupe concurrent
+      </button>
+      {/* Surface validation hint at the section level too */}
+      {groups.some((g, i) => isDuplicate(g, i)) && (
+        <p className="mt-2 text-[11px] text-red-400">
+          Corrigez les paires en doublon avant d'enregistrer.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Operator Form Modal
 // ============================================================================
 
@@ -325,6 +510,7 @@ interface OperatorFormModalProps {
     operatingSchedule: OperatingSchedule;
     scheduleExceptions: ScheduleExceptionInput[];
     skills: OperatorSkillResponse[];
+    concurrentGroups: ConcurrentGroupPayload[];
   }) => Promise<void>;
   onCancel: () => void;
   isSaving: boolean;
@@ -338,6 +524,19 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
   // Skills: stationId -> proficiency (only tracked in a ref + state for re-renders on checkbox/commit)
   const initialSkillMap = useMemo(() => buildSkillMap(initial?.skills ?? []), [initial]);
   const [skillMap, setSkillMap] = useState<Map<string, number>>(() => new Map(initialSkillMap));
+
+  // Concurrent groups: per-operator pairs of stations he can supervise simultaneously.
+  const [concurrentGroups, setConcurrentGroups] = useState<DraftGroup[]>(() => {
+    const initialGroups = initial?.concurrentGroups ?? [];
+    return initialGroups.map((g) => ({
+      key: g.id,
+      stationIds: [g.stationIds[0] ?? '', g.stationIds[1] ?? ''] as [string, string],
+      productivity: [
+        g.effectiveProductivity[g.stationIds[0]] ?? 0.9,
+        g.effectiveProductivity[g.stationIds[1]] ?? 0.9,
+      ] as [number, number],
+    }));
+  });
 
   // Schedule
   const [schedule, setSchedule] = useState<OperatingSchedule>(() => {
@@ -368,6 +567,12 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
     [stations, categories],
   );
 
+  // Stations the operator currently has a skill on — only these can be paired.
+  const skilledStations = useMemo(
+    () => stations.filter((s) => (skillMap.get(s.id) ?? 0) > 0).sort((a, b) => a.name.localeCompare(b.name)),
+    [stations, skillMap],
+  );
+
   // Escape to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -377,7 +582,24 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isSaving, onCancel]);
 
-  const canSave = firstName.trim() !== '' && lastName.trim() !== '';
+  // Concurrent groups must be either empty rows (in-progress) or fully valid:
+  // both stations selected, distinct, no duplicate pair, both productivities in range.
+  const concurrentGroupsValid = useMemo(() => {
+    const seen = new Set<string>();
+    for (const g of concurrentGroups) {
+      const [a, b] = g.stationIds;
+      if (a === '' || b === '') return false;  // incomplete row blocks save
+      if (a === b) return false;
+      const key = [a, b].sort().join('|');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      if (g.productivity[0] < 0 || g.productivity[0] > 1.5) return false;
+      if (g.productivity[1] < 0 || g.productivity[1] > 1.5) return false;
+    }
+    return true;
+  }, [concurrentGroups]);
+
+  const canSave = firstName.trim() !== '' && lastName.trim() !== '' && concurrentGroupsValid;
 
   const handleProficiencyCommit = useCallback((stationId: string, value: number) => {
     setSkillMap((prev) => {
@@ -389,6 +611,14 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
       }
       return next;
     });
+    // When a skill is removed, drop any concurrent group that referenced it.
+    // Done here (at the source of the removal) rather than in an effect, so
+    // we avoid cascading renders.
+    if (value === 0) {
+      setConcurrentGroups((prev) =>
+        prev.filter((g) => g.stationIds[0] !== stationId && g.stationIds[1] !== stationId),
+      );
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -401,6 +631,14 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
         skills.push({ stationId, proficiency });
       }
     });
+
+    const concurrentGroupsPayload: ConcurrentGroupPayload[] = concurrentGroups.map((g) => ({
+      stationIds: [g.stationIds[0], g.stationIds[1]],
+      effectiveProductivity: {
+        [g.stationIds[0]]: g.productivity[0],
+        [g.stationIds[1]]: g.productivity[1],
+      },
+    }));
 
     await onSave({
       firstName: firstName.trim(),
@@ -415,6 +653,7 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
         reason: a.reason || null,
       })),
       skills,
+      concurrentGroups: concurrentGroupsPayload,
     });
   };
 
@@ -495,6 +734,13 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
               )}
             </div>
           </div>
+
+          {/* Section 2.5: Concurrent groups */}
+          <ConcurrentGroupsSection
+            skilledStations={skilledStations}
+            groups={concurrentGroups}
+            onChange={setConcurrentGroups}
+          />
 
           {/* Section 3: Schedule */}
           <div className="pt-2 border-t border-flux-border">
@@ -655,6 +901,7 @@ export default function OperatorsPage() {
   const [updateOperator, { isLoading: isUpdatingLoading }] = useUpdateOperatorMutation();
   const [deleteOperator] = useDeleteOperatorMutation();
   const [replaceSkills] = useReplaceSkillsMutation();
+  const [replaceConcurrentGroups] = useReplaceConcurrentGroupsMutation();
 
   const { data: stations = [] } = useGetStationsQuery();
   const { data: categories = [] } = useGetStationCategoriesQuery();
@@ -716,8 +963,9 @@ export default function OperatorsPage() {
     operatingSchedule: OperatingSchedule;
     scheduleExceptions: unknown[];
     skills: OperatorSkillResponse[];
+    concurrentGroups: ConcurrentGroupPayload[];
   }) => {
-    await createOperator({
+    const created = await createOperator({
       firstName: data.firstName,
       lastName: data.lastName,
       role: data.role || null,
@@ -725,6 +973,9 @@ export default function OperatorsPage() {
       scheduleExceptions: data.scheduleExceptions,
       skills: data.skills,
     }).unwrap();
+    if (data.concurrentGroups.length > 0) {
+      await replaceConcurrentGroups({ id: created.id, groups: data.concurrentGroups }).unwrap();
+    }
     setIsCreating(false);
   };
 
@@ -736,6 +987,7 @@ export default function OperatorsPage() {
     operatingSchedule: OperatingSchedule;
     scheduleExceptions: unknown[];
     skills: OperatorSkillResponse[];
+    concurrentGroups: ConcurrentGroupPayload[];
   }) => {
     if (!editingOperator) return;
     await updateOperator({
@@ -748,7 +1000,12 @@ export default function OperatorsPage() {
         scheduleExceptions: data.scheduleExceptions,
       },
     }).unwrap();
+    // Skills must be saved BEFORE concurrent groups: the backend cascade
+    // drops groups whose stations are no longer in skills, so we need the
+    // skill set to be updated first. Then groups are bulk-replaced from
+    // the modal's local state, which is the new source of truth.
     await replaceSkills({ id: editingOperator.id, skills: data.skills }).unwrap();
+    await replaceConcurrentGroups({ id: editingOperator.id, groups: data.concurrentGroups }).unwrap();
     setEditingOperator(null);
   };
 

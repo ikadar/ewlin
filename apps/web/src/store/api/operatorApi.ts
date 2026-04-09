@@ -10,6 +10,25 @@ export interface OperatorSkillResponse {
   proficiency: number;
 }
 
+/**
+ * A pair of stations an operator can supervise simultaneously, with a
+ * per-station effective productivity for that pair. Models the operator's
+ * "masked time" capability — see services/php-api Entity/OperatorConcurrentGroup.
+ */
+export interface ConcurrentGroupResponse {
+  id: string;
+  /** Exactly 2 station UUIDs, sorted canonically by the backend. */
+  stationIds: string[];
+  /** Productivity per station within this pair, ∈ [0.0, 1.5]. */
+  effectiveProductivity: Record<string, number>;
+}
+
+/** Payload for replacing or creating a group (no id, server assigns it). */
+export interface ConcurrentGroupPayload {
+  stationIds: string[];
+  effectiveProductivity: Record<string, number>;
+}
+
 export interface OperatorResponse {
   id: string;
   firstName: string;
@@ -18,6 +37,7 @@ export interface OperatorResponse {
   operatingSchedule: Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }> | null;
   scheduleExceptions: Array<{ date: string; type: string; schedule: unknown; reason: string | null }> | null;
   skills: OperatorSkillResponse[];
+  concurrentGroups: ConcurrentGroupResponse[];
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +93,14 @@ export const operatorApi = createApi({
       }),
       invalidatesTags: ['Operators'],
     }),
+    replaceConcurrentGroups: builder.mutation<OperatorResponse, { id: string; groups: ConcurrentGroupPayload[] }>({
+      query: ({ id, groups }) => ({
+        url: `/operators/${id}/concurrent-groups`,
+        method: 'PUT',
+        body: groups,
+      }),
+      invalidatesTags: ['Operators'],
+    }),
   }),
 });
 
@@ -82,4 +110,5 @@ export const {
   useUpdateOperatorMutation,
   useDeleteOperatorMutation,
   useReplaceSkillsMutation,
+  useReplaceConcurrentGroupsMutation,
 } = operatorApi;
