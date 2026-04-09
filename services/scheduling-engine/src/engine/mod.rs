@@ -50,14 +50,6 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         .map(|s| (s.id.clone(), s.masked_time_enabled))
         .collect();
 
-    // Debug: log station attention values as received
-    for s in &request.stations {
-        if s.masked_time_enabled {
-            eprintln!("[STATION] {} masked=true attention_masked={:?} productivity={:?}",
-                s.name, s.attention_masked, s.masked_productivity);
-        }
-    }
-
     // Run FBI loop with optional multi-start (TierFirst + EDD orderings)
     let (mut assignments, mut actions, mut stats, mut fbi_iterations) = fbi::run_with_multi_start_fbi(
         &request.jobs,
