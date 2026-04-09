@@ -689,3 +689,232 @@ pub fn parse_deadline_minutes(deadline: &str, start_date: chrono::NaiveDate) -> 
 }
 
 use chrono::Timelike;
+
+#[cfg(test)]
+mod integration_tests {
+    //! End-to-end scenario tests for the concurrent groups model.
+
+    use super::*;
+    use crate::model::job::{ElementInput, JobInput, TaskInput};
+    use crate::model::operator::{ConcurrentGroupInput, OperatorInput, OperatorSkill};
+    use crate::model::schedule::{ComputeOptions, ComputeRequest};
+    use crate::model::station::StationInput;
+
+    fn make_station(id: &str, name: &str, masked_enabled: bool) -> StationInput {
+        StationInput {
+            id: id.to_string(),
+            name: name.to_string(),
+            attention_full: Some(1.0),
+            attention_run: Some(1.0),
+            max_run_attention: Some(1.0),
+            masked_time_enabled: masked_enabled,
+            attention_masked: None,
+            masked_productivity: None,
+            tick_minutes: Some(60),
+            peremption_threshold_minutes: None,
+            max_chunk_minutes: None,
+            category_id: None,
+            similarity_criteria: None,
+            is_press: false,
+            drying_time_minutes: 0,
+            max_operators: Some(1),
+            capacity: Some(1),
+        }
+    }
+
+    fn make_operator(
+        id: &str,
+        first_name: &str,
+        skills: &[(&str, f64)],
+        groups: Vec<ConcurrentGroupInput>,
+    ) -> OperatorInput {
+        OperatorInput {
+            id: id.to_string(),
+            first_name: first_name.to_string(),
+            last_name: "Test".to_string(),
+            role: "operator".to_string(),
+            operating_schedule: None,
+            skills: skills
+                .iter()
+                .map(|(s, p)| OperatorSkill {
+                    station_id: s.to_string(),
+                    proficiency: *p,
+                })
+                .collect(),
+            concurrent_groups: groups,
+        }
+    }
+
+    fn make_job(id: &str, station_id: &str, run_minutes: u32) -> JobInput {
+        JobInput {
+            id: id.to_string(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: format!("{id}-elem"),
+                name: None,
+                tasks: vec![TaskInput {
+                    id: format!("{id}-task"),
+                    station_id: station_id.to_string(),
+                    setup_minutes: 0,
+                    run_minutes,
+                    sequence_order: 0,
+                }],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        }
+    }
+
+    fn options() -> Option<ComputeOptions> {
+        Some(ComputeOptions {
+            horizon_days: 2,
+            tick_minutes: 60,
+            fbi_max_iterations: 1,
+            multi_start: false,
+        })
+    }
+
+    #[test]
+    fn ludovic_pairs_two_stations_in_parallel() {
+        let stations = vec![
+            make_station("sbg", "SBG", true),
+            make_station("mbo-xl", "MBO XL", true),
+        ];
+        let ludovic = make_operator(
+            "ludovic",
+            "Ludovic",
+            &[("sbg", 1.0), ("mbo-xl", 1.0)],
+            vec![ConcurrentGroupInput {
+                station_ids: vec!["sbg".into(), "mbo-xl".into()],
+                effective_productivity: [
+                    ("sbg".to_string(), 0.85),
+                    ("mbo-xl".to_string(), 0.90),
+                ]
+                .into_iter()
+                .collect(),
+            }],
+        );
+
+        let request = ComputeRequest {
+            stations,
+            operators: vec![ludovic],
+            jobs: vec![
+                make_job("job-a", "sbg", 60),
+                make_job("job-b", "mbo-xl", 60),
+            ],
+            options: options(),
+            station_groups: Vec::new(),
+        };
+
+        let result = compute(&request);
+        assert_eq!(result.assignments.len(), 2, "expected 2 assignments");
+        let starts: Vec<&str> = result.assignments.iter().map(|a| a.scheduled_start.as_str()).collect();
+        assert_eq!(starts[0], starts[1], "Ludovic should run both jobs in parallel; got {starts:?}");
+    }
+
+    #[test]
+    fn frederic_without_groups_serializes_jobs() {
+        let stations = vec![
+            make_station("sbg", "SBG", true),
+            make_station("mbo-xl", "MBO XL", true),
+        ];
+        let fred = make_operator("fred", "Frederic", &[("sbg", 1.0), ("mbo-xl", 1.0)], vec![]);
+
+        let request = ComputeRequest {
+            stations,
+            operators: vec![fred],
+            jobs: vec![
+                make_job("job-a", "sbg", 60),
+                make_job("job-b", "mbo-xl", 60),
+            ],
+            options: options(),
+            station_groups: Vec::new(),
+        };
+
+        let result = compute(&request);
+        assert_eq!(result.assignments.len(), 2);
+        let starts: Vec<&str> = result.assignments.iter().map(|a| a.scheduled_start.as_str()).collect();
+        assert_ne!(starts[0], starts[1], "Frédéric without groups must serialize, got {starts:?}");
+    }
+
+    #[test]
+    fn invalid_group_referencing_non_skill_emits_warning() {
+        let stations = vec![
+            make_station("sbg", "SBG", true),
+            make_station("mbo-xl", "MBO XL", true),
+        ];
+        let op = make_operator(
+            "op",
+            "OpName",
+            &[("sbg", 1.0)],
+            vec![ConcurrentGroupInput {
+                station_ids: vec!["sbg".into(), "mbo-xl".into()],
+                effective_productivity: [
+                    ("sbg".to_string(), 0.85),
+                    ("mbo-xl".to_string(), 0.90),
+                ]
+                .into_iter()
+                .collect(),
+            }],
+        );
+
+        let request = ComputeRequest {
+            stations,
+            operators: vec![op],
+            jobs: vec![make_job("job-a", "sbg", 60)],
+            options: options(),
+            station_groups: Vec::new(),
+        };
+
+        let result = compute(&request);
+        assert!(
+            result.warnings.iter().any(|w| w.message.contains("no skill")),
+            "expected a warning about missing skill, got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn group_with_productivity_above_one_is_accepted() {
+        let stations = vec![
+            make_station("sbg", "SBG", true),
+            make_station("mbo-xl", "MBO XL", true),
+        ];
+        let genie = make_operator(
+            "genie",
+            "Genie",
+            &[("sbg", 1.0), ("mbo-xl", 1.0)],
+            vec![ConcurrentGroupInput {
+                station_ids: vec!["sbg".into(), "mbo-xl".into()],
+                effective_productivity: [
+                    ("sbg".to_string(), 1.3),
+                    ("mbo-xl".to_string(), 1.2),
+                ]
+                .into_iter()
+                .collect(),
+            }],
+        );
+
+        let request = ComputeRequest {
+            stations,
+            operators: vec![genie],
+            jobs: vec![
+                make_job("job-a", "sbg", 60),
+                make_job("job-b", "mbo-xl", 60),
+            ],
+            options: options(),
+            station_groups: Vec::new(),
+        };
+
+        let result = compute(&request);
+        let invalid: Vec<&str> = result.warnings.iter()
+            .filter(|w| w.message.contains("out of range"))
+            .map(|w| w.message.as_str()).collect();
+        assert!(invalid.is_empty(), "unexpected: {invalid:?}");
+        assert_eq!(result.assignments.len(), 2);
+    }
+}
