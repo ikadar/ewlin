@@ -78,8 +78,6 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   const [attentionFull, setAttentionFull] = useState(String(initial?.attentionFull ?? 1));
   const [attentionRun, setAttentionRun] = useState(String(initial?.attentionRun ?? 1));
   const [maskedTimeEnabled, setMaskedTimeEnabled] = useState(initial?.maskedTimeEnabled ?? false);
-  const [attentionMasked, setAttentionMasked] = useState(String(initial?.attentionMasked ?? 1));
-  const [maskedProductivity, setMaskedProductivity] = useState(initial?.maskedProductivity != null ? String(initial.maskedProductivity) : '0.95');
   const [tickMinutes, setTickMinutes] = useState(String(initial?.tickMinutes ?? 15));
   const [peremptionHours, setPeremptionHours] = useState(String(initial?.peremptionThresholdMinutes != null ? initial.peremptionThresholdMinutes / 60 : 2));
   const [maxChunkHours, setMaxChunkHours] = useState(String(initial?.maxChunkMinutes != null ? initial.maxChunkMinutes / 60 : 7));
@@ -111,8 +109,6 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
       attentionFull: attentionFull.trim() ? parseFloat(attentionFull) : null,
       attentionRun: attentionRun.trim() ? parseFloat(attentionRun) : null,
       maskedTimeEnabled,
-      attentionMasked: maskedTimeEnabled && attentionMasked.trim() ? parseFloat(attentionMasked) : null,
-      maskedProductivity: maskedTimeEnabled && maskedProductivity.trim() ? parseFloat(maskedProductivity) : null,
       tickMinutes: tickMinutes.trim() ? parseInt(tickMinutes, 10) : null,
       peremptionThresholdMinutes: peremptionHours.trim() ? Math.round(parseFloat(peremptionHours) * 60) : null,
       maxChunkMinutes: maxChunkHours.trim() ? Math.round(parseFloat(maxChunkHours) * 60) : null,
@@ -235,32 +231,11 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
               >
                 <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${maskedTimeEnabled ? 'left-[18px] bg-white' : 'left-0.5 bg-flux-text-muted'}`} />
               </button>
-              <span className="text-sm text-flux-text-secondary">Temps masqué possible</span>
+              <span className="text-sm text-flux-text-secondary">
+                Pairing temps masqué autorisé
+                <span className="text-flux-text-muted ml-1">(productivité définie par opérateur)</span>
+              </span>
             </div>
-
-            {/* Masked time fields (only when switch enabled) */}
-            {maskedTimeEnabled && (
-              <div className="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                  <label className="block text-sm text-flux-text-secondary mb-1">Attention temps masqué</label>
-                  <input
-                    type="number" step="0.1" min="0" max="2"
-                    value={attentionMasked}
-                    onChange={(e) => setAttentionMasked(e.target.value)}
-                    className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-flux-text-secondary mb-1">Productivité masquée</label>
-                  <input
-                    type="number" step="0.05" min="0" max="1"
-                    value={maskedProductivity}
-                    onChange={(e) => setMaskedProductivity(e.target.value)}
-                    className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Timing fields */}
             <div className="grid grid-cols-3 gap-4">

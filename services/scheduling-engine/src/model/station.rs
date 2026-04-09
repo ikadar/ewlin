@@ -11,9 +11,19 @@ pub struct StationInput {
     /// When > attentionRun, extra operators speed up the task proportionally.
     /// Default = attentionRun (machine-paced, no benefit from extra operators).
     pub max_run_attention: Option<f64>,
+    /// Whether this station can ever appear in an operator's concurrent
+    /// group (i.e., whether masked-time pairing is allowed at all). The
+    /// pair-specific productivity comes from the operator's group, not
+    /// from the station — see operator concurrent_groups in Phase 2b.
     #[serde(default)]
     pub masked_time_enabled: bool,
+    /// Deprecated: kept for backward-compat with old payloads. Ignored
+    /// by the engine since Phase 2b.
+    #[serde(default)]
     pub attention_masked: Option<f64>,
+    /// Deprecated: kept for backward-compat with old payloads. Ignored
+    /// by the engine since Phase 2b.
+    #[serde(default)]
     pub masked_productivity: Option<f64>,
     pub tick_minutes: Option<u32>,
     pub peremption_threshold_minutes: Option<u32>,
@@ -53,18 +63,6 @@ impl StationInput {
 
     pub fn effective_attention_run(&self) -> f64 {
         self.attention_run.unwrap_or(1.0)
-    }
-
-    pub fn effective_attention_masked(&self) -> f64 {
-        self.attention_masked.unwrap_or(0.3)
-    }
-
-    pub fn effective_masked_productivity(&self) -> f64 {
-        if self.masked_time_enabled {
-            self.masked_productivity.unwrap_or(0.95).max(0.0).min(1.0)
-        } else {
-            1.0
-        }
     }
 
     pub fn effective_max_run_attention(&self) -> f64 {

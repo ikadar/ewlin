@@ -22,8 +22,6 @@ export interface StationResponse {
   attentionFull: number | null;
   attentionRun: number | null;
   maskedTimeEnabled: boolean;
-  attentionMasked: number | null;
-  maskedProductivity: number | null;
   tickMinutes: number | null;
   peremptionThresholdMinutes: number | null;
   maxChunkMinutes: number | null;
@@ -44,8 +42,6 @@ export interface StationInput {
   attentionFull?: number | null;
   attentionRun?: number | null;
   maskedTimeEnabled?: boolean;
-  attentionMasked?: number | null;
-  maskedProductivity?: number | null;
   tickMinutes?: number | null;
   peremptionThresholdMinutes?: number | null;
   maxChunkMinutes?: number | null;
