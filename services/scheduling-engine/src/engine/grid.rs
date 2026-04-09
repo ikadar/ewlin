@@ -2,8 +2,15 @@
 ///
 /// Uses flat Vec storage with manual 2D indexing:
 /// - station_ticks[station * num_ticks + tick] = Some(action_idx) if occupied
-/// - operator_station[operator * num_ticks + tick] = Some(station_idx) if assigned
-/// - operator_attention[operator * num_ticks + tick] = attention level given
+/// - operator_stations[operator * num_ticks + tick] = which stations the
+///   operator is currently assigned to (max 2 per tick — masked time pairing)
+/// - operator_attention[operator * num_ticks + tick] = total attention given
+///
+/// `operator_stations` and `operator_attention` are kept in sync by
+/// assign_operator/clear_operator. The attention sum is the legacy gating
+/// mechanism (still consulted by find_operators_for_station). The stations
+/// array is the new source of truth that Phase 2b will switch the algorithm
+/// over to (concurrent groups model).
 pub struct ScheduleGrid {
     pub num_stations: usize,
     pub num_operators: usize,
@@ -11,8 +18,9 @@ pub struct ScheduleGrid {
     pub tick_minutes: u32,
     /// station_ticks[station * num_ticks + tick] -> Option<action_idx>
     station_ticks: Vec<Option<usize>>,
-    /// operator_station[operator * num_ticks + tick] -> Option<station_idx>
-    operator_station: Vec<Option<usize>>,
+    /// operator_stations[operator * num_ticks + tick] -> stations the
+    /// operator is on at this tick. Capped at 2 (the masked time max).
+    operator_stations: Vec<[Option<usize>; 2]>,
     /// operator_attention[operator * num_ticks + tick] -> attention level
     operator_attention: Vec<f64>,
     /// group_active[group * num_ticks + tick] -> active station count in that group
@@ -33,7 +41,7 @@ impl ScheduleGrid {
             num_ticks,
             tick_minutes,
             station_ticks: vec![None; num_stations * num_ticks],
-            operator_station: vec![None; num_operators * num_ticks],
+            operator_stations: vec![[None, None]; num_operators * num_ticks],
             operator_attention: vec![0.0; num_operators * num_ticks],
             num_groups: 0,
             group_active: Vec::new(),
@@ -55,18 +63,18 @@ impl ScheduleGrid {
         }
         self.station_ticks = new_station_ticks;
 
-        // Rebuild operator_station
-        let mut new_operator_station = vec![None; self.num_operators * new_num_ticks];
+        // Rebuild operator_stations + operator_attention
+        let mut new_operator_stations = vec![[None, None]; self.num_operators * new_num_ticks];
         let mut new_operator_attention = vec![0.0; self.num_operators * new_num_ticks];
         for o in 0..self.num_operators {
             for t in 0..old_num_ticks {
-                new_operator_station[o * new_num_ticks + t] =
-                    self.operator_station[o * old_num_ticks + t];
+                new_operator_stations[o * new_num_ticks + t] =
+                    self.operator_stations[o * old_num_ticks + t];
                 new_operator_attention[o * new_num_ticks + t] =
                     self.operator_attention[o * old_num_ticks + t];
             }
         }
-        self.operator_station = new_operator_station;
+        self.operator_stations = new_operator_stations;
         self.operator_attention = new_operator_attention;
 
         // Rebuild group_active
@@ -98,18 +106,45 @@ impl ScheduleGrid {
         }
     }
 
-    /// Assign an operator at tick t to a station with given attention
+    /// Assign an operator at tick t to a station with given attention.
+    ///
+    /// Updates both `operator_stations` (the new source-of-truth for which
+    /// stations the operator is on) and `operator_attention` (legacy
+    /// fractional bookkeeping consumed by find_operators_for_station).
+    /// If the operator is already assigned to this station at this tick,
+    /// the station is not added twice (attention still accumulates — that
+    /// matches the legacy behavior where the same station could be
+    /// assigned multiple ticks during incremental scheduling).
     pub fn assign_operator(
         &mut self,
         operator: usize,
         t: usize,
-        _station: usize,
+        station: usize,
         attention: f64,
     ) {
         if t < self.num_ticks && operator < self.num_operators {
             // ADD attention (not set) — an operator can work on multiple stations
             // at the same tick (e.g., monitoring a masked station + active work on another)
             self.operator_attention[operator * self.num_ticks + t] += attention;
+
+            // Track station occupancy (max 2 per tick — masked time pairing).
+            // If both slots are full and the new station isn't already among
+            // them, log and drop — this should be impossible under the
+            // current scheduler but we don't want a panic in production.
+            let slots = &mut self.operator_stations[operator * self.num_ticks + t];
+            if slots[0] == Some(station) || slots[1] == Some(station) {
+                return;
+            }
+            if slots[0].is_none() {
+                slots[0] = Some(station);
+            } else if slots[1].is_none() {
+                slots[1] = Some(station);
+            } else {
+                eprintln!(
+                    "[GRID] operator {} tick {} already has 2 stations ({:?}, {:?}); dropping {}",
+                    operator, t, slots[0], slots[1], station
+                );
+            }
         }
     }
 
@@ -120,6 +155,26 @@ impl ScheduleGrid {
         }
         let used = self.operator_attention[operator * self.num_ticks + t];
         (1.0 - used).max(0.0)
+    }
+
+    /// Stations the operator is currently assigned to at tick t.
+    /// Returns up to 2 station indices; None entries are unused slots.
+    pub fn operator_stations_at(&self, operator: usize, t: usize) -> [Option<usize>; 2] {
+        if t >= self.num_ticks || operator >= self.num_operators {
+            return [None, None];
+        }
+        self.operator_stations[operator * self.num_ticks + t]
+    }
+
+    /// How many stations the operator is on at tick t (0, 1, or 2).
+    pub fn operator_load_count(&self, operator: usize, t: usize) -> usize {
+        let slots = self.operator_stations_at(operator, t);
+        slots.iter().filter(|s| s.is_some()).count()
+    }
+
+    /// Whether the operator has no assignments at tick t.
+    pub fn operator_is_idle(&self, operator: usize, t: usize) -> bool {
+        self.operator_load_count(operator, t) == 0
     }
 
     /// Get which action is assigned to a station at tick t
@@ -137,10 +192,15 @@ impl ScheduleGrid {
         }
     }
 
-    /// Clear operator assignments at tick t
+    /// Clear ALL operator assignments at tick t.
+    ///
+    /// This is the legacy bulk-clear used by rollback. Phase 2b will add
+    /// a station-specific unassign_operator_from_station that the new
+    /// algorithm uses instead, but rollback's broad-brush behavior is
+    /// preserved here for iso-comportement.
     pub fn clear_operator(&mut self, operator: usize, t: usize) {
         if t < self.num_ticks && operator < self.num_operators {
-            self.operator_station[operator * self.num_ticks + t] = None;
+            self.operator_stations[operator * self.num_ticks + t] = [None, None];
             self.operator_attention[operator * self.num_ticks + t] = 0.0;
         }
     }
@@ -172,5 +232,68 @@ impl ScheduleGrid {
             self.group_active[group * self.num_ticks + t] =
                 self.group_active[group * self.num_ticks + t].saturating_sub(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod operator_stations_tests {
+    use super::*;
+
+    #[test]
+    fn idle_operator_starts_empty() {
+        let grid = ScheduleGrid::new(2, 1, 10, 15);
+        assert!(grid.operator_is_idle(0, 5));
+        assert_eq!(grid.operator_load_count(0, 5), 0);
+        assert_eq!(grid.operator_stations_at(0, 5), [None, None]);
+    }
+
+    #[test]
+    fn assign_one_station_tracks_load() {
+        let mut grid = ScheduleGrid::new(2, 1, 10, 15);
+        grid.assign_operator(0, 5, 1, 0.5);
+        assert!(!grid.operator_is_idle(0, 5));
+        assert_eq!(grid.operator_load_count(0, 5), 1);
+        assert_eq!(grid.operator_stations_at(0, 5), [Some(1), None]);
+        // Legacy attention tracking still updated.
+        assert_eq!(grid.operator_remaining_attention(0, 5), 0.5);
+    }
+
+    #[test]
+    fn assign_two_stations_fills_both_slots() {
+        let mut grid = ScheduleGrid::new(3, 1, 10, 15);
+        grid.assign_operator(0, 5, 1, 0.5);
+        grid.assign_operator(0, 5, 2, 0.3);
+        assert_eq!(grid.operator_load_count(0, 5), 2);
+        assert_eq!(grid.operator_stations_at(0, 5), [Some(1), Some(2)]);
+    }
+
+    #[test]
+    fn reassigning_same_station_does_not_duplicate() {
+        let mut grid = ScheduleGrid::new(2, 1, 10, 15);
+        grid.assign_operator(0, 5, 1, 0.3);
+        grid.assign_operator(0, 5, 1, 0.3);
+        assert_eq!(grid.operator_load_count(0, 5), 1);
+        // But attention still accumulates (legacy behavior).
+        assert_eq!(grid.operator_remaining_attention(0, 5), 0.4);
+    }
+
+    #[test]
+    fn clear_operator_wipes_both_slots_and_attention() {
+        let mut grid = ScheduleGrid::new(3, 1, 10, 15);
+        grid.assign_operator(0, 5, 1, 0.5);
+        grid.assign_operator(0, 5, 2, 0.3);
+        grid.clear_operator(0, 5);
+        assert!(grid.operator_is_idle(0, 5));
+        assert_eq!(grid.operator_remaining_attention(0, 5), 1.0);
+    }
+
+    #[test]
+    fn grid_grow_preserves_operator_stations() {
+        let mut grid = ScheduleGrid::new(2, 1, 5, 15);
+        grid.assign_operator(0, 3, 1, 0.5);
+        grid.grow(10);
+        assert_eq!(grid.operator_stations_at(0, 3), [Some(1), None]);
+        assert_eq!(grid.operator_remaining_attention(0, 3), 0.5);
+        assert!(grid.operator_is_idle(0, 10));
     }
 }
