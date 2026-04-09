@@ -193,14 +193,29 @@ impl ScheduleGrid {
     }
 
     /// Clear ALL operator assignments at tick t.
-    ///
-    /// This is the legacy bulk-clear used by rollback. Phase 2b will add
-    /// a station-specific unassign_operator_from_station that the new
-    /// algorithm uses instead, but rollback's broad-brush behavior is
-    /// preserved here for iso-comportement.
     pub fn clear_operator(&mut self, operator: usize, t: usize) {
         if t < self.num_ticks && operator < self.num_operators {
             self.operator_stations[operator * self.num_ticks + t] = [None, None];
+            self.operator_attention[operator * self.num_ticks + t] = 0.0;
+        }
+    }
+
+    /// Remove a single station assignment for an operator at tick t,
+    /// leaving any other station the operator may have been on intact.
+    /// Used by rollback in the Phase 2b concurrent groups model.
+    pub fn unassign_operator_from_station(&mut self, operator: usize, t: usize, station: usize) {
+        if t >= self.num_ticks || operator >= self.num_operators {
+            return;
+        }
+        let slots = &mut self.operator_stations[operator * self.num_ticks + t];
+        if slots[0] == Some(station) {
+            slots[0] = None;
+        }
+        if slots[1] == Some(station) {
+            slots[1] = None;
+        }
+        // If both slots are now empty, also reset the legacy attention.
+        if slots[0].is_none() && slots[1].is_none() {
             self.operator_attention[operator * self.num_ticks + t] = 0.0;
         }
     }

@@ -11,12 +11,72 @@ pub struct StationAttrs {
     pub attention_run: f64,
     pub max_run_attention: f64,
     pub masked_time_enabled: bool,
-    pub attention_masked: f64,
-    pub masked_productivity: f64,
     /// Setup peremption threshold in ticks. If operator is absent this many consecutive
     /// ticks during setup, setup expires and must be redone.
     pub peremption_ticks: u32,
     pub max_operators: u32,
+}
+
+/// A pair of stations an operator can supervise simultaneously, prepared
+/// for fast lookup during scheduling. station_pair is sorted (min, max).
+/// productivity is aligned: productivity[0] is for station_pair[0],
+/// productivity[1] is for station_pair[1].
+#[derive(Debug, Clone)]
+pub struct PreparedConcurrentGroup {
+    pub station_pair: [usize; 2],
+    pub productivity: [f64; 2],
+}
+
+impl PreparedConcurrentGroup {
+    /// Lookup productivity for a specific station within this pair.
+    /// Returns None if the station isn't part of the pair.
+    pub fn productivity_for(&self, station: usize) -> Option<f64> {
+        if self.station_pair[0] == station {
+            Some(self.productivity[0])
+        } else if self.station_pair[1] == station {
+            Some(self.productivity[1])
+        } else {
+            None
+        }
+    }
+}
+
+/// Translate the operators' string-keyed concurrent groups into the
+/// idx-keyed PreparedConcurrentGroup form used by the hot loop.
+///
+/// Groups whose stations don't all map to known indices (e.g., the
+/// snapshot doesn't include those stations) are silently dropped — the
+/// validation pass at engine entry already emits warnings for those.
+pub fn build_prepared_groups(
+    operators: &[crate::model::operator::OperatorInput],
+    station_id_to_idx: &std::collections::HashMap<String, usize>,
+) -> Vec<Vec<PreparedConcurrentGroup>> {
+    operators
+        .iter()
+        .map(|op| {
+            op.concurrent_groups
+                .iter()
+                .filter_map(|g| {
+                    if g.station_ids.len() != 2 {
+                        return None;
+                    }
+                    let a = *station_id_to_idx.get(&g.station_ids[0])?;
+                    let b = *station_id_to_idx.get(&g.station_ids[1])?;
+                    let pa = *g.effective_productivity.get(&g.station_ids[0])?;
+                    let pb = *g.effective_productivity.get(&g.station_ids[1])?;
+                    let (pair, prod) = if a < b {
+                        ([a, b], [pa, pb])
+                    } else {
+                        ([b, a], [pb, pa])
+                    };
+                    Some(PreparedConcurrentGroup {
+                        station_pair: pair,
+                        productivity: prod,
+                    })
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// An action to be scheduled (mutable during forward pass)
@@ -169,81 +229,180 @@ struct ScoredAction {
 }
 
 /// Find operators capable of staffing a station at tick t.
-/// Returns Vec<(operator_idx, attention_to_give)> or empty if insufficient.
-/// `preferred_operators` enables operator continuity: preferred operators sort first
-/// at equal proficiency, reducing context-switching waste.
+///
+/// The new (Phase 2b) selection model:
+/// - **Priority A** (always allowed): operators currently idle (load == 0).
+///   They will be assigned solo with productivity = their proficiency.
+/// - **Priority B** (run phase only): operators currently on exactly one
+///   station, where {their current station, station_idx} forms one of
+///   their declared concurrent groups. They will be paired, and
+///   productivity for both stations comes from the group definition.
+///
+/// Setup phase blocks priority B — setup is always solo (no pairing during
+/// setup phase, regardless of operator skill).
+///
+/// Returns up to `max_operators` operator indices. The caller is
+/// responsible for actually assigning them via grid.assign_operator.
 pub fn find_operators_for_station(
     grid: &ScheduleGrid,
     t: usize,
     station_idx: usize,
-    attention_needed: f64,
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &OperatorAvailability,
-    preferred_operators: &[(usize, f64)],
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
+    preferred_operators: &[usize],
     max_operators: u32,
-) -> Vec<(usize, f64)> {
-    // Collect all qualified, available operators with remaining attention
-    let mut candidates: Vec<(usize, f64, f64, bool)> = Vec::new(); // (op_idx, proficiency, remaining_attention, is_preferred)
-
-    for (op_idx, skills) in operator_skills.iter().enumerate() {
-        // Check if this operator has the skill for this station
-        let proficiency = skills
+    is_setup_phase: bool,
+) -> Vec<usize> {
+    let qualified = |op_idx: usize| -> Option<f64> {
+        operator_skills[op_idx]
             .iter()
-            .find(|(s_idx, _)| *s_idx == station_idx)
-            .map(|(_, p)| *p);
+            .find(|(s, _)| *s == station_idx)
+            .map(|(_, p)| *p)
+            .filter(|p| *p > 0.0)
+    };
 
-        if let Some(prof) = proficiency {
-            if prof <= 0.0 {
-                continue;
+    let is_pref = |op_idx: usize| preferred_operators.contains(&op_idx);
+
+    // Priority A — idle solo. Sort by preferred → proficiency desc.
+    let mut idle_candidates: Vec<(usize, f64)> = (0..operator_skills.len())
+        .filter_map(|op| {
+            qualified(op)?;
+            if !operator_availability.is_available(op, t) {
+                return None;
             }
-            // Check availability
-            if !operator_availability.is_available(op_idx, t) {
-                continue;
+            if !grid.operator_is_idle(op, t) {
+                return None;
             }
-            // Check remaining attention
-            let remaining = grid.operator_remaining_attention(op_idx, t);
-            if remaining > 0.001 {
-                let is_preferred = preferred_operators.iter().any(|(op, _)| *op == op_idx);
-                candidates.push((op_idx, prof, remaining, is_preferred));
+            Some((op, qualified(op).unwrap_or(0.0)))
+        })
+        .collect();
+    idle_candidates.sort_by(|a, b| {
+        is_pref(b.0)
+            .cmp(&is_pref(a.0))
+            .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+    });
+
+    let mut result: Vec<usize> = Vec::new();
+    for (op, _) in &idle_candidates {
+        if result.len() >= max_operators as usize {
+            break;
+        }
+        result.push(*op);
+    }
+
+    // Setup is always solo. Skip pairing.
+    if is_setup_phase {
+        return result;
+    }
+
+    // If we already filled max_operators with idle ones, no need to pair.
+    if (result.len() as u32) >= max_operators {
+        return result;
+    }
+
+    // Priority B — pairing with an operator already on one station whose
+    // current_station + station_idx forms a declared group.
+    let mut pair_candidates: Vec<usize> = (0..operator_skills.len())
+        .filter(|&op| {
+            qualified(op).is_some()
+                && operator_availability.is_available(op, t)
+                && grid.operator_load_count(op, t) == 1
+        })
+        .filter(|&op| {
+            // Don't double-count an op already in result.
+            if result.contains(&op) {
+                return false;
             }
+            let current = grid.operator_stations_at(op, t);
+            let other_station = current[0].or(current[1]).expect("load == 1 implies one slot is filled");
+            if other_station == station_idx {
+                // Already on this station — adding the same station is a no-op.
+                return false;
+            }
+            let pair = if other_station < station_idx {
+                [other_station, station_idx]
+            } else {
+                [station_idx, other_station]
+            };
+            operator_groups[op].iter().any(|g| g.station_pair == pair)
+        })
+        .collect();
+    pair_candidates.sort_by(|&a, &b| is_pref(b).cmp(&is_pref(a)));
+
+    for op in pair_candidates {
+        if result.len() >= max_operators as usize {
+            break;
+        }
+        result.push(op);
+    }
+
+    result
+}
+
+/// Compute the productivity contribution of an operator on a station at a tick.
+///
+/// - If the operator is on this station alone (load == 1): productivity equals
+///   the operator's proficiency on this station.
+/// - If the operator is on this station as part of a known pair: productivity
+///   comes from the matching PreparedConcurrentGroup.
+/// - Otherwise (operator not on station, or load doesn't match any group):
+///   returns 0.0.
+pub fn productivity_at_tick(
+    op: usize,
+    station: usize,
+    t: usize,
+    grid: &ScheduleGrid,
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
+    operator_skills: &[Vec<(usize, f64)>],
+) -> f64 {
+    let load = grid.operator_stations_at(op, t);
+    let count = load.iter().filter(|s| s.is_some()).count();
+
+    let on_station = load[0] == Some(station) || load[1] == Some(station);
+    if !on_station {
+        return 0.0;
+    }
+
+    if count == 1 {
+        return operator_skills[op]
+            .iter()
+            .find(|(s, _)| *s == station)
+            .map(|(_, p)| *p)
+            .unwrap_or(0.0);
+    }
+
+    // count == 2 → look up the matching group.
+    let s0 = load[0].unwrap();
+    let s1 = load[1].unwrap();
+    let pair = if s0 < s1 { [s0, s1] } else { [s1, s0] };
+
+    for g in &operator_groups[op] {
+        if g.station_pair == pair {
+            return g.productivity_for(station).unwrap_or(0.0);
         }
     }
 
-    // Sort by: preferred first, then composite score (availability + proficiency)
-    const PROFICIENCY_WEIGHT: f64 = 0.5;
-    let score = |prof: f64, remaining: f64| -> f64 {
-        remaining * (1.0 - PROFICIENCY_WEIGHT) + prof * PROFICIENCY_WEIGHT
-    };
-    candidates.sort_by(|a, b| {
-        b.3.cmp(&a.3)
-            .then(score(b.1, b.2).partial_cmp(&score(a.1, a.2)).unwrap_or(std::cmp::Ordering::Equal))
-    });
-
-    // Greedily pick operators until attention_needed is met
-    let mut result: Vec<(usize, f64)> = Vec::new();
-    let mut attention_remaining = attention_needed;
-
-    for (op_idx, _prof, remaining_attn, _pref) in &candidates {
-        if attention_remaining <= 0.001 { break; }
-        if result.len() >= max_operators as usize { break; }
-        let give = remaining_attn.min(attention_remaining);
-        result.push((*op_idx, give));
-        attention_remaining -= give;
-    }
-
-    // Return what we found — caller decides whether to proceed based on
-    // total attention vs. required threshold.
-    result
+    // Should not happen: a load of 2 stations on an operator that doesn't
+    // have a matching group is an algorithm bug.
+    debug_assert!(
+        false,
+        "operator {op} has stations {pair:?} but no matching group at tick {t}"
+    );
+    0.0
 }
 
 /// Main forward pass: schedule all actions onto the grid.
 /// `station_to_group` maps station_idx → Option<(group_idx, max_concurrent)> for group capacity.
+/// `operator_groups[op_idx]` is the list of concurrent station pairs that
+/// operator can supervise simultaneously (Phase 2b masked time model).
 pub fn run_forward_pass(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
     station_attrs: &[StationAttrs],
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &mut OperatorAvailability,
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
     tick_minutes: u32,
     start_date: NaiveDate,
     station_to_group: &[Option<(usize, u32)>],
@@ -409,36 +568,26 @@ pub fn run_forward_pass(
                 let action_idx = candidate.action_idx;
                 let station_idx = actions[action_idx].station_idx;
 
-                // Determine attention needed
                 let attrs = &station_attrs[station_idx];
-                // If no setup phase, we go straight to run — check run attention
                 let action_setup = actions[action_idx].setup_ticks;
-                let attention_needed = if action_setup > 0 {
-                    attrs.attention_full
-                } else if attrs.masked_time_enabled {
-                    attrs.attention_masked
-                } else {
-                    attrs.attention_run
-                };
+                let is_setup_phase = action_setup > 0;
 
                 // Find operators (no preference for initial assignment)
                 let operators = find_operators_for_station(
                     grid,
                     t,
                     station_idx,
-                    attention_needed,
                     operator_skills,
                     operator_availability,
-                    &[], // no preferred operators for initial pick
+                    operator_groups,
+                    &[],
                     attrs.max_operators,
+                    is_setup_phase,
                 );
 
-                // Don't start if attention is insufficient at this tick
-                if grid.num_operators > 0 {
-                    let total_att: f64 = operators.iter().map(|(_, a)| a).sum();
-                    if total_att < attention_needed - 0.001 {
-                        continue;
-                    }
+                // Don't start if no operator can take this station now.
+                if grid.num_operators > 0 && operators.is_empty() {
+                    continue;
                 }
 
                 // Found operators (or no operators needed) -- schedule to completion
@@ -452,6 +601,7 @@ pub fn run_forward_pass(
                     station_attrs,
                     operator_skills,
                     operator_availability,
+                    operator_groups,
                     tick_minutes,
                     start_date,
                     grow_ticks,
@@ -484,10 +634,11 @@ fn schedule_action_to_completion(
     actions: &mut Vec<Action>,
     action_idx: usize,
     start_t: usize,
-    initial_operators: &[(usize, f64)],
+    initial_operators: &[usize],
     station_attrs: &[StationAttrs],
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &mut OperatorAvailability,
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
     tick_minutes: u32,
     start_date: NaiveDate,
     grow_ticks: usize,
@@ -538,8 +689,10 @@ fn schedule_action_to_completion(
         None
     };
 
-    // Store operator assignments across all ticks
-    let mut tick_operator_log: Vec<(usize, Vec<(usize, f64)>)> = Vec::new();
+    // Store operator assignments across all ticks. Phase 2b: stores op
+    // indices only — attention is derived from operator_stations load
+    // count at report time.
+    let mut tick_operator_log: Vec<(usize, Vec<usize>)> = Vec::new();
 
     let mut current_t = start_t;
     let is_degraded = false; // kept for ComputedAssignment struct compatibility
@@ -548,7 +701,10 @@ fn schedule_action_to_completion(
     let mut idle_ticks: u32 = 0; // SPR: consecutive ticks without operator
 
     actions[action_idx].start_tick = Some(start_t);
-    actions[action_idx].assigned_operators = initial_operators.to_vec();
+    // assigned_operators preserved as (op, attention) for legacy magnetism
+    // logic — attention defaults to 1.0 in the new model.
+    actions[action_idx].assigned_operators =
+        initial_operators.iter().map(|&op| (op, 1.0)).collect();
 
     let mut work_accumulator: f64 = 0.0;
     let mut stall_ticks_total: u32 = 0;
@@ -619,15 +775,6 @@ fn schedule_action_to_completion(
 
         // Find operators for this tick
         let in_setup = actions[action_idx].eat < setup_ticks;
-        let is_masked_run = !in_setup && attrs.masked_time_enabled;
-
-        let attention_needed = if in_setup {
-            attrs.attention_full
-        } else if is_masked_run {
-            attrs.attention_masked
-        } else {
-            attrs.max_run_attention
-        };
 
         loop_iterations += 1;
         if loop_iterations % 1000 == 0 {
@@ -637,86 +784,46 @@ fn schedule_action_to_completion(
                 find_ops_cumulative, grid_ops_cumulative);
         }
 
+        let preferred_op_indices: Vec<usize> = actions[action_idx]
+            .assigned_operators
+            .iter()
+            .map(|(op, _)| *op)
+            .collect();
+
         let find_ops_t0 = std::time::Instant::now();
-        let operators_this_tick = if attention_needed > 0.001 {
-            let mut ops = find_operators_for_station(
-                grid, current_t, station_idx, attention_needed,
-                operator_skills, operator_availability,
-                &actions[action_idx].assigned_operators, attrs.max_operators,
+        // Try preferred operators first (continuity / magnetism), then fall
+        // back to a fresh selection if none of the preferred ones can take
+        // the station this tick (e.g., they became unavailable).
+        let mut operators_this_tick = find_operators_for_station(
+            grid,
+            current_t,
+            station_idx,
+            operator_skills,
+            operator_availability,
+            operator_groups,
+            &preferred_op_indices,
+            attrs.max_operators,
+            in_setup,
+        );
+        if operators_this_tick.is_empty() && !preferred_op_indices.is_empty() {
+            operators_this_tick = find_operators_for_station(
+                grid,
+                current_t,
+                station_idx,
+                operator_skills,
+                operator_availability,
+                operator_groups,
+                &[],
+                attrs.max_operators,
+                in_setup,
             );
-            // Non-masked: if preferred can't provide full attention, try a fresh operator.
-            if !is_masked_run {
-                let min_att = if in_setup { attrs.attention_full } else { attrs.attention_run };
-                let total_att: f64 = ops.iter().map(|(_, a)| a).sum();
-                if total_att < min_att - 0.001 {
-                    let fresh = find_operators_for_station(
-                        grid, current_t, station_idx, attention_needed,
-                        operator_skills, operator_availability,
-                        &[], attrs.max_operators,
-                    );
-                    let fresh_att: f64 = fresh.iter().map(|(_, a)| a).sum();
-                    if fresh_att > total_att + 0.001 {
-                        ops = fresh;
-                    }
-                }
-            }
-            if ops.is_empty() && grid.num_operators > 0 {
-                // No qualified operator at all — handled by the unified
-                // stall block below (total_attention=0 < min_attention).
-                // Fall through; the stall block will reserve station + advance tick.
-            }
-            // Masked-time run: 1 operator monitors, must meet attention_masked threshold
-            if is_masked_run {
-                // Magnetism: if a preferred operator meets the threshold, keep them
-                let preferred = &actions[action_idx].assigned_operators;
-                let preferred_ok = if !preferred.is_empty() {
-                    let pref_idx = preferred[0].0;
-                    ops.iter().find(|(idx, att)| *idx == pref_idx && *att >= attrs.attention_masked - 0.001)
-                        .copied()
-                } else {
-                    None
-                };
-                if let Some(op) = preferred_ok {
-                    vec![op]
-                } else {
-                    // No preferred or preferred can't meet threshold — pick best
-                    let best = ops.iter()
-                        .filter(|(_, att)| *att >= attrs.attention_masked - 0.001)
-                        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-                    if let Some(&op) = best {
-                        vec![op]
-                    } else {
-                    // No single operator meets masked threshold — stall
-                    idle_ticks += 1; stall_ticks_total += 1;
-                    grid.assign_station(station_idx, current_t, action_idx);
-                    if let Some(g) = group_idx { grid.increment_group(g, current_t); }
-                    current_t += 1;
-                    continue;
-                    }
-                }
-            } else {
-                ops
-            }
-        } else {
-            Vec::new()
-        };
+        }
 
         find_ops_cumulative += find_ops_t0.elapsed();
 
-        let total_attention: f64 = operators_this_tick.iter().map(|(_, a)| a).sum();
-
-        // Check if attention is sufficient for the current phase.
-        // If not: stall — reserve the station (no other task can use it) but
-        // do NO work, don't log operators, don't advance work_accumulator.
-        let min_attention = if in_setup {
-            attrs.attention_full
-        } else if is_masked_run {
-            attrs.attention_masked
-        } else {
-            attrs.attention_run
-        };
-
-        if total_attention < min_attention - 0.001 {
+        // No operator → stall.
+        let no_operator = grid.num_operators > 0 && operators_this_tick.is_empty();
+        if no_operator {
             idle_ticks += 1;
             stall_ticks_total += 1;
             grid.assign_station(station_idx, current_t, action_idx);
@@ -735,17 +842,13 @@ fn schedule_action_to_completion(
             }
 
             // Skip ahead: if no qualified operator is even available (schedule-wise)
-            // at this tick, jump to the next tick where enough operators overlap.
-            let qualified_available_count: usize = operator_skills.iter().enumerate()
-                .filter(|(op_idx, skills)| {
-                    skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
-                        && operator_availability.is_available(*op_idx, current_t)
-                })
-                .count();
+            // at this tick, jump to the next tick where any qualified operator is.
+            let any_qualified_available = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
+                skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+                    && operator_availability.is_available(op_idx, current_t)
+            });
 
-            if (qualified_available_count as f64) < min_attention - 0.001 {
-                // Not enough qualified operators even on schedule — skip ahead
-                // to next tick where enough are on schedule (scan up to 7 days)
+            if !any_qualified_available {
                 let max_skip = 7 * 24 * 60 / tick_minutes as usize;
                 let mut skip_to = current_t + 1;
                 while skip_to < current_t + max_skip {
@@ -753,16 +856,13 @@ fn schedule_action_to_completion(
                         grid.grow(grow_ticks);
                         operator_availability.extend(grow_ticks);
                     }
-                    let avail_count: usize = operator_skills.iter().enumerate()
-                        .filter(|(op_idx, skills)| {
-                            skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
-                                && operator_availability.is_available(*op_idx, skip_to)
-                        })
-                        .count();
-                    if avail_count as f64 >= min_attention - 0.001 {
+                    let any_avail = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
+                        skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+                            && operator_availability.is_available(op_idx, skip_to)
+                    });
+                    if any_avail {
                         break;
                     }
-                    // Reserve station for skipped ticks
                     grid.assign_station(station_idx, skip_to, action_idx);
                     if let Some(g) = group_idx {
                         grid.increment_group(g, skip_to);
@@ -776,16 +876,6 @@ fn schedule_action_to_completion(
             continue;
         }
 
-        // Attention is sufficient — compute productivity
-        let productivity = if in_setup {
-            (total_attention / attrs.attention_full.max(0.001)).min(1.0)
-        } else if is_masked_run {
-            attrs.masked_productivity
-        } else {
-            (total_attention / attrs.attention_run.max(0.001))
-                .min(attrs.max_run_attention / attrs.attention_run.max(0.001))
-        };
-
         idle_ticks = 0;
 
         // Assign station tick
@@ -797,10 +887,20 @@ fn schedule_action_to_completion(
             grid.increment_group(g, current_t);
         }
 
-        // Assign operator ticks
-        for &(op_idx, attention) in &operators_this_tick {
-            grid.assign_operator(op_idx, current_t, station_idx, attention);
+        // Assign operator ticks. Attention recorded in the legacy float
+        // bookkeeping is left at 0 in the new model — productivity is
+        // derived from operator load count, not attention sum.
+        for &op_idx in &operators_this_tick {
+            grid.assign_operator(op_idx, current_t, station_idx, 0.0);
         }
+
+        // Compute tick productivity AFTER assignment so the load reflects
+        // this tick's pairing decisions.
+        let productivity: f64 = operators_this_tick
+            .iter()
+            .map(|&op| productivity_at_tick(op, station_idx, current_t, grid, operator_groups, operator_skills))
+            .sum();
+
         grid_ops_cumulative += grid_t0.elapsed();
 
         tick_operator_log.push((current_t, operators_this_tick));
@@ -840,6 +940,7 @@ fn schedule_action_to_completion(
     // Build operator assignments for the result
     let operator_assignments = build_operator_assignments(
         &tick_operator_log,
+        grid,
         tick_minutes,
         start_date,
     );
@@ -866,11 +967,14 @@ fn schedule_action_to_completion(
 }
 
 /// Build consolidated operator assignments from tick-level log.
-/// Detects gaps in operator presence and creates separate assignment segments
-/// for each contiguous range, avoiding false continuous ranges when an operator
-/// is temporarily absent mid-task.
+///
+/// Phase 2b: the log stores op indices only. Attention reported to the
+/// frontend is derived from the grid's operator_load_count: 1.0 when
+/// solo, 0.5 when paired with another station. The average is computed
+/// per contiguous segment.
 fn build_operator_assignments(
-    tick_operator_log: &[(usize, Vec<(usize, f64)>)],
+    tick_operator_log: &[(usize, Vec<usize>)],
+    grid: &ScheduleGrid,
     tick_minutes: u32,
     start_date: NaiveDate,
 ) -> Vec<OperatorAssignment> {
@@ -878,13 +982,25 @@ fn build_operator_assignments(
         return Vec::new();
     }
 
+    let attention_for = |op_idx: usize, t: usize| -> f64 {
+        let load = grid.operator_load_count(op_idx, t);
+        if load == 0 {
+            0.0
+        } else {
+            1.0 / load as f64
+        }
+    };
+
     // Collect per-operator: sorted list of (tick, attention)
     let mut op_ticks: std::collections::HashMap<usize, Vec<(usize, f64)>> =
         std::collections::HashMap::new();
 
     for (tick, operators) in tick_operator_log {
-        for &(op_idx, attention) in operators {
-            op_ticks.entry(op_idx).or_default().push((*tick, attention));
+        for &op_idx in operators {
+            op_ticks
+                .entry(op_idx)
+                .or_default()
+                .push((*tick, attention_for(op_idx, *tick)));
         }
     }
 
@@ -893,7 +1009,6 @@ fn build_operator_assignments(
     for (op_idx, mut ticks) in op_ticks {
         ticks.sort_by_key(|(t, _)| *t);
 
-        // Split into contiguous segments (gap = tick not consecutive)
         let mut seg_start = ticks[0].0;
         let mut seg_end = ticks[0].0;
         let mut seg_attn = ticks[0].1;
@@ -902,12 +1017,10 @@ fn build_operator_assignments(
         for i in 1..ticks.len() {
             let (t, attn) = ticks[i];
             if t == seg_end + 1 {
-                // Contiguous — extend segment
                 seg_end = t;
                 seg_attn += attn;
                 seg_count += 1;
             } else {
-                // Gap detected — emit current segment, start new one
                 let from_minutes = seg_start as u64 * tick_minutes as u64;
                 let to_minutes = (seg_end + 1) as u64 * tick_minutes as u64;
                 let avg_attention = seg_attn / seg_count as f64;
@@ -924,7 +1037,6 @@ fn build_operator_assignments(
             }
         }
 
-        // Emit final segment
         let from_minutes = seg_start as u64 * tick_minutes as u64;
         let to_minutes = (seg_end + 1) as u64 * tick_minutes as u64;
         let avg_attention = seg_attn / seg_count as f64;
@@ -939,14 +1051,20 @@ fn build_operator_assignments(
     result
 }
 
-/// Rollback a partially-scheduled action, clearing station, operator attention, and group counts.
+/// Rollback a partially-scheduled action.
+///
+/// Phase 2b: tick_operator_log stores plain op indices. We unassign each
+/// op from THIS specific station at the logged tick — leaving any other
+/// stations the operator might have been on intact (which is the new
+/// model's invariant: an operator can be on at most 2 stations at a tick,
+/// and rolling back one shouldn't drop the other).
 fn rollback_action_with_operators(
     grid: &mut ScheduleGrid,
     actions: &mut [Action],
     action_idx: usize,
     from_t: usize,
     to_t: usize,
-    tick_operator_log: &[(usize, Vec<(usize, f64)>)],
+    tick_operator_log: &[(usize, Vec<usize>)],
     group_idx: Option<usize>,
 ) {
     let station_idx = actions[action_idx].station_idx;
@@ -956,13 +1074,11 @@ fn rollback_action_with_operators(
             grid.decrement_group(g, t);
         }
     }
-    // Clear operator attention that was assigned during this action
     for (tick, operators) in tick_operator_log {
-        for &(op_idx, _attention) in operators {
-            grid.clear_operator(op_idx, *tick);
+        for &op_idx in operators {
+            grid.unassign_operator_from_station(op_idx, *tick, station_idx);
         }
     }
-    // Reset action state
     let total = actions[action_idx].setup_ticks + actions[action_idx].run_ticks;
     actions[action_idx].art = total;
     actions[action_idx].eat = 0;
@@ -994,4 +1110,197 @@ fn compute_calage_bonus(
         }
     }
     0
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+    use crate::model::operator::OperatingSchedule;
+    use chrono::NaiveDate;
+
+    /// Helper: build an availability where all ops are available at all ticks
+    /// (uses the default schedule fallback path).
+    fn always_available(num_ops: usize, num_ticks: usize) -> OperatorAvailability {
+        // Force all-true by giving each op a schedule with one big slot covering all ticks.
+        let schedules: Vec<Option<OperatingSchedule>> = (0..num_ops).map(|_| None).collect();
+        let mut avail = OperatorAvailability::new(
+            num_ops,
+            num_ticks,
+            15,
+            NaiveDate::from_ymd_opt(2026, 4, 9).unwrap(),
+            schedules,
+        );
+        // Override with all-true (the schedule path may say false outside business hours)
+        for op in 0..num_ops {
+            for t in 0..num_ticks {
+                while avail.data.get(op).map_or(0, |v| v.len()) <= t {
+                    avail.data.get_mut(op).map(|v| v.push(true));
+                }
+                if let Some(v) = avail.data.get_mut(op) {
+                    v[t] = true;
+                }
+            }
+        }
+        avail
+    }
+
+    fn make_grid(num_stations: usize, num_ops: usize, num_ticks: usize) -> ScheduleGrid {
+        ScheduleGrid::new(num_stations, num_ops, num_ticks, 15)
+    }
+
+    #[test]
+    fn idle_solo_priority_a_picks_idle_operator() {
+        let grid = make_grid(2, 2, 10);
+        let avail = always_available(2, 10);
+        // Op 0 has skill on station 0, op 1 on station 1.
+        let skills = vec![vec![(0, 1.0)], vec![(1, 1.0)]];
+        let groups = vec![vec![]; 2];
+
+        let result = find_operators_for_station(
+            &grid, 5, 0, &skills, &avail, &groups, &[], 1, false,
+        );
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn setup_phase_blocks_pairing() {
+        let mut grid = make_grid(2, 1, 10);
+        let avail = always_available(1, 10);
+        // Single op skilled on both stations, with a group {0, 1}.
+        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let groups = vec![vec![PreparedConcurrentGroup {
+            station_pair: [0, 1],
+            productivity: [0.85, 0.9],
+        }]];
+
+        // Op is already on station 0.
+        grid.assign_operator(0, 5, 0, 0.0);
+
+        // Setup phase: even though pairing would be valid, setup forces solo.
+        let result = find_operators_for_station(
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, true,
+        );
+        assert!(result.is_empty(), "setup must not pair, got {result:?}");
+    }
+
+    #[test]
+    fn run_phase_pairs_when_group_matches() {
+        let mut grid = make_grid(2, 1, 10);
+        let avail = always_available(1, 10);
+        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let groups = vec![vec![PreparedConcurrentGroup {
+            station_pair: [0, 1],
+            productivity: [0.85, 0.9],
+        }]];
+
+        grid.assign_operator(0, 5, 0, 0.0);
+
+        let result = find_operators_for_station(
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, false,
+        );
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn run_phase_does_not_pair_when_group_does_not_match() {
+        let mut grid = make_grid(3, 1, 10);
+        let avail = always_available(1, 10);
+        let skills = vec![vec![(0, 1.0), (1, 1.0), (2, 1.0)]];
+        // Operator can pair {0, 1} but NOT {0, 2}.
+        let groups = vec![vec![PreparedConcurrentGroup {
+            station_pair: [0, 1],
+            productivity: [0.85, 0.9],
+        }]];
+
+        grid.assign_operator(0, 5, 0, 0.0);
+
+        let result = find_operators_for_station(
+            &grid, 5, 2, &skills, &avail, &groups, &[], 1, false,
+        );
+        assert!(result.is_empty(), "no group {{0,2}} → must reject pairing");
+    }
+
+    #[test]
+    fn operator_without_groups_never_pairs() {
+        let mut grid = make_grid(2, 1, 10);
+        let avail = always_available(1, 10);
+        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![]]; // Frédéric: no groups
+
+        grid.assign_operator(0, 5, 0, 0.0);
+
+        let result = find_operators_for_station(
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, false,
+        );
+        assert!(result.is_empty(), "Frédéric never pairs");
+    }
+
+    #[test]
+    fn idle_priority_beats_pair_priority() {
+        let mut grid = make_grid(2, 2, 10);
+        let avail = always_available(2, 10);
+        // Both ops can do both stations; op 0 has the group, op 1 is idle.
+        let skills = vec![vec![(0, 1.0), (1, 1.0)], vec![(0, 1.0), (1, 1.0)]];
+        let groups = vec![
+            vec![PreparedConcurrentGroup {
+                station_pair: [0, 1],
+                productivity: [0.85, 0.9],
+            }],
+            vec![],
+        ];
+
+        // Op 0 is on station 0 (could pair with station 1).
+        grid.assign_operator(0, 5, 0, 0.0);
+
+        // Asking for an op for station 1: idle op 1 should be preferred over
+        // pairing op 0.
+        let result = find_operators_for_station(
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, false,
+        );
+        assert_eq!(result, vec![1]);
+    }
+
+    #[test]
+    fn productivity_solo_uses_proficiency() {
+        let mut grid = make_grid(2, 1, 10);
+        let skills = vec![vec![(0, 0.95)]];
+        let groups = vec![vec![]];
+
+        grid.assign_operator(0, 5, 0, 0.0);
+
+        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        assert_eq!(p, 0.95);
+    }
+
+    #[test]
+    fn productivity_paired_uses_group_value() {
+        let mut grid = make_grid(2, 1, 10);
+        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let groups = vec![vec![PreparedConcurrentGroup {
+            station_pair: [0, 1],
+            productivity: [0.85, 0.92],
+        }]];
+
+        grid.assign_operator(0, 5, 0, 0.0);
+        grid.assign_operator(0, 5, 1, 0.0);
+
+        // On station 0 in this pairing → 0.85
+        let p0 = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        assert_eq!(p0, 0.85);
+
+        // On station 1 in this pairing → 0.92
+        let p1 = productivity_at_tick(0, 1, 5, &grid, &groups, &skills);
+        assert_eq!(p1, 0.92);
+    }
+
+    #[test]
+    fn productivity_for_station_not_assigned_is_zero() {
+        let grid = make_grid(2, 1, 10);
+        let skills = vec![vec![(0, 1.0)]];
+        let groups = vec![vec![]];
+
+        // Op is idle, not on station 0.
+        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        assert_eq!(p, 0.0);
+    }
 }

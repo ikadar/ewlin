@@ -6,7 +6,7 @@ use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
 use crate::model::station::StationInput;
 
-use super::forward_pass::{OperatorAvailability, StationAttrs};
+use super::forward_pass::{OperatorAvailability, PreparedConcurrentGroup, StationAttrs};
 use super::grid::ScheduleGrid;
 
 /// Ordering strategy for the backward pass.
@@ -33,6 +33,7 @@ pub fn compute_last_values(
     operators: &[OperatorInput],
     station_attrs: &[StationAttrs],
     operator_skills: &[Vec<(usize, f64)>],
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
     tick_minutes: u32,
     start_date: NaiveDate,
     horizon_ticks: usize,
@@ -132,6 +133,7 @@ pub fn compute_last_values(
             &mut grid,
             station_attrs,
             operator_skills,
+            operator_groups,
             &operator_availability,
             horizon_ticks,
         );
@@ -199,6 +201,7 @@ fn run_backward_tier(
     grid: &mut ScheduleGrid,
     station_attrs: &[StationAttrs],
     operator_skills: &[Vec<(usize, f64)>],
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
 ) {
@@ -253,6 +256,7 @@ fn run_backward_tier(
                 grid,
                 station_attrs,
                 operator_skills,
+                operator_groups,
                 operator_availability,
                 horizon_ticks,
             );
@@ -271,6 +275,7 @@ fn place_backward(
     grid: &mut ScheduleGrid,
     station_attrs: &[StationAttrs],
     operator_skills: &[Vec<(usize, f64)>],
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
 ) -> u64 {
@@ -301,18 +306,19 @@ fn place_backward(
             continue;
         }
 
-        // Find operators
-        let attention_needed = attrs.attention_full; // conservative: use setup attention
+        // Find operators (backward pass uses setup-mode logic: always solo).
         let operators = super::forward_pass::find_operators_for_station(
             grid,
             t,
             station_idx,
-            attention_needed,
             operator_skills,
             operator_availability,
+            operator_groups,
             &[], // no preferred operators in backward pass
             attrs.max_operators,
+            true, // is_setup_phase: backward pass is conservative and only places solo
         );
+        let _ = attrs; // attrs still used elsewhere; silence warn if unused here
 
         if operators.is_empty() && grid.num_operators > 0 {
             continue; // no qualified operator available at this tick
@@ -320,8 +326,8 @@ fn place_backward(
 
         // This tick is usable — reserve it
         grid.assign_station(station_idx, t, action_idx);
-        for &(op_idx, attention) in &operators {
-            grid.assign_operator(op_idx, t, station_idx, attention);
+        for &op_idx in &operators {
+            grid.assign_operator(op_idx, t, station_idx, 0.0);
         }
 
         occupied_ticks.push(t);
