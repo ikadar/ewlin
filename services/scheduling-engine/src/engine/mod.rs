@@ -462,6 +462,11 @@ pub fn build_actions(
                     job_deadline_tick,
                     earliest_retry_tick: None,
                     additional_predecessors: Vec::new(),
+                    work_accumulator: 0.0,
+                    idle_ticks: 0,
+                    tick_operator_log: Vec::new(),
+                    total_productivity: 0.0,
+                    ticks_counted: 0,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);

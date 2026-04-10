@@ -108,6 +108,28 @@ pub struct Action {
     /// Additional predecessor action indices for cross-element / cross-job dependencies.
     /// Each entry is (action_idx, gap_ticks). All must have end_tick + gap <= current tick.
     pub additional_predecessors: Vec<(usize, u32)>,
+    // ============================================================
+    // Persistent per-action state for the tick-major forward pass.
+    // These were previously local variables in schedule_action_to_completion;
+    // moving them to the struct lets the main loop run actions in lockstep
+    // tick-by-tick, which is required to compute productivity correctly
+    // when two actions are paired on the same operator at the same tick.
+    // ============================================================
+    /// Fractional work accumulated within the current "almost-done" tick.
+    /// Each tick adds productivity; when the accumulator reaches >= 1, art
+    /// is decremented by floor(accumulator).
+    pub work_accumulator: f64,
+    /// Consecutive idle ticks (used by the setup peremption rule).
+    pub idle_ticks: u32,
+    /// Per-tick log of operators assigned to this action's station.
+    /// Drives build_operator_assignments and rollback.
+    pub tick_operator_log: Vec<(usize, Vec<usize>)>,
+    /// Sum of per-tick productivity contributions, used for the
+    /// effective_productivity field reported in ComputedAssignment.
+    pub total_productivity: f64,
+    /// Number of ticks where this action accumulated work (denominator
+    /// for the average productivity reported in ComputedAssignment).
+    pub ticks_counted: u32,
 }
 
 /// Manages operator availability with dynamic extension
@@ -409,10 +431,46 @@ pub fn productivity_at_tick(
     0.0
 }
 
+/// Outcome of a per-tick assignment attempt for a single action.
+enum AssignOutcome {
+    /// Operators were assigned on the grid for this action at this tick.
+    Assigned(Vec<usize>),
+    /// No operators available — the action stalls (station reserved but no work).
+    Stalled,
+    /// No qualified operator on schedule for the foreseeable future — caller
+    /// should advance current_t. The included tick is the new earliest tick
+    /// to retry.
+    SkipTo(usize),
+    /// Another action occupies this station at this tick — the calling
+    /// action should not advance work but should re-try at next tick.
+    StationOccupied,
+}
+
 /// Main forward pass: schedule all actions onto the grid.
 /// `station_to_group` maps station_idx → Option<(group_idx, max_concurrent)> for group capacity.
 /// `operator_groups[op_idx]` is the list of concurrent station pairs that
 /// operator can supervise simultaneously (Phase 2b masked time model).
+///
+/// **Tick-major scheduling (CRITICAL refactor)**: the loop iterates over
+/// ticks, and for each tick processes all active actions in two phases:
+///
+/// 1. **Phase 1 — assignment**: for every active action, compute which
+///    operators can take the station this tick and write the assignment
+///    to the grid. This happens for ALL actions before any productivity
+///    is computed. As a result, when two actions form a pair on the same
+///    operator, both stations end up on the operator's slots BEFORE
+///    `productivity_at_tick` is called for either.
+///
+/// 2. **Phase 2 — productivity & advance**: for every action assigned in
+///    Phase 1, read productivity from the now-final grid state for tick
+///    t and advance the action's `work_accumulator`. Mark done if the
+///    accumulated work covers the action's `art`.
+///
+/// The previous monolithic `schedule_action_to_completion` ran one action
+/// from start to finish before processing the next, which caused a
+/// productivity bug: the first paired action saw the operator as solo
+/// because the second hadn't been assigned yet. The tick-major split fixes
+/// that.
 pub fn run_forward_pass(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
@@ -428,7 +486,6 @@ pub fn run_forward_pass(
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
 
     let mut t: usize = 0;
-    let horizon_ticks = grid.num_ticks as i64;
 
     // Pre-build station-to-pending-actions index for LAST safety check
     let mut station_to_actions: Vec<Vec<usize>> = vec![Vec::new(); station_attrs.len()];
@@ -437,9 +494,16 @@ pub fn run_forward_pass(
             station_to_actions[action.station_idx].push(i);
         }
     }
+    // station_to_actions silences unused-warning if LAST safety check stays disabled
+    let _ = &station_to_actions;
 
-    let mut main_loop_idle: usize = 0;
+    // Per-action minimum-retry tick (used when an action stalls due to no
+    // qualified operator at all — jump ahead instead of polling each tick).
+    let mut earliest_retry: Vec<usize> = vec![0; actions.len()];
+
     let forward_pass_deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+
+    let horizon_ticks = grid.num_ticks as i64;
 
     loop {
         // Check if all actions are done
@@ -459,14 +523,6 @@ pub fn run_forward_pass(
             operator_availability.extend(grow_ticks);
         }
 
-        // Quick check: skip scoring entirely if no station has capacity at this tick
-        let any_station_free = (0..station_attrs.len()).any(|s| grid.is_station_free(s, t));
-        if !any_station_free {
-            main_loop_idle += 1;
-            t += 1;
-            continue;
-        }
-
         // Pre-compute per-job remaining ART for job_boost scoring
         let mut job_remaining_art: std::collections::HashMap<String, i64> =
             std::collections::HashMap::new();
@@ -476,198 +532,213 @@ pub fn run_forward_pass(
             }
         }
 
-        let mut assigned_something = true;
-        while assigned_something {
-            assigned_something = false;
+        // ============================================================
+        // Score actions eligible TO START at this tick (predecessors
+        // satisfied, station free, group not full, retry cooldown OK).
+        // ============================================================
+        let mut scored: Vec<ScoredAction> = Vec::new();
+        for i in 0..actions.len() {
+            let action = &actions[i];
 
-            // Find eligible actions at tick t
-            let mut scored: Vec<ScoredAction> = Vec::new();
-
-            for i in 0..actions.len() {
-                let action = &actions[i];
-
-                // Must have remaining work
-                if action.art == 0 {
-                    continue;
+            if action.art == 0 { continue; }
+            if action.start_tick.is_some() { continue; }  // already started
+            if t < earliest_retry[i] { continue; }
+            if let Some(retry_tick) = action.earliest_retry_tick {
+                if t < retry_tick { continue; }
+            }
+            if let Some(pred_idx) = action.predecessor_idx {
+                let gap = actions[i].predecessor_gap_ticks as usize;
+                match actions[pred_idx].end_tick {
+                    Some(pred_end) if pred_end + gap <= t => {}
+                    _ => continue,
                 }
-
-                // Must not already be in progress (start_tick set but end_tick not yet)
-                if action.start_tick.is_some() && action.end_tick.is_none() {
-                    continue;
-                }
-
-                // Respect LAST safety rollback cooldown
-                if let Some(retry_tick) = action.earliest_retry_tick {
-                    if t < retry_tick {
+            }
+            if !action.additional_predecessors.is_empty() {
+                let all_done = action.additional_predecessors.iter().all(|&(pred_idx, gap)| {
+                    match actions[pred_idx].end_tick {
+                        Some(pred_end) => pred_end + gap as usize <= t,
+                        None => false,
+                    }
+                });
+                if !all_done { continue; }
+            }
+            if !grid.is_station_free(action.station_idx, t) { continue; }
+            if action.station_idx < station_to_group.len() {
+                if let Some((group_idx, max_concurrent)) = station_to_group[action.station_idx] {
+                    if grid.group_active_count(group_idx, t) >= max_concurrent {
                         continue;
                     }
                 }
+            }
 
-                // Predecessor must be done (end_tick set) and finished by now
-                if let Some(pred_idx) = action.predecessor_idx {
-                    let gap = actions[i].predecessor_gap_ticks as usize;
-                    match actions[pred_idx].end_tick {
-                        Some(pred_end) if pred_end + gap <= t => {} // OK (including drying time)
-                        _ => continue,                              // Not ready
-                    }
-                }
+            let slack = action.last as i64 - t as i64 - action.art as i64;
+            let raw_urgency: i64 = if slack <= 0 {
+                10000 + (-slack) as i64
+            } else {
+                let ratio = 1.0 - (slack as f64 / horizon_ticks as f64);
+                (ratio * 1000.0) as i64
+            };
+            let tier_w = TIER_WEIGHT[action.deadline_priority.min(3) as usize];
+            let weighted_urgency = (raw_urgency as f64 * tier_w) as i64;
 
-                // Cross-element / cross-job dependencies: all additional predecessors
-                // must be done AND their end_tick + gap must be <= current tick
-                if !action.additional_predecessors.is_empty() {
-                    let all_done = action.additional_predecessors.iter().all(|&(pred_idx, gap)| {
-                        match actions[pred_idx].end_tick {
-                            Some(pred_end) => pred_end + gap as usize <= t,
-                            None => false,
-                        }
-                    });
-                    if !all_done { continue; }
-                }
-
-                // Station must be free at tick t
-                if !grid.is_station_free(action.station_idx, t) {
-                    continue;
-                }
-
-                // Group concurrency: check if station's group allows another active task
-                if action.station_idx < station_to_group.len() {
-                    if let Some((group_idx, max_concurrent)) = station_to_group[action.station_idx] {
-                        if grid.group_active_count(group_idx, t) >= max_concurrent {
-                            continue; // group at capacity
-                        }
-                    }
-                }
-
-                // Compute score using continuous urgency weighted by deadline priority tier
-                let slack = action.last as i64 - t as i64 - action.art as i64;
-                let raw_urgency: i64 = if slack <= 0 {
-                    10000 + (-slack) as i64
-                } else {
-                    let ratio = 1.0 - (slack as f64 / horizon_ticks as f64);
-                    (ratio * 1000.0) as i64
-                };
-
-                // Weight urgency by deadline priority tier:
-                // imperative(×4) > important(×2) > standard(×1) > flexible(×0.5)
-                let tier_w = TIER_WEIGHT[action.deadline_priority.min(3) as usize];
-                let weighted_urgency = (raw_urgency as f64 * tier_w) as i64;
-
-                // Job-level pressure: when the entire job is behind schedule,
-                // boost all its tasks so they get scheduled sooner
-                let job_boost: i64 = if action.job_deadline_tick < u64::MAX {
-                    let job_art = job_remaining_art.get(&action.job_id).copied().unwrap_or(0);
-                    let job_slack = action.job_deadline_tick as i64 - t as i64 - job_art;
-                    if job_slack < 0 {
-                        ((-job_slack) as f64 * 50.0 * tier_w) as i64
-                    } else {
-                        0
-                    }
+            let job_boost: i64 = if action.job_deadline_tick < u64::MAX {
+                let job_art = job_remaining_art.get(&action.job_id).copied().unwrap_or(0);
+                let job_slack = action.job_deadline_tick as i64 - t as i64 - job_art;
+                if job_slack < 0 {
+                    ((-job_slack) as f64 * 50.0 * tier_w) as i64
                 } else {
                     0
-                };
-
-                // Calage bonus: if last action on this station is from same job
-                let calage_bonus = compute_calage_bonus(grid, &actions, i, t);
-
-                let score = weighted_urgency + job_boost + calage_bonus;
-
-                scored.push(ScoredAction {
-                    action_idx: i,
-                    score,
-                });
-            }
-
-            // Sort by score DESC
-            scored.sort_by(|a, b| b.score.cmp(&a.score));
-
-            // Try to assign highest-scoring action
-            for candidate in &scored {
-                let action_idx = candidate.action_idx;
-                let station_idx = actions[action_idx].station_idx;
-
-                let attrs = &station_attrs[station_idx];
-                let action_setup = actions[action_idx].setup_ticks;
-                let is_setup_phase = action_setup > 0;
-
-                // Find operators (no preference for initial assignment)
-                let operators = find_operators_for_station(
-                    grid,
-                    t,
-                    station_idx,
-                    operator_skills,
-                    operator_availability,
-                    operator_groups,
-                    &[],
-                    attrs.max_operators,
-                    is_setup_phase,
-                );
-
-                // Don't start if no operator can take this station now.
-                if grid.num_operators > 0 && operators.is_empty() {
-                    continue;
                 }
+            } else {
+                0
+            };
 
-                // Found operators (or no operators needed) -- schedule to completion
-                eprintln!("[START] t={} task={} station_idx={}", t, &actions[action_idx].task_id[..8], station_idx);
-                let assignment = schedule_action_to_completion(
-                    grid,
-                    actions,
-                    action_idx,
-                    t,
-                    &operators,
-                    station_attrs,
-                    operator_skills,
-                    operator_availability,
-                    operator_groups,
-                    tick_minutes,
-                    start_date,
-                    grow_ticks,
-                    &station_to_actions,
-                    horizon_ticks,
-                    station_to_group,
-                );
+            let calage_bonus = compute_calage_bonus(grid, &actions, i, t);
+            let score = weighted_urgency + job_boost + calage_bonus;
 
-                if let Some(a) = assignment {
-                    assignments.push(a);
-                    assigned_something = true;
-                    main_loop_idle = 0; // A task was placed — reset idle counter
-                    break; // Re-score at same tick
+            scored.push(ScoredAction { action_idx: i, score });
+        }
+        scored.sort_by(|a, b| b.score.cmp(&a.score));
+
+        // ============================================================
+        // Build the candidate list for this tick:
+        //   1) Already-active actions (start_tick set, end_tick not) —
+        //      these are continuing across ticks. They are processed
+        //      first (in start-tick order) so their continuity wins.
+        //   2) Newly-eligible actions in score order — trying to START.
+        //      Their start_tick is set ONLY IF assignment in Phase 1
+        //      succeeds; a stall does not "start" the action.
+        // ============================================================
+        let mut already_active: Vec<usize> = (0..actions.len())
+            .filter(|&i| {
+                let a = &actions[i];
+                a.start_tick.is_some() && a.end_tick.is_none() && a.art > 0
+            })
+            .collect();
+        already_active.sort_by_key(|&i| actions[i].start_tick.unwrap_or(usize::MAX));
+
+        let mut candidates: Vec<usize> = already_active;
+        for c in &scored {
+            candidates.push(c.action_idx);
+        }
+
+        // ============================================================
+        // PHASE 1 — assignment.
+        // ============================================================
+        let mut tick_outcomes: Vec<(usize, AssignOutcome)> = Vec::with_capacity(candidates.len());
+        for action_idx in candidates {
+            let was_new = actions[action_idx].start_tick.is_none();
+            if was_new {
+                // Reset per-action accumulators (chunked / replanned actions
+                // might carry stale values from a previous attempt).
+                actions[action_idx].work_accumulator = 0.0;
+                actions[action_idx].idle_ticks = 0;
+                actions[action_idx].tick_operator_log.clear();
+                actions[action_idx].total_productivity = 0.0;
+                actions[action_idx].ticks_counted = 0;
+                // Apply chunk re-setup BEFORE assignment so setup_ticks
+                // reflects the corrected value during this tick's logic.
+                apply_chunk_re_setup(actions, action_idx, t, grid);
+            }
+            let outcome = assign_action_at_tick(
+                grid,
+                actions,
+                action_idx,
+                t,
+                station_attrs,
+                operator_skills,
+                operator_availability,
+                operator_groups,
+                station_to_group,
+                tick_minutes,
+                grow_ticks,
+            );
+            // Only mark new actions as started when assignment SUCCEEDED.
+            // A stall keeps the action eligible for retry next tick.
+            if was_new {
+                if let AssignOutcome::Assigned(_) = &outcome {
+                    actions[action_idx].start_tick = Some(t);
+                }
+            }
+            tick_outcomes.push((action_idx, outcome));
+        }
+
+        // ============================================================
+        // PHASE 2 — productivity & advance.
+        // For each action that got assigned (Stalled/SkipTo do not advance
+        // work), read productivity from the now-final grid state and
+        // update work_accumulator. Mark done if art reaches 0.
+        // ============================================================
+        let mut newly_done: Vec<usize> = Vec::new();
+        let mut max_skip_t: Option<usize> = None;
+        for (action_idx, outcome) in tick_outcomes.into_iter() {
+            match outcome {
+                AssignOutcome::Assigned(ops) => {
+                    let done = advance_action_at_tick(
+                        actions,
+                        action_idx,
+                        t,
+                        grid,
+                        operator_groups,
+                        operator_skills,
+                        &ops,
+                    );
+                    if done {
+                        newly_done.push(action_idx);
+                    }
+                }
+                AssignOutcome::Stalled => {
+                    // Station was reserved by assign_action_at_tick; nothing
+                    // to do at the productivity layer.
+                }
+                AssignOutcome::SkipTo(new_t) => {
+                    // The action wants to jump ahead — record for outer loop.
+                    if let Some(prev) = max_skip_t {
+                        max_skip_t = Some(prev.max(new_t));
+                    } else {
+                        max_skip_t = Some(new_t);
+                    }
+                    earliest_retry[action_idx] = new_t;
+                }
+                AssignOutcome::StationOccupied => {
+                    // Should not happen for active actions whose station
+                    // they themselves are occupying; defensive only.
                 }
             }
         }
 
-        if !assigned_something {
-            main_loop_idle += 1;
+        // Emit ComputedAssignments for done actions
+        for action_idx in newly_done {
+            let assignment = build_assignment_for(
+                actions,
+                action_idx,
+                grid,
+                tick_minutes,
+                start_date,
+            );
+            assignments.push(assignment);
         }
-        t += 1;
+
+        // Advance time. If NO action made progress this tick AND a
+        // skip-ahead was requested, jump ahead.
+        let any_active_remaining = (0..actions.len()).any(|i| {
+            let a = &actions[i];
+            a.start_tick.is_some() && a.end_tick.is_none() && a.art > 0
+        });
+        if !any_active_remaining && max_skip_t.map_or(false, |st| st > t + 1) {
+            t = max_skip_t.unwrap();
+        } else {
+            t += 1;
+        }
     }
 
     assignments
 }
 
-/// Schedule an action from start_t to completion.
-fn schedule_action_to_completion(
-    grid: &mut ScheduleGrid,
-    actions: &mut Vec<Action>,
-    action_idx: usize,
-    start_t: usize,
-    initial_operators: &[usize],
-    station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
-    operator_availability: &mut OperatorAvailability,
-    operator_groups: &[Vec<PreparedConcurrentGroup>],
-    tick_minutes: u32,
-    start_date: NaiveDate,
-    grow_ticks: usize,
-    station_to_actions: &[Vec<usize>],
-    horizon_ticks: i64,
-    station_to_group: &[Option<(usize, u32)>],
-) -> Option<ComputedAssignment> {
+/// Apply chunk re-setup logic at start: if this is chunk 2+ and a
+/// different job ran on this station before, restore the original setup time.
+fn apply_chunk_re_setup(actions: &mut Vec<Action>, action_idx: usize, start_t: usize, grid: &ScheduleGrid) {
     let station_idx = actions[action_idx].station_idx;
-    let attrs = &station_attrs[station_idx];
-
-    // Chunk re-setup: if this is chunk 2+ and a different job ran on this station,
-    // the calage is broken — restore the original setup time.
     if let Some((chunk_n, _, _)) = &actions[action_idx].chunk_info {
         if *chunk_n > 1 && actions[action_idx].setup_ticks == 0 {
             let job_id = actions[action_idx].job_id.clone();
@@ -696,260 +767,203 @@ fn schedule_action_to_completion(
             }
         }
     }
+}
 
-    let setup_ticks = actions[action_idx].setup_ticks;
+/// Phase 1 of tick-major scheduling: decide which operators take this
+/// action's station at tick t and write the assignment to the grid.
+///
+/// Side effects on the grid: assigns the station to this action, increments
+/// the station-group active count if applicable, and adds the assigned
+/// operators to their operator_stations slots at tick t.
+///
+/// Side effects on Action state: increments idle_ticks on stall, may
+/// reset eat on peremption.
+fn assign_action_at_tick(
+    grid: &mut ScheduleGrid,
+    actions: &mut Vec<Action>,
+    action_idx: usize,
+    t: usize,
+    station_attrs: &[StationAttrs],
+    operator_skills: &[Vec<(usize, f64)>],
+    operator_availability: &mut OperatorAvailability,
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
+    station_to_group: &[Option<(usize, u32)>],
+    tick_minutes: u32,
+    grow_ticks: usize,
+) -> AssignOutcome {
+    let station_idx = actions[action_idx].station_idx;
+    let attrs = &station_attrs[station_idx];
 
-    // Resolve station's group for concurrency tracking
+    // Group concurrency: skip this tick if the station's group is at capacity
     let group_idx = if station_idx < station_to_group.len() {
         station_to_group[station_idx].map(|(g, _)| g)
     } else {
         None
     };
 
-    // Store operator assignments across all ticks. Phase 2b: stores op
-    // indices only — attention is derived from operator_stations load
-    // count at report time.
-    let mut tick_operator_log: Vec<(usize, Vec<usize>)> = Vec::new();
-
-    let mut current_t = start_t;
-    let is_degraded = false; // kept for ComputedAssignment struct compatibility
-    let mut total_productivity = 0.0;
-    let mut ticks_counted = 0u32;
-    let mut idle_ticks: u32 = 0; // SPR: consecutive ticks without operator
-
-    actions[action_idx].start_tick = Some(start_t);
-    actions[action_idx].assigned_operators = initial_operators.to_vec();
-
-    let mut work_accumulator: f64 = 0.0;
-    let mut stall_ticks_total: u32 = 0;
-    let subloop_start = std::time::Instant::now();
-    let mut loop_iterations: u64 = 0;
-    let mut find_ops_cumulative = std::time::Duration::ZERO;
-    let mut grid_ops_cumulative = std::time::Duration::ZERO;
-
-    while actions[action_idx].art > 0 {
-        // Ensure grid is large enough
-        if current_t >= grid.num_ticks {
-            grid.grow(grow_ticks);
-            operator_availability.extend(grow_ticks);
+    // Station occupied by another action? (rare — only if the algorithm
+    // failed to coordinate; we don't reserve here.)
+    if let Some(occupant) = grid.station_action_at(station_idx, t) {
+        if occupant != action_idx {
+            return AssignOutcome::StationOccupied;
         }
+    }
 
-        // Check if another task occupies this station at this tick.
-        // Skip forward — do NOT reserve the station, just advance.
-        if let Some(occupant) = grid.station_action_at(station_idx, current_t) {
-            if occupant != action_idx && current_t != start_t {
-                current_t += 1;
-                continue; // skip tick occupied by another task
-            }
-        }
+    let setup_ticks = actions[action_idx].setup_ticks;
+    let in_setup = actions[action_idx].eat < setup_ticks;
+    let preferred_op_indices: Vec<usize> = actions[action_idx].assigned_operators.clone();
 
-        // LAST safety check: DISABLED for now — O(actions²) per tick causes timeout
-        // on large instances. TODO: re-enable with a cheaper check (e.g., only at start_t).
-        if false && station_idx < station_to_actions.len() {
-            let remaining_art = actions[action_idx].art as usize;
-            let current_tier_w = TIER_WEIGHT[actions[action_idx].deadline_priority.min(3) as usize];
-            let current_slack = actions[action_idx].last as i64 - current_t as i64 - remaining_art as i64;
-            let current_raw_urgency: i64 = if current_slack <= 0 {
-                10000 + (-current_slack)
-            } else {
-                ((1.0 - current_slack as f64 / horizon_ticks as f64) * 1000.0) as i64
-            };
-            let current_weighted = (current_raw_urgency as f64 * current_tier_w) as i64;
-
-            let mut should_yield = false;
-            for &other_idx in &station_to_actions[station_idx] {
-                if other_idx == action_idx { continue; }
-                let other = &actions[other_idx];
-                if other.art == 0 || other.start_tick.is_some() { continue; }
-
-                // Would the other action's LAST be exceeded while we're running?
-                if other.last <= (current_t + remaining_art) as u64 {
-                    let other_tier_w = TIER_WEIGHT[other.deadline_priority.min(3) as usize];
-                    let other_slack = other.last as i64 - current_t as i64 - other.art as i64;
-                    let other_raw_urgency: i64 = if other_slack <= 0 {
-                        10000 + (-other_slack)
-                    } else {
-                        ((1.0 - other_slack as f64 / horizon_ticks as f64) * 1000.0) as i64
-                    };
-                    let other_weighted = (other_raw_urgency as f64 * other_tier_w) as i64;
-
-                    if other_weighted > current_weighted {
-                        should_yield = true;
-                        // Set retry tick to after the other action would finish
-                        actions[action_idx].earliest_retry_tick = Some(current_t + other.art as usize);
-                        break;
-                    }
-                }
-            }
-            if should_yield {
-                rollback_action_with_operators(grid, actions, action_idx, start_t, current_t, &tick_operator_log, group_idx);
-                return None;
-            }
-        }
-
-        // Find operators for this tick
-        let in_setup = actions[action_idx].eat < setup_ticks;
-
-        loop_iterations += 1;
-        if loop_iterations % 1000 == 0 {
-            eprintln!("[TICK-{:>6}] task={} iter={} elapsed={:?} stalls={} find_ops={:?} grid_ops={:?}",
-                current_t, &actions[action_idx].task_id[..8.min(actions[action_idx].task_id.len())],
-                loop_iterations, subloop_start.elapsed(), stall_ticks_total,
-                find_ops_cumulative, grid_ops_cumulative);
-        }
-
-        let preferred_op_indices: Vec<usize> = actions[action_idx].assigned_operators.clone();
-
-        let find_ops_t0 = std::time::Instant::now();
-        // Try preferred operators first (continuity / magnetism), then fall
-        // back to a fresh selection if none of the preferred ones can take
-        // the station this tick (e.g., they became unavailable).
-        let mut operators_this_tick = find_operators_for_station(
+    // Try preferred (magnetism) first, then any fresh selection.
+    let mut operators = find_operators_for_station(
+        grid,
+        t,
+        station_idx,
+        operator_skills,
+        operator_availability,
+        operator_groups,
+        &preferred_op_indices,
+        attrs.max_operators,
+        in_setup,
+    );
+    if operators.is_empty() && !preferred_op_indices.is_empty() {
+        operators = find_operators_for_station(
             grid,
-            current_t,
+            t,
             station_idx,
             operator_skills,
             operator_availability,
             operator_groups,
-            &preferred_op_indices,
+            &[],
             attrs.max_operators,
             in_setup,
         );
-        if operators_this_tick.is_empty() && !preferred_op_indices.is_empty() {
-            operators_this_tick = find_operators_for_station(
-                grid,
-                current_t,
-                station_idx,
-                operator_skills,
-                operator_availability,
-                operator_groups,
-                &[],
-                attrs.max_operators,
-                in_setup,
-            );
-        }
+    }
 
-        find_ops_cumulative += find_ops_t0.elapsed();
-
-        // No operator → stall.
-        let no_operator = grid.num_operators > 0 && operators_this_tick.is_empty();
-        if no_operator {
-            idle_ticks += 1;
-            stall_ticks_total += 1;
-            grid.assign_station(station_idx, current_t, action_idx);
-            if let Some(g) = group_idx {
-                grid.increment_group(g, current_t);
-            }
-            // Peremption: if setup stalls too long, reset setup progress
-            if attrs.peremption_ticks > 0
-                && idle_ticks >= attrs.peremption_ticks
-                && actions[action_idx].eat > 0
-                && actions[action_idx].eat < setup_ticks
-            {
-                actions[action_idx].art += actions[action_idx].eat;
-                actions[action_idx].eat = 0;
-                idle_ticks = 0;
-            }
-
-            // Skip ahead: if no qualified operator is even available (schedule-wise)
-            // at this tick, jump to the next tick where any qualified operator is.
-            let any_qualified_available = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
-                skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
-                    && operator_availability.is_available(op_idx, current_t)
-            });
-
-            if !any_qualified_available {
-                let max_skip = 7 * 24 * 60 / tick_minutes as usize;
-                let mut skip_to = current_t + 1;
-                while skip_to < current_t + max_skip {
-                    if skip_to >= grid.num_ticks {
-                        grid.grow(grow_ticks);
-                        operator_availability.extend(grow_ticks);
-                    }
-                    let any_avail = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
-                        skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
-                            && operator_availability.is_available(op_idx, skip_to)
-                    });
-                    if any_avail {
-                        break;
-                    }
-                    grid.assign_station(station_idx, skip_to, action_idx);
-                    if let Some(g) = group_idx {
-                        grid.increment_group(g, skip_to);
-                    }
-                    skip_to += 1;
-                }
-                current_t = skip_to;
-            } else {
-                current_t += 1;
-            }
-            continue;
-        }
-
-        idle_ticks = 0;
-
-        // Assign station tick
-        let grid_t0 = std::time::Instant::now();
-        grid.assign_station(station_idx, current_t, action_idx);
-
-        // Increment group active count
+    if grid.num_operators > 0 && operators.is_empty() {
+        // Stall path
+        actions[action_idx].idle_ticks += 1;
+        grid.assign_station(station_idx, t, action_idx);
         if let Some(g) = group_idx {
-            grid.increment_group(g, current_t);
+            grid.increment_group(g, t);
+        }
+        // Peremption: if setup stalls too long, reset setup progress
+        if attrs.peremption_ticks > 0
+            && actions[action_idx].idle_ticks >= attrs.peremption_ticks
+            && actions[action_idx].eat > 0
+            && actions[action_idx].eat < setup_ticks
+        {
+            actions[action_idx].art += actions[action_idx].eat;
+            actions[action_idx].eat = 0;
+            actions[action_idx].idle_ticks = 0;
         }
 
-        // Assign operator ticks. Attention recorded in the legacy float
-        // bookkeeping is left at 0 in the new model — productivity is
-        // derived from operator load count, not attention sum.
-        for &op_idx in &operators_this_tick {
-            grid.assign_operator(op_idx, current_t, station_idx, 0.0);
+        // Skip ahead if NO qualified operator is available at all
+        let any_qualified_available = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
+            skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+                && operator_availability.is_available(op_idx, t)
+        });
+        if !any_qualified_available {
+            let max_skip = 7 * 24 * 60 / tick_minutes as usize;
+            let mut skip_to = t + 1;
+            while skip_to < t + max_skip {
+                if skip_to >= grid.num_ticks {
+                    grid.grow(grow_ticks);
+                    operator_availability.extend(grow_ticks);
+                }
+                let any_avail = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
+                    skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+                        && operator_availability.is_available(op_idx, skip_to)
+                });
+                if any_avail { break; }
+                grid.assign_station(station_idx, skip_to, action_idx);
+                if let Some(g) = group_idx { grid.increment_group(g, skip_to); }
+                skip_to += 1;
+            }
+            return AssignOutcome::SkipTo(skip_to);
         }
-
-        // Compute tick productivity AFTER assignment so the load reflects
-        // this tick's pairing decisions.
-        let productivity: f64 = operators_this_tick
-            .iter()
-            .map(|&op| productivity_at_tick(op, station_idx, current_t, grid, operator_groups, operator_skills))
-            .sum();
-
-        grid_ops_cumulative += grid_t0.elapsed();
-
-        tick_operator_log.push((current_t, operators_this_tick));
-
-        // Decrement ART: speed > 1.0 on parallelizable stations (multiple operators)
-        work_accumulator += productivity;
-        let work_done = work_accumulator.floor() as u32;
-        work_accumulator -= work_done as f64;
-        actions[action_idx].art = actions[action_idx].art.saturating_sub(work_done);
-        actions[action_idx].eat += 1; // wall-clock ticks still +1
-        total_productivity += productivity;
-        ticks_counted += 1;
-
-        if actions[action_idx].art == 0 {
-            break; // Completed
-        }
-
-        current_t += 1;
+        return AssignOutcome::Stalled;
     }
 
-    let subloop_elapsed = subloop_start.elapsed();
-    let total_ticks = current_t - start_t;
-    if subloop_elapsed.as_millis() > 50 || stall_ticks_total > 100 {
-        eprintln!("[SUBLOOP] task={} station_idx={} elapsed={:?} total_ticks={} stall_ticks={} start={} end={}",
-            &actions[action_idx].task_id, station_idx, subloop_elapsed, total_ticks, stall_ticks_total, start_t, current_t);
+    // Successful assignment
+    actions[action_idx].idle_ticks = 0;
+    grid.assign_station(station_idx, t, action_idx);
+    if let Some(g) = group_idx {
+        grid.increment_group(g, t);
     }
+    for &op_idx in &operators {
+        grid.assign_operator(op_idx, t, station_idx, 0.0);
+    }
+    // Remember the assigned operators on the action for magnetism on
+    // subsequent ticks.
+    if actions[action_idx].assigned_operators.is_empty() {
+        actions[action_idx].assigned_operators = operators.clone();
+    }
+    AssignOutcome::Assigned(operators)
+}
 
-    let end_t = current_t + 1; // end_tick is exclusive (first free tick after)
-    actions[action_idx].end_tick = Some(end_t);
+/// Phase 2 of tick-major scheduling: read productivity from the (now final)
+/// grid state at tick t and advance the action's `work_accumulator`.
+/// Returns true if the action is now done.
+fn advance_action_at_tick(
+    actions: &mut Vec<Action>,
+    action_idx: usize,
+    t: usize,
+    grid: &ScheduleGrid,
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
+    operator_skills: &[Vec<(usize, f64)>],
+    operators_this_tick: &[usize],
+) -> bool {
+    let station_idx = actions[action_idx].station_idx;
 
-    let avg_productivity = if ticks_counted > 0 {
-        total_productivity / ticks_counted as f64
+    // Productivity is the sum across operators currently on this station.
+    // For solo: each operator contributes their proficiency.
+    // For paired: each operator contributes their group's productivity for
+    // this station.
+    let productivity: f64 = operators_this_tick
+        .iter()
+        .map(|&op| productivity_at_tick(op, station_idx, t, grid, operator_groups, operator_skills))
+        .sum();
+
+    actions[action_idx].tick_operator_log.push((t, operators_this_tick.to_vec()));
+
+    actions[action_idx].work_accumulator += productivity;
+    let work_done = actions[action_idx].work_accumulator.floor() as u32;
+    actions[action_idx].work_accumulator -= work_done as f64;
+    actions[action_idx].art = actions[action_idx].art.saturating_sub(work_done);
+    actions[action_idx].eat += 1;
+    actions[action_idx].total_productivity += productivity;
+    actions[action_idx].ticks_counted += 1;
+
+    if actions[action_idx].art == 0 {
+        actions[action_idx].end_tick = Some(t + 1);
+        true
+    } else {
+        false
+    }
+}
+
+/// Build a ComputedAssignment for an action that has finished.
+fn build_assignment_for(
+    actions: &[Action],
+    action_idx: usize,
+    grid: &ScheduleGrid,
+    tick_minutes: u32,
+    start_date: NaiveDate,
+) -> ComputedAssignment {
+    let action = &actions[action_idx];
+    let station_idx = action.station_idx;
+    let start_t = action.start_tick.unwrap_or(0);
+    let end_t = action.end_tick.unwrap_or(start_t);
+    let setup_ticks = action.setup_ticks;
+
+    let avg_productivity = if action.ticks_counted > 0 {
+        action.total_productivity / action.ticks_counted as f64
     } else {
         1.0
     };
 
-    // Build operator assignments for the result
     let operator_assignments = build_operator_assignments(
-        &tick_operator_log,
+        &action.tick_operator_log,
         grid,
         tick_minutes,
         start_date,
@@ -963,18 +977,19 @@ fn schedule_action_to_completion(
         None
     };
 
-    Some(ComputedAssignment {
-        task_id: actions[action_idx].task_id.clone(),
+    ComputedAssignment {
+        task_id: action.task_id.clone(),
         station_id: format!("station_idx:{}", station_idx),
         scheduled_start: super::format_minutes(start_minutes, start_date),
         scheduled_end: super::format_minutes(end_minutes, start_date),
         operators: operator_assignments,
         setup_end: setup_end_minutes.map(|m| super::format_minutes(m, start_date)),
-        is_degraded,
+        is_degraded: false,
         effective_productivity: (avg_productivity * 100.0).round() / 100.0,
         is_masked_time: false, // Set in post-processing by compute()
-    })
+    }
 }
+
 
 /// Build consolidated operator assignments from tick-level log.
 ///
@@ -1061,41 +1076,6 @@ fn build_operator_assignments(
     result
 }
 
-/// Rollback a partially-scheduled action.
-///
-/// Phase 2b: tick_operator_log stores plain op indices. We unassign each
-/// op from THIS specific station at the logged tick — leaving any other
-/// stations the operator might have been on intact (which is the new
-/// model's invariant: an operator can be on at most 2 stations at a tick,
-/// and rolling back one shouldn't drop the other).
-fn rollback_action_with_operators(
-    grid: &mut ScheduleGrid,
-    actions: &mut [Action],
-    action_idx: usize,
-    from_t: usize,
-    to_t: usize,
-    tick_operator_log: &[(usize, Vec<usize>)],
-    group_idx: Option<usize>,
-) {
-    let station_idx = actions[action_idx].station_idx;
-    for t in from_t..to_t {
-        grid.clear_station(station_idx, t);
-        if let Some(g) = group_idx {
-            grid.decrement_group(g, t);
-        }
-    }
-    for (tick, operators) in tick_operator_log {
-        for &op_idx in operators {
-            grid.unassign_operator_from_station(op_idx, *tick, station_idx);
-        }
-    }
-    let total = actions[action_idx].setup_ticks + actions[action_idx].run_ticks;
-    actions[action_idx].art = total;
-    actions[action_idx].eat = 0;
-    actions[action_idx].start_tick = None;
-    actions[action_idx].end_tick = None;
-    actions[action_idx].assigned_operators.clear();
-}
 
 /// Compute calage bonus: +100 if last action on this station belongs to same job.
 fn compute_calage_bonus(
