@@ -241,6 +241,15 @@ struct ScoredAction {
 /// Setup phase blocks priority B — setup is always solo (no pairing during
 /// setup phase, regardless of operator skill).
 ///
+/// **Magnetism / continuity**: `preferred_operators` is the list of op
+/// indices the caller wants to keep across ticks (typically the action's
+/// `assigned_operators` from the start tick). Within Priority A, preferred
+/// ops sort BEFORE non-preferred ops regardless of proficiency — so a
+/// once-assigned op is preserved across ticks even if a higher-prof idle
+/// op is available. This prevents operator-flipping mid-task. Within
+/// Priority B, the same `is_pref` tiebreak applies. See
+/// `selection_tests::preferred_operator_beats_higher_proficiency_idle_op`.
+///
 /// Returns up to `max_operators` operator indices. The caller is
 /// responsible for actually assigning them via grid.assign_operator.
 pub fn find_operators_for_station(
@@ -1302,5 +1311,48 @@ mod selection_tests {
         // Op is idle, not on station 0.
         let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
         assert_eq!(p, 0.0);
+    }
+
+    /// Magnetism regression test (code review MAJOR #3): a preferred
+    /// operator must be returned even when a different idle operator has
+    /// higher proficiency. The mechanism is the `is_pref` sort key on
+    /// idle_candidates: preferred ops sort before unpreferred ones, then
+    /// proficiency tiebreaks within each group.
+    ///
+    /// Without magnetism, schedule_action_to_completion would re-pick a
+    /// fresh higher-prof operator at every tick, creating instability
+    /// (operators flipping mid-task on the operator Gantt).
+    #[test]
+    fn preferred_operator_beats_higher_proficiency_idle_op() {
+        let grid = make_grid(1, 2, 10);
+        let avail = always_available(2, 10);
+        // Op 0: prof 1.0 on station 0. Op 1: prof 1.5 on station 0
+        // (the "higher proficiency idle op" that would otherwise win).
+        let skills = vec![vec![(0, 1.0)], vec![(0, 1.5)]];
+        let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![], vec![]];
+
+        // Op 0 is preferred (e.g., it was the initial pick at start_t).
+        let result = find_operators_for_station(
+            &grid, 5, 0, &skills, &avail, &groups, &[0], 1, false,
+        );
+        assert_eq!(
+            result,
+            vec![0],
+            "preferred op (0) must beat higher-prof idle op (1) for magnetism"
+        );
+    }
+
+    /// Without a preference hint, the higher-proficiency op wins as before.
+    #[test]
+    fn no_preference_picks_highest_proficiency() {
+        let grid = make_grid(1, 2, 10);
+        let avail = always_available(2, 10);
+        let skills = vec![vec![(0, 1.0)], vec![(0, 1.5)]];
+        let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![], vec![]];
+
+        let result = find_operators_for_station(
+            &grid, 5, 0, &skills, &avail, &groups, &[], 1, false,
+        );
+        assert_eq!(result, vec![1], "no preference → highest prof wins");
     }
 }
