@@ -263,28 +263,27 @@ pub fn find_operators_for_station(
     max_operators: u32,
     is_setup_phase: bool,
 ) -> Vec<usize> {
-    let qualified = |op_idx: usize| -> Option<f64> {
-        operator_skills[op_idx]
-            .iter()
-            .find(|(s, _)| *s == station_idx)
-            .map(|(_, p)| *p)
-            .filter(|p| *p > 0.0)
-    };
+    // Cache (op, proficiency) for all qualified ops once. This function
+    // is called once per tick per in-progress action — caching avoids
+    // re-scanning operator_skills[op] twice (Priority A + Priority B).
+    let qualified_ops: Vec<(usize, f64)> = (0..operator_skills.len())
+        .filter_map(|op| {
+            let prof = operator_skills[op]
+                .iter()
+                .find(|(s, _)| *s == station_idx)
+                .map(|(_, p)| *p)?;
+            if prof > 0.0 { Some((op, prof)) } else { None }
+        })
+        .collect();
 
     let is_pref = |op_idx: usize| preferred_operators.contains(&op_idx);
 
     // Priority A — idle solo. Sort by preferred → proficiency desc.
-    let mut idle_candidates: Vec<(usize, f64)> = (0..operator_skills.len())
-        .filter_map(|op| {
-            qualified(op)?;
-            if !operator_availability.is_available(op, t) {
-                return None;
-            }
-            if !grid.operator_is_idle(op, t) {
-                return None;
-            }
-            Some((op, qualified(op).unwrap_or(0.0)))
-        })
+    let mut idle_candidates: Vec<(usize, f64)> = qualified_ops
+        .iter()
+        .copied()
+        .filter(|(op, _)| operator_availability.is_available(*op, t))
+        .filter(|(op, _)| grid.operator_is_idle(*op, t))
         .collect();
     idle_candidates.sort_by(|a, b| {
         is_pref(b.0)
@@ -311,30 +310,32 @@ pub fn find_operators_for_station(
     }
 
     // Priority B — pairing with an operator already on one station whose
-    // current_station + station_idx forms a declared group.
-    let mut pair_candidates: Vec<usize> = (0..operator_skills.len())
-        .filter(|&op| {
-            qualified(op).is_some()
-                && operator_availability.is_available(op, t)
-                && grid.operator_load_count(op, t) == 1
-        })
-        .filter(|&op| {
-            // Don't double-count an op already in result.
-            if result.contains(&op) {
-                return false;
-            }
+    // current_station + station_idx forms a declared group. We can drop
+    // the `result.contains(&op)` check that was here previously: ops in
+    // `result` were sourced from `idle_candidates` (load == 0), and pair
+    // candidates require load == 1 — the two sets are disjoint.
+    let mut pair_candidates: Vec<usize> = qualified_ops
+        .iter()
+        .copied()
+        .filter(|(op, _)| operator_availability.is_available(*op, t))
+        .filter(|(op, _)| grid.operator_load_count(*op, t) == 1)
+        .filter_map(|(op, _)| {
             let current = grid.operator_stations_at(op, t);
-            let other_station = current[0].or(current[1]).expect("load == 1 implies one slot is filled");
+            let other_station = current[0].or(current[1])?;
             if other_station == station_idx {
                 // Already on this station — adding the same station is a no-op.
-                return false;
+                return None;
             }
             let pair = if other_station < station_idx {
                 [other_station, station_idx]
             } else {
                 [station_idx, other_station]
             };
-            operator_groups[op].iter().any(|g| g.station_pair == pair)
+            if operator_groups[op].iter().any(|g| g.station_pair == pair) {
+                Some(op)
+            } else {
+                None
+            }
         })
         .collect();
     pair_candidates.sort_by(|&a, &b| is_pref(b).cmp(&is_pref(a)));
@@ -393,7 +394,12 @@ pub fn productivity_at_tick(
     }
 
     // Should not happen: a load of 2 stations on an operator that doesn't
-    // have a matching group is an algorithm bug.
+    // have a matching group is an algorithm bug. Panic in debug builds to
+    // catch it during dev/test, log unconditionally in release so production
+    // telemetry surfaces it instead of silently returning 0 productivity.
+    eprintln!(
+        "[ALGO BUG] operator {op} has stations {pair:?} at tick {t} but no matching concurrent group; productivity = 0",
+    );
     debug_assert!(
         false,
         "operator {op} has stations {pair:?} but no matching group at tick {t}"
@@ -1340,6 +1346,26 @@ mod selection_tests {
             vec![0],
             "preferred op (0) must beat higher-prof idle op (1) for magnetism"
         );
+    }
+
+    /// Verifies the productivity_at_tick "solo branch" fires when an op
+    /// is freshly assigned a single station. Locks in the post-assign
+    /// state semantics: after assign_operator, load_count == 1 and the
+    /// branch returns proficiency.
+    #[test]
+    fn productivity_solo_after_fresh_assign_returns_proficiency() {
+        let mut grid = make_grid(2, 1, 10);
+        let skills = vec![vec![(0, 0.95)]];
+        let groups = vec![vec![]];
+
+        // Simulate the algorithm flow: assign_operator then immediately
+        // ask for productivity at the same tick.
+        grid.assign_operator(0, 5, 0, 0.0);
+        let load = grid.operator_load_count(0, 5);
+        assert_eq!(load, 1, "load must be 1 after a single assign");
+
+        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        assert_eq!(p, 0.95, "solo branch must return proficiency");
     }
 
     /// Without a preference hint, the higher-proficiency op wins as before.

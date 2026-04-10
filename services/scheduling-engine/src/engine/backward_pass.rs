@@ -318,7 +318,6 @@ fn place_backward(
             attrs.max_operators,
             true, // is_setup_phase: backward pass is conservative and only places solo
         );
-        let _ = attrs; // attrs still used elsewhere; silence warn if unused here
 
         if operators.is_empty() && grid.num_operators > 0 {
             continue; // no qualified operator available at this tick
