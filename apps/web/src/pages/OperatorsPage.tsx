@@ -412,6 +412,7 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                       <div key={slot} className="contents">
                         <select
                           value={stationId}
+                          aria-label={`Station ${slot + 1} du groupe concurrent ${idx + 1}`}
                           onChange={(e) => {
                             const nextIds = [...group.stationIds] as [string, string];
                             nextIds[slot] = e.target.value;
@@ -437,6 +438,7 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                           max="1.5"
                           value={group.productivity[slot]}
                           disabled={!stationId}
+                          aria-label={`Productivité de la station ${slot + 1} dans le groupe ${idx + 1}`}
                           onChange={(e) => {
                             const v = parseFloat(e.target.value);
                             if (Number.isFinite(v)) {
@@ -455,6 +457,7 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                     type="button"
                     onClick={() => removeGroup(idx)}
                     className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none"
+                    aria-label={`Supprimer le groupe concurrent ${idx + 1}`}
                     title="Supprimer ce groupe"
                   >
                     ×
@@ -632,13 +635,19 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
       }
     });
 
-    const concurrentGroupsPayload: ConcurrentGroupPayload[] = concurrentGroups.map((g) => ({
-      stationIds: [g.stationIds[0], g.stationIds[1]],
-      effectiveProductivity: {
-        [g.stationIds[0]]: g.productivity[0],
-        [g.stationIds[1]]: g.productivity[1],
-      },
-    }));
+    // Defensive cascade: drop any group whose station IDs are no longer
+    // in skilledStations (covers station deletions, not just skill
+    // removals which handleProficiencyCommit already handles).
+    const skilledIds = new Set(skilledStations.map((s) => s.id));
+    const concurrentGroupsPayload: ConcurrentGroupPayload[] = concurrentGroups
+      .filter((g) => skilledIds.has(g.stationIds[0]) && skilledIds.has(g.stationIds[1]))
+      .map((g) => ({
+        stationIds: [g.stationIds[0], g.stationIds[1]],
+        effectiveProductivity: {
+          [g.stationIds[0]]: g.productivity[0],
+          [g.stationIds[1]]: g.productivity[1],
+        },
+      }));
 
     await onSave({
       firstName: firstName.trim(),
