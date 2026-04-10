@@ -327,6 +327,11 @@ interface DraftGroup {
   productivity: [number, number];  // aligned with stationIds
 }
 
+/** Canonical key for a station pair (sorted), used for duplicate detection. */
+function pairKey(a: string, b: string): string {
+  return [a, b].sort().join('|');
+}
+
 interface ConcurrentGroupsSectionProps {
   /** Stations the operator currently has a skill on (groups can only pair these). */
   skilledStations: StationResponse[];
@@ -339,9 +344,6 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
     (id: string) => skilledStations.find((s) => s.id === id)?.name ?? id,
     [skilledStations],
   );
-
-  /** Canonical key for a pair (sorted), used for duplicate detection. */
-  const pairKey = (a: string, b: string) => [a, b].sort().join('|');
 
   const addGroup = () => {
     onChange([

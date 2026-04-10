@@ -93,7 +93,9 @@ pub struct Action {
     pub predecessor_idx: Option<usize>,
     pub predecessor_gap_ticks: u32, // Drying time gap after predecessor (e.g. 4h after printing)
     pub end_tick: Option<usize>,
-    pub assigned_operators: Vec<(usize, f64)>, // [(operator_idx, attention)]
+    /// Operators assigned at start_t. Used by find_operators_for_station
+    /// as the magnetism hint (preferred_operators) on subsequent ticks.
+    pub assigned_operators: Vec<usize>,
     pub start_tick: Option<usize>,
     /// Chunk info: Some((chunk_number, total_chunks, original_task_id)) for pre-split chunks
     pub chunk_info: Option<(u32, u32, String)>,
@@ -716,10 +718,7 @@ fn schedule_action_to_completion(
     let mut idle_ticks: u32 = 0; // SPR: consecutive ticks without operator
 
     actions[action_idx].start_tick = Some(start_t);
-    // assigned_operators preserved as (op, attention) for legacy magnetism
-    // logic — attention defaults to 1.0 in the new model.
-    actions[action_idx].assigned_operators =
-        initial_operators.iter().map(|&op| (op, 1.0)).collect();
+    actions[action_idx].assigned_operators = initial_operators.to_vec();
 
     let mut work_accumulator: f64 = 0.0;
     let mut stall_ticks_total: u32 = 0;
@@ -799,11 +798,7 @@ fn schedule_action_to_completion(
                 find_ops_cumulative, grid_ops_cumulative);
         }
 
-        let preferred_op_indices: Vec<usize> = actions[action_idx]
-            .assigned_operators
-            .iter()
-            .map(|(op, _)| *op)
-            .collect();
+        let preferred_op_indices: Vec<usize> = actions[action_idx].assigned_operators.clone();
 
         let find_ops_t0 = std::time::Instant::now();
         // Try preferred operators first (continuity / magnetism), then fall

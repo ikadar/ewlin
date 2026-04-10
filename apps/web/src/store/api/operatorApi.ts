@@ -18,14 +18,14 @@ export interface OperatorSkillResponse {
 export interface ConcurrentGroupResponse {
   id: string;
   /** Exactly 2 station UUIDs, sorted canonically by the backend. */
-  stationIds: string[];
+  stationIds: readonly [string, string];
   /** Productivity per station within this pair, ∈ [0.0, 1.5]. */
   effectiveProductivity: Record<string, number>;
 }
 
 /** Payload for replacing or creating a group (no id, server assigns it). */
 export interface ConcurrentGroupPayload {
-  stationIds: string[];
+  stationIds: readonly [string, string];
   effectiveProductivity: Record<string, number>;
 }
 
