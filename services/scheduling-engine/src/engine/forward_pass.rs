@@ -501,11 +501,62 @@ pub fn run_forward_pass(
     // qualified operator at all — jump ahead instead of polling each tick).
     let mut earliest_retry: Vec<usize> = vec![0; actions.len()];
 
+    // Pre-compute: which stations have at least ONE operator with a non-zero
+    // skill on them? Actions on stations without any qualified operator can
+    // NEVER be scheduled — mark them impossible immediately so the loop
+    // doesn't waste time on the SkipTo dance forever.
+    let mut station_has_qualified_op: Vec<bool> = vec![false; station_attrs.len()];
+    for skills in operator_skills.iter() {
+        for &(s_idx, prof) in skills.iter() {
+            if prof > 0.0 && s_idx < station_has_qualified_op.len() {
+                station_has_qualified_op[s_idx] = true;
+            }
+        }
+    }
+    // Mark unscheduleable actions: zero out their art so they're filtered
+    // by the main loop's `total_art == 0` and the `art > 0` candidate filter.
+    // Their assignment is omitted; the unplaced-tasks warning at the end
+    // of compute() reports them.
+    if grid.num_operators > 0 {
+        let mut impossible_count = 0;
+        for action in actions.iter_mut() {
+            if action.station_idx < station_has_qualified_op.len()
+                && !station_has_qualified_op[action.station_idx]
+            {
+                action.art = 0;
+                impossible_count += 1;
+            }
+        }
+        if impossible_count > 0 {
+            eprintln!(
+                "[FORWARD-PASS] {} actions are unschedulable (no qualified operator on their station)",
+                impossible_count
+            );
+        }
+    }
+
+    // Cache: last completed action per station, used by compute_calage_bonus
+    // to avoid the previous O(t) backward grid scan. Updated when an action
+    // is emitted as done.
+    let mut last_action_per_station: Vec<Option<usize>> = vec![None; station_attrs.len()];
+
+    // Hard cap on the outer tick to prevent runaway loops. The previous
+    // SkipTo path could push t to absurd values (millions of ticks) when
+    // chasing impossible actions; the impossibility filter above should
+    // catch those, but the cap is a defensive guard.
+    let max_outer_t: usize = 100_000;
+
     let forward_pass_deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
 
     let horizon_ticks = grid.num_ticks as i64;
 
     loop {
+        // Hard cap on outer tick — defensive guard against runaway loops
+        if t >= max_outer_t {
+            eprintln!("[FORWARD-PASS] hit max_outer_t={}, exiting", max_outer_t);
+            break;
+        }
+
         // Check if all actions are done
         let total_art: u64 = actions.iter().map(|a| a.art as u64).sum();
         if total_art == 0 {
@@ -593,7 +644,7 @@ pub fn run_forward_pass(
                 0
             };
 
-            let calage_bonus = compute_calage_bonus(grid, &actions, i, t);
+            let calage_bonus = compute_calage_bonus(&last_action_per_station, &actions, i);
             let score = weighted_urgency + job_boost + calage_bonus;
 
             scored.push(ScoredAction { action_idx: i, score });
@@ -709,6 +760,11 @@ pub fn run_forward_pass(
 
         // Emit ComputedAssignments for done actions
         for action_idx in newly_done {
+            // Update calage cache: this is now the latest action on its station
+            let station_idx = actions[action_idx].station_idx;
+            if station_idx < last_action_per_station.len() {
+                last_action_per_station[station_idx] = Some(action_idx);
+            }
             let assignment = build_assignment_for(
                 actions,
                 action_idx,
@@ -1077,29 +1133,32 @@ fn build_operator_assignments(
 }
 
 
-/// Compute calage bonus: +100 if last action on this station belongs to same job.
+/// Compute calage bonus: +100 if the LAST action that occupied this
+/// station (according to the cache) belongs to the same job as the
+/// candidate. The cache is maintained by run_forward_pass and updated
+/// each time an assignment completes — this brings the cost from O(t)
+/// per call (the previous backward grid scan) down to O(1).
 fn compute_calage_bonus(
-    grid: &ScheduleGrid,
+    last_action_per_station: &[Option<usize>],
     actions: &[Action],
     candidate_idx: usize,
-    t: usize,
 ) -> i64 {
     let station_idx = actions[candidate_idx].station_idx;
-    let job_id = &actions[candidate_idx].job_id;
-
-    // Look backward from t to find the last action on this station
-    if t == 0 {
+    if station_idx >= last_action_per_station.len() {
         return 0;
     }
-    for check_t in (0..t).rev() {
-        if let Some(prev_action_idx) = grid.station_action_at(station_idx, check_t) {
-            if prev_action_idx < actions.len() && actions[prev_action_idx].job_id == *job_id {
-                return 100;
-            }
-            return 0; // Found a different job
-        }
+    let prev_idx = match last_action_per_station[station_idx] {
+        Some(i) => i,
+        None => return 0,
+    };
+    if prev_idx >= actions.len() {
+        return 0;
     }
-    0
+    if actions[prev_idx].job_id == actions[candidate_idx].job_id {
+        100
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
