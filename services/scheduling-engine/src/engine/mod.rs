@@ -778,6 +778,22 @@ mod integration_tests {
         })
     }
 
+    /// Parse a "YYYY-MM-DDTHH:MM:00" timestamp into absolute minutes from
+    /// an arbitrary epoch. Only the differences between values are
+    /// meaningful — used in tests to assert overlap or duration.
+    fn iso_to_minutes(s: &str) -> i64 {
+        let dt = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+            .unwrap_or_else(|e| panic!("invalid ISO datetime {s:?}: {e}"));
+        dt.and_utc().timestamp() / 60
+    }
+
+    fn assignment_minutes(a: &crate::model::schedule::ComputedAssignment) -> (i64, i64) {
+        (
+            iso_to_minutes(&a.scheduled_start),
+            iso_to_minutes(&a.scheduled_end),
+        )
+    }
+
     #[test]
     fn ludovic_pairs_two_stations_in_parallel() {
         let stations = vec![
@@ -812,8 +828,18 @@ mod integration_tests {
 
         let result = compute(&request);
         assert_eq!(result.assignments.len(), 2, "expected 2 assignments");
-        let starts: Vec<&str> = result.assignments.iter().map(|a| a.scheduled_start.as_str()).collect();
-        assert_eq!(starts[0], starts[1], "Ludovic should run both jobs in parallel; got {starts:?}");
+
+        // Both jobs must run in parallel: their time ranges must overlap.
+        // With 0.85/0.90 productivity each job takes 2 ticks to complete
+        // (work accumulator < 1.0 after the first tick), but the two
+        // assignments still overlap because Ludovic is on both stations
+        // simultaneously — that's the pairing being exercised.
+        let (start_a, end_a) = assignment_minutes(&result.assignments[0]);
+        let (start_b, end_b) = assignment_minutes(&result.assignments[1]);
+        assert!(
+            start_a < end_b && start_b < end_a,
+            "Ludovic pairing should overlap the two assignments; got A=[{start_a},{end_a}] B=[{start_b},{end_b}]"
+        );
     }
 
     #[test]
@@ -837,8 +863,100 @@ mod integration_tests {
 
         let result = compute(&request);
         assert_eq!(result.assignments.len(), 2);
-        let starts: Vec<&str> = result.assignments.iter().map(|a| a.scheduled_start.as_str()).collect();
-        assert_ne!(starts[0], starts[1], "Frédéric without groups must serialize, got {starts:?}");
+
+        // Frédéric has no concurrent groups: he can only be on one
+        // station at a time, so the assignments must NOT overlap.
+        let (start_a, end_a) = assignment_minutes(&result.assignments[0]);
+        let (start_b, end_b) = assignment_minutes(&result.assignments[1]);
+        let overlap = start_a < end_b && start_b < end_a;
+        assert!(
+            !overlap,
+            "Frédéric must serialize, but assignments overlap: A=[{start_a},{end_a}] B=[{start_b},{end_b}]"
+        );
+
+        // Total wall-clock should be ~2 job durations (120 min).
+        let makespan = end_a.max(end_b) - start_a.min(start_b);
+        assert!(
+            makespan >= 120,
+            "Frédéric should take ~120 min total (serialized); got makespan={makespan} min"
+        );
+    }
+
+    /// Direct comparison: same input, two different operators (one paired,
+    /// one not). The paired operator's makespan must be strictly shorter.
+    /// This is the strongest possible "pairing actually works" assertion.
+    #[test]
+    fn paired_operator_finishes_strictly_faster_than_unpaired() {
+        let stations = vec![
+            make_station("sbg", "SBG", true),
+            make_station("mbo-xl", "MBO XL", true),
+        ];
+
+        let paired_op = make_operator(
+            "ludovic",
+            "Ludovic",
+            &[("sbg", 1.0), ("mbo-xl", 1.0)],
+            vec![ConcurrentGroupInput {
+                station_ids: vec!["sbg".into(), "mbo-xl".into()],
+                effective_productivity: [
+                    ("sbg".to_string(), 1.0),
+                    ("mbo-xl".to_string(), 1.0),
+                ]
+                .into_iter()
+                .collect(),
+            }],
+        );
+        let unpaired_op = make_operator("fred", "Frederic", &[("sbg", 1.0), ("mbo-xl", 1.0)], vec![]);
+
+        let jobs = vec![
+            make_job("job-a", "sbg", 60),
+            make_job("job-b", "mbo-xl", 60),
+        ];
+
+        let paired_result = compute(&ComputeRequest {
+            stations: stations.clone(),
+            operators: vec![paired_op],
+            jobs: jobs.clone(),
+            options: options(),
+            station_groups: Vec::new(),
+        });
+        let unpaired_result = compute(&ComputeRequest {
+            stations,
+            operators: vec![unpaired_op],
+            jobs,
+            options: options(),
+            station_groups: Vec::new(),
+        });
+
+        let paired_makespan = paired_result
+            .assignments
+            .iter()
+            .map(|a| iso_to_minutes(&a.scheduled_end))
+            .max()
+            .unwrap()
+            - paired_result
+                .assignments
+                .iter()
+                .map(|a| iso_to_minutes(&a.scheduled_start))
+                .min()
+                .unwrap();
+        let unpaired_makespan = unpaired_result
+            .assignments
+            .iter()
+            .map(|a| iso_to_minutes(&a.scheduled_end))
+            .max()
+            .unwrap()
+            - unpaired_result
+                .assignments
+                .iter()
+                .map(|a| iso_to_minutes(&a.scheduled_start))
+                .min()
+                .unwrap();
+
+        assert!(
+            paired_makespan < unpaired_makespan,
+            "paired should finish faster than unpaired; got paired={paired_makespan} unpaired={unpaired_makespan}"
+        );
     }
 
     #[test]
