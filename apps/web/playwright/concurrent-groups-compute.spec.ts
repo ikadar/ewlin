@@ -239,6 +239,68 @@ test.describe('Concurrent groups — algorithmic pairing through Rust engine', (
     expect(summary.makespan).toBeGreaterThanOrEqual(120);
   });
 
+  test('REALISTIC: tick=15min, 60min jobs, paired 0.85/0.90 → faster than unpaired', async () => {
+    // The "tick=60, job=60min" tests above are degenerate: with run_ticks=1
+    // and paired productivity 0.85, ceil(1/0.85)=2 ticks, so the paired
+    // makespan equals the serialized one (120 min both). At a finer
+    // granularity (tick=15min, run_ticks=4), the rounding overhead is
+    // amortized and pairing actually saves wall-clock time.
+    //
+    // Math:
+    //   Solo  : ceil(4/1.0) = 4 ticks = 60 min per job
+    //   Paired: ceil(4/0.85) = 5 ticks = 75 min per job (parallel)
+    //
+    //   Frédéric (serialized) : 60 + 60 = 120 min
+    //   Ludovic (paired)      : max(75, 75) = 75 min
+    //   Speedup               : 120 / 75 = 1.6×
+
+    const finegrainBuild = (operatorName: string, groups: ConcurrentGroupInput[]) => {
+      const req = buildRequest(operatorName, groups);
+      // Override to fine granularity
+      req.options = {
+        horizonDays: 2,
+        tickMinutes: 15,
+        fbiMaxIterations: 1,
+        multiStart: false,
+      };
+      // Stations also need tick=15 for consistency
+      for (const s of req.stations) {
+        (s as { tickMinutes: number }).tickMinutes = 15;
+      }
+      return req;
+    };
+
+    const ludovicReq = finegrainBuild('Ludovic', [
+      {
+        stationIds: [SBG_ID, MBO_ID],
+        effectiveProductivity: {
+          [SBG_ID]: 0.85,
+          [MBO_ID]: 0.9,
+        },
+      },
+    ]);
+    const fredReq = finegrainBuild('Frederic', []);
+
+    const paired = await postCompute(ludovicReq);
+    const serial = await postCompute(fredReq);
+
+    const pairedSummary = summarize('LUDOVIC paired 0.85/0.90 (tick=15)', paired);
+    const serialSummary = summarize('FREDERIC unpaired (tick=15)', serial);
+
+    console.log(`\n=== REALISTIC SCENARIO ===`);
+    console.log(`Paired makespan   : ${pairedSummary.makespan} min`);
+    console.log(`Unpaired makespan : ${serialSummary.makespan} min`);
+    console.log(`Time saved        : ${serialSummary.makespan - pairedSummary.makespan} min`);
+    console.log(`Speedup           : ${(serialSummary.makespan / pairedSummary.makespan).toFixed(2)}×`);
+    console.log(`==========================\n`);
+
+    // Pairing must produce a strictly shorter makespan than serializing.
+    expect(pairedSummary.makespan).toBeLessThan(serialSummary.makespan);
+    // Sanity: the paired makespan should be in the predicted ballpark
+    // (5 ticks * 15 min = 75 min, allow a bit of slack for FBI placement).
+    expect(pairedSummary.makespan).toBeLessThanOrEqual(90);
+  });
+
   test('side-by-side comparison: paired makespan < unpaired makespan', async () => {
     const ludovicReq = buildRequest('Ludovic', [
       {
