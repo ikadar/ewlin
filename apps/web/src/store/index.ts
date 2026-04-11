@@ -26,6 +26,7 @@ import { fluxApi } from './api/fluxApi';
 import { authApi } from './api/authApi';
 import { adminUserApi } from './api/adminUserApi';
 import { adminUserGroupApi } from './api/adminUserGroupApi';
+import { consoleApi } from './api/consoleApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -54,6 +55,7 @@ export const store = configureStore({
     [authApi.reducerPath]: authApi.reducer,
     [adminUserApi.reducerPath]: adminUserApi.reducer,
     [adminUserGroupApi.reducerPath]: adminUserGroupApi.reducer,
+    [consoleApi.reducerPath]: consoleApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -81,7 +83,8 @@ export const store = configureStore({
       .concat(fluxApi.middleware)
       .concat(authApi.middleware)
       .concat(adminUserApi.middleware)
-      .concat(adminUserGroupApi.middleware),
+      .concat(adminUserGroupApi.middleware)
+      .concat(consoleApi.middleware),
   devTools: import.meta.env.DEV,
 });
 
