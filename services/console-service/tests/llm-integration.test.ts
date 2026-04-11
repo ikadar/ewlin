@@ -83,7 +83,7 @@ function makeFakePhp(): PhpClient {
 }
 
 describe.skipIf(!ollamaAvailable)('LLM integration (live Ollama)', () => {
-  it.runIf(true)(
+  it(
     'plans an operator absence from a French prompt',
     async () => {
       const result = await runExecuteLoop({
@@ -92,6 +92,7 @@ describe.skipIf(!ollamaAvailable)('LLM integration (live Ollama)', () => {
         jwt: 'fake-jwt',
         config,
         dryRun: true,
+        php: makeFakePhp(),
       });
 
       expect(result.kind).toBe('plan');
@@ -116,6 +117,7 @@ describe.skipIf(!ollamaAvailable)('LLM integration (live Ollama)', () => {
         jwt: 'fake-jwt',
         config,
         dryRun: true,
+        php: makeFakePhp(),
       });
 
       expect(result.kind).toBe('plan');
@@ -140,18 +142,3 @@ describe('LLM integration (skip notice)', () => {
   });
 });
 
-// Replace the PhpClient inside loop.ts with our fake. The loop builds it
-// internally from `args.jwt`, so we monkey-patch the constructor here.
-// (This is the simplest approach without restructuring the loop.)
-import { PhpClient as RealPhpClient } from '../src/phpClient.js';
-const fake = makeFakePhp();
-// @ts-expect-error — overwrite all methods on the prototype with fakes.
-RealPhpClient.prototype.get = fake.get;
-// @ts-expect-error
-RealPhpClient.prototype.post = fake.post;
-// @ts-expect-error
-RealPhpClient.prototype.put = fake.put;
-// @ts-expect-error
-RealPhpClient.prototype.patch = fake.patch;
-// @ts-expect-error
-RealPhpClient.prototype.delete = fake.delete;

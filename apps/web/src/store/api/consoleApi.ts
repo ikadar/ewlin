@@ -8,7 +8,6 @@
  */
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import type { AuthState } from '../slices/authSlice';
 
 // ----------------------------------------------------------------------------
@@ -27,11 +26,16 @@ export interface ResolvedEntity {
   label: string;
 }
 
+/**
+ * Mirror of services/console-service/src/llm/loop.ts ConversationMessage.
+ * Treated as an opaque payload by the FE — we never read its fields, only
+ * round-trip it to /execute so the LLM keeps prior tool-call context.
+ */
 export interface ConversationMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   toolCallId?: string;
-  name?: string;
+  toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
 }
 
 export type ExecuteResult =
@@ -101,7 +105,7 @@ function getConsoleBaseUrl(): string {
   return url.replace(/\/$/, '');
 }
 
-const rawBaseQuery = fetchBaseQuery({
+const consoleBaseQuery = fetchBaseQuery({
   baseUrl: getConsoleBaseUrl(),
   credentials: 'same-origin',
   prepareHeaders: (headers, { getState }) => {
@@ -114,14 +118,6 @@ const rawBaseQuery = fetchBaseQuery({
     return headers;
   },
 });
-
-const consoleBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
-  args,
-  api,
-  extraOptions,
-) => {
-  return rawBaseQuery(args, api, extraOptions);
-};
 
 // ----------------------------------------------------------------------------
 // API slice

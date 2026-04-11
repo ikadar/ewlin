@@ -28,9 +28,11 @@ export interface ApplyActionResult {
 }
 
 export interface ApplyResult {
-  kind: 'applied' | 'partial' | 'error';
+  /** True iff every action returned ok. The frontend reads this directly. */
+  success: boolean;
   results: ApplyActionResult[];
-  auditId?: string;
+  /** Null if the audit endpoint was unreachable — apply still succeeded. */
+  auditId: string | null;
 }
 
 export interface ApplyPlanArgs {
@@ -84,7 +86,7 @@ export async function applyPlan(args: ApplyPlanArgs): Promise<ApplyResult> {
   }
 
   // Best-effort audit logging — never block the apply on audit failure
-  let auditId: string | undefined;
+  let auditId: string | null = null;
   try {
     const audit = await php.post<{ id: string }>('/api/v1/console/audit', {
       rawPrompt: args.rawPrompt,
@@ -95,15 +97,14 @@ export async function applyPlan(args: ApplyPlanArgs): Promise<ApplyResult> {
     });
     auditId = audit.id;
   } catch (err) {
-    // Audit endpoint might not exist yet (Phase 5 lands later) — don't fail
+    // Don't propagate: a missing audit endpoint must not break apply.
     if (!(err instanceof PhpClientError && err.status === 404)) {
-      // log but don't propagate
       console.warn('audit log failed:', err instanceof Error ? err.message : String(err));
     }
   }
 
   return {
-    kind: allOk ? 'applied' : results.length === args.actions.length ? 'error' : 'partial',
+    success: allOk,
     results,
     auditId,
   };

@@ -72,6 +72,8 @@ export interface RunExecuteLoopArgs {
   jwt: string;
   config: Config;
   dryRun: boolean;
+  /** Override the PhpClient (for tests). Production callers omit this. */
+  php?: PhpClient;
 }
 
 function buildToolCatalog(): OllamaToolDefinition[] {
@@ -150,7 +152,7 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
   const systemPrompt = buildSystemPrompt(todayIso);
   const toolCatalog = buildToolCatalog();
   const ollama = new OllamaClient(args.config.ollamaBaseUrl);
-  const php = new PhpClient(args.config.phpApiUrl, args.jwt);
+  const php = args.php ?? new PhpClient(args.config.phpApiUrl, args.jwt);
   const ctx: ToolContext = { php, dryRun: args.dryRun, todayIso };
 
   // Build the conversation history that we'll keep extending
@@ -198,9 +200,34 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
 
       // Process each tool call. If propose_plan or ask_user is called, the
       // loop ends with the corresponding result.
+      //
+      // Read-only tools (resolve_*) run in parallel within a turn — the LLM
+      // commonly fans out 2-3 resolvers in one shot ("Frédéric absent sur
+      // la MBO XL"), and serializing them adds N×PHP-API latency for no
+      // reason. Mutating tools and terminals stay sequential to keep the
+      // audit trail / propose_plan ordering deterministic.
+      const calls = assistantMessage.tool_calls;
+      const orderedResults: Array<ToolResult | null> = calls.map(() => null);
+      const parallelIdx: number[] = [];
+      const sequentialIdx: number[] = [];
+      for (let i = 0; i < calls.length; i++) {
+        const def = findTool(calls[i]!.function.name);
+        if (def?.readOnly) parallelIdx.push(i);
+        else sequentialIdx.push(i);
+      }
+      await Promise.all(
+        parallelIdx.map(async (i) => {
+          orderedResults[i] = await runToolCall(calls[i]!, ctx);
+        }),
+      );
+      for (const i of sequentialIdx) {
+        orderedResults[i] = await runToolCall(calls[i]!, ctx);
+      }
+
       let terminal: ExecuteResult | null = null;
-      for (const toolCall of assistantMessage.tool_calls) {
-        const result = await runToolCall(toolCall, ctx);
+      for (let i = 0; i < calls.length; i++) {
+        const toolCall = calls[i]!;
+        const result = orderedResults[i]!;
         toolHistory.push({ name: toolCall.function.name, result });
 
         // Append the tool result to the conversation for the next turn
