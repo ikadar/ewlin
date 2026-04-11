@@ -27,15 +27,16 @@ export interface ResolvedEntity {
 }
 
 /**
- * Mirror of services/console-service/src/llm/loop.ts ConversationMessage.
- * Treated as an opaque payload by the FE — we never read its fields, only
- * round-trip it to /execute so the LLM keeps prior tool-call context.
+ * Mirror of services/console-service/src/llm/loop.ts ConversationMessage,
+ * which itself mirrors Anthropic's wire format. The FE never reads
+ * any field of these messages — we just round-trip the array back to
+ * /execute on the next request so the model keeps prior tool-use
+ * context. So the type is intentionally loose: anything the server
+ * sends back, we send back.
  */
 export interface ConversationMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  toolCallId?: string;
-  toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+  role: 'user' | 'assistant';
+  content: unknown;
 }
 
 export type ExecuteResult =
@@ -55,6 +56,7 @@ export type ExecuteResult =
   | {
       kind: 'error';
       error: string;
+      message?: string;
       conversationAfter: ConversationMessage[];
     };
 

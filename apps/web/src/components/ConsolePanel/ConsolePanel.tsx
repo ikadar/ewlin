@@ -115,9 +115,10 @@ export function ConsolePanel({ isOpen, onClose }: ConsolePanelProps) {
         ]);
       } else {
         setPendingPlan(null);
+        const detail = result.message ? `\n${result.message}` : '';
         setMessages((prev) => [
           ...prev,
-          { id: newId(), role: 'assistant', text: `❌ ${result.error}` },
+          { id: newId(), role: 'assistant', text: `❌ ${result.error}${detail}` },
         ]);
       }
     },
@@ -210,32 +211,32 @@ export function ConsolePanel({ isOpen, onClose }: ConsolePanelProps) {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-50 flex flex-col border-t border-border bg-background/95 shadow-2xl backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-50 flex flex-col border-t border-zinc-700 bg-zinc-900/95 text-zinc-100 shadow-2xl backdrop-blur"
       style={{ height: '40vh', minHeight: 320 }}
       role="dialog"
       aria-label="Console en langage naturel"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-2">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+      <div className="flex items-center justify-between border-b border-zinc-700 px-4 py-2">
+        <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
           <span aria-hidden="true">⚡</span>
           <span>Console (ALT+I)</span>
           {executeState.isLoading && (
-            <span className="text-xs text-muted-foreground">…réflexion</span>
+            <span className="text-xs text-zinc-400">…réflexion</span>
           )}
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleResetConversation}
-            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            className="rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
           >
             Nouvelle conversation
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            className="rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
             aria-label="Fermer la console"
           >
             ✕
@@ -246,7 +247,7 @@ export function ConsolePanel({ isOpen, onClose }: ConsolePanelProps) {
       {/* Message stream */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
         {messages.length === 0 && !pendingPlan && (
-          <div className="text-center text-xs text-muted-foreground">
+          <div className="text-center text-xs text-zinc-500">
             Tapez une commande en français. Exemples : « Frédéric absent du 13 au 15 avril »,
             « Décale la deadline du dossier 35202 de 4 jours », « Maintenance MBO XL le 14 avril
             de 10h à 13h ».
@@ -269,7 +270,7 @@ export function ConsolePanel({ isOpen, onClose }: ConsolePanelProps) {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="border-t border-border px-4 py-3">
+      <form onSubmit={handleSubmit} className="border-t border-zinc-700 px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
@@ -279,17 +280,17 @@ export function ConsolePanel({ isOpen, onClose }: ConsolePanelProps) {
             placeholder="Que voulez-vous faire ?"
             rows={2}
             disabled={executeState.isLoading}
-            className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+            className="flex-1 resize-none rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={!input.trim() || executeState.isLoading}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
           >
             {executeState.isLoading ? '…' : 'Envoyer'}
           </button>
         </div>
-        <div className="mt-1 text-[10px] text-muted-foreground">
+        <div className="mt-1 text-[10px] text-zinc-500">
           Entrée pour envoyer • Shift+Entrée pour aller à la ligne • Échap pour fermer
         </div>
       </form>

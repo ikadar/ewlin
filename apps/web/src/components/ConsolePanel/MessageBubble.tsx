@@ -15,7 +15,7 @@ interface MessageBubbleProps {
 export function MessageBubble({ role, text }: MessageBubbleProps) {
   if (role === 'result') {
     return (
-      <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-foreground whitespace-pre-wrap">
+      <div className="rounded-md border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-xs text-zinc-200 whitespace-pre-wrap">
         {text}
       </div>
     );
@@ -27,8 +27,8 @@ export function MessageBubble({ role, text }: MessageBubbleProps) {
       <div
         className={`max-w-[75%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
           isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-foreground'
+            ? 'bg-blue-600 text-white'
+            : 'bg-zinc-800 text-zinc-100'
         }`}
       >
         {text}

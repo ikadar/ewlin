@@ -14,7 +14,6 @@ import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
 import { AutoPlaceModal } from './components/AutoPlaceModal';
-import { ConsolePanel } from './components/ConsolePanel/ConsolePanel';
 import { SmartCompactModal } from './components/SmartCompactModal';
 import { ScheduleEvaluationModal } from './components/ScheduleEvaluationModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
@@ -454,9 +453,6 @@ function AppContent() {
   const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
-
-  // Natural-language console (Alt+I)
-  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
 
   // Sidebar visibility toggle (Alt+B)
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -1289,13 +1285,6 @@ function AppContent() {
       if (isAltLetter(e, 'z') && selectedJobId) {
         e.preventDefault();
         handleClearJobAssignments();
-        return;
-      }
-
-      // Alt+I: open natural-language console
-      if (isAltLetter(e, 'i')) {
-        e.preventDefault();
-        setIsConsoleOpen(prev => !prev);
         return;
       }
 
@@ -2724,12 +2713,6 @@ function AppContent() {
       <ScheduleSaveLoadModal
         isOpen={isSaveLoadOpen}
         onClose={() => setIsSaveLoadOpen(false)}
-      />
-
-      {/* Natural-language console (ALT+I) */}
-      <ConsolePanel
-        isOpen={isConsoleOpen}
-        onClose={() => setIsConsoleOpen(false)}
       />
 
     </>
