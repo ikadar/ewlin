@@ -363,6 +363,15 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
             }
         }
 
+        // Coalesce contiguous same-operator same-attention segments. Without
+        // this step, a 30h task pre-split into 4 chunks emits 4 separate
+        // operator entries even when the same operator stayed put across the
+        // entire chunk boundary, which is misleading in the operator-view
+        // schedule (the human reading the log sees "Halim 05:00-05:15
+        // followed by Halim 05:15-07:15" instead of one clean 05:00-07:15
+        // segment).
+        merged_operators = coalesce_operator_segments(merged_operators);
+
         let avg_productivity = if count > 0 {
             (total_productivity / count as f64 * 100.0).round() / 100.0
         } else {
@@ -382,6 +391,66 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
         });
     }
 
+    // Apply the same coalescing to single-chunk assignments too. They go
+    // through this function via `chunks.len() == 1` short-circuit above
+    // (which doesn't merge), so we post-process them here. The cost is one
+    // pass over the result list — negligible vs the engine itself.
+    for assignment in &mut result {
+        assignment.operators = coalesce_operator_segments(std::mem::take(&mut assignment.operators));
+    }
+
+    result
+}
+
+/// Merge consecutive operator segments belonging to the same operator
+/// when they have the same attention level and are time-contiguous
+/// (the previous segment's `to` equals the next segment's `from`).
+///
+/// Why this exists: each pre-split chunk of a long task carries its own
+/// independent operator log. After `merge_chunk_assignments` flattens the
+/// chunks back into one assignment, the operator entries are concatenated
+/// verbatim. So a single operator who worked the entire task continuously
+/// still ends up with N entries, one per chunk. This pass collapses them
+/// back into the natural per-operator segments a human expects to see.
+///
+/// The merge predicate is conservative: same operatorId AND same attention
+/// AND `prev.to == curr.from` (string equality on the ISO timestamps —
+/// safe because both are produced by the engine's `format_minutes` and so
+/// share the same lexical form).
+fn coalesce_operator_segments(operators: Vec<OperatorAssignment>) -> Vec<OperatorAssignment> {
+    if operators.len() <= 1 {
+        return operators;
+    }
+
+    // Group by operator_id, sort each group by `from`, then walk and merge.
+    let mut by_op: HashMap<String, Vec<OperatorAssignment>> = HashMap::new();
+    for op in operators {
+        by_op.entry(op.operator_id.clone()).or_default().push(op);
+    }
+
+    let mut result: Vec<OperatorAssignment> = Vec::new();
+    for (_op_id, mut entries) in by_op {
+        entries.sort_by(|a, b| a.from.cmp(&b.from));
+
+        let mut current = entries.remove(0);
+        for next in entries {
+            // Same attention (1e-6 epsilon) AND time-contiguous?
+            let same_attention = (current.attention - next.attention).abs() < 1e-6;
+            let contiguous = current.to == next.from;
+            if same_attention && contiguous {
+                // Extend the current segment to swallow the next one.
+                current.to = next.to;
+            } else {
+                result.push(current);
+                current = next;
+            }
+        }
+        result.push(current);
+    }
+
+    // Stable-sort the final result by start time so the operator-view
+    // timeline reads chronologically regardless of HashMap iteration order.
+    result.sort_by(|a, b| a.from.cmp(&b.from));
     result
 }
 
@@ -1142,5 +1211,104 @@ mod integration_tests {
             finish_start,
             print_end
         );
+    }
+
+    #[test]
+    fn coalesce_merges_contiguous_same_attention_segments() {
+        // Two segments back-to-back, same operator, same attention →
+        // should collapse into one continuous segment.
+        let input = vec![
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T05:00:00".into(),
+                to: "2026-04-13T05:15:00".into(),
+                attention: 1.0,
+            },
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T05:15:00".into(),
+                to: "2026-04-13T07:15:00".into(),
+                attention: 1.0,
+            },
+        ];
+        let out = super::coalesce_operator_segments(input);
+        assert_eq!(out.len(), 1, "should collapse to one segment");
+        assert_eq!(out[0].from, "2026-04-13T05:00:00");
+        assert_eq!(out[0].to, "2026-04-13T07:15:00");
+    }
+
+    #[test]
+    fn coalesce_keeps_different_attention_separate() {
+        // Same op, contiguous, but attention changed → must NOT merge.
+        let input = vec![
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T05:00:00".into(),
+                to: "2026-04-13T06:00:00".into(),
+                attention: 0.5,
+            },
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T06:00:00".into(),
+                to: "2026-04-13T07:00:00".into(),
+                attention: 1.0,
+            },
+        ];
+        let out = super::coalesce_operator_segments(input);
+        assert_eq!(out.len(), 2, "different attention must not collapse");
+    }
+
+    #[test]
+    fn coalesce_keeps_gap_separate() {
+        // Same op, same attention, but a real gap between them → must NOT merge.
+        let input = vec![
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T05:00:00".into(),
+                to: "2026-04-13T06:00:00".into(),
+                attention: 1.0,
+            },
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T06:30:00".into(),
+                to: "2026-04-13T07:00:00".into(),
+                attention: 1.0,
+            },
+        ];
+        let out = super::coalesce_operator_segments(input);
+        assert_eq!(out.len(), 2, "30-min gap must not collapse");
+    }
+
+    #[test]
+    fn coalesce_groups_per_operator() {
+        // Two operators interleaved — each is independently coalesced.
+        let input = vec![
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T05:00:00".into(),
+                to: "2026-04-13T05:30:00".into(),
+                attention: 1.0,
+            },
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-b".into(),
+                from: "2026-04-13T05:00:00".into(),
+                to: "2026-04-13T05:30:00".into(),
+                attention: 0.5,
+            },
+            crate::model::schedule::OperatorAssignment {
+                operator_id: "op-a".into(),
+                from: "2026-04-13T05:30:00".into(),
+                to: "2026-04-13T06:00:00".into(),
+                attention: 1.0,
+            },
+        ];
+        let out = super::coalesce_operator_segments(input);
+        // op-a's two pieces should fuse, op-b stays alone.
+        assert_eq!(out.len(), 2);
+        let a = out.iter().find(|o| o.operator_id == "op-a").unwrap();
+        assert_eq!(a.from, "2026-04-13T05:00:00");
+        assert_eq!(a.to, "2026-04-13T06:00:00");
+        let b = out.iter().find(|o| o.operator_id == "op-b").unwrap();
+        assert_eq!(b.to, "2026-04-13T05:30:00");
     }
 }
