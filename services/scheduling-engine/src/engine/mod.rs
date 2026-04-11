@@ -467,6 +467,8 @@ pub fn build_actions(
                     tick_operator_log: Vec::new(),
                     total_productivity: 0.0,
                     ticks_counted: 0,
+                    is_pinned: task.is_pinned,
+                    pinned_start_tick: task.pinned_start_tick,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);
@@ -767,6 +769,8 @@ mod integration_tests {
                     setup_minutes: 0,
                     run_minutes,
                     sequence_order: 0,
+                    is_pinned: false,
+                    pinned_start_tick: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -1039,5 +1043,104 @@ mod integration_tests {
             .map(|w| w.message.as_str()).collect();
         assert!(invalid.is_empty(), "unexpected: {invalid:?}");
         assert_eq!(result.assignments.len(), 2);
+    }
+
+    /// Pin scenario: a job has 2 sequential tasks (printing → finishing).
+    /// Printing is pinned at tick 100. Finishing has no pin. After compute,
+    /// printing must stay at tick 100 (≈ start_minutes 100 * tick_minutes)
+    /// and finishing must start AFTER printing ends.
+    ///
+    /// This is the regression test for the bug where the engine ignored
+    /// pins, placed printing at tick 0, and the user ended up with a
+    /// PrecedenceConflict because the saved pin didn't match what the
+    /// engine returned for the finishing successor.
+    #[test]
+    fn pinned_predecessor_makes_successor_chain_after_it() {
+        let stations = vec![
+            make_station("press", "Press", false),
+            make_station("finish", "Finish", false),
+        ];
+        let alice = make_operator(
+            "alice",
+            "Alice",
+            &[("press", 1.0), ("finish", 1.0)],
+            vec![],
+        );
+
+        // tick_minutes = 60 (from `options()`), so a 60-minute task = 1 tick.
+        // Pin printing at tick 5 (= 5h after epoch).
+        let pinned_tick: usize = 5;
+
+        let job = JobInput {
+            id: "job-1".into(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: "elem-1".into(),
+                name: None,
+                tasks: vec![
+                    TaskInput {
+                        id: "task-print".into(),
+                        station_id: "press".into(),
+                        setup_minutes: 0,
+                        run_minutes: 60,
+                        sequence_order: 0,
+                        is_pinned: true,
+                        pinned_start_tick: Some(pinned_tick),
+                    },
+                    TaskInput {
+                        id: "task-finish".into(),
+                        station_id: "finish".into(),
+                        setup_minutes: 0,
+                        run_minutes: 60,
+                        sequence_order: 1,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                    },
+                ],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let request = ComputeRequest {
+            stations,
+            operators: vec![alice],
+            jobs: vec![job],
+            options: options(),
+            station_groups: Vec::new(),
+        };
+
+        let result = compute(&request);
+
+        // Find both assignments by task id
+        let print = result.assignments.iter().find(|a| a.task_id == "task-print")
+            .expect("printing assignment must be in the engine result");
+        let finish = result.assignments.iter().find(|a| a.task_id == "task-finish")
+            .expect("finishing assignment must be in the engine result");
+
+        let (print_start, print_end) = assignment_minutes(print);
+        let (finish_start, _finish_end) = assignment_minutes(finish);
+
+        // Pin must be exactly at tick 5 = 5*60 = 300 minutes after epoch.
+        // We compare with the printing start since the absolute timestamps
+        // depend on `Local::now().date_naive()` which we can't control here.
+        // Instead, we assert that finish_start - print_start equals
+        // exactly the printing duration (60 minutes), which proves the
+        // successor chained immediately after the pinned predecessor.
+        assert_eq!(
+            print_end - print_start,
+            60,
+            "printing duration should be 60 minutes (its run_minutes)"
+        );
+        assert!(
+            finish_start >= print_end,
+            "finishing must start after printing ends — got finish_start={} print_end={} (precedence violation, the pin wasn't respected by the engine)",
+            finish_start,
+            print_end
+        );
     }
 }

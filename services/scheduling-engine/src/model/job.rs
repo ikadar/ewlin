@@ -47,6 +47,18 @@ pub struct TaskInput {
     pub run_minutes: u32,
     #[serde(default)]
     pub sequence_order: u32,
+    /// True if the user has pinned this task to a specific moment in time.
+    /// The engine MUST place it at exactly `pinned_start_tick` on
+    /// `station_id` and not move it. Successors of a pinned task see its
+    /// fixed end_tick when checking precedence and chain naturally after.
+    #[serde(default)]
+    pub is_pinned: bool,
+    /// Tick at which the task starts (only meaningful if `is_pinned`).
+    /// PHP computes this from the existing assignment's scheduledStart
+    /// using the same epoch (today 00:00 local) and tick_minutes (15) the
+    /// engine uses.
+    #[serde(default)]
+    pub pinned_start_tick: Option<usize>,
 }
 
 impl TaskInput {

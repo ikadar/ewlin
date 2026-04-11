@@ -28,6 +28,18 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             continue;
         }
 
+        // Pinned tasks have a fixed start time set by the user — splitting
+        // them into chunks doesn't make sense. Pass them through unchanged
+        // so the forward-pass pre-placement step handles them as one unit.
+        if action.is_pinned {
+            let mut cloned = clone_action(action);
+            cloned.idx = new_actions.len();
+            cloned.predecessor_idx = remap_predecessor(action.predecessor_idx, &original_to_last_chunk);
+            original_to_last_chunk.insert(action.idx, cloned.idx);
+            new_actions.push(cloned);
+            continue;
+        }
+
         let max_chunk_minutes = stations[station_idx].effective_max_chunk();
         let total_minutes = (action.setup_ticks + action.run_ticks) * tick_minutes;
 
@@ -115,6 +127,11 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 tick_operator_log: Vec::new(),
                 total_productivity: 0.0,
                 ticks_counted: 0,
+                // Pinned tasks are never split into chunks (their start time
+                // is fixed by the user). Pre-split skips them upstream, so
+                // these chunked actions are by definition non-pinned.
+                is_pinned: false,
+                pinned_start_tick: None,
             });
 
             prev_chunk_idx = Some(idx);
@@ -164,5 +181,7 @@ pub fn clone_action(a: &Action) -> Action {
         tick_operator_log: a.tick_operator_log.clone(),
         total_productivity: a.total_productivity,
         ticks_counted: a.ticks_counted,
+        is_pinned: a.is_pinned,
+        pinned_start_tick: a.pinned_start_tick,
     }
 }

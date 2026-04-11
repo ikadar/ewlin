@@ -130,6 +130,14 @@ pub struct Action {
     /// Number of ticks where this action accumulated work (denominator
     /// for the average productivity reported in ComputedAssignment).
     pub ticks_counted: u32,
+    /// True if the user has pinned this task. Pre-placed before the
+    /// tick-major loop with start_tick/end_tick set and art=0, so the
+    /// scoring loop skips it and successors see its fixed end_tick.
+    pub is_pinned: bool,
+    /// The tick at which the pinned action must start (only meaningful
+    /// if `is_pinned`). Used by `pre_place_pinned_actions` to set
+    /// start_tick / end_tick before the main loop runs.
+    pub pinned_start_tick: Option<usize>,
 }
 
 /// Manages operator availability with dynamic extension
@@ -484,6 +492,13 @@ pub fn run_forward_pass(
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
+
+    // Pre-place user-pinned actions before the main scheduling loop. They
+    // become "already done" (art=0, end_tick set) so the scoring loop skips
+    // them and successors see their fixed end_tick when checking precedence.
+    // The grid is marked occupied for the pinned interval so other actions
+    // don't try to use the same station slot.
+    pre_place_pinned_actions(grid, actions, grow_ticks, &mut assignments, tick_minutes, start_date);
 
     let mut t: usize = 0;
 
@@ -995,6 +1010,104 @@ fn advance_action_at_tick(
         true
     } else {
         false
+    }
+}
+
+/// Pre-place user-pinned actions onto the grid BEFORE the tick-major loop
+/// runs. The contract:
+///
+/// - The user said: "this task starts at exactly tick T on this station,
+///   no matter what". The engine's job is to honour that, even if the
+///   timing is awkward (e.g. predecessors might not fit before T).
+/// - We mark the action as already-completed (`art = 0`, `end_tick` set)
+///   so the scoring loop's `art > 0` and `start_tick.is_none()` filters
+///   skip it naturally.
+/// - We mark the station occupied across `[pinned_start_tick, end_tick)`
+///   in the grid so other actions can't claim the same slot.
+/// - We emit a `ComputedAssignment` immediately for each pinned action so
+///   the engine output includes it. The assignment has empty operators —
+///   the PHP persistence layer will skip applying it (it skips pinned
+///   tasks in the unassign loop), so the existing operator assignment is
+///   preserved as-is.
+///
+/// Edge cases handled here:
+/// - `pinned_start_tick == None` while `is_pinned == true` → silently
+///   ignore the pin (treat as non-pinned). This is a config error and
+///   would already be caught by validation upstream.
+/// - The pinned interval extends beyond the current grid → grow the grid.
+/// - The station is already occupied at one of the pinned ticks (e.g. by
+///   a maintenance constraint or another pinned task) → log and overwrite
+///   anyway. The user's pin decision wins; collisions are reported as
+///   warnings post-compute via the conflict validator.
+fn pre_place_pinned_actions(
+    grid: &mut ScheduleGrid,
+    actions: &mut Vec<Action>,
+    grow_ticks: usize,
+    assignments: &mut Vec<ComputedAssignment>,
+    tick_minutes: u32,
+    start_date: NaiveDate,
+) {
+    for i in 0..actions.len() {
+        if !actions[i].is_pinned {
+            continue;
+        }
+        let start_t = match actions[i].pinned_start_tick {
+            Some(t) => t,
+            None => {
+                eprintln!(
+                    "[PRE-PLACE] action {} (task {}) is_pinned but has no pinned_start_tick — ignoring pin",
+                    i, actions[i].task_id
+                );
+                continue;
+            }
+        };
+        let total_ticks = (actions[i].setup_ticks + actions[i].run_ticks) as usize;
+        if total_ticks == 0 {
+            // Zero-duration pinned task — degenerate, skip but emit empty assignment
+            actions[i].start_tick = Some(start_t);
+            actions[i].end_tick = Some(start_t);
+            actions[i].art = 0;
+            actions[i].eat = 0;
+            continue;
+        }
+        let end_t = start_t + total_ticks;
+
+        // Make sure the grid covers the pinned interval. Grow in chunks
+        // until end_t fits, mirroring the dynamic-grow strategy used in
+        // the main loop.
+        while end_t > grid.num_ticks {
+            grid.grow(grow_ticks);
+        }
+
+        // Reserve the station for the whole interval. We overwrite any
+        // existing occupancy on these cells — the user's pin decision
+        // takes precedence over the engine's earlier choices (which
+        // shouldn't have happened anyway since pre-placement runs first).
+        let station_idx = actions[i].station_idx;
+        for t in start_t..end_t {
+            if let Some(prev) = grid.station_action_at(station_idx, t) {
+                if prev != i {
+                    eprintln!(
+                        "[PRE-PLACE] pinned task {} overwrites action {} on station_idx {} at tick {}",
+                        actions[i].task_id, prev, station_idx, t
+                    );
+                }
+            }
+            grid.assign_station(station_idx, t, i);
+        }
+
+        // Mark the action as already-completed for the main loop.
+        actions[i].start_tick = Some(start_t);
+        actions[i].end_tick = Some(end_t);
+        actions[i].art = 0;
+        actions[i].eat = total_ticks as u32;
+
+        // Emit the ComputedAssignment now. Operators are intentionally
+        // empty — the PHP persistence layer keeps the existing pinned
+        // assignment (with its existing operators) instead of applying
+        // this one.
+        let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
+        assignments.push(assignment);
     }
 }
 
