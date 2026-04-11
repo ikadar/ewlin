@@ -66,6 +66,38 @@ services:
       - flux-network
 
   # ===========================================
+  # Console Service (Node + MCP server + LLM driver)
+  # Natural-language ALT+I console + MCP server for external clients
+  # ===========================================
+  console-service:
+    build:
+      context: .
+      dockerfile: services/console-service/Dockerfile
+    container_name: flux-console-service
+    restart: unless-stopped
+    ports:
+      - "${CONSOLE_SERVICE_PORT:-3004}:3004"
+    environment:
+      NODE_ENV: production
+      HTTP_PORT: 3004
+      PHP_API_URL: http://nginx
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      LLM_MODEL: ${LLM_MODEL:-gemma3:12b}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.1}
+      LOG_LEVEL: ${CONSOLE_SERVICE_LOG_LEVEL:-info}
+      TZ: Europe/Paris
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - flux-network
+
+  # ===========================================
   # PHP-FPM (Symfony API)
   # ===========================================
   php:
