@@ -15,6 +15,14 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      '/console': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/mcp': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
       '/.well-known/mercure': {
         target: 'http://localhost:3000',
         changeOrigin: true,

@@ -71,8 +71,8 @@ services:
   # ===========================================
   console-service:
     build:
-      context: .
-      dockerfile: services/console-service/Dockerfile
+      context: ./services/console-service
+      dockerfile: Dockerfile
     container_name: flux-console-service
     restart: unless-stopped
     ports:
