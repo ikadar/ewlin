@@ -81,13 +81,11 @@ services:
       NODE_ENV: production
       HTTP_PORT: 3004
       PHP_API_URL: http://nginx
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      LLM_MODEL: ${LLM_MODEL:-gemma3:12b}
-      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.1}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required for the NL console}
+      LLM_MODEL: ${LLM_MODEL:-claude-haiku-4-5-20251001}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
       LOG_LEVEL: ${CONSOLE_SERVICE_LOG_LEVEL:-info}
       TZ: Europe/Paris
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3004/health"]
       interval: 10s
