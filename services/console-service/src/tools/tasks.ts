@@ -6,7 +6,8 @@
  */
 import { z } from 'zod';
 import type { ToolDefinition } from './types.js';
-import { combineDateAndTime, isIsoDate } from './dates.js';
+import { isIsoDate, toIsoWithLocalOffset } from './dates.js';
+import { uuidField } from './ids.js';
 
 interface OperatorRow {
   id: string;
@@ -23,7 +24,7 @@ export const addOperatorOvertimeTool: ToolDefinition = {
   description:
     "Ajoute une heure supplémentaire (extension d'horaire) pour un opérateur sur une date donnée. Crée ou étend une exception d'horaire 'MODIFIED'. Si l'opérateur a déjà une exception ce jour-là, l'extension fusionne avec.",
   inputSchema: z.object({
-    operatorId: z.string().min(1),
+    operatorId: uuidField('resolve_operator'),
     operatorLabel: z.string().min(1),
     date: z.string().describe("Date YYYY-MM-DD."),
     fromTime: z.string().describe("HH:MM, début de la plage supplémentaire."),
@@ -74,7 +75,7 @@ export const updateTaskDurationTool: ToolDefinition = {
   description:
     "Modifie la durée setup et/ou run d'une tâche. Format usuel : '30+150' = 30 min de setup + 150 min de run. Au moins un des deux champs doit être fourni. La tâche est résolue via resolve_task_in_job.",
   inputSchema: z.object({
-    taskId: z.string().min(1).describe("UUID de la tâche."),
+    taskId: uuidField('resolve_task_in_job').describe("UUID de la tâche."),
     taskLabel: z.string().min(1).describe("Nom lisible (ex 'MBO XL du job 12345')."),
     setupMinutes: z.number().int().nonnegative().optional(),
     runMinutes: z.number().int().nonnegative().optional(),
@@ -105,7 +106,7 @@ export const replaceTaskStationTool: ToolDefinition = {
   description:
     "Remplace la station d'une tâche existante par une autre, optionnellement en changeant aussi sa durée. Exemple : 'remplace la tâche MBO XL du job 1234 par une tâche MBO M de 20+120'. Les stations doivent être résolues via resolve_station, et la tâche via resolve_task_in_job.",
   inputSchema: z.object({
-    taskId: z.string().min(1),
+    taskId: uuidField('resolve_task_in_job'),
     taskLabel: z.string().min(1).describe("Nom lisible avant remplacement."),
     newStationId: z.string().min(1),
     newStationLabel: z.string().min(1),
@@ -143,9 +144,9 @@ export const pinTaskAtTimeTool: ToolDefinition = {
   description:
     "Force une tâche à démarrer à un instant précis sur une station précise. Combine assign + pin : la tâche est replanifiée puis épinglée pour qu'aucune opération automatique ne la déplace. Exemple : 'le job 12345 doit passer à 15h le 15 avril sur la G40'.",
   inputSchema: z.object({
-    taskId: z.string().min(1),
+    taskId: uuidField('resolve_task_in_job'),
     taskLabel: z.string().min(1),
-    stationId: z.string().min(1),
+    stationId: uuidField('resolve_station'),
     stationLabel: z.string().min(1),
     date: z.string().describe("Date YYYY-MM-DD du début."),
     time: z.string().describe("Heure HH:MM du début."),
@@ -153,7 +154,8 @@ export const pinTaskAtTimeTool: ToolDefinition = {
   handler: async (input, ctx) => {
     let scheduledStart: string;
     try {
-      scheduledStart = combineDateAndTime(input.date, input.time);
+      // PHP API requires full ISO 8601 with offset (server is TZ=Europe/Paris).
+      scheduledStart = toIsoWithLocalOffset(input.date, input.time);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -179,7 +181,7 @@ export const unpinTaskTool: ToolDefinition = {
   name: 'unpin_task',
   description: "Retire le pin d'une tâche, la rendant éligible aux opérations automatiques de replanification.",
   inputSchema: z.object({
-    taskId: z.string().min(1),
+    taskId: uuidField('resolve_task_in_job'),
     taskLabel: z.string().min(1),
   }),
   handler: async (input, ctx) => {

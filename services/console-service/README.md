@@ -49,24 +49,23 @@ All config via environment variables. See `src/config.ts` for the full list.
 |---|---|---|
 | `HTTP_PORT` | `3004` | Port for the Fastify HTTP server |
 | `PHP_API_URL` | `http://localhost:8080` | Base URL of the PHP/Symfony API |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Base URL of the Ollama server (use `http://host.docker.internal:11434` from inside Docker on macOS) |
-| `LLM_MODEL` | `gemma3:12b` | The model name as registered in Ollama. Switch to `gemma4:*` once Gemma 4 is available. |
-| `LLM_TEMPERATURE` | `0.1` | Sampling temperature. Low for deterministic plans. |
+| **`ANTHROPIC_API_KEY`** | (required) | Your Anthropic API key — get one at https://console.anthropic.com/settings/keys |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Override the API endpoint (only useful for proxies / self-host) |
+| `LLM_MODEL` | `claude-haiku-4-5-20251001` | Claude model id. Haiku is fast + cheap; switch to `claude-sonnet-4-5` for harder prompts. |
+| `LLM_TEMPERATURE` | `0` | Sampling temperature. Keep at 0 for deterministic plans. |
 | `LLM_MAX_TURNS` | `8` | Max LLM turns per execute call. |
-| `LLM_TOTAL_TIMEOUT_MS` | `30000` | Total wall-clock timeout per execute call. |
+| `LLM_TOTAL_TIMEOUT_MS` | `60000` | Total wall-clock timeout per execute call. |
 | `MCP_JWT` | (none) | For stdio mode: the JWT to forward to the PHP API. |
 | `MCP_JWT_FILE` | (none) | Alternative: path to a file containing the JWT. |
 
 ## Local development
 
-Install Ollama and pull a Gemma model:
+The console-service drives the LLM via the Anthropic Messages API (Claude Haiku 4.5 by default). You only need an API key — no local model download.
+
+Add the key to the repo's root `.env`:
 
 ```bash
-brew install ollama       # or download from https://ollama.com
-ollama serve              # leave running in a separate terminal
-ollama pull gemma3:12b    # ~7 GB download
-# or, when available:
-# ollama pull gemma4:12b
+echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env
 ```
 
 Run the service in watch mode (re-compiles on save):
@@ -86,12 +85,12 @@ curl -s http://localhost:3004/health | jq .
 ## Tests
 
 ```bash
-npm test                  # all tests
-npm test -- tools         # tool unit tests only (no LLM)
-npm test -- llm-integration  # live Ollama integration (auto-skipped if unreachable)
+npm test                                 # all tests
+npm test -- tools                        # tool unit tests only (no LLM)
+ANTHROPIC_API_KEY=sk-ant-... npm test -- llm-integration  # live Anthropic, auto-skipped if no key
 ```
 
-The LLM integration suite is **live** — it pings `OLLAMA_BASE_URL/api/tags`
+The LLM integration suite is **live** — it sends real Messages API calls
 to verify the configured model is pulled, and skips itself if not. This
 matches the project rule "no mocks for live infra." Tool unit tests fake
 the PHP client so they're fast and offline.

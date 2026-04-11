@@ -56,3 +56,35 @@ export function todayIsoUtc(): string {
   const dd = d.getUTCDate().toString().padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
+
+/**
+ * Convert a local-wall-clock date+time into a fully-qualified ISO 8601
+ * datetime with the SERVER's current timezone offset (DST-aware).
+ *
+ * The PHP API rejects naive datetimes ("2025-04-15T11:00") with:
+ *   "Invalid datetime format. Use ISO 8601 (e.g. 2025-01-15T08:00:00Z
+ *    or 2025-01-15T08:00:00+00:00)"
+ * so every datetime we send must include seconds AND a timezone marker.
+ *
+ * The console-service container runs in TZ=Europe/Paris (set in
+ * docker-compose), so `new Date('YYYY-MM-DDTHH:mm:ss')` parses as Paris
+ * local time and getTimezoneOffset() returns the right DST-corrected
+ * offset (-120 in summer, -60 in winter).
+ */
+export function toIsoWithLocalOffset(date: string, time: string): string {
+  if (!ISO_DATE.test(date)) {
+    throw new Error(`Invalid ISO date: ${date}`);
+  }
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(time)) {
+    throw new Error(`Invalid HH:MM time: ${time}`);
+  }
+  const tt = time.length === 5 ? `${time}:00` : time;
+  // Parsing without a Z makes Date interpret the string as local time.
+  const local = new Date(`${date}T${tt}`);
+  const offsetMin = -local.getTimezoneOffset(); // minutes east of UTC
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMin);
+  const oh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const om = String(abs % 60).padStart(2, '0');
+  return `${date}T${tt}${sign}${oh}:${om}`;
+}

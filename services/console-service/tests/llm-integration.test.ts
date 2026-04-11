@@ -1,68 +1,44 @@
 /**
- * Live integration test against Ollama.
+ * Live integration test against the Anthropic Messages API.
  *
- * This test does NOT use mocks for the LLM — that's the whole point. It
- * exercises the full execute loop end-to-end against a real Ollama with
- * the configured Gemma model. The PHP API client is faked because the
- * goal here is to validate the LLM-driven planning, not the database.
- *
- * Skipped automatically when:
- *   - OLLAMA_BASE_URL is unreachable, or
- *   - the configured model isn't pulled.
+ * Skipped automatically when ANTHROPIC_API_KEY is not set.
  *
  * To run:
- *   ollama serve &
- *   ollama pull gemma3:12b
- *   npm test -- llm-integration
+ *   ANTHROPIC_API_KEY=sk-ant-... npm test -- llm-integration
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { runExecuteLoop } from '../src/llm/loop.js';
 import type { PhpClient } from '../src/phpClient.js';
 import { loadConfig } from '../src/config.js';
 
 const config = loadConfig();
-
-let ollamaAvailable = false;
-
-beforeAll(async () => {
-  try {
-    const res = await fetch(`${config.ollamaBaseUrl}/api/tags`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    if (!res.ok) return;
-    const data = (await res.json()) as { models?: Array<{ name?: string }> };
-    const want = config.llmModel.split(':')[0];
-    ollamaAvailable = !!data.models?.some((m) => m.name?.startsWith(want ?? ''));
-  } catch {
-    ollamaAvailable = false;
-  }
-});
+const apiKeyAvailable = config.anthropicApiKey.length > 0;
 
 /**
  * Fake PhpClient that pretends Frédéric and the MBO XL exist. The LLM
  * will call resolve_operator / resolve_station — we return the canonical
- * shapes so it can pick an ID and proceed to propose_plan.
+ * shapes so it can pick a UUID and proceed to propose_plan.
  */
 function makeFakePhp(): PhpClient {
   const fake = {
     async get<T>(path: string): Promise<T> {
       if (path === '/api/v1/operators') {
         return [
-          { id: 'op-fred', firstName: 'Frédéric', lastName: 'Dupont', role: 'Conducteur' },
-          { id: 'op-lud', firstName: 'Ludovic', lastName: 'Martin', role: 'Conducteur' },
+          { id: '11111111-1111-1111-1111-111111111111', firstName: 'Frédéric', lastName: 'Dupont', role: 'Conducteur' },
+          { id: '22222222-2222-2222-2222-222222222222', firstName: 'Ludovic', lastName: 'Martin', role: 'Conducteur' },
         ] as T;
       }
       if (path === '/api/v1/stations') {
         return [
-          { id: 'st-mbo-xl', name: 'MBO XL', abbreviation: 'MBOXL' },
-          { id: 'st-press', name: 'Press', abbreviation: 'P' },
+          { id: '33333333-3333-3333-3333-333333333333', name: 'MBO XL', abbreviation: 'MBOXL' },
+          { id: '44444444-4444-4444-4444-444444444444', name: 'Press', abbreviation: 'P' },
         ] as T;
       }
       if (path === '/api/v1/jobs/search-by-references?refs=35202') {
-        return [{ id: 'job-35202', reference: '35202', batDeadline: '2026-04-15T17:00:00' }] as T;
+        return [{ id: '55555555-5555-5555-5555-555555555555', reference: '35202', batDeadline: '2026-04-15T17:00:00' }] as T;
       }
-      if (path === '/api/v1/jobs/job-35202') {
-        return { id: 'job-35202', reference: '35202', batDeadline: '2026-04-15T17:00:00' } as T;
+      if (path === '/api/v1/jobs/55555555-5555-5555-5555-555555555555') {
+        return { id: '55555555-5555-5555-5555-555555555555', reference: '35202', batDeadline: '2026-04-15T17:00:00' } as T;
       }
       return [] as T;
     },
@@ -82,7 +58,7 @@ function makeFakePhp(): PhpClient {
   return fake as unknown as PhpClient;
 }
 
-describe.skipIf(!ollamaAvailable)('LLM integration (live Ollama)', () => {
+describe.skipIf(!apiKeyAvailable)('LLM integration (live Anthropic Haiku)', () => {
   it(
     'plans an operator absence from a French prompt',
     async () => {
@@ -104,6 +80,11 @@ describe.skipIf(!ollamaAvailable)('LLM integration (live Ollama)', () => {
       const absenceAction = result.actions.find((a) => a.tool === 'add_operator_absence');
       expect(absenceAction?.args.fromDate).toMatch(/^\d{4}-04-13$/);
       expect(absenceAction?.args.toDate).toMatch(/^\d{4}-04-15$/);
+      // The model must have resolved Frédéric to a real UUID, not passed
+      // the prénom directly — that's the whole point of resolve_operator.
+      expect(absenceAction?.args.operatorId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
     },
     60_000,
   );
@@ -125,20 +106,22 @@ describe.skipIf(!ollamaAvailable)('LLM integration (live Ollama)', () => {
 
       const tools = result.actions.map((a) => a.tool);
       expect(tools).toContain('update_job_deadline');
+      const action = result.actions.find((a) => a.tool === 'update_job_deadline');
+      expect(action?.args.shiftDays).toBe(4);
+      expect(action?.args.jobId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
     },
     60_000,
   );
 });
 
 describe('LLM integration (skip notice)', () => {
-  it('reports whether Ollama was reachable', () => {
-    if (!ollamaAvailable) {
+  it('reports whether ANTHROPIC_API_KEY was provided', () => {
+    if (!apiKeyAvailable) {
       // eslint-disable-next-line no-console
-      console.log(
-        `[llm-integration] SKIPPED — no Ollama at ${config.ollamaBaseUrl} or model ${config.llmModel} not pulled`,
-      );
+      console.log('[llm-integration] SKIPPED — ANTHROPIC_API_KEY not set in env');
     }
-    expect(typeof ollamaAvailable).toBe('boolean');
+    expect(typeof apiKeyAvailable).toBe('boolean');
   });
 });
-

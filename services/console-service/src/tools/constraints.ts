@@ -12,7 +12,8 @@
  */
 import { z } from 'zod';
 import type { ToolDefinition } from './types.js';
-import { combineDateAndTime, isIsoDate } from './dates.js';
+import { isIsoDate, toIsoWithLocalOffset } from './dates.js';
+import { uuidField } from './ids.js';
 
 interface CreatedConstraint {
   id: string;
@@ -28,7 +29,7 @@ export const addOperatorAbsenceTool: ToolDefinition = {
   description:
     "Marque un opérateur comme absent sur un intervalle de dates (jours inclus). Utiliser le tool resolve_operator d'abord pour obtenir l'ID. Le résultat sera un objet 'constraint' avec un id qu'on peut passer à cancel_constraint si besoin d'annuler.",
   inputSchema: z.object({
-    operatorId: z.string().min(1).describe("UUID de l'opérateur (résolu via resolve_operator)."),
+    operatorId: uuidField('resolve_operator').describe("UUID de l'opérateur, OBTENU EN APPELANT resolve_operator(name=...) D'ABORD. JAMAIS le prénom donné par l'utilisateur."),
     operatorLabel: z
       .string()
       .min(1)
@@ -49,8 +50,9 @@ export const addOperatorAbsenceTool: ToolDefinition = {
       : `Absence ${input.operatorLabel}`;
     // SchedulingConstraint uses ISO datetime — interpret a date interval as
     // 00:00 of the from-date through 23:59 of the to-date (inclusive).
-    const timeStart = `${input.fromDate}T00:00:00`;
-    const timeEnd = `${input.toDate}T23:59:00`;
+    // Full ISO 8601 with TZ offset is required by the PHP API.
+    const timeStart = toIsoWithLocalOffset(input.fromDate, '00:00');
+    const timeEnd = toIsoWithLocalOffset(input.toDate, '23:59');
     const preview = `${input.operatorLabel} absent du ${input.fromDate} au ${input.toDate}${
       input.reason ? ` (${input.reason})` : ''
     }`;
@@ -86,7 +88,7 @@ export const addStationMaintenanceTool: ToolDefinition = {
   description:
     "Déclare une station en maintenance sur un intervalle horaire. Utiliser resolve_station d'abord pour obtenir l'ID. Si la maintenance dure plusieurs jours, fromDate < toDate. Pour une plage intra-jour : même date pour fromDate et toDate, fromTime/toTime distinctes.",
   inputSchema: z.object({
-    stationId: z.string().min(1).describe("UUID de la station."),
+    stationId: uuidField('resolve_station').describe("UUID de la station, OBTENU EN APPELANT resolve_station(name=...) D'ABORD. JAMAIS le nom court donné par l'utilisateur."),
     stationLabel: z.string().min(1).describe("Nom lisible de la station, ex 'MBO XL'."),
     fromDate: z.string().describe("Date de début, YYYY-MM-DD."),
     fromTime: z.string().describe("Heure de début, HH:MM."),
@@ -98,8 +100,8 @@ export const addStationMaintenanceTool: ToolDefinition = {
     let timeStart: string;
     let timeEnd: string;
     try {
-      timeStart = combineDateAndTime(input.fromDate, input.fromTime);
-      timeEnd = combineDateAndTime(input.toDate, input.toTime);
+      timeStart = toIsoWithLocalOffset(input.fromDate, input.fromTime);
+      timeEnd = toIsoWithLocalOffset(input.toDate, input.toTime);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -144,7 +146,7 @@ export const cancelConstraintTool: ToolDefinition = {
   description:
     "Supprime une contrainte de planning par son ID (utile pour lever une absence ou une maintenance déjà déclarée). L'ID est obtenu via list_active_constraints.",
   inputSchema: z.object({
-    constraintId: z.string().min(1).describe("UUID de la contrainte à supprimer."),
+    constraintId: uuidField('list_active_constraints').describe("UUID de la contrainte à supprimer, obtenu via list_active_constraints."),
     label: z.string().optional().describe("Description lisible de la contrainte (pour le preview)."),
   }),
   handler: async (input, ctx) => {

@@ -1,20 +1,31 @@
 /**
- * Multi-turn LLM execution loop with function calling.
+ * Multi-turn LLM execution loop with Anthropic Messages API.
  *
  * The loop:
- *   1. Builds the system prompt + tool catalog
- *   2. Sends the user prompt + conversation history to Ollama
- *   3. If Ollama returns tool_calls, runs each tool in dry-run mode and
- *      appends the tool results to the conversation
- *   4. Loops until Ollama calls propose_plan, ask_user, or hits a limit
- *   5. Returns the final result to the caller
+ *   1. Builds the system prompt + tool catalog from the registry
+ *   2. Sends the user prompt + prior conversation to Anthropic
+ *   3. Runs the tool_use blocks the model emits, in dry-run mode for
+ *      /execute and in wet mode for /apply
+ *   4. Loops until the model emits a propose_plan or ask_user tool_use
+ *   5. Returns the final result
  *
  * Two terminal tools (propose_plan, ask_user) short-circuit the loop:
  * propose_plan returns a structured plan, ask_user returns a question
  * back to the frontend.
+ *
+ * The FE-visible ConversationMessage type mirrors Anthropic's wire
+ * format directly (role + content blocks). The FE never reads it —
+ * it just round-trips it back on the next /execute call so the model
+ * keeps prior tool-use context.
  */
 import type { Config } from '../config.js';
-import { OllamaClient, type OllamaMessage, type OllamaToolDefinition, type OllamaToolCall } from './ollama.js';
+import {
+  AnthropicClient,
+  type AnthropicMessage,
+  type AnthropicContentBlock,
+  type AnthropicToolDefinition,
+  type AnthropicToolUseBlock,
+} from './anthropic.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import { allTools, findTool } from '../tools/registry.js';
 import { zodToJsonSchema } from '../tools/jsonSchema.js';
@@ -22,16 +33,11 @@ import { PhpClient } from '../phpClient.js';
 import type { ToolContext, ToolResult } from '../tools/types.js';
 import { todayIsoUtc } from '../tools/dates.js';
 
-export interface ConversationMessage {
-  role: 'user' | 'assistant' | 'system' | 'tool';
-  content: string;
-  toolCallId?: string;
-  toolCalls?: Array<{
-    id: string;
-    name: string;
-    arguments: Record<string, unknown>;
-  }>;
-}
+/**
+ * Wire shape stored on the FE between turns. Mirrors Anthropic's
+ * messages format so we can pass it straight back to the API.
+ */
+export type ConversationMessage = AnthropicMessage;
 
 export interface ProposedAction {
   tool: string;
@@ -76,65 +82,43 @@ export interface RunExecuteLoopArgs {
   php?: PhpClient;
 }
 
-function buildToolCatalog(): OllamaToolDefinition[] {
+function buildToolCatalog(): AnthropicToolDefinition[] {
   return allTools.map((t) => ({
-    type: 'function',
-    function: {
-      name: t.name,
-      description: t.description,
-      parameters: zodToJsonSchema(t.inputSchema) as Record<string, unknown>,
-    },
+    name: t.name,
+    description: t.description,
+    input_schema: zodToJsonSchema(t.inputSchema) as Record<string, unknown>,
   }));
 }
 
-function convertToOllamaMessages(
-  systemPrompt: string,
-  conversation: ConversationMessage[],
-  newPrompt: string,
-): OllamaMessage[] {
-  const messages: OllamaMessage[] = [{ role: 'system', content: systemPrompt }];
-  for (const m of conversation) {
-    if (m.role === 'tool') {
-      messages.push({
-        role: 'tool',
-        content: m.content,
-        tool_call_id: m.toolCallId,
-      });
-    } else if (m.role === 'assistant' && m.toolCalls) {
-      messages.push({
-        role: 'assistant',
-        content: m.content || null,
-        tool_calls: m.toolCalls.map((tc) => ({
-          id: tc.id,
-          type: 'function',
-          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
-        })),
-      });
-    } else {
-      messages.push({ role: m.role, content: m.content });
-    }
-  }
-  messages.push({ role: 'user', content: newPrompt });
-  return messages;
-}
-
-function extractResolvedEntities(toolHistory: Array<{ name: string; result: ToolResult }>): ResolvedEntity[] {
+function extractResolvedEntities(
+  toolHistory: Array<{ name: string; result: ToolResult }>,
+): ResolvedEntity[] {
   const entities: ResolvedEntity[] = [];
   for (const { name, result } of toolHistory) {
     if (!result.ok) continue;
-    const data = result.data as { candidates?: Array<{ id: string; label?: string; reference?: string; firstName?: string; lastName?: string; name?: string }> };
+    const data = result.data as {
+      candidates?: Array<{
+        id: string;
+        label?: string;
+        reference?: string;
+        firstName?: string;
+        lastName?: string;
+        name?: string;
+      }>;
+    };
     if (!data?.candidates) continue;
     if (data.candidates.length !== 1) continue; // only commit unambiguous resolutions
     const c = data.candidates[0]!;
-    const kind: ResolvedEntity['kind'] | null = name === 'resolve_operator'
-      ? 'operator'
-      : name === 'resolve_station'
-        ? 'station'
-        : name === 'resolve_job'
-          ? 'job'
-          : name === 'resolve_task_in_job'
-            ? 'task'
-            : null;
+    const kind: ResolvedEntity['kind'] | null =
+      name === 'resolve_operator'
+        ? 'operator'
+        : name === 'resolve_station'
+          ? 'station'
+          : name === 'resolve_job'
+            ? 'job'
+            : name === 'resolve_task_in_job'
+              ? 'task'
+              : null;
     if (!kind) continue;
     const label =
       c.label ||
@@ -147,18 +131,47 @@ function extractResolvedEntities(toolHistory: Array<{ name: string; result: Tool
   return entities;
 }
 
+/**
+ * Pull the assistant's tool_use blocks out of the latest message, in
+ * the original order so tool_result blocks line up.
+ */
+function extractToolUses(content: AnthropicContentBlock[]): AnthropicToolUseBlock[] {
+  return content.filter((b): b is AnthropicToolUseBlock => b.type === 'tool_use');
+}
+
+function extractAssistantText(content: AnthropicContentBlock[]): string {
+  return content
+    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
+
 export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteResult> {
   const todayIso = todayIsoUtc();
   const systemPrompt = buildSystemPrompt(todayIso);
   const toolCatalog = buildToolCatalog();
-  const ollama = new OllamaClient(args.config.ollamaBaseUrl);
+
+  if (!args.config.anthropicApiKey) {
+    return {
+      kind: 'error',
+      error: 'MISSING_API_KEY',
+      message:
+        "ANTHROPIC_API_KEY n'est pas configurée côté console-service. Ajoute-la dans .env puis redémarre le service.",
+      conversationAfter: [],
+    };
+  }
+
+  const anthropic = new AnthropicClient(args.config.anthropicApiKey, args.config.anthropicBaseUrl);
   const php = args.php ?? new PhpClient(args.config.phpApiUrl, args.jwt);
   const ctx: ToolContext = { php, dryRun: args.dryRun, todayIso };
 
-  // Build the conversation history that we'll keep extending
-  const messages = convertToOllamaMessages(systemPrompt, args.conversation, args.prompt);
+  // The conversation we feed Anthropic on every turn. Starts with the prior
+  // conversation (if any) plus the new user prompt.
+  const messages: AnthropicMessage[] = [
+    ...args.conversation,
+    { role: 'user', content: args.prompt },
+  ];
 
-  // Track tool execution history so we can extract resolved entities later
   const toolHistory: Array<{ name: string; result: ToolResult }> = [];
 
   const startedAt = Date.now();
@@ -167,78 +180,85 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
 
   try {
     for (let turn = 0; turn < args.config.llmMaxTurns; turn++) {
-      const response = await ollama.chat(
+      const response = await anthropic.messages(
         {
           model: args.config.llmModel,
+          max_tokens: 2048,
+          system: systemPrompt,
           messages,
           tools: toolCatalog,
-          tool_choice: 'auto',
+          // 'any' forces a tool call every turn — the model still chooses
+          // WHICH tool, so it can call propose_plan/ask_user to terminate.
+          // Anthropic's tool_choice is honored (unlike Ollama's).
+          tool_choice: { type: 'any' },
           temperature: args.config.llmTemperature,
         },
         abortController.signal,
       );
 
-      const choice = response.choices[0];
-      if (!choice) {
-        return errorResult('NO_CHOICE', 'LLM returned no choices', messages);
-      }
-      const assistantMessage = choice.message;
+      // Persist the full assistant message verbatim — Anthropic requires
+      // the round-trip to include text + tool_use blocks together.
+      messages.push({ role: 'assistant', content: response.content });
 
-      // Append the assistant message to history regardless
-      messages.push(assistantMessage);
+      const toolUses = extractToolUses(response.content);
 
-      // No tool calls → the LLM gave a plain text answer. We expect a tool
-      // call (propose_plan or ask_user) — treat this as an error so we
-      // can surface what the LLM said.
-      if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
+      // tool_choice='any' should make this impossible, but defend anyway.
+      if (toolUses.length === 0) {
+        if (turn < args.config.llmMaxTurns - 1) {
+          messages.push({
+            role: 'user',
+            content:
+              "Tu dois IMPÉRATIVEMENT appeler un tool. Si tu as besoin de l'UUID d'un job/opérateur/station, appelle d'abord resolve_job/resolve_operator/resolve_station avec la référence DÉJÀ donnée par l'utilisateur dans le tout premier message. Quand tu as les UUIDs, appelle propose_plan. Ne demande PAS à l'utilisateur ce qu'il a déjà dit.",
+          });
+          continue;
+        }
         return errorResult(
           'MISSING_TERMINAL_TOOL',
-          `Le modèle a répondu sans appeler propose_plan ni ask_user. Réponse brute : ${assistantMessage.content?.slice(0, 500) ?? '(vide)'}`,
+          `Le modèle a répondu sans appeler propose_plan ni ask_user après ${args.config.llmMaxTurns} tours. Réponse brute : ${extractAssistantText(response.content).slice(0, 500)}`,
           messages,
         );
       }
 
-      // Process each tool call. If propose_plan or ask_user is called, the
-      // loop ends with the corresponding result.
-      //
-      // Read-only tools (resolve_*) run in parallel within a turn — the LLM
-      // commonly fans out 2-3 resolvers in one shot ("Frédéric absent sur
-      // la MBO XL"), and serializing them adds N×PHP-API latency for no
-      // reason. Mutating tools and terminals stay sequential to keep the
-      // audit trail / propose_plan ordering deterministic.
-      const calls = assistantMessage.tool_calls;
-      const orderedResults: Array<ToolResult | null> = calls.map(() => null);
+      // Run all tool_use blocks. Read-only tools (resolve_*) run in
+      // parallel — the model often fans out 2-3 resolvers per turn for
+      // composite prompts ("Frédéric absent sur la MBO XL"). Mutating
+      // tools and terminals stay sequential to keep audit ordering.
+      const orderedResults: Array<ToolResult | null> = toolUses.map(() => null);
       const parallelIdx: number[] = [];
       const sequentialIdx: number[] = [];
-      for (let i = 0; i < calls.length; i++) {
-        const def = findTool(calls[i]!.function.name);
+      for (let i = 0; i < toolUses.length; i++) {
+        const def = findTool(toolUses[i]!.name);
         if (def?.readOnly) parallelIdx.push(i);
         else sequentialIdx.push(i);
       }
       await Promise.all(
         parallelIdx.map(async (i) => {
-          orderedResults[i] = await runToolCall(calls[i]!, ctx);
+          orderedResults[i] = await runToolCall(toolUses[i]!, ctx);
         }),
       );
       for (const i of sequentialIdx) {
-        orderedResults[i] = await runToolCall(calls[i]!, ctx);
+        orderedResults[i] = await runToolCall(toolUses[i]!, ctx);
       }
 
+      // Collect tool_result blocks for this turn into a single user message.
+      // Anthropic requires every assistant tool_use to be acknowledged in
+      // ONE user message — split per call would be a protocol violation.
+      const toolResultBlocks: AnthropicContentBlock[] = [];
       let terminal: ExecuteResult | null = null;
-      for (let i = 0; i < calls.length; i++) {
-        const toolCall = calls[i]!;
-        const result = orderedResults[i]!;
-        toolHistory.push({ name: toolCall.function.name, result });
 
-        // Append the tool result to the conversation for the next turn
-        messages.push({
-          role: 'tool',
+      for (let i = 0; i < toolUses.length; i++) {
+        const tu = toolUses[i]!;
+        const result = orderedResults[i]!;
+        toolHistory.push({ name: tu.name, result });
+
+        toolResultBlocks.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
           content: JSON.stringify(result),
-          tool_call_id: toolCall.id,
+          is_error: !result.ok,
         });
 
-        // Detect terminal tools
-        if (toolCall.function.name === 'propose_plan' && result.ok) {
+        if (tu.name === 'propose_plan' && result.ok) {
           const planData = result.data as {
             kind: 'plan';
             narration: string;
@@ -249,9 +269,11 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
             narration: planData.narration,
             actions: planData.actions,
             resolvedEntities: extractResolvedEntities(toolHistory),
-            conversationAfter: ollamaMessagesToConversation(messages),
+            conversationAfter: messages.concat([
+              { role: 'user', content: toolResultBlocks },
+            ]),
           };
-        } else if (toolCall.function.name === 'ask_user' && result.ok) {
+        } else if (tu.name === 'ask_user' && result.ok) {
           const qData = result.data as {
             kind: 'question';
             question: string;
@@ -261,17 +283,21 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
             kind: 'question',
             question: qData.question,
             options: qData.options.length > 0 ? qData.options : undefined,
-            conversationAfter: ollamaMessagesToConversation(messages),
+            conversationAfter: messages.concat([
+              { role: 'user', content: toolResultBlocks },
+            ]),
           };
         }
       }
+
+      messages.push({ role: 'user', content: toolResultBlocks });
+
       if (terminal) {
         clearTimeout(timeoutId);
         return terminal;
       }
     }
 
-    // Hit the turn limit without a terminal tool
     return errorResult(
       'MAX_TURNS_REACHED',
       `Le modèle n'a pas terminé en ${args.config.llmMaxTurns} tours. Réessaie avec une requête plus simple.`,
@@ -296,25 +322,17 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
   }
 }
 
-async function runToolCall(toolCall: OllamaToolCall, ctx: ToolContext): Promise<ToolResult> {
-  const def = findTool(toolCall.function.name);
+async function runToolCall(toolUse: AnthropicToolUseBlock, ctx: ToolContext): Promise<ToolResult> {
+  const def = findTool(toolUse.name);
   if (!def) {
-    return { ok: false, error: `Unknown tool: ${toolCall.function.name}` };
+    return { ok: false, error: `Unknown tool: ${toolUse.name}` };
   }
-  let parsedArgs: unknown;
-  try {
-    parsedArgs = JSON.parse(toolCall.function.arguments || '{}');
-  } catch (err) {
-    return {
-      ok: false,
-      error: `Invalid JSON arguments for ${toolCall.function.name}: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-  const validation = def.inputSchema.safeParse(parsedArgs);
+  // Anthropic gives us the input pre-parsed as an object, so no JSON.parse.
+  const validation = def.inputSchema.safeParse(toolUse.input);
   if (!validation.success) {
     return {
       ok: false,
-      error: `Validation failed for ${toolCall.function.name}: ${validation.error.message}`,
+      error: `Validation failed for ${toolUse.name}: ${validation.error.issues.map((i) => i.message).join('; ')}`,
     };
   }
   try {
@@ -322,47 +340,16 @@ async function runToolCall(toolCall: OllamaToolCall, ctx: ToolContext): Promise<
   } catch (err) {
     return {
       ok: false,
-      error: `Tool ${toolCall.function.name} threw: ${err instanceof Error ? err.message : String(err)}`,
+      error: `Tool ${toolUse.name} threw: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 }
 
-function ollamaMessagesToConversation(messages: OllamaMessage[]): ConversationMessage[] {
-  const out: ConversationMessage[] = [];
-  for (const m of messages) {
-    if (m.role === 'system') continue;
-    if (m.role === 'tool') {
-      out.push({ role: 'tool', content: m.content ?? '', toolCallId: m.tool_call_id });
-    } else if (m.role === 'assistant' && m.tool_calls) {
-      out.push({
-        role: 'assistant',
-        content: m.content ?? '',
-        toolCalls: m.tool_calls.map((tc) => ({
-          id: tc.id,
-          name: tc.function.name,
-          arguments: safeJsonParse(tc.function.arguments),
-        })),
-      });
-    } else {
-      out.push({ role: m.role as ConversationMessage['role'], content: m.content ?? '' });
-    }
-  }
-  return out;
-}
-
-function safeJsonParse(s: string): Record<string, unknown> {
-  try {
-    return JSON.parse(s) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-function errorResult(error: string, message: string, messages: OllamaMessage[]): ExecuteResult {
+function errorResult(error: string, message: string, messages: AnthropicMessage[]): ExecuteResult {
   return {
     kind: 'error',
     error,
     message,
-    conversationAfter: ollamaMessagesToConversation(messages),
+    conversationAfter: messages,
   };
 }

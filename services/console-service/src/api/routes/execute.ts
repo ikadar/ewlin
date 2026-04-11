@@ -17,15 +17,12 @@ import type { Config } from '../../config.js';
 import { runExecuteLoop } from '../../llm/loop.js';
 import { requireJwt } from '../auth.js';
 
+// The conversation is opaque to us — it's whatever the previous /execute
+// returned in conversationAfter. We just round-trip it back to Anthropic.
+// Validate only the outer shape so a malformed FE can't crash us.
 const messageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system', 'tool']),
-  content: z.string(),
-  toolCallId: z.string().optional(),
-  toolCalls: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    arguments: z.record(z.unknown()),
-  })).optional(),
+  role: z.enum(['user', 'assistant']),
+  content: z.unknown(),
 });
 
 const executeRequestSchema = z.object({
@@ -48,9 +45,11 @@ export async function registerExecuteRoute(app: FastifyInstance, config: Config)
     }
 
     try {
+      // Cast: the conversation came from a previous /execute response and
+      // is opaque to us. We trust its shape was valid when we sent it.
       const result = await runExecuteLoop({
         prompt: parsed.data.prompt,
-        conversation: parsed.data.conversation,
+        conversation: parsed.data.conversation as Parameters<typeof runExecuteLoop>[0]['conversation'],
         jwt,
         config,
         dryRun: true,

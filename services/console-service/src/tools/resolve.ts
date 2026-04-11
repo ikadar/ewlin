@@ -37,16 +37,23 @@ interface JobRow {
 interface TaskRow {
   id: string;
   stationId: string;
+  elementId?: string;
   setupMinutes: number;
   runMinutes: number;
-  sequenceOrder: number;
+  sequenceOrder?: number;
 }
 
+/**
+ * The PHP API returns tasks at the top level of the job response
+ * (`tasks: [...]`), NOT nested inside `elements[].tasks`. Elements
+ * carry only `taskIds: string[]` to preserve element grouping.
+ */
 interface JobDetailRow extends JobRow {
+  tasks?: TaskRow[];
   elements?: Array<{
     id: string;
     name?: string | null;
-    tasks: TaskRow[];
+    taskIds?: string[];
   }>;
 }
 
@@ -151,18 +158,27 @@ export const resolveJobTool: ToolDefinition = {
       `/api/v1/jobs?search=${encodeURIComponent(cleaned)}`,
     ];
     let candidates: JobRow[] = [];
+    const attempts: Array<{ endpoint: string; status: 'ok' | 'empty' | 'error'; error?: string; count?: number }> = [];
     for (const endpoint of tryEndpoints) {
       try {
         const raw = await ctx.php.get<JobRow[] | { items: JobRow[] }>(endpoint);
         const list = Array.isArray(raw) ? raw : raw.items ?? [];
+        attempts.push({ endpoint, status: list.length > 0 ? 'ok' : 'empty', count: list.length });
         if (list.length > 0) {
           candidates = list;
           break;
         }
-      } catch {
-        // try next endpoint
+      } catch (err) {
+        attempts.push({
+          endpoint,
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
+    // Log to stderr so it shows up in `docker compose logs console-service`.
+    // Useful for debugging "the LLM said it couldn't find a job that exists".
+    console.error(`[resolve_job] reference="${input.reference}" cleaned="${cleaned}" attempts=${JSON.stringify(attempts)}`);
     return {
       ok: true,
       data: {
@@ -196,27 +212,32 @@ export const resolveTaskInJobTool: ToolDefinition = {
   }),
   handler: async (input, ctx) => {
     const job = await ctx.php.get<JobDetailRow>(`/api/v1/jobs/${input.jobId}`);
+
+    // Build a taskId → elementId map so we can attach the element id back
+    // even though tasks live at the top level of the job response.
+    const taskToElement = new Map<string, string>();
+    for (const element of job.elements ?? []) {
+      for (const tid of element.taskIds ?? []) {
+        taskToElement.set(tid, element.id);
+      }
+    }
+
     const allTasks: Array<{
       taskId: string;
       stationId: string;
       stationName?: string;
       setupMinutes: number;
       runMinutes: number;
-      elementId: string;
-      sequenceOrder: number;
-    }> = [];
-    for (const element of job.elements ?? []) {
-      for (const task of element.tasks ?? []) {
-        allTasks.push({
-          taskId: task.id,
-          stationId: task.stationId,
-          setupMinutes: task.setupMinutes,
-          runMinutes: task.runMinutes,
-          elementId: element.id,
-          sequenceOrder: task.sequenceOrder,
-        });
-      }
-    }
+      elementId: string | null;
+      sequenceOrder: number | null;
+    }> = (job.tasks ?? []).map((task) => ({
+      taskId: task.id,
+      stationId: task.stationId,
+      setupMinutes: task.setupMinutes,
+      runMinutes: task.runMinutes,
+      elementId: taskToElement.get(task.id) ?? task.elementId ?? null,
+      sequenceOrder: task.sequenceOrder ?? null,
+    }));
 
     // Enrich with station names so the LLM can match by name
     if (allTasks.length > 0) {
@@ -235,9 +256,24 @@ export const resolveTaskInJobTool: ToolDefinition = {
 
     let filtered = allTasks;
     if (input.stationName) {
-      const needle = normalize(input.stationName);
-      filtered = allTasks.filter((t) => normalize(t.stationName ?? '').includes(needle));
+      // Token-based match: each whitespace-separated word in the needle must
+      // appear somewhere in the station name. So "Komori G40" matches both
+      // "G40 Komori 540" and "Komori G40", whereas the previous strict
+      // includes() failed when the user's word order didn't match exactly.
+      const needleTokens = normalize(input.stationName)
+        .split(/\s+/)
+        .filter((t) => t.length > 0);
+      filtered = allTasks.filter((t) => {
+        const hay = normalize(t.stationName ?? '');
+        return needleTokens.every((tok) => hay.includes(tok));
+      });
     }
+
+    console.error(
+      `[resolve_task_in_job] jobId=${input.jobId} stationName=${input.stationName ?? '(none)'} ` +
+        `total_tasks=${allTasks.length} matched=${filtered.length} ` +
+        `available_stations=${JSON.stringify([...new Set(allTasks.map((t) => t.stationName ?? '?'))])}`,
+    );
 
     return {
       ok: true,

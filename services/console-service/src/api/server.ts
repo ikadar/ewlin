@@ -38,7 +38,7 @@ export async function startHttpServer(config: Config): Promise<void> {
     version: '0.1.0',
     config: {
       llmModel: config.llmModel,
-      ollamaBaseUrl: config.ollamaBaseUrl,
+      anthropicConfigured: config.anthropicApiKey.length > 0,
       phpApiUrl: config.phpApiUrl,
     },
   }));
