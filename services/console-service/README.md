@@ -83,6 +83,19 @@ Health check:
 curl -s http://localhost:3004/health | jq .
 ```
 
+## Tests
+
+```bash
+npm test                  # all tests
+npm test -- tools         # tool unit tests only (no LLM)
+npm test -- llm-integration  # live Ollama integration (auto-skipped if unreachable)
+```
+
+The LLM integration suite is **live** — it pings `OLLAMA_BASE_URL/api/tags`
+to verify the configured model is pulled, and skips itself if not. This
+matches the project rule "no mocks for live infra." Tool unit tests fake
+the PHP client so they're fast and offline.
+
 ## Connecting Claude Code to the MCP server
 
 Stdio transport (recommended for local Claude Code):
