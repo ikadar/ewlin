@@ -736,7 +736,14 @@ pub fn run_forward_pass(
         // update work_accumulator. Mark done if art reaches 0.
         // ============================================================
         let mut newly_done: Vec<usize> = Vec::new();
-        let mut max_skip_t: Option<usize> = None;
+        // Earliest tick at which ANY skipped action wants to retry. The
+        // outer loop jumps t directly to this tick when nothing else is
+        // active, instead of inching forward one tick at a time. We use
+        // MIN (not max) so that an action ready early (e.g. an op working
+        // from 5h00) isn't delayed by a sibling whose first op only
+        // arrives at 10h00 — that was the bug behind "everything starts
+        // at 10h Monday even when half the operators are there at dawn".
+        let mut next_skip_t: Option<usize> = None;
         for (action_idx, outcome) in tick_outcomes.into_iter() {
             match outcome {
                 AssignOutcome::Assigned(ops) => {
@@ -758,12 +765,16 @@ pub fn run_forward_pass(
                     // to do at the productivity layer.
                 }
                 AssignOutcome::SkipTo(new_t) => {
-                    // The action wants to jump ahead — record for outer loop.
-                    if let Some(prev) = max_skip_t {
-                        max_skip_t = Some(prev.max(new_t));
-                    } else {
-                        max_skip_t = Some(new_t);
-                    }
+                    // The action wants to jump ahead — record the EARLIEST
+                    // such request so the outer loop wakes up as soon as
+                    // possible. Other actions whose own retry tick is later
+                    // are gated by the per-action `earliest_retry` check at
+                    // the top of the scoring loop, so they correctly stay
+                    // dormant until their own tick arrives.
+                    next_skip_t = Some(match next_skip_t {
+                        Some(prev) => prev.min(new_t),
+                        None => new_t,
+                    });
                     earliest_retry[action_idx] = new_t;
                 }
                 AssignOutcome::StationOccupied => {
@@ -790,14 +801,15 @@ pub fn run_forward_pass(
             assignments.push(assignment);
         }
 
-        // Advance time. If NO action made progress this tick AND a
-        // skip-ahead was requested, jump ahead.
+        // Advance time. If NO action made progress this tick AND at least
+        // one skip-ahead was requested, jump ahead to the earliest pending
+        // retry tick (see comment on next_skip_t above for the rationale).
         let any_active_remaining = (0..actions.len()).any(|i| {
             let a = &actions[i];
             a.start_tick.is_some() && a.end_tick.is_none() && a.art > 0
         });
-        if !any_active_remaining && max_skip_t.map_or(false, |st| st > t + 1) {
-            t = max_skip_t.unwrap();
+        if !any_active_remaining && next_skip_t.map_or(false, |st| st > t + 1) {
+            t = next_skip_t.unwrap();
         } else {
             t += 1;
         }
