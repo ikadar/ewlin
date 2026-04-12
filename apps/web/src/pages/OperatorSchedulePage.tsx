@@ -509,6 +509,8 @@ export default function OperatorSchedulePage() {
             elements={snapshot.elements}
             assignments={snapshot.assignments}
             stations={snapshot.stations}
+            categories={snapshot.categories}
+            providers={snapshot.providers}
             onClose={() => setSelectedJobId(null)}
             lateJobIds={lateJobIds}
             snapshotOperators={snapshot.operators}
