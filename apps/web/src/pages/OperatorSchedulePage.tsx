@@ -18,8 +18,18 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Cpu } from 'lucide-react';
-import { useGetSnapshotQuery, useComputeScheduleMutation } from '../store';
+import {
+  useGetSnapshotQuery,
+  useComputeScheduleMutation,
+  scheduleApi,
+  useToggleCompletionMutation,
+  useTogglePinMutation,
+  useUpdateOutsourcingDatesMutation,
+  useUnassignTaskMutation,
+  useUpdateElementStatusMutation,
+} from '../store';
 import type { ComputeScheduleResult } from '../store';
+import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
 import { isCtrlAltLetter } from '../utils/keyboardLayout';
 import { isInternalTask } from '@flux/types';
 import type {
@@ -42,6 +52,7 @@ import {
   timeToYPosition,
 } from '../components';
 import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
+import type { ElementStatusUpdate } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
@@ -186,6 +197,17 @@ export default function OperatorSchedulePage() {
   } = useGetSnapshotQuery();
 
   const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
+  const [toggleCompletion] = useToggleCompletionMutation();
+  const [togglePin] = useTogglePinMutation();
+  const [updateOutsourcingDates] = useUpdateOutsourcingDatesMutation();
+  const [unassignTask] = useUnassignTaskMutation();
+  const [updateElementStatus] = useUpdateElementStatusMutation();
+  const [updateSTStatus] = useUpdateSTStatusMutation();
+  const dispatch = useAppDispatch();
+  const invalidateSnapshot = useCallback(() => {
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+  }, [dispatch]);
+
   const [computeResult, setComputeResult] = useState<ComputeScheduleResult | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const massUnschedule = useMassUnschedule(snapshotData);
@@ -353,6 +375,48 @@ export default function OperatorSchedulePage() {
     }
   }, [computeSchedule]);
 
+  // ---- Job details panel handlers (same UX as station schedule) ----
+
+  const handleRecallAssignment = useCallback(async (assignmentId: string) => {
+    const assignment = snapshot.assignments.find((a) => a.taskId === assignmentId);
+    if (!assignment) return;
+    try { await unassignTask(assignment.taskId).unwrap(); } catch { /* ignore */ }
+  }, [snapshot.assignments, unassignTask]);
+
+  const handleElementStatusChange = useCallback(async (update: ElementStatusUpdate) => {
+    try { await updateElementStatus(update).unwrap(); } catch { /* ignore */ }
+  }, [updateElementStatus]);
+
+  const handleOutsourcingDepartureChange = useCallback(async (taskId: string, departure: Date | undefined) => {
+    try {
+      await updateOutsourcingDates({ taskId, manualDeparture: departure?.toISOString() ?? null }).unwrap();
+    } catch { /* ignore */ }
+    invalidateSnapshot();
+  }, [updateOutsourcingDates, invalidateSnapshot]);
+
+  const handleOutsourcingReturnChange = useCallback(async (taskId: string, returnDate: Date | undefined) => {
+    try {
+      await updateOutsourcingDates({ taskId, manualReturn: returnDate?.toISOString() ?? null }).unwrap();
+    } catch { /* ignore */ }
+    invalidateSnapshot();
+  }, [updateOutsourcingDates, invalidateSnapshot]);
+
+  const handleToggleComplete = useCallback(async (assignmentId: string) => {
+    try { await toggleCompletion(assignmentId).unwrap(); } catch { /* ignore */ }
+  }, [toggleCompletion]);
+
+  const handleToggleOutsourcedDone = useCallback(async (taskId: string) => {
+    const task = snapshot.tasks.find((t) => t.id === taskId);
+    if (!task || task.type !== 'Outsourced') return;
+    const nextStatus = task.status === 'Completed' ? 'Ready' : 'Completed';
+    try { await updateSTStatus({ taskId, status: nextStatus }).unwrap(); } catch { /* ignore */ }
+    invalidateSnapshot();
+  }, [snapshot.tasks, updateSTStatus, invalidateSnapshot]);
+
+  const handleTogglePin = useCallback(async (assignmentId: string) => {
+    try { await togglePin(assignmentId).unwrap(); } catch { /* ignore */ }
+  }, [togglePin]);
+
   // ---- Keyboard navigation: Alt+Up/Down to cycle jobs ----
   const orderedJobIds = useMemo(() => snapshot.jobs.map(j => j.id), [snapshot.jobs]);
 
@@ -512,7 +576,16 @@ export default function OperatorSchedulePage() {
             categories={snapshot.categories}
             providers={snapshot.providers}
             onClose={() => setSelectedJobId(null)}
+            onRecallTask={handleRecallAssignment}
+            onElementStatusChange={handleElementStatusChange}
+            onToggleComplete={handleToggleComplete}
+            onToggleOutsourcedDone={handleToggleOutsourcedDone}
+            onTogglePin={handleTogglePin}
+            onDepartureChange={handleOutsourcingDepartureChange}
+            onReturnChange={handleOutsourcingReturnChange}
             lateJobIds={lateJobIds}
+            allJobs={snapshot.jobs}
+            onSelectJob={setSelectedJobId}
             snapshotOperators={snapshot.operators}
           />
         </div>
