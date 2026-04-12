@@ -422,6 +422,7 @@ function AppContent() {
   const [jcfRequiredJobs, setJcfRequiredJobs] = useState('');
   const [jcfDeadline, setJcfDeadline] = useState('');
   const [jcfBatDeadline, setJcfBatDeadline] = useState('');
+  const [jcfDeadlinePriority, setJcfDeadlinePriority] = useState(2);
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
   const [jcfReferent, setJcfReferent] = useState('');
@@ -494,6 +495,7 @@ function AppContent() {
             description: jcfIntitule,
             workshopExitDate: jcfDeadline,
             batDeadline: jcfBatDeadline || null,
+            deadlinePriority: jcfDeadlinePriority,
             elements: jcfElements.map(transformJcfElementToRequest),
             ...(jcfQuantity ? { quantity: parseInt(jcfQuantity, 10) } : {}),
             shipperId: jcfShipperId || null,
@@ -515,6 +517,7 @@ function AppContent() {
           jcfRequiredJobs || undefined,
           jcfBatDeadline || undefined,
           jcfReferent || undefined,
+          jcfDeadlinePriority,
         );
         await createJob(request).unwrap();
       }
@@ -535,6 +538,7 @@ function AppContent() {
       setJcfRequiredJobs('');
       setJcfDeadline('');
       setJcfBatDeadline('');
+      setJcfDeadlinePriority(2);
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
       setSequenceWorkflows([]); // v0.4.31: Reset workflow on save
       setIsEditMode(false); // v0.5.13b: Reset edit mode
@@ -546,7 +550,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
+  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfDeadlinePriority, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -736,6 +740,7 @@ function AppContent() {
     setJcfIntitule(job.description);
     setJcfDeadline(job.workshopExitDate);
     setJcfBatDeadline(job.batDeadline ?? '');
+    setJcfDeadlinePriority(job.deadlinePriority ?? 2);
     setJcfQuantity(job.quantity?.toString() ?? '');
     setJcfShipperId(job.shipperId ?? '');
     setJcfTemplate('');
@@ -2544,6 +2549,8 @@ function AppContent() {
           onDeadlineChange={setJcfDeadline}
           batDeadline={jcfBatDeadline}
           onBatDeadlineChange={setJcfBatDeadline}
+          deadlinePriority={jcfDeadlinePriority}
+          onDeadlinePriorityChange={setJcfDeadlinePriority}
           requiredJobs={jcfRequiredJobs}
           onRequiredJobsChange={setJcfRequiredJobs}
           jobSuggestions={snapshot?.jobs.map((j) => ({ reference: j.reference, client: j.client })) ?? []}

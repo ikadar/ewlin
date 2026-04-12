@@ -34,6 +34,9 @@ export interface JcfJobHeaderProps {
   /** BAT deadline (ISO or French format) */
   batDeadline?: string;
   onBatDeadlineChange?: (value: string) => void;
+  /** Deadline priority tier: 0=Imperative, 1=Important, 2=Standard, 3=Flexible */
+  deadlinePriority?: number;
+  onDeadlinePriorityChange?: (value: number) => void;
   /** Required job references (comma-separated) */
   requiredJobs?: string;
   onRequiredJobsChange?: (value: string) => void;
@@ -70,6 +73,8 @@ export function JcfJobHeader({
   onDeadlineChange,
   batDeadline,
   onBatDeadlineChange,
+  deadlinePriority,
+  onDeadlinePriorityChange,
   requiredJobs,
   onRequiredJobsChange,
   jobSuggestions,
@@ -456,6 +461,24 @@ export function JcfJobHeader({
               className={`${inputBaseClass} font-mono [color-scheme:dark]`}
               data-testid="jcf-field-bat-deadline"
             />
+          </div>
+        )}
+
+        {/* Priorité deadline */}
+        {onDeadlinePriorityChange && (
+          <div className="w-[130px]">
+            <label className={labelClass}>Priorité</label>
+            <select
+              value={deadlinePriority ?? 2}
+              onChange={(e) => onDeadlinePriorityChange(parseInt(e.target.value, 10))}
+              className={inputBaseClass}
+              data-testid="jcf-field-deadline-priority"
+            >
+              <option value={0}>Impératif</option>
+              <option value={1}>Important</option>
+              <option value={2}>Standard</option>
+              <option value={3}>Flexible</option>
+            </select>
           </div>
         )}
 

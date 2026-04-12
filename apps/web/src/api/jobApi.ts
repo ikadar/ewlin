@@ -41,6 +41,7 @@ export interface CreateJobRequest {
   description: string;
   workshopExitDate: string;
   batDeadline?: string | null;
+  deadlinePriority?: number;
   quantity?: number;
   shipperId?: string;
   status: 'draft' | 'planned' | 'in_progress' | 'delayed' | 'completed' | 'cancelled';
@@ -206,6 +207,7 @@ export function transformJcfToRequest(
   requiredJobs?: string,
   batDeadline?: string,
   referent?: string,
+  deadlinePriority?: number,
 ): CreateJobRequest {
   // Parse required jobs: "JOB-001, JOB-002" → ["JOB-001", "JOB-002"]
   const requiredJobReferences = requiredJobs
@@ -224,6 +226,7 @@ export function transformJcfToRequest(
     ...(requiredJobReferences && requiredJobReferences.length > 0 ? { requiredJobReferences } : {}),
     ...(batDeadline ? { batDeadline } : {}),
     ...(referent ? { referent } : {}),
+    ...(deadlinePriority !== undefined && deadlinePriority !== 2 ? { deadlinePriority } : {}),
   };
 }
 
