@@ -207,14 +207,10 @@ export function TaskList({
 
       // v0.5.11: Get predecessor end time for outsourcing calculations
       // First try intra-element predecessor, then fall back to cross-element predecessors
-      // v0.5.14: Only pass predecessorEndTime for outsourced tasks that have an assignment
-      // (unassigned outsourced tasks should show empty dates, e.g. during grid pick)
       const prevTask = index > 0 ? sortedTasks[index - 1] : null;
       const prevAssignment = prevTask ? assignmentByTaskId.get(prevTask.id) : undefined;
-      const predecessorEndTime = (task.type === 'Outsourced' && !assignment)
-        ? undefined
-        : (prevAssignment?.scheduledEnd
-          ?? (index === 0 ? getCrossElementPredecessorEnd(element) : undefined));
+      const predecessorEndTime = prevAssignment?.scheduledEnd
+          ?? (index === 0 ? getCrossElementPredecessorEnd(element) : undefined);
 
       // Check if previous task is a printing task (for dry time label)
       // Skip dry time between parts of the same split group (still same print run)
