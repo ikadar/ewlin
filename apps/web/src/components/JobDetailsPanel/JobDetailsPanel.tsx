@@ -276,6 +276,19 @@ export function JobDetailsPanel({
           </div>
         )}
 
+        {/* Line 3c: Deadline priority (if not standard) */}
+        {job.deadlinePriority !== undefined && job.deadlinePriority !== 2 && (
+          <div className="text-xs">
+            <span className={
+              job.deadlinePriority === 0 ? 'text-red-400' :
+              job.deadlinePriority === 1 ? 'text-orange-400' :
+              'text-blue-400'
+            }>
+              {['Impératif', 'Important', 'Standard', 'Flexible'][job.deadlinePriority]}
+            </span>
+          </div>
+        )}
+
         {/* Line 4: Modifier button */}
         {onEditJob && (
           <div className="pt-1">
