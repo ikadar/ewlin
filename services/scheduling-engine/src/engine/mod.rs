@@ -495,8 +495,8 @@ pub fn build_actions(
                     .as_ref()
                     .and_then(|pid| task_id_to_action_idx.get(pid).copied());
 
-                // Drying time: if predecessor is on a press, add drying gap
-                let predecessor_gap_ticks = match predecessor_idx {
+                // Gap after predecessor: drying time (press → next) + outsourcing gap
+                let drying_gap = match predecessor_idx {
                     Some(pred_idx) => {
                         let pred_station = actions[pred_idx].station_idx;
                         if pred_station < stations.len() && stations[pred_station].is_press {
@@ -507,6 +507,8 @@ pub fn build_actions(
                     }
                     None => 0,
                 };
+                let outsourcing_gap = minutes_to_ticks(task.predecessor_gap_minutes, tick_minutes);
+                let predecessor_gap_ticks = drying_gap + outsourcing_gap;
 
                 let last = last_values.get(&task.id).copied().unwrap_or(u64::MAX);
 
@@ -839,7 +841,7 @@ mod integration_tests {
                     run_minutes,
                     sequence_order: 0,
                     is_pinned: false,
-                    pinned_start_tick: None,
+                    pinned_start_tick: None, predecessor_gap_minutes: 0,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -1159,6 +1161,7 @@ mod integration_tests {
                         sequence_order: 0,
                         is_pinned: true,
                         pinned_start_tick: Some(pinned_tick),
+                        predecessor_gap_minutes: 0,
                     },
                     TaskInput {
                         id: "task-finish".into(),
@@ -1167,7 +1170,7 @@ mod integration_tests {
                         run_minutes: 60,
                         sequence_order: 1,
                         is_pinned: false,
-                        pinned_start_tick: None,
+                        pinned_start_tick: None, predecessor_gap_minutes: 0,
                     },
                 ],
                 spec: None,

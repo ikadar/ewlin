@@ -59,6 +59,11 @@ pub struct TaskInput {
     /// engine uses.
     #[serde(default)]
     pub pinned_start_tick: Option<usize>,
+    /// Extra gap (in minutes) to add after the predecessor before this task
+    /// can start. Used for outsourced tasks: PHP skips the outsourced task
+    /// but encodes its estimated duration as a gap on the next internal task.
+    #[serde(default)]
+    pub predecessor_gap_minutes: u32,
 }
 
 impl TaskInput {
