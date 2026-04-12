@@ -26,6 +26,7 @@ export function recalculatePrecedenceConflicts(snapshot: ScheduleSnapshot): Sche
       targetId: assignment.targetId,
       isOutsourced: assignment.isOutsourced,
       scheduledStart: assignment.scheduledStart,
+      scheduledEnd: assignment.scheduledEnd,
       bypassPrecedence: false,
     };
 
