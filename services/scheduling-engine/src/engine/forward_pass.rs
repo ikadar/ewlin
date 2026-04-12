@@ -683,15 +683,191 @@ pub fn run_forward_pass(
             .collect();
         already_active.sort_by_key(|&i| actions[i].start_tick.unwrap_or(usize::MAX));
 
-        let mut candidates: Vec<usize> = already_active;
-        for c in &scored {
-            candidates.push(c.action_idx);
+        // ============================================================
+        // PHASE 1A — preferred-operator preservation pass.
+        //
+        // For each already-active action, if the operator who was working
+        // it on previous ticks (action.assigned_operators) is currently
+        // available AND idle, lock that operator onto the action BEFORE
+        // any other action gets a chance to grab them.
+        //
+        // Without this pass, two parallel long tasks competing for the
+        // same operator pool would alternate operators every tick at
+        // shift boundaries: e.g. when Halim's shift ends at 12:00, both
+        // TEST-PAIR-A (preferred Ludovic) and TEST-PAIR-B (preferred
+        // Halim, now unavailable) would race for Ludovic. The first task
+        // processed wins for one tick, the second wins the next, and the
+        // operator-view schedule shows a 15-minute "blip" of Ludovic on
+        // TEST-PAIR-B that's instantly reverted. With this pass,
+        // TEST-PAIR-A's preference is enforced HARD: Ludovic is locked
+        // to it before TEST-PAIR-B's processing even starts, and
+        // TEST-PAIR-B simply stalls (cleanly) until a fresh operator
+        // appears (e.g. Christophe at 13:00). This is what the user
+        // intuitively expects from "magnetism" — continuity of operator
+        // assignment across ticks, not just a soft sort tiebreaker.
+        // ============================================================
+        let mut handled_in_phase_1a: std::collections::HashSet<usize> =
+            std::collections::HashSet::new();
+        let mut tick_outcomes: Vec<(usize, AssignOutcome)> = Vec::with_capacity(
+            already_active.len() + scored.len(),
+        );
+
+        for &action_idx in &already_active {
+            // The action's "preferred ops" come from its most recent
+            // successful assignment. If empty AND the action is a chunk
+            // 2+ of a longer task, inherit from the previous chunk's
+            // assigned_operators — that's how the magnetism survives
+            // chunk boundaries (without this, every chunk transition
+            // resets the preferred set and the next-tick pre-pass falls
+            // through to Phase 1B, allowing competing tasks to grab the
+            // op back for one tick before the chunk reclaims them).
+            let mut preferred: Vec<usize> = actions[action_idx].assigned_operators.clone();
+            if preferred.is_empty() {
+                if let Some((chunk_n, _, _)) = &actions[action_idx].chunk_info {
+                    if *chunk_n > 1 {
+                        if let Some(pred_idx) = actions[action_idx].predecessor_idx {
+                            if pred_idx < actions.len() {
+                                preferred = actions[pred_idx].assigned_operators.clone();
+                            }
+                        }
+                    }
+                }
+            }
+            if preferred.is_empty() {
+                continue;
+            }
+            // ALL preferred ops must be both available AND idle (load 0)
+            // at this tick. Partial-availability falls through to the
+            // normal phase, which can pick replacements.
+            let all_locked_in = preferred.iter().all(|&op| {
+                operator_availability.is_available(op, t)
+                    && grid.operator_load_count(op, t) == 0
+            });
+            if !all_locked_in {
+                continue;
+            }
+            // Run the normal assignment path, which uses preferred_op_indices
+            // (= action.assigned_operators) as its first-pass hint. Since the
+            // ops are locked-in idle, find_operators_for_station will return
+            // exactly them, and the assignment commits.
+            let outcome = assign_action_at_tick(
+                grid,
+                actions,
+                action_idx,
+                t,
+                station_attrs,
+                operator_skills,
+                operator_availability,
+                operator_groups,
+                station_to_group,
+                tick_minutes,
+                grow_ticks,
+            );
+            if matches!(outcome, AssignOutcome::Assigned(_)) {
+                handled_in_phase_1a.insert(action_idx);
+                tick_outcomes.push((action_idx, outcome));
+            }
+            // If the assign call somehow didn't take (Stalled / SkipTo),
+            // do NOT add it to handled — let Phase 1B retry it.
         }
 
         // ============================================================
-        // PHASE 1 — assignment.
+        // PHASE 1A.5 — predecessor magnetism for newborn chunks.
+        //
+        // A chunk K of a long task becomes eligible the very tick chunk
+        // K-1 ends. At that exact tick, the operator who finished K-1
+        // is idle (load = 0) for one tick before the engine re-assigns
+        // them. Without intervention, ANOTHER stalled task that's also
+        // looking for an operator at this tick can grab them — exactly
+        // the "Ludovic borrowed for one tick to finish a stranded TEST-
+        // PAIR-B chunk before resuming his own TEST-PAIR-A chunk 2"
+        // pathology that produces 15-minute cosmetic flips in the
+        // operator-view schedule.
+        //
+        // Phase 1A.5 enforces the natural successor relationship: when
+        // a brand-new chunk K is processed at the tick its predecessor
+        // ended, lock in the predecessor's last operator(s) BEFORE any
+        // other action gets a turn. This is the chunk-boundary
+        // equivalent of Phase 1A's tick-boundary lock-in.
         // ============================================================
-        let mut tick_outcomes: Vec<(usize, AssignOutcome)> = Vec::with_capacity(candidates.len());
+        for c in &scored {
+            let action_idx = c.action_idx;
+            // Only consider chunks (chunk_n > 1 means there's a real
+            // predecessor inside the same task).
+            let chunk_n = match &actions[action_idx].chunk_info {
+                Some((n, _, _)) if *n > 1 => *n,
+                _ => continue,
+            };
+            let _ = chunk_n;
+            let pred_idx = match actions[action_idx].predecessor_idx {
+                Some(p) if p < actions.len() => p,
+                _ => continue,
+            };
+            // Predecessor must have just ended at-or-before this tick.
+            // (If it ended earlier, the operator has likely moved on
+            // already, so the magnetism is no longer "natural".)
+            let pred_ended_recently = match actions[pred_idx].end_tick {
+                Some(end_t) => end_t == t,
+                None => false,
+            };
+            if !pred_ended_recently {
+                continue;
+            }
+            let preferred: Vec<usize> = actions[pred_idx].assigned_operators.clone();
+            if preferred.is_empty() {
+                continue;
+            }
+            let all_locked_in = preferred.iter().all(|&op| {
+                operator_availability.is_available(op, t)
+                    && grid.operator_load_count(op, t) == 0
+            });
+            if !all_locked_in {
+                continue;
+            }
+            // Seed assigned_operators so assign_action_at_tick uses them
+            // as the preferred set (it copies from the action's field).
+            actions[action_idx].assigned_operators = preferred.clone();
+            // Reset per-action accumulators for the brand-new chunk
+            // (mirrors Phase 1B's "was_new" path).
+            actions[action_idx].work_accumulator = 0.0;
+            actions[action_idx].idle_ticks = 0;
+            actions[action_idx].tick_operator_log.clear();
+            actions[action_idx].total_productivity = 0.0;
+            actions[action_idx].ticks_counted = 0;
+            apply_chunk_re_setup(actions, action_idx, t, grid);
+            let outcome = assign_action_at_tick(
+                grid,
+                actions,
+                action_idx,
+                t,
+                station_attrs,
+                operator_skills,
+                operator_availability,
+                operator_groups,
+                station_to_group,
+                tick_minutes,
+                grow_ticks,
+            );
+            if let AssignOutcome::Assigned(_) = &outcome {
+                actions[action_idx].start_tick = Some(t);
+                handled_in_phase_1a.insert(action_idx);
+                tick_outcomes.push((action_idx, outcome));
+            }
+        }
+
+        let mut candidates: Vec<usize> = already_active
+            .into_iter()
+            .filter(|i| !handled_in_phase_1a.contains(i))
+            .collect();
+        for c in &scored {
+            if !handled_in_phase_1a.contains(&c.action_idx) {
+                candidates.push(c.action_idx);
+            }
+        }
+
+        // ============================================================
+        // PHASE 1B — normal assignment for the remaining candidates.
+        // ============================================================
         for action_idx in candidates {
             let was_new = actions[action_idx].start_tick.is_none();
             if was_new {
@@ -894,7 +1070,27 @@ fn assign_action_at_tick(
 
     let setup_ticks = actions[action_idx].setup_ticks;
     let in_setup = actions[action_idx].eat < setup_ticks;
-    let preferred_op_indices: Vec<usize> = actions[action_idx].assigned_operators.clone();
+
+    // Build the magnetism preference list. Start from this action's own
+    // assigned_operators (set on first successful assign). If it's empty
+    // AND the action is part of a chunk chain (chunk 2+), inherit the
+    // previous chunk's assigned_operators via the predecessor link — that
+    // way the operator who worked the previous chunk is preferred for the
+    // next one, instead of the new chunk re-discovering an op from
+    // scratch and possibly picking a different one (which produces visible
+    // flips at chunk boundaries in the operator-view schedule).
+    let mut preferred_op_indices: Vec<usize> = actions[action_idx].assigned_operators.clone();
+    if preferred_op_indices.is_empty() {
+        if let Some((chunk_n, _, _)) = &actions[action_idx].chunk_info {
+            if *chunk_n > 1 {
+                if let Some(pred_idx) = actions[action_idx].predecessor_idx {
+                    if pred_idx < actions.len() {
+                        preferred_op_indices = actions[pred_idx].assigned_operators.clone();
+                    }
+                }
+            }
+        }
+    }
 
     // Try preferred (magnetism) first, then any fresh selection.
     let mut operators = find_operators_for_station(
@@ -976,11 +1172,16 @@ fn assign_action_at_tick(
     for &op_idx in &operators {
         grid.assign_operator(op_idx, t, station_idx, 0.0);
     }
-    // Remember the assigned operators on the action for magnetism on
-    // subsequent ticks.
-    if actions[action_idx].assigned_operators.is_empty() {
-        actions[action_idx].assigned_operators = operators.clone();
-    }
+    // Update the action's "current operators" so the next tick's
+    // Phase 1A preemptive reservation pass can lock them in. We
+    // ALWAYS replace (not "set if empty") — that's the magnetism
+    // contract: at tick t+1, "preferred" means "ops who were doing
+    // the work at tick t", not "ops who originally started the
+    // action 6 hours ago". Otherwise an op who took over a stalled
+    // action would be silently dropped at the next tick because the
+    // original starter (now unavailable) is still considered the
+    // preferred op.
+    actions[action_idx].assigned_operators = operators.clone();
     AssignOutcome::Assigned(operators)
 }
 
