@@ -542,6 +542,8 @@ pub fn build_actions(
                     pinned_start_tick: task.pinned_start_tick,
                 });
 
+                if predecessor_gap_ticks > 0 {
+                }
                 task_id_to_action_idx.insert(task.id.clone(), idx);
                 prev_task_id = Some(task.id.clone());
             }
