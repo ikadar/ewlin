@@ -3,6 +3,7 @@ import { Calendar } from 'lucide-react';
 import { parseFrenchDate, formatToFrench } from './frenchDate';
 import { JcfAutocomplete } from '../JcfAutocomplete';
 import { JcfTransporteurSelect } from './JcfTransporteurSelect';
+import { JcfPrioritySelect } from './JcfPrioritySelect';
 import { JcfJobPrecedencesAutocomplete } from '../JcfJobPrecedencesAutocomplete';
 import type { Suggestion } from '../JcfAutocomplete';
 import type { JcfTemplate } from '@flux/types';
@@ -468,17 +469,11 @@ export function JcfJobHeader({
         {onDeadlinePriorityChange && (
           <div className="w-[130px]">
             <label className={labelClass}>Priorité</label>
-            <select
+            <JcfPrioritySelect
               value={deadlinePriority ?? 2}
-              onChange={(e) => onDeadlinePriorityChange(parseInt(e.target.value, 10))}
-              className={inputBaseClass}
-              data-testid="jcf-field-deadline-priority"
-            >
-              <option value={0}>Impératif</option>
-              <option value={1}>Important</option>
-              <option value={2}>Standard</option>
-              <option value={3}>Flexible</option>
-            </select>
+              onChange={onDeadlinePriorityChange}
+              inputBaseClass={inputBaseClass}
+            />
           </div>
         )}
 
