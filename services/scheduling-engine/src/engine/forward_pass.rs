@@ -124,6 +124,9 @@ pub struct Action {
     /// Per-tick log of operators assigned to this action's station.
     /// Drives build_operator_assignments and rollback.
     pub tick_operator_log: Vec<(usize, Vec<usize>)>,
+    /// Original ART (setup + run ticks) at action creation. Used for
+    /// incremental job_remaining_art updates when the action completes.
+    pub original_art: u32,
     /// Sum of per-tick productivity contributions, used for the
     /// effective_productivity field reported in ComputedAssignment.
     pub total_productivity: f64,
@@ -295,42 +298,15 @@ pub fn find_operators_for_station(
     max_operators: u32,
     is_setup_phase: bool,
 ) -> Vec<usize> {
-    find_operators_for_station_cached(
-        grid, t, station_idx, operator_skills, operator_availability,
-        operator_groups, preferred_operators, max_operators, is_setup_phase, None,
-    )
-}
-
-/// Inner implementation that accepts an optional pre-computed qualified_ops cache.
-/// The hot path in run_forward_pass passes `Some(&station_qualified_ops[station_idx])`.
-fn find_operators_for_station_cached(
-    grid: &ScheduleGrid,
-    t: usize,
-    station_idx: usize,
-    operator_skills: &[Vec<(usize, f64)>],
-    operator_availability: &OperatorAvailability,
-    operator_groups: &[Vec<PreparedConcurrentGroup>],
-    preferred_operators: &[usize],
-    max_operators: u32,
-    is_setup_phase: bool,
-    cached_qualified_ops: Option<&[(usize, f64)]>,
-) -> Vec<usize> {
-    let owned: Vec<(usize, f64)>;
-    let qualified_ops: &[(usize, f64)] = match cached_qualified_ops {
-        Some(cached) => cached,
-        None => {
-            owned = (0..operator_skills.len())
-                .filter_map(|op| {
-                    let prof = operator_skills[op]
-                        .iter()
-                        .find(|(s, _)| *s == station_idx)
-                        .map(|(_, p)| *p)?;
-                    if prof > 0.0 { Some((op, prof)) } else { None }
-                })
-                .collect();
-            &owned
-        }
-    };
+    let qualified_ops: Vec<(usize, f64)> = (0..operator_skills.len())
+        .filter_map(|op| {
+            let prof = operator_skills[op]
+                .iter()
+                .find(|(s, _)| *s == station_idx)
+                .map(|(_, p)| *p)?;
+            if prof > 0.0 { Some((op, prof)) } else { None }
+        })
+        .collect();
 
     let is_pref = |op_idx: usize| preferred_operators.contains(&op_idx);
 
@@ -596,17 +572,6 @@ pub fn run_forward_pass(
     for action in actions.iter() {
         if action.art > 0 {
             *job_remaining_art.entry(action.job_id.clone()).or_insert(0) += action.art as i64;
-        }
-    }
-
-    // Pre-compute per-station qualified operators ONCE (avoids O(O×S) per
-    // find_operators_for_station call). Index: station_idx → Vec<(op_idx, proficiency)>.
-    let mut station_qualified_ops: Vec<Vec<(usize, f64)>> = vec![Vec::new(); station_attrs.len()];
-    for (op_idx, skills) in operator_skills.iter().enumerate() {
-        for &(s_idx, prof) in skills {
-            if prof > 0.0 && s_idx < station_qualified_ops.len() {
-                station_qualified_ops[s_idx].push((op_idx, prof));
-            }
         }
     }
 
@@ -1003,15 +968,9 @@ pub fn run_forward_pass(
             if station_idx < last_action_per_station.len() {
                 last_action_per_station[station_idx] = Some(action_idx);
             }
-            // Decrement job ART (incremental update — avoids full rebuild each tick)
+            // Decrement job ART: O(1) using stored original_art
             if let Some(entry) = job_remaining_art.get_mut(&actions[action_idx].job_id) {
-                // The action's art was decremented to 0 in advance_action_at_tick;
-                // subtract what it contributed at the start (its original total ticks).
-                // Since we can't easily track the original, just recompute for this job.
-                *entry = actions.iter()
-                    .filter(|a| a.job_id == actions[action_idx].job_id && a.art > 0)
-                    .map(|a| a.art as i64)
-                    .sum();
+                *entry -= actions[action_idx].original_art as i64;
             }
             let assignment = build_assignment_for(
                 actions,
