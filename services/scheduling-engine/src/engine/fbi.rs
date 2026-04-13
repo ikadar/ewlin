@@ -95,11 +95,11 @@ pub fn run_with_fbi(
         makespan_minutes: u64::MAX,
         total_tasks: 0,
         scheduled_tasks: 0,
-        deadline_violations: 0,
-        late_task_count: 0,
-        total_lateness_minutes: 0,
-        late_job_count: 0,
-        weighted_lateness_minutes: 0,
+        deadline_violations: u32::MAX,
+        late_task_count: u32::MAX,
+        total_lateness_minutes: u64::MAX,
+        late_job_count: u32::MAX,
+        weighted_lateness_minutes: u64::MAX,
         late_job_ids: Vec::new(),
     };
     let mut prev_makespan: u64 = u64::MAX;
