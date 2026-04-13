@@ -29,6 +29,7 @@ pub enum ProgressEvent {
         iteration: u32,
         makespan_minutes: u64,
         scheduled_tasks: u32,
+        late_job_count: u32,
     },
     /// FBI converged early
     #[serde(rename_all = "camelCase")]

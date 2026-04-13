@@ -234,6 +234,7 @@ pub fn run_with_fbi(
             iteration: iteration + 1,
             makespan_minutes: current_makespan,
             scheduled_tasks: stats.scheduled_tasks,
+            late_job_count: stats.late_job_count,
         });
 
         // Track best result

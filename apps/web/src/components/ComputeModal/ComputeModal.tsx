@@ -208,7 +208,9 @@ function useComputeStream(
                 }
               } else if (type === 'fbiIterationDone') {
                 if (activeIdx >= 0) {
-                  currentSteps[activeIdx].detail = `${parsed.scheduledTasks} tâches · makespan ${Math.round(parsed.makespanMinutes / 60 / 24)}j`;
+                  const late = parsed.lateJobCount ?? 0;
+                  const lateStr = late > 0 ? ` · ${late} job${late > 1 ? 's' : ''} en retard` : ' · 0 retard';
+                  currentSteps[activeIdx].detail = `${parsed.scheduledTasks} tâches · makespan ${Math.round(parsed.makespanMinutes / 60 / 24)}j${lateStr}`;
                 }
                 finishCurrent();
               } else if (type === 'fbiConverged') {
