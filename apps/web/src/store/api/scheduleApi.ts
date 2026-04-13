@@ -874,8 +874,8 @@ export const scheduleApi = createApi({
      *
      * No optimistic update — waits for server response then refetches snapshot.
      */
-    computeSchedule: builder.mutation<ComputeScheduleResult, void>({
-      query: () => ({ url: '/schedule/compute', method: 'POST' }),
+    computeSchedule: builder.mutation<ComputeScheduleResult, { mode?: 'full' | 'selective' | 'incremental'; jobId?: string } | void>({
+      query: (body) => ({ url: '/schedule/compute', method: 'POST', body: body ?? {} }),
       invalidatesTags: ['Snapshot'],
     }),
   }),

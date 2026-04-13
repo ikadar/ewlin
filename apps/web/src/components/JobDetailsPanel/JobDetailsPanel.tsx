@@ -53,6 +53,8 @@ export interface JobDetailsPanelProps {
   conflictTaskIds?: Set<string>;
   /** v0.5.13b: Callback when edit button is clicked */
   onEditJob?: () => void;
+  /** Callback when "Calculer ce job" is clicked */
+  onComputeJob?: (jobId: string) => void;
   /** Job IDs that are late (past workshop exit date) */
   lateJobIds?: Set<string>;
   /** Job IDs that are shipped (highest priority tile coloring) */
@@ -122,6 +124,7 @@ export function JobDetailsPanel({
   onDepartureChange,
   onReturnChange,
   onEditJob,
+  onComputeJob,
   lateJobIds,
   shippedJobIds,
   onSplitTask,
@@ -283,16 +286,27 @@ export function JobDetailsPanel({
           </div>
         )}
 
-        {/* Line 4: Modifier button */}
-        {onEditJob && (
-          <div className="pt-1">
-            <button
-              onClick={onEditJob}
-              className="bg-white/[0.06] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-100 transition-colors"
-              data-testid="job-details-edit-button"
-            >
-              Modifier
-            </button>
+        {/* Action buttons */}
+        {(onEditJob || onComputeJob) && (
+          <div className="pt-1 flex gap-1.5">
+            {onEditJob && (
+              <button
+                onClick={onEditJob}
+                className="bg-white/[0.06] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-100 transition-colors"
+                data-testid="job-details-edit-button"
+              >
+                Modifier
+              </button>
+            )}
+            {onComputeJob && (
+              <button
+                onClick={() => onComputeJob(job.id)}
+                className="bg-blue-600/20 border border-blue-500/30 rounded px-2.5 py-1.5 text-xs text-blue-400 hover:text-blue-200 hover:bg-blue-600/30 transition-colors"
+                data-testid="job-details-compute-button"
+              >
+                Calculer ce job
+              </button>
+            )}
           </div>
         )}
 

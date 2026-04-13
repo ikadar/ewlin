@@ -429,6 +429,26 @@ export default function OperatorSchedulePage() {
     try { await fuseTask(taskId).unwrap(); } catch { /* ignore */ }
   }, [fuseTask]);
 
+  // Selective compute: place one job in the gaps
+  const handleComputeJob = useCallback(async (jobId: string) => {
+    try {
+      const result = await computeSchedule({ mode: 'selective', jobId }).unwrap();
+      setComputeResult(result);
+    } catch (err) {
+      console.error('Selective compute failed:', err);
+    }
+  }, [computeSchedule]);
+
+  // Incremental compute: place all unplaced jobs in the gaps
+  const handleComputeIncremental = useCallback(async () => {
+    try {
+      const result = await computeSchedule({ mode: 'incremental' }).unwrap();
+      setComputeResult(result);
+    } catch (err) {
+      console.error('Incremental compute failed:', err);
+    }
+  }, [computeSchedule]);
+
   // ---- Keyboard navigation: Alt+Up/Down to cycle jobs ----
   const orderedJobIds = useMemo(() => snapshot.jobs.map(j => j.id), [snapshot.jobs]);
 
@@ -438,6 +458,22 @@ export default function OperatorSchedulePage() {
       if (isCtrlAltLetter(e, 'z')) {
         e.preventDefault();
         massUnschedule.trigger();
+        return;
+      }
+
+      // Ctrl+Alt+P: incremental compute (all unplaced)
+      if (isCtrlAltLetter(e, 'p')) {
+        e.preventDefault();
+        handleComputeIncremental();
+        return;
+      }
+
+      // Alt+P: selective compute (selected job)
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        if (selectedJobId) {
+          handleComputeJob(selectedJobId);
+        }
         return;
       }
 
@@ -597,6 +633,7 @@ export default function OperatorSchedulePage() {
             onReturnChange={handleOutsourcingReturnChange}
             onSplitTask={handleSplitTask}
             onFuseTask={handleFuseTask}
+            onComputeJob={handleComputeJob}
             lateJobIds={lateJobIds}
             allJobs={snapshot.jobs}
             onSelectJob={setSelectedJobId}
