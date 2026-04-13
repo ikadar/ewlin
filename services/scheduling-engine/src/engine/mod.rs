@@ -157,6 +157,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
         fbi_max_iterations,
         start_date,
         options.multi_start,
+        options.perturbed_starts,
         &request.station_groups,
         &station_blocked_ranges,
         &occupied_slots_parsed,
@@ -1033,6 +1034,7 @@ mod integration_tests {
             tick_minutes: 60,
             fbi_max_iterations: 1,
             multi_start: false,
+            perturbed_starts: 0,
         })
     }
 
@@ -1547,7 +1549,7 @@ mod integration_tests {
             stations: vec![station],
             operators: vec![alice],
             jobs,
-            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false }),
+            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0 }),
             station_groups: Vec::new(),
             constraints: Vec::new(),
             occupied_slots: Vec::new(),
@@ -1607,7 +1609,7 @@ mod integration_tests {
                 make_2step_job("B", fmt(48)), // listed first, loose
                 make_2step_job("A", fmt(5)),  // listed second, tight
             ],
-            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false }),
+            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0 }),
             station_groups: Vec::new(),
             constraints: Vec::new(),
             occupied_slots: Vec::new(),

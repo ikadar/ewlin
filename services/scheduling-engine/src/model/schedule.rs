@@ -72,6 +72,11 @@ pub struct ComputeOptions {
     pub fbi_max_iterations: u32,
     #[serde(default)]
     pub multi_start: bool,
+    /// Number of additional perturbed multi-start passes to run.
+    /// Each pass uses randomly perturbed scoring weights (seeded for determinism).
+    /// 0 = disabled (default: 4 additional passes).
+    #[serde(default = "default_perturbed_starts")]
+    pub perturbed_starts: u32,
 }
 
 impl Default for ComputeOptions {
@@ -81,6 +86,7 @@ impl Default for ComputeOptions {
             tick_minutes: default_tick_minutes(),
             fbi_max_iterations: default_fbi_max_iterations(),
             multi_start: true,
+            perturbed_starts: default_perturbed_starts(),
         }
     }
 }
@@ -95,6 +101,10 @@ fn default_tick_minutes() -> u32 {
 
 fn default_fbi_max_iterations() -> u32 {
     3
+}
+
+fn default_perturbed_starts() -> u32 {
+    4
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

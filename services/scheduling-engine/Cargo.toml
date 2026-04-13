@@ -12,3 +12,4 @@ chrono = { version = "0.4", features = ["serde"] }
 tower-http = { version = "0.6", features = ["cors"] }
 futures = "0.3"
 async-stream = "0.3"
+rand = "0.8"

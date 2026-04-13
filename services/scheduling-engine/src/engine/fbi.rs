@@ -42,6 +42,7 @@ pub fn run_with_fbi(
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
     now_tick: usize,
+    score_weights: &[f64; 6],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -112,9 +113,6 @@ pub fn run_with_fbi(
     // Stations where late jobs waited longest get a bonus to prioritize
     // their tasks in the next iteration's forward pass.
     let mut station_urgency_boost: HashMap<usize, f64> = HashMap::new();
-
-    // Default score weights (all 1.0 = current behavior)
-    let score_weights: [f64; 6] = [1.0; 6];
 
     let effective_max = if max_iterations == 0 { 1 } else { max_iterations };
 
@@ -351,12 +349,23 @@ pub fn run_with_fbi_ordering(
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
     now_tick: usize,
+    score_weights: &[f64; 6],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick, score_weights)
 }
 
-/// Multi-start FBI: optionally run with both TierFirst and EDD orderings and
-/// return the best result.  When `multi_start` is false, behaves like plain FBI.
+/// Multi-start FBI with perturbed scoring weights.
+///
+/// Runs multiple FBI passes with different configurations and returns the
+/// best result. Configurations include:
+/// 1. Baseline: TierFirst ordering, default weights [1.0; 6]
+/// 2. EDD ordering (if multi_start=true): EarliestDeadline, default weights
+/// 3. Perturbed passes (if perturbed_starts > 0): each uses TierFirst with
+///    randomly perturbed scoring weights (seeded for determinism)
+///
+/// The scoring weights multiply the 6 forward pass scoring components:
+/// [weighted_urgency, job_boost, proximity_bonus, calage_bonus,
+///  chain_pressure, contention_bonus]
 pub fn run_with_multi_start_fbi(
     jobs: &[JobInput],
     stations: &[StationInput],
@@ -366,37 +375,96 @@ pub fn run_with_multi_start_fbi(
     max_iterations: u32,
     start_date: NaiveDate,
     multi_start: bool,
+    perturbed_starts: u32,
     station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
     now_tick: usize,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    let (a1, act1, s1, i1) = run_with_fbi_ordering(
+    use rand::Rng;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let default_weights: [f64; 6] = [1.0; 6];
+    let mut total_iters: u32 = 0;
+
+    // Pass 1: Baseline (TierFirst, default weights)
+    let (mut best_a, mut best_act, mut best_s, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
         BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
-        now_tick,
+        now_tick, &default_weights,
     );
+    total_iters += i1;
+    let mut best_score = (best_s.late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
 
-    if !multi_start {
-        return (a1, act1, s1, i1);
+    eprintln!("[MULTI-START] pass 0 (baseline TierFirst): late_jobs={} lateness={} makespan={}",
+        best_s.late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
+
+    // Pass 2: EDD ordering (if multi_start enabled)
+    if multi_start {
+        let (a2, act2, s2, i2) = run_with_fbi_ordering(
+            jobs, stations, operators,
+            tick_minutes, horizon_days, max_iterations, start_date,
+            BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, progress,
+            now_tick, &default_weights,
+        );
+        total_iters += i2;
+        let score2 = (s2.late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+
+        eprintln!("[MULTI-START] pass 1 (EDD): late_jobs={} lateness={} makespan={}",
+            s2.late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+
+        if score2 < best_score {
+            best_a = a2;
+            best_act = act2;
+            best_s = s2;
+            best_score = score2;
+        }
     }
 
-    let (a2, act2, s2, i2) = run_with_fbi_ordering(
-        jobs, stations, operators,
-        tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, progress,
-        now_tick,
-    );
+    // Perturbed passes: randomly perturb scoring weights
+    if perturbed_starts > 0 {
+        let mut rng = StdRng::seed_from_u64(42);
 
-    // Pick the result with fewer late jobs, then less weighted lateness, then shorter makespan
-    let score1 = (s1.late_job_count, s1.weighted_lateness_minutes, s1.makespan_minutes);
-    let score2 = (s2.late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+        for pass in 0..perturbed_starts {
+            // Generate perturbed weights in [0.5, 1.5] for each of the 6 scoring components
+            let mut weights = [0.0f64; 6];
+            for w in &mut weights {
+                *w = 0.5 + rng.gen_range(0.0..1.0); // [0.5, 1.5)
+            }
 
-    if score2 < score1 {
-        (a2, act2, s2, i1 + i2)
-    } else {
-        (a1, act1, s1, i1 + i2)
+            // Alternate between TierFirst and EDD for perturbed passes
+            let ordering = if pass % 2 == 0 {
+                BackwardOrdering::TierFirst
+            } else {
+                BackwardOrdering::EarliestDeadline
+            };
+
+            let (ap, actp, sp, ip) = run_with_fbi_ordering(
+                jobs, stations, operators,
+                tick_minutes, horizon_days, max_iterations, start_date,
+                ordering, station_groups, station_blocked_ranges, occupied_slots, progress,
+                now_tick, &weights,
+            );
+            total_iters += ip;
+            let score_p = (sp.late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
+
+            eprintln!("[MULTI-START] pass {} (perturbed {:?} w={:.2?}): late_jobs={} lateness={} makespan={}",
+                pass + 2, ordering, weights, sp.late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
+
+            if score_p < best_score {
+                best_a = ap;
+                best_act = actp;
+                best_s = sp;
+                best_score = score_p;
+            }
+        }
     }
+
+    eprintln!("[MULTI-START] best: late_jobs={} lateness={} makespan={} (total {} FBI iterations)",
+        best_s.late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes, total_iters);
+
+    (best_a, best_act, best_s, total_iters)
 }
