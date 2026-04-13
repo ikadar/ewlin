@@ -268,23 +268,26 @@ export const ComputeModal = memo(function ComputeModal({
 
   const lateJobs = useMemo(() => {
     if (!result) return [];
-    // Use snapshot.lateJobs as single source of truth (includes outsourced tasks
-    // auto-assigned by PHP, which the engine never sees).
-    // Enrich with exact lateness from engine assignments when available.
+    // Start with engine assignments (available immediately after compute).
     const engineLate = findLateJobs(snapshot, result);
-    const engineByRef = new Map(engineLate.map((lj) => [lj.ref, lj]));
-    return snapshot.lateJobs
-      .map((lj) => {
-        const job = snapshot.jobs.find((j) => j.id === lj.jobId);
-        const ref = job?.reference ?? '?';
-        const exact = engineByRef.get(ref);
-        return {
-          ref,
-          client: job?.client ?? '',
-          lateByMinutes: exact?.lateByMinutes ?? (lj.delayDays ?? 1) * 24 * 60,
-        };
-      })
-      .sort((a, b) => b.lateByMinutes - a.lateByMinutes);
+    // Once snapshot is refetched, merge in validation-service late jobs
+    // (includes outsourced tasks auto-assigned by PHP).
+    if (snapshot.lateJobs.length > 0) {
+      const engineByRef = new Map(engineLate.map((lj) => [lj.ref, lj]));
+      return snapshot.lateJobs
+        .map((lj) => {
+          const job = snapshot.jobs.find((j) => j.id === lj.jobId);
+          const ref = job?.reference ?? '?';
+          const exact = engineByRef.get(ref);
+          return {
+            ref,
+            client: job?.client ?? '',
+            lateByMinutes: exact?.lateByMinutes ?? (lj.delayDays ?? 1) * 24 * 60,
+          };
+        })
+        .sort((a, b) => b.lateByMinutes - a.lateByMinutes);
+    }
+    return engineLate;
   }, [result, snapshot]);
 
   const hasLate = lateJobs.length > 0;
