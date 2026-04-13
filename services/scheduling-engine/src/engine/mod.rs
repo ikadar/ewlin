@@ -52,7 +52,8 @@ pub fn compute_with_progress(request: &ComputeRequest, tx: mpsc::Sender<Progress
 
 fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> ScheduleResult {
     let start_time = Instant::now();
-    let start_date = Local::now().date_naive();
+    let now = Local::now();
+    let start_date = now.date_naive();
 
     let options = request.options.clone().unwrap_or_default();
     // Use the finest tick granularity across all stations. If any station
@@ -134,6 +135,16 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
         .map(|s| (s.id.clone(), s.masked_time_enabled))
         .collect();
 
+    // Compute now_tick: current time rounded UP to the next tick boundary.
+    // No task will be placed before this tick (avoids scheduling in the past).
+    let now_tick = {
+        use chrono::Timelike;
+        let minutes_since_midnight = now.hour() as u32 * 60 + now.minute() as u32;
+        // Round up to next tick boundary
+        let ticks = (minutes_since_midnight + tick_minutes - 1) / tick_minutes;
+        ticks as usize
+    };
+
     // Run FBI loop with optional multi-start (TierFirst + EDD orderings)
     emit(progress, ProgressEvent::MergeStart); // signal "sending to engine"
 
@@ -150,6 +161,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
         &station_blocked_ranges,
         &occupied_slots_parsed,
         progress,
+        now_tick,
     );
 
     // Moore escape hatch: if late imperative/important jobs remain after FBI,
@@ -169,6 +181,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             start_date,
             3, // max_attempts
             &request.station_groups,
+            now_tick,
         ) {
             assignments = moore_assignments;
             actions = moore_actions;

@@ -493,6 +493,7 @@ pub fn run_forward_pass(
     tick_minutes: u32,
     start_date: NaiveDate,
     station_to_group: &[Option<(usize, u32)>],
+    now_tick: usize,
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
@@ -504,7 +505,9 @@ pub fn run_forward_pass(
     // don't try to use the same station slot.
     pre_place_pinned_actions(grid, actions, grow_ticks, &mut assignments, tick_minutes, start_date);
 
-    let mut t: usize = 0;
+    // Start scheduling from now (rounded up to tick boundary), not midnight.
+    // Tasks cannot be placed in the past.
+    let mut t: usize = now_tick;
 
     // Pre-build station-to-pending-actions index for LAST safety check
     let mut station_to_actions: Vec<Vec<usize>> = vec![Vec::new(); station_attrs.len()];

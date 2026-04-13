@@ -40,6 +40,7 @@ pub fn run_with_fbi(
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
+    now_tick: usize,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -216,6 +217,7 @@ pub fn run_with_fbi(
             tick_minutes,
             start_date,
             &station_to_group,
+            now_tick,
         );
 
         // Remap and compute stats
@@ -332,8 +334,9 @@ pub fn run_with_fbi_ordering(
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
+    now_tick: usize,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges, occupied_slots, progress)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges, occupied_slots, progress, now_tick)
 }
 
 /// Multi-start FBI: optionally run with both TierFirst and EDD orderings and
@@ -351,11 +354,13 @@ pub fn run_with_multi_start_fbi(
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
+    now_tick: usize,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let (a1, act1, s1, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
         BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
+        now_tick,
     );
 
     if !multi_start {
@@ -366,6 +371,7 @@ pub fn run_with_multi_start_fbi(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
         BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, progress,
+        now_tick,
     );
 
     // Pick the result with fewer late jobs, then less weighted lateness, then shorter makespan
