@@ -901,6 +901,9 @@ export interface ComputeScheduleResult {
     deadlineViolations: number;
     lateTaskCount: number;
     totalLatenessMinutes: number;
+    lateJobCount: number;
+    weightedLatenessMinutes: number;
+    lateJobIds: string[];
   };
   warnings: Array<{ taskId: string | null; message: string }>;
   fbiIterations: number;

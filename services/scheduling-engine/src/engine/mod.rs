@@ -859,6 +859,10 @@ pub fn compute_stats(
         }
     }
 
+    let late_job_count = late_jobs.len() as u32;
+    let mut late_job_ids: Vec<String> = late_jobs.into_iter().collect();
+    late_job_ids.sort();
+
     ScheduleStats {
         makespan_minutes,
         total_tasks,
@@ -866,8 +870,9 @@ pub fn compute_stats(
         deadline_violations,
         late_task_count,
         total_lateness_minutes,
-        late_job_count: late_jobs.len() as u32,
+        late_job_count,
         weighted_lateness_minutes,
+        late_job_ids,
     }
 }
 

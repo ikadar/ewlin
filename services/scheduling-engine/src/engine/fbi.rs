@@ -100,6 +100,7 @@ pub fn run_with_fbi(
         total_lateness_minutes: 0,
         late_job_count: 0,
         weighted_lateness_minutes: 0,
+        late_job_ids: Vec::new(),
     };
     let mut prev_makespan: u64 = u64::MAX;
     let mut iteration_count: u32 = 0;

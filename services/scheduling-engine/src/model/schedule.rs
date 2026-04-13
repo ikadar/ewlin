@@ -156,6 +156,9 @@ pub struct ScheduleStats {
     pub late_job_count: u32,
     #[serde(default)]
     pub weighted_lateness_minutes: u64,
+    /// IDs of jobs that miss their deadline (one entry per job, deduplicated)
+    #[serde(default)]
+    pub late_job_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

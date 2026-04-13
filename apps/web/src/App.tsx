@@ -33,7 +33,7 @@ import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
-import { formatAutoSaveName, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
+import { formatAutoSaveName, getTasksForJob, getJobIdForTask, compareTaskOrder, createTaskToJobMap } from './utils';
 import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory } from '@flux/types';
 import { getDeadlineDate } from '@flux/types';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
@@ -938,11 +938,25 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pixelsPerHour]); // handleGridScroll is stable, pixelsPerHour triggers recalc
 
-  // Late job IDs for state-based tile coloring
-  const lateJobIds = useMemo(
-    () => new Set(snapshot.lateJobs.map((lj) => lj.jobId)),
-    [snapshot.lateJobs],
-  );
+  // Real-time clock for NOW-surpassed overdue detection (updated every 60 s)
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Late job IDs: deadline violations (snapshot) + real-time NOW-surpassed tasks
+  const lateJobIds = useMemo(() => {
+    const ids = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
+    const taskToJob = createTaskToJobMap(snapshot.tasks, snapshot.elements);
+    for (const a of snapshot.assignments) {
+      if (!a.isCompleted && new Date(a.scheduledEnd) < now) {
+        const jobId = taskToJob.get(a.taskId);
+        if (jobId) ids.add(jobId);
+      }
+    }
+    return ids;
+  }, [snapshot.lateJobs, snapshot.assignments, snapshot.tasks, snapshot.elements, now]);
 
   // Shipped job IDs for state-based tile coloring (highest priority)
   const shippedJobIds = useMemo(
