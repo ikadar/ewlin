@@ -353,6 +353,15 @@ fn place_backward(
             continue; // no qualified operator available at this tick
         }
 
+        // Reserve this tick BEFORE computing productivity, because
+        // productivity_at_tick checks grid.operator_stations_at() — the
+        // operator must already be assigned to the station for it to see
+        // a non-zero contribution.
+        grid.assign_station(station_idx, t, action_idx);
+        for &op_idx in &operators {
+            grid.assign_operator(op_idx, t, station_idx, 0.0);
+        }
+
         // Compute productivity for this tick using the same model as forward pass
         let productivity: f64 = if operators.is_empty() {
             // No operators configured (e.g. automated station) — 1.0 per tick
@@ -368,12 +377,6 @@ fn place_backward(
             // Setup phase: fixed duration, 1.0 per tick regardless of proficiency
             1.0
         };
-
-        // Reserve this tick
-        grid.assign_station(station_idx, t, action_idx);
-        for &op_idx in &operators {
-            grid.assign_operator(op_idx, t, station_idx, 0.0);
-        }
 
         occupied_ticks.push(t);
         work_remaining -= productivity;

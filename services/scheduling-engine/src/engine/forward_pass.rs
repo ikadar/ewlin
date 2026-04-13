@@ -666,16 +666,33 @@ pub fn run_forward_pass(
             let tier_w = TIER_WEIGHT[action.deadline_priority.min(3) as usize];
             let weighted_urgency = (raw_urgency as f64 * tier_w) as i64;
 
-            let job_boost: i64 = if action.job_deadline_tick < u64::MAX {
+            // job_boost: reactive penalty when job is already past its deadline estimate.
+            // proximity_bonus: proactive boost when job is within 1 day of deadline.
+            //
+            // The two are calibrated to form a continuous function at job_slack = 0:
+            //   job_slack < 0  → job_boost  = |slack| × 50 × tier_w  (grows with lateness)
+            //   job_slack = 0  → proximity  = 45 × tier_w              (just below job_boost at -1)
+            //   job_slack > 0  → proximity  = ratio × 45 × tier_w      (tapers to 0 at +1 day)
+            //
+            // Using 45 (< 50) guarantees any negative-slack job always outscores a
+            // same-tier job at zero slack, preventing priority inversion.
+            let (job_boost, proximity_bonus): (i64, i64) = if action.job_deadline_tick < u64::MAX {
                 let job_art = job_remaining_art.get(&action.job_id).copied().unwrap_or(0);
                 let job_slack = action.job_deadline_tick as i64 - t as i64 - job_art;
                 if job_slack < 0 {
-                    ((-job_slack) as f64 * 50.0 * tier_w) as i64
+                    (((-job_slack) as f64 * 50.0 * tier_w) as i64, 0)
                 } else {
-                    0
+                    let ticks_per_day = (24 * 60 / tick_minutes) as i64;
+                    let prox = if job_slack < ticks_per_day {
+                        let ratio = 1.0 - (job_slack as f64 / ticks_per_day as f64);
+                        (ratio * 45.0 * tier_w) as i64
+                    } else {
+                        0
+                    };
+                    (0, prox)
                 }
             } else {
-                0
+                (0, 0)
             };
 
             let calage_bonus = compute_calage_bonus(&last_action_per_station, &actions, i);
@@ -700,7 +717,7 @@ pub fn run_forward_pass(
                 0
             };
 
-            let score = weighted_urgency + job_boost + calage_bonus + chain_pressure + contention_bonus;
+            let score = weighted_urgency + job_boost + proximity_bonus + calage_bonus + chain_pressure + contention_bonus;
 
             scored.push(ScoredAction { action_idx: i, score });
         }

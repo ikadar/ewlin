@@ -915,7 +915,7 @@ mod integration_tests {
 
     use super::*;
     use crate::model::job::{ElementInput, JobInput, TaskInput};
-    use crate::model::operator::{ConcurrentGroupInput, OperatorInput, OperatorSkill};
+    use crate::model::operator::{ConcurrentGroupInput, DaySchedule, OperatingSchedule, OperatorInput, OperatorSkill, TimeSlot};
     use crate::model::schedule::{ComputeOptions, ComputeRequest};
     use crate::model::station::StationInput;
 
@@ -953,6 +953,43 @@ mod integration_tests {
             last_name: "Test".to_string(),
             role: "operator".to_string(),
             operating_schedule: None,
+            skills: skills
+                .iter()
+                .map(|(s, p)| OperatorSkill {
+                    station_id: s.to_string(),
+                    proficiency: *p,
+                })
+                .collect(),
+            concurrent_groups: groups,
+        }
+    }
+
+    /// Operator available 24/7 — avoids Mon-Fri 8h-17h default schedule
+    /// that causes flaky tests when the current time is close to end-of-day.
+    fn make_always_on_operator(
+        id: &str,
+        first_name: &str,
+        skills: &[(&str, f64)],
+        groups: Vec<ConcurrentGroupInput>,
+    ) -> OperatorInput {
+        let full_day = DaySchedule {
+            slots: vec![TimeSlot { start: "00:00".into(), end: "24:00".into() }],
+        };
+        let schedule = OperatingSchedule {
+            monday: Some(full_day.clone()),
+            tuesday: Some(full_day.clone()),
+            wednesday: Some(full_day.clone()),
+            thursday: Some(full_day.clone()),
+            friday: Some(full_day.clone()),
+            saturday: Some(full_day.clone()),
+            sunday: Some(full_day),
+        };
+        OperatorInput {
+            id: id.to_string(),
+            first_name: first_name.to_string(),
+            last_name: "Test".to_string(),
+            role: "operator".to_string(),
+            operating_schedule: Some(schedule),
             skills: skills
                 .iter()
                 .map(|(s, p)| OperatorSkill {
@@ -1454,5 +1491,134 @@ mod integration_tests {
         assert_eq!(a.to, "2026-04-13T06:00:00");
         let b = out.iter().find(|o| o.operator_id == "op-b").unwrap();
         assert_eq!(b.to, "2026-04-13T05:30:00");
+    }
+
+    /// Four jobs compete for 1 station. Each takes 2 h (tick=60 min).
+    /// Deadlines spread 3/5/7/9 h from now — listed in reverse (D,C,B,A)
+    /// to confirm input order doesn't override urgency ordering.
+    /// Wrong scheduling order (e.g. D first) would make A late (ends at h+8 > deadline h+3).
+    #[test]
+    fn tight_deadlines_all_scheduled_on_time() {
+        let station = make_station("press", "Press", false);
+        let alice = make_always_on_operator("alice", "Alice", &[("press", 1.0)], vec![]);
+
+        let now = chrono::Local::now().naive_local();
+        let fmt = |h: i64| {
+            (now + chrono::Duration::hours(h))
+                .format("%Y-%m-%dT%H:%M:%S")
+                .to_string()
+        };
+
+        let make_job_with_deadline = |id: &str, deadline: String| JobInput {
+            id: id.to_string(),
+            reference: None,
+            description: None,
+            deadline: Some(deadline),
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: format!("{id}-elem"),
+                name: None,
+                // 2-h task: enough time so A (3 h deadline) must go first,
+                // but scheduling D first would push A to end at h+8 → late.
+                tasks: vec![TaskInput {
+                    id: format!("{id}-task"),
+                    station_id: "press".to_string(),
+                    setup_minutes: 0,
+                    run_minutes: 120,
+                    sequence_order: 0,
+                    is_pinned: false,
+                    pinned_start_tick: None,
+                    predecessor_gap_minutes: 0,
+                }],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let jobs = vec![
+            make_job_with_deadline("D", fmt(9)), // loosest deadline, listed first
+            make_job_with_deadline("C", fmt(7)),
+            make_job_with_deadline("B", fmt(5)),
+            make_job_with_deadline("A", fmt(3)), // tightest deadline, listed last
+        ];
+
+        let request = ComputeRequest {
+            stations: vec![station],
+            operators: vec![alice],
+            jobs,
+            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false }),
+            station_groups: Vec::new(),
+            constraints: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+
+        let result = compute(&request);
+        assert_eq!(result.assignments.len(), 4, "all 4 jobs must be scheduled");
+        assert_eq!(result.stats.late_job_count, 0,
+            "wrong schedule order would make A late (ends h+8 > deadline h+3)");
+    }
+
+    /// Proximity bonus regression: A and B both need S1 then S2 (sequential, 2 h each leg).
+    /// A deadline = 5 h → LAST(A.s1) = 5-2-2 = 1 h (very urgent).
+    /// B deadline = 48 h → very loose.
+    /// B is listed first in input; the engine must still schedule A first.
+    #[test]
+    fn proximity_bonus_prioritises_tight_deadline_job() {
+        let s1 = make_station("s1", "S1", false);
+        let s2 = make_station("s2", "S2", false);
+        let alice = make_always_on_operator("alice", "Alice", &[("s1", 1.0), ("s2", 1.0)], vec![]);
+
+        let now = chrono::Local::now().naive_local();
+        let fmt = |h: i64| {
+            (now + chrono::Duration::hours(h))
+                .format("%Y-%m-%dT%H:%M:%S")
+                .to_string()
+        };
+
+        let make_2step_job = |id: &str, deadline: String| JobInput {
+            id: id.to_string(),
+            reference: None,
+            description: None,
+            deadline: Some(deadline),
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: format!("{id}-elem"),
+                name: None,
+                tasks: vec![
+                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, pinned_start_tick: None, predecessor_gap_minutes: 0 },
+                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, pinned_start_tick: None, predecessor_gap_minutes: 0 },
+                ],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        // B listed first, A has tight deadline — correct scheduling: A.s1 before B.s1
+        let request = ComputeRequest {
+            stations: vec![s1, s2],
+            operators: vec![alice],
+            jobs: vec![
+                make_2step_job("B", fmt(48)), // listed first, loose
+                make_2step_job("A", fmt(5)),  // listed second, tight
+            ],
+            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false }),
+            station_groups: Vec::new(),
+            constraints: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+
+        let result = compute(&request);
+        assert_eq!(result.assignments.len(), 4, "all 4 tasks must be assigned");
+        assert_eq!(result.stats.late_job_count, 0, "job-A must not be late");
+
+        let a_s1 = result.assignments.iter().find(|a| a.task_id == "A-s1").unwrap();
+        let b_s1 = result.assignments.iter().find(|a| a.task_id == "B-s1").unwrap();
+        assert!(
+            a_s1.scheduled_start <= b_s1.scheduled_start,
+            "A (5 h deadline) must start before B (48 h deadline): A={} B={}",
+            a_s1.scheduled_start, b_s1.scheduled_start
+        );
     }
 }
