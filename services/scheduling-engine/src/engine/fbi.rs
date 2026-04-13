@@ -112,6 +112,12 @@ pub fn run_with_fbi(
 
     let effective_max = if max_iterations == 0 { 1 } else { max_iterations };
 
+    // Mid-FBI re-prioritization: late jobs from the previous iteration get
+    // their deadline_priority boosted by one tier (clamped to 0 = imperative)
+    // so the next backward pass schedules them earlier. The boost only
+    // affects the backward pass (LAST computation), not the permanent job data.
+    let mut boosted_jobs: Vec<JobInput> = Vec::new();
+
     for iteration in 0..effective_max {
         iteration_count = iteration + 1;
 
@@ -120,10 +126,13 @@ pub fn run_with_fbi(
             max_iterations: effective_max,
         });
 
+        // Use boosted jobs for backward pass if available (from previous iteration's late jobs)
+        let jobs_for_backward = if boosted_jobs.is_empty() { jobs } else { &boosted_jobs };
+
         // Compute LAST values using reverse forward pass
         let initial_ticks_for_last = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
         let last_values = compute_last_values(
-            jobs, stations, operators,
+            jobs_for_backward, stations, operators,
             &station_attrs, &operator_skills, &operator_groups,
             tick_minutes, start_date,
             initial_ticks_for_last,
@@ -279,6 +288,22 @@ pub fn run_with_fbi(
         prev_makespan = current_makespan;
         prev_late_job_count = current_score.0;
         prev_weighted_lateness = current_score.1;
+
+        // Mid-FBI re-prioritization: boost late jobs by one tier for the
+        // next iteration's backward pass. This makes the LAST computation
+        // treat them as more urgent, giving them earlier slots.
+        if !best_stats.late_job_ids.is_empty() {
+            let late_set: std::collections::HashSet<&str> = best_stats.late_job_ids.iter().map(|s| s.as_str()).collect();
+            boosted_jobs = jobs.iter().map(|j| {
+                let mut j2 = j.clone();
+                if late_set.contains(j.id.as_str()) {
+                    j2.deadline_priority = j.deadline_priority.saturating_sub(1);
+                }
+                j2
+            }).collect();
+        } else {
+            boosted_jobs.clear();
+        }
 
         // Collect actual durations for feedback
         duration_overrides.clear();
