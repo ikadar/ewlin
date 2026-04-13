@@ -82,6 +82,31 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         station_blocked_ranges[station_idx].push((start_tick, end_tick));
     }
 
+    // Parse occupied slots (existing assignments to preserve) into grid-ready form.
+    // Each entry: (station_idx, Vec<operator_idx>, start_tick, end_tick)
+    let operator_id_to_idx: HashMap<String, usize> = request
+        .operators
+        .iter()
+        .enumerate()
+        .map(|(i, o)| (o.id.clone(), i))
+        .collect();
+
+    let occupied_slots_parsed: Vec<(usize, Vec<usize>, usize, usize)> = request
+        .occupied_slots
+        .iter()
+        .filter_map(|slot| {
+            let station_idx = *station_id_to_idx.get(&slot.station_id)?;
+            let start_tick = parse_deadline_minutes(&slot.start, start_date)
+                .map(|mins| mins as usize / tick_minutes as usize)?;
+            let end_tick = parse_deadline_minutes(&slot.end, start_date)
+                .map(|mins| mins as usize / tick_minutes as usize)?;
+            let op_indices: Vec<usize> = slot.operator_ids.iter()
+                .filter_map(|id| operator_id_to_idx.get(id).copied())
+                .collect();
+            Some((station_idx, op_indices, start_tick, end_tick))
+        })
+        .collect();
+
     // Build station masked_time lookup for post-processing
     let station_masked_time: HashMap<String, bool> = request
         .stations
@@ -101,6 +126,7 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         options.multi_start,
         &request.station_groups,
         &station_blocked_ranges,
+        &occupied_slots_parsed,
     );
 
     // Moore escape hatch: DISABLED for now — adds full FBI re-runs.
@@ -945,7 +971,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -980,7 +1006,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1040,14 +1066,14 @@ mod integration_tests {
             operators: vec![paired_op],
             jobs: jobs.clone(),
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
         });
         let unpaired_result = compute(&ComputeRequest {
             stations,
             operators: vec![unpaired_op],
             jobs,
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
         });
 
         let paired_makespan = paired_result
@@ -1107,7 +1133,7 @@ mod integration_tests {
             operators: vec![op],
             jobs: vec![make_job("job-a", "sbg", 60)],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1147,7 +1173,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1225,7 +1251,7 @@ mod integration_tests {
             operators: vec![alice],
             jobs: vec![job],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);

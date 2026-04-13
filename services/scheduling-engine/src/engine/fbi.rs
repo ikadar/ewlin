@@ -38,6 +38,7 @@ pub fn run_with_fbi(
     max_iterations: u32,
     start_date: NaiveDate,
     station_blocked_ranges: &[Vec<(usize, usize)>],
+    occupied_slots: &[(usize, Vec<usize>, usize, usize)],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -167,6 +168,23 @@ pub fn run_with_fbi(
             }
         }
 
+        // Pre-block occupied slots (existing assignments to preserve).
+        // Marks both station ticks AND operator ticks as occupied so the
+        // forward pass won't schedule new tasks on top of them.
+        for &(station_idx, ref op_indices, start_t, end_t) in occupied_slots {
+            let clamped_end = end_t.min(initial_ticks);
+            for t in start_t..clamped_end {
+                if station_idx < num_stations {
+                    grid.assign_station(station_idx, t, usize::MAX);
+                }
+                for &op_idx in op_indices {
+                    if op_idx < num_operators {
+                        grid.assign_operator(op_idx, t, station_idx, 0.0);
+                    }
+                }
+            }
+        }
+
         let mut operator_availability = OperatorAvailability::new(
             num_operators,
             initial_ticks,
@@ -292,8 +310,9 @@ pub fn run_with_fbi_ordering(
     _ordering: BackwardOrdering,
     _station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
+    occupied_slots: &[(usize, Vec<usize>, usize, usize)],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges, occupied_slots)
 }
 
 /// Multi-start FBI: optionally run with both TierFirst and EDD orderings and
@@ -309,11 +328,12 @@ pub fn run_with_multi_start_fbi(
     multi_start: bool,
     station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
+    occupied_slots: &[(usize, Vec<usize>, usize, usize)],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let (a1, act1, s1, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges,
+        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots,
     );
 
     if !multi_start {
@@ -323,7 +343,7 @@ pub fn run_with_multi_start_fbi(
     let (a2, act2, s2, i2) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges,
+        BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots,
     );
 
     // Pick the result with fewer late jobs, then less weighted lateness, then shorter makespan
