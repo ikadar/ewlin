@@ -33,10 +33,9 @@ import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
-import { formatAutoSaveName, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
+import { formatAutoSaveName, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
 import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory } from '@flux/types';
 import { getDeadlineDate } from '@flux/types';
-import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
 import { transformJcfToRequest, transformJcfElementToRequest } from './api';
@@ -92,26 +91,7 @@ interface KeyboardContext {
   gridRef: React.RefObject<SchedulingGridHandle | null>;
   pixelsPerHour: number;
   gridStartDate: Date;
-  setIsAltPressed: (v: boolean) => void;
   setSelectedJobId: (id: string | null) => void;
-}
-
-function handleAltKey(e: KeyboardEvent, ctx: KeyboardContext): boolean {
-  if (e.key === 'Alt') {
-    // Don't preventDefault — it can interfere with Alt+<key> combos on some platforms
-    ctx.setIsAltPressed(true);
-    return true;
-  }
-  return false;
-}
-
-// v0.3.54: Handle ESC to cancel pick
-function handleEscapePick(e: KeyboardEvent, cancelPick: () => void, isPicking: boolean): boolean {
-  if (e.key === 'Escape' && isPicking) {
-    cancelPick();
-    return true;
-  }
-  return false;
 }
 
 function handleEscapeCloseJob(e: KeyboardEvent, ctx: KeyboardContext): boolean {
@@ -293,8 +273,6 @@ function AppContent() {
   );
 
   // v0.5.2: RTK Query mutations for assignment operations
-  const [assignTask] = useAssignTaskMutation();
-  const [rescheduleTask] = useRescheduleTaskMutation();
   const [unassignTask] = useUnassignTaskMutation();
   const [toggleCompletion] = useToggleCompletionMutation();
   const [togglePin] = useTogglePinMutation();
@@ -354,24 +332,8 @@ function AppContent() {
   // Deferred value for grid: tile isSelected logic can lag, visual highlight is handled by CSS selector
   const deferredSelectedJobId = useDeferredValue(selectedJobId);
 
-  // v0.3.54: Pick & Place state
-  // v0.3.57: Added assignmentId for grid picks (reschedule)
-  const { state: pickState, actions: pickActions } = usePickState();
-  const { pickedTask, pickedJob, isPicking, targetStationId: pickTargetStationId, pickSource, assignmentId: pickedAssignmentId } = pickState;
-
-  // Alt key state for precedence bypass
-  const [isAltPressed, setIsAltPressed] = useState(false);
-
   // Display mode state (Produit / Tirage)
   const [displayMode, setDisplayMode] = useState<'produit' | 'tirage'>('produit');
-
-  // v0.3.54: Pick & Place validation state
-  const [pickValidation, setPickValidation] = useState<{
-    scheduledStart: string | null;
-    ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
-    message: string | null;
-    debugConflicts: Array<{ type: string; message?: string }>;
-  }>({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
 
   // Smart compaction modal state
   const [isSmartCompactOpen, setIsSmartCompactOpen] = useState(false);
@@ -662,32 +624,8 @@ function AppContent() {
     }
   }, [jcfClient]);
 
-  // v0.3.54: Sync pixelsPerHour to PickStateContext for zoom-aware ghost snapping
-  useEffect(() => {
-    pickActions.setPixelsPerHour(pixelsPerHour);
-  }, [pixelsPerHour, pickActions]);
-
-  // v0.3.56: Toggle body class for global grabbing cursor during pick mode
-  useEffect(() => {
-    if (isPicking) {
-      document.body.classList.add('pick-mode-active');
-    } else {
-      document.body.classList.remove('pick-mode-active');
-    }
-    return () => document.body.classList.remove('pick-mode-active');
-  }, [isPicking]);
-
   // Grid ref for programmatic scrolling
   const gridRef = useRef<SchedulingGridHandle>(null);
-
-  // v0.3.55: Saved scroll position for sidebar pick cancel restoration
-  const savedScrollRef = useRef<{ x: number; y: number } | null>(null);
-
-  // v0.3.56: Track last validated slot for early-exit optimization
-  const lastPickSlotRef = useRef<string | null>(null);
-
-  // v0.5.14: Store original assignment info for grid picks (to restore outsourced on cancel)
-  const gridPickInfoRef = useRef<{ taskId: string; targetId: string; scheduledStart: string } | null>(null);
 
   // v0.3.47: Zoom handler that maintains grid center position
   const handleZoomChange = useCallback((newPixelsPerHour: number) => {
@@ -851,32 +789,6 @@ function AppContent() {
     snapshot.categories.forEach((c) => map.set(c.id, c));
     return map;
   }, [snapshot.categories]);
-
-  // v0.3.54: Calculate precedence constraints for pick
-  const pickPrecedenceConstraints = useMemo(() => {
-    if (!pickedTask) {
-      return { earliestY: null, latestY: null };
-    }
-    const earliestY = getPredecessorConstraint(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    const latestY = getSuccessorConstraint(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-    return { earliestY, latestY };
-  }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
-
-  // v0.3.54: Calculate drying time info during pick
-  const pickDryingTimeInfo = useMemo((): DryingTimeInfo | null => {
-    if (!pickedTask) {
-      return null;
-    }
-    return getDryingTimeInfo(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-  }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
-
-  // v0.5.13: Calculate outsourcing time info during pick
-  const pickOutsourcingTimeInfo = useMemo((): OutsourcingTimeInfo | null => {
-    if (!pickedTask) {
-      return null;
-    }
-    return getOutsourcingTimeInfo(pickedTask, snapshot, START_HOUR, pixelsPerHour, gridStartDate);
-  }, [pickedTask, snapshot, pixelsPerHour, gridStartDate]);
 
   // REQ-14: Auto-scroll to today on initial load
   const hasScrolledToToday = useRef(false);
@@ -1225,7 +1137,6 @@ function AppContent() {
       gridRef,
       pixelsPerHour,
       gridStartDate,
-      setIsAltPressed,
       setSelectedJobId,
     };
 
@@ -1320,38 +1231,6 @@ function AppContent() {
       }
 
       // Each handler returns true if it handled the event
-      if (handleAltKey(e, ctx)) return;
-      // v0.3.54: Handle ESC to cancel pick
-      // v0.3.55: Also restore scroll position for sidebar picks
-      if (handleEscapePick(e, () => {
-        // Restore scroll position for sidebar picks
-        if (pickSource === 'sidebar' && savedScrollRef.current && gridRef.current) {
-          gridRef.current.scrollTo(savedScrollRef.current.x, savedScrollRef.current.y, 'smooth');
-          savedScrollRef.current = null;
-        }
-        lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking
-
-        // v0.5.14: Restore outsourced successor assignments for grid picks
-        // Reschedule at original position to trigger autoAssignOutsourcedSuccessors
-        const savedGridPickInfo = gridPickInfoRef.current;
-        gridPickInfoRef.current = null;
-
-        pickActions.cancelPick();
-        setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
-
-        if (savedGridPickInfo) {
-          rescheduleTask({
-            taskId: savedGridPickInfo.taskId,
-            body: {
-              targetId: savedGridPickInfo.targetId,
-              scheduledStart: savedGridPickInfo.scheduledStart,
-              isOutsourced: false,
-            },
-          }).catch((error: unknown) => {
-            console.error('Failed to restore outsourced assignments on cancel:', error);
-          });
-        }
-      }, isPicking)) return;
       if (handleDisplayModeToggle(e, setDisplayMode)) return;
       if (handleEscapeCloseJob(e, ctx)) return;
       if (handleJobNavigation(e, ctx)) return;
@@ -1360,53 +1239,15 @@ function AppContent() {
       handlePageScroll(e, ctx);
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        setIsAltPressed(false);
-      }
-    };
-
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, isPicking, pickActions, pickSource, setSelectedJobId, setDisplayMode, rescheduleTask, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleAutoPlaceAll]);
-
-  // Handle swap in a given direction using two rescheduleTask mutations
-  const handleSwap = useCallback(async (assignmentId: string, direction: 'up' | 'down') => {
-    // Guard: don't swap completed tiles
-    const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
-    if (assignment?.isCompleted) return;
-
-    const result = applySwap(snapshot.assignments, assignmentId, direction);
-    if (!result.swapped || result.reschedules.length < 2) return;
-
-    try {
-      await Promise.all(
-        result.reschedules.map(({ taskId, targetId, scheduledStart }) =>
-          rescheduleTask({ taskId, body: { targetId, scheduledStart } }).unwrap()
-        )
-      );
-    } catch (err) {
-      console.error(`Swap ${direction} failed:`, err);
-    }
-  }, [snapshot.assignments, rescheduleTask]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleAutoPlaceAll]);
 
   // Handle grid background click (deselect job)
   const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);
-
-  // Handle swap up - exchange position with tile above
-  const handleSwapUp = useCallback((assignmentId: string) => {
-    handleSwap(assignmentId, 'up');
-  }, [handleSwap]);
-
-  // Handle swap down - exchange position with tile below
-  const handleSwapDown = useCallback((assignmentId: string) => {
-    handleSwap(assignmentId, 'down');
-  }, [handleSwap]);
 
   // v0.3.58: Handle context menu open
   const handleContextMenuOpen = useCallback((x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned = false) => {
@@ -1796,45 +1637,6 @@ function AppContent() {
     handleTogglePin(contextMenu.assignmentId);
   }, [contextMenu, handleTogglePin]);
 
-  // v0.3.58: Handle context menu "Move up" action
-  const handleContextMenuMoveUp = useCallback(() => {
-    if (!contextMenu) return;
-    handleSwapUp(contextMenu.assignmentId);
-  }, [contextMenu, handleSwapUp]);
-
-  // v0.3.58: Handle context menu "Move down" action
-  const handleContextMenuMoveDown = useCallback(() => {
-    if (!contextMenu) return;
-    handleSwapDown(contextMenu.assignmentId);
-  }, [contextMenu, handleSwapDown]);
-
-  // v0.3.58: Calculate if swap is available for context menu
-  const getContextMenuSwapAvailability = useCallback(() => {
-    if (!contextMenu) return { canSwapUp: false, canSwapDown: false };
-
-    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
-    if (!assignment) return { canSwapUp: false, canSwapDown: false };
-
-    // Completed tiles cannot be swapped
-    if (assignment.isCompleted) return { canSwapUp: false, canSwapDown: false };
-
-    // Find adjacent tiles on the same station
-    const stationAssignments = snapshot.assignments
-      .filter((a) => a.targetId === assignment.targetId)
-      .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
-
-    const currentIndex = stationAssignments.findIndex((a) => a.id === contextMenu.assignmentId);
-
-    // Also check if adjacent tiles are completed
-    const adjacentUp = currentIndex > 0 ? stationAssignments[currentIndex - 1] : null;
-    const adjacentDown = currentIndex < stationAssignments.length - 1 ? stationAssignments[currentIndex + 1] : null;
-
-    return {
-      canSwapUp: currentIndex > 0 && !adjacentUp?.isCompleted,
-      canSwapDown: currentIndex < stationAssignments.length - 1 && !adjacentDown?.isCompleted,
-    };
-  }, [contextMenu, snapshot.assignments]);
-
   // Derive whether the context menu task is a split task
   const contextMenuTask = useMemo(() => {
     if (!contextMenu) return null;
@@ -1914,286 +1716,6 @@ function AppContent() {
     }
   }, [fuseTask, showToast]);
 
-  // v0.3.54: Handle pick from sidebar (unscheduled task)
-  // v0.3.55: Added scroll to target column and save scroll position
-  // v0.4.29: Accept click coordinates for initial ghost position
-  const handlePickTask = useCallback((task: Task, job: Job, clientX: number, clientY: number) => {
-    pickActions.pickFromSidebar(task, job);
-    // Initialize ghost position at click location
-    pickActions.updateGhostPosition(clientX, clientY);
-
-    // v0.3.55: Save current scroll position for cancel restoration
-    if (gridRef.current) {
-      savedScrollRef.current = {
-        x: gridRef.current.getScrollX(),
-        y: gridRef.current.getScrollY(),
-      };
-
-      // Scroll to target station column (for internal tasks)
-      if (task.type === 'Internal') {
-        const targetStationId = task.stationId;
-        const stationIndex = activeStations.findIndex((s) => s.id === targetStationId);
-        if (stationIndex >= 0) {
-          const { x: targetX } = getStationXOffset(stationIndex, activeStations, categoryMap);
-          gridRef.current.scrollToX(targetX, 'smooth');
-        }
-      }
-    }
-  }, [pickActions, activeStations, categoryMap]);
-
-  // v0.3.57: Handle pick from grid (reschedule existing task)
-  // No scroll needed as user is already at tile location
-  const handlePickFromGrid = useCallback(async (task: InternalTask, job: Job, assignmentId: string) => {
-    pickActions.pickFromGrid(task, job, assignmentId);
-    // Initialize ghost position at cursor (will be updated on mouse move)
-    pickActions.updateGhostPosition(0, 0);
-    // No scroll position saving for grid picks - no scroll restoration needed
-
-    // v0.5.14: Store original position for cancel restoration
-    const originalAssignment = snapshot.assignments.find((a) => a.id === assignmentId);
-    gridPickInfoRef.current = originalAssignment
-      ? { taskId: task.id, targetId: originalAssignment.targetId, scheduledStart: originalAssignment.scheduledStart }
-      : null;
-
-    // v0.5.14: Remove outsourced successor assignments when picking the last task of a prerequisite element
-    const element = snapshot.elements.find((e) => e.id === task.elementId);
-    if (!element) return;
-
-    const taskById = new Map(snapshot.tasks.map((t) => [t.id, t]));
-    const elementTasks = element.taskIds
-      .map((id) => taskById.get(id))
-      .filter((t): t is Task => t !== undefined)
-      .sort(compareTaskOrder);
-    const lastTask = elementTasks[elementTasks.length - 1];
-    if (!lastTask || lastTask.id !== task.id) return;
-
-    // Find dependent elements that have outsourced tasks with assignments
-    const dependentElements = snapshot.elements.filter((e) =>
-      e.prerequisiteElementIds.includes(element.id)
-    );
-
-    for (const depElem of dependentElements) {
-      for (const depTaskId of depElem.taskIds) {
-        const depTask = taskById.get(depTaskId);
-        if (depTask?.type === 'Outsourced' && snapshot.assignments.some((a) => a.taskId === depTask.id)) {
-          try {
-            await unassignTask(depTask.id).unwrap();
-          } catch (error) {
-            console.error('Failed to unassign outsourced successor on pick:', error);
-          }
-        }
-      }
-    }
-  }, [pickActions, snapshot, unassignTask]);
-
-  // v0.3.54: Handle mouse move during pick (update ghost position and validate)
-  // v0.3.56: Added early-exit optimization when cursor stays in same slot
-  const handlePickMouseMove = useCallback((stationId: string, clientX: number, clientY: number, relativeY: number) => {
-    // Update ghost position for RAF rendering (PickPreview handles offset internally)
-    pickActions.updateGhostPosition(clientX, clientY);
-
-    // Calculate tile top from cursor position (cursor is PICK_CURSOR_OFFSET_Y pixels inside the tile)
-    const tileTopY = relativeY - PICK_CURSOR_OFFSET_Y;
-    const snappedTileTop = snapToGrid(Math.max(0, tileTopY), pixelsPerHour);
-
-    // v0.3.56: Early-exit if cursor is in the same slot (skip redundant validation)
-    const slotKey = `${stationId}-${snappedTileTop}`;
-    if (slotKey === lastPickSlotRef.current) {
-      return; // Ghost position already updated, skip validation
-    }
-    lastPickSlotRef.current = slotKey;
-
-    const dropTime = yPositionToTime(snappedTileTop, START_HOUR, gridStartDate, pixelsPerHour);
-    const scheduledStart = dropTime.toISOString();
-
-    // Validate placement
-    const proposedAssignment: ProposedAssignment = {
-      taskId: pickedTask?.id || '',
-      targetId: stationId,
-      isOutsourced: false,
-      scheduledStart,
-      bypassPrecedence: isAltPressed,
-    };
-    const validationResult = pickedTask ? validateAssignment(proposedAssignment, snapshot) : { valid: false, conflicts: [] };
-
-    // Check for blocking conflicts
-    // Note: Unlike drag-and-drop, pick mode does NOT auto-snap to suggestedStart,
-    // so PrecedenceConflict is always blocking (unless Alt-bypassed).
-    // StationConflict IS blocking in pick mode (means overlap with another task).
-    const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'ApprovalGateConflict') &&
-             !(c.type === 'DeadlineConflict')
-    );
-
-    // Check if only warning (non-blocking) conflicts exist
-    const hasWarningOnly = blockingConflicts.length === 0 &&
-      validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict');
-
-    // Determine ring state
-    let ringState: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
-
-    if (validationResult.valid) {
-      ringState = 'valid';
-    } else if (blockingConflicts.length === 0) {
-      ringState = validationResult.conflicts.some((c) => c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict') ? 'warning' : 'valid';
-    } else if (isAltPressed && blockingConflicts.length > 0) {
-      ringState = 'bypass';
-    } else {
-      ringState = 'invalid';
-    }
-
-    // Get validation message for display
-    const message = getPrimaryValidationMessage(validationResult.conflicts, validationResult.valid, hasWarningOnly);
-
-    // Debug: store conflicts for overlay
-    const debugConflicts = validationResult.conflicts.map(c => ({ type: c.type, message: c.message }));
-
-    setPickValidation({ scheduledStart, ringState, message, debugConflicts });
-  }, [pickActions, pickedTask, snapshot, isAltPressed, pixelsPerHour, gridStartDate]);
-
-  // v0.3.54: Handle mouse leave during pick
-  const handlePickMouseLeave = useCallback(() => {
-    setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
-  }, []);
-
-  // v0.3.54: Handle click to place during pick
-  // v0.3.57: Added reschedule support (when pickedAssignmentId exists)
-  // v0.5.2: Now uses RTK Query mutations
-  const handlePickClick = useCallback(async (stationId: string, clientX: number, clientY: number, relativeY: number) => {
-    if (!pickedTask || !pickedJob) return;
-
-    // Calculate tile top from cursor position (cursor is PICK_CURSOR_OFFSET_Y pixels inside the tile)
-    const tileTopY = relativeY - PICK_CURSOR_OFFSET_Y;
-    const snappedTileTop = snapToGrid(Math.max(0, tileTopY), pixelsPerHour);
-    const dropTime = yPositionToTime(snappedTileTop, START_HOUR, gridStartDate, pixelsPerHour);
-    const rawScheduledStart = dropTime.toISOString();
-
-    // Snap to grid interval (SNAP_INTERVAL_MINUTES)
-    const startDate = new Date(rawScheduledStart);
-    const minutes = startDate.getMinutes();
-    const snappedMinutes = Math.round(minutes / SNAP_INTERVAL_MINUTES) * SNAP_INTERVAL_MINUTES;
-    startDate.setMinutes(snappedMinutes, 0, 0);
-    const scheduledStart = startDate.toISOString();
-
-    // Validate
-    const proposedAssignment: ProposedAssignment = {
-      taskId: pickedTask.id,
-      targetId: stationId,
-      isOutsourced: false,
-      scheduledStart,
-      bypassPrecedence: isAltPressed,
-    };
-    const validationResult = validateAssignment(proposedAssignment, snapshot);
-
-    // Check for blocking conflicts
-    // StationConflict is NOT blocking (push-down) UNLESS the existing tile is completed
-    // PrecedenceConflict with suggestedStart is NOT blocking (can be placed at suggested time)
-    // ApprovalGateConflict is NOT blocking (all gates are warning-only)
-    // DeadlineConflict is NOT blocking (user can place after deadline)
-    const blockingConflicts = validationResult.conflicts.filter(
-      (c) => !(c.type === 'StationConflict' && !c.details?.existingTaskIsCompleted) &&
-             !(c.type === 'PrecedenceConflict' &&
-               c.details?.constraintType === 'predecessor' &&
-               validationResult.suggestedStart) &&
-             !(c.type === 'ApprovalGateConflict') &&
-             !(c.type === 'DeadlineConflict')
-    );
-
-    if (blockingConflicts.length > 0 && !isAltPressed) {
-      console.log('Pick placement blocked: validation failed', blockingConflicts);
-      // Cancel pick so the tile returns to its original state
-      // v0.5.14: Restore outsourced successor assignments (same as ESC cancel)
-      const savedGridPickInfo = gridPickInfoRef.current;
-      gridPickInfoRef.current = null;
-      pickActions.cancelPick();
-      setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
-      if (savedGridPickInfo) {
-        rescheduleTask({
-          taskId: savedGridPickInfo.taskId,
-          body: {
-            targetId: savedGridPickInfo.targetId,
-            scheduledStart: savedGridPickInfo.scheduledStart,
-            isOutsourced: false,
-          },
-        }).catch((error: unknown) => {
-          console.error('Failed to restore outsourced assignments on blocked placement:', error);
-        });
-      }
-      return;
-    }
-
-    // Check for precedence conflict WITHOUT bypass (to detect actual conflicts)
-    // This is needed because when ALT is pressed, the validation passes and conflicts are empty
-    const proposalWithoutBypass: ProposedAssignment = {
-      ...proposedAssignment,
-      bypassPrecedence: false,
-    };
-    const validationWithoutBypass = validateAssignment(proposalWithoutBypass, snapshot);
-    const hasPrecedenceConflict = validationWithoutBypass.conflicts.some(
-      (c) => c.type === 'PrecedenceConflict' && c.details?.constraintType === 'predecessor'
-    );
-
-    // Auto-snap to suggestedStart if there's a precedence conflict (without Alt bypass)
-    // This ensures the tile is placed at the earliest valid position
-    const effectiveStart = (!isAltPressed && hasPrecedenceConflict && validationWithoutBypass.suggestedStart)
-      ? validationWithoutBypass.suggestedStart
-      : scheduledStart;
-
-    if (effectiveStart !== scheduledStart) {
-      console.log('Auto-snap: precedence conflict detected, using suggestedStart:', {
-        original: scheduledStart,
-        snapped: effectiveStart,
-      });
-    }
-
-    // Cast to InternalTask for API call
-    const task = pickedTask as InternalTask;
-
-    // v0.3.57: Determine if this is a reschedule (grid pick with assignmentId)
-    const isRescheduleOp = pickedAssignmentId !== null;
-
-    // Determine if we're creating a precedence conflict via ALT bypass
-    const creatingPrecedenceConflict = isAltPressed && hasPrecedenceConflict;
-
-    // v0.5.2: Use RTK Query mutations for assignment operations
-    try {
-      if (isRescheduleOp) {
-        // Reschedule existing assignment
-        await rescheduleTask({
-          taskId: task.id,
-          body: {
-            targetId: stationId,
-            scheduledStart: effectiveStart,
-            isOutsourced: false,
-            bypassPrecedence: creatingPrecedenceConflict,
-          },
-        }).unwrap();
-        console.log('Pick reschedule completed:', { taskId: task.id, scheduledStart: effectiveStart, bypassPrecedence: creatingPrecedenceConflict });
-      } else {
-        // Create new assignment
-        await assignTask({
-          taskId: task.id,
-          body: {
-            targetId: stationId,
-            scheduledStart: effectiveStart,
-            isOutsourced: false,
-            bypassPrecedence: creatingPrecedenceConflict,
-          },
-        }).unwrap();
-        console.log('Pick placement created:', { taskId: task.id, scheduledStart: effectiveStart, bypassPrecedence: creatingPrecedenceConflict });
-      }
-      // Cache invalidation is automatic via invalidatesTags
-    } catch (error) {
-      console.error('Failed to place/reschedule task:', error);
-      showToast(getErrorMessage(error));
-    }
-
-    gridPickInfoRef.current = null; // v0.5.14: Clear grid pick info on successful placement
-    pickActions.completePlacement();
-    lastPickSlotRef.current = null; // v0.3.56: Clear slot tracking on successful placement
-    setPickValidation({ scheduledStart: null, ringState: 'none', message: null, debugConflicts: [] });
-  }, [pickedTask, pickedJob, snapshot, isAltPressed, pixelsPerHour, gridStartDate, pickActions, pickedAssignmentId, assignTask, rescheduleTask, showToast]);
-
   // Smart compaction handler
   const handleSmartCompact = useCallback(() => {
     setIsSmartCompactOpen(true);
@@ -2205,11 +1727,10 @@ function AppContent() {
 
   // Compute footer mode from app state
   const footerMode = useMemo(() => {
-    if (isPicking) return 'picking' as const;
     if (isJcfModalOpen) return 'jcfModal' as const;
     if (selectedJobId) return 'jobSelected' as const;
     return 'default' as const;
-  }, [isPicking, isJcfModalOpen, selectedJobId]);
+  }, [isJcfModalOpen, selectedJobId]);
 
   // Scheduler-specific commands — registered into the global Command Center
   const schedulerCommands = useCommands({
@@ -2351,11 +1872,9 @@ function AppContent() {
           categories={snapshot.categories}
           providers={snapshot.providers}
           activeTaskId={undefined}
-          pickedTaskId={pickedTask?.id}
           conflictTaskIds={conflictTaskIds}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
-          onPick={handlePickTask}
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
           onElementStatusChange={handleElementStatusChange}
@@ -2373,8 +1892,6 @@ function AppContent() {
           onSelectJob={setSelectedJobId}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mode banner — shows active mode (picking) */}
-          <ModeBanner mode={isPicking ? 'picking' : null} />
           <div className="flex-1 flex overflow-hidden">
         <DateStrip
           startDate={gridStartDate}
@@ -2403,26 +1920,11 @@ function AppContent() {
           totalDays={DAY_COUNT}
           onSelectJob={setSelectedJobId}
           onDeselect={handleDeselect}
-          onSwapUp={handleSwapUp}
-          onSwapDown={handleSwapDown}
           onToggleComplete={handleToggleComplete}
           onTogglePin={handleTogglePin}
-          isAltPressed={isAltPressed}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
           groups={snapshot.groups}
-          isPicking={isPicking}
-          pickTargetStationId={pickTargetStationId}
-          pickRingState={pickValidation.ringState}
-          pickSource={pickSource}
-          onPickMouseMove={handlePickMouseMove}
-          onPickMouseLeave={handlePickMouseLeave}
-          onPickClick={handlePickClick}
-          pickPrecedenceConstraints={pickPrecedenceConstraints}
-          pickDryingTimeInfo={pickDryingTimeInfo}
-          pickOutsourcingTimeInfo={pickOutsourcingTimeInfo}
-          pickedAssignmentId={pickedAssignmentId}
-          onPickFromGrid={handlePickFromGrid}
           onContextMenu={handleContextMenuOpen}
           displayMode={displayMode}
           lateJobIds={lateJobIds}
@@ -2465,16 +1967,6 @@ function AppContent() {
 
       <ShortcutFooter mode={footerMode} />
 
-      {/* v0.3.54: Pick preview - ghost tile during pick */}
-      <PickPreview
-        validationMessage={pickValidation.message}
-        debugInfo={{
-          ringState: pickValidation.ringState,
-          scheduledStart: pickValidation.scheduledStart,
-          conflicts: pickValidation.debugConflicts,
-        }}
-      />
-
       {/* v0.3.58: Context menu for tiles */}
       {contextMenu && (
         <TileContextMenu
@@ -2483,12 +1975,8 @@ function AppContent() {
           isCompleted={contextMenu.isCompleted}
           isPinned={contextMenu.isPinned}
           onTogglePin={handleContextMenuTogglePin}
-          canSwapUp={getContextMenuSwapAvailability().canSwapUp}
-          canSwapDown={getContextMenuSwapAvailability().canSwapDown}
           onViewDetails={handleContextMenuViewDetails}
           onToggleComplete={handleContextMenuToggleComplete}
-          onSwapUp={handleContextMenuMoveUp}
-          onSwapDown={handleContextMenuMoveDown}
           onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
           onSplit={handleContextMenuSplit}
           onFuse={handleContextMenuFuse}
@@ -2718,13 +2206,11 @@ function AppContent() {
   );
 }
 
-// Main App component wrapping with PickStateProvider and ErrorBoundary
+// Main App component wrapping with ErrorBoundary
 function App() {
   return (
     <ErrorBoundary>
-      <PickStateProvider>
-        <AppContent />
-      </PickStateProvider>
+      <AppContent />
     </ErrorBoundary>
   );
 }
