@@ -263,32 +263,33 @@ export const ComputeModal = memo(function ComputeModal({
 }: ComputeModalProps) {
   const { steps, result, elapsed, error } = useComputeStream(mode, jobId, onDone);
 
-  const isDone = result !== null;
+  // Wait for snapshot refetch after compute — snapshot.lateJobs is the single
+  // source of truth (includes outsourced tasks the engine never sees).
+  // The snapshot is stale (assignments cleared) until the refetch triggered by
+  // invalidatesTags: ['Snapshot'] completes. We detect "stale" by checking
+  // whether assignments exist: the compute placed 1600+ tasks, so an empty
+  // assignments array means the refetch hasn't landed yet.
+  const snapshotReady = !result || snapshot.assignments.length > 0;
+  const isDone = result !== null && snapshotReady;
   const isComputing = mode !== null && !isDone && !error;
 
   const lateJobs = useMemo(() => {
-    if (!result) return [];
-    // Start with engine assignments (available immediately after compute).
+    if (!result || !snapshotReady) return [];
     const engineLate = findLateJobs(snapshot, result);
-    // Once snapshot is refetched, merge in validation-service late jobs
-    // (includes outsourced tasks auto-assigned by PHP).
-    if (snapshot.lateJobs.length > 0) {
-      const engineByRef = new Map(engineLate.map((lj) => [lj.ref, lj]));
-      return snapshot.lateJobs
-        .map((lj) => {
-          const job = snapshot.jobs.find((j) => j.id === lj.jobId);
-          const ref = job?.reference ?? '?';
-          const exact = engineByRef.get(ref);
-          return {
-            ref,
-            client: job?.client ?? '',
-            lateByMinutes: exact?.lateByMinutes ?? (lj.delayDays ?? 1) * 24 * 60,
-          };
-        })
-        .sort((a, b) => b.lateByMinutes - a.lateByMinutes);
-    }
-    return engineLate;
-  }, [result, snapshot]);
+    const engineByRef = new Map(engineLate.map((lj) => [lj.ref, lj]));
+    return snapshot.lateJobs
+      .map((lj) => {
+        const job = snapshot.jobs.find((j) => j.id === lj.jobId);
+        const ref = job?.reference ?? '?';
+        const exact = engineByRef.get(ref);
+        return {
+          ref,
+          client: job?.client ?? '',
+          lateByMinutes: exact?.lateByMinutes ?? (lj.delayDays ?? 1) * 24 * 60,
+        };
+      })
+      .sort((a, b) => b.lateByMinutes - a.lateByMinutes);
+  }, [result, snapshot, snapshotReady]);
 
   const hasLate = lateJobs.length > 0;
   const accentColor = error ? 'bg-red-500' : isComputing ? 'bg-blue-500' : hasLate ? 'bg-amber-500' : 'bg-green-500';
