@@ -37,6 +37,7 @@ pub fn run_with_fbi(
     horizon_days: u32,
     max_iterations: u32,
     start_date: NaiveDate,
+    station_blocked_ranges: &[Vec<(usize, usize)>],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -154,6 +155,17 @@ pub fn run_with_fbi(
         // Build grid
         let initial_ticks = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
         let mut grid = ScheduleGrid::new(num_stations, num_operators, initial_ticks, tick_minutes);
+
+        // Pre-block station ticks for machine unavailability constraints.
+        // Uses a sentinel action index (usize::MAX) that no real action has.
+        for (station_idx, ranges) in station_blocked_ranges.iter().enumerate() {
+            for &(start_t, end_t) in ranges {
+                let clamped_end = end_t.min(initial_ticks);
+                for t in start_t..clamped_end {
+                    grid.assign_station(station_idx, t, usize::MAX);
+                }
+            }
+        }
 
         let mut operator_availability = OperatorAvailability::new(
             num_operators,
@@ -279,8 +291,9 @@ pub fn run_with_fbi_ordering(
     start_date: NaiveDate,
     _ordering: BackwardOrdering,
     _station_groups: &[StationGroupInput],
+    station_blocked_ranges: &[Vec<(usize, usize)>],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges)
 }
 
 /// Multi-start FBI: optionally run with both TierFirst and EDD orderings and
@@ -295,11 +308,12 @@ pub fn run_with_multi_start_fbi(
     start_date: NaiveDate,
     multi_start: bool,
     station_groups: &[StationGroupInput],
+    station_blocked_ranges: &[Vec<(usize, usize)>],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let (a1, act1, s1, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::TierFirst, station_groups,
+        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges,
     );
 
     if !multi_start {
@@ -309,7 +323,7 @@ pub fn run_with_multi_start_fbi(
     let (a2, act2, s2, i2) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::EarliestDeadline, station_groups,
+        BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges,
     );
 
     // Pick the result with fewer late jobs, then less weighted lateness, then shorter makespan

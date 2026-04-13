@@ -52,6 +52,36 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
     let mut concurrent_group_warnings =
         validate_concurrent_groups(&request.operators, &request.stations);
 
+    // Build station ID → index map (reused for constraints + masked_time)
+    let station_id_to_idx: HashMap<String, usize> = request
+        .stations
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.id.clone(), i))
+        .collect();
+
+    // Parse machine unavailability constraints into per-station blocked tick ranges.
+    // Each entry is (start_tick, end_tick) — the forward pass skips these ticks.
+    let mut station_blocked_ranges: Vec<Vec<(usize, usize)>> = vec![Vec::new(); request.stations.len()];
+    for constraint in &request.constraints {
+        if constraint.constraint_type != "MachineUnavailable" {
+            continue;
+        }
+        let station_idx = match station_id_to_idx.get(&constraint.target_id) {
+            Some(&idx) => idx,
+            None => continue,
+        };
+        let start_tick = constraint.time_start.as_ref()
+            .and_then(|s| parse_deadline_minutes(s, start_date))
+            .map(|mins| mins as usize / tick_minutes as usize)
+            .unwrap_or(0);
+        let end_tick = constraint.time_end.as_ref()
+            .and_then(|s| parse_deadline_minutes(s, start_date))
+            .map(|mins| mins as usize / tick_minutes as usize)
+            .unwrap_or(usize::MAX);
+        station_blocked_ranges[station_idx].push((start_tick, end_tick));
+    }
+
     // Build station masked_time lookup for post-processing
     let station_masked_time: HashMap<String, bool> = request
         .stations
@@ -70,6 +100,7 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         start_date,
         options.multi_start,
         &request.station_groups,
+        &station_blocked_ranges,
     );
 
     // Moore escape hatch: DISABLED for now — adds full FBI re-runs.
@@ -914,7 +945,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(),
         };
 
         let result = compute(&request);
@@ -949,7 +980,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1009,14 +1040,14 @@ mod integration_tests {
             operators: vec![paired_op],
             jobs: jobs.clone(),
             options: options(),
-            station_groups: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(),
         });
         let unpaired_result = compute(&ComputeRequest {
             stations,
             operators: vec![unpaired_op],
             jobs,
             options: options(),
-            station_groups: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(),
         });
 
         let paired_makespan = paired_result
@@ -1076,7 +1107,7 @@ mod integration_tests {
             operators: vec![op],
             jobs: vec![make_job("job-a", "sbg", 60)],
             options: options(),
-            station_groups: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1116,7 +1147,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1194,7 +1225,7 @@ mod integration_tests {
             operators: vec![alice],
             jobs: vec![job],
             options: options(),
-            station_groups: Vec::new(),
+            station_groups: Vec::new(), constraints: Vec::new(),
         };
 
         let result = compute(&request);
