@@ -35,7 +35,16 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
     let start_date = Local::now().date_naive();
 
     let options = request.options.clone().unwrap_or_default();
-    let tick_minutes = options.tick_minutes;
+    // Use the finest tick granularity across all stations. If any station
+    // has tick_minutes=5 (e.g. massicot), the whole grid runs at 5-min
+    // resolution so that station gets precise scheduling boundaries.
+    let tick_minutes = request
+        .stations
+        .iter()
+        .map(|s| s.effective_tick_minutes())
+        .filter(|&t| t > 0)
+        .min()
+        .unwrap_or(options.tick_minutes);
     let fbi_max_iterations = options.fbi_max_iterations;
 
     // Validate concurrent groups (Phase 1 ingestion only — these warnings
@@ -191,6 +200,7 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         warnings,
         fbi_iterations,
         compute_time_ms,
+        tick_minutes,
     }
 }
 

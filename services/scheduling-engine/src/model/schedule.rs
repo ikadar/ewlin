@@ -75,6 +75,9 @@ pub struct ScheduleResult {
     pub warnings: Vec<Warning>,
     pub fbi_iterations: u32,
     pub compute_time_ms: u64,
+    /// Actual tick granularity used (may differ from requested if per-station
+    /// tick_minutes are configured — the engine uses the minimum).
+    pub tick_minutes: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
