@@ -87,6 +87,8 @@ pub fn compute_last_values(
                     task_id: task.id.clone(),
                     job_id: job.id.clone(),
                     station_idx,
+                    setup_ticks,
+                    run_ticks,
                     total_ticks,
                     deadline_ticks,
                     deadline_priority: job.deadline_priority,
@@ -155,6 +157,8 @@ struct BackwardAction {
     task_id: String,
     job_id: String,
     station_idx: usize,
+    setup_ticks: u32,
+    run_ticks: u32,
     total_ticks: u32,
     deadline_ticks: u64,
     deadline_priority: u8,
@@ -268,6 +272,10 @@ fn run_backward_tier(
 
 /// Place a single action backward from its deadline.
 /// Walk backward tick by tick, finding operators at each tick.
+/// Uses proficiency-aware work tracking: each tick contributes the operator's
+/// proficiency (not a flat 1.0), so tasks with lower-proficiency operators
+/// correctly require more ticks. Setup phase uses solo operators; run phase
+/// allows paired operators via concurrent groups.
 /// Returns the LAST tick (latest start tick for this action).
 fn place_backward(
     action_idx: usize,
@@ -280,10 +288,12 @@ fn place_backward(
     horizon_ticks: usize,
 ) -> u64 {
     let station_idx = actions[action_idx].station_idx;
-    let total_ticks = actions[action_idx].total_ticks as usize;
+    let setup_ticks = actions[action_idx].setup_ticks;
+    let run_ticks = actions[action_idx].run_ticks;
+    let total_work = (setup_ticks + run_ticks) as f64;
     let deadline = actions[action_idx].deadline_ticks as usize;
 
-    if total_ticks == 0 {
+    if total_work <= 0.0 {
         return deadline.min(horizon_ticks) as u64;
     }
 
@@ -293,12 +303,15 @@ fn place_backward(
         return 0;
     };
 
-    // Walk backward from deadline, collecting ticks where this task can run
-    let mut work_remaining = total_ticks;
+    // Walk backward from deadline, collecting ticks where this task can run.
+    // We track work as a float: setup phase consumes 1.0 per tick (fixed duration),
+    // run phase consumes proficiency per tick (scales with operator skill).
+    // We place backward: first ticks encountered are run phase, then setup.
+    let mut work_remaining = total_work;
     let mut occupied_ticks: Vec<usize> = Vec::new();
     let mut t = deadline.min(horizon_ticks);
 
-    while work_remaining > 0 && t > 0 {
+    while work_remaining > 0.001 && t > 0 {
         t -= 1;
 
         // Station must be free
@@ -306,7 +319,10 @@ fn place_backward(
             continue;
         }
 
-        // Find operators (backward pass uses setup-mode logic: always solo).
+        // Determine if we're still in run phase (backward = run first, then setup)
+        let in_run_phase = work_remaining > setup_ticks as f64;
+
+        // Find operators — allow pairing during run phase
         let operators = super::forward_pass::find_operators_for_station(
             grid,
             t,
@@ -316,21 +332,37 @@ fn place_backward(
             operator_groups,
             &[], // no preferred operators in backward pass
             attrs.max_operators,
-            true, // is_setup_phase: backward pass is conservative and only places solo
+            !in_run_phase, // is_setup_phase: solo during setup, allow pairs during run
         );
 
         if operators.is_empty() && grid.num_operators > 0 {
             continue; // no qualified operator available at this tick
         }
 
-        // This tick is usable — reserve it
+        // Compute productivity for this tick using the same model as forward pass
+        let productivity: f64 = if operators.is_empty() {
+            // No operators configured (e.g. automated station) — 1.0 per tick
+            1.0
+        } else if in_run_phase {
+            // Run phase: sum productivity across assigned operators
+            operators.iter().map(|&op| {
+                super::forward_pass::productivity_at_tick(
+                    op, station_idx, t, grid, operator_groups, operator_skills,
+                )
+            }).sum()
+        } else {
+            // Setup phase: fixed duration, 1.0 per tick regardless of proficiency
+            1.0
+        };
+
+        // Reserve this tick
         grid.assign_station(station_idx, t, action_idx);
         for &op_idx in &operators {
             grid.assign_operator(op_idx, t, station_idx, 0.0);
         }
 
         occupied_ticks.push(t);
-        work_remaining -= 1;
+        work_remaining -= productivity;
     }
 
     // LAST = the earliest occupied tick (that's when the task must start at the latest)
