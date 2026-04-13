@@ -2,6 +2,7 @@ mod backward_pass;
 pub mod fbi;
 mod forward_pass;
 mod grid;
+pub mod local_search;
 pub mod moore;
 pub mod pre_split;
 
@@ -188,6 +189,32 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             actions = moore_actions;
             stats = moore_stats;
             fbi_iterations += moore_iters;
+        }
+    }
+
+    // Local search: if late jobs remain after Moore, try targeted improvements.
+    // Budget-capped to fit within total compute time.
+    let elapsed_ms = start_time.elapsed().as_millis() as u64;
+    if stats.late_job_count > 0 && elapsed_ms < 25_000 {
+        let remaining_budget = 30_000u64.saturating_sub(elapsed_ms);
+        if let Some((ls_assignments, ls_actions, ls_stats, ls_iters)) = local_search::local_search_improve(
+            &request.jobs,
+            &request.stations,
+            &request.operators,
+            &actions,
+            &stats,
+            tick_minutes,
+            options.horizon_days,
+            fbi_max_iterations,
+            start_date,
+            &request.station_groups,
+            now_tick,
+            remaining_budget,
+        ) {
+            assignments = ls_assignments;
+            actions = ls_actions;
+            stats = ls_stats;
+            fbi_iterations += ls_iters;
         }
     }
 
