@@ -18,3 +18,26 @@ Tracking late job count and other key metrics as we improve the scheduling algor
 | 2 | Reactivate Moore escape hatch | **Done** — no effect (all jobs same priority), kept for future use |
 | 3 | Chain pressure + station contention in scoring | **Done** — -31 late jobs, -8% makespan |
 | 4 | Shift-aware pre-split | **Skipped** — no tasks exceed maxChunkMinutes, pre-split inactive |
+
+## Tested but ineffective
+
+| Change | Result | Why |
+|--------|--------|-----|
+| Multi-start (2 orderings) | Same result, 2x compute | TierFirst already optimal |
+| FBI iterations 3→5 | Same result, longer compute | Converges at 3 |
+| Bottleneck bonus (+300 for single-op stations) | Slightly worse (+3 late) | Over-concentrates on bottlenecks |
+| Deferral penalty (penalize high-slack tasks) | No change | Scoring already orders correctly |
+| Horizon 14→120 days | No change | Dynamic grid growth already handles it |
+
+## Remaining bottleneck
+
+The 146 remaining late jobs are caused by **physical capacity limits**, not algorithmic inefficiency:
+
+- **Polar 137**: 208h work, 1 operator (Frédéric)
+- **Ryobi 528**: 391h work, 1 operator (Bertrand)
+- **Carton**: 214h work, 1 operator (Antoine)
+- **Komori G40**: 411h work, 2 operators (Guilian, Nicolas)
+- **Horizon**: 269h work, 1 operator (Christophe)
+
+None of these bottleneck stations have concurrent groups (masked time pairing).
+Further reduction requires either cross-training operators or architectural changes (local search / backtracking).
