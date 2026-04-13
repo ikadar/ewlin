@@ -948,6 +948,7 @@ function AppContent() {
   // Late job IDs: deadline violations (snapshot) + real-time NOW-surpassed tasks
   const lateJobIds = useMemo(() => {
     const ids = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
+    const fromValidation = ids.size;
     const taskToJob = createTaskToJobMap(snapshot.tasks, snapshot.elements);
     for (const a of snapshot.assignments) {
       if (!a.isCompleted && new Date(a.scheduledEnd) < now) {

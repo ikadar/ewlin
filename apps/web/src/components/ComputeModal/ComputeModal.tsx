@@ -266,10 +266,26 @@ export const ComputeModal = memo(function ComputeModal({
   const isDone = result !== null;
   const isComputing = mode !== null && !isDone && !error;
 
-  const lateJobs = useMemo(
-    () => result ? findLateJobs(snapshot, result) : [],
-    [result, snapshot],
-  );
+  const lateJobs = useMemo(() => {
+    if (!result) return [];
+    // Use snapshot.lateJobs as single source of truth (includes outsourced tasks
+    // auto-assigned by PHP, which the engine never sees).
+    // Enrich with exact lateness from engine assignments when available.
+    const engineLate = findLateJobs(snapshot, result);
+    const engineByRef = new Map(engineLate.map((lj) => [lj.ref, lj]));
+    return snapshot.lateJobs
+      .map((lj) => {
+        const job = snapshot.jobs.find((j) => j.id === lj.jobId);
+        const ref = job?.reference ?? '?';
+        const exact = engineByRef.get(ref);
+        return {
+          ref,
+          client: job?.client ?? '',
+          lateByMinutes: exact?.lateByMinutes ?? (lj.delayDays ?? 1) * 24 * 60,
+        };
+      })
+      .sort((a, b) => b.lateByMinutes - a.lateByMinutes);
+  }, [result, snapshot]);
 
   const hasLate = lateJobs.length > 0;
   const accentColor = error ? 'bg-red-500' : isComputing ? 'bg-blue-500' : hasLate ? 'bg-amber-500' : 'bg-green-500';
