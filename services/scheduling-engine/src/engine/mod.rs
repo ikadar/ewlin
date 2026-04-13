@@ -1564,10 +1564,8 @@ mod integration_tests {
     /// B deadline = 48 h → very loose.
     /// B is listed first in input; the engine must still schedule A first.
     ///
-    /// NOTE: this test requires correct LAST values from the backward pass.
-    /// The backward pass currently has a known productivity bug (LAST=0 for
-    /// all tasks) that makes this test fail. Re-enable when the backward
-    /// pass is fixed.
+    /// NOTE: requires differentiated LAST values. The backward pass currently
+    /// produces LAST=0 for all tasks (known bug). Re-enable when fixed.
     #[test]
     #[ignore]
     fn proximity_bonus_prioritises_tight_deadline_job() {
