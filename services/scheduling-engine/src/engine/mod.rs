@@ -180,7 +180,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             options.horizon_days,
             fbi_max_iterations,
             start_date,
-            3, // max_attempts
+            5, // max_attempts (increased for Strategy B)
             &request.station_groups,
             now_tick,
         ) {

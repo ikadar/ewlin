@@ -121,11 +121,50 @@ pub fn moore_escape(
             }
         }
 
-        // Strategy B is intentionally not implemented: when all jobs share
-        // the same priority, artificially demoting capacity hogs and re-running
-        // FBI shuffles the same capacity around without net improvement.
-        // Better ordering within same-priority jobs is handled by scoring
-        // (chain pressure, station contention) rather than priority manipulation.
+        // Strategy B: same-priority capacity sacrifice.
+        // When no cross-priority blockers exist (all same priority), find
+        // non-late jobs on the same stations consuming the most capacity.
+        // Demote them to flexible, boost the late job to imperative.
+        // This creates genuine priority differentiation: backward pass
+        // reserves capacity for tier 0 before tier 3, and forward pass
+        // tier weights differ 8x (4.0/0.5).
+        if blocker_jobs.is_empty() {
+            // Sum ART per job on shared stations (only non-late jobs)
+            let mut job_capacity: HashMap<String, u32> = HashMap::new();
+            for action in actions {
+                if action.job_id == late_job.job_id { continue; }
+                if seen_jobs.contains(&action.job_id) { continue; } // skip other late jobs
+                if !my_stations.contains(&action.station_idx) { continue; }
+                *job_capacity.entry(action.job_id.clone()).or_insert(0) += action.art;
+            }
+
+            // Skip sacrifice candidates whose own slack is tight (< 2 days in ticks)
+            let two_days_ticks = 2 * 24 * 60 / tick_minutes as u64;
+            let mut sacrifice_candidates: Vec<(String, u32)> = job_capacity
+                .into_iter()
+                .filter(|(jid, _)| {
+                    // Check this job has enough slack to absorb demotion
+                    if let Some(&dl) = job_deadlines.get(jid.as_str()) {
+                        // Find max end_tick for this job
+                        let max_end = actions.iter()
+                            .filter(|a| a.job_id == *jid)
+                            .filter_map(|a| a.end_tick)
+                            .max()
+                            .unwrap_or(0) as u64;
+                        // Slack = deadline - current end
+                        dl.saturating_sub(max_end) >= two_days_ticks
+                    } else {
+                        true // no deadline = infinite slack
+                    }
+                })
+                .collect();
+
+            // Sort by capacity descending, take top 3
+            sacrifice_candidates.sort_by(|a, b| b.1.cmp(&a.1));
+            for (jid, _cap) in sacrifice_candidates.iter().take(3) {
+                blocker_jobs.insert(jid.clone());
+            }
+        }
 
         if blocker_jobs.is_empty() {
             continue;
@@ -156,16 +195,18 @@ pub fn moore_escape(
 
         let new_score = (new_stats.late_job_count, new_stats.weighted_lateness_minutes, new_stats.makespan_minutes);
 
-        if new_score < current_score {
-            let is_better = match &best_result {
-                Some((_, _, best, _)) => {
-                    new_score < (best.late_job_count, best.weighted_lateness_minutes, best.makespan_minutes)
-                }
-                None => true,
-            };
-            if is_better {
-                best_result = Some((new_assignments, new_actions, new_stats, new_iters));
-            }
+        eprintln!("[MOORE-B] attempt {}: boost {} demote {:?} → late_jobs={} (was {})",
+            attempts, &late_job.job_id[..8.min(late_job.job_id.len())],
+            blocker_jobs.iter().map(|s| &s[..8.min(s.len())]).collect::<Vec<_>>(),
+            new_stats.late_job_count, stats.late_job_count);
+
+        let effective_current = match &best_result {
+            Some((_, _, best, _)) => (best.late_job_count, best.weighted_lateness_minutes, best.makespan_minutes),
+            None => current_score,
+        };
+
+        if new_score < effective_current {
+            best_result = Some((new_assignments, new_actions, new_stats, new_iters));
         }
     }
 
