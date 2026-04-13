@@ -48,6 +48,20 @@ pub fn compute_last_values(
     let mut backward_actions: Vec<BackwardAction> = Vec::new();
     let mut task_id_to_ba_idx: HashMap<String, usize> = HashMap::new();
 
+    // Compute the actual horizon needed: max deadline across all jobs + margin.
+    // The caller's horizon_ticks may be too small (e.g. 14 days) while deadlines
+    // extend much further. The backward pass grid must cover all deadlines.
+    let max_deadline_ticks: usize = jobs
+        .iter()
+        .filter_map(|j| {
+            j.deadline.as_ref()
+                .and_then(|d| parse_deadline_to_ticks(d, tick_minutes, start_date))
+                .map(|t| t as usize)
+        })
+        .max()
+        .unwrap_or(horizon_ticks);
+    let effective_horizon = horizon_ticks.max(max_deadline_ticks + 1);
+
     // Group jobs by deadline priority tier
     let mut tiered_jobs: Vec<(u8, &JobInput)> = jobs.iter().map(|j| (j.deadline_priority, j)).collect();
     tiered_jobs.sort_by_key(|(tier, _)| *tier);
@@ -57,7 +71,7 @@ pub fn compute_last_values(
             .deadline
             .as_ref()
             .and_then(|d| parse_deadline_to_ticks(d, tick_minutes, start_date))
-            .unwrap_or(horizon_ticks as u64);
+            .unwrap_or(effective_horizon as u64);
 
         for element in &job.elements {
             let mut sorted_tasks = element.tasks.clone();
@@ -121,9 +135,9 @@ pub fn compute_last_values(
     let schedules: Vec<Option<crate::model::operator::OperatingSchedule>> =
         operators.iter().map(|op| op.operating_schedule.clone()).collect();
 
-    let mut grid = ScheduleGrid::new(num_stations, num_operators, horizon_ticks, tick_minutes);
+    let mut grid = ScheduleGrid::new(num_stations, num_operators, effective_horizon, tick_minutes);
     let operator_availability = OperatorAvailability::new(
-        num_operators, horizon_ticks, tick_minutes, start_date, schedules,
+        num_operators, effective_horizon, tick_minutes, start_date, schedules,
     );
 
     // Process by tier: imperative first, then important, standard, flexible
@@ -137,7 +151,7 @@ pub fn compute_last_values(
             operator_skills,
             operator_groups,
             &operator_availability,
-            horizon_ticks,
+            effective_horizon,
         );
     }
 
