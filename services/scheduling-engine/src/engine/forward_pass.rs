@@ -137,6 +137,10 @@ pub struct Action {
     /// tick-major loop with start_tick/end_tick set and art=0, so the
     /// scoring loop skips it and successors see its fixed end_tick.
     pub is_pinned: bool,
+    /// Total remaining work in this action's successor chain (this task + all
+    /// successors). Used by the scoring function to prioritize tasks at the
+    /// head of long chains where delay cascades.
+    pub chain_remaining_art: u32,
     /// The tick at which the pinned action must start (only meaningful
     /// if `is_pinned`). Used by `pre_place_pinned_actions` to set
     /// start_tick / end_tick before the main loop runs.
@@ -575,6 +579,17 @@ pub fn run_forward_pass(
         }
     }
 
+    // Pre-compute station contention: count of pending (unstarted, non-zero ART)
+    // actions per station. Stations with more pending work are bottlenecks —
+    // tasks on them get a scoring bonus.
+    let mut station_pending_count: Vec<u32> = vec![0; station_attrs.len()];
+    for action in actions.iter() {
+        if action.art > 0 && action.start_tick.is_none() && action.station_idx < station_pending_count.len() {
+            station_pending_count[action.station_idx] += 1;
+        }
+    }
+    let max_pending = *station_pending_count.iter().max().unwrap_or(&1).max(&1);
+
     loop {
         // Hard cap on outer tick — defensive guard against runaway loops
         if t >= max_outer_t {
@@ -661,7 +676,28 @@ pub fn run_forward_pass(
             };
 
             let calage_bonus = compute_calage_bonus(&last_action_per_station, &actions, i);
-            let score = weighted_urgency + job_boost + calage_bonus;
+
+            // Chain pressure: tasks at the head of long successor chains get a
+            // bonus because any delay cascades to all downstream tasks.
+            // Normalized to [0, 500] range based on chain_remaining_art vs own art.
+            let chain_pressure: i64 = if action.chain_remaining_art > action.art {
+                let chain_ratio = action.chain_remaining_art as f64 / action.art.max(1) as f64;
+                // chain_ratio >= 1.0; a task with 5x more work downstream than itself scores ~400
+                ((chain_ratio - 1.0).min(5.0) * 100.0) as i64
+            } else {
+                0
+            };
+
+            // Station contention: tasks on bottleneck stations (many pending tasks)
+            // get a bonus so they're scheduled when the station is available.
+            let contention_bonus: i64 = if action.station_idx < station_pending_count.len() {
+                let ratio = station_pending_count[action.station_idx] as f64 / max_pending as f64;
+                (ratio * 200.0) as i64
+            } else {
+                0
+            };
+
+            let score = weighted_urgency + job_boost + calage_bonus + chain_pressure + contention_bonus;
 
             scored.push(ScoredAction { action_idx: i, score });
         }

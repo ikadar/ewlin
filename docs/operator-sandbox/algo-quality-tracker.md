@@ -8,6 +8,7 @@ Tracking late job count and other key metrics as we improve the scheduling algor
 |------|--------|-----------|------------|----------------------|----------------|--------------|----------|
 | 2026-04-13 | **Baseline** (commit 4769f3d) | **206** | 808 | 5,680,715 | 146,080 | 10,382 | 3 |
 | 2026-04-13 | Proficiency-aware backward pass + run-phase pairing | **177** (-14%) | 608 (-25%) | 2,779,130 (-51%) | 146,120 | 5,945 | 3 |
+| 2026-04-13 | Chain pressure + station contention scoring | **146** (-29%) | 569 (-30%) | 3,041,110 (-46%) | 134,560 | 5,999 | 3 |
 
 ## Improvement Plan
 
@@ -15,5 +16,5 @@ Tracking late job count and other key metrics as we improve the scheduling algor
 |---|---|---|
 | 1 | Backward pass multi-resource (realistic LAST) | **Done** — -29 late jobs, -51% lateness |
 | 2 | Reactivate Moore escape hatch | **Done** — no effect (all jobs same priority), kept for future use |
-| 3 | Chain pressure + station contention in scoring | Pending |
+| 3 | Chain pressure + station contention in scoring | **Done** — -31 late jobs, -8% makespan |
 | 4 | Shift-aware pre-split | Pending |

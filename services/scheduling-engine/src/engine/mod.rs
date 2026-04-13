@@ -632,6 +632,7 @@ pub fn build_actions(
                     tick_operator_log: Vec::new(),
                     total_productivity: 0.0,
                     ticks_counted: 0,
+                    chain_remaining_art: 0, // computed below
                     is_pinned: task.is_pinned,
                     pinned_start_tick: task.pinned_start_tick,
                 });
@@ -639,6 +640,24 @@ pub fn build_actions(
                 task_id_to_action_idx.insert(task.id.clone(), idx);
                 prev_task_id = Some(task.id.clone());
             }
+        }
+    }
+
+    // Compute chain_remaining_art: walk successor chains backward.
+    // successor_of[i] = j means action j's predecessor is i.
+    {
+        let mut successor_of: HashMap<usize, usize> = HashMap::new();
+        for (i, a) in actions.iter().enumerate() {
+            if let Some(pred) = a.predecessor_idx {
+                successor_of.insert(pred, i);
+            }
+        }
+        // Start from terminal actions (no successor), walk backward
+        for i in (0..actions.len()).rev() {
+            let succ_chain = successor_of.get(&i)
+                .map(|&s| actions[s].chain_remaining_art)
+                .unwrap_or(0);
+            actions[i].chain_remaining_art = actions[i].art + succ_chain;
         }
     }
 

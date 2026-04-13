@@ -128,6 +128,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 tick_operator_log: Vec::new(),
                 total_productivity: 0.0,
                 ticks_counted: 0,
+                chain_remaining_art: action.chain_remaining_art,
                 // Pinned tasks are never split into chunks (their start time
                 // is fixed by the user). Pre-split skips them upstream, so
                 // these chunked actions are by definition non-pinned.
@@ -183,6 +184,7 @@ pub fn clone_action(a: &Action) -> Action {
         tick_operator_log: a.tick_operator_log.clone(),
         total_productivity: a.total_productivity,
         ticks_counted: a.ticks_counted,
+        chain_remaining_art: a.chain_remaining_art,
         is_pinned: a.is_pinned,
         pinned_start_tick: a.pinned_start_tick,
     }
