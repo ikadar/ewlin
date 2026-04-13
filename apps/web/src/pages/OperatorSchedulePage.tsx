@@ -61,6 +61,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
 import { useVirtualScroll, isAssignmentVisible, useMassUnschedule } from '../hooks';
 import { MassUnscheduleDialog } from '../components/MassUnscheduleDialog';
+import { ComputeModal } from '../components/ComputeModal/ComputeModal';
 
 // ============================================================================
 // Constants (matching App.tsx)
@@ -212,7 +213,8 @@ export default function OperatorSchedulePage() {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
   }, [dispatch]);
 
-  const [computeResult, setComputeResult] = useState<ComputeScheduleResult | null>(null);
+  const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
+  const [computeModalJobId, setComputeModalJobId] = useState<string | undefined>(undefined);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const massUnschedule = useMassUnschedule(snapshotData);
   const [pixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
@@ -370,14 +372,10 @@ export default function OperatorSchedulePage() {
   }, [pixelsPerHour, gridStartDate]);
 
   // ---- Compute schedule ----
-  const handleComputeSchedule = useCallback(async () => {
-    try {
-      const result = await computeSchedule().unwrap();
-      setComputeResult(result);
-    } catch (err) {
-      console.error('Compute failed:', err);
-    }
-  }, [computeSchedule]);
+  const handleComputeSchedule = useCallback(() => {
+    setComputeModalJobId(undefined);
+    setComputeModalMode('full');
+  }, []);
 
   // ---- Job details panel handlers (same UX as station schedule) ----
 
@@ -430,24 +428,16 @@ export default function OperatorSchedulePage() {
   }, [fuseTask]);
 
   // Selective compute: place one job in the gaps
-  const handleComputeJob = useCallback(async (jobId: string) => {
-    try {
-      const result = await computeSchedule({ mode: 'selective', jobId }).unwrap();
-      setComputeResult(result);
-    } catch (err) {
-      console.error('Selective compute failed:', err);
-    }
-  }, [computeSchedule]);
+  const handleComputeJob = useCallback((jobId: string) => {
+    setComputeModalJobId(jobId);
+    setComputeModalMode('selective');
+  }, []);
 
   // Incremental compute: place all unplaced jobs in the gaps
-  const handleComputeIncremental = useCallback(async () => {
-    try {
-      const result = await computeSchedule({ mode: 'incremental' }).unwrap();
-      setComputeResult(result);
-    } catch (err) {
-      console.error('Incremental compute failed:', err);
-    }
-  }, [computeSchedule]);
+  const handleComputeIncremental = useCallback(() => {
+    setComputeModalJobId(undefined);
+    setComputeModalMode('incremental');
+  }, []);
 
   // ---- Keyboard navigation: Alt+Up/Down to cycle jobs ----
   const orderedJobIds = useMemo(() => snapshot.jobs.map(j => j.id), [snapshot.jobs]);
@@ -742,17 +732,13 @@ export default function OperatorSchedulePage() {
       {/* ---- Compute Schedule FAB ---- */}
       <button
         onClick={handleComputeSchedule}
-        disabled={isComputingSchedule}
+        disabled={computeModalMode !== null}
         className="fixed bottom-24 right-6 z-40 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white shadow-lg transition-all flex items-center justify-center"
         aria-label="Calculer le planning"
-        title="Calculer le planning"
+        title="Calculer le planning (recalcul complet)"
         data-testid="compute-schedule-fab-operator"
       >
-        {isComputingSchedule ? (
-          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        ) : (
-          <Cpu size={20} />
-        )}
+        <Cpu size={20} />
       </button>
 
       {/* ---- Mass unschedule confirmation dialog ---- */}
@@ -766,47 +752,16 @@ export default function OperatorSchedulePage() {
         />
       )}
 
-      {/* ---- Compute result modal ---- */}
-      {computeResult && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setComputeResult(null)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setComputeResult(null); }}
-          tabIndex={-1}
-          ref={(el) => el?.focus()}
-        >
-          <div
-            className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
-            style={{ width: '24rem' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-flux-text-primary font-semibold mb-4">
-              Calcul terminé
-            </h2>
-            <div className="space-y-2 text-sm text-flux-text-secondary mb-6">
-              <p>Tâches placées : <span className="text-flux-text-primary font-mono">{computeResult.stats.scheduledTasks} / {computeResult.stats.totalTasks}</span></p>
-              <p>Retard : <span className="text-flux-text-primary font-mono">{computeResult.stats.lateTaskCount} tâche(s), {computeResult.stats.totalLatenessMinutes}min</span></p>
-              <p>Temps de calcul : <span className="text-flux-text-primary font-mono">{computeResult.computeTimeMs}ms</span></p>
-              {computeResult.warnings.length > 0 && (
-                <div className="pt-2 border-t border-flux-border mt-2">
-                  {computeResult.warnings.slice(0, 3).map((w, i) => (
-                    <p key={i} className="text-amber-400 text-xs">{w.message}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <button
-                className="px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
-                onClick={() => setComputeResult(null)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ---- Compute modal (real-time SSE) ---- */}
+      <ComputeModal
+        mode={computeModalMode}
+        jobId={computeModalJobId}
+        snapshot={snapshot}
+        onDone={() => { /* snapshot will auto-refresh via invalidatesTags */ invalidateSnapshot(); }}
+        onDismiss={() => setComputeModalMode(null)}
+        onComputeIncremental={handleComputeIncremental}
+        onComputeFull={handleComputeSchedule}
+      />
     </div>
   );
 }
