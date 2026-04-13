@@ -37,6 +37,7 @@ pub fn run_with_fbi(
     horizon_days: u32,
     max_iterations: u32,
     start_date: NaiveDate,
+    ordering: BackwardOrdering,
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
@@ -136,6 +137,7 @@ pub fn run_with_fbi(
             &station_attrs, &operator_skills, &operator_groups,
             tick_minutes, start_date,
             initial_ticks_for_last,
+            ordering,
         );
 
         super::emit(progress, crate::model::progress::ProgressEvent::BackwardDone {
@@ -170,6 +172,7 @@ pub fn run_with_fbi(
                 &mut actions, jobs, stations, operators,
                 &station_attrs, &operator_skills, &operator_groups,
                 tick_minutes, start_date, horizon_days,
+                ordering,
             );
         }
 
@@ -340,6 +343,7 @@ fn recompute_last_values(
     tick_minutes: u32,
     start_date: NaiveDate,
     horizon_days: u32,
+    ordering: BackwardOrdering,
 ) {
     let initial_ticks = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
     let last_values = compute_last_values(
@@ -347,6 +351,7 @@ fn recompute_last_values(
         station_attrs, operator_skills, operator_groups,
         tick_minutes, start_date,
         initial_ticks,
+        ordering,
     );
 
     for action in actions.iter_mut() {
@@ -357,8 +362,6 @@ fn recompute_last_values(
 }
 
 /// Run FBI with a specific backward ordering and station groups.
-/// Delegates to `run_with_fbi` (ordering and groups are not yet wired into the
-/// backward pass, so this is a thin wrapper that keeps the call-sites compiling).
 pub fn run_with_fbi_ordering(
     jobs: &[JobInput],
     stations: &[StationInput],
@@ -367,14 +370,14 @@ pub fn run_with_fbi_ordering(
     horizon_days: u32,
     max_iterations: u32,
     start_date: NaiveDate,
-    _ordering: BackwardOrdering,
+    ordering: BackwardOrdering,
     _station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
     now_tick: usize,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges, occupied_slots, progress, now_tick)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick)
 }
 
 /// Multi-start FBI: optionally run with both TierFirst and EDD orderings and

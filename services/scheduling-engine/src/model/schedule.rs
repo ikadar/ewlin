@@ -80,7 +80,7 @@ impl Default for ComputeOptions {
             horizon_days: default_horizon_days(),
             tick_minutes: default_tick_minutes(),
             fbi_max_iterations: default_fbi_max_iterations(),
-            multi_start: false,
+            multi_start: true,
         }
     }
 }

@@ -23,8 +23,11 @@ pub enum BackwardOrdering {
 /// Runs backward from each task's deadline toward t=0, using the same grid,
 /// operator availability, and attention mechanics as the forward pass.
 ///
-/// Jobs are processed by deadline priority tier (imperative first, flexible last).
-/// Within each tier, tasks are scored by dynamic critical ratio at each tick.
+/// With `TierFirst` ordering, jobs are processed by deadline priority tier
+/// (imperative first, flexible last), then EDD within each tier.
+/// With `EarliestDeadline` ordering, all jobs are processed globally by
+/// deadline ascending, ignoring tiers. This can produce different LAST
+/// values because capacity is reserved in a different order.
 ///
 /// Returns HashMap<task_id, LAST_tick> for use by the forward pass.
 pub fn compute_last_values(
@@ -37,6 +40,7 @@ pub fn compute_last_values(
     tick_minutes: u32,
     start_date: NaiveDate,
     horizon_ticks: usize,
+    ordering: BackwardOrdering,
 ) -> HashMap<String, u64> {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -140,19 +144,38 @@ pub fn compute_last_values(
         num_operators, effective_horizon, tick_minutes, start_date, schedules,
     );
 
-    // Process by tier: imperative first, then important, standard, flexible
-    let tiers = [0u8, 1, 2, 3];
-    for tier in &tiers {
-        run_backward_tier(
-            *tier,
-            &mut backward_actions,
-            &mut grid,
-            station_attrs,
-            operator_skills,
-            operator_groups,
-            &operator_availability,
-            effective_horizon,
-        );
+    match ordering {
+        BackwardOrdering::TierFirst => {
+            // Process by tier: imperative first, then important, standard, flexible
+            let tiers = [0u8, 1, 2, 3];
+            for tier in &tiers {
+                run_backward_tier(
+                    *tier,
+                    &mut backward_actions,
+                    &mut grid,
+                    station_attrs,
+                    operator_skills,
+                    operator_groups,
+                    &operator_availability,
+                    effective_horizon,
+                );
+            }
+        }
+        BackwardOrdering::EarliestDeadline => {
+            // Process ALL actions globally by deadline ascending, ignoring tiers.
+            // This produces different LAST values because capacity reservation
+            // order changes: a tight-deadline flexible job can reserve capacity
+            // before a loose-deadline imperative job.
+            run_backward_edd(
+                &mut backward_actions,
+                &mut grid,
+                station_attrs,
+                operator_skills,
+                operator_groups,
+                &operator_availability,
+                effective_horizon,
+            );
+        }
     }
 
     // Collect LAST values
@@ -264,6 +287,76 @@ fn run_backward_tier(
         }
 
         // Sort eligible by deadline ascending (EDD within tier)
+        eligible.sort_by_key(|&i| actions[i].deadline_ticks);
+
+        // Place each eligible action backward from its effective deadline
+        for &ai in &eligible {
+            let last = place_backward(
+                ai,
+                actions,
+                grid,
+                station_attrs,
+                operator_skills,
+                operator_groups,
+                operator_availability,
+                horizon_ticks,
+            );
+            actions[ai].last_tick = Some(last);
+            placed[ai] = true;
+        }
+    }
+}
+
+/// Run the backward pass with pure EDD ordering (ignoring tiers).
+/// All actions are processed globally by deadline ascending. Within each
+/// iteration of the loop, eligible actions (terminal or successor placed)
+/// are sorted by effective deadline and placed.
+fn run_backward_edd(
+    actions: &mut Vec<BackwardAction>,
+    grid: &mut ScheduleGrid,
+    station_attrs: &[StationAttrs],
+    operator_skills: &[Vec<(usize, f64)>],
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
+    operator_availability: &OperatorAvailability,
+    horizon_ticks: usize,
+) {
+    let mut placed = vec![false; actions.len()];
+
+    loop {
+        // Find eligible actions: not placed, either terminal or successor already placed
+        // No tier filter — all actions compete globally
+        let mut eligible: Vec<usize> = Vec::new();
+        for i in 0..actions.len() {
+            if placed[i] {
+                continue;
+            }
+            match actions[i].successor_idx {
+                None => eligible.push(i),
+                Some(succ) => {
+                    if placed[succ] {
+                        eligible.push(i);
+                    }
+                }
+            }
+        }
+
+        if eligible.is_empty() {
+            break;
+        }
+
+        // Compute effective deadlines (same logic as run_backward_tier)
+        for &ai in &eligible {
+            let effective_deadline = match actions[ai].successor_idx {
+                Some(succ) => {
+                    let succ_last = actions[succ].last_tick.unwrap_or(actions[succ].deadline_ticks);
+                    succ_last.saturating_sub(actions[ai].successor_gap_ticks as u64)
+                }
+                None => actions[ai].deadline_ticks,
+            };
+            actions[ai].deadline_ticks = effective_deadline.min(actions[ai].deadline_ticks);
+        }
+
+        // Sort eligible globally by deadline ascending (EDD)
         eligible.sort_by_key(|&i| actions[i].deadline_ticks);
 
         // Place each eligible action backward from its effective deadline
