@@ -14,6 +14,6 @@ Tracking late job count and other key metrics as we improve the scheduling algor
 | # | Improvement | Status |
 |---|---|---|
 | 1 | Backward pass multi-resource (realistic LAST) | **Done** — -29 late jobs, -51% lateness |
-| 2 | Reactivate Moore escape hatch | Pending |
+| 2 | Reactivate Moore escape hatch | **Done** — no effect (all jobs same priority), kept for future use |
 | 3 | Chain pressure + station contention in scoring | Pending |
 | 4 | Shift-aware pre-split | Pending |

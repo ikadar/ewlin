@@ -152,10 +152,11 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
         progress,
     );
 
-    // Moore escape hatch: DISABLED for now — adds full FBI re-runs.
-    // TODO: re-enable once base performance is validated.
+    // Moore escape hatch: if late imperative/important jobs remain after FBI,
+    // try swapping lower-priority work to rescue them. Budget-capped to avoid
+    // excessive compute time.
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
-    if false && stats.late_job_count > 0 && elapsed_ms < 8000 {
+    if stats.late_job_count > 0 && elapsed_ms < 20_000 {
         if let Some((moore_assignments, moore_actions, moore_stats, moore_iters)) = moore::moore_escape(
             &request.jobs,
             &request.stations,
@@ -166,7 +167,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             options.horizon_days,
             fbi_max_iterations,
             start_date,
-            2, // max_attempts
+            3, // max_attempts
             &request.station_groups,
         ) {
             assignments = moore_assignments;
