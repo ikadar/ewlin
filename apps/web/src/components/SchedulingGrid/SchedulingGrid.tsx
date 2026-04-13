@@ -394,6 +394,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   // Step 1d: Pre-compute per-tile render data (independent of selectedJobId)
   const tileDataCache = useMemo(() => {
     const cache = new Map<string, CachedTileData>();
+    const currentNow = now;
 
     for (const [stationId, stationAssignments] of assignmentsByStation) {
       const station = stationMap.get(stationId);
@@ -430,7 +431,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         // Tile state
         const isJobShipped = shippedJobIds?.has(job.id) ?? false;
         const isJobLate = lateJobIds?.has(job.id) ?? false;
-        const isLate = isJobLate;
+        const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < currentNow;
+        const isLate = isJobLate || isTaskOverdue;
         const hasConflict = conflictTaskIds.has(task.id);
         const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocking?.blocked ?? false, assignment.isCompleted);
 
@@ -459,7 +461,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   }, [assignmentsByStation, taskMap, jobMap, elementMap, elementBlockingCache,
       elementsByJobId, stationMap, categoryMap, assemblyStationIds,
       startHour, pixelsPerHour, startDate, shippedJobIds, lateJobIds,
-      conflictTaskIds, operatorNameMap]);
+      conflictTaskIds, now, operatorNameMap]);
 
   // Calculate departure marker position (if selected job has workshopExitDate)
   // Multi-day: show marker regardless of day (REQ-15)
