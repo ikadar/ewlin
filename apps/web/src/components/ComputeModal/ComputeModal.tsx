@@ -123,7 +123,7 @@ function useComputeStream(
     }
 
     // Get auth token from localStorage
-    const token = localStorage.getItem('flux_token') || '';
+    const token = localStorage.getItem('flux_auth_token') || '';
 
     const body = JSON.stringify({
       mode,
