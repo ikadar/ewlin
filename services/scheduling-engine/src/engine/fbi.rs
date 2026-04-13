@@ -103,6 +103,8 @@ pub fn run_with_fbi(
         late_job_ids: Vec::new(),
     };
     let mut prev_makespan: u64 = u64::MAX;
+    let mut prev_late_job_count: u32 = u32::MAX;
+    let mut prev_weighted_lateness: u64 = u64::MAX;
     let mut iteration_count: u32 = 0;
 
     // For FBI feedback: actual durations from previous iteration
@@ -240,8 +242,11 @@ pub fn run_with_fbi(
             late_job_count: stats.late_job_count,
         });
 
-        // Track best result
-        if current_makespan < best_stats.makespan_minutes {
+        // Track best result: prefer fewer late jobs, then less weighted
+        // lateness, then shorter makespan.
+        let current_score = (stats.late_job_count, stats.weighted_lateness_minutes, current_makespan);
+        let best_score = (best_stats.late_job_count, best_stats.weighted_lateness_minutes, best_stats.makespan_minutes);
+        if current_score < best_score {
             best_assignments = remapped;
             best_stats = stats;
             best_actions = actions
@@ -250,7 +255,9 @@ pub fn run_with_fbi(
                 .collect();
         }
 
-        // Convergence check: makespan changed < 1%
+        // Convergence check: makespan changed < 1% AND lateness metrics
+        // are stable. Without the lateness check, FBI can converge with
+        // avoidable late jobs just because makespan stopped moving.
         if iteration > 0 && prev_makespan < u64::MAX {
             let diff = if current_makespan > prev_makespan {
                 current_makespan - prev_makespan
@@ -258,7 +265,10 @@ pub fn run_with_fbi(
                 prev_makespan - current_makespan
             };
             let threshold = (prev_makespan as f64 * 0.01) as u64;
-            if diff <= threshold {
+            let makespan_stable = diff <= threshold;
+            let lateness_stable = current_score.0 == prev_late_job_count
+                && current_score.1 == prev_weighted_lateness;
+            if makespan_stable && lateness_stable {
                 super::emit(progress, crate::model::progress::ProgressEvent::FbiConverged {
                     iteration: iteration + 1,
                 });
@@ -267,6 +277,8 @@ pub fn run_with_fbi(
         }
 
         prev_makespan = current_makespan;
+        prev_late_job_count = current_score.0;
+        prev_weighted_lateness = current_score.1;
 
         // Collect actual durations for feedback
         duration_overrides.clear();
