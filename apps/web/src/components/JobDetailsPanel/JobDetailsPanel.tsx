@@ -29,14 +29,10 @@ export interface JobDetailsPanelProps {
   providers?: OutsourcedProvider[];
   /** Task ID that is the active placement target in Quick Placement Mode */
   activeTaskId?: string | null;
-  /** Task ID that is currently picked (v0.3.54 Pick & Place) */
-  pickedTaskId?: string | null;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
-  /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
-  onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
   /** Callback when close button is clicked (REQ-02) */
   onClose?: () => void;
   /** REQ-02: Callback when departure date is clicked (scrolls grid to date) */
@@ -114,11 +110,9 @@ export function JobDetailsPanel({
   categories,
   providers,
   activeTaskId,
-  pickedTaskId,
   conflictTaskIds,
   onJumpToTask,
   onRecallTask,
-  onPick,
   onClose,
   onDateClick,
   onElementStatusChange,
@@ -340,13 +334,11 @@ export function JobDetailsPanel({
         categories={categories}
         providers={providers}
         activeTaskId={activeTaskId}
-        pickedTaskId={pickedTaskId}
         conflictTaskIds={conflictTaskIds}
         lateJobIds={lateJobIds}
         shippedJobIds={shippedJobIds}
         onJumpToTask={onJumpToTask}
         onRecallTask={onRecallTask}
-        onPick={onPick}
         onElementStatusChange={onElementStatusChange}
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}

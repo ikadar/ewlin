@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter, ModeBanner } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter } from './components';
 import { useTheme } from './contexts/ThemeContext';
 import { ZOOM_LEVELS } from './utils/zoom';
 import { Save, ClipboardCopy, Cpu } from 'lucide-react';
@@ -20,10 +20,9 @@ import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
 import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
-import { snapToGrid, yPositionToTime, SNAP_INTERVAL_MINUTES } from './components/DragPreview';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useAssignTaskMutation, useRescheduleTaskMutation, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable, useComputeScheduleMutation } from './store';
+import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable, useComputeScheduleMutation } from './store';
 import type { ComputeScheduleResult } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
@@ -34,15 +33,8 @@ import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
-import { applySwap, formatAutoSaveName, getPredecessorConstraint, getSuccessorConstraint, getDryingTimeInfo, getOutsourcingTimeInfo, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
-import type { DryingTimeInfo, OutsourcingTimeInfo } from './utils';
-import {
-  PickStateProvider,
-  PickPreview,
-  usePickState,
-  PICK_CURSOR_OFFSET_Y,
-} from './pick';
-import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory, ProposedAssignment } from '@flux/types';
+import { formatAutoSaveName, getPrimaryValidationMessage, getTasksForJob, getJobIdForTask, compareTaskOrder } from './utils';
+import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory } from '@flux/types';
 import { getDeadlineDate } from '@flux/types';
 import { validateAssignment } from '@flux/schedule-validator';
 import { calculateReturnDate } from './utils/outsourcingCalculation';

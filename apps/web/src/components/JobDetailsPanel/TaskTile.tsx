@@ -20,14 +20,10 @@ export interface TaskTileProps {
   station?: Station;
   /** Whether this task is the active placement target in Quick Placement Mode */
   isActivePlacement?: boolean;
-  /** Whether this task is currently picked (for Pick & Place) */
-  isPicked?: boolean;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
-  /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
-  onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
   /** v0.5.11: Provider for outsourced tasks */
   provider?: OutsourcedProvider;
   /** v0.5.11: End time of predecessor task (ISO string) for outsourcing calculations */
@@ -116,10 +112,8 @@ export const TaskTile = memo(function TaskTile({
   assignment,
   station,
   isActivePlacement = false,
-  isPicked = false,
   onJumpToTask,
   onRecallTask,
-  onPick,
   provider,
   predecessorEndTime,
   onDepartureChange,
@@ -261,14 +255,9 @@ export const TaskTile = memo(function TaskTile({
     : undefined;
 
   // Picked state styling (v0.3.54)
-  const pickedStyle = isPicked
-    ? { boxShadow: '0 0 0 2px #3b82f6, 0 0 12px rgba(59, 130, 246, 0.4)', opacity: 0.7 }
-    : undefined;
-
   const tileInlineStyle = {
     borderLeftColor: style.borderColor,
     ...activePlacementStyle,
-    ...pickedStyle,
   };
 
   if (isScheduled) {
@@ -388,57 +377,8 @@ export const TaskTile = memo(function TaskTile({
   };
 
   // Handle click for pick & place
-  const handleClick = (e: React.MouseEvent) => {
-    if (onPick) {
-      onPick(task, job, e.clientX, e.clientY);
-    }
-  };
+  const baseClassName = `h-8 pt-0.5 px-2 text-sm border-l-4 ${style.bg} select-none transition-all duration-150 cursor-default`;
 
-  // Determine cursor style
-  const getCursorClass = () => {
-    if (isPicked) return 'cursor-default';
-    if (onPick) return 'cursor-pointer';
-    return 'cursor-default';
-  };
-
-  const baseClassName = `h-8 pt-0.5 px-2 text-sm border-l-4 ${style.bg} select-none transition-all duration-150 ${getCursorClass()}`;
-
-  const content = (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>
-          {displayName}
-        </span>
-        {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
-          <>
-            <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
-            <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1 py-px font-semibold shrink-0">
-              {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
-            </span>
-          </>
-        )}
-      </div>
-      <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
-    </div>
-  );
-
-  // Use button when interactive (onPick provided)
-  if (onPick) {
-    return (
-      <button
-        type="button"
-        className={`${baseClassName} w-full text-left`}
-        style={tileInlineStyle}
-        data-testid={`task-tile-${task.id}`}
-        onClick={handleClick}
-        onContextMenu={handleUnplacedContextMenu}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  // Non-interactive display
   return (
     <div
       className={baseClassName}
@@ -446,7 +386,22 @@ export const TaskTile = memo(function TaskTile({
       data-testid={`task-tile-${task.id}`}
       onContextMenu={handleUnplacedContextMenu}
     >
-      {content}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>
+            {displayName}
+          </span>
+          {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
+            <>
+              <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
+              <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1 py-px font-semibold shrink-0">
+                {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
+              </span>
+            </>
+          )}
+        </div>
+        <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
+      </div>
     </div>
   );
 });

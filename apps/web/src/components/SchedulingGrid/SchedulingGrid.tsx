@@ -42,8 +42,6 @@ interface CachedTileData {
   task: Task;
   job: Job;
   top: number;
-  showSwapUp: boolean;
-  showSwapDown: boolean;
   similarityResults: ReturnType<typeof compareSimilarity> | undefined;
   hasConflict: boolean;
   tileState: ReturnType<typeof computeTileState>;
@@ -81,16 +79,10 @@ export interface SchedulingGridProps {
   onSelectJob?: (jobId: string) => void;
   /** Callback when clicking the grid background (deselect) */
   onDeselect?: () => void;
-  /** Callback when swap up is clicked */
-  onSwapUp?: (assignmentId: string) => void;
-  /** Callback when swap down is clicked */
-  onSwapDown?: (assignmentId: string) => void;
   /** Callback when completion icon is clicked */
   onToggleComplete?: (assignmentId: string) => void;
   /** Callback when pin icon is clicked */
   onTogglePin?: (assignmentId: string) => void;
-  /** Whether ALT key is pressed (for precedence bypass) */
-  isAltPressed?: boolean;
   /** Schedule conflicts for conflict visualization (REQ-12) */
   conflicts?: ScheduleConflict[];
   /** Station groups for capacity visualization (REQ-18) */
@@ -101,30 +93,6 @@ export interface SchedulingGridProps {
   totalDays?: number;
   /** v0.3.46: Number of buffer days to render around focused day (default: 3) */
   bufferDays?: number;
-  /** v0.3.54: Whether a task is currently picked (Pick & Place mode) */
-  isPicking?: boolean;
-  /** v0.3.54: Target station ID for the picked task */
-  pickTargetStationId?: string | null;
-  /** v0.3.54: Ring color state for pick operation */
-  pickRingState?: 'none' | 'valid' | 'invalid' | 'warning' | 'bypass';
-  /** v0.3.55: Source of the pick operation (sidebar vs grid) */
-  pickSource?: 'sidebar' | 'grid' | null;
-  /** v0.3.54: Callback for mouse move during pick */
-  onPickMouseMove?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
-  /** v0.3.54: Callback for mouse leave during pick */
-  onPickMouseLeave?: () => void;
-  /** v0.3.54: Callback for click to place during pick */
-  onPickClick?: (stationId: string, clientX: number, clientY: number, relativeY: number) => void;
-  /** v0.3.54: Precedence constraint Y positions during pick */
-  pickPrecedenceConstraints?: { earliestY: number | null; latestY: number | null };
-  /** v0.3.54: Drying time info during pick */
-  pickDryingTimeInfo?: DryingTimeInfo | null;
-  /** v0.5.13: Outsourcing time info during pick */
-  pickOutsourcingTimeInfo?: OutsourcingTimeInfo | null;
-  /** v0.3.57: Assignment ID of picked tile (for showing placeholder) */
-  pickedAssignmentId?: string | null;
-  /** v0.3.57: Callback when tile is clicked to pick from grid */
-  onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
   /** v0.3.58: Callback when tile is right-clicked (context menu) */
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
   /** Current display mode (Produit or Tirage) — affects column widths */
@@ -157,30 +125,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       pixelsPerHour = PIXELS_PER_HOUR,
       onSelectJob,
       onDeselect,
-      onSwapUp,
-      onSwapDown,
       onToggleComplete,
       onTogglePin,
-      isAltPressed = false,
       conflicts = [],
       groups = [],
       onScroll,
       totalDays = 365,
       bufferDays = 7,
-      // v0.3.54: Pick & Place props
-      isPicking = false,
-      pickTargetStationId,
-      pickRingState = 'none',
-      pickSource,
-      onPickMouseMove,
-      onPickMouseLeave,
-      onPickClick,
-      pickPrecedenceConstraints,
-      pickDryingTimeInfo,
-      pickOutsourcingTimeInfo,
-      // v0.3.57: Pick from grid props
-      pickedAssignmentId,
-      onPickFromGrid,
       // v0.3.58: Context menu props
       onContextMenu,
       displayMode,
@@ -461,13 +412,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         const blocking = element ? elementBlockingCache.get(element.id) : undefined;
         const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate);
 
-        // Swap buttons
-        const isCurrentCompleted = assignment.isCompleted;
-        const adjacentUp = index > 0 ? stationAssignments[index - 1] : null;
-        const adjacentDown = index < stationAssignments.length - 1 ? stationAssignments[index + 1] : null;
-        const showSwapUp = !isCurrentCompleted && index > 0 && !adjacentUp?.isCompleted;
-        const showSwapDown = !isCurrentCompleted && index < stationAssignments.length - 1 && !adjacentDown?.isCompleted;
-
         // Similarity
         let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
         if (index > 0 && criteria.length > 0 && element?.spec) {
@@ -503,7 +447,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
         cache.set(assignment.id, {
           jobId: job.id, element, task, job, top,
-          showSwapUp, showSwapDown, similarityResults,
+          similarityResults,
           hasConflict, tileState,
           blocked: blocking?.blocked ?? false,
           blockingInfo: blocking?.blockingInfo,
@@ -619,16 +563,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               // v0.3.57: Column collapse removed (was only for drag & drop)
               const isCollapsed = false;
 
-              // Precedence constraints: show for pick
-              const isPickTarget = isPicking && pickTargetStationId === station.id;
-              const effectivePrecedenceConstraints = isPickTarget ? pickPrecedenceConstraints : undefined;
-
-              // v0.3.51: Drying time info - show only on the predecessor's station
-              const effectiveDryingTimeInfo = pickDryingTimeInfo?.predecessorStationId === station.id ? pickDryingTimeInfo : undefined;
-
-              // v0.5.13: Outsourcing time info - show on the pick target station
-              const effectiveOutsourcingTimeInfo = isPickTarget ? pickOutsourcingTimeInfo : undefined;
-
               return (
                 <StationColumn
                   key={station.id}
@@ -638,17 +572,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   pixelsPerHour={pixelsPerHour}
                   gridStartDate={startDate}
                   isCollapsed={isCollapsed}
-                  precedenceConstraints={effectivePrecedenceConstraints}
-                  dryingTimeInfo={effectiveDryingTimeInfo}
-                  outsourcingTimeInfo={effectiveOutsourcingTimeInfo ?? undefined}
                   visibleDayRange={virtualScroll.visibleRange}
-                  isPicking={isPicking}
-                  isPickTarget={isPickTarget}
-                  pickRingState={isPickTarget ? pickRingState : 'none'}
-                  pickSource={pickSource}
-                  onPickMouseMove={onPickMouseMove}
-                  onPickMouseLeave={onPickMouseLeave}
-                  onPickClick={onPickClick}
                   displayMode={displayMode}
                   category={category}
                   onDeselect={onDeselect}
@@ -665,20 +589,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         element={cached.element}
                         top={cached.top}
                         isSelected={selectedJobId === cached.jobId}
-                        showSwapUp={cached.showSwapUp}
-                        showSwapDown={cached.showSwapDown}
                         similarityResults={cached.similarityResults}
                         onSelect={onSelectJob}
-                        onSwapUp={onSwapUp}
-                        onSwapDown={onSwapDown}
                         onToggleComplete={onToggleComplete}
                         onTogglePin={onTogglePin}
                         hasConflict={cached.hasConflict}
                         tileState={cached.tileState}
                         pixelsPerHour={cached.pixelsPerHour}
-                        isPicked={pickedAssignmentId === assignment.id}
-                        onPickFromGrid={onPickFromGrid}
-                        isPickingActive={isPicking}
                         onContextMenu={onContextMenu}
                         isBlocked={cached.blocked}
                         blockingInfo={cached.blockingInfo}

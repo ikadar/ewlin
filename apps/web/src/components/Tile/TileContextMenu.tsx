@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Square, CheckSquare, ChevronUp, ChevronDown, Undo2, Scissors, Merge, Pin } from 'lucide-react';
+import { Eye, Square, CheckSquare, Undo2, Scissors, Merge, Pin } from 'lucide-react';
 
 export interface TileContextMenuProps {
   /** Menu position X coordinate (from cursor) */
@@ -13,18 +13,10 @@ export interface TileContextMenuProps {
   isPinned: boolean;
   /** Callback for "Toggle pin" action */
   onTogglePin: () => void;
-  /** Whether swap up is available (has tile above) */
-  canSwapUp: boolean;
-  /** Whether swap down is available (has tile below) */
-  canSwapDown: boolean;
   /** Callback for "View details" action */
   onViewDetails: () => void;
   /** Callback for "Toggle completion" action */
   onToggleComplete: () => void;
-  /** Callback for "Move up" action */
-  onSwapUp: () => void;
-  /** Callback for "Move down" action */
-  onSwapDown: () => void;
   /** Callback for "Recall" action (unassign) */
   onRecall: () => void;
   /** Callback for "Split" action */
@@ -87,12 +79,8 @@ export function TileContextMenu({
   isCompleted,
   isPinned,
   onTogglePin,
-  canSwapUp,
-  canSwapDown,
   onViewDetails,
   onToggleComplete,
-  onSwapUp,
-  onSwapDown,
   onRecall,
   onSplit,
   onFuse,
@@ -187,20 +175,6 @@ export function TileContextMenu({
     onClose();
   };
 
-  const handleSwapUp = () => {
-    if (canSwapUp) {
-      onSwapUp();
-      onClose();
-    }
-  };
-
-  const handleSwapDown = () => {
-    if (canSwapDown) {
-      onSwapDown();
-      onClose();
-    }
-  };
-
   const handleRecall = () => {
     if (!isCompleted && !isPinned) {
       onRecall();
@@ -268,21 +242,6 @@ export function TileContextMenu({
           testId="context-menu-fuse"
         />
       )}
-      {(onSplit || (isSplit && onFuse)) && <Separator />}
-      <MenuItem
-        icon={<ChevronUp className="w-4 h-4" />}
-        label="Déplacer vers le haut"
-        onClick={handleSwapUp}
-        disabled={!canSwapUp}
-        testId="context-menu-move-up"
-      />
-      <MenuItem
-        icon={<ChevronDown className="w-4 h-4" />}
-        label="Déplacer vers le bas"
-        onClick={handleSwapDown}
-        disabled={!canSwapDown}
-        testId="context-menu-move-down"
-      />
     </div>,
     document.body
   );

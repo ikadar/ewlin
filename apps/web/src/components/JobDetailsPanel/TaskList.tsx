@@ -24,8 +24,6 @@ export interface TaskListProps {
   providers?: OutsourcedProvider[];
   /** Task ID that is the active placement target in Quick Placement Mode */
   activeTaskId?: string | null;
-  /** Task ID that is currently picked (v0.3.54 Pick & Place) */
-  pickedTaskId?: string | null;
   /** Task IDs involved in precedence conflicts (for amber glow highlighting) */
   conflictTaskIds?: Set<string>;
   /** Job IDs that are late (past workshop exit date) */
@@ -36,8 +34,6 @@ export interface TaskListProps {
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
-  /** Callback when an unscheduled task is clicked (pick for placement) - v0.3.54 */
-  onPick?: (task: Task, job: Job, clientX: number, clientY: number) => void;
   /** Callback when element prerequisite status changes (v0.4.32a) */
   onElementStatusChange?: (update: ElementStatusUpdate) => void;
   /** v0.5.11: Callback when manual departure changes for outsourced task */
@@ -68,13 +64,11 @@ export function TaskList({
   providers = [],
   categories = [],
   activeTaskId,
-  pickedTaskId,
   conflictTaskIds,
   lateJobIds,
   shippedJobIds,
   onJumpToTask,
   onRecallTask,
-  onPick,
   onElementStatusChange,
   onDepartureChange,
   onReturnChange,
@@ -264,10 +258,8 @@ export function TaskList({
             assignment={assignment}
             station={station}
             isActivePlacement={activeTaskId === task.id}
-            isPicked={pickedTaskId === task.id}
             onJumpToTask={onJumpToTask}
             onRecallTask={onRecallTask}
-            onPick={!assignment ? onPick : undefined}
             provider={provider}
             predecessorEndTime={predecessorEndTime}
             isLastTaskOfJob={isLastTask}

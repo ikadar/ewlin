@@ -2,7 +2,6 @@ import { memo } from 'react';
 import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
-import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { TileTooltip } from './TileTooltip';
 import { getStateColorClasses } from './colorUtils';
@@ -22,14 +21,6 @@ export interface TileProps {
   top: number;
   /** Callback when tile is clicked (select job) */
   onSelect?: (jobId: string) => void;
-  /** Callback when swap up is clicked */
-  onSwapUp?: (assignmentId: string) => void;
-  /** Callback when swap down is clicked */
-  onSwapDown?: (assignmentId: string) => void;
-  /** Whether to show swap up button */
-  showSwapUp?: boolean;
-  /** Whether to show swap down button */
-  showSwapDown?: boolean;
   /** Whether this tile's job is selected */
   isSelected?: boolean;
   /** Similarity comparison results with previous tile (if any) */
@@ -42,12 +33,6 @@ export interface TileProps {
   onTogglePin?: (assignmentId: string) => void;
   /** Pixels per hour for height calculation (default: 80) */
   pixelsPerHour?: number;
-  /** v0.3.57: Whether this tile is currently picked (shows placeholder) */
-  isPicked?: boolean;
-  /** v0.3.57: Callback when tile is clicked to pick for reschedule */
-  onPickFromGrid?: (task: InternalTask, job: Job, assignmentId: string) => void;
-  /** v0.3.57: Whether picking is active (for muting other tiles) */
-  isPickingActive?: boolean;
   /** v0.3.58: Callback when tile is right-clicked (context menu) */
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
   /** v0.4.32b: Whether this element is blocked due to missing prerequisites */
@@ -91,19 +76,12 @@ export const Tile = memo(function Tile({
   job,
   top,
   onSelect,
-  onSwapUp,
-  onSwapDown,
-  showSwapUp = true,
-  showSwapDown = true,
   isSelected = false,
   similarityResults,
   hasConflict = false,
   onToggleComplete,
   onTogglePin,
   pixelsPerHour = PIXELS_PER_HOUR,
-  isPicked = false,
-  onPickFromGrid,
-  isPickingActive = false,
   onContextMenu,
   isBlocked = false,
   blockingInfo,
@@ -141,26 +119,9 @@ export const Tile = memo(function Tile({
   // Completion state
   const isCompleted = assignment.isCompleted;
 
-  // Handle click - "Select Then Act": click to select, click selected tile to pick
+  // Handle click — select this job
   const handleClick = () => {
-    if (isPickingActive) return;
-
-    if (isSelected && !isCompleted && !assignment.isPinned && onPickFromGrid) {
-      // Already-selected job's tile → pick for repositioning
-      onPickFromGrid(task, job, assignment.id);
-    } else {
-      // Select (or switch to) this job
-      onSelect?.(job.id);
-    }
-  };
-
-  // Handle swap
-  const handleSwapUp = () => {
-    onSwapUp?.(assignment.id);
-  };
-
-  const handleSwapDown = () => {
-    onSwapDown?.(assignment.id);
+    onSelect?.(job.id);
   };
 
   // Handle completion toggle (v0.3.33)
@@ -186,34 +147,13 @@ export const Tile = memo(function Tile({
 
   // Selection outline is handled by CSS selector on [data-job-id] (instant, no re-render needed)
 
-  // During pick mode, disable pointer events on non-picked tiles
-  const pickStyle = isPickingActive && !isPicked
-    ? { pointerEvents: 'none' as const }
-    : undefined;
-
   // v0.4.32b: Blocked tiles show dashed border
   const borderStyleClass = isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
 
   // Cursor: grab for selected pickable tiles, pointer for all others
-  const cursorClass = isSelected && !isCompleted && onPickFromGrid
-    ? 'cursor-grab'
-    : 'cursor-pointer';
-
-  // v0.3.57: Pulsating placeholder shown at original position when tile is picked
-  if (isPicked) {
-    return (
-      <div
-        className="absolute left-0 right-0 border-2 border-dashed border-zinc-500 bg-zinc-800/30 rounded pointer-events-none animate-pulse-opacity"
-        style={{ top: `${top}px`, height: `${totalHeight}px` }}
-        data-testid={`tile-placeholder-${assignment.id}`}
-        aria-hidden="true"
-      />
-    );
-  }
-
   return (
     <div
-      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group ${cursorClass} touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
         top: `${top}px`,
         height: `${totalHeight}px`,
@@ -221,7 +161,6 @@ export const Tile = memo(function Tile({
         width: overrideWidth ?? undefined,
         right: overrideWidth ? undefined : 0,
         opacity: overrideOpacity ?? undefined,
-        ...pickStyle,
       }}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -321,14 +260,6 @@ export const Tile = memo(function Tile({
         </div>
       )}
 
-      {/* Swap buttons (visible on hover) */}
-      <SwapButtons
-        onSwapUp={handleSwapUp}
-        onSwapDown={handleSwapDown}
-        showUp={showSwapUp}
-        showDown={showSwapDown}
-      />
-
       {/* Fázis D: Rich tooltip (shown after 500ms hover on all tiles) */}
       <TileTooltip
         isVisible={showTooltip}
@@ -366,11 +297,7 @@ function haveDataPropsChanged(prev: TileProps, next: TileProps): boolean {
 function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
   return (
     prev.isSelected !== next.isSelected ||
-    prev.showSwapUp !== next.showSwapUp ||
-    prev.showSwapDown !== next.showSwapDown ||
     prev.hasConflict !== next.hasConflict ||
-    prev.isPicked !== next.isPicked ||
-    prev.isPickingActive !== next.isPickingActive ||
     prev.isBlocked !== next.isBlocked ||
     prev.blockingInfo !== next.blockingInfo ||
     prev.displayMode !== next.displayMode ||
@@ -387,11 +314,8 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
 function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
   return (
     prev.onSelect !== next.onSelect ||
-    prev.onSwapUp !== next.onSwapUp ||
-    prev.onSwapDown !== next.onSwapDown ||
     prev.onToggleComplete !== next.onToggleComplete ||
     prev.onTogglePin !== next.onTogglePin ||
-    prev.onPickFromGrid !== next.onPickFromGrid ||
     prev.onContextMenu !== next.onContextMenu
   );
 }
