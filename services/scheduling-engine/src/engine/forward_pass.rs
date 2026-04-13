@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{Datelike, NaiveDate};
 
 use crate::model::operator::OperatingSchedule;
@@ -494,6 +496,8 @@ pub fn run_forward_pass(
     start_date: NaiveDate,
     station_to_group: &[Option<(usize, u32)>],
     now_tick: usize,
+    station_urgency_boost: &HashMap<usize, f64>,
+    score_weights: &[f64; 6],
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
@@ -717,7 +721,20 @@ pub fn run_forward_pass(
                 0
             };
 
-            let score = weighted_urgency + job_boost + proximity_bonus + calage_bonus + chain_pressure + contention_bonus;
+            // Station urgency boost from FBI feedback: stations where late jobs
+            // waited longest get a bonus to prioritize their tasks next iteration.
+            let station_boost: i64 = station_urgency_boost
+                .get(&action.station_idx)
+                .map(|&b| (b * 0.1) as i64)
+                .unwrap_or(0);
+
+            let score = (weighted_urgency as f64 * score_weights[0]) as i64
+                + (job_boost as f64 * score_weights[1]) as i64
+                + (proximity_bonus as f64 * score_weights[2]) as i64
+                + (calage_bonus as f64 * score_weights[3]) as i64
+                + (chain_pressure as f64 * score_weights[4]) as i64
+                + (contention_bonus as f64 * score_weights[5]) as i64
+                + station_boost;
 
             scored.push(ScoredAction { action_idx: i, score });
         }

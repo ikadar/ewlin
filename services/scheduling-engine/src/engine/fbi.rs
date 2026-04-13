@@ -108,8 +108,13 @@ pub fn run_with_fbi(
     let mut prev_weighted_lateness: u64 = u64::MAX;
     let mut iteration_count: u32 = 0;
 
-    // For FBI feedback: actual durations from previous iteration
-    let mut duration_overrides: HashMap<String, u32> = HashMap::new();
+    // For FBI feedback: station urgency boost from previous iteration.
+    // Stations where late jobs waited longest get a bonus to prioritize
+    // their tasks in the next iteration's forward pass.
+    let mut station_urgency_boost: HashMap<usize, f64> = HashMap::new();
+
+    // Default score weights (all 1.0 = current behavior)
+    let score_weights: [f64; 6] = [1.0; 6];
 
     let effective_max = if max_iterations == 0 { 1 } else { max_iterations };
 
@@ -154,27 +159,8 @@ pub fn run_with_fbi(
             start_date,
         );
 
-        // Apply duration overrides from previous iteration
-        if !duration_overrides.is_empty() {
-            for action in &mut actions {
-                if let Some(&actual_total_ticks) = duration_overrides.get(&action.task_id) {
-                    // The actual duration was longer (due to degraded mode).
-                    // Update ART so LAST computation reflects reality.
-                    if actual_total_ticks > action.art {
-                        action.run_ticks = actual_total_ticks.saturating_sub(action.setup_ticks);
-                        action.art = actual_total_ticks;
-                    }
-                }
-            }
-
-            // Recompute LAST values with realistic durations
-            recompute_last_values(
-                &mut actions, jobs, stations, operators,
-                &station_attrs, &operator_skills, &operator_groups,
-                tick_minutes, start_date, horizon_days,
-                ordering,
-            );
-        }
+        // Station urgency boost is applied in the forward pass scoring,
+        // not here — it doesn't change LAST values, just scoring weights.
 
         // Pre-split
         pre_split(&mut actions, stations, tick_minutes);
@@ -233,6 +219,8 @@ pub fn run_with_fbi(
             start_date,
             &station_to_group,
             now_tick,
+            &station_urgency_boost,
+            &score_weights,
         );
 
         // Remap and compute stats
@@ -308,57 +296,44 @@ pub fn run_with_fbi(
             boosted_jobs.clear();
         }
 
-        // Collect actual durations for feedback
-        duration_overrides.clear();
-        for action in &actions {
-            if let (Some(start), Some(end)) = (action.start_tick, action.end_tick) {
-                let actual_ticks = (end - start) as u32;
-                let original_total = action.setup_ticks + action.run_ticks;
-                // Only feed back if actual > planned (degraded mode made it slower)
-                if actual_ticks > original_total {
-                    // Map chunk task_ids back to original for aggregation
-                    let task_id = match &action.chunk_info {
-                        Some((_chunk_n, _total, original_id)) => original_id.clone(),
-                        None => action.task_id.clone(),
-                    };
-                    let entry = duration_overrides.entry(task_id).or_insert(0);
-                    *entry += actual_ticks;
+        // Station-bottleneck feedback: for late jobs, compute how long each
+        // task waited between predecessor completion and its own start. Sum
+        // waiting time per station. Stations with the most late-job waiting
+        // time get a boost in the next iteration's forward pass scoring.
+        station_urgency_boost.clear();
+        if !best_stats.late_job_ids.is_empty() {
+            let late_set: std::collections::HashSet<&str> =
+                best_stats.late_job_ids.iter().map(|s| s.as_str()).collect();
+
+            // Build predecessor end_tick lookup
+            let mut pred_end: HashMap<usize, usize> = HashMap::new();
+            for action in &actions {
+                if let Some(pred_idx) = action.predecessor_idx {
+                    if let Some(end) = actions[pred_idx].end_tick {
+                        pred_end.insert(action.idx, end);
+                    }
+                }
+            }
+
+            for action in &actions {
+                if !late_set.contains(action.job_id.as_str()) {
+                    continue;
+                }
+                if let Some(start) = action.start_tick {
+                    // Waiting time = gap between predecessor end (or t=0) and start
+                    let pred_done = pred_end.get(&action.idx).copied().unwrap_or(0);
+                    if start > pred_done {
+                        let wait = (start - pred_done) as f64;
+                        *station_urgency_boost
+                            .entry(action.station_idx)
+                            .or_insert(0.0) += wait;
+                    }
                 }
             }
         }
     }
 
     (best_assignments, best_actions, best_stats, iteration_count)
-}
-
-/// Recompute LAST values in-place on actions using the reverse forward pass.
-fn recompute_last_values(
-    actions: &mut Vec<Action>,
-    jobs: &[JobInput],
-    stations: &[StationInput],
-    operators: &[OperatorInput],
-    station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
-    operator_groups: &[Vec<PreparedConcurrentGroup>],
-    tick_minutes: u32,
-    start_date: NaiveDate,
-    horizon_days: u32,
-    ordering: BackwardOrdering,
-) {
-    let initial_ticks = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
-    let last_values = compute_last_values(
-        jobs, stations, operators,
-        station_attrs, operator_skills, operator_groups,
-        tick_minutes, start_date,
-        initial_ticks,
-        ordering,
-    );
-
-    for action in actions.iter_mut() {
-        if let Some(&base_last) = last_values.get(&action.task_id) {
-            action.last = base_last;
-        }
-    }
 }
 
 /// Run FBI with a specific backward ordering and station groups.
