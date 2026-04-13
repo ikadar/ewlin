@@ -721,20 +721,34 @@ pub fn run_forward_pass(
                 0
             };
 
-            // Station urgency boost from FBI feedback: stations where late jobs
-            // waited longest get a bonus to prioritize their tasks next iteration.
+            // Station urgency boost (currently unused — infrastructure kept for future)
             let station_boost: i64 = station_urgency_boost
                 .get(&action.station_idx)
                 .map(|&b| (b * 0.1) as i64)
                 .unwrap_or(0);
 
-            let score = (weighted_urgency as f64 * score_weights[0]) as i64
-                + (job_boost as f64 * score_weights[1]) as i64
-                + (proximity_bonus as f64 * score_weights[2]) as i64
-                + (calage_bonus as f64 * score_weights[3]) as i64
-                + (chain_pressure as f64 * score_weights[4]) as i64
-                + (contention_bonus as f64 * score_weights[5]) as i64
-                + station_boost;
+            // Fast path: when all weights are 1.0 (default/unperturbed),
+            // use pure integer arithmetic to avoid float conversion.
+            let is_default_weights = score_weights[0] == 1.0
+                && score_weights[1] == 1.0
+                && score_weights[2] == 1.0
+                && score_weights[3] == 1.0
+                && score_weights[4] == 1.0
+                && score_weights[5] == 1.0;
+
+            let score = if is_default_weights {
+                weighted_urgency + job_boost + proximity_bonus
+                    + calage_bonus + chain_pressure + contention_bonus
+                    + station_boost
+            } else {
+                (weighted_urgency as f64 * score_weights[0]) as i64
+                    + (job_boost as f64 * score_weights[1]) as i64
+                    + (proximity_bonus as f64 * score_weights[2]) as i64
+                    + (calage_bonus as f64 * score_weights[3]) as i64
+                    + (chain_pressure as f64 * score_weights[4]) as i64
+                    + (contention_bonus as f64 * score_weights[5]) as i64
+                    + station_boost
+            };
 
             scored.push(ScoredAction { action_idx: i, score });
         }

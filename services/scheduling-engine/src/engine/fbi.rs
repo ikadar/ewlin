@@ -109,10 +109,10 @@ pub fn run_with_fbi(
     let mut prev_weighted_lateness: u64 = u64::MAX;
     let mut iteration_count: u32 = 0;
 
-    // For FBI feedback: station urgency boost from previous iteration.
-    // Stations where late jobs waited longest get a bonus to prioritize
-    // their tasks in the next iteration's forward pass.
-    let mut station_urgency_boost: HashMap<usize, f64> = HashMap::new();
+    // Station urgency boost: currently disabled (empirically harmful —
+    // causes catastrophic priority inversions on iterations 2+).
+    // The infrastructure remains for future use with perturbed multi-start.
+    let station_urgency_boost: HashMap<usize, f64> = HashMap::new();
 
     let effective_max = if max_iterations == 0 { 1 } else { max_iterations };
 
@@ -294,41 +294,6 @@ pub fn run_with_fbi(
             boosted_jobs.clear();
         }
 
-        // Station-bottleneck feedback: for late jobs, compute how long each
-        // task waited between predecessor completion and its own start. Sum
-        // waiting time per station. Stations with the most late-job waiting
-        // time get a boost in the next iteration's forward pass scoring.
-        station_urgency_boost.clear();
-        if !best_stats.late_job_ids.is_empty() {
-            let late_set: std::collections::HashSet<&str> =
-                best_stats.late_job_ids.iter().map(|s| s.as_str()).collect();
-
-            // Build predecessor end_tick lookup
-            let mut pred_end: HashMap<usize, usize> = HashMap::new();
-            for action in &actions {
-                if let Some(pred_idx) = action.predecessor_idx {
-                    if let Some(end) = actions[pred_idx].end_tick {
-                        pred_end.insert(action.idx, end);
-                    }
-                }
-            }
-
-            for action in &actions {
-                if !late_set.contains(action.job_id.as_str()) {
-                    continue;
-                }
-                if let Some(start) = action.start_tick {
-                    // Waiting time = gap between predecessor end (or t=0) and start
-                    let pred_done = pred_end.get(&action.idx).copied().unwrap_or(0);
-                    if start > pred_done {
-                        let wait = (start - pred_done) as f64;
-                        *station_urgency_boost
-                            .entry(action.station_idx)
-                            .or_insert(0.0) += wait;
-                    }
-                }
-            }
-        }
     }
 
     (best_assignments, best_actions, best_stats, iteration_count)
