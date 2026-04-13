@@ -39,6 +39,7 @@ pub fn run_with_fbi(
     start_date: NaiveDate,
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
+    progress: &super::ProgressSender,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -110,6 +111,11 @@ pub fn run_with_fbi(
     for iteration in 0..effective_max {
         iteration_count = iteration + 1;
 
+        super::emit(progress, crate::model::progress::ProgressEvent::FbiStart {
+            iteration: iteration + 1,
+            max_iterations: effective_max,
+        });
+
         // Compute LAST values using reverse forward pass
         let initial_ticks_for_last = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
         let last_values = compute_last_values(
@@ -118,6 +124,10 @@ pub fn run_with_fbi(
             tick_minutes, start_date,
             initial_ticks_for_last,
         );
+
+        super::emit(progress, crate::model::progress::ProgressEvent::BackwardDone {
+            iteration: iteration + 1,
+        });
 
         // Build actions
         let mut actions = build_actions(
@@ -220,6 +230,12 @@ pub fn run_with_fbi(
 
         let current_makespan = stats.makespan_minutes;
 
+        super::emit(progress, crate::model::progress::ProgressEvent::FbiIterationDone {
+            iteration: iteration + 1,
+            makespan_minutes: current_makespan,
+            scheduled_tasks: stats.scheduled_tasks,
+        });
+
         // Track best result
         if current_makespan < best_stats.makespan_minutes {
             best_assignments = remapped;
@@ -239,7 +255,10 @@ pub fn run_with_fbi(
             };
             let threshold = (prev_makespan as f64 * 0.01) as u64;
             if diff <= threshold {
-                break; // Converged
+                super::emit(progress, crate::model::progress::ProgressEvent::FbiConverged {
+                    iteration: iteration + 1,
+                });
+                break;
             }
         }
 
@@ -311,8 +330,9 @@ pub fn run_with_fbi_ordering(
     _station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
+    progress: &super::ProgressSender,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges, occupied_slots)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, station_blocked_ranges, occupied_slots, progress)
 }
 
 /// Multi-start FBI: optionally run with both TierFirst and EDD orderings and
@@ -329,11 +349,12 @@ pub fn run_with_multi_start_fbi(
     station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
+    progress: &super::ProgressSender,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let (a1, act1, s1, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots,
+        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
     );
 
     if !multi_start {
@@ -343,7 +364,7 @@ pub fn run_with_multi_start_fbi(
     let (a2, act2, s2, i2) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots,
+        BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, progress,
     );
 
     // Pick the result with fewer late jobs, then less weighted lateness, then shorter makespan

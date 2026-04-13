@@ -151,7 +151,7 @@ pub fn moore_escape(
         let (new_assignments, new_actions, new_stats, new_iters) = run_with_fbi_ordering(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, fbi_max_iterations, start_date,
-            BackwardOrdering::TierFirst, station_groups, &[], &[],
+            BackwardOrdering::TierFirst, station_groups, &[], &[], &None,
         );
 
         let new_score = (new_stats.late_job_count, new_stats.weighted_lateness_minutes, new_stats.makespan_minutes);

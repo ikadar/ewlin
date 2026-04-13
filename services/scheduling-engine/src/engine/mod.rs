@@ -6,7 +6,19 @@ pub mod moore;
 pub mod pre_split;
 
 use std::collections::HashMap;
+use std::sync::mpsc;
 use std::time::Instant;
+
+use crate::model::progress::ProgressEvent;
+
+/// Optional progress sender. When Some, the engine emits real-time progress events.
+pub type ProgressSender = Option<mpsc::Sender<ProgressEvent>>;
+
+fn emit(tx: &ProgressSender, event: ProgressEvent) {
+    if let Some(tx) = tx {
+        let _ = tx.send(event);
+    }
+}
 
 use chrono::Local;
 
@@ -31,6 +43,14 @@ pub fn format_minutes(minutes: u64, start_date: chrono::NaiveDate) -> String {
 }
 
 pub fn compute(request: &ComputeRequest) -> ScheduleResult {
+    compute_inner(request, &None)
+}
+
+pub fn compute_with_progress(request: &ComputeRequest, tx: mpsc::Sender<ProgressEvent>) -> ScheduleResult {
+    compute_inner(request, &Some(tx))
+}
+
+fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> ScheduleResult {
     let start_time = Instant::now();
     let start_date = Local::now().date_naive();
 
@@ -115,6 +135,8 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         .collect();
 
     // Run FBI loop with optional multi-start (TierFirst + EDD orderings)
+    emit(progress, ProgressEvent::MergeStart); // signal "sending to engine"
+
     let (mut assignments, mut actions, mut stats, mut fbi_iterations) = fbi::run_with_multi_start_fbi(
         &request.jobs,
         &request.stations,
@@ -127,6 +149,7 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
         &request.station_groups,
         &station_blocked_ranges,
         &occupied_slots_parsed,
+        progress,
     );
 
     // Moore escape hatch: DISABLED for now — adds full FBI re-runs.
@@ -250,6 +273,8 @@ pub fn compute(request: &ComputeRequest) -> ScheduleResult {
     }
 
     let compute_time_ms = start_time.elapsed().as_millis() as u64;
+
+    emit(progress, ProgressEvent::EngineDone { compute_time_ms });
 
     ScheduleResult {
         assignments,
