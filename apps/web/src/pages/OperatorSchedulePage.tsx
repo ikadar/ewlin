@@ -27,6 +27,8 @@ import {
   useUpdateOutsourcingDatesMutation,
   useUnassignTaskMutation,
   useUpdateElementStatusMutation,
+  useSplitTaskMutation,
+  useFuseTaskMutation,
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
@@ -203,6 +205,8 @@ export default function OperatorSchedulePage() {
   const [unassignTask] = useUnassignTaskMutation();
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [updateSTStatus] = useUpdateSTStatusMutation();
+  const [splitTask] = useSplitTaskMutation();
+  const [fuseTask] = useFuseTaskMutation();
   const dispatch = useAppDispatch();
   const invalidateSnapshot = useCallback(() => {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
@@ -417,6 +421,14 @@ export default function OperatorSchedulePage() {
     try { await togglePin(assignmentId).unwrap(); } catch { /* ignore */ }
   }, [togglePin]);
 
+  const handleSplitTask = useCallback(async (taskId: string) => {
+    try { await splitTask(taskId).unwrap(); } catch { /* ignore */ }
+  }, [splitTask]);
+
+  const handleFuseTask = useCallback(async (taskId: string) => {
+    try { await fuseTask(taskId).unwrap(); } catch { /* ignore */ }
+  }, [fuseTask]);
+
   // ---- Keyboard navigation: Alt+Up/Down to cycle jobs ----
   const orderedJobIds = useMemo(() => snapshot.jobs.map(j => j.id), [snapshot.jobs]);
 
@@ -583,6 +595,8 @@ export default function OperatorSchedulePage() {
             onTogglePin={handleTogglePin}
             onDepartureChange={handleOutsourcingDepartureChange}
             onReturnChange={handleOutsourcingReturnChange}
+            onSplitTask={handleSplitTask}
+            onFuseTask={handleFuseTask}
             lateJobIds={lateJobIds}
             allJobs={snapshot.jobs}
             onSelectJob={setSelectedJobId}

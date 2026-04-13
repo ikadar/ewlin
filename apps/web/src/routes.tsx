@@ -71,13 +71,13 @@ export function AppRoutes() {
           <Route path="a-facturer" element={null} />
         </Route>
 
-        {/* Scheduling routes */}
-        <Route path="/" element={<App />} />
-        <Route path="/job/new" element={<App />} />
-        <Route path="/job/:jobId" element={<App />} />
+        {/* Operator schedule — default view */}
+        <Route path="/" element={<OperatorSchedulePage />} />
 
-        {/* Operator schedule Gantt view */}
-        <Route path="/operator-schedule" element={<OperatorSchedulePage />} />
+        {/* Station schedule — verification view */}
+        <Route path="/stations" element={<App />} />
+        <Route path="/stations/job/new" element={<App />} />
+        <Route path="/stations/job/:jobId" element={<App />} />
 
         {/* Settings routes — SettingsLayout provides the w-72 submenu */}
         <Route path="/settings" element={<RequirePermission permission={['settings.view', 'admin.users']}><SettingsLayout /></RequirePermission>}>

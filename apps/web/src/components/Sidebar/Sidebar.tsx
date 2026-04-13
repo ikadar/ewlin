@@ -30,8 +30,8 @@ export function Sidebar() {
   const fromRoute = (location.state as { from?: string } | null)?.from;
   const isJcfFromFlux = location.pathname === '/job/new' && fromRoute?.startsWith('/flux');
   const isFlux = location.pathname.startsWith('/flux') || isJcfFromFlux;
-  const isOperatorSchedule = location.pathname === '/operator-schedule';
-  const isScheduler = !isSettings && !isFlux && !isOperatorSchedule;
+  const isStationSchedule = location.pathname.startsWith('/stations');
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -71,22 +71,22 @@ export function Sidebar() {
         {/* Top navigation section */}
         <div className="flex flex-col items-center py-3 gap-2">
           <SidebarButton
-            icon={CalendarDays}
-            label="Planificateur"
-            isActive={isScheduler}
+            icon={Users}
+            label="Planning opérateurs"
+            isActive={isOperatorSchedule}
             onClick={() => navigate('/')}
+          />
+          <SidebarButton
+            icon={CalendarDays}
+            label="Planning machines"
+            isActive={isStationSchedule}
+            onClick={() => navigate('/stations')}
           />
           <SidebarButton
             icon={TowerControl}
             label="Flux de production"
             isActive={isFlux}
             onClick={() => navigate('/flux')}
-          />
-          <SidebarButton
-            icon={Users}
-            label="Planning opérateurs"
-            isActive={isOperatorSchedule}
-            onClick={() => navigate('/operator-schedule')}
           />
         </div>
 
