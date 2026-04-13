@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { ScheduleSnapshot, Job } from '@flux/types';
@@ -85,6 +85,10 @@ function useComputeStream(
   const [result, setResult] = useState<ComputeScheduleResult | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Ref to avoid re-triggering the effect when onResult changes
+  const onResultRef = useRef(onResult);
+  onResultRef.current = onResult;
 
   useEffect(() => {
     if (!mode) {
@@ -222,7 +226,7 @@ function useComputeStream(
             } else if (eventType === 'result') {
               if (!cancelled) {
                 setResult(parsed);
-                onResult(parsed);
+                onResultRef.current(parsed);
               }
             } else if (eventType === 'error') {
               if (!cancelled) setError(parsed.message || 'Unknown error');
@@ -240,7 +244,8 @@ function useComputeStream(
       cancelled = true;
       clearInterval(timer);
     };
-  }, [mode, jobId, onResult]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onResult via ref
+  }, [mode, jobId]);
 
   return { steps, result, elapsed, error };
 }
