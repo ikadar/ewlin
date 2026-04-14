@@ -862,6 +862,7 @@ pub fn compute_stats(
     // Late job tracking (deduplicated by job_id)
     let mut late_jobs: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut weighted_lateness_minutes: u64 = 0;
+    let mut weighted_late_job_count: u64 = 0;
     let tier_weights: [f64; 4] = [4.0, 2.0, 1.0, 0.5];
 
     // Build job deadline map
@@ -885,8 +886,13 @@ pub fn compute_stats(
                     total_lateness_minutes += lateness;
 
                     // Deduplicated late job count + weighted lateness
-                    late_jobs.insert(action.job_id.clone());
                     let w = tier_weights[action.deadline_priority.min(3) as usize];
+                    if late_jobs.insert(action.job_id.clone()) {
+                        // First time seeing this job late — accumulate weighted count
+                        // (imperative=4, important=2, standard=1, flexible=0.5)
+                        // Multiply by 10 to keep integer precision (40,20,10,5)
+                        weighted_late_job_count += (w * 10.0) as u64;
+                    }
                     weighted_lateness_minutes += (lateness as f64 * w) as u64;
                 }
             }
@@ -906,6 +912,7 @@ pub fn compute_stats(
         total_lateness_minutes,
         late_job_count,
         weighted_lateness_minutes,
+        weighted_late_job_count,
         late_job_ids,
     }
 }
@@ -984,6 +991,7 @@ fn recompute_stats_from_assignments(
     }
 
     // Per-job lateness (deduplicated)
+    let mut weighted_late_job_count: u64 = 0;
     for (job_id, &max_end) in &job_max_end_minutes {
         if let Some(&deadline_mins) = job_deadlines.get(job_id) {
             if max_end > deadline_mins {
@@ -992,6 +1000,7 @@ fn recompute_stats_from_assignments(
                 let priority = *job_priority.get(job_id.as_str()).unwrap_or(&2);
                 let w = tier_weights[priority.min(3) as usize];
                 weighted_lateness_minutes += (lateness as f64 * w) as u64;
+                weighted_late_job_count += (w * 10.0) as u64;
             }
         }
     }
@@ -1012,6 +1021,7 @@ fn recompute_stats_from_assignments(
         total_lateness_minutes,
         late_job_count,
         weighted_lateness_minutes,
+        weighted_late_job_count,
         late_job_ids,
     }
 }

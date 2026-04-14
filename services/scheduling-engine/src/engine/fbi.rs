@@ -102,10 +102,11 @@ pub fn run_with_fbi(
         total_lateness_minutes: u64::MAX,
         late_job_count: u32::MAX,
         weighted_lateness_minutes: u64::MAX,
+        weighted_late_job_count: u64::MAX,
         late_job_ids: Vec::new(),
     };
     let mut prev_makespan: u64 = u64::MAX;
-    let mut prev_late_job_count: u32 = u32::MAX;
+    let mut prev_weighted_late_count: u64 = u64::MAX;
     let mut prev_weighted_lateness: u64 = u64::MAX;
     let mut iteration_count: u32 = 0;
 
@@ -162,6 +163,14 @@ pub fn run_with_fbi(
 
         // Pre-split
         pre_split(&mut actions, stations, tick_minutes);
+
+        // Sort actions by deadline priority (imperative first), then by
+        // tightest LAST value. This ensures the forward pass considers
+        // high-priority tasks before low-priority ones at each tick.
+        actions.sort_by(|a, b| {
+            a.deadline_priority.cmp(&b.deadline_priority)
+                .then(a.last.cmp(&b.last))
+        });
 
         // Build grid
         let initial_ticks = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
@@ -240,10 +249,11 @@ pub fn run_with_fbi(
             late_job_count: stats.late_job_count,
         });
 
-        // Track best result: prefer fewer late jobs, then less weighted
-        // lateness, then shorter makespan.
-        let current_score = (stats.late_job_count, stats.weighted_lateness_minutes, current_makespan);
-        let best_score = (best_stats.late_job_count, best_stats.weighted_lateness_minutes, best_stats.makespan_minutes);
+        // Track best result: prefer fewer weighted-late jobs (protects
+        // imperative over flexible), then less weighted lateness, then
+        // shorter makespan.
+        let current_score = (stats.weighted_late_job_count, stats.weighted_lateness_minutes, current_makespan);
+        let best_score = (best_stats.weighted_late_job_count, best_stats.weighted_lateness_minutes, best_stats.makespan_minutes);
         if current_score < best_score {
             best_assignments = remapped;
             best_stats = stats;
@@ -264,7 +274,7 @@ pub fn run_with_fbi(
             };
             let threshold = (prev_makespan as f64 * 0.01) as u64;
             let makespan_stable = diff <= threshold;
-            let lateness_stable = current_score.0 == prev_late_job_count
+            let lateness_stable = current_score.0 == prev_weighted_late_count
                 && current_score.1 == prev_weighted_lateness;
             if makespan_stable && lateness_stable {
                 super::emit(progress, crate::model::progress::ProgressEvent::FbiConverged {
@@ -275,7 +285,7 @@ pub fn run_with_fbi(
         }
 
         prev_makespan = current_makespan;
-        prev_late_job_count = current_score.0;
+        prev_weighted_late_count = current_score.0;
         prev_weighted_lateness = current_score.1;
 
         // Mid-FBI re-prioritization: boost late jobs by one tier for the
@@ -362,10 +372,10 @@ pub fn run_with_multi_start_fbi(
         now_tick, &default_weights,
     );
     total_iters += i1;
-    let mut best_score = (best_s.late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
+    let mut best_score = (best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
 
-    eprintln!("[MULTI-START] pass 0 (baseline TierFirst): late_jobs={} lateness={} makespan={}",
-        best_s.late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
+    eprintln!("[MULTI-START] pass 0 (baseline TierFirst): late_jobs={} w_late={} lateness={} makespan={}",
+        best_s.late_job_count, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
 
     // Pass 2: EDD ordering (if multi_start enabled)
     if multi_start {
@@ -376,10 +386,10 @@ pub fn run_with_multi_start_fbi(
             now_tick, &default_weights,
         );
         total_iters += i2;
-        let score2 = (s2.late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+        let score2 = (s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
 
-        eprintln!("[MULTI-START] pass 1 (EDD): late_jobs={} lateness={} makespan={}",
-            s2.late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+        eprintln!("[MULTI-START] pass 1 (EDD): late_jobs={} w_late={} lateness={} makespan={}",
+            s2.late_job_count, s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
 
         if score2 < best_score {
             best_a = a2;
@@ -414,10 +424,10 @@ pub fn run_with_multi_start_fbi(
                 now_tick, &weights,
             );
             total_iters += ip;
-            let score_p = (sp.late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
+            let score_p = (sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
 
-            eprintln!("[MULTI-START] pass {} (perturbed {:?} w={:.2?}): late_jobs={} lateness={} makespan={}",
-                pass + 2, ordering, weights, sp.late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
+            eprintln!("[MULTI-START] pass {} (perturbed {:?} w={:.2?}): late_jobs={} w_late={} lateness={} makespan={}",
+                pass + 2, ordering, weights, sp.late_job_count, sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
 
             if score_p < best_score {
                 best_a = ap;
@@ -428,8 +438,8 @@ pub fn run_with_multi_start_fbi(
         }
     }
 
-    eprintln!("[MULTI-START] best: late_jobs={} lateness={} makespan={} (total {} FBI iterations)",
-        best_s.late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes, total_iters);
+    eprintln!("[MULTI-START] best: late_jobs={} w_late={} lateness={} makespan={} (total {} FBI iterations)",
+        best_s.late_job_count, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes, total_iters);
 
     (best_a, best_act, best_s, total_iters)
 }
