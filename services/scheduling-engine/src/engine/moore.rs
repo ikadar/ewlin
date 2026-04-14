@@ -190,7 +190,7 @@ pub fn moore_escape(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, fbi_max_iterations, start_date,
             BackwardOrdering::TierFirst, station_groups, &[], &[], &None,
-            now_tick, &default_weights,
+            now_tick, &default_weights, None,
         );
 
         let new_score = (new_stats.late_job_count, new_stats.weighted_lateness_minutes, new_stats.makespan_minutes);

@@ -498,6 +498,7 @@ pub fn run_forward_pass(
     now_tick: usize,
     station_urgency_boost: &HashMap<usize, f64>,
     score_weights: &[f64; 6],
+    action_ranks: Option<&[i64]>,
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
@@ -736,7 +737,12 @@ pub fn run_forward_pass(
                 && score_weights[4] == 1.0
                 && score_weights[5] == 1.0;
 
-            let score = if is_default_weights {
+            let score = if let Some(ranks) = action_ranks {
+                // SA-derived rank: higher rank = scheduled first.
+                // Skip the normal scoring entirely — the SA permutation
+                // determines ordering.
+                ranks[i]
+            } else if is_default_weights {
                 weighted_urgency + job_boost + proximity_bonus
                     + calage_bonus + chain_pressure + contention_bonus
                     + station_boost

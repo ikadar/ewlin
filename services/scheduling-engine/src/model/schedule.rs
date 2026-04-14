@@ -104,7 +104,7 @@ fn default_fbi_max_iterations() -> u32 {
 }
 
 fn default_perturbed_starts() -> u32 {
-    4
+    0 // Disabled: SA uses the freed compute budget instead
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

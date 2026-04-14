@@ -5,6 +5,7 @@ mod grid;
 pub mod local_search;
 pub mod moore;
 pub mod pre_split;
+pub mod sa;
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -192,12 +193,13 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
         }
     }
 
-    // Local search: if late jobs remain after Moore, try targeted improvements.
-    // Budget-capped to fit within total compute time.
+    // Simulated annealing: if late jobs remain after Moore, explore alternative
+    // sequencing by swapping task orderings on stations. SA can escape local
+    // optima that the greedy constructive heuristic gets stuck in.
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
     if stats.late_job_count > 0 && elapsed_ms < 25_000 {
-        let remaining_budget = 30_000u64.saturating_sub(elapsed_ms);
-        if let Some((ls_assignments, ls_actions, ls_stats, ls_iters)) = local_search::local_search_improve(
+        let sa_budget = 30_000u64.saturating_sub(elapsed_ms);
+        if let Some((sa_assignments, sa_actions, sa_stats, sa_iters)) = sa::sa_improve(
             &request.jobs,
             &request.stations,
             &request.operators,
@@ -208,13 +210,15 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             fbi_max_iterations,
             start_date,
             &request.station_groups,
+            &station_blocked_ranges,
+            &occupied_slots_parsed,
             now_tick,
-            remaining_budget,
+            sa_budget,
         ) {
-            assignments = ls_assignments;
-            actions = ls_actions;
-            stats = ls_stats;
-            fbi_iterations += ls_iters;
+            assignments = sa_assignments;
+            actions = sa_actions;
+            stats = sa_stats;
+            fbi_iterations += sa_iters;
         }
     }
 

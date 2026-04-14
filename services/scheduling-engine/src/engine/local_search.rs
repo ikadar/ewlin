@@ -98,7 +98,7 @@ pub fn local_search_improve(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, fbi_max_iterations, start_date,
             BackwardOrdering::TierFirst, station_groups, &[], &[], &None,
-            now_tick, &default_weights,
+            now_tick, &default_weights, None,
         );
 
         let new_score = (new_s.late_job_count, new_s.weighted_lateness_minutes, new_s.makespan_minutes);
@@ -144,7 +144,7 @@ pub fn local_search_improve(
                 &modified_jobs, stations, operators,
                 tick_minutes, horizon_days, fbi_max_iterations, start_date,
                 BackwardOrdering::TierFirst, station_groups, &[], &[], &None,
-                now_tick, &default_weights,
+                now_tick, &default_weights, None,
             );
 
             let new_score = (new_s.late_job_count, new_s.weighted_lateness_minutes, new_s.makespan_minutes);
