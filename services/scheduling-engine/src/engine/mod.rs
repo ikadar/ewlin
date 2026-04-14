@@ -2,6 +2,7 @@ mod backward_pass;
 pub mod fbi;
 mod forward_pass;
 mod grid;
+pub mod lns;
 pub mod moore;
 pub mod pre_split;
 
@@ -188,6 +189,34 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             actions = moore_actions;
             stats = moore_stats;
             fbi_iterations += moore_iters;
+        }
+    }
+
+    // LNS: if late jobs remain after Moore, explore alternative priority
+    // configurations by destroying/repairing batches of late jobs.
+    let elapsed_ms = start_time.elapsed().as_millis() as u64;
+    if stats.late_job_count > 0 && elapsed_ms < 55_000 {
+        let lns_budget = 60_000u64.saturating_sub(elapsed_ms).max(5_000);
+        if let Some((lns_a, lns_act, lns_s, lns_i)) = lns::lns_improve(
+            &request.jobs,
+            &request.stations,
+            &request.operators,
+            &actions,
+            &stats,
+            tick_minutes,
+            options.horizon_days,
+            start_date,
+            &request.station_groups,
+            &station_blocked_ranges,
+            &occupied_slots_parsed,
+            now_tick,
+            lns_budget,
+            progress,
+        ) {
+            assignments = lns_a;
+            actions = lns_act;
+            stats = lns_s;
+            fbi_iterations += lns_i;
         }
     }
 
