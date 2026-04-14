@@ -7,6 +7,7 @@ import {
   ScheduleOrderScatter,
   LatenessByPriorityBar,
   SlackDistributionHistogram,
+  DeadlineDistributionHistogram,
   StationUtilizationHeatmap,
 } from '../components/StatsCharts';
 import { LATE_COLOR, ONTIME_COLOR, PRIORITY_COLORS, PRIORITY_LABELS, DIAG_COLOR } from '../components/StatsCharts/chartTheme';
@@ -111,7 +112,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        {/* Charts grid */}
+        {/* Row 1: Scatter plots (2 columns) */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <ChartCard
             title="Slack vs Urgence"
@@ -138,7 +139,10 @@ export default function StatsPage() {
           >
             <ScheduleOrderScatter data={stats.scheduleOrder} />
           </ChartCard>
+        </div>
 
+        {/* Row 2: Distributions & bar chart (3 columns) */}
+        <div className="grid grid-cols-3 gap-4 mb-4">
           <ChartCard
             title="Retard par priorité"
             description="L'algo respecte-t-il la hiérarchie ?"
@@ -152,7 +156,7 @@ export default function StatsPage() {
 
           <ChartCard
             title="Distribution du slack"
-            description="À quel seuil de slack les jobs deviennent en retard ?"
+            description="À quel seuil les jobs deviennent en retard ?"
             legend={<>
               <LegendRect color={ONTIME_COLOR} label="À l'heure" />
               <LegendRect color={LATE_COLOR} label="En retard" />
@@ -161,18 +165,28 @@ export default function StatsPage() {
           >
             <SlackDistributionHistogram data={stats.slackDistribution} />
           </ChartCard>
-        </div>
 
-        {/* Full-width heatmap */}
-        <div className="grid grid-cols-2 gap-4">
           <ChartCard
-            fullWidth
-            title="Utilisation des stations"
-            description="Taux d'occupation par créneau horaire — identifier les goulots"
+            title="Distribution des deadlines"
+            description="Clusters de deadlines = pression sur l'algo"
+            legend={<>
+              <LegendRect color={ONTIME_COLOR} label="À l'heure" />
+              <LegendRect color={LATE_COLOR} label="En retard" />
+              <LegendLine label="aujourd'hui" />
+            </>}
           >
-            <StationUtilizationHeatmap data={stats.stationUtilization} horizonStart={stats.horizonStart} />
+            <DeadlineDistributionHistogram data={stats.deadlineDistribution} />
           </ChartCard>
         </div>
+
+        {/* Row 3: Full-width heatmap */}
+        <ChartCard
+          fullWidth
+          title="Utilisation des stations"
+          description="Taux d'occupation par créneau horaire — identifier les goulots"
+        >
+          <StationUtilizationHeatmap data={stats.stationUtilization} horizonStart={stats.horizonStart} />
+        </ChartCard>
       </div>
     </div>
   );

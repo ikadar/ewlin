@@ -41,6 +41,14 @@ export interface SlackDistributionDatum {
   isLate: boolean;
 }
 
+export interface DeadlineDistributionDatum {
+  jobId: string;
+  reference: string;
+  deadline: Date;
+  isLate: boolean;
+  priorityTier: number;
+}
+
 export interface StationUtilizationBlock {
   hour: number;
   startTime: Date;
@@ -60,6 +68,7 @@ export interface StatsData {
   scheduleOrder: ScheduleOrderDatum[];
   latenessByPriority: LatenessByPriorityDatum[];
   slackDistribution: SlackDistributionDatum[];
+  deadlineDistribution: DeadlineDistributionDatum[];
   stationUtilization: StationUtilizationDatum[];
   horizonStart: Date;
   horizonEnd: Date;
@@ -115,6 +124,7 @@ export function deriveStatsData(snapshot: ScheduleSnapshot): StatsData {
   const slackUrgency: SlackUrgencyDatum[] = [];
   const scheduleOrder: ScheduleOrderDatum[] = [];
   const slackDistribution: SlackDistributionDatum[] = [];
+  const deadlineDistribution: DeadlineDistributionDatum[] = [];
 
   for (const job of snapshot.jobs) {
     if (!scheduledJobIds.has(job.id)) continue;
@@ -163,6 +173,14 @@ export function deriveStatsData(snapshot: ScheduleSnapshot): StatsData {
       reference: job.reference,
       slackHours,
       isLate,
+    });
+
+    deadlineDistribution.push({
+      jobId: job.id,
+      reference: job.reference,
+      deadline,
+      isLate,
+      priorityTier: job.deadlinePriority,
     });
 
     // First scheduled start
@@ -252,6 +270,7 @@ export function deriveStatsData(snapshot: ScheduleSnapshot): StatsData {
     scheduleOrder,
     latenessByPriority,
     slackDistribution,
+    deadlineDistribution,
     stationUtilization,
     horizonStart,
     horizonEnd,
