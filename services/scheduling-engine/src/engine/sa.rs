@@ -473,9 +473,11 @@ fn violates_precedence(a: usize, b: usize, ctx: &SaContext) -> bool {
 // ---------------------------------------------------------------------------
 
 fn eval_score(eval: &SaEvaluation) -> f64 {
-    eval.late_job_count as f64
-        + eval.weighted_lateness_minutes as f64 * 1e-6
-        + eval.makespan_ticks as f64 * 1e-9
+    // late_job_count dominates: reducing by 1 is worth 1M points.
+    // This ensures SA always prefers fewer late jobs over less lateness.
+    eval.late_job_count as f64 * 1_000_000.0
+        + eval.weighted_lateness_minutes as f64
+        + eval.makespan_ticks as f64 * 0.001
 }
 
 fn run_sa(
@@ -713,22 +715,29 @@ pub fn sa_improve(
     // Extract initial solution from FBI result
     let initial = extract_initial_solution(actions, stations.len());
 
+    // Evaluate the initial solution with the SA decoder to get our baseline.
+    // This is the score the SA must beat — NOT the FBI score (which uses
+    // the full forward pass and will always be different from the decoder).
+    let initial_eval = sa_decode(&initial, &ctx);
+    let initial_sa_score = eval_score(&initial_eval);
+    eprintln!("[SA] decoder baseline: {} late jobs (FBI says {})",
+        initial_eval.late_job_count, stats.late_job_count);
+
     // Run SA (70% of budget for SA, 30% for validation)
     let sa_budget = (time_budget_ms as f64 * 0.7) as u64;
     let (best_solution, best_eval) = run_sa(initial, &ctx, sa_budget, 42, progress);
 
-    // Compare with current stats (using SA decode metrics)
-    let current_score = (stats.late_job_count, stats.weighted_lateness_minutes);
-    let sa_score = (best_eval.late_job_count, best_eval.weighted_lateness_minutes);
-
-    if sa_score >= current_score {
-        eprintln!("[SA] no improvement over FBI: SA={} late vs FBI={} late",
-            best_eval.late_job_count, stats.late_job_count);
+    // Compare SA's best against its own baseline (not against FBI).
+    // Did SA find a better ORDERING according to its own decoder?
+    let best_sa_score = eval_score(&best_eval);
+    if best_sa_score >= initial_sa_score {
+        eprintln!("[SA] no improvement in decoder score: {} late (baseline {} late)",
+            best_eval.late_job_count, initial_eval.late_job_count);
         return None;
     }
 
-    eprintln!("[SA] SA found better: {} late vs FBI {} late, validating with full forward pass...",
-        best_eval.late_job_count, stats.late_job_count);
+    eprintln!("[SA] SA improved decoder score: {} → {} late jobs, validating with full forward pass...",
+        initial_eval.late_job_count, best_eval.late_job_count);
 
     // Validate: run full forward pass with SA ordering
     let ranks = sa_solution_to_ranks(&best_solution, actions.len());
@@ -743,11 +752,14 @@ pub fn sa_improve(
         Some(&ranks),
     );
 
+    let fbi_score = (stats.late_job_count, stats.weighted_lateness_minutes);
     let val_score = (val_stats.late_job_count, val_stats.weighted_lateness_minutes);
-    eprintln!("[SA] validation result: {} late jobs (SA decode predicted {})",
-        val_stats.late_job_count, best_eval.late_job_count);
+    eprintln!("[SA] validation result: {} late jobs (SA decode predicted {}, FBI was {})",
+        val_stats.late_job_count, best_eval.late_job_count, stats.late_job_count);
 
-    if val_score < current_score {
+    if val_score < fbi_score {
+        eprintln!("[SA] confirmed improvement: {} → {} late jobs",
+            stats.late_job_count, val_stats.late_job_count);
         Some((val_assignments, val_actions, val_stats, val_iters))
     } else {
         eprintln!("[SA] validation did not confirm improvement, keeping FBI result");
