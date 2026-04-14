@@ -227,8 +227,8 @@ fn sa_decode(solution: &SaSolution, ctx: &SaContext) -> SaEvaluation {
 
     // Per-station tracking
     let mut station_free_after: Vec<usize> = vec![ctx.now_tick; solution.station_queues.len()];
-    // Per-operator busy-until tick
-    let mut op_busy_until: Vec<usize> = vec![0; ctx.num_operators];
+    // Per-operator interval list: tracks all (start, end) assignments
+    let mut op_intervals: Vec<Vec<(usize, usize)>> = vec![Vec::new(); ctx.num_operators];
 
     // Per-station queue pointer (next action to consider)
     let mut station_ptr: Vec<usize> = vec![0; solution.station_queues.len()];
@@ -295,7 +295,7 @@ fn sa_decode(solution: &SaSolution, ctx: &SaContext) -> SaEvaluation {
             earliest = skip_blocked(earliest, info.duration_ticks as usize, station_idx, ctx);
 
             // Find operator availability
-            earliest = find_operator(earliest, info, ctx, &op_busy_until);
+            earliest = find_operator(earliest, info, ctx, &op_intervals);
 
             // Cap at horizon
             if earliest + info.duration_ticks as usize > ctx.horizon_ticks * 2 {
@@ -308,7 +308,7 @@ fn sa_decode(solution: &SaSolution, ctx: &SaContext) -> SaEvaluation {
             station_free_after[station_idx] = end;
 
             // Assign operator (pick first available qualified)
-            assign_operator(earliest, end, info, ctx, &mut op_busy_until);
+            assign_operator(earliest, end, info, ctx, &mut op_intervals);
 
             // Advance pointer if this was at the head
             if scan == station_ptr[station_idx] {
@@ -360,37 +360,54 @@ fn skip_blocked(mut earliest: usize, duration: usize, station_idx: usize, ctx: &
     earliest
 }
 
-fn find_operator(earliest: usize, info: &SaActionInfo, ctx: &SaContext, op_busy_until: &[usize]) -> usize {
+/// Check if an operator is free during [start, end) given their interval list.
+fn is_op_free_in_intervals(intervals: &[(usize, usize)], start: usize, end: usize) -> bool {
+    for &(s, e) in intervals {
+        if start < e && s < end {
+            return false; // overlap
+        }
+    }
+    true
+}
+
+fn find_operator(earliest: usize, info: &SaActionInfo, ctx: &SaContext, op_intervals: &[Vec<(usize, usize)>]) -> usize {
     let qualified = &ctx.station_operators[info.station_idx];
     if qualified.is_empty() {
         return earliest; // automated station
     }
 
-    // Try to find an operator free at earliest
-    for attempt in 0..500 {
+    let duration = info.duration_ticks as usize;
+
+    // Try to find an operator free for the full duration starting at earliest
+    for attempt in 0..2000 {
         let t = earliest + attempt;
+        let end = t + duration;
         for &op in qualified {
-            if op_busy_until[op] <= t {
-                // Check schedule availability at start tick
-                if t < ctx.op_avail[op].len() && ctx.op_avail[op][t] {
+            // Check schedule availability at start tick
+            if t < ctx.op_avail[op].len() && ctx.op_avail[op][t] {
+                // Check no overlap with existing intervals
+                if is_op_free_in_intervals(&op_intervals[op], t, end) {
                     return t;
                 }
             }
         }
     }
-    earliest // fallback
+    // Fallback: place anyway at a far-future tick (will count as very late)
+    earliest + 2000
 }
 
-fn assign_operator(start: usize, end: usize, info: &SaActionInfo, ctx: &SaContext, op_busy_until: &mut [usize]) {
+fn assign_operator(start: usize, end: usize, info: &SaActionInfo, ctx: &SaContext, op_intervals: &mut [Vec<(usize, usize)>]) {
     let qualified = &ctx.station_operators[info.station_idx];
     for &op in qualified {
-        if op_busy_until[op] <= start {
-            if start < ctx.op_avail[op].len() && ctx.op_avail[op][start] {
-                op_busy_until[op] = end;
+        if start < ctx.op_avail[op].len() && ctx.op_avail[op][start] {
+            if is_op_free_in_intervals(&op_intervals[op], start, end) {
+                op_intervals[op].push((start, end));
                 return;
             }
         }
     }
+    // No operator found — action placed without operator assignment.
+    // This is a degraded state that will naturally produce a late schedule.
 }
 
 fn compute_metrics(end_ticks: &[Option<usize>], ctx: &SaContext) -> SaEvaluation {
@@ -421,19 +438,33 @@ fn compute_metrics(end_ticks: &[Option<usize>], ctx: &SaContext) -> SaEvaluation
             continue;
         }
         if info.job_deadline_tick == u64::MAX {
+            seen_jobs.insert(info.job_id.as_str());
             continue;
         }
-        if let Some(&max_end) = job_max_end.get(info.job_id.as_str()) {
-            let end_minutes = max_end as u64 * ctx.tick_minutes as u64;
-            let deadline_minutes = info.job_deadline_tick * ctx.tick_minutes as u64;
-            if end_minutes > deadline_minutes {
+
+        let w = TIER_WEIGHT[info.deadline_priority.min(3) as usize];
+
+        match job_max_end.get(info.job_id.as_str()) {
+            Some(&max_end) => {
+                let end_minutes = max_end as u64 * ctx.tick_minutes as u64;
+                let deadline_minutes = info.job_deadline_tick * ctx.tick_minutes as u64;
+                if end_minutes > deadline_minutes {
+                    late_job_count += 1;
+                    let lateness = end_minutes - deadline_minutes;
+                    weighted_lateness_minutes += (lateness as f64 * w) as u64;
+                }
+            }
+            None => {
+                // Job has NO placed actions → treat as maximally late.
+                // This prevents the SA from "improving" by simply not placing jobs.
                 late_job_count += 1;
-                let lateness = end_minutes - deadline_minutes;
-                let w = TIER_WEIGHT[info.deadline_priority.min(3) as usize];
+                let horizon_minutes = ctx.horizon_ticks as u64 * ctx.tick_minutes as u64;
+                let deadline_minutes = info.job_deadline_tick * ctx.tick_minutes as u64;
+                let lateness = horizon_minutes.saturating_sub(deadline_minutes) + 10_000;
                 weighted_lateness_minutes += (lateness as f64 * w) as u64;
             }
-            seen_jobs.insert(info.job_id.as_str());
         }
+        seen_jobs.insert(info.job_id.as_str());
     }
 
     SaEvaluation {
@@ -516,8 +547,10 @@ fn run_sa(
     // Hot stations: stations with late jobs
     let mut hot_stations = compute_hot_stations(&current_eval, ctx);
 
-    eprintln!("[SA] starting: {} late jobs, decode ~{:.1}ms, est. {} iterations, alpha={:.6}",
-        current_eval.late_job_count, decode_ms, estimated_iters, alpha);
+    let placed = current_eval.end_ticks.iter().filter(|e| e.is_some()).count();
+    let total = current_eval.end_ticks.len();
+    eprintln!("[SA] starting: {} late jobs, {}/{} placed, decode ~{:.1}ms, est. {} iterations, alpha={:.6}",
+        current_eval.late_job_count, placed, total, decode_ms, estimated_iters, alpha);
 
     super::emit(progress, ProgressEvent::SaStart {
         late_job_count: current_eval.late_job_count,
