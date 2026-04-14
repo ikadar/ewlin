@@ -90,20 +90,20 @@ export function SlackDistributionHistogram({ data }: Props) {
 
     const barW = (d: BinData) => Math.max(1, x(d.x1) - x(d.x0) - 1);
 
-    // On-time bars (bottom)
+    // On-time bars (bottom): from y(onTime) down to baseline
     g.selectAll('.hist-ontime').data(binsData).join('rect')
       .attr('x', (d) => x(d.x0) + 0.5)
-      .attr('y', (d) => y(d.total))
+      .attr('y', (d) => y(d.onTime))
       .attr('width', barW)
       .attr('height', (d) => h - y(d.onTime))
       .attr('fill', ONTIME_COLOR).attr('opacity', 0.75).attr('rx', 1);
 
-    // Late bars (stacked)
+    // Late bars (stacked on top): from y(total) down to y(onTime)
     g.selectAll('.hist-late').data(binsData).join('rect')
       .attr('x', (d) => x(d.x0) + 0.5)
       .attr('y', (d) => y(d.total))
       .attr('width', barW)
-      .attr('height', (d) => h - y(d.late))
+      .attr('height', (d) => y(d.onTime) - y(d.total))
       .attr('fill', LATE_COLOR).attr('opacity', 0.75).attr('rx', 1);
 
     // Hover targets

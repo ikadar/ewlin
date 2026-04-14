@@ -764,11 +764,11 @@
         .attr('x1', 0).attr('x2', w).attr('y1', d => y(d)).attr('y2', d => y(d))
         .attr('stroke', GRID_COLOR);
 
-      // On-time bars
+      // On-time bars (bottom): from y(onTime) down to baseline
       g.selectAll('.bar-ontime').data(tiers).join('rect')
         .attr('class', 'bar-ontime')
         .attr('x', d => x(d.label))
-        .attr('y', d => y(d.onTime + d.late))
+        .attr('y', d => y(d.onTime))
         .attr('width', x.bandwidth())
         .attr('height', d => h - y(d.onTime))
         .attr('fill', ONTIME_COLOR)
@@ -788,13 +788,13 @@
         .on('mousemove', (event) => showTooltip(event, tooltip.html()))
         .on('mouseout', function() { d3.select(this).attr('opacity', 0.8); hideTooltip(); });
 
-      // Late bars (stacked on top)
+      // Late bars (stacked on top of on-time): from y(total) down to y(onTime)
       g.selectAll('.bar-late').data(tiers).join('rect')
         .attr('class', 'bar-late')
         .attr('x', d => x(d.label))
-        .attr('y', d => y(d.onTime + d.late))
+        .attr('y', d => y(d.total))
         .attr('width', x.bandwidth())
-        .attr('height', d => h - y(d.late))
+        .attr('height', d => y(d.onTime) - y(d.total))
         .attr('fill', LATE_COLOR)
         .attr('opacity', 0.8)
         .attr('rx', 3)
@@ -907,23 +907,23 @@
 
       const barWidth = d => Math.max(1, x(d.x1) - x(d.x0) - 1);
 
-      // On-time bars (bottom)
+      // On-time bars (bottom): from y(onTime) down to baseline
       g.selectAll('.hist-ontime').data(binsData).join('rect')
         .attr('class', 'hist-ontime')
         .attr('x', d => x(d.x0) + 0.5)
-        .attr('y', d => y(d.onTime + d.late))
+        .attr('y', d => y(d.onTime))
         .attr('width', barWidth)
         .attr('height', d => h - y(d.onTime))
         .attr('fill', ONTIME_COLOR).attr('opacity', 0.75)
         .attr('rx', 1);
 
-      // Late bars (stacked on top of on-time)
+      // Late bars (stacked on top): from y(total) down to y(onTime)
       g.selectAll('.hist-late').data(binsData).join('rect')
         .attr('class', 'hist-late')
         .attr('x', d => x(d.x0) + 0.5)
-        .attr('y', d => y(d.onTime + d.late))
+        .attr('y', d => y(d.total))
         .attr('width', barWidth)
-        .attr('height', d => h - y(d.late))
+        .attr('height', d => y(d.onTime) - y(d.total))
         .attr('fill', LATE_COLOR).attr('opacity', 0.75)
         .attr('rx', 1);
 

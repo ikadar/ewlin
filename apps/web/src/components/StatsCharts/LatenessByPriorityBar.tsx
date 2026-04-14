@@ -44,22 +44,22 @@ export function LatenessByPriorityBar({ data }: Props) {
       .attr('y1', (d) => y(d)).attr('y2', (d) => y(d))
       .attr('stroke', GRID_COLOR);
 
-    // On-time bars (bottom portion)
+    // On-time bars (bottom portion): from y(onTimeCount) down to baseline
     g.selectAll('.bar-ontime').data(data).join('rect')
       .attr('x', (d) => x(d.tierLabel) ?? 0)
-      .attr('y', (d) => y(d.total))
+      .attr('y', (d) => y(d.onTimeCount))
       .attr('width', x.bandwidth())
       .attr('height', (d) => h - y(d.onTimeCount))
       .attr('fill', ONTIME_COLOR)
       .attr('opacity', 0.8)
       .attr('rx', 3);
 
-    // Late bars (stacked on top)
+    // Late bars (stacked on top of on-time): from y(total) down to y(onTimeCount)
     g.selectAll('.bar-late').data(data).join('rect')
       .attr('x', (d) => x(d.tierLabel) ?? 0)
       .attr('y', (d) => y(d.total))
       .attr('width', x.bandwidth())
-      .attr('height', (d) => h - y(d.lateCount))
+      .attr('height', (d) => y(d.onTimeCount) - y(d.total))
       .attr('fill', LATE_COLOR)
       .attr('opacity', 0.8)
       .attr('rx', 3);
