@@ -8,6 +8,7 @@ use rand::SeedableRng;
 
 use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
+use crate::model::progress::ProgressEvent;
 use crate::model::schedule::{ComputedAssignment, ScheduleStats, StationGroupInput};
 use crate::model::station::StationInput;
 
@@ -154,21 +155,30 @@ pub fn lns_improve(
             })
             .collect();
 
-        // Run full FBI with 1 iteration (skip convergence, fast)
+        // Run full FBI with 1 iteration (skip convergence, fast).
+        // Suppress FBI progress events (pass &None) to avoid flooding the modal.
         let (new_a, new_act, new_s, new_i) = run_with_fbi_ordering(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, 1, // single FBI iteration
             start_date, BackwardOrdering::TierFirst,
             station_groups, station_blocked_ranges, occupied_slots,
-            progress, now_tick, &default_weights,
+            &None, now_tick, &default_weights,
         );
         total_iters += new_i;
 
         let new_score = (new_s.late_job_count, new_s.weighted_lateness_minutes);
+        let improved = new_score < best_score;
 
         eprintln!("[LNS] iter {}: destroy={} sacrifice={} → {} late (best={})",
             iteration, n_destroy, n_sacrifice,
             new_s.late_job_count, best_score.0);
+
+        super::emit(progress, ProgressEvent::LnsIteration {
+            iteration: iteration as u32 + 1,
+            late_job_count: new_s.late_job_count,
+            best_late_job_count: if improved { new_s.late_job_count } else { best_score.0 },
+            improved,
+        });
 
         if new_score < best_score {
             best_score = new_score;
@@ -194,6 +204,7 @@ pub fn lns_improve(
         iteration += 1;
     }
 
+    let lns_improved = best_result.is_some();
     if let Some(ref result) = best_result {
         eprintln!("[LNS] improved: {} → {} late jobs ({} iterations, {}ms)",
             stats.late_job_count, result.2.late_job_count, iteration,
@@ -202,6 +213,12 @@ pub fn lns_improve(
         eprintln!("[LNS] no improvement found ({} iterations, {}ms)",
             iteration, start.elapsed().as_millis());
     }
+
+    super::emit(progress, ProgressEvent::LnsDone {
+        iterations: iteration as u32,
+        best_late_job_count: best_score.0,
+        improved: lns_improved,
+    });
 
     best_result
 }

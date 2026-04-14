@@ -220,6 +220,25 @@ function useComputeStream(
               } else if (type === 'fbiConverged') {
                 addStep('Convergence FBI', `Arrêt à l'itération ${parsed.iteration}`);
                 finishCurrent();
+              } else if (type === 'lnsIteration') {
+                if (activeIdx >= 0 && currentSteps[activeIdx].label.startsWith('Optimisation LNS')) {
+                  // Update existing LNS step
+                  const best = parsed.bestLateJobCount;
+                  const improved = parsed.improved ? ' ✓' : '';
+                  currentSteps[activeIdx].detail =
+                    `Itération ${parsed.iteration} · ${parsed.lateJobCount} retards · best ${best}${improved}`;
+                  setSteps([...currentSteps]);
+                } else {
+                  // First LNS iteration — create the step
+                  addStep('Optimisation LNS', `Itération ${parsed.iteration} · ${parsed.lateJobCount} retards`);
+                }
+              } else if (type === 'lnsDone') {
+                if (activeIdx >= 0) {
+                  currentSteps[activeIdx].detail = parsed.improved
+                    ? `${parsed.iterations} itérations · ${parsed.bestLateJobCount} jobs en retard`
+                    : `${parsed.iterations} itérations · pas d'amélioration`;
+                }
+                finishCurrent();
               } else if (type === 'engineDone') {
                 // Engine done step is handled by the PHP 'engine_done' step
               }

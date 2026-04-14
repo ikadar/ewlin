@@ -36,6 +36,21 @@ pub enum ProgressEvent {
     FbiConverged {
         iteration: u32,
     },
+    /// LNS iteration completed
+    #[serde(rename_all = "camelCase")]
+    LnsIteration {
+        iteration: u32,
+        late_job_count: u32,
+        best_late_job_count: u32,
+        improved: bool,
+    },
+    /// LNS completed
+    #[serde(rename_all = "camelCase")]
+    LnsDone {
+        iterations: u32,
+        best_late_job_count: u32,
+        improved: bool,
+    },
     /// Post-processing: merging chunks
     MergeStart,
     /// Compute fully done — result follows as a separate event
