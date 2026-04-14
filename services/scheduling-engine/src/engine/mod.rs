@@ -171,7 +171,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
     // try swapping lower-priority work to rescue them. Budget-capped to avoid
     // excessive compute time.
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
-    if stats.late_job_count > 0 && elapsed_ms < 20_000 {
+    if stats.late_job_count > 0 && elapsed_ms < 15_000 {
         if let Some((moore_assignments, moore_actions, moore_stats, moore_iters)) = moore::moore_escape(
             &request.jobs,
             &request.stations,
@@ -182,7 +182,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             options.horizon_days,
             fbi_max_iterations,
             start_date,
-            5, // max_attempts (increased for Strategy B)
+            2, // max_attempts (reduced to leave budget for SA)
             &request.station_groups,
             now_tick,
         ) {
@@ -197,8 +197,9 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
     // sequencing by swapping task orderings on stations. SA can escape local
     // optima that the greedy constructive heuristic gets stuck in.
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
-    if stats.late_job_count > 0 && elapsed_ms < 25_000 {
-        let sa_budget = 30_000u64.saturating_sub(elapsed_ms);
+    eprintln!("[PIPELINE] before SA: elapsed={}ms, late_jobs={}", elapsed_ms, stats.late_job_count);
+    if stats.late_job_count > 0 && elapsed_ms < 60_000 {
+        let sa_budget = 60_000u64.saturating_sub(elapsed_ms).max(5_000);
         if let Some((sa_assignments, sa_actions, sa_stats, sa_iters)) = sa::sa_improve(
             &request.jobs,
             &request.stations,
