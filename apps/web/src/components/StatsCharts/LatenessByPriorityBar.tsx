@@ -35,7 +35,7 @@ export function LatenessByPriorityBar({ data }: Props) {
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
     const x = d3.scaleBand().domain(data.map((t) => t.tierLabel)).range([0, w]).padding(0.35);
-    const yMax = (d3.max(data, (t) => t.total) ?? 10) * 1.15;
+    const yMax = Math.max(1, (d3.max(data, (t) => t.total) ?? 1) * 1.15);
     const y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
 
     // Grid

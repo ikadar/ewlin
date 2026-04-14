@@ -75,16 +75,23 @@ export function StationUtilizationHeatmap({ data, horizonStart }: Props) {
       }
     }
 
-    // Station labels
+    // Station labels with category separators
     let prevCat = '';
     sorted.forEach((st, row) => {
-      const label = st.categoryName !== prevCat ? `${st.categoryName} / ${st.name}` : st.name;
+      // Category separator line
+      if (st.categoryName !== prevCat && row > 0) {
+        g.append('line')
+          .attr('x1', -margin.left + 8).attr('x2', w)
+          .attr('y1', row * cellH - 1).attr('y2', row * cellH - 1)
+          .attr('stroke', 'rgba(255,255,255,0.1)');
+      }
       prevCat = st.categoryName;
+
       g.append('text')
         .attr('x', -6).attr('y', row * cellH + cellH / 2 + 4)
         .attr('text-anchor', 'end')
         .attr('fill', AXIS_COLOR).attr('font-size', 10)
-        .text(label);
+        .text(st.stationName);
     });
 
     // Cells

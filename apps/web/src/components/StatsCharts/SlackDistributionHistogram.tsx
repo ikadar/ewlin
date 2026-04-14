@@ -63,7 +63,7 @@ export function SlackDistributionHistogram({ data }: Props) {
       total: bin.length,
     }));
 
-    const yMax = (d3.max(binsData, (d) => d.total) ?? 5) * 1.15;
+    const yMax = Math.max(1, (d3.max(binsData, (d) => d.total) ?? 1) * 1.15);
     const y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
 
     // Grid
