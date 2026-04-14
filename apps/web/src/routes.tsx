@@ -46,6 +46,7 @@ import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { ShippersPage } from './pages/ShippersPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OperatorSchedulePage from './pages/OperatorSchedulePage';
+import StatsPage from './pages/StatsPage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
 import { UserGroupsPage } from './pages/UserGroupsPage';
@@ -73,6 +74,9 @@ export function AppRoutes() {
 
         {/* Operator schedule — default view */}
         <Route path="/" element={<OperatorSchedulePage />} />
+
+        {/* Algorithm stats dashboard */}
+        <Route path="/stats" element={<StatsPage />} />
 
         {/* Station schedule — verification view */}
         <Route path="/stations" element={<App />} />

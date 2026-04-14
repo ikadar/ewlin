@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flux Stats — Algorithm Analytics Playground</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    :root {
+      --flux-base: #0f0f0f;
+      --flux-surface: #1a1a1a;
+      --flux-elevated: #242424;
+      --flux-hover: #2c2c2c;
+      --flux-border: #2a2a2a;
+      --flux-border-light: #3a3a3a;
+      --flux-text-primary: #f5f5f5;
+      --flux-text-secondary: #d1d1d1;
+      --flux-text-tertiary: #a1a1a1;
+      --flux-text-muted: #808080;
+      --late-color: #ef4444;
+      --ontime-color: #22c55e;
+      --priority-0: #ef4444;
+      --priority-1: #f97316;
+      --priority-2: #fbbf24;
+      --priority-3: #22c55e;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--flux-base);
+      color: var(--flux-text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .page {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--flux-text-primary);
+    }
+
+    .header .subtitle {
+      font-size: 12px;
+      color: var(--flux-text-muted);
+      margin-top: 2px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .control-group label {
+      font-size: 11px;
+      color: var(--flux-text-tertiary);
+      white-space: nowrap;
+    }
+
+    .control-group input[type="range"] {
+      width: 100px;
+      accent-color: #6366f1;
+    }
+
+    .control-group .value {
+      font-size: 11px;
+      color: var(--flux-text-secondary);
+      min-width: 28px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    button.regenerate {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button.regenerate:hover { background: #4f46e5; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .chart-card {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--flux-border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .chart-card.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .chart-header {
+      padding: 14px 16px 0 16px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .chart-header h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--flux-text-primary);
+    }
+
+    .chart-header .chart-desc {
+      font-size: 11px;
+      color: var(--flux-text-muted);
+    }
+
+    .chart-body {
+      padding: 8px 8px 12px 8px;
+    }
+
+    .chart-body svg {
+      display: block;
+      width: 100%;
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: var(--flux-elevated);
+      border: 1px solid var(--flux-border-light);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--flux-text-secondary);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 1000;
+      max-width: 260px;
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+
+    .tooltip.visible { opacity: 1; }
+
+    .tooltip .tt-title {
+      font-weight: 600;
+      color: var(--flux-text-primary);
+      margin-bottom: 4px;
+    }
+
+    .tooltip .tt-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .tooltip .tt-label { color: var(--flux-text-muted); }
+    .tooltip .tt-value { color: var(--flux-text-primary); font-variant-numeric: tabular-nums; }
+    .tooltip .tt-late { color: var(--late-color); font-weight: 600; }
+    .tooltip .tt-ontime { color: var(--ontime-color); font-weight: 600; }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 16px;
+      padding: 6px 16px 10px 16px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--flux-text-tertiary);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-rect {
+      width: 12px;
+      height: 8px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Summary bar */
+    .summary-bar {
+      display: flex;
+      gap: 24px;
+      padding: 12px 16px;
+      background: var(--flux-surface);
+      border: 1px solid var(--flux-border);
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    .summary-stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .summary-stat .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-stat .stat-label {
+      font-size: 11px;
+      color: var(--flux-text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <h1>Statistiques algorithme</h1>
+        <div class="subtitle">Analyse du comportement de priorisation du moteur FBI + LNS</div>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label>Jobs</label>
+          <input type="range" id="ctrl-jobs" min="20" max="120" value="60" step="10">
+          <span class="value" id="val-jobs">60</span>
+        </div>
+        <div class="control-group">
+          <label>% retard</label>
+          <input type="range" id="ctrl-late" min="5" max="50" value="20" step="5">
+          <span class="value" id="val-late">20%</span>
+        </div>
+        <div class="control-group">
+          <label>Stations</label>
+          <input type="range" id="ctrl-stations" min="6" max="20" value="12" step="1">
+          <span class="value" id="val-stations">12</span>
+        </div>
+        <button class="regenerate" onclick="regenerate()">Regenerer</button>
+      </div>
+    </div>
+
+    <div class="summary-bar" id="summary-bar"></div>
+
+    <div class="grid">
+      <div class="chart-card" id="card-slack">
+        <div class="chart-header">
+          <h2>Slack vs Urgence</h2>
+          <span class="chart-desc">Au-dessus de la diagonale = pas assez de temps</span>
+        </div>
+        <div class="legend" id="legend-slack"></div>
+        <div class="chart-body"><svg id="chart-slack"></svg></div>
+      </div>
+
+      <div class="chart-card" id="card-order">
+        <div class="chart-header">
+          <h2>Ordre de planification vs Deadline</h2>
+          <span class="chart-desc">Les jobs urgents devraient demarrer tot</span>
+        </div>
+        <div class="legend" id="legend-order"></div>
+        <div class="chart-body"><svg id="chart-order"></svg></div>
+      </div>
+
+      <div class="chart-card" id="card-priority">
+        <div class="chart-header">
+          <h2>Retard par priorite</h2>
+          <span class="chart-desc">L'algo respecte-t-il la hierarchie ?</span>
+        </div>
+        <div class="legend" id="legend-priority"></div>
+        <div class="chart-body"><svg id="chart-priority"></svg></div>
+      </div>
+
+      <div class="chart-card" id="card-histogram">
+        <div class="chart-header">
+          <h2>Distribution du slack</h2>
+          <span class="chart-desc">A quel seuil de slack les jobs deviennent en retard ?</span>
+        </div>
+        <div class="legend" id="legend-histogram"></div>
+        <div class="chart-body"><svg id="chart-histogram"></svg></div>
+      </div>
+
+      <div class="chart-card full-width" id="card-heatmap">
+        <div class="chart-header">
+          <h2>Utilisation des stations</h2>
+          <span class="chart-desc">Taux d'occupation par creneau horaire — identifier les goulots</span>
+        </div>
+        <div class="chart-body"><svg id="chart-heatmap"></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    // ── Globals ──────────────────────────────────────────────────────
+    const PRIORITY_LABELS = ['Imperatif', 'Important', 'Standard', 'Flexible'];
+    const PRIORITY_COLORS = ['#ef4444', '#f97316', '#fbbf24', '#22c55e'];
+    const LATE_COLOR = '#ef4444';
+    const ONTIME_COLOR = '#22c55e';
+    const AXIS_COLOR = '#a1a1a1';
+    const GRID_COLOR = 'rgba(255,255,255,0.05)';
+
+    const tooltip = d3.select('#tooltip');
+
+    function showTooltip(event, html) {
+      tooltip.html(html).classed('visible', true);
+      const tt = tooltip.node();
+      const r = tt.getBoundingClientRect();
+      let x = event.clientX + 12;
+      let y = event.clientY - 10;
+      if (x + r.width > window.innerWidth - 8) x = event.clientX - r.width - 12;
+      if (y + r.height > window.innerHeight - 8) y = event.clientY - r.height + 10;
+      if (y < 8) y = 8;
+      tooltip.style('left', x + 'px').style('top', y + 'px');
+    }
+
+    function hideTooltip() {
+      tooltip.classed('visible', false);
+    }
+
+    // ── Mock Data Generator ─────────────────────────────────────────
+    const STATION_NAMES = [
+      'Offset SM74', 'Offset SM52', 'Numerique Indigo', 'Numerique Xerox',
+      'Massicot Polar', 'Plieuse Stahl', 'Assembleuse', 'Brochage Kolbus',
+      'Pelliculeuse', 'Dorure', 'Decoupe Bobst', 'Rainage',
+      'Encollage', 'Spirale', 'Thermoreliure', 'Dos carre colle',
+      'Vernis UV', 'Gaufrage', 'Perfo', 'Emballage'
+    ];
+    const CATEGORIES = [
+      { id: 'cat-offset', name: 'Offset', stations: [0, 1] },
+      { id: 'cat-digital', name: 'Numerique', stations: [2, 3] },
+      { id: 'cat-finishing', name: 'Faconnage', stations: [4, 5, 6, 7, 8, 9, 10, 11] },
+      { id: 'cat-binding', name: 'Reliure', stations: [12, 13, 14, 15] },
+      { id: 'cat-special', name: 'Special', stations: [16, 17, 18, 19] },
+    ];
+    const CLIENT_NAMES = [
+      'Editions Gallimard', 'Hachette', 'LVMH Cosmetiques', 'Carrefour',
+      'BNP Paribas', 'Publicis', 'L\'Oreal', 'Danone', 'Michelin',
+      'Air France', 'Renault', 'SNCF', 'EDF', 'Orange'
+    ];
+
+    function generateMockData(numJobs, latePercent, numStations) {
+      const rng = d3.randomLcg(42);
+      const rand = () => rng();
+      const randInt = (min, max) => Math.floor(rand() * (max - min + 1)) + min;
+      const pick = (arr) => arr[Math.floor(rand() * arr.length)];
+
+      const horizonStart = new Date('2026-04-14T06:00:00');
+      const horizonDays = 14;
+
+      const stations = STATION_NAMES.slice(0, numStations).map((name, i) => ({
+        id: `st-${i}`,
+        name,
+        categoryId: CATEGORIES.find(c => c.stations.includes(i))?.id || 'cat-finishing',
+        categoryName: CATEGORIES.find(c => c.stations.includes(i))?.name || 'Faconnage',
+      }));
+
+      const jobs = [];
+      const numLate = Math.round(numJobs * latePercent / 100);
+
+      for (let i = 0; i < numJobs; i++) {
+        const isLate = i < numLate;
+        const priorityTier = isLate
+          ? (rand() < 0.15 ? 0 : rand() < 0.35 ? 1 : rand() < 0.7 ? 2 : 3)
+          : (rand() < 0.05 ? 0 : rand() < 0.2 ? 1 : rand() < 0.6 ? 2 : 3);
+
+        const numTasks = randInt(2, 6);
+        const totalSetupMin = numTasks * randInt(15, 45);
+        const totalRunMin = numTasks * randInt(30, 180);
+        const totalProductionMin = totalSetupMin + totalRunMin;
+        const totalProductionHours = totalProductionMin / 60;
+
+        // Deadline: days from horizon start
+        let daysToDeadline;
+        if (isLate) {
+          // Late jobs: deadline is tight relative to production
+          const minDays = totalProductionHours / 8; // 8h workday
+          daysToDeadline = Math.max(1, minDays * (0.3 + rand() * 0.7));
+        } else {
+          // On-time jobs: deadline has enough slack
+          const minDays = totalProductionHours / 8;
+          daysToDeadline = minDays * (1.2 + rand() * 2.5);
+        }
+        daysToDeadline = Math.max(0.5, Math.min(horizonDays, daysToDeadline));
+
+        const deadline = new Date(horizonStart.getTime() + daysToDeadline * 86400000);
+
+        // First scheduled start: algo decision point
+        let firstStartOffset;
+        if (isLate) {
+          // Late jobs sometimes start too late
+          firstStartOffset = rand() < 0.4
+            ? daysToDeadline * 0.6 + rand() * daysToDeadline * 0.4  // Started late
+            : rand() * daysToDeadline * 0.3; // Started early but still late
+        } else {
+          firstStartOffset = rand() * Math.max(0.5, daysToDeadline - totalProductionHours / 8);
+        }
+        const firstScheduledStart = new Date(horizonStart.getTime() + firstStartOffset * 86400000);
+
+        const slackHours = (daysToDeadline * 8) - totalProductionHours; // 8h workdays
+        const delayDays = isLate ? (rand() * 3 + 0.5) : 0;
+
+        // Assign tasks to stations
+        const taskStations = [];
+        for (let t = 0; t < numTasks; t++) {
+          taskStations.push(pick(stations));
+        }
+
+        jobs.push({
+          id: `job-${i}`,
+          reference: `FL-${2026}-${String(1000 + i).slice(1)}`,
+          client: pick(CLIENT_NAMES),
+          priorityTier,
+          deadline,
+          daysToDeadline,
+          totalProductionHours,
+          totalProductionMin,
+          firstScheduledStart,
+          slackHours,
+          isLate,
+          delayDays,
+          numTasks,
+          taskStations,
+        });
+      }
+
+      // Shuffle so late jobs aren't all first
+      jobs.sort(() => rand() - 0.5);
+
+      // Generate station utilization heatmap data
+      const hoursInHorizon = horizonDays * 10; // 10 working hours per day (6h-16h)
+      const stationUtil = stations.map(st => {
+        const blocks = [];
+        for (let h = 0; h < hoursInHorizon; h++) {
+          const dayOfWeek = Math.floor(h / 10);
+          const hourOfDay = h % 10 + 6; // 6h-16h
+          // Utilization depends on how many jobs target this station
+          const baseUtil = jobs.filter(j => j.taskStations.some(s => s.id === st.id)).length / numJobs;
+          const noise = rand() * 0.4 - 0.2;
+          // Peak hours (9-12, 14-16) have higher utilization
+          const peakBoost = (hourOfDay >= 9 && hourOfDay <= 12) || (hourOfDay >= 14 && hourOfDay <= 16) ? 0.15 : 0;
+          const util = Math.max(0, Math.min(1, baseUtil * 1.8 + noise + peakBoost));
+
+          const blockStart = new Date(horizonStart);
+          blockStart.setDate(blockStart.getDate() + dayOfWeek);
+          blockStart.setHours(hourOfDay, 0, 0, 0);
+
+          blocks.push({
+            hour: h,
+            dayOfWeek,
+            hourOfDay,
+            startTime: blockStart,
+            utilization: util,
+          });
+        }
+        return { ...st, blocks };
+      });
+
+      return { jobs, stations, stationUtil, horizonStart, horizonDays };
+    }
+
+    // ── Chart Renderers ─────────────────────────────────────────────
+
+    function renderSummary(data) {
+      const { jobs } = data;
+      const total = jobs.length;
+      const late = jobs.filter(j => j.isLate).length;
+      const onTimePct = Math.round(((total - late) / total) * 100);
+      const avgLateness = late > 0
+        ? (jobs.filter(j => j.isLate).reduce((s, j) => s + j.delayDays, 0) / late).toFixed(1)
+        : '0';
+      const maxLateness = late > 0
+        ? Math.max(...jobs.filter(j => j.isLate).map(j => j.delayDays)).toFixed(1)
+        : '0';
+
+      const pctColor = onTimePct >= 85 ? ONTIME_COLOR : onTimePct >= 60 ? '#fbbf24' : LATE_COLOR;
+      const lateColor = late === 0 ? ONTIME_COLOR : late <= 3 ? '#fbbf24' : LATE_COLOR;
+
+      d3.select('#summary-bar').html(`
+        <div class="summary-stat">
+          <span class="stat-value">${total}</span>
+          <span class="stat-label">Jobs planifies</span>
+        </div>
+        <div class="summary-stat">
+          <span class="stat-value" style="color:${pctColor}">${onTimePct}%</span>
+          <span class="stat-label">A l'heure</span>
+        </div>
+        <div class="summary-stat">
+          <span class="stat-value" style="color:${lateColor}">${late}</span>
+          <span class="stat-label">En retard</span>
+        </div>
+        <div class="summary-stat">
+          <span class="stat-value">${avgLateness}j</span>
+          <span class="stat-label">Retard moyen</span>
+        </div>
+        <div class="summary-stat">
+          <span class="stat-value">${maxLateness}j</span>
+          <span class="stat-label">Retard max</span>
+        </div>
+      `);
+    }
+
+    // ── Chart 1: Slack vs Urgency Scatter ───────────────────────────
+    function renderSlackUrgency(data) {
+      const { jobs } = data;
+      const svg = d3.select('#chart-slack');
+      svg.selectAll('*').remove();
+
+      const width = 680, height = 380;
+      const margin = { top: 16, right: 20, bottom: 44, left: 56 };
+      const w = width - margin.left - margin.right;
+      const h = height - margin.top - margin.bottom;
+
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const xMax = d3.max(jobs, d => d.daysToDeadline) * 1.1;
+      const yMax = d3.max(jobs, d => d.totalProductionHours) * 1.1;
+
+      const x = d3.scaleLinear().domain([0, xMax]).range([0, w]);
+      const y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
+
+      // Grid
+      g.append('g').selectAll('line').data(y.ticks(6)).join('line')
+        .attr('x1', 0).attr('x2', w).attr('y1', d => y(d)).attr('y2', d => y(d))
+        .attr('stroke', GRID_COLOR);
+
+      // Diagonal: slack = 0 line (production hours = days * 8h)
+      const diagEndX = Math.min(xMax, yMax / 8);
+      g.append('line')
+        .attr('x1', x(0)).attr('y1', y(0))
+        .attr('x2', x(diagEndX)).attr('y2', y(diagEndX * 8))
+        .attr('stroke', '#6366f1').attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '6,4').attr('opacity', 0.6);
+
+      // Label for diagonal
+      g.append('text')
+        .attr('x', x(diagEndX * 0.65) + 4).attr('y', y(diagEndX * 0.65 * 8) - 6)
+        .attr('fill', '#6366f1').attr('font-size', 10).attr('opacity', 0.7)
+        .text('slack = 0');
+
+      // Danger zone shading (above diagonal)
+      g.append('path')
+        .attr('d', `M${x(0)},${y(0)} L${x(diagEndX)},${y(diagEndX * 8)} L${x(0)},${y(diagEndX * 8)} Z`)
+        .attr('fill', LATE_COLOR).attr('opacity', 0.04);
+
+      // Size scale for priority
+      const sizeScale = d3.scaleOrdinal()
+        .domain([0, 1, 2, 3])
+        .range([8, 6.5, 5, 4]);
+
+      // Dots
+      const dots = g.selectAll('circle').data(jobs).join('circle')
+        .attr('cx', d => x(d.daysToDeadline))
+        .attr('cy', d => y(d.totalProductionHours))
+        .attr('r', d => sizeScale(d.priorityTier))
+        .attr('fill', d => d.isLate ? LATE_COLOR : ONTIME_COLOR)
+        .attr('opacity', 0.7)
+        .attr('stroke', d => d.isLate ? '#fca5a5' : '#86efac')
+        .attr('stroke-width', 0.5)
+        .style('cursor', 'pointer');
+
+      const fmtDeadline = d3.timeFormat('%d/%m/%Y');
+      dots.on('mouseover', function(event, d) {
+        d3.select(this).attr('opacity', 1).attr('stroke-width', 2);
+        showTooltip(event, `
+          <div class="tt-title">${d.reference}</div>
+          <div class="tt-row"><span class="tt-label">Client</span><span class="tt-value">${d.client}</span></div>
+          <div class="tt-row"><span class="tt-label">Priorite</span><span class="tt-value">${PRIORITY_LABELS[d.priorityTier]}</span></div>
+          <div class="tt-row"><span class="tt-label">Deadline</span><span class="tt-value">${fmtDeadline(d.deadline)}</span></div>
+          <div class="tt-row"><span class="tt-label">Production</span><span class="tt-value">${d.totalProductionHours.toFixed(1)}h</span></div>
+          <div class="tt-row"><span class="tt-label">Jours avant deadline</span><span class="tt-value">${d.daysToDeadline.toFixed(1)}j</span></div>
+          <div class="tt-row"><span class="tt-label">Slack</span><span class="tt-value">${d.slackHours.toFixed(1)}h</span></div>
+          <div class="tt-row"><span class="tt-label">Statut</span><span class="${d.isLate ? 'tt-late' : 'tt-ontime'}">${d.isLate ? 'En retard (' + d.delayDays.toFixed(1) + 'j)' : 'A l\'heure'}</span></div>
+        `);
+      })
+      .on('mousemove', (event) => showTooltip(event, tooltip.html()))
+      .on('mouseout', function() {
+        d3.select(this).attr('opacity', 0.7).attr('stroke-width', 0.5);
+        hideTooltip();
+      });
+
+      // Axes
+      const xAxis = g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(8));
+      const yAxis = g.append('g').call(d3.axisLeft(y).ticks(6));
+
+      [xAxis, yAxis].forEach(ax => {
+        ax.selectAll('text').attr('fill', AXIS_COLOR).attr('font-size', 10);
+        ax.selectAll('line').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+        ax.select('.domain').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+      });
+
+      // Axis labels
+      g.append('text').attr('x', w / 2).attr('y', h + 36).attr('text-anchor', 'middle')
+        .attr('fill', AXIS_COLOR).attr('font-size', 11).text('Jours avant deadline');
+      g.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -42)
+        .attr('text-anchor', 'middle').attr('fill', AXIS_COLOR).attr('font-size', 11)
+        .text('Duree de production (heures)');
+
+      // Legend
+      d3.select('#legend-slack').html(`
+        <div class="legend-item"><div class="legend-dot" style="background:${ONTIME_COLOR}"></div>A l'heure</div>
+        <div class="legend-item"><div class="legend-dot" style="background:${LATE_COLOR}"></div>En retard</div>
+        <div class="legend-item"><div class="legend-dot" style="background:${LATE_COLOR};width:12px;height:12px"></div>Imperatif</div>
+        <div class="legend-item"><div class="legend-dot" style="background:${LATE_COLOR};width:8px;height:8px"></div>Standard</div>
+        <div class="legend-item" style="color:#6366f1">--- slack = 0</div>
+      `);
+    }
+
+    // ── Chart 2: Scheduling Order vs Deadline ───────────────────────
+    function renderScheduleOrder(data) {
+      const { jobs, horizonStart } = data;
+      const svg = d3.select('#chart-order');
+      svg.selectAll('*').remove();
+
+      const scheduled = jobs.filter(j => j.firstScheduledStart);
+      const width = 680, height = 380;
+      const margin = { top: 16, right: 20, bottom: 44, left: 72 };
+      const w = width - margin.left - margin.right;
+      const h = height - margin.top - margin.bottom;
+
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const deadlineExtent = d3.extent(scheduled, d => d.deadline);
+      const startExtent = d3.extent(scheduled, d => d.firstScheduledStart);
+      const allDates = [...scheduled.map(d => d.deadline), ...scheduled.map(d => d.firstScheduledStart)];
+      const dateMin = d3.min(allDates);
+      const dateMax = d3.max(allDates);
+
+      const x = d3.scaleTime().domain([dateMin, dateMax]).range([0, w]).nice();
+      const y = d3.scaleTime().domain([dateMin, dateMax]).range([h, 0]).nice();
+
+      // Grid
+      g.append('g').selectAll('line').data(y.ticks(6)).join('line')
+        .attr('x1', 0).attr('x2', w).attr('y1', d => y(d)).attr('y2', d => y(d))
+        .attr('stroke', GRID_COLOR);
+
+      // Diagonal reference: scheduled at deadline
+      g.append('line')
+        .attr('x1', x(dateMin)).attr('y1', y(dateMin))
+        .attr('x2', x(dateMax)).attr('y2', y(dateMax))
+        .attr('stroke', '#6366f1').attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '6,4').attr('opacity', 0.5);
+
+      // Dots
+      const dots = g.selectAll('circle').data(scheduled).join('circle')
+        .attr('cx', d => x(d.deadline))
+        .attr('cy', d => y(d.firstScheduledStart))
+        .attr('r', 5)
+        .attr('fill', d => PRIORITY_COLORS[d.priorityTier])
+        .attr('opacity', 0.7)
+        .attr('stroke', 'rgba(255,255,255,0.15)')
+        .attr('stroke-width', 0.5)
+        .style('cursor', 'pointer');
+
+      dots.on('mouseover', function(event, d) {
+        d3.select(this).attr('opacity', 1).attr('r', 7).attr('stroke-width', 2);
+        const fmt = d3.timeFormat('%d/%m %Hh');
+        showTooltip(event, `
+          <div class="tt-title">${d.reference}</div>
+          <div class="tt-row"><span class="tt-label">Client</span><span class="tt-value">${d.client}</span></div>
+          <div class="tt-row"><span class="tt-label">Priorite</span><span class="tt-value" style="color:${PRIORITY_COLORS[d.priorityTier]}">${PRIORITY_LABELS[d.priorityTier]}</span></div>
+          <div class="tt-row"><span class="tt-label">Deadline</span><span class="tt-value">${fmt(d.deadline)}</span></div>
+          <div class="tt-row"><span class="tt-label">1er slot planifie</span><span class="tt-value">${fmt(d.firstScheduledStart)}</span></div>
+          <div class="tt-row"><span class="tt-label">Statut</span><span class="${d.isLate ? 'tt-late' : 'tt-ontime'}">${d.isLate ? 'En retard' : 'A l\'heure'}</span></div>
+        `);
+      })
+      .on('mousemove', (event) => showTooltip(event, tooltip.html()))
+      .on('mouseout', function(event, d) {
+        d3.select(this).attr('opacity', 0.7).attr('r', 5).attr('stroke-width', 0.5);
+        hideTooltip();
+      });
+
+      // Axes
+      const fmtDate = d3.timeFormat('%d/%m');
+      const xAxis = g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(7).tickFormat(fmtDate));
+      const yAxis = g.append('g').call(d3.axisLeft(y).ticks(7).tickFormat(fmtDate));
+
+      [xAxis, yAxis].forEach(ax => {
+        ax.selectAll('text').attr('fill', AXIS_COLOR).attr('font-size', 10);
+        ax.selectAll('line').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+        ax.select('.domain').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+      });
+
+      g.append('text').attr('x', w / 2).attr('y', h + 36).attr('text-anchor', 'middle')
+        .attr('fill', AXIS_COLOR).attr('font-size', 11).text('Date de deadline');
+      g.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -56)
+        .attr('text-anchor', 'middle').attr('fill', AXIS_COLOR).attr('font-size', 11)
+        .text('1er slot planifie');
+
+      // Legend
+      d3.select('#legend-order').html(
+        PRIORITY_LABELS.map((l, i) =>
+          `<div class="legend-item"><div class="legend-dot" style="background:${PRIORITY_COLORS[i]}"></div>${l}</div>`
+        ).join('')
+      );
+    }
+
+    // ── Chart 3: Lateness by Priority Tier (Stacked Bar) ────────────
+    function renderLatenessByPriority(data) {
+      const { jobs } = data;
+      const svg = d3.select('#chart-priority');
+      svg.selectAll('*').remove();
+
+      const width = 680, height = 380;
+      const margin = { top: 16, right: 20, bottom: 44, left: 48 };
+      const w = width - margin.left - margin.right;
+      const h = height - margin.top - margin.bottom;
+
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      // Aggregate by tier
+      const tiers = [0, 1, 2, 3].map(tier => {
+        const tierJobs = jobs.filter(j => j.priorityTier === tier);
+        return {
+          tier,
+          label: PRIORITY_LABELS[tier],
+          onTime: tierJobs.filter(j => !j.isLate).length,
+          late: tierJobs.filter(j => j.isLate).length,
+          total: tierJobs.length,
+        };
+      });
+
+      const x = d3.scaleBand().domain(tiers.map(t => t.label)).range([0, w]).padding(0.35);
+      const yMax = d3.max(tiers, t => t.total) * 1.15 || 10;
+      const y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
+
+      // Grid
+      g.append('g').selectAll('line').data(y.ticks(5)).join('line')
+        .attr('x1', 0).attr('x2', w).attr('y1', d => y(d)).attr('y2', d => y(d))
+        .attr('stroke', GRID_COLOR);
+
+      // On-time bars
+      g.selectAll('.bar-ontime').data(tiers).join('rect')
+        .attr('class', 'bar-ontime')
+        .attr('x', d => x(d.label))
+        .attr('y', d => y(d.onTime + d.late))
+        .attr('width', x.bandwidth())
+        .attr('height', d => h - y(d.onTime))
+        .attr('fill', ONTIME_COLOR)
+        .attr('opacity', 0.8)
+        .attr('rx', 3)
+        .style('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+          d3.select(this).attr('opacity', 1);
+          showTooltip(event, `
+            <div class="tt-title">${d.label}</div>
+            <div class="tt-row"><span class="tt-label">Total</span><span class="tt-value">${d.total} jobs</span></div>
+            <div class="tt-row"><span class="tt-label">A l'heure</span><span class="tt-ontime">${d.onTime}</span></div>
+            <div class="tt-row"><span class="tt-label">En retard</span><span class="tt-late">${d.late}</span></div>
+            <div class="tt-row"><span class="tt-label">Taux</span><span class="tt-value">${d.total > 0 ? Math.round(d.onTime / d.total * 100) : 100}%</span></div>
+          `);
+        })
+        .on('mousemove', (event) => showTooltip(event, tooltip.html()))
+        .on('mouseout', function() { d3.select(this).attr('opacity', 0.8); hideTooltip(); });
+
+      // Late bars (stacked on top)
+      g.selectAll('.bar-late').data(tiers).join('rect')
+        .attr('class', 'bar-late')
+        .attr('x', d => x(d.label))
+        .attr('y', d => y(d.onTime + d.late))
+        .attr('width', x.bandwidth())
+        .attr('height', d => h - y(d.late))
+        .attr('fill', LATE_COLOR)
+        .attr('opacity', 0.8)
+        .attr('rx', 3)
+        .style('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+          d3.select(this).attr('opacity', 1);
+          showTooltip(event, `
+            <div class="tt-title">${d.label}</div>
+            <div class="tt-row"><span class="tt-label">En retard</span><span class="tt-late">${d.late} / ${d.total}</span></div>
+          `);
+        })
+        .on('mousemove', (event) => showTooltip(event, tooltip.html()))
+        .on('mouseout', function() { d3.select(this).attr('opacity', 0.8); hideTooltip(); });
+
+      // Count labels on top of bars
+      g.selectAll('.bar-label').data(tiers).join('text')
+        .attr('class', 'bar-label')
+        .attr('x', d => x(d.label) + x.bandwidth() / 2)
+        .attr('y', d => y(d.total) - 6)
+        .attr('text-anchor', 'middle')
+        .attr('fill', AXIS_COLOR).attr('font-size', 11)
+        .attr('font-weight', 600)
+        .text(d => d.total);
+
+      // Axes
+      const xAxis = g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x));
+      const yAxis = g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('d')));
+
+      [xAxis, yAxis].forEach(ax => {
+        ax.selectAll('text').attr('fill', AXIS_COLOR).attr('font-size', 10);
+        ax.selectAll('line').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+        ax.select('.domain').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+      });
+
+      // Color the x-axis labels by priority
+      xAxis.selectAll('text').data(tiers).attr('fill', (d, i) => PRIORITY_COLORS[i]).attr('font-weight', 600);
+
+      g.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -34)
+        .attr('text-anchor', 'middle').attr('fill', AXIS_COLOR).attr('font-size', 11)
+        .text('Nombre de jobs');
+
+      // Legend
+      d3.select('#legend-priority').html(`
+        <div class="legend-item"><div class="legend-rect" style="background:${ONTIME_COLOR}"></div>A l'heure</div>
+        <div class="legend-item"><div class="legend-rect" style="background:${LATE_COLOR}"></div>En retard</div>
+      `);
+    }
+
+    // ── Chart 4: Slack Distribution Histogram ───────────────────────
+    function renderSlackDistribution(data) {
+      const { jobs } = data;
+      const svg = d3.select('#chart-histogram');
+      svg.selectAll('*').remove();
+
+      const width = 680, height = 380;
+      const margin = { top: 16, right: 20, bottom: 44, left: 48 };
+      const w = width - margin.left - margin.right;
+      const h = height - margin.top - margin.bottom;
+
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const slackValues = jobs.map(d => d.slackHours);
+      const slackExtent = d3.extent(slackValues);
+      const xDomain = [Math.min(-20, slackExtent[0] - 5), Math.max(80, slackExtent[1] + 5)];
+
+      const x = d3.scaleLinear().domain(xDomain).range([0, w]);
+
+      // Create bins
+      const binGen = d3.bin().domain(xDomain).thresholds(20).value(d => d.slackHours);
+      const bins = binGen(jobs);
+
+      // Split each bin into late / on-time counts
+      const binsData = bins.map(bin => ({
+        x0: bin.x0,
+        x1: bin.x1,
+        late: bin.filter(j => j.isLate).length,
+        onTime: bin.filter(j => !j.isLate).length,
+        total: bin.length,
+      }));
+
+      const yMax = d3.max(binsData, d => d.total) * 1.15 || 5;
+      const y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
+
+      // Grid
+      g.append('g').selectAll('line').data(y.ticks(5)).join('line')
+        .attr('x1', 0).attr('x2', w).attr('y1', d => y(d)).attr('y2', d => y(d))
+        .attr('stroke', GRID_COLOR);
+
+      // Zero line (slack = 0)
+      if (xDomain[0] < 0) {
+        g.append('line')
+          .attr('x1', x(0)).attr('x2', x(0))
+          .attr('y1', 0).attr('y2', h)
+          .attr('stroke', '#6366f1').attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '6,4').attr('opacity', 0.6);
+
+        g.append('text').attr('x', x(0) + 4).attr('y', 12)
+          .attr('fill', '#6366f1').attr('font-size', 10).attr('opacity', 0.7)
+          .text('slack = 0');
+      }
+
+      // Danger zone shading (negative slack)
+      if (xDomain[0] < 0) {
+        g.append('rect')
+          .attr('x', x(xDomain[0])).attr('y', 0)
+          .attr('width', x(0) - x(xDomain[0])).attr('height', h)
+          .attr('fill', LATE_COLOR).attr('opacity', 0.04);
+      }
+
+      const barWidth = d => Math.max(1, x(d.x1) - x(d.x0) - 1);
+
+      // On-time bars (bottom)
+      g.selectAll('.hist-ontime').data(binsData).join('rect')
+        .attr('class', 'hist-ontime')
+        .attr('x', d => x(d.x0) + 0.5)
+        .attr('y', d => y(d.onTime + d.late))
+        .attr('width', barWidth)
+        .attr('height', d => h - y(d.onTime))
+        .attr('fill', ONTIME_COLOR).attr('opacity', 0.75)
+        .attr('rx', 1);
+
+      // Late bars (stacked on top of on-time)
+      g.selectAll('.hist-late').data(binsData).join('rect')
+        .attr('class', 'hist-late')
+        .attr('x', d => x(d.x0) + 0.5)
+        .attr('y', d => y(d.onTime + d.late))
+        .attr('width', barWidth)
+        .attr('height', d => h - y(d.late))
+        .attr('fill', LATE_COLOR).attr('opacity', 0.75)
+        .attr('rx', 1);
+
+      // Hover zones (full bar)
+      g.selectAll('.hist-hover').data(binsData).join('rect')
+        .attr('class', 'hist-hover')
+        .attr('x', d => x(d.x0))
+        .attr('y', d => y(d.total))
+        .attr('width', d => x(d.x1) - x(d.x0))
+        .attr('height', d => h - y(d.total))
+        .attr('fill', 'transparent')
+        .style('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+          showTooltip(event, `
+            <div class="tt-title">Slack: ${d.x0.toFixed(0)}h a ${d.x1.toFixed(0)}h</div>
+            <div class="tt-row"><span class="tt-label">Jobs</span><span class="tt-value">${d.total}</span></div>
+            <div class="tt-row"><span class="tt-label">A l'heure</span><span class="tt-ontime">${d.onTime}</span></div>
+            <div class="tt-row"><span class="tt-label">En retard</span><span class="tt-late">${d.late}</span></div>
+          `);
+        })
+        .on('mousemove', (event) => showTooltip(event, tooltip.html()))
+        .on('mouseout', hideTooltip);
+
+      // Axes
+      const xAxis = g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(10));
+      const yAxis = g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('d')));
+
+      [xAxis, yAxis].forEach(ax => {
+        ax.selectAll('text').attr('fill', AXIS_COLOR).attr('font-size', 10);
+        ax.selectAll('line').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+        ax.select('.domain').attr('stroke', AXIS_COLOR).attr('opacity', 0.3);
+      });
+
+      g.append('text').attr('x', w / 2).attr('y', h + 36).attr('text-anchor', 'middle')
+        .attr('fill', AXIS_COLOR).attr('font-size', 11).text('Slack (heures)');
+      g.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', -34)
+        .attr('text-anchor', 'middle').attr('fill', AXIS_COLOR).attr('font-size', 11)
+        .text('Nombre de jobs');
+
+      // Legend
+      d3.select('#legend-histogram').html(`
+        <div class="legend-item"><div class="legend-rect" style="background:${ONTIME_COLOR}"></div>A l'heure</div>
+        <div class="legend-item"><div class="legend-rect" style="background:${LATE_COLOR}"></div>En retard</div>
+        <div class="legend-item" style="color:#6366f1">--- slack = 0</div>
+      `);
+    }
+
+    // ── Chart 5: Station Utilization Heatmap ────────────────────────
+    function renderStationUtilization(data) {
+      const { stationUtil, horizonStart, horizonDays } = data;
+      const svg = d3.select('#chart-heatmap');
+      svg.selectAll('*').remove();
+
+      // Limit to 7 days for readability
+      const displayDays = Math.min(7, horizonDays);
+      const hoursPerDay = 10; // 6h-16h
+      const totalCols = displayDays * hoursPerDay;
+      const numRows = stationUtil.length;
+
+      const width = 1520, cellH = 22;
+      const margin = { top: 36, right: 16, bottom: 24, left: 140 };
+      const w = width - margin.left - margin.right;
+      const height = margin.top + numRows * cellH + margin.bottom;
+      const cellW = w / totalCols;
+
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      // Color scale: sequential blue/purple
+      const colorScale = d3.scaleSequential()
+        .domain([0, 1])
+        .interpolator(t => d3.interpolateRgb('#1a1a2e', '#7c3aed')(t));
+
+      // Group stations by category for visual separation
+      const grouped = [];
+      const catOrder = [...new Set(stationUtil.map(s => s.categoryName))];
+      for (const cat of catOrder) {
+        grouped.push(...stationUtil.filter(s => s.categoryName === cat));
+      }
+
+      // Day headers
+      const fmtDay = d3.timeFormat('%a %d/%m');
+      for (let d = 0; d < displayDays; d++) {
+        const dayDate = new Date(horizonStart);
+        dayDate.setDate(dayDate.getDate() + d);
+        g.append('text')
+          .attr('x', d * hoursPerDay * cellW + (hoursPerDay * cellW) / 2)
+          .attr('y', -18)
+          .attr('text-anchor', 'middle')
+          .attr('fill', AXIS_COLOR).attr('font-size', 10)
+          .text(fmtDay(dayDate));
+
+        // Day separator
+        if (d > 0) {
+          g.append('line')
+            .attr('x1', d * hoursPerDay * cellW).attr('x2', d * hoursPerDay * cellW)
+            .attr('y1', -8).attr('y2', numRows * cellH)
+            .attr('stroke', 'rgba(255,255,255,0.08)');
+        }
+      }
+
+      // Hour labels (every 2h)
+      for (let d = 0; d < displayDays; d++) {
+        for (let h = 0; h < hoursPerDay; h += 2) {
+          g.append('text')
+            .attr('x', (d * hoursPerDay + h) * cellW + cellW)
+            .attr('y', -6)
+            .attr('text-anchor', 'middle')
+            .attr('fill', 'rgba(255,255,255,0.2)').attr('font-size', 8)
+            .text(`${h + 6}h`);
+        }
+      }
+
+      // Station labels
+      let prevCat = '';
+      grouped.forEach((st, row) => {
+        const label = st.categoryName !== prevCat ? `${st.categoryName} / ${st.name}` : st.name;
+        prevCat = st.categoryName;
+        g.append('text')
+          .attr('x', -6).attr('y', row * cellH + cellH / 2 + 4)
+          .attr('text-anchor', 'end')
+          .attr('fill', AXIS_COLOR).attr('font-size', 10)
+          .text(label);
+      });
+
+      // Cells
+      grouped.forEach((st, row) => {
+        const blocks = st.blocks.slice(0, totalCols);
+        g.selectAll(`.cell-${row}`).data(blocks).join('rect')
+          .attr('x', (d, i) => i * cellW)
+          .attr('y', row * cellH)
+          .attr('width', Math.max(1, cellW - 1))
+          .attr('height', cellH - 2)
+          .attr('fill', d => colorScale(d.utilization))
+          .attr('rx', 2)
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event, d) {
+            d3.select(this).attr('stroke', '#fff').attr('stroke-width', 1.5);
+            const pct = Math.round(d.utilization * 100);
+            showTooltip(event, `
+              <div class="tt-title">${st.name}</div>
+              <div class="tt-row"><span class="tt-label">Categorie</span><span class="tt-value">${st.categoryName}</span></div>
+              <div class="tt-row"><span class="tt-label">Creneau</span><span class="tt-value">${d.hourOfDay}h - ${d.hourOfDay + 1}h</span></div>
+              <div class="tt-row"><span class="tt-label">Occupation</span><span class="tt-value" style="color:${pct > 80 ? '#ef4444' : pct > 50 ? '#fbbf24' : '#22c55e'}">${pct}%</span></div>
+            `);
+          })
+          .on('mousemove', (event) => showTooltip(event, tooltip.html()))
+          .on('mouseout', function() {
+            d3.select(this).attr('stroke', 'none');
+            hideTooltip();
+          });
+      });
+
+      // Color scale legend
+      const legendW = 150, legendH = 10;
+      const legendG = svg.append('g').attr('transform', `translate(${margin.left + w - legendW - 10},${height - 14})`);
+      const defs = svg.append('defs');
+      const grad = defs.append('linearGradient').attr('id', 'util-grad');
+      grad.append('stop').attr('offset', '0%').attr('stop-color', '#1a1a2e');
+      grad.append('stop').attr('offset', '100%').attr('stop-color', '#7c3aed');
+      legendG.append('rect').attr('width', legendW).attr('height', legendH).attr('rx', 3)
+        .attr('fill', 'url(#util-grad)');
+      legendG.append('text').attr('x', -4).attr('y', legendH / 2 + 3).attr('text-anchor', 'end')
+        .attr('fill', AXIS_COLOR).attr('font-size', 9).text('0%');
+      legendG.append('text').attr('x', legendW + 4).attr('y', legendH / 2 + 3)
+        .attr('fill', AXIS_COLOR).attr('font-size', 9).text('100%');
+    }
+
+    // ── Main Render ─────────────────────────────────────────────────
+    function renderAll(data) {
+      renderSummary(data);
+      renderSlackUrgency(data);
+      renderScheduleOrder(data);
+      renderLatenessByPriority(data);
+      renderSlackDistribution(data);
+      renderStationUtilization(data);
+    }
+
+    function regenerate() {
+      const numJobs = +document.getElementById('ctrl-jobs').value;
+      const latePct = +document.getElementById('ctrl-late').value;
+      const numStations = +document.getElementById('ctrl-stations').value;
+      const data = generateMockData(numJobs, latePct, numStations);
+      renderAll(data);
+    }
+
+    // Controls
+    document.getElementById('ctrl-jobs').addEventListener('input', function() {
+      document.getElementById('val-jobs').textContent = this.value;
+    });
+    document.getElementById('ctrl-late').addEventListener('input', function() {
+      document.getElementById('val-late').textContent = this.value + '%';
+    });
+    document.getElementById('ctrl-stations').addEventListener('input', function() {
+      document.getElementById('val-stations').textContent = this.value;
+    });
+
+    // Initial render
+    regenerate();
+  </script>
+</body>
+</html>

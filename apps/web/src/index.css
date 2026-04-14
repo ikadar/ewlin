@@ -85,6 +85,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Stats chart tooltip helpers (D3 injects raw HTML) ── */
+.tt-title { font-weight: 600; color: var(--color-flux-text-primary); margin-bottom: 4px; }
+.tt-row { display: flex; justify-content: space-between; gap: 16px; }
+.tt-label { color: var(--color-flux-text-muted); }
+.tt-value { color: var(--color-flux-text-primary); font-variant-numeric: tabular-nums; }
+.tt-late { color: #ef4444; font-weight: 600; }
+.tt-ontime { color: #22c55e; font-weight: 600; }
+
 /* ── Flux Dashboard animations (v0.5.17) ── */
 
 @keyframes flux-subrow-in {
