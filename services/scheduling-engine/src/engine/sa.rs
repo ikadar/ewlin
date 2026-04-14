@@ -1,5 +1,4 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::cmp::Reverse;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use chrono::NaiveDate;
@@ -230,116 +229,86 @@ fn sa_decode(solution: &SaSolution, ctx: &SaContext) -> SaEvaluation {
     // Per-operator interval list: tracks all (start, end) assignments
     let mut op_intervals: Vec<Vec<(usize, usize)>> = vec![Vec::new(); ctx.num_operators];
 
-    // Per-station queue pointer (next action to consider)
-    let mut station_ptr: Vec<usize> = vec![0; solution.station_queues.len()];
-
-    // Event-driven: use a min-heap of (tick, station_idx) for when stations become free
-    let mut events: BinaryHeap<Reverse<(usize, usize)>> = BinaryHeap::new();
-    for (s, _) in solution.station_queues.iter().enumerate() {
-        events.push(Reverse((ctx.now_tick, s)));
-    }
-
+    // Round-robin decoder: iterate rounds over all stations until no progress.
+    // Each round tries to place one ready action per station. Cross-station
+    // dependencies resolve naturally across rounds (predecessor placed in
+    // round N → successor becomes ready in round N+1).
+    // Typically converges in ~10-20 rounds (max chain depth).
+    let num_stations = solution.station_queues.len();
     let mut placed_count = 0;
     let total_to_place = ctx.actions.iter().filter(|a| !a.is_pinned).count();
-    let mut stall_counter = 0;
-    let max_stalls = n * 2;
 
-    while placed_count < total_to_place && stall_counter < max_stalls {
-        // Pop earliest event
-        let event = match events.pop() {
-            Some(Reverse(e)) => e,
-            None => break,
-        };
-        let (_event_tick, station_idx) = event;
+    loop {
+        let mut round_progress = false;
 
-        if station_idx >= solution.station_queues.len() {
-            continue;
+        for station_idx in 0..num_stations {
+            let queue = &solution.station_queues[station_idx];
+
+            // Try to place as many ready actions on this station as possible
+            loop {
+                let mut placed_this_scan = false;
+
+                for scan_pos in 0..queue.len() {
+                    let action_idx = queue[scan_pos];
+                    let info = &ctx.actions[action_idx];
+
+                    if info.is_pinned || end_ticks[action_idx].is_some() {
+                        continue; // already placed
+                    }
+
+                    if !ready.contains(&action_idx) {
+                        continue; // predecessors not done yet
+                    }
+
+                    // Compute earliest start
+                    let mut earliest = station_free_after[station_idx].max(ctx.now_tick);
+
+                    if let Some(pred) = info.predecessor_idx {
+                        if let Some(pred_end) = end_ticks[pred] {
+                            earliest = earliest.max(pred_end + info.predecessor_gap_ticks as usize);
+                        }
+                    }
+                    for &(ap, gap) in &info.additional_predecessors {
+                        if let Some(ap_end) = end_ticks[ap] {
+                            earliest = earliest.max(ap_end + gap as usize);
+                        }
+                    }
+
+                    // Skip blocked ranges on this station
+                    earliest = skip_blocked(earliest, info.duration_ticks as usize, station_idx, ctx);
+
+                    // Find operator availability
+                    earliest = find_operator(earliest, info, ctx, &op_intervals);
+
+                    let end = earliest + info.duration_ticks as usize;
+                    end_ticks[action_idx] = Some(end);
+                    station_free_after[station_idx] = end;
+
+                    // Assign operator
+                    assign_operator(earliest, end, info, ctx, &mut op_intervals);
+
+                    // Update ready set: add successors whose predecessors are all done
+                    for &succ in &info.successor_indices {
+                        pred_remaining[succ] = pred_remaining[succ].saturating_sub(1);
+                        if pred_remaining[succ] == 0 && !ctx.actions[succ].is_pinned {
+                            ready.insert(succ);
+                        }
+                    }
+
+                    placed_count += 1;
+                    placed_this_scan = true;
+                    round_progress = true;
+                    break; // restart scan from beginning for this station (new ready actions may have appeared)
+                }
+
+                if !placed_this_scan {
+                    break; // no more ready actions on this station this round
+                }
+            }
         }
 
-        let queue = &solution.station_queues[station_idx];
-        let ptr = station_ptr[station_idx];
-
-        // Find the first action in this station's queue (from ptr onward) that is ready
-        let mut found = false;
-        for scan in ptr..queue.len() {
-            let action_idx = queue[scan];
-            let info = &ctx.actions[action_idx];
-
-            if info.is_pinned || end_ticks[action_idx].is_some() {
-                // Already placed — advance pointer if it's at ptr
-                if scan == station_ptr[station_idx] {
-                    station_ptr[station_idx] += 1;
-                }
-                continue;
-            }
-
-            if !ready.contains(&action_idx) {
-                continue; // predecessors not done yet, skip
-            }
-
-            // Compute earliest start
-            let mut earliest = station_free_after[station_idx].max(ctx.now_tick);
-
-            if let Some(pred) = info.predecessor_idx {
-                if let Some(pred_end) = end_ticks[pred] {
-                    earliest = earliest.max(pred_end + info.predecessor_gap_ticks as usize);
-                }
-            }
-            for &(ap, gap) in &info.additional_predecessors {
-                if let Some(ap_end) = end_ticks[ap] {
-                    earliest = earliest.max(ap_end + gap as usize);
-                }
-            }
-
-            // Skip blocked ranges on this station
-            earliest = skip_blocked(earliest, info.duration_ticks as usize, station_idx, ctx);
-
-            // Find operator availability
-            earliest = find_operator(earliest, info, ctx, &op_intervals);
-
-            // Cap at horizon
-            if earliest + info.duration_ticks as usize > ctx.horizon_ticks * 2 {
-                // Place at horizon boundary as fallback
-                earliest = ctx.horizon_ticks;
-            }
-
-            let end = earliest + info.duration_ticks as usize;
-            end_ticks[action_idx] = Some(end);
-            station_free_after[station_idx] = end;
-
-            // Assign operator (pick first available qualified)
-            assign_operator(earliest, end, info, ctx, &mut op_intervals);
-
-            // Advance pointer if this was at the head
-            if scan == station_ptr[station_idx] {
-                station_ptr[station_idx] += 1;
-            }
-
-            // Update ready set: add successors whose predecessors are all done
-            for &succ in &info.successor_indices {
-                pred_remaining[succ] = pred_remaining[succ].saturating_sub(1);
-                if pred_remaining[succ] == 0 && !ctx.actions[succ].is_pinned {
-                    ready.insert(succ);
-                    // Schedule an event for the successor's station
-                    let succ_station = ctx.actions[succ].station_idx;
-                    events.push(Reverse((end, succ_station)));
-                }
-            }
-
-            placed_count += 1;
-            found = true;
-
-            // Schedule next event for this station
-            events.push(Reverse((end, station_idx)));
+        if !round_progress || placed_count >= total_to_place {
             break;
-        }
-
-        if !found {
-            stall_counter += 1;
-            // Re-schedule this station a bit later
-            events.push(Reverse((event.0 + 1, station_idx)));
-        } else {
-            stall_counter = 0;
         }
     }
 
