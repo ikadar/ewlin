@@ -316,6 +316,10 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
         });
     }
 
+    // Recompute stats from the FINAL assignments (after merge + post-processing)
+    // so that stats.lateJobCount matches what the validation-service sees.
+    let stats = recompute_stats_from_assignments(&assignments, &request.jobs, tick_minutes, start_date);
+
     let compute_time_ms = start_time.elapsed().as_millis() as u64;
 
     emit(progress, ProgressEvent::EngineDone { compute_time_ms });
@@ -904,6 +908,132 @@ pub fn compute_stats(
         weighted_lateness_minutes,
         late_job_ids,
     }
+}
+
+/// Recompute stats from the FINAL assignments (after merge + post-processing).
+/// Uses the same logic as the validation-service: compare each assignment's
+/// scheduledEnd against the job's deadline. This ensures stats.lateJobCount
+/// matches what the validation-service reports.
+fn recompute_stats_from_assignments(
+    assignments: &[ComputedAssignment],
+    jobs: &[JobInput],
+    tick_minutes: u32,
+    start_date: chrono::NaiveDate,
+) -> ScheduleStats {
+    let tier_weights: [f64; 4] = [4.0, 2.0, 1.0, 0.5];
+
+    // Build task_id → job_id map from jobs
+    let mut task_to_job: HashMap<String, String> = HashMap::new();
+    for job in jobs {
+        for element in &job.elements {
+            for task in &element.tasks {
+                task_to_job.insert(task.id.clone(), job.id.clone());
+            }
+        }
+    }
+
+    // Build job deadline map (in minutes from start_date)
+    let job_deadlines: HashMap<String, u64> = jobs
+        .iter()
+        .filter_map(|j| {
+            j.deadline.as_ref().and_then(|d| {
+                parse_deadline_minutes(d, start_date).map(|mins| (j.id.clone(), mins))
+            })
+        })
+        .collect();
+
+    // Build job priority map
+    let job_priority: HashMap<&str, u8> = jobs
+        .iter()
+        .map(|j| (j.id.as_str(), j.deadline_priority))
+        .collect();
+
+    // Find max end per job from assignments (using scheduledEnd datetime strings)
+    let mut job_max_end_minutes: HashMap<String, u64> = HashMap::new();
+    for a in assignments {
+        if let Some(job_id) = task_to_job.get(&a.task_id) {
+            if let Some(end_mins) = parse_datetime_to_minutes(&a.scheduled_end, start_date) {
+                let entry = job_max_end_minutes.entry(job_id.clone()).or_insert(0);
+                if end_mins > *entry {
+                    *entry = end_mins;
+                }
+            }
+        }
+    }
+
+    // Compute late jobs from final assignments
+    let mut late_jobs: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut weighted_lateness_minutes: u64 = 0;
+    let mut late_task_count: u32 = 0;
+    let mut total_lateness_minutes: u64 = 0;
+    let mut deadline_violations: u32 = 0;
+
+    // Per-task lateness
+    for a in assignments {
+        if let Some(job_id) = task_to_job.get(&a.task_id) {
+            if let Some(end_mins) = parse_datetime_to_minutes(&a.scheduled_end, start_date) {
+                if let Some(&deadline_mins) = job_deadlines.get(job_id) {
+                    if end_mins > deadline_mins {
+                        deadline_violations += 1;
+                        late_task_count += 1;
+                        total_lateness_minutes += end_mins - deadline_mins;
+                    }
+                }
+            }
+        }
+    }
+
+    // Per-job lateness (deduplicated)
+    for (job_id, &max_end) in &job_max_end_minutes {
+        if let Some(&deadline_mins) = job_deadlines.get(job_id) {
+            if max_end > deadline_mins {
+                late_jobs.insert(job_id.clone());
+                let lateness = max_end - deadline_mins;
+                let priority = *job_priority.get(job_id.as_str()).unwrap_or(&2);
+                let w = tier_weights[priority.min(3) as usize];
+                weighted_lateness_minutes += (lateness as f64 * w) as u64;
+            }
+        }
+    }
+
+    // Makespan from assignments
+    let makespan_minutes = job_max_end_minutes.values().copied().max().unwrap_or(0);
+
+    let late_job_count = late_jobs.len() as u32;
+    let mut late_job_ids: Vec<String> = late_jobs.into_iter().collect();
+    late_job_ids.sort();
+
+    ScheduleStats {
+        makespan_minutes,
+        total_tasks: assignments.len() as u32,
+        scheduled_tasks: assignments.len() as u32,
+        deadline_violations,
+        late_task_count,
+        total_lateness_minutes,
+        late_job_count,
+        weighted_lateness_minutes,
+        late_job_ids,
+    }
+}
+
+/// Parse a datetime string (ISO/ATOM format) to minutes from start_date.
+fn parse_datetime_to_minutes(dt_str: &str, start_date: chrono::NaiveDate) -> Option<u64> {
+    // Try RFC 3339 (with timezone)
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(dt_str) {
+        let naive = dt.naive_local();
+        let days = (naive.date() - start_date).num_days();
+        if days < 0 { return Some(0); }
+        use chrono::Timelike;
+        return Some(days as u64 * 24 * 60 + naive.time().hour() as u64 * 60 + naive.time().minute() as u64);
+    }
+    // Try NaiveDateTime
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%dT%H:%M:%S") {
+        let days = (dt.date() - start_date).num_days();
+        if days < 0 { return Some(0); }
+        use chrono::Timelike;
+        return Some(days as u64 * 24 * 60 + dt.time().hour() as u64 * 60 + dt.time().minute() as u64);
+    }
+    None
 }
 
 pub fn parse_deadline_minutes(deadline: &str, start_date: chrono::NaiveDate) -> Option<u64> {
