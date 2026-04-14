@@ -217,6 +217,10 @@ pub fn run_with_fbi(
         // Pre-block ALAP placements for high-priority jobs (tier 0+1).
         // These ticks are reserved so the forward pass places remaining
         // jobs (tier 2+3) around them.
+        let alap_task_ids: std::collections::HashSet<&str> = alap_placements.iter()
+            .map(|p| p.task_id.as_str())
+            .collect();
+
         for p in &alap_placements {
             let clamped_end = p.end_tick.min(initial_ticks);
             for t in p.start_tick..clamped_end {
@@ -228,6 +232,17 @@ pub fn run_with_fbi(
                         grid.assign_operator(op_idx, t, p.station_idx, 0.0);
                     }
                 }
+            }
+        }
+
+        // Mark ALAP-placed actions as done so the forward pass skips them.
+        // Without this, the forward pass wastes time trying to place actions
+        // whose station slots are blocked — O(actions × ticks) wasted cycles.
+        for action in actions.iter_mut() {
+            if alap_task_ids.contains(action.task_id.as_str()) {
+                action.start_tick = Some(0);
+                action.end_tick = Some(0);
+                action.art = 0;
             }
         }
 
