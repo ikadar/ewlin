@@ -1212,6 +1212,15 @@ fn assign_action_at_tick(
         );
     }
 
+    // Shift-end guard: don't start a NEW task with an operator who is
+    // leaving in less than tick_minutes (i.e., not available at t+1).
+    // This prevents wasteful single-tick assignments before shift change
+    // (e.g., 5 min of setup that can't finish before handoff).
+    // Does NOT apply to continuing tasks (start_tick already set).
+    if actions[action_idx].start_tick.is_none() && !operators.is_empty() {
+        operators.retain(|&op| operator_availability.is_available(op, t + 1));
+    }
+
     if grid.num_operators > 0 && operators.is_empty() {
         // Stall path
         actions[action_idx].idle_ticks += 1;
