@@ -878,19 +878,27 @@ function computeTileSlices(
 
   for (const slice of rawSlices) {
     const gaps = findOperatorGaps(operator, slice.from, slice.to);
-    // Keep gaps that split the slice: gap start must be inside the slice
+    const ss = slice.from.getTime();
+    const se = slice.to.getTime();
+    // Keep gaps that overlap the slice interior and leave at least one
+    // working segment (≥ 30s) on at least one side.
     const splittingGaps = gaps.filter(g => {
-      const gs = g.gapStart.getTime();
-      const ss = slice.from.getTime();
-      const se = slice.to.getTime();
-      // Gap must start strictly after slice start and before slice end
-      return gs > ss + 30000 && gs < se - 30000;
+      const overlapStart = Math.max(g.gapStart.getTime(), ss);
+      const overlapEnd = Math.min(g.gapEnd.getTime(), se);
+      if (overlapEnd - overlapStart < 30000) return false; // overlap too small
+      const hasWorkBefore = overlapStart - ss >= 30000;
+      const hasWorkAfter = se - overlapEnd >= 30000;
+      return hasWorkBefore || hasWorkAfter;
     });
 
     if (splittingGaps.length === 0) {
       finalSlices.push(slice);
       continue;
     }
+
+    // Does the tile start or end inside a gap?
+    const tileStartsInGap = splittingGaps[0].gapStart.getTime() <= ss + 30000;
+    const tileEndsInGap = splittingGaps[splittingGaps.length - 1].gapEnd.getTime() >= se - 30000;
 
     // Split at gap boundaries
     const segments: Array<{ start: Date; end: Date }> = [];
@@ -912,22 +920,38 @@ function computeTileSlices(
     for (let i = 0; i < segments.length; i++) {
       const isFirst = i === 0;
       const isLast = i === segments.length - 1;
-      const sawBottom = !isLast;
-      const sawTop = !isFirst;
+      const sawBottom = !isLast || tileEndsInGap;
+      const sawTop = !isFirst || tileStartsInGap;
 
-      // Relay labels
+      // Relay labels — map each segment edge to the adjacent gap
       let relayBottom: string | undefined;
       let relayTop: string | undefined;
 
-      if (sawBottom) {
-        const gap = splittingGaps[i];
-        const otherOp = slice.isMasked ? undefined : findRelayOperator(entries, slice.assignmentId, operator, gap, allOperators);
-        relayBottom = otherOp ?? '→ pause';
+      // Gap index for the bottom edge: the gap that follows this segment
+      // When tileStartsInGap, the first working segment follows gap[0],
+      // so gap indices shift by 1 compared to the non-leading-gap case.
+      const gapOffset = tileStartsInGap ? 1 : 0;
+
+      if (sawBottom && !isLast) {
+        const gap = splittingGaps[i + gapOffset];
+        if (gap) {
+          const otherOp = slice.isMasked ? undefined : findRelayOperator(entries, slice.assignmentId, operator, gap, allOperators);
+          relayBottom = otherOp ?? '→ pause';
+        }
       }
-      if (sawTop) {
-        const gap = splittingGaps[i - 1];
-        const otherOp = slice.isMasked ? undefined : findRelayOperator(entries, slice.assignmentId, operator, gap, allOperators);
-        relayTop = otherOp ? otherOp.replace('→ ', '') + ' →' : 'reprise →';
+      if (sawTop && !isFirst) {
+        const gap = splittingGaps[i - 1 + gapOffset];
+        if (gap) {
+          const otherOp = slice.isMasked ? undefined : findRelayOperator(entries, slice.assignmentId, operator, gap, allOperators);
+          relayTop = otherOp ? otherOp.replace('→ ', '') + ' →' : 'reprise →';
+        }
+      }
+      // Edge segment relay labels (tile starts/ends in gap)
+      if (isFirst && tileStartsInGap) {
+        relayTop = 'reprise →';
+      }
+      if (isLast && tileEndsInGap) {
+        relayBottom = '→ pause';
       }
 
       finalSlices.push({

@@ -57,6 +57,39 @@ interface TileSegmentProps {
 }
 
 /**
+ * Build an SVG <path> d-attribute for a visible zigzag stroke line.
+ * Coordinates are in pixel space matching the container's viewBox.
+ */
+function buildSawtoothSvgPath(
+  width: number,
+  y: number,
+  direction: 'top' | 'bottom',
+): string {
+  const amp = SAW_AMPLITUDE;
+  const teeth = SAW_TEETH;
+  const stepW = width / teeth;
+  const parts: string[] = [];
+
+  if (direction === 'top') {
+    // Top edge: zigzag starting at valley (y + amp), peaking at y
+    parts.push(`M 0 ${y + amp}`);
+    for (let i = 0; i < teeth; i++) {
+      parts.push(`L ${(i * stepW + stepW / 2).toFixed(1)} ${y}`);
+      parts.push(`L ${((i + 1) * stepW).toFixed(1)} ${y + amp}`);
+    }
+  } else {
+    // Bottom edge: zigzag starting at valley (y - amp), peaking at y
+    parts.push(`M 0 ${y - amp}`);
+    for (let i = 0; i < teeth; i++) {
+      parts.push(`L ${(i * stepW + stepW / 2).toFixed(1)} ${y}`);
+      parts.push(`L ${((i + 1) * stepW).toFixed(1)} ${y - amp}`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+/**
  * Build a CSS clip-path polygon() string.
  * X coordinates use percentages (responsive to container width).
  * Y coordinates use pixels (fixed tooth height).
@@ -148,6 +181,36 @@ export function TileSegment({
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom),
         }}
       />
+
+      {/* SVG zigzag stroke lines — visible teeth at sawtooth edges */}
+      {(sawtoothTop || sawtoothBottom) && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={width}
+          height={totalHeight}
+          viewBox={`0 0 ${width} ${totalHeight}`}
+          preserveAspectRatio="none"
+        >
+          {sawtoothTop && (
+            <path
+              d={buildSawtoothSvgPath(width, 0, 'top')}
+              fill="none"
+              stroke={colors.border}
+              strokeWidth={1.5}
+              strokeOpacity={0.7}
+            />
+          )}
+          {sawtoothBottom && (
+            <path
+              d={buildSawtoothSvgPath(width, totalHeight, 'bottom')}
+              fill="none"
+              stroke={colors.border}
+              strokeWidth={1.5}
+              strokeOpacity={0.7}
+            />
+          )}
+        </svg>
+      )}
 
       {/* Content overlay */}
       <div
