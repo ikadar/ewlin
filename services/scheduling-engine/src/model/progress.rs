@@ -36,6 +36,29 @@ pub enum ProgressEvent {
     FbiConverged {
         iteration: u32,
     },
+    /// Simulated annealing starting
+    #[serde(rename_all = "camelCase")]
+    SaStart {
+        late_job_count: u32,
+        estimated_iterations: u64,
+        decode_ms: f64,
+    },
+    /// Simulated annealing progress (emitted periodically)
+    #[serde(rename_all = "camelCase")]
+    SaProgress {
+        iteration: u64,
+        best_late_jobs: u32,
+        accepted: u64,
+        improved: u64,
+        temperature: f64,
+    },
+    /// Simulated annealing completed
+    #[serde(rename_all = "camelCase")]
+    SaDone {
+        iterations: u64,
+        best_late_jobs: u32,
+        improved: bool,
+    },
     /// Post-processing: merging chunks
     MergeStart,
     /// Compute fully done — result follows as a separate event

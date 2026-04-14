@@ -9,6 +9,7 @@ use rand::SeedableRng;
 
 use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
+use crate::model::progress::ProgressEvent;
 use crate::model::schedule::{ComputedAssignment, ScheduleStats, StationGroupInput};
 use crate::model::station::StationInput;
 
@@ -482,6 +483,7 @@ fn run_sa(
     ctx: &SaContext,
     time_budget_ms: u64,
     seed: u64,
+    progress: &super::ProgressSender,
 ) -> (SaSolution, SaEvaluation) {
     let mut rng = StdRng::seed_from_u64(seed);
     let start = Instant::now();
@@ -490,6 +492,7 @@ fn run_sa(
     let mut current_eval = sa_decode(&current, ctx);
     let mut best = SaSolution::clone_from(&current);
     let mut best_score = eval_score(&current_eval);
+    let mut best_eval_late_jobs = current_eval.late_job_count;
 
     let t0: f64 = 5.0;
     let t_min: f64 = 0.01;
@@ -515,6 +518,12 @@ fn run_sa(
 
     eprintln!("[SA] starting: {} late jobs, decode ~{:.1}ms, est. {} iterations, alpha={:.6}",
         current_eval.late_job_count, decode_ms, estimated_iters, alpha);
+
+    super::emit(progress, ProgressEvent::SaStart {
+        late_job_count: current_eval.late_job_count,
+        estimated_iterations: estimated_iters,
+        decode_ms,
+    });
 
     loop {
         if start.elapsed().as_millis() as u64 >= time_budget_ms {
@@ -557,14 +566,27 @@ fn run_sa(
             current_eval = new_eval;
             accepted += 1;
 
-            if eval_score(&current_eval) < best_score {
+            let current_s = eval_score(&current_eval);
+            if current_s < best_score {
                 best = SaSolution::clone_from(&current);
-                best_score = eval_score(&current_eval);
+                best_score = current_s;
+                best_eval_late_jobs = current_eval.late_job_count;
                 improved += 1;
             }
         } else {
             // Undo swap
             current.station_queues[station_idx].swap(pos, pos + 1);
+        }
+
+        // Emit progress every 100 iterations
+        if iteration % 100 == 0 {
+            super::emit(progress, ProgressEvent::SaProgress {
+                iteration,
+                best_late_jobs: best_eval_late_jobs,
+                accepted,
+                improved,
+                temperature,
+            });
         }
 
         iteration += 1;
@@ -579,6 +601,12 @@ fn run_sa(
     let best_eval = sa_decode(&best, ctx);
     eprintln!("[SA] best result: {} late jobs, {} weighted lateness, {} makespan ticks",
         best_eval.late_job_count, best_eval.weighted_lateness_minutes, best_eval.makespan_ticks);
+
+    super::emit(progress, ProgressEvent::SaDone {
+        iterations: iteration,
+        best_late_jobs: best_eval.late_job_count,
+        improved: improved > 0,
+    });
 
     (best, best_eval)
 }
@@ -668,6 +696,7 @@ pub fn sa_improve(
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     now_tick: usize,
     time_budget_ms: u64,
+    progress: &super::ProgressSender,
 ) -> Option<(Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32)> {
     if stats.late_job_count == 0 || time_budget_ms < 1000 {
         return None;
@@ -684,7 +713,7 @@ pub fn sa_improve(
 
     // Run SA (70% of budget for SA, 30% for validation)
     let sa_budget = (time_budget_ms as f64 * 0.7) as u64;
-    let (best_solution, best_eval) = run_sa(initial, &ctx, sa_budget, 42);
+    let (best_solution, best_eval) = run_sa(initial, &ctx, sa_budget, 42, progress);
 
     // Compare with current stats (using SA decode metrics)
     let current_score = (stats.late_job_count, stats.weighted_lateness_minutes);

@@ -214,6 +214,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             &occupied_slots_parsed,
             now_tick,
             sa_budget,
+            progress,
         ) {
             assignments = sa_assignments;
             actions = sa_actions;
