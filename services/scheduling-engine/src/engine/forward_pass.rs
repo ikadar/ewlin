@@ -668,16 +668,7 @@ pub fn run_forward_pass(
                 (ratio * 1000.0) as i64
             };
             let tier_w = TIER_WEIGHT[action.deadline_priority.min(3) as usize];
-            // Priority floor: imperative tasks always outscore flexible ones
-            // even when raw urgency is similar. Values calibrated relative to
-            // raw_urgency range (0-10000) × tier_w (0.5-4.0).
-            let priority_floor: i64 = match action.deadline_priority {
-                0 => 2000,
-                1 => 1000,
-                2 => 200,
-                _ => 0,
-            };
-            let weighted_urgency = (raw_urgency as f64 * tier_w) as i64 + priority_floor;
+            let weighted_urgency = (raw_urgency as f64 * tier_w) as i64;
 
             // job_boost: reactive penalty when job is already past its deadline estimate.
             // proximity_bonus: proactive boost when job is within 1 day of deadline.

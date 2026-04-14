@@ -164,13 +164,6 @@ pub fn run_with_fbi(
         // Pre-split
         pre_split(&mut actions, stations, tick_minutes);
 
-        // Sort actions by deadline priority (imperative first), then by
-        // tightest LAST value. This ensures the forward pass considers
-        // high-priority tasks before low-priority ones at each tick.
-        actions.sort_by(|a, b| {
-            a.deadline_priority.cmp(&b.deadline_priority)
-                .then(a.last.cmp(&b.last))
-        });
 
         // Build grid
         let initial_ticks = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
