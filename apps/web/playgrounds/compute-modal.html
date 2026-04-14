@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compute Modal Playground — Flux Scheduler</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-muted: rgb(128, 128, 128);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--flux-base); color: var(--flux-text-primary);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--flux-text-secondary); }
+  .subtitle { font-size: 13px; color: var(--flux-text-muted); margin-bottom: 32px; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 40px; }
+  .btn {
+    padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--flux-border-light); background: var(--flux-elevated);
+    color: var(--flux-text-primary); cursor: pointer; transition: all 0.15s;
+  }
+  .btn:hover { background: rgb(50, 50, 50); }
+  .btn.primary { background: rgb(37, 99, 235); border-color: rgb(59, 130, 246); }
+  .btn.primary:hover { background: rgb(29, 78, 216); }
+
+  /* Backdrop + Modal */
+  .backdrop {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .backdrop.visible { opacity: 1; pointer-events: auto; }
+  .modal {
+    width: 420px; max-height: 80vh; background: var(--flux-surface);
+    border: 1px solid var(--flux-border); border-radius: 10px; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    transform: scale(0.95); transition: transform 0.2s;
+    display: flex; flex-direction: column;
+  }
+  .backdrop.visible .modal { transform: scale(1); }
+
+  .modal-accent { height: 3px; width: 100%; flex-shrink: 0; }
+  .accent-green { background: rgb(34, 197, 94); }
+  .accent-amber { background: rgb(245, 158, 11); }
+  .accent-blue { background: rgb(59, 130, 246); }
+
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 0; flex-shrink: 0;
+  }
+  .modal-title { font-size: 14px; font-weight: 600; }
+  .modal-close {
+    width: 26px; height: 26px; border-radius: 6px; border: none;
+    background: transparent; color: var(--flux-text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 0.15s;
+  }
+  .modal-close:hover { background: var(--flux-elevated); color: var(--flux-text-primary); }
+
+  .modal-body { padding: 10px 18px 14px; overflow-y: auto; flex: 1; }
+
+  /* Steps log */
+  .steps { display: flex; flex-direction: column; gap: 1px; }
+  .step {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 5px 0; font-size: 12px; min-height: 24px;
+  }
+  .step-icon {
+    width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .step-spinner {
+    width: 14px; height: 14px; border: 2px solid var(--flux-border);
+    border-top-color: rgb(59, 130, 246); border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .step-check { color: rgb(34, 197, 94); }
+  .step-pending { color: var(--flux-border); }
+  .step-body { flex: 1; }
+  .step-label { color: var(--flux-text-secondary); line-height: 1.4; }
+  .step-label.active { color: var(--flux-text-primary); font-weight: 500; }
+  .step-label.pending { color: var(--flux-text-muted); }
+  .step-detail { color: var(--flux-text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .step-time {
+    font-size: 11px; color: var(--flux-text-muted); font-variant-numeric: tabular-nums;
+    flex-shrink: 0; min-width: 36px; text-align: right;
+  }
+
+  /* Stats */
+  .stat-line {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--flux-text-secondary); line-height: 1.8;
+  }
+  .stat-value { font-weight: 600; color: var(--flux-text-primary); font-variant-numeric: tabular-nums; }
+  .stat-muted { color: var(--flux-text-muted); font-size: 12px; }
+
+  /* Late section */
+  .late-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--flux-border); }
+  .late-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--flux-text-muted); font-weight: 600; margin-bottom: 6px; }
+  .late-job { display: flex; align-items: center; justify-content: space-between; padding: 3px 6px; border-radius: 4px; font-size: 12px; }
+  .late-job:hover { background: var(--flux-elevated); }
+  .late-job-ref { font-weight: 600; color: var(--flux-text-primary); }
+  .late-job-client { color: var(--flux-text-muted); margin-left: 6px; }
+  .late-job-delay { font-weight: 600; color: rgb(245, 158, 11); font-variant-numeric: tabular-nums; }
+  .late-job-delay.critical { color: rgb(239, 68, 68); }
+  .late-more { font-size: 11px; color: var(--flux-text-muted); padding: 3px 6px; cursor: pointer; }
+  .late-more:hover { color: var(--flux-text-secondary); text-decoration: underline; }
+
+  .modal-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    padding: 0 18px 14px; flex-shrink: 0;
+  }
+  .modal-btn {
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--flux-border-light); background: var(--flux-elevated);
+    color: var(--flux-text-secondary); cursor: pointer; transition: all 0.15s;
+  }
+  .modal-btn:hover { background: rgb(50, 50, 50); color: var(--flux-text-primary); }
+  .modal-btn.action { background: rgb(37, 99, 235); border-color: rgb(59, 130, 246); color: white; }
+  .modal-btn.action:hover { background: rgb(29, 78, 216); }
+</style>
+</head>
+<body>
+
+<h1>Compute Modal Playground</h1>
+<p class="subtitle">Modale avec suivi en temps réel de l'algorithme</p>
+
+<div class="controls">
+  <button class="btn primary" onclick="runFull()">Calcul complet</button>
+  <button class="btn primary" onclick="runSelective()">Placement job 4523</button>
+  <button class="btn primary" onclick="runIncremental()">Placement incrémental</button>
+  <button class="btn" onclick="showResult('full-many-late')">Résultat : 112 retards</button>
+  <button class="btn" onclick="showResult('selective-late')">Résultat : job en retard</button>
+</div>
+
+<div class="backdrop" id="backdrop" onclick="if(event.target===this)dismiss()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let _timers = [];
+
+function clearTimers() { _timers.forEach(clearTimeout); _timers = []; }
+function dismiss() { $('backdrop').classList.remove('visible'); clearTimers(); }
+function show(html) { $('modal').innerHTML = html; $('backdrop').classList.add('visible'); }
+
+function stepIcon(state) {
+  if (state === 'done') return '<span class="step-check">✓</span>';
+  if (state === 'active') return '<div class="step-spinner"></div>';
+  return '<span class="step-pending">○</span>';
+}
+
+function renderSteps(steps, title) {
+  return `
+    <div class="modal-accent accent-blue"></div>
+    <div class="modal-header">
+      <span class="modal-title">${title}</span>
+      <button class="modal-close" onclick="dismiss()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="steps">
+        ${steps.map(s => `
+          <div class="step">
+            <div class="step-icon">${stepIcon(s.state)}</div>
+            <div class="step-body">
+              <div class="step-label ${s.state}">${s.label}</div>
+              ${s.detail ? `<div class="step-detail">${s.detail}</div>` : ''}
+            </div>
+            ${s.time ? `<div class="step-time">${s.time}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ─── Full compute simulation ───
+function runFull() {
+  clearTimers();
+  const allSteps = [
+    { label: 'Préparation du payload', detail: '300 jobs · 1704 tâches · 8 opérateurs · 15 machines', dur: 200 },
+    { label: 'Envoi au moteur Rust', detail: '', dur: 100 },
+    { label: 'Itération FBI 1/3 — Passe arrière (LAST values)', detail: '', dur: 400 },
+    { label: 'Itération FBI 1/3 — Passe avant', detail: '1704 actions · tick 0→11600', dur: 2200 },
+    { label: 'Itération FBI 2/3 — Passe arrière', detail: 'Durées ajustées depuis itération 1', dur: 300 },
+    { label: 'Itération FBI 2/3 — Passe avant', detail: '1704 actions · convergence -2.1%', dur: 1800 },
+    { label: 'Itération FBI 3/3 — Passe avant', detail: 'Convergence < 1% → arrêt', dur: 1500 },
+    { label: 'Fusion des chunks et segments opérateur', detail: '', dur: 200 },
+    { label: 'Persistance des assignments', detail: '1629 assignments en bulk', dur: 400 },
+    { label: 'Calcul des dates de sous-traitance', detail: '75 tâches outsourced', dur: 300 },
+    { label: 'Validation du planning', detail: 'Conflits · Retards · Stations', dur: 500 },
+  ];
+
+  let elapsed = 0;
+  function update(activeIdx) {
+    const steps = allSteps.map((s, i) => ({
+      label: s.label,
+      detail: s.detail,
+      state: i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending',
+      time: i < activeIdx ? (elapsed > 0 ? '' : '') : '',
+    }));
+    // Show cumulative time on the active step
+    if (activeIdx < allSteps.length) {
+      steps[activeIdx].time = (elapsed / 1000).toFixed(1) + 's';
+    }
+    show(renderSteps(steps, 'Calcul complet'));
+  }
+
+  update(0);
+  let idx = 0;
+  function next() {
+    if (idx >= allSteps.length) {
+      showResult('full-many-late');
+      return;
+    }
+    update(idx);
+    // Animate timer on active step
+    const startElapsed = elapsed;
+    const dur = allSteps[idx].dur;
+    const tickInterval = 100;
+    let ticked = 0;
+    const tick = setInterval(() => {
+      ticked += tickInterval;
+      elapsed = startElapsed + ticked;
+      const el = document.querySelector('.step.active .step-time') || document.querySelector('.step:last-child .step-time');
+      // Update the active step's time
+      const activeTimeEl = document.querySelectorAll('.step-time')[idx];
+      if (activeTimeEl) activeTimeEl.textContent = (elapsed / 1000).toFixed(1) + 's';
+    }, tickInterval);
+    _timers.push(setTimeout(() => {
+      clearInterval(tick);
+      elapsed = startElapsed + dur;
+      idx++;
+      next();
+    }, dur));
+  }
+  next();
+}
+
+// ─── Selective compute simulation ───
+function runSelective() {
+  clearTimers();
+  const allSteps = [
+    { label: 'Préparation du payload', detail: 'Job 4523 — Dupont SA · 5 tâches', dur: 100 },
+    { label: 'Construction des slots occupés', detail: '1624 assignments existants → slots bloqués', dur: 100 },
+    { label: 'Envoi au moteur Rust', detail: '', dur: 50 },
+    { label: 'Itération FBI 1/3 — Passe avant', detail: '5 actions dans les trous du planning', dur: 150 },
+    { label: 'Itération FBI 2/3 — Convergence', detail: 'Makespan stable → arrêt', dur: 80 },
+    { label: 'Persistance', detail: '5 assignments ajoutés (mode additif)', dur: 50 },
+  ];
+
+  let elapsed = 0;
+  let idx = 0;
+  function update(activeIdx) {
+    const steps = allSteps.map((s, i) => ({
+      label: s.label, detail: s.detail,
+      state: i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending',
+      time: i === activeIdx ? (elapsed / 1000).toFixed(1) + 's' : '',
+    }));
+    show(renderSteps(steps, 'Placement — Job 4523'));
+  }
+  function next() {
+    if (idx >= allSteps.length) { showResult('selective-ok'); return; }
+    update(idx);
+    const dur = allSteps[idx].dur;
+    const start = elapsed;
+    const tick = setInterval(() => {
+      elapsed += 50;
+      const el = document.querySelectorAll('.step-time')[idx];
+      if (el) el.textContent = (elapsed / 1000).toFixed(1) + 's';
+    }, 50);
+    _timers.push(setTimeout(() => { clearInterval(tick); elapsed = start + dur; idx++; next(); }, dur));
+  }
+  next();
+}
+
+// ─── Incremental compute simulation ───
+function runIncremental() {
+  clearTimers();
+  const allSteps = [
+    { label: 'Identification des jobs non placés', detail: '12 jobs · 47 tâches', dur: 100 },
+    { label: 'Construction des slots occupés', detail: '1582 assignments existants → slots bloqués', dur: 150 },
+    { label: 'Envoi au moteur Rust', detail: '', dur: 50 },
+    { label: 'Itération FBI 1/3 — Passe avant', detail: '47 actions · 12 jobs dans les trous', dur: 800 },
+    { label: 'Itération FBI 2/3 — Passe avant', detail: 'Convergence -0.3%', dur: 600 },
+    { label: 'Persistance', detail: '42 assignments ajoutés (mode additif)', dur: 100 },
+    { label: 'Calcul des dates de sous-traitance', detail: '3 tâches outsourced', dur: 80 },
+  ];
+
+  let elapsed = 0;
+  let idx = 0;
+  function update(activeIdx) {
+    const steps = allSteps.map((s, i) => ({
+      label: s.label, detail: s.detail,
+      state: i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending',
+      time: i === activeIdx ? (elapsed / 1000).toFixed(1) + 's' : '',
+    }));
+    show(renderSteps(steps, 'Placement incrémental'));
+  }
+  function next() {
+    if (idx >= allSteps.length) { showResult('incremental-late'); return; }
+    update(idx);
+    const dur = allSteps[idx].dur;
+    const start = elapsed;
+    const tick = setInterval(() => {
+      elapsed += 50;
+      const el = document.querySelectorAll('.step-time')[idx];
+      if (el) el.textContent = (elapsed / 1000).toFixed(1) + 's';
+    }, 50);
+    _timers.push(setTimeout(() => { clearInterval(tick); elapsed = start + dur; idx++; next(); }, dur));
+  }
+  next();
+}
+
+// ─── Result states ───
+function showResult(scenario) {
+  clearTimers();
+  const scenarios = {
+    'full-many-late': {
+      accent: 'amber', title: 'Calcul terminé',
+      stats: `
+        <div class="stat-line"><span class="stat-value">1629</span> / 1704 tâches placées</div>
+        <div class="stat-line">⚠ <span class="stat-value">112</span> jobs en retard</div>
+        <div class="stat-line stat-muted">Retard total : 847j · Temps : 8.2s · 3 itérations FBI</div>
+      `,
+      lateSection: `
+        <div class="late-section">
+          <div class="late-title">Jobs les plus en retard</div>
+          <div class="late-job"><div><span class="late-job-ref">4501</span><span class="late-job-client">ACME Corp</span></div><span class="late-job-delay critical">+14j</span></div>
+          <div class="late-job"><div><span class="late-job-ref">4489</span><span class="late-job-client">Hermès</span></div><span class="late-job-delay critical">+12j</span></div>
+          <div class="late-job"><div><span class="late-job-ref">4523</span><span class="late-job-client">Dupont SA</span></div><span class="late-job-delay critical">+9j</span></div>
+          <div class="late-job"><div><span class="late-job-ref">4467</span><span class="late-job-client">L'Oréal</span></div><span class="late-job-delay critical">+8j</span></div>
+          <div class="late-job"><div><span class="late-job-ref">4510</span><span class="late-job-client">Renault</span></div><span class="late-job-delay">+5j</span></div>
+          <div class="late-more">et 107 autres...</div>
+        </div>
+      `,
+      actions: '<button class="modal-btn" onclick="dismiss()">Fermer</button>',
+    },
+    'selective-ok': {
+      accent: 'green', title: 'Job 4523 — Dupont SA',
+      stats: `
+        <div class="stat-line">✓ <span class="stat-value">5</span> / 5 tâches placées</div>
+        <div class="stat-line">✓ Deadline respectée</div>
+        <div class="stat-line stat-muted">Temps : 530ms</div>
+      `,
+      lateSection: '',
+      actions: '<button class="modal-btn action" onclick="runIncremental()">Calculer tous les non-placés</button><button class="modal-btn" onclick="dismiss()">Fermer</button>',
+    },
+    'selective-late': {
+      accent: 'amber', title: 'Job 4523 — Dupont SA',
+      stats: `
+        <div class="stat-line"><span class="stat-value">5</span> / 5 tâches placées</div>
+        <div class="stat-line">⚠ Deadline dépassée de <span class="stat-value">2j 4h</span></div>
+        <div class="stat-line stat-muted">Temps : 480ms</div>
+      `,
+      lateSection: '',
+      actions: '<button class="modal-btn action" onclick="runIncremental()">Calculer tous les non-placés</button><button class="modal-btn" onclick="dismiss()">Fermer</button>',
+    },
+    'incremental-late': {
+      accent: 'amber', title: 'Placement incrémental',
+      stats: `
+        <div class="stat-line"><span class="stat-value">42</span> / 47 tâches placées</div>
+        <div class="stat-line"><span class="stat-value">12</span> jobs traités</div>
+        <div class="stat-line">⚠ <span class="stat-value">2</span> jobs en retard</div>
+        <div class="stat-line stat-muted">Temps : 1.9s</div>
+      `,
+      lateSection: `
+        <div class="late-section">
+          <div class="late-title">Jobs en retard</div>
+          <div class="late-job"><div><span class="late-job-ref">4501</span><span class="late-job-client">ACME Corp</span></div><span class="late-job-delay">+18h</span></div>
+          <div class="late-job"><div><span class="late-job-ref">4510</span><span class="late-job-client">Martin SARL</span></div><span class="late-job-delay">+14h</span></div>
+        </div>
+      `,
+      actions: '<button class="modal-btn action" onclick="runFull()">Recalcul complet</button><button class="modal-btn" onclick="dismiss()">Fermer</button>',
+    },
+  };
+  const s = scenarios[scenario];
+  show(`
+    <div class="modal-accent accent-${s.accent}"></div>
+    <div class="modal-header"><span class="modal-title">${s.title}</span><button class="modal-close" onclick="dismiss()">×</button></div>
+    <div class="modal-body">${s.stats}${s.lateSection}</div>
+    <div class="modal-footer">${s.actions}</div>
+  `);
+}
+</script>
+</body>
+</html>

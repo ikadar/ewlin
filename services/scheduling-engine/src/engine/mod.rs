@@ -2,10 +2,8 @@ mod backward_pass;
 pub mod fbi;
 mod forward_pass;
 mod grid;
-pub mod local_search;
 pub mod moore;
 pub mod pre_split;
-pub mod sa;
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -190,37 +188,6 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             actions = moore_actions;
             stats = moore_stats;
             fbi_iterations += moore_iters;
-        }
-    }
-
-    // Simulated annealing: if late jobs remain after Moore, explore alternative
-    // sequencing by swapping task orderings on stations. SA can escape local
-    // optima that the greedy constructive heuristic gets stuck in.
-    let elapsed_ms = start_time.elapsed().as_millis() as u64;
-    eprintln!("[PIPELINE] before SA: elapsed={}ms, late_jobs={}", elapsed_ms, stats.late_job_count);
-    if stats.late_job_count > 0 && elapsed_ms < 60_000 {
-        let sa_budget = 60_000u64.saturating_sub(elapsed_ms).max(5_000);
-        if let Some((sa_assignments, sa_actions, sa_stats, sa_iters)) = sa::sa_improve(
-            &request.jobs,
-            &request.stations,
-            &request.operators,
-            &actions,
-            &stats,
-            tick_minutes,
-            options.horizon_days,
-            fbi_max_iterations,
-            start_date,
-            &request.station_groups,
-            &station_blocked_ranges,
-            &occupied_slots_parsed,
-            now_tick,
-            sa_budget,
-            progress,
-        ) {
-            assignments = sa_assignments;
-            actions = sa_actions;
-            stats = sa_stats;
-            fbi_iterations += sa_iters;
         }
     }
 
