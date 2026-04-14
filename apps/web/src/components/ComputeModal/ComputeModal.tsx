@@ -310,7 +310,7 @@ export const ComputeModal = memo(function ComputeModal({
       .sort((a, b) => b.lateByMinutes - a.lateByMinutes);
   }, [result, snapshot, snapshotReady]);
 
-  const hasLate = result ? result.stats.lateJobCount > 0 : lateJobs.length > 0;
+  const hasLate = lateJobs.length > 0;
   const accentColor = error ? 'bg-red-500' : isComputing ? 'bg-blue-500' : hasLate ? 'bg-amber-500' : 'bg-green-500';
 
   // Auto-dismiss after 8s if no late jobs
@@ -403,8 +403,8 @@ export const ComputeModal = memo(function ComputeModal({
                   / {result.stats.totalTasks} tâches placées
                 </div>
                 <div className="flex items-center gap-2 text-[13px] text-zinc-300 leading-7">
-                  {result.stats.lateJobCount > 0
-                    ? <><span className="text-amber-500">⚠</span> <span className="font-semibold text-zinc-100 tabular-nums">{result.stats.lateJobCount}</span> job{result.stats.lateJobCount > 1 ? 's' : ''} en retard</>
+                  {hasLate
+                    ? <><span className="text-amber-500">⚠</span> <span className="font-semibold text-zinc-100 tabular-nums">{lateJobs.length}</span> job{lateJobs.length > 1 ? 's' : ''} en retard</>
                     : <><span className="text-green-500">✓</span> {mode === 'selective' ? 'Deadline respectée' : '0 job en retard'}</>
                   }
                 </div>
