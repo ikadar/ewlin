@@ -304,15 +304,20 @@ function PriorityBreakdown({ snapshot, lateJobs }: { snapshot: ScheduleSnapshot;
               <span className="text-[11px] text-zinc-400 w-16 shrink-0">
                 {PRIORITY_LABELS[tier]}
               </span>
-              {/* Mini progress bar */}
-              <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${pct}%`,
-                    background: pct >= 80 ? '#22c55e' : pct >= 50 ? '#fbbf24' : '#ef4444',
-                  }}
-                />
+              {/* Green/red stacked bar */}
+              <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden flex">
+                {pct > 0 && (
+                  <div
+                    className="h-full"
+                    style={{ width: `${pct}%`, background: '#22c55e' }}
+                  />
+                )}
+                {pct < 100 && (
+                  <div
+                    className="h-full"
+                    style={{ width: `${100 - pct}%`, background: '#ef4444' }}
+                  />
+                )}
               </div>
               <span className="text-[11px] tabular-nums text-zinc-400 w-16 text-right shrink-0">
                 {onTime}/{total}
