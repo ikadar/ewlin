@@ -11,7 +11,7 @@ use crate::model::job::JobInput;
 
 use super::backward_pass::BackwardOrdering;
 
-use super::backward_pass::compute_last_values;
+use super::backward_pass::{compute_last_values, compute_last_values_with_placements, BackwardPlacement};
 use super::forward_pass::{
     build_prepared_groups, run_forward_pass, Action, OperatorAvailability, PreparedConcurrentGroup,
     StationAttrs,
@@ -122,6 +122,7 @@ pub fn run_with_fbi(
     // so the next backward pass schedules them earlier. The boost only
     // affects the backward pass (LAST computation), not the permanent job data.
     let mut boosted_jobs: Vec<JobInput> = Vec::new();
+    let mut alap_placements: Vec<BackwardPlacement> = Vec::new();
 
     for iteration in 0..effective_max {
         iteration_count = iteration + 1;
@@ -134,15 +135,31 @@ pub fn run_with_fbi(
         // Use boosted jobs for backward pass if available (from previous iteration's late jobs)
         let jobs_for_backward = if boosted_jobs.is_empty() { jobs } else { &boosted_jobs };
 
-        // Compute LAST values using reverse forward pass
+        // Compute LAST values. On iteration 0, also extract ALAP placements
+        // for imperative (tier 0) + important (tier 1) jobs.
         let initial_ticks_for_last = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
-        let last_values = compute_last_values(
-            jobs_for_backward, stations, operators,
-            &station_attrs, &operator_skills, &operator_groups,
-            tick_minutes, start_date,
-            initial_ticks_for_last,
-            ordering,
-        );
+
+        let has_priority_jobs = jobs.iter().any(|j| j.deadline_priority <= 1);
+        let last_values = if iteration == 0 && has_priority_jobs && ordering == BackwardOrdering::TierFirst {
+            let (lv, placements) = compute_last_values_with_placements(
+                jobs_for_backward, stations, operators,
+                &station_attrs, &operator_skills, &operator_groups,
+                tick_minutes, start_date,
+                initial_ticks_for_last,
+                &[0, 1], // ALAP tiers: imperative + important
+            );
+            // Store placements for later merging into occupied_slots
+            alap_placements = placements;
+            lv
+        } else {
+            compute_last_values(
+                jobs_for_backward, stations, operators,
+                &station_attrs, &operator_skills, &operator_groups,
+                tick_minutes, start_date,
+                initial_ticks_for_last,
+                ordering,
+            )
+        };
 
         super::emit(progress, crate::model::progress::ProgressEvent::BackwardDone {
             iteration: iteration + 1,
@@ -192,6 +209,23 @@ pub fn run_with_fbi(
                 for &op_idx in op_indices {
                     if op_idx < num_operators {
                         grid.assign_operator(op_idx, t, station_idx, 0.0);
+                    }
+                }
+            }
+        }
+
+        // Pre-block ALAP placements for high-priority jobs (tier 0+1).
+        // These ticks are reserved so the forward pass places remaining
+        // jobs (tier 2+3) around them.
+        for p in &alap_placements {
+            let clamped_end = p.end_tick.min(initial_ticks);
+            for t in p.start_tick..clamped_end {
+                if p.station_idx < num_stations {
+                    grid.assign_station(p.station_idx, t, usize::MAX);
+                }
+                for &op_idx in &p.operator_indices {
+                    if op_idx < num_operators {
+                        grid.assign_operator(op_idx, t, p.station_idx, 0.0);
                     }
                 }
             }
@@ -299,7 +333,72 @@ pub fn run_with_fbi(
 
     }
 
+    // Merge ALAP placements into final assignments.
+    // ALAP tasks were pre-blocked in the grid, so the forward pass skipped them.
+    // Now we convert them to ComputedAssignment and prepend to the result.
+    if !alap_placements.is_empty() {
+        let alap_task_ids: std::collections::HashSet<&str> = alap_placements.iter()
+            .map(|p| p.task_id.as_str())
+            .collect();
+
+        // Remove any forward-pass assignments for ALAP tasks (they shouldn't exist,
+        // but safety check in case the forward pass placed them elsewhere)
+        best_assignments.retain(|a| !alap_task_ids.contains(a.task_id.as_str()));
+
+        // Convert placements to ComputedAssignment
+        for p in &alap_placements {
+            let station_id = if p.station_idx < stations.len() {
+                stations[p.station_idx].id.clone()
+            } else {
+                continue;
+            };
+
+            let start_dt = tick_to_datetime(p.start_tick, tick_minutes, start_date);
+            let end_dt = tick_to_datetime(p.end_tick, tick_minutes, start_date);
+
+            let op_assignments: Vec<crate::model::schedule::OperatorAssignment> = p.operator_indices.iter()
+                .filter_map(|&op_idx| {
+                    if op_idx < operators.len() {
+                        Some(crate::model::schedule::OperatorAssignment {
+                            operator_id: operators[op_idx].id.clone(),
+                            from: start_dt.clone(),
+                            to: end_dt.clone(),
+                            attention: 1.0,
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            best_assignments.push(ComputedAssignment {
+                task_id: p.task_id.clone(),
+                station_id,
+                scheduled_start: start_dt,
+                scheduled_end: end_dt,
+                operators: op_assignments,
+                setup_end: None,
+                is_degraded: false,
+                effective_productivity: 1.0,
+                is_masked_time: false,
+            });
+        }
+
+        // Recompute stats with ALAP assignments included
+        best_stats = super::compute_stats(&best_assignments, &best_actions, jobs, tick_minutes, start_date);
+        eprintln!("[FBI] ALAP phase: {} tasks pre-placed for tier 0+1, final late_jobs={}",
+            alap_placements.len(), best_stats.late_job_count);
+    }
+
     (best_assignments, best_actions, best_stats, iteration_count)
+}
+
+/// Convert a tick number to an ISO datetime string.
+fn tick_to_datetime(tick: usize, tick_minutes: u32, start_date: NaiveDate) -> String {
+    let total_minutes = tick as i64 * tick_minutes as i64;
+    let dt = start_date.and_hms_opt(0, 0, 0).unwrap()
+        + chrono::Duration::minutes(total_minutes);
+    dt.format("%Y-%m-%dT%H:%M:%S").to_string()
 }
 
 /// Run FBI with a specific backward ordering and station groups.
