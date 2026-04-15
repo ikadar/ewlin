@@ -310,7 +310,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         }
         return false;
       });
-      const blockOpts = { hasOffset, hasDieCutting };
+      const job = jobMap.get(element.jobId);
+      const blockOpts = { hasOffset, hasDieCutting, batDeadline: job?.batDeadline };
       cache.set(element.id, {
         hasOffset,
         hasDieCutting,
@@ -319,7 +320,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       });
     }
     return cache;
-  }, [elements, taskMap, stationMap, categoryMap]);
+  }, [elements, taskMap, stationMap, categoryMap, jobMap]);
 
   // REQ-18: Calculate group capacity info for each station
   const groupCapacityMap = useMemo((): Map<string, GroupCapacityInfo> => {

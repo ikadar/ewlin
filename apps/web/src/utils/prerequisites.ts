@@ -119,6 +119,8 @@ export function hasOffsetAction(
 export interface ElementBlockingOpts {
   hasOffset?: boolean;
   hasDieCutting?: boolean;
+  /** When set (non-null), BAT blocking is exempted — job has a BAT deadline (BR-SCHED-BAT-001) */
+  batDeadline?: string | null;
 }
 
 /**
@@ -132,7 +134,7 @@ export interface ElementBlockingOpts {
  */
 export function isElementBlocked(element: Element, opts?: ElementBlockingOpts): boolean {
   const paperReady = isPaperReady(element.paperStatus);
-  const batReady = isBatReady(element.batStatus);
+  const batReady = isBatReady(element.batStatus) || (opts?.batDeadline != null);
   const platesReady = (opts?.hasOffset === false) || isPlatesReady(element.plateStatus);
   const formeReady = (opts?.hasDieCutting === false) || isFormeReady(element.formeStatus);
 
@@ -175,7 +177,7 @@ export interface PrerequisiteBlockingInfo {
 
 export function getPrerequisiteBlockingInfo(element: Element, opts?: ElementBlockingOpts): PrerequisiteBlockingInfo {
   const paperReady = isPaperReady(element.paperStatus);
-  const batReady = isBatReady(element.batStatus);
+  const batReady = isBatReady(element.batStatus) || (opts?.batDeadline != null);
   const platesReady = (opts?.hasOffset === false) || isPlatesReady(element.plateStatus);
   const formeReady = (opts?.hasDieCutting === false) || isFormeReady(element.formeStatus);
 

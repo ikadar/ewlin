@@ -188,6 +188,38 @@ describe('isElementBlocked', () => {
     const element = createElement('in_stock', 'bat_approved', 'ready', 'in_stock');
     expect(isElementBlocked(element)).toBe(false);
   });
+
+  // BAT deadline exemption (BR-SCHED-BAT-001)
+
+  it('returns false when BAT is bat_sent but batDeadline is set', () => {
+    const element = createElement('in_stock', 'bat_sent', 'ready');
+    expect(isElementBlocked(element, { batDeadline: '2026-05-01' })).toBe(false);
+  });
+
+  it('returns false when BAT is waiting_files but batDeadline is set', () => {
+    const element = createElement('in_stock', 'waiting_files', 'ready');
+    expect(isElementBlocked(element, { batDeadline: '2026-05-01' })).toBe(false);
+  });
+
+  it('returns false when BAT is files_received but batDeadline is set', () => {
+    const element = createElement('in_stock', 'files_received', 'ready');
+    expect(isElementBlocked(element, { batDeadline: '2026-05-01' })).toBe(false);
+  });
+
+  it('returns true when BAT is bat_sent and batDeadline is null', () => {
+    const element = createElement('in_stock', 'bat_sent', 'ready');
+    expect(isElementBlocked(element, { batDeadline: null })).toBe(true);
+  });
+
+  it('returns true when BAT is bat_sent and batDeadline is undefined', () => {
+    const element = createElement('in_stock', 'bat_sent', 'ready');
+    expect(isElementBlocked(element, {})).toBe(true);
+  });
+
+  it('still returns true when paper is blocked even with batDeadline set', () => {
+    const element = createElement('to_order', 'bat_sent', 'ready');
+    expect(isElementBlocked(element, { batDeadline: '2026-05-01' })).toBe(true);
+  });
 });
 
 describe('getPrerequisiteBlockingInfo', () => {
@@ -250,5 +282,25 @@ describe('getPrerequisiteBlockingInfo', () => {
     expect(info.plates.isReady).toBe(true);
     expect(info.forme.status).toBe('to_order');
     expect(info.forme.isReady).toBe(false);
+  });
+
+  // BAT deadline exemption (BR-SCHED-BAT-001)
+
+  it('treats BAT as ready when batDeadline is set', () => {
+    const element = createElement('in_stock', 'bat_sent', 'ready');
+    const info = getPrerequisiteBlockingInfo(element, { batDeadline: '2026-05-01' });
+
+    expect(info.isBlocked).toBe(false);
+    expect(info.bat.status).toBe('bat_sent');
+    expect(info.bat.isReady).toBe(true);
+  });
+
+  it('treats BAT as not ready when batDeadline is null', () => {
+    const element = createElement('in_stock', 'waiting_files', 'ready');
+    const info = getPrerequisiteBlockingInfo(element, { batDeadline: null });
+
+    expect(info.isBlocked).toBe(true);
+    expect(info.bat.status).toBe('waiting_files');
+    expect(info.bat.isReady).toBe(false);
   });
 });
