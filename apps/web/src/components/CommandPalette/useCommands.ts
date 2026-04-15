@@ -218,7 +218,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       commands.push({ id: 'alap-placement', label: 'Auto-place ALAP', category: 'Job selectionne', shortcut: 'Alt+P L', keywords: 'alap latest deadline backward auto place', icon: 'rewind', action: onAlapPlacement });
     }
     if (onAutoPlaceAll) {
-      commands.push({ id: 'auto-place-all', label: 'Auto-place all (V1)', category: 'Actions', shortcut: 'Ctrl+Alt+P', keywords: 'auto place all global fbi dynamic cr schedule everything', icon: 'zap', action: onAutoPlaceAll });
+      commands.push({ id: 'auto-place-all', label: 'Calculer le planning (incrémental)', category: 'Actions', shortcut: 'Ctrl+Alt+P', keywords: 'compute calculate incremental auto place schedule planning calculer', icon: 'cpu', action: onAutoPlaceAll });
     }
 
     // Scheduler-specific: Affichage

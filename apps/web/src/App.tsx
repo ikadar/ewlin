@@ -13,7 +13,7 @@ import { MaintenanceState } from './components/MaintenanceState';
 import type { JcfElement, ElementStatusUpdate } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
-import { AutoPlaceModal } from './components/AutoPlaceModal';
+import { ComputeModal } from './components/ComputeModal/ComputeModal';
 import { SmartCompactModal } from './components/SmartCompactModal';
 import { ScheduleEvaluationModal } from './components/ScheduleEvaluationModal';
 import { JcfTemplateEditorModal } from './components/JcfTemplateEditorModal';
@@ -22,8 +22,7 @@ import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable, useComputeScheduleMutation } from './store';
-import type { ComputeScheduleResult } from './store';
+import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
@@ -293,8 +292,8 @@ function AppContent() {
   const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
-  const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
-  const [computeResult, setComputeResult] = useState<ComputeScheduleResult | null>(null);
+  const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
+  const [computeModalJobId, setComputeModalJobId] = useState<string | undefined>(undefined);
 
   // v0.5.2: Toast notifications for errors
   const { toast, showToast, hideToast } = useToast();
@@ -404,8 +403,6 @@ function AppContent() {
   const [isSaveLoadOpen, setIsSaveLoadOpen] = useState(false);
   // Mass unschedule (shared hook)
   const massUnschedule = useMassUnschedule(snapshotData);
-  // Auto-place V1 modal
-  const [isAutoPlaceOpen, setIsAutoPlaceOpen] = useState(false);
   // Command Center (global — provided by RootLayout)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, registerPageCommands, unregisterPageCommands, registerJobs, unregisterJobs } = useCommandCenter();
 
@@ -1065,15 +1062,17 @@ function AppContent() {
     }
   }, [snapshot, showToast]);
 
-  // Handle compute schedule (full scheduling engine)
-  const handleComputeSchedule = useCallback(async () => {
-    try {
-      const result = await computeSchedule().unwrap();
-      setComputeResult(result);
-    } catch (err) {
-      console.error('Compute failed:', err);
-    }
-  }, [computeSchedule]);
+  // Handle compute schedule (full recalculation via ComputeModal)
+  const handleComputeSchedule = useCallback(() => {
+    setComputeModalJobId(undefined);
+    setComputeModalMode('full');
+  }, []);
+
+  // Handle incremental compute (all unplaced jobs)
+  const handleComputeIncremental = useCallback(() => {
+    setComputeModalJobId(undefined);
+    setComputeModalMode('incremental');
+  }, []);
 
   // Handle mass unschedule confirm with toast
   const handleMassUnscheduleConfirm = useCallback(async () => {
@@ -1131,17 +1130,6 @@ function AppContent() {
     }
   }, [selectedJobId, autoPlaceJobAlap, showToast, autoSaveBeforeAutoplace]);
 
-  // Handle global auto-place V1 (Ctrl+Alt+P)
-  const handleAutoPlaceAll = useCallback(async () => {
-    await autoSaveBeforeAutoplace();
-    setIsAutoPlaceOpen(true);
-  }, [autoSaveBeforeAutoplace]);
-
-  const handleAutoPlaceComplete = useCallback(() => {
-    // Refetch snapshot when auto-place finishes
-    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-  }, [dispatch]);
-
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
     const ctx: KeyboardContext = {
@@ -1176,10 +1164,10 @@ function AppContent() {
         return;
       }
 
-      // Ctrl+Alt+P: global auto-place V1
+      // Ctrl+Alt+P: incremental compute (all unplaced jobs)
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
-        handleAutoPlaceAll();
+        handleComputeIncremental();
         return;
       }
 
@@ -1259,7 +1247,7 @@ function AppContent() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleAutoPlaceAll]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleComputeIncremental]);
 
   // Handle grid background click (deselect job)
   const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);
@@ -1816,7 +1804,7 @@ function AppContent() {
     onClearAllAssignments: massUnschedule.trigger,
     onAsapPlacement: handleAsapPlacement,
     onAlapPlacement: handleAlapPlacement,
-    onAutoPlaceAll: handleAutoPlaceAll,
+    onAutoPlaceAll: handleComputeIncremental,
   });
 
   // Register scheduler-specific commands into the global Command Center
@@ -2104,60 +2092,14 @@ function AppContent() {
       {/* Compute Schedule FAB */}
       <button
         onClick={handleComputeSchedule}
-        disabled={isComputingSchedule}
+        disabled={computeModalMode !== null}
         className="fixed bottom-[184px] right-6 z-40 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white shadow-lg transition-all flex items-center justify-center"
         aria-label="Calculer le planning"
-        title="Calculer le planning"
+        title="Calculer le planning (recalcul complet)"
         data-testid="compute-schedule-fab"
       >
-        {isComputingSchedule ? (
-          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        ) : (
-          <Cpu size={20} />
-        )}
+        <Cpu size={20} />
       </button>
-
-      {/* Compute result modal */}
-      {computeResult && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setComputeResult(null)}
-          onKeyDown={e => { if (e.key === 'Escape') setComputeResult(null); }}
-          tabIndex={-1}
-          ref={el => el?.focus()}
-        >
-          <div
-            className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
-            style={{ width: '24rem' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h2 className="text-flux-text-primary font-semibold mb-4">
-              Calcul terminé
-            </h2>
-            <div className="space-y-2 text-sm text-flux-text-secondary mb-6">
-              <p>Tâches placées : <span className="text-flux-text-primary font-mono">{computeResult.stats.scheduledTasks} / {computeResult.stats.totalTasks}</span></p>
-              <p>Retard : <span className="text-flux-text-primary font-mono">{computeResult.stats.lateTaskCount} tâche(s), {computeResult.stats.totalLatenessMinutes}min</span></p>
-              <p>Temps de calcul : <span className="text-flux-text-primary font-mono">{computeResult.computeTimeMs}ms</span></p>
-              {computeResult.warnings.length > 0 && (
-                <div className="pt-2 border-t border-flux-border mt-2">
-                  {computeResult.warnings.slice(0, 3).map((w, i) => (
-                    <p key={i} className="text-amber-400 text-xs">{w.message}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <button
-                className="px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
-                onClick={() => setComputeResult(null)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Debug Export FAB — copy snapshot to clipboard */}
       <button
@@ -2203,12 +2145,14 @@ function AppContent() {
         onComplete={handleSmartCompactComplete}
       />
 
-      {/* Auto-place V1 modal */}
-      <AutoPlaceModal
-        isOpen={isAutoPlaceOpen}
-        onClose={() => setIsAutoPlaceOpen(false)}
-        onComplete={handleAutoPlaceComplete}
-        apiBaseUrl="/api/v1"
+      {/* Compute modal (real-time SSE — same as operator schedule) */}
+      <ComputeModal
+        mode={computeModalMode}
+        snapshot={snapshot}
+        onDone={() => { dispatch(scheduleApi.util.invalidateTags(['Snapshot'])); }}
+        onDismiss={() => setComputeModalMode(null)}
+        onComputeIncremental={handleComputeIncremental}
+        onComputeFull={handleComputeSchedule}
       />
 
       {/* Schedule save/load modal */}
