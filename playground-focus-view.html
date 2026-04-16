@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playground — Focus View (Station / Opérateur mono-colonne)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      font-size: 13px;
+    }
+    body {
+      background: #09090b;
+      color: #e4e4e7;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+    /* Viewport mock containers */
+    .viewport-mobile {
+      width: 390px;
+      height: 780px;
+      border: 1px solid #27272a;
+      border-radius: 28px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .viewport-desktop {
+      width: 1280px;
+      max-width: 100%;
+      height: 780px;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .viewport-scroll {
+      height: 100%;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+    .viewport-scroll::-webkit-scrollbar { width: 8px; }
+    .viewport-scroll::-webkit-scrollbar-track { background: #18181b; }
+    .viewport-scroll::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+
+    /* Timeline hours column */
+    .time-axis {
+      width: 48px;
+      flex-shrink: 0;
+      position: sticky;
+      left: 0;
+      background: #09090b;
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      z-index: 10;
+    }
+    .time-axis-inner {
+      position: relative;
+      background: rgba(24, 24, 27, 0.5);
+    }
+    .hour-label {
+      position: absolute;
+      left: 4px;
+      font-size: 10px;
+      font-family: ui-monospace, monospace;
+      color: #71717a;
+    }
+
+    /* NOW line */
+    .now-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #ef4444;
+      z-index: 20;
+    }
+    .now-label {
+      position: absolute;
+      left: 4px;
+      font-size: 10px;
+      font-family: ui-monospace, monospace;
+      color: #fca5a5;
+      background: #18181b;
+      padding: 0 4px;
+      border-radius: 2px;
+      z-index: 20;
+    }
+
+    /* Tile — matches Tile.tsx (absolute, left border 4px, setup+run sections, icons) */
+    .tile {
+      position: absolute;
+      border-left-width: 4px;
+      border-left-style: solid;
+      cursor: pointer;
+      user-select: none;
+      transition: filter 150ms, box-shadow 150ms;
+      font-size: 13px;
+    }
+    .tile:hover { filter: brightness(1.15); }
+    .tile-section {
+      position: absolute;
+      left: 0;
+      right: 0;
+    }
+    .tile-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      padding: 2px 8px 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .tile-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .tile-label {
+      font-weight: 500;
+      line-height: 1.15;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .tile-sub {
+      font-size: 9px;
+      color: #a1a1aa;
+      margin-top: 2px;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tile-icon { flex-shrink: 0; pointer-events: auto; }
+
+    /* Dropdown — JCF-style */
+    .focus-selector {
+      position: relative;
+    }
+    .focus-selector-btn {
+      width: 100%;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e4e4e7;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      transition: background 120ms;
+    }
+    .focus-selector-btn:hover { background: #27272a; }
+    .focus-selector-btn:focus { outline: 2px solid #3b82f6; outline-offset: -1px; }
+
+    .focus-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      z-index: 50;
+      max-height: 360px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .focus-dropdown-search {
+      padding: 8px;
+      border-bottom: 1px solid #27272a;
+    }
+    .focus-dropdown-search input {
+      width: 100%;
+      background: #09090b;
+      border: 1px solid #3f3f46;
+      border-radius: 4px;
+      padding: 6px 8px;
+      color: #e4e4e7;
+      font-size: 13px;
+    }
+    .focus-dropdown-search input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+    .focus-dropdown-list {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .focus-dropdown-section {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #71717a;
+      padding: 8px 12px 4px;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      background: #18181b;
+    }
+    .focus-dropdown-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 12px;
+      cursor: pointer;
+      transition: background 80ms;
+      gap: 8px;
+    }
+    .focus-dropdown-item:hover { background: #27272a; }
+    .focus-dropdown-item.active { background: #2563eb; color: white; }
+    .focus-dropdown-item.active .muted { color: rgba(255,255,255,0.7); }
+    .muted { color: #71717a; font-size: 11px; }
+
+    /* Floating NOW button */
+    .now-fab {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #2563eb;
+      border: 1px solid #3b82f6;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+      transition: all 150ms;
+      z-index: 40;
+    }
+    .now-fab:hover {
+      background: #1d4ed8;
+      transform: scale(1.05);
+    }
+    .now-fab:active { transform: scale(0.95); }
+
+    /* Column header hover affordance (on multi-column view) */
+    .column-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      cursor: pointer;
+      position: relative;
+    }
+    .column-header .focus-link {
+      opacity: 0;
+      transition: opacity 120ms;
+      color: #71717a;
+    }
+    .column-header:hover .focus-link {
+      opacity: 1;
+    }
+    .column-header:hover .focus-link:hover {
+      color: #e4e4e7;
+    }
+
+    /* Mode switcher pills */
+    .mode-pill {
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 120ms;
+      border: 1px solid transparent;
+    }
+    .mode-pill.active {
+      background: #2563eb;
+      color: white;
+      border-color: #3b82f6;
+    }
+    .mode-pill:not(.active) {
+      background: #27272a;
+      color: #a1a1aa;
+    }
+    .mode-pill:not(.active):hover {
+      background: #3f3f46;
+      color: #e4e4e7;
+    }
+  </style>
+</head>
+<body>
+
+<div class="max-w-[1600px] mx-auto p-6">
+
+  <!-- Playground header -->
+  <div class="mb-6 flex items-start justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold">Focus View — Mono-colonne Station / Opérateur</h1>
+      <p class="text-zinc-400 mt-1 text-sm">
+        Page dédiée avec URL propre, accessible depuis les en-têtes de colonnes.
+        Optimisée mobile, utilisable desktop.
+      </p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <div class="flex gap-1 bg-zinc-900 p-1 rounded-lg">
+        <button data-viewport="mobile" class="viewport-switch mode-pill active">📱 Mobile (390×780)</button>
+        <button data-viewport="desktop" class="viewport-switch mode-pill">🖥 Desktop (1280×780)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- URL preview -->
+  <div class="mb-4 p-3 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center gap-3 text-sm">
+    <svg class="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    <span class="text-zinc-500">URL courante :</span>
+    <code id="url-preview" class="text-blue-400 font-mono">/focus/operator/adrien</code>
+    <button id="copy-url" class="ml-auto text-xs text-zinc-400 hover:text-zinc-200">copier</button>
+  </div>
+
+  <!-- Layouts -->
+  <div class="flex items-start gap-8 flex-wrap">
+
+    <!-- Entry point demo (multi-column with hover) -->
+    <div class="mb-8 flex-shrink-0">
+      <h2 class="text-sm font-semibold mb-2 text-zinc-300">Déclencheur — survol en-tête colonne (multi)</h2>
+      <p class="text-xs text-zinc-500 mb-3 max-w-[300px]">
+        Sur la vue multi-colonnes, l'icône apparaît au survol. Sur mobile, elle est toujours visible.
+      </p>
+      <div class="bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden" style="width: 300px;">
+        <div class="flex border-b border-zinc-800">
+          <div class="column-header" style="width: 150px; border-right: 1px solid #27272a;">
+            <span class="text-zinc-300 font-medium truncate">Adrien</span>
+            <a href="#" class="focus-link" title="Ouvrir la vue focus">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            </a>
+          </div>
+          <div class="column-header" style="width: 150px;">
+            <span class="text-zinc-300 font-medium truncate">Benjamin</span>
+            <a href="#" class="focus-link" title="Ouvrir la vue focus">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="h-40 bg-zinc-900/30 relative">
+          <div class="absolute inset-2 text-xs text-zinc-600">(colonnes planning multi)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main viewport -->
+    <div id="viewport-container" class="viewport-mobile">
+      <div class="viewport-scroll" id="focus-scroll">
+
+        <!-- Top bar -->
+        <div class="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800" style="padding-top: env(safe-area-inset-top);">
+          <div class="px-3 py-2 flex items-center gap-2">
+            <!-- Back button -->
+            <button id="back-btn" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200" title="Retour">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <!-- Focus selector -->
+            <div class="focus-selector flex-1">
+              <button id="selector-btn" class="focus-selector-btn">
+                <span class="flex items-baseline gap-2 min-w-0">
+                  <span id="selector-label" class="text-sm font-medium text-zinc-300 truncate">Adrien</span>
+                  <span id="selector-sub" class="text-xs text-zinc-500 truncate">Impression</span>
+                </span>
+                <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div id="selector-dropdown" class="focus-dropdown hidden">
+                <div class="focus-dropdown-list" id="selector-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Planning grid (centered on desktop, fills on mobile) -->
+        <div class="flex relative justify-center" id="planning-grid">
+          <!-- Time axis -->
+          <div class="time-axis">
+            <div class="time-axis-inner" id="time-axis-inner" style="height: 1920px;">
+              <!-- hours injected by JS -->
+            </div>
+          </div>
+          <!-- Column (single) -->
+          <div class="flex-1 relative" id="tiles-column" style="height: 1920px; min-width: 0; max-width: 500px;">
+            <!-- tiles injected by JS -->
+          </div>
+        </div>
+
+        <!-- Floating NOW button -->
+        <button id="now-fab" class="now-fab" title="Recentrer sur maintenant">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="3"/>
+            <line x1="22" y1="12" x2="18" y2="12"/>
+            <line x1="6" y1="12" x2="2" y2="12"/>
+            <line x1="12" y1="6" x2="12" y2="2"/>
+            <line x1="12" y1="22" x2="12" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Design notes -->
+    <div class="flex-1 min-w-[280px] max-w-[480px] text-sm text-zinc-400 space-y-4">
+      <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+        <h3 class="text-zinc-200 font-semibold mb-2 text-sm">Choix par défaut (modifiables)</h3>
+        <ul class="space-y-1.5 text-xs">
+          <li>• <strong>URL</strong> : <code class="text-blue-400">/focus/operator/:id</code> et <code class="text-blue-400">/focus/station/:id</code></li>
+          <li>• <strong>Dropdown</strong> : un seul sélecteur avec sections <em>Stations</em> / <em>Opérateurs</em> + recherche (JCF-style)</li>
+          <li>• <strong>Bouton NOW</strong> : <code>LocateFixed</code> (cible), toujours visible bottom-right</li>
+          <li>• <strong>Tuiles</strong> : <code>Tile</code> sur station, <code>TileSegment</code> sur opérateur (cohérent avec vues parent)</li>
+          <li>• <strong>Survol en-tête</strong> : icône <code>ExternalLink</code> à droite du nom (visible au hover desktop, toujours en mobile)</li>
+          <li>• <strong>Mobile</strong> : colonne pleine largeur, frise d'heures <em>sticky gauche</em> (préserve le geste habituel)</li>
+          <li>• <strong>Back</strong> : chevron explicite, en plus du bouton natif</li>
+          <li>• <strong>Interactions tuiles</strong> : clic → modal job (read-only pour cette itération)</li>
+        </ul>
+      </div>
+
+      <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+        <h3 class="text-zinc-200 font-semibold mb-2 text-sm">À arbitrer</h3>
+        <ul class="space-y-1.5 text-xs">
+          <li>• Conserver les interactions tuiles (drag, pin, toggle complete) ou lecture seule ?</li>
+          <li>• Encoder la date dans l'URL (<code>?d=2026-04-16</code>) pour partage ?</li>
+          <li>• Zoom sur mobile : boutons +/-, pinch-to-zoom, ou figé ?</li>
+          <li>• Masquer le bouton NOW quand la ligne est déjà visible ?</li>
+          <li>• Cible du bouton retour : vue multi-colonnes dont on vient, ou accueil fixe ?</li>
+        </ul>
+      </div>
+
+      <div class="p-4 rounded-lg bg-blue-950/30 border border-blue-900/40">
+        <h3 class="text-blue-200 font-semibold mb-2 text-sm">À tester dans le playground</h3>
+        <ul class="space-y-1.5 text-xs text-blue-200/80">
+          <li>• Basculer entre Mobile et Desktop en haut de page</li>
+          <li>• Ouvrir le dropdown, chercher, basculer station ↔ opérateur</li>
+          <li>• Cliquer sur le bouton flottant ⊕ pour revenir à NOW</li>
+          <li>• Survoler les en-têtes à gauche (déclencheur)</li>
+          <li>• Scroller pour voir la frise d'heures sticky et la ligne NOW</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // ─── Mock data ────────────────────────────────────────────────
+  const OPERATORS = [
+    { id: 'adrien', name: 'Adrien', role: 'Impression' },
+    { id: 'benjamin', name: 'Benjamin', role: 'Impression' },
+    { id: 'claude', name: 'Claude', role: 'Façonnage' },
+    { id: 'diane', name: 'Diane', role: 'Prépresse' },
+    { id: 'eric', name: 'Eric', role: 'Impression' },
+    { id: 'florence', name: 'Florence', role: 'Façonnage' },
+    { id: 'gustave', name: 'Gustave', role: 'Expédition' },
+  ];
+  const STATIONS = [
+    { id: 'presse-1', name: 'Presse 1', category: 'Impression HUV' },
+    { id: 'presse-2', name: 'Presse 2', category: 'Impression HUV' },
+    { id: 'presse-numerique', name: 'Presse numérique', category: 'Impression num' },
+    { id: 'dorure-1', name: 'Dorure 1', category: 'Façonnage' },
+    { id: 'massicot-1', name: 'Massicot 1', category: 'Façonnage' },
+    { id: 'plieuse', name: 'Plieuse', category: 'Façonnage' },
+    { id: 'ctp', name: 'CTP', category: 'Prépresse' },
+  ];
+
+  // Tiles for each entity (start hour is 6). Times in minutes since 6am.
+  const TILES = {
+    'adrien': [
+      { jobRef: '26-0412', client: 'Client Alpha', station: 'Presse 1', start: 120, setup: 30, run: 90, state: 'completed' },
+      { jobRef: '26-0413', client: 'BetaCorp', station: 'Presse 1', start: 240, setup: 20, run: 120, state: 'default', isPinned: true },
+      { jobRef: '26-0418', client: 'Gamma SA', station: 'Presse 2', start: 385, setup: 15, run: 80, state: 'late' },
+      { jobRef: '26-0422', client: 'Delta SARL', station: 'Presse 1', start: 510, setup: 25, run: 150, state: 'default' },
+      { jobRef: '26-0429', client: 'Epsilon', station: 'Presse 1', start: 720, setup: 20, run: 110, state: 'conflict', isPinned: true },
+      { jobRef: '26-0435', client: 'Zeta Holding', station: 'Presse 2', start: 870, setup: 30, run: 200, state: 'default' },
+    ],
+    'benjamin': [
+      { jobRef: '26-0411', client: 'Alpha', station: 'Presse 2', start: 60, setup: 20, run: 140, state: 'completed' },
+      { jobRef: '26-0417', client: 'Theta Group', station: 'Presse 2', start: 240, setup: 30, run: 180, state: 'default' },
+      { jobRef: '26-0425', client: 'Iota', station: 'Presse numérique', start: 510, setup: 10, run: 45, state: 'default' },
+    ],
+    'claude': [
+      { jobRef: '26-0415', client: 'Kappa', station: 'Dorure 1', start: 180, setup: 20, run: 60, state: 'completed' },
+      { jobRef: '26-0419', client: 'Lambda', station: 'Massicot 1', start: 300, setup: 10, run: 90, state: 'default' },
+      { jobRef: '26-0423', client: 'Mu', station: 'Plieuse', start: 480, setup: 15, run: 120, state: 'late' },
+    ],
+    'diane': [
+      { jobRef: '26-0420', client: 'Nu', station: 'CTP', start: 120, setup: 10, run: 80, state: 'default' },
+    ],
+    'eric': [
+      { jobRef: '26-0432', client: 'Xi', station: 'Presse 2', start: 300, setup: 20, run: 200, state: 'default' },
+    ],
+    'florence': [
+      { jobRef: '26-0433', client: 'Omicron', station: 'Massicot 1', start: 420, setup: 10, run: 60, state: 'completed' },
+    ],
+    'gustave': [],
+    'presse-1': [
+      { jobRef: '26-0412', client: 'Client Alpha', station: 'Adrien', start: 120, setup: 30, run: 90, state: 'completed' },
+      { jobRef: '26-0413', client: 'BetaCorp', station: 'Adrien', start: 240, setup: 20, run: 120, state: 'default' },
+      { jobRef: '26-0422', client: 'Delta SARL', station: 'Adrien', start: 510, setup: 25, run: 150, state: 'default' },
+      { jobRef: '26-0429', client: 'Epsilon', station: 'Adrien', start: 720, setup: 20, run: 110, state: 'conflict' },
+    ],
+    'presse-2': [
+      { jobRef: '26-0411', client: 'Alpha', station: 'Benjamin', start: 60, setup: 20, run: 140, state: 'completed' },
+      { jobRef: '26-0417', client: 'Theta Group', station: 'Benjamin', start: 240, setup: 30, run: 180, state: 'default' },
+      { jobRef: '26-0418', client: 'Gamma SA', station: 'Adrien', start: 385, setup: 15, run: 80, state: 'late' },
+      { jobRef: '26-0432', client: 'Xi', station: 'Eric', start: 300, setup: 20, run: 200, state: 'default' },
+      { jobRef: '26-0435', client: 'Zeta Holding', station: 'Adrien', start: 870, setup: 30, run: 200, state: 'default' },
+    ],
+    'presse-numerique': [
+      { jobRef: '26-0425', client: 'Iota', station: 'Benjamin', start: 510, setup: 10, run: 45, state: 'default' },
+    ],
+    'dorure-1': [
+      { jobRef: '26-0415', client: 'Kappa', station: 'Claude', start: 180, setup: 20, run: 60, state: 'completed' },
+    ],
+    'massicot-1': [
+      { jobRef: '26-0419', client: 'Lambda', station: 'Claude', start: 300, setup: 10, run: 90, state: 'default' },
+      { jobRef: '26-0433', client: 'Omicron', station: 'Florence', start: 420, setup: 10, run: 60, state: 'completed' },
+    ],
+    'plieuse': [
+      { jobRef: '26-0423', client: 'Mu', station: 'Claude', start: 480, setup: 15, run: 120, state: 'late' },
+    ],
+    'ctp': [
+      { jobRef: '26-0420', client: 'Nu', station: 'Diane', start: 120, setup: 10, run: 80, state: 'default' },
+    ],
+  };
+
+  // ─── Constants (match apps/web) ───────────────────────────────
+  const PIXELS_PER_HOUR = 80;
+  const START_HOUR = 6;
+
+  // Tile colors — exact match of apps/web/src/components/Tile/colorUtils.ts
+  // Format: { border, setupBg, setupBorder, runBg, text }
+  const TILE_COLORS = {
+    shipped:   { border: '#10b981', setupBg: 'rgba(16,185,129,0.14)', setupBorder: 'rgba(52,211,153,0.20)', runBg: 'rgba(16,185,129,0.09)', text: '#6ee7b7' },
+    default:   { border: '#3b82f6', setupBg: 'rgba(59,130,246,0.12)', setupBorder: 'rgba(96,165,250,0.20)', runBg: 'rgba(59,130,246,0.12)', text: '#93c5fd' },
+    completed: { border: '#22c55e', setupBg: 'rgba(34,197,94,0.14)', setupBorder: 'rgba(74,222,128,0.20)', runBg: 'rgba(34,197,94,0.09)', text: '#86efac' },
+    conflict:  { border: '#f59e0b', setupBg: 'rgba(245,158,11,0.14)', setupBorder: 'rgba(251,191,36,0.20)', runBg: 'rgba(245,158,11,0.09)', text: '#fcd34d' },
+    late:      { border: '#ef4444', setupBg: 'rgba(239,68,68,0.14)', setupBorder: 'rgba(248,113,113,0.20)', runBg: 'rgba(239,68,68,0.09)', text: '#fca5a5' },
+    blocked:   { border: '#71717a', setupBg: 'rgba(113,113,122,0.10)', setupBorder: 'rgba(161,161,170,0.15)', runBg: 'rgba(113,113,122,0.06)', text: '#a1a1aa' },
+  };
+
+  // SVG icon helpers — match lucide-react icons used in Tile.tsx
+  function iconCircle(color) {
+    return `<svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`;
+  }
+  function iconCircleCheck(color) {
+    return `<svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+  }
+  function iconPin(color) {
+    return `<svg class="tile-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px;"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>`;
+  }
+
+  // Simulated NOW = 10:37 for consistent playground
+  const simulatedNow = new Date();
+  simulatedNow.setHours(10, 37, 0, 0);
+
+  // ─── State ────────────────────────────────────────────────────
+  let currentKind = 'operator'; // 'operator' | 'station'
+  let currentId = 'adrien';
+
+  // ─── Render time axis ─────────────────────────────────────────
+  function renderTimeAxis() {
+    const container = document.getElementById('time-axis-inner');
+    container.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+      const hour = (START_HOUR + i) % 24;
+      const y = i * PIXELS_PER_HOUR;
+      const label = document.createElement('div');
+      label.className = 'hour-label';
+      label.style.top = y + 'px';
+      label.textContent = String(hour).padStart(2, '0') + 'h';
+      container.appendChild(label);
+      // horizontal tick line
+      const tick = document.createElement('div');
+      tick.style.position = 'absolute';
+      tick.style.left = 0;
+      tick.style.right = 0;
+      tick.style.top = y + 'px';
+      tick.style.height = '1px';
+      tick.style.background = 'rgba(255,255,255,0.04)';
+      container.appendChild(tick);
+    }
+    // NOW line on axis
+    const nowY = timeToY(simulatedNow);
+    const nowLabel = document.createElement('span');
+    nowLabel.className = 'now-label';
+    nowLabel.style.top = (nowY - 7) + 'px';
+    nowLabel.textContent = formatTime(simulatedNow);
+    container.appendChild(nowLabel);
+  }
+
+  function timeToY(date) {
+    const totalMinutes = (date.getHours() * 60 + date.getMinutes()) - (START_HOUR * 60);
+    return (totalMinutes / 60) * PIXELS_PER_HOUR;
+  }
+  function formatTime(date) {
+    return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+  }
+
+  // ─── Render tiles column ──────────────────────────────────────
+  function renderTiles() {
+    const col = document.getElementById('tiles-column');
+    col.innerHTML = '';
+    // background grid lines
+    for (let i = 1; i < 24; i++) {
+      const line = document.createElement('div');
+      line.style.position = 'absolute';
+      line.style.left = 0;
+      line.style.right = 0;
+      line.style.top = (i * PIXELS_PER_HOUR) + 'px';
+      line.style.height = '1px';
+      line.style.background = 'rgba(255,255,255,0.03)';
+      col.appendChild(line);
+    }
+    // tiles
+    const key = currentId;
+    const tiles = TILES[key] || [];
+    tiles.forEach(t => {
+      const topPx = (t.start / 60) * PIXELS_PER_HOUR;
+      const setupPx = (t.setup / 60) * PIXELS_PER_HOUR;
+      const runPx = (t.run / 60) * PIXELS_PER_HOUR;
+      const totalPx = setupPx + runPx;
+      const c = TILE_COLORS[t.state] || TILE_COLORS.default;
+      const isCompleted = t.state === 'completed';
+      const isPinned = !!t.isPinned;
+
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.style.top = topPx + 'px';
+      tile.style.height = totalPx + 'px';
+      tile.style.left = '0';
+      tile.style.right = '0';
+      tile.style.borderLeftColor = c.border;
+
+      const setupHtml = t.setup > 0
+        ? `<div class="tile-section" style="top:0;height:${setupPx}px;background:${c.setupBg};border-bottom:1px solid ${c.setupBorder};"></div>`
+        : '';
+      const runHtml = `<div class="tile-section" style="top:${setupPx}px;height:${runPx}px;background:${c.runBg};"></div>`;
+
+      const completionIcon = isCompleted
+        ? iconCircleCheck('#10b981')
+        : iconCircle('#52525b');
+      const pinIcon = iconPin(isPinned ? '#f59e0b' : '#3f3f46');
+
+      tile.innerHTML = `
+        ${setupHtml}
+        ${runHtml}
+        <div class="tile-overlay">
+          <div class="tile-row">
+            ${completionIcon}
+            ${pinIcon}
+            <span class="tile-label" style="color:${c.text};">${t.jobRef} · ${t.client}</span>
+          </div>
+          ${t.station ? `<div class="tile-sub">${t.station}</div>` : ''}
+        </div>
+      `;
+      col.appendChild(tile);
+    });
+    // NOW line on tiles column
+    const nowY = timeToY(simulatedNow);
+    const nowLine = document.createElement('div');
+    nowLine.className = 'now-line';
+    nowLine.style.top = nowY + 'px';
+    col.appendChild(nowLine);
+  }
+
+  // ─── Focus selector dropdown ──────────────────────────────────
+  const btn = document.getElementById('selector-btn');
+  const dropdown = document.getElementById('selector-dropdown');
+  const list = document.getElementById('selector-list');
+  const selLabel = document.getElementById('selector-label');
+  const selSub = document.getElementById('selector-sub');
+
+  function renderDropdownList() {
+    list.innerHTML = '';
+
+    const opSec = document.createElement('div');
+    opSec.className = 'focus-dropdown-section';
+    opSec.textContent = 'Opérateurs';
+    list.appendChild(opSec);
+    OPERATORS.forEach(o => {
+      const item = document.createElement('div');
+      item.className = 'focus-dropdown-item' + (currentKind === 'operator' && currentId === o.id ? ' active' : '');
+      item.innerHTML = `
+        <span class="font-medium text-zinc-300 truncate">${o.name}</span>
+        <span class="text-xs text-zinc-500 truncate">${o.role}</span>
+      `;
+      item.onclick = () => selectEntity('operator', o.id);
+      list.appendChild(item);
+    });
+
+    const stSec = document.createElement('div');
+    stSec.className = 'focus-dropdown-section';
+    stSec.textContent = 'Stations';
+    list.appendChild(stSec);
+    STATIONS.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'focus-dropdown-item' + (currentKind === 'station' && currentId === s.id ? ' active' : '');
+      item.innerHTML = `
+        <span class="font-medium text-zinc-300 truncate">${s.name}</span>
+        <span class="text-xs text-zinc-500 truncate">${s.category}</span>
+      `;
+      item.onclick = () => selectEntity('station', s.id);
+      list.appendChild(item);
+    });
+  }
+
+  function openDropdown() {
+    dropdown.classList.remove('hidden');
+    renderDropdownList();
+  }
+  function closeDropdown() { dropdown.classList.add('hidden'); }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (dropdown.classList.contains('hidden')) openDropdown();
+    else closeDropdown();
+  });
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target) && !btn.contains(e.target)) closeDropdown();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !dropdown.classList.contains('hidden')) {
+      closeDropdown();
+      btn.focus();
+    }
+  });
+
+  function selectEntity(kind, id) {
+    currentKind = kind;
+    currentId = id;
+    const entity = kind === 'operator'
+      ? OPERATORS.find(o => o.id === id)
+      : STATIONS.find(s => s.id === id);
+    selLabel.textContent = entity.name;
+    selSub.textContent = kind === 'operator' ? entity.role : entity.category;
+    document.getElementById('url-preview').textContent = `/focus/${kind}/${id}`;
+    renderTiles();
+    closeDropdown();
+    scrollToNow();
+  }
+
+  // ─── Floating NOW button ──────────────────────────────────────
+  function scrollToNow() {
+    const scroll = document.getElementById('focus-scroll');
+    const nowY = timeToY(simulatedNow);
+    const target = nowY - (scroll.clientHeight / 2) + 64; // account for sticky topbar
+    scroll.scrollTo({ top: target, behavior: 'smooth' });
+  }
+  document.getElementById('now-fab').addEventListener('click', scrollToNow);
+
+  // ─── Viewport switch ──────────────────────────────────────────
+  document.querySelectorAll('.viewport-switch').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.viewport-switch').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      const vp = b.dataset.viewport;
+      const container = document.getElementById('viewport-container');
+      container.className = vp === 'mobile' ? 'viewport-mobile' : 'viewport-desktop';
+      setTimeout(scrollToNow, 100);
+    });
+  });
+
+  // ─── Copy URL ─────────────────────────────────────────────────
+  document.getElementById('copy-url').addEventListener('click', (e) => {
+    navigator.clipboard.writeText(document.getElementById('url-preview').textContent);
+    e.target.textContent = 'copié !';
+    setTimeout(() => { e.target.textContent = 'copier'; }, 1500);
+  });
+
+  // ─── Init ─────────────────────────────────────────────────────
+  renderTimeAxis();
+  renderTiles();
+  setTimeout(scrollToNow, 50);
+</script>
+
+</body>
+</html>

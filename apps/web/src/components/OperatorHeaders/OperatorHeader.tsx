@@ -1,0 +1,39 @@
+import { Link } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
+import type { Operator } from '@flux/types';
+
+export interface OperatorHeaderProps {
+  operator: Operator;
+  columnWidth: number;
+}
+
+/**
+ * OperatorHeader — single operator column header cell.
+ * Shows first name + last name, optional role in muted text, and a
+ * link icon to the operator focus view (always visible on mobile,
+ * hover-only on desktop).
+ */
+export function OperatorHeader({ operator, columnWidth }: OperatorHeaderProps) {
+  return (
+    <div
+      className="group w-60 shrink-0 py-2 px-3 text-sm flex items-center justify-between gap-2"
+      style={{ width: `${columnWidth}px` }}
+      data-testid={`operator-header-${operator.id}`}
+    >
+      <span className="font-medium text-zinc-300 truncate min-w-0">
+        {operator.firstName} {operator.lastName}
+        {operator.role && (
+          <span className="text-zinc-500 font-normal ml-1">({operator.role})</span>
+        )}
+      </span>
+      <Link
+        to={`/focus/operator/${operator.id}`}
+        aria-label={`Ouvrir la vue focus de ${operator.firstName} ${operator.lastName}`}
+        className="shrink-0 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
+        data-testid={`operator-header-focus-link-${operator.id}`}
+      >
+        <ExternalLink className="w-4 h-4" />
+      </Link>
+    </div>
+  );
+}

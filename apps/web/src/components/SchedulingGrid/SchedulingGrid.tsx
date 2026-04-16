@@ -1,16 +1,16 @@
-import type { Station, Job, TaskAssignment, Task, InternalTask, StationCategory, ScheduleConflict, StationGroup, Element, Operator } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, StationGroup, Element, Operator } from '@flux/types';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
-import { isInternalTask, getDeadlineDate, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
+import { getDeadlineDate, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
-import { Tile, compareSimilarity, computeTileState } from '../Tile';
+import { Tile } from '../Tile';
 import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
-import { getTirageLabel } from '../../utils/tileLabelResolver';
+import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } from '../../utils/stationTileData';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -34,22 +34,6 @@ export interface SchedulingGridHandle {
   getScrollWidth: () => number;
   /** Get total scrollable height */
   getScrollHeight: () => number;
-}
-
-interface CachedTileData {
-  jobId: string;
-  element: Element | undefined;
-  task: Task;
-  job: Job;
-  top: number;
-  similarityResults: ReturnType<typeof compareSimilarity> | undefined;
-  hasConflict: boolean;
-  tileState: ReturnType<typeof computeTileState>;
-  blocked: boolean;
-  blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined;
-  tirageLabel: string | undefined;
-  pixelsPerHour: number;
-  operatorNames: string | undefined;
 }
 
 export interface SchedulingGridProps {
@@ -289,7 +273,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   );
 
   const elementBlockingCache = useMemo(() => {
-    const cache = new Map<string, { hasOffset: boolean; hasDieCutting: boolean; blocked: boolean; blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined }>();
+    const cache = new Map<string, ElementBlockingInfo>();
     for (const element of elements) {
       const hasOffset = element.taskIds.some((taskId) => {
         const task = taskMap.get(taskId);
@@ -393,73 +377,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   }, [operators]);
 
   // Step 1d: Pre-compute per-tile render data (independent of selectedJobId)
-  const tileDataCache = useMemo(() => {
-    const cache = new Map<string, CachedTileData>();
-    const currentNow = now;
-
-    for (const [stationId, stationAssignments] of assignmentsByStation) {
-      const station = stationMap.get(stationId);
-      const category = station ? categoryMap.get(station.categoryId) : undefined;
-      const criteria = category?.similarityCriteria || [];
-
-      stationAssignments.forEach((assignment, index) => {
-        const task = taskMap.get(assignment.taskId);
-        if (!task) return;
-        const element = elementMap.get(task.elementId);
-        const jobId = element?.jobId;
-        const job = jobId ? jobMap.get(jobId) : undefined;
-        if (!job || !isInternalTask(task)) return;
-
-        const blocking = element ? elementBlockingCache.get(element.id) : undefined;
-        const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate);
-
-        // Similarity
-        let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
-        if (index > 0 && criteria.length > 0 && element?.spec) {
-          const prevTask = taskMap.get(stationAssignments[index - 1].taskId);
-          const prevElement = prevTask ? elementMap.get(prevTask.elementId) : undefined;
-          if (prevElement?.spec) {
-            similarityResults = compareSimilarity(prevElement.spec, element.spec, criteria);
-          }
-        }
-
-        // Tirage label
-        const jobElements = elementsByJobId.get(job.id) ?? [];
-        const rawTirageLabel = category && element
-          ? getTirageLabel(category.name, element, job, jobElements, taskMap, assemblyStationIds)
-          : '';
-
-        // Tile state
-        const isJobShipped = shippedJobIds?.has(job.id) ?? false;
-        const isJobLate = lateJobIds?.has(job.id) ?? false;
-        const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < currentNow;
-        const isLate = isJobLate || isTaskOverdue;
-        const hasConflict = conflictTaskIds.has(task.id);
-        const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocking?.blocked ?? false, assignment.isCompleted);
-
-        // Operator names (comma-separated)
-        let operatorNames: string | undefined;
-        if (assignment.operators && assignment.operators.length > 0 && operatorNameMap.size > 0) {
-          operatorNames = assignment.operators
-            .map(op => operatorNameMap.get(op.operatorId))
-            .filter(Boolean)
-            .join(', ') || undefined;
-        }
-
-        cache.set(assignment.id, {
-          jobId: job.id, element, task, job, top,
-          similarityResults,
-          hasConflict, tileState,
-          blocked: blocking?.blocked ?? false,
-          blockingInfo: blocking?.blockingInfo,
-          tirageLabel: rawTirageLabel || undefined,
-          pixelsPerHour,
-          operatorNames,
-        });
-      });
-    }
-    return cache;
-  }, [assignmentsByStation, taskMap, jobMap, elementMap, elementBlockingCache,
+  const tileDataCache = useMemo(() => computeTileDataCache({
+    assignmentsByStation, taskMap, jobMap, elementMap, elementBlockingCache,
+    elementsByJobId, stationMap, categoryMap, assemblyStationIds,
+    operatorNameMap, conflictTaskIds, shippedJobIds, lateJobIds,
+    startHour, pixelsPerHour, startDate, now,
+  }), [assignmentsByStation, taskMap, jobMap, elementMap, elementBlockingCache,
       elementsByJobId, stationMap, categoryMap, assemblyStationIds,
       startHour, pixelsPerHour, startDate, shippedJobIds, lateJobIds,
       conflictTaskIds, now, operatorNameMap]);

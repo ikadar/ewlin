@@ -38,12 +38,12 @@ import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
 import { getTasksForJob } from '../utils';
 import { getErrorMessage } from '../store/api/errorNormalization';
 import { ZOOM_LEVELS } from '../utils/zoom';
-import { isInternalTask, getActiveScheduleForDate } from '@flux/types';
+import { computeTileSlices, getOperatorDaySchedule, type TileSlice } from '../utils/operatorTileSlices';
+import { isInternalTask } from '@flux/types';
 import type {
   Operator,
   TaskAssignment,
   ScheduleSnapshot,
-  DaySchedule,
   InternalTask,
   Job,
   Element,
@@ -62,6 +62,7 @@ import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import type { ElementStatusUpdate } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
+import { OperatorHeader } from '../components/OperatorHeaders';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
 import { useVirtualScroll, isAssignmentVisible, useMassUnschedule, useToast } from '../hooks';
@@ -79,10 +80,6 @@ const START_HOUR = 0;
 const DAY_COUNT = 365;
 const OPERATOR_COLUMN_WIDTH = 240; // w-60 = 15rem = 240px (same as default station column)
 
-const DAY_NAMES = [
-  'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
-] as const;
-
 const defaultSnapshot: ScheduleSnapshot = {
   version: 0,
   generatedAt: new Date().toISOString(),
@@ -98,104 +95,6 @@ const defaultSnapshot: ScheduleSnapshot = {
   lateJobs: [],
   operators: [],
 };
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/** Get the day schedule for an operator on a given date (checks exceptions first, then rotating schedule). */
-function getOperatorDaySchedule(operator: Operator, date: Date): DaySchedule {
-  // Check for date-specific exceptions
-  if (operator.scheduleExceptions?.length) {
-    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const exception = operator.scheduleExceptions.find((e) => e.date === dateStr);
-    if (exception) {
-      return exception.schedule;
-    }
-  }
-  // Resolve active schedule from rotation
-  const activeSchedule = getActiveScheduleForDate(
-    operator.operatingSchedules,
-    operator.scheduleRotationReferenceWeek,
-    date,
-  );
-  if (!activeSchedule) {
-    // No schedule defined = always available (no hatching)
-    return { isOperating: true, slots: [{ start: '00:00', end: '24:00' }] };
-  }
-  const dayName = DAY_NAMES[date.getDay()];
-  return activeSchedule[dayName] ?? { isOperating: false, slots: [] };
-}
-
-/** Parse "HH:MM" to minutes since midnight. */
-function parseHHMM(s: string): number {
-  const [h, m] = s.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
-
-/**
- * Find unavailability gaps for an operator within a time range.
- * Returns gaps as [{gapStart: Date, gapEnd: Date}].
- */
-function findOperatorGaps(
-  operator: Operator,
-  start: Date,
-  end: Date,
-): Array<{ gapStart: Date; gapEnd: Date }> {
-  const gaps: Array<{ gapStart: Date; gapEnd: Date }> = [];
-  const startMs = start.getTime();
-  const endMs = end.getTime();
-
-  // Iterate day by day
-  const dayStart = new Date(start);
-  dayStart.setHours(0, 0, 0, 0);
-
-  for (let d = new Date(dayStart); d.getTime() < endMs; d.setDate(d.getDate() + 1)) {
-    const daySchedule = getOperatorDaySchedule(operator, d);
-    const dayBase = d.getTime();
-
-    if (!daySchedule.isOperating || !daySchedule.slots?.length) {
-      // Entire day is a gap
-      const gapStart = new Date(Math.max(dayBase, startMs));
-      const gapEnd = new Date(Math.min(dayBase + 24 * 60 * 60000, endMs));
-      if (gapStart < gapEnd) gaps.push({ gapStart, gapEnd });
-      continue;
-    }
-
-    // Sort slots by start time
-    const slots = [...daySchedule.slots].sort((a, b) => parseHHMM(a.start) - parseHHMM(b.start));
-
-    // Gap before first slot
-    const firstSlotStart = dayBase + parseHHMM(slots[0].start) * 60000;
-    if (dayBase < firstSlotStart) {
-      const gs = new Date(Math.max(dayBase, startMs));
-      const ge = new Date(Math.min(firstSlotStart, endMs));
-      if (gs < ge) gaps.push({ gapStart: gs, gapEnd: ge });
-    }
-
-    // Gaps between slots
-    for (let i = 0; i < slots.length - 1; i++) {
-      const slotEnd = dayBase + parseHHMM(slots[i].end) * 60000;
-      const nextStart = dayBase + parseHHMM(slots[i + 1].start) * 60000;
-      if (slotEnd < nextStart) {
-        const gs = new Date(Math.max(slotEnd, startMs));
-        const ge = new Date(Math.min(nextStart, endMs));
-        if (gs < ge) gaps.push({ gapStart: gs, gapEnd: ge });
-      }
-    }
-
-    // Gap after last slot
-    const lastSlotEnd = dayBase + parseHHMM(slots[slots.length - 1].end) * 60000;
-    const dayEnd = dayBase + 24 * 60 * 60000;
-    if (lastSlotEnd < dayEnd) {
-      const gs = new Date(Math.max(lastSlotEnd, startMs));
-      const ge = new Date(Math.min(dayEnd, endMs));
-      if (gs < ge) gaps.push({ gapStart: gs, gapEnd: ge });
-    }
-  }
-
-  return gaps;
-}
 
 // ============================================================================
 // Main Page Component
@@ -849,19 +748,7 @@ export default function OperatorSchedulePage() {
                 {/* Operator headers */}
                 <div className="flex gap-3 px-3 border-b border-white/10">
                   {operators.map((op) => (
-                    <div
-                      key={op.id}
-                      className="w-60 shrink-0 py-2 px-3 text-sm flex items-center"
-                      style={{ width: `${OPERATOR_COLUMN_WIDTH}px` }}
-                      data-testid={`operator-header-${op.id}`}
-                    >
-                      <span className="font-medium text-zinc-300 truncate">
-                        {op.firstName} {op.lastName}
-                        {op.role && (
-                          <span className="text-zinc-500 font-normal ml-1">({op.role})</span>
-                        )}
-                      </span>
-                    </div>
+                    <OperatorHeader key={op.id} operator={op} columnWidth={OPERATOR_COLUMN_WIDTH} />
                   ))}
                   {/* Spacer for rightmost column scrollability */}
                   <div className="shrink-0" style={{ width: 'calc(100vw - 300px)' }} aria-hidden="true" />
@@ -974,249 +861,6 @@ export default function OperatorSchedulePage() {
       <ShortcutFooter mode={selectedJobId ? 'operatorJobSelected' : 'operatorDefault'} />
     </div>
   );
-}
-
-// ============================================================================
-// Overlap layout for masked-time side-by-side tiles
-// ============================================================================
-
-/**
- * Compute overlap info for assignments in one operator column.
- * Returns a map of taskId → { hasOverlap, isMasked } for tile width overrides.
- */
-/** A rendered slice of a tile — one contiguous segment with fixed position. */
-interface TileSlice {
-  assignmentId: string;
-  taskId: string;
-  from: Date;
-  to: Date;
-  position: 'full' | 'left' | 'right';
-  isMasked: boolean;
-  sawtoothTop: boolean;
-  sawtoothBottom: boolean;
-  relayLabelTop?: string;
-  relayLabelBottom?: string;
-}
-
-/**
- * Check if a timestamp is inside an operator's working hours.
- */
-function isOperatorWorking(operator: Operator, timestamp: Date): boolean {
-  const daySchedule = getOperatorDaySchedule(operator, timestamp);
-  if (!daySchedule.isOperating || !daySchedule.slots?.length) return false;
-  const h = timestamp.getHours();
-  const m = timestamp.getMinutes();
-  const mins = h * 60 + m;
-  return daySchedule.slots.some(slot => {
-    const slotStart = parseHHMM(slot.start);
-    const slotEnd = parseHHMM(slot.end);
-    return mins >= slotStart && mins < slotEnd;
-  });
-}
-
-/**
- * Compute tile slices for an operator column.
- * Two passes:
- *   1. Overlap segmentation: split at concurrency change points
- *   2. Gap segmentation: split at unavailability boundaries, add sawtooth edges
- */
-function computeTileSlices(
-  assignments: TaskAssignment[],
-  operator: Operator,
-  allOperators: Operator[],
-): TileSlice[] {
-  if (assignments.length === 0) return [];
-
-  const entries = assignments.map(a => ({
-    id: a.id,
-    taskId: a.taskId,
-    startMs: new Date(a.scheduledStart).getTime(),
-    endMs: new Date(a.scheduledEnd).getTime(),
-    isMasked: a.isMaskedTime ?? false,
-    assignment: a,
-  }));
-
-  // ── Pass 1: Overlap segmentation ──
-  // Collect concurrency change points
-  const boundarySet = new Set<number>();
-  for (const e of entries) {
-    boundarySet.add(e.startMs);
-    boundarySet.add(e.endMs);
-  }
-  const boundaries = [...boundarySet].sort((a, b) => a - b);
-
-  let rawSlices: TileSlice[] = [];
-
-  for (let b = 0; b < boundaries.length - 1; b++) {
-    const sliceStart = boundaries[b];
-    const sliceEnd = boundaries[b + 1];
-    if (sliceEnd - sliceStart < 30000) continue;
-
-    const active = entries.filter(e => e.startMs < sliceEnd && e.endMs > sliceStart);
-    if (active.length === 0) continue;
-
-    if (active.length === 1) {
-      rawSlices.push({
-        assignmentId: active[0].id, taskId: active[0].taskId,
-        from: new Date(sliceStart), to: new Date(sliceEnd),
-        position: 'full', isMasked: active[0].isMasked,
-        sawtoothTop: false, sawtoothBottom: false,
-      });
-    } else {
-      // Sort so masked tasks come first (left), then by start time
-      const sorted = [...active].sort((x, y) =>
-        x.isMasked === y.isMasked ? x.startMs - y.startMs : x.isMasked ? -1 : 1
-      );
-      for (let idx = 0; idx < sorted.length; idx++) {
-        const a = sorted[idx];
-        rawSlices.push({
-          assignmentId: a.id, taskId: a.taskId,
-          from: new Date(sliceStart), to: new Date(sliceEnd),
-          position: idx === 0 ? 'left' : 'right', isMasked: a.isMasked,
-          sawtoothTop: false, sawtoothBottom: false,
-        });
-      }
-    }
-  }
-
-  // Merge adjacent slices with same assignment + position
-  rawSlices = mergeAdjacentSlices(rawSlices);
-
-  // ── Pass 2: Gap segmentation ──
-  // For each slice, split it at operator unavailability gaps
-  const finalSlices: TileSlice[] = [];
-
-  for (const slice of rawSlices) {
-    const gaps = findOperatorGaps(operator, slice.from, slice.to);
-    const ss = slice.from.getTime();
-    const se = slice.to.getTime();
-    // Keep gaps that overlap the slice interior and leave at least one
-    // working segment (≥ 30s) on at least one side.
-    const splittingGaps = gaps.filter(g => {
-      const overlapStart = Math.max(g.gapStart.getTime(), ss);
-      const overlapEnd = Math.min(g.gapEnd.getTime(), se);
-      if (overlapEnd - overlapStart < 30000) return false; // overlap too small
-      const hasWorkBefore = overlapStart - ss >= 30000;
-      const hasWorkAfter = se - overlapEnd >= 30000;
-      return hasWorkBefore || hasWorkAfter;
-    });
-
-    if (splittingGaps.length === 0) {
-      finalSlices.push(slice);
-      continue;
-    }
-
-    // Does the tile start or end inside a gap?
-    const tileStartsInGap = splittingGaps[0].gapStart.getTime() <= ss + 30000;
-    const tileEndsInGap = splittingGaps[splittingGaps.length - 1].gapEnd.getTime() >= se - 30000;
-
-    // Split at gap boundaries
-    const segments: Array<{ start: Date; end: Date }> = [];
-    let segStart = slice.from;
-    for (const gap of splittingGaps) {
-      if (gap.gapStart.getTime() > segStart.getTime() + 30000) {
-        segments.push({ start: segStart, end: gap.gapStart });
-      }
-      segStart = gap.gapEnd;
-    }
-    if (slice.to.getTime() > segStart.getTime() + 30000) {
-      segments.push({ start: segStart, end: slice.to });
-    }
-    if (segments.length === 0) {
-      // All segments were too small — skip
-      continue;
-    }
-
-    for (let i = 0; i < segments.length; i++) {
-      const isFirst = i === 0;
-      const isLast = i === segments.length - 1;
-      const sawBottom = !isLast || tileEndsInGap;
-      const sawTop = !isFirst || tileStartsInGap;
-
-      // Relay labels — map each segment edge to the adjacent gap
-      let relayBottom: string | undefined;
-      let relayTop: string | undefined;
-
-      // Gap index for the bottom edge: the gap that follows this segment
-      // When tileStartsInGap, the first working segment follows gap[0],
-      // so gap indices shift by 1 compared to the non-leading-gap case.
-      const gapOffset = tileStartsInGap ? 1 : 0;
-
-      if (sawBottom && !isLast) {
-        const gap = splittingGaps[i + gapOffset];
-        if (gap) {
-          const otherOp = slice.isMasked ? undefined : findRelayOperator(entries, slice.assignmentId, operator, gap, allOperators);
-          relayBottom = otherOp ?? '→ pause';
-        }
-      }
-      if (sawTop && !isFirst) {
-        const gap = splittingGaps[i - 1 + gapOffset];
-        if (gap) {
-          const otherOp = slice.isMasked ? undefined : findRelayOperator(entries, slice.assignmentId, operator, gap, allOperators);
-          relayTop = otherOp ? otherOp.replace('→ ', '') + ' →' : 'reprise →';
-        }
-      }
-      // Edge segment relay labels (tile starts/ends in gap)
-      if (isFirst && tileStartsInGap) {
-        relayTop = 'reprise →';
-      }
-      if (isLast && tileEndsInGap) {
-        relayBottom = '→ pause';
-      }
-
-      finalSlices.push({
-        ...slice,
-        from: segments[i].start,
-        to: segments[i].end,
-        sawtoothTop: sawTop,
-        sawtoothBottom: sawBottom,
-        relayLabelBottom: relayBottom,
-        relayLabelTop: relayTop,
-      });
-    }
-  }
-
-  return finalSlices;
-}
-
-function findRelayOperator(
-  entries: Array<{ id: string; assignment: TaskAssignment }>,
-  assignmentId: string,
-  currentOp: Operator,
-  gap: { gapStart: Date; gapEnd: Date },
-  allOperators: Operator[],
-): string | undefined {
-  const entry = entries.find(e => e.id === assignmentId);
-  if (!entry) return undefined;
-  const otherOp = entry.assignment.operators?.find(o => {
-    if (o.operatorId === currentOp.id) return false;
-    if (!o.from || !o.to) return false;
-    const opFrom = new Date(o.from).getTime();
-    const opTo = new Date(o.to).getTime();
-    return opFrom <= gap.gapEnd.getTime() && opTo >= gap.gapStart.getTime();
-  });
-  if (otherOp) {
-    const op = allOperators.find(o => o.id === otherOp.operatorId);
-    return op ? `→ ${op.firstName} ${op.lastName}` : undefined;
-  }
-  return undefined;
-}
-
-function mergeAdjacentSlices(slices: TileSlice[]): TileSlice[] {
-  const merged: TileSlice[] = [];
-  for (const s of slices) {
-    const prev = merged.length > 0 ? merged[merged.length - 1] : null;
-    if (prev
-      && prev.assignmentId === s.assignmentId
-      && prev.position === s.position
-      && prev.to.getTime() === s.from.getTime()
-    ) {
-      prev.to = s.to;
-    } else {
-      merged.push({ ...s });
-    }
-  }
-  return merged;
 }
 
 // ============================================================================

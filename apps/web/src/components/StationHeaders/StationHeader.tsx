@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
 import type { Station, StationCategory } from '@flux/types';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 import { OffScreenIndicator } from './OffScreenIndicator';
@@ -56,12 +58,12 @@ export function StationHeader({
 
   return (
     <div
-      className={`${customWidth === null ? 'w-60' : ''} shrink-0 py-2 px-3 text-sm transition-[filter,opacity] duration-150 ease-out flex items-center justify-between`}
+      className={`group ${customWidth === null ? 'w-60' : ''} shrink-0 py-2 px-3 text-sm transition-[filter,opacity] duration-150 ease-out flex items-center justify-between gap-2`}
       style={customWidth !== null ? { width: `${customWidth}px` } : {}}
       data-testid={`station-header-${station.id}`}
     >
-      <span className="font-medium text-zinc-300 truncate">{station.name}</span>
-      <div className="flex items-center gap-1">
+      <span className="font-medium text-zinc-300 truncate min-w-0">{station.name}</span>
+      <div className="flex items-center gap-1 shrink-0">
         {/* Off-screen indicators */}
         {offScreen && offScreen.above > 0 && (
           <OffScreenIndicator
@@ -77,6 +79,14 @@ export function StationHeader({
             onClick={() => onOffScreenClick?.('down')}
           />
         )}
+        <Link
+          to={`/focus/station/${station.id}`}
+          aria-label={`Ouvrir la vue focus de ${station.name}`}
+          className="text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
+          data-testid={`station-header-focus-link-${station.id}`}
+        >
+          <ExternalLink className="w-4 h-4" />
+        </Link>
       </div>
     </div>
   );

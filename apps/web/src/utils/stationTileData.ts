@@ -1,0 +1,131 @@
+import type {
+  Station,
+  StationCategory,
+  Task,
+  Job,
+  Element,
+  TaskAssignment,
+} from '@flux/types';
+import { isInternalTask } from '@flux/types';
+import { compareSimilarity, computeTileState } from '../components/Tile';
+import { timeToYPosition } from '../components/TimelineColumn';
+import { getPrerequisiteBlockingInfo } from './prerequisites';
+import { getTirageLabel } from './tileLabelResolver';
+
+export interface CachedTileData {
+  jobId: string;
+  element: Element | undefined;
+  task: Task;
+  job: Job;
+  top: number;
+  similarityResults: ReturnType<typeof compareSimilarity> | undefined;
+  hasConflict: boolean;
+  tileState: ReturnType<typeof computeTileState>;
+  blocked: boolean;
+  blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined;
+  tirageLabel: string | undefined;
+  pixelsPerHour: number;
+  operatorNames: string | undefined;
+}
+
+export interface ElementBlockingInfo {
+  hasOffset: boolean;
+  hasDieCutting: boolean;
+  blocked: boolean;
+  blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined;
+}
+
+export interface ComputeTileDataCacheInput {
+  assignmentsByStation: Map<string, TaskAssignment[]>;
+  taskMap: Map<string, Task>;
+  elementMap: Map<string, Element>;
+  jobMap: Map<string, Job>;
+  stationMap: Map<string, Station>;
+  categoryMap: Map<string, StationCategory>;
+  elementsByJobId: Map<string, Element[]>;
+  elementBlockingCache: Map<string, ElementBlockingInfo>;
+  assemblyStationIds: Set<string>;
+  operatorNameMap: Map<string, string>;
+  conflictTaskIds: Set<string>;
+  shippedJobIds?: Set<string>;
+  lateJobIds?: Set<string>;
+  startHour: number;
+  pixelsPerHour: number;
+  startDate?: Date;
+  now: Date;
+}
+
+/**
+ * Pre-compute per-tile render data for the station scheduling grid.
+ * Pure function — keep all caller maps as inputs so both multi-column station view
+ * and single-column focus view share one source of truth.
+ */
+export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<string, CachedTileData> {
+  const {
+    assignmentsByStation, taskMap, elementMap, jobMap, stationMap, categoryMap,
+    elementsByJobId, elementBlockingCache, assemblyStationIds, operatorNameMap,
+    conflictTaskIds, shippedJobIds, lateJobIds, startHour, pixelsPerHour, startDate, now,
+  } = input;
+
+  const cache = new Map<string, CachedTileData>();
+
+  for (const [stationId, stationAssignments] of assignmentsByStation) {
+    const station = stationMap.get(stationId);
+    const category = station ? categoryMap.get(station.categoryId) : undefined;
+    const criteria = category?.similarityCriteria || [];
+
+    stationAssignments.forEach((assignment, index) => {
+      const task = taskMap.get(assignment.taskId);
+      if (!task) return;
+      const element = elementMap.get(task.elementId);
+      const jobId = element?.jobId;
+      const job = jobId ? jobMap.get(jobId) : undefined;
+      if (!job || !isInternalTask(task)) return;
+
+      const blocking = element ? elementBlockingCache.get(element.id) : undefined;
+      const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate);
+
+      let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
+      if (index > 0 && criteria.length > 0 && element?.spec) {
+        const prevTask = taskMap.get(stationAssignments[index - 1].taskId);
+        const prevElement = prevTask ? elementMap.get(prevTask.elementId) : undefined;
+        if (prevElement?.spec) {
+          similarityResults = compareSimilarity(prevElement.spec, element.spec, criteria);
+        }
+      }
+
+      const jobElements = elementsByJobId.get(job.id) ?? [];
+      const rawTirageLabel = category && element
+        ? getTirageLabel(category.name, element, job, jobElements, taskMap, assemblyStationIds)
+        : '';
+
+      const isJobShipped = shippedJobIds?.has(job.id) ?? false;
+      const isJobLate = lateJobIds?.has(job.id) ?? false;
+      const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < now;
+      const isLate = isJobLate || isTaskOverdue;
+      const hasConflict = conflictTaskIds.has(task.id);
+      const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocking?.blocked ?? false, assignment.isCompleted);
+
+      let operatorNames: string | undefined;
+      if (assignment.operators && assignment.operators.length > 0 && operatorNameMap.size > 0) {
+        operatorNames = assignment.operators
+          .map(op => operatorNameMap.get(op.operatorId))
+          .filter(Boolean)
+          .join(', ') || undefined;
+      }
+
+      cache.set(assignment.id, {
+        jobId: job.id, element, task, job, top,
+        similarityResults,
+        hasConflict, tileState,
+        blocked: blocking?.blocked ?? false,
+        blockingInfo: blocking?.blockingInfo,
+        tirageLabel: rawTirageLabel || undefined,
+        pixelsPerHour,
+        operatorNames,
+      });
+    });
+  }
+
+  return cache;
+}

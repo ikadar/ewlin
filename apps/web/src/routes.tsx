@@ -46,6 +46,8 @@ import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { ShippersPage } from './pages/ShippersPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OperatorSchedulePage from './pages/OperatorSchedulePage';
+import FocusPage from './pages/FocusPage';
+import { FocusLayout } from './components/FocusLayout';
 import StatsPage from './pages/StatsPage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
@@ -60,6 +62,13 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Focus view — minimal layout, no sidebar, mobile-first */}
+      <Route element={<RequireAuth><FocusLayout /></RequireAuth>}>
+        <Route path="/focus/operator/:id" element={<FocusPage mode="operator" />} />
+        <Route path="/focus/station/:id" element={<FocusPage mode="station" />} />
+      </Route>
+
       <Route element={<RequireAuth><RootLayout /></RequireAuth>}>
         {/* Production Flow Dashboard — tab nested routes (v0.5.16) */}
         <Route path="/flux" element={<FluxPage />}>
