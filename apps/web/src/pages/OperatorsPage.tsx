@@ -400,14 +400,11 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
       </div>
 
       {groups.length > 0 && (
-        <div className="flex flex-col gap-2 mb-3">
+        <div className="bg-flux-base border border-flux-border-light rounded-lg mb-3 divide-y divide-flux-border">
           {groups.map((group, idx) => {
             const duplicate = isDuplicate(group, idx);
             return (
-              <div
-                key={group.key}
-                className={`p-3 bg-flux-base rounded border ${duplicate ? 'border-red-500' : 'border-flux-border'}`}
-              >
+              <div key={group.key} className={`px-3 py-2.5 ${duplicate ? 'bg-red-500/5' : ''}`}>
                 <div className="grid grid-cols-[1fr_60px_1fr_60px_24px] items-center gap-2">
                   {[0, 1].map((slot) => {
                     const stationId = group.stationIds[slot];
