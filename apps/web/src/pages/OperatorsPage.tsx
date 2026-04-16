@@ -729,7 +729,7 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
             <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">
               Compétences machines
             </p>
-            <div className="overflow-y-auto max-h-[280px]">
+            <div>
               {groupedStations.map((group) => (
                 <div key={group.categoryName}>
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted py-2 first:pt-0">
