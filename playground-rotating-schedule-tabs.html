@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playground — Plannings tournants (version finale)</title>
+<style>
+  :root {
+    --base: rgb(15 15 15);
+    --surface: rgb(26 26 26);
+    --elevated: rgb(36 36 36);
+    --hover: rgb(44 44 44);
+    --active: rgb(52 52 52);
+    --border: rgb(42 42 42);
+    --border-light: rgb(58 58 58);
+    --text-primary: rgb(245 245 245);
+    --text-secondary: rgb(209 209 209);
+    --text-tertiary: rgb(161 161 161);
+    --text-muted: rgb(128 128 128);
+    --accent: #6366f1;
+    --accent-dim: rgba(99,102,241,0.15);
+    --accent-border: rgba(99,102,241,0.4);
+    --danger: #ef4444;
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --green-border: rgba(34,197,94,0.3);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--base); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 24px; }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: var(--text-tertiary); margin-bottom: 32px; }
+  .section-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; font-weight: 600; }
+
+  /* ─── Container ─── */
+  .editor-container { background: var(--surface); border: 1px solid var(--border-light); border-radius: 8px; padding: 20px; max-width: 640px; }
+
+  /* ─── Rotation selector row ─── */
+  .rotation-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--text-tertiary); }
+  .rotation-row select {
+    padding: 5px 28px 5px 10px;
+    background: var(--base);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1a1' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+  .rotation-row select:focus { outline: none; border-color: var(--accent); }
+
+  /* ─── Cards ─── */
+  .cards { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .card { padding: 10px 14px; min-width: 140px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: var(--base); transition: all 0.15s; position: relative; }
+  .card:hover { border-color: var(--border-light); background: var(--elevated); }
+  .card.active { border-color: var(--accent); background: var(--elevated); }
+  .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+  .card-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+  .card-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+  .card-actions { display: flex; gap: 10px; }
+  .card-actions a { font-size: 11px; color: var(--text-muted); text-decoration: none; cursor: pointer; }
+  .card-actions a:hover { color: var(--text-secondary); text-decoration: underline; }
+  .card-actions a.danger:hover { color: var(--danger); }
+  .card-add { padding: 10px 14px; min-width: 80px; border: 1px dashed var(--border); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--text-muted); background: transparent; }
+  .card-add:hover { border-color: var(--border-light); color: var(--text-secondary); background: var(--elevated); }
+
+  /* Badge */
+  .badge-current { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); letter-spacing: 0.02em; }
+
+  /* Placeholder */
+  .placeholder-content { background: var(--base); border: 1px solid var(--border); border-radius: 6px; padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; }
+
+  /* ─── Interactive demo ─── */
+  .demo-note { margin-top: 24px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border-light); border-radius: 8px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .demo-note code { background: var(--base); padding: 1px 5px; border-radius: 3px; font-size: 11px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<h1>Plannings tournants — Version finale</h1>
+<p class="subtitle">Cartes (version C) + dropdown "planning de la semaine en cours" + badge "en cours". Le dropdown est interactif.</p>
+
+<div class="editor-container">
+  <div class="section-label">Plannings de rotation</div>
+
+  <!-- Cards -->
+  <div class="cards" id="cards-container">
+    <div class="card" onclick="selectCard(0)">
+      <div class="card-header">
+        <div class="card-name">Matin</div>
+        <span class="badge-current" id="badge-0" style="display:none">en cours</span>
+      </div>
+      <div class="card-sub">Lun–Ven · 05:00 – 13:00</div>
+      <div class="card-actions"><a>Renommer</a> <a class="danger">Supprimer</a></div>
+    </div>
+    <div class="card active" onclick="selectCard(1)">
+      <div class="card-header">
+        <div class="card-name">Après-midi</div>
+        <span class="badge-current" id="badge-1">en cours</span>
+      </div>
+      <div class="card-sub">Lun–Ven · 13:00 – 21:00</div>
+      <div class="card-actions"><a>Renommer</a> <a class="danger">Supprimer</a></div>
+    </div>
+    <div class="card" onclick="selectCard(2)">
+      <div class="card-header">
+        <div class="card-name">Nuit</div>
+        <span class="badge-current" id="badge-2" style="display:none">en cours</span>
+      </div>
+      <div class="card-sub">Lun–Ven · 21:00 – 05:00</div>
+      <div class="card-actions"><a>Renommer</a> <a class="danger">Supprimer</a></div>
+    </div>
+    <div class="card-add">+ Ajouter</div>
+  </div>
+
+  <!-- Placeholder editor -->
+  <div class="placeholder-content" id="editor-placeholder">▸ Éditeur des créneaux "Après-midi" (Lundi → Dimanche)</div>
+
+  <!-- Rotation selector (below editor) -->
+  <div class="rotation-row">
+    <span>Planning de la semaine en cours (S<span id="current-week">16</span>) :</span>
+    <select id="rotation-select" onchange="updateRotation()">
+      <option value="0">Matin</option>
+      <option value="1" selected>Après-midi</option>
+      <option value="2">Nuit</option>
+    </select>
+  </div>
+</div>
+
+<div class="demo-note">
+  <strong>Interaction :</strong> Change le dropdown pour voir le badge "en cours" se déplacer.<br>
+  <strong>Calcul interne :</strong> <code>referenceWeek = currentWeek - selectedIndex</code>
+  — l'utilisateur ne manipule jamais de numéro ISO brut.<br>
+  <strong>Stockage :</strong> le système convertit le choix du dropdown en <code>scheduleRotationReferenceWeek</code> pour le backend.
+  <br><br>
+  <strong>Exemple :</strong> si l'utilisateur choisit "Matin" pour S16 → <code>ref = 16 - 0 = 16</code> (Matin commence en S16).<br>
+  Si l'utilisateur choisit "Après-midi" pour S16 → <code>ref = 16 - 1 = 15</code> (Matin a commencé en S15, Après-midi est en S16).
+</div>
+
+<script>
+const names = ['Matin', 'Après-midi', 'Nuit'];
+const currentWeek = 16;
+let activeCard = 1; // editing index
+
+function updateRotation() {
+  const select = document.getElementById('rotation-select');
+  const currentIdx = parseInt(select.value);
+
+  // Move "en cours" badge
+  for (let i = 0; i < names.length; i++) {
+    document.getElementById('badge-' + i).style.display = (i === currentIdx) ? '' : 'none';
+  }
+}
+
+function selectCard(idx) {
+  activeCard = idx;
+  const cards = document.querySelectorAll('.cards .card');
+  cards.forEach((c, i) => c.classList.toggle('active', i === idx));
+  document.getElementById('editor-placeholder').textContent =
+    `▸ Éditeur des créneaux "${names[idx]}" (Lundi → Dimanche)`;
+}
+
+document.getElementById('current-week').textContent = currentWeek;
+</script>
+
+</body>
+</html>
