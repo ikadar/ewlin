@@ -169,8 +169,9 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
     // Moore escape hatch: if late imperative/important jobs remain after FBI,
     // try swapping lower-priority work to rescue them. Budget-capped to avoid
     // excessive compute time.
+    // Skip for single-job payloads — no other jobs to swap with.
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
-    if stats.late_job_count > 0 && elapsed_ms < 15_000 {
+    if stats.late_job_count > 0 && elapsed_ms < 15_000 && request.jobs.len() > 1 {
         if let Some((moore_assignments, moore_actions, moore_stats, moore_iters)) = moore::moore_escape(
             &request.jobs,
             &request.stations,
@@ -194,8 +195,9 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
 
     // LNS: if late jobs remain after Moore, explore alternative priority
     // configurations by destroying/repairing batches of late jobs.
+    // Skip for single-job payloads — nothing to destroy/repair across jobs.
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
-    if stats.late_job_count > 0 && elapsed_ms < 55_000 {
+    if stats.late_job_count > 0 && elapsed_ms < 55_000 && request.jobs.len() > 1 {
         let lns_budget = 60_000u64.saturating_sub(elapsed_ms).max(5_000);
         if let Some((lns_a, lns_act, lns_s, lns_i)) = lns::lns_improve(
             &request.jobs,
