@@ -443,7 +443,7 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                               updateGroup(idx, { productivity: nextProd });
                             }
                           }}
-                          className="px-1 py-[5px] text-xs font-mono bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary text-center focus:outline-none focus:border-flux-text-secondary disabled:opacity-50"
+                          className="px-1 py-[7px] text-sm font-mono leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary text-center focus:outline-none focus:border-flux-text-secondary disabled:opacity-50"
                           title="Productivité effective sur cette machine quand l'opérateur est sur cette paire"
                         />
                       </div>
