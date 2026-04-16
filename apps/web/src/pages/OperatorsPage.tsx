@@ -400,11 +400,14 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
       </div>
 
       {groups.length > 0 && (
-        <div className="bg-flux-base border border-flux-border-light rounded-lg mb-3 divide-y divide-flux-border">
+        <div className="flex flex-col gap-2 mb-3">
           {groups.map((group, idx) => {
             const duplicate = isDuplicate(group, idx);
             return (
-              <div key={group.key} className={`px-3 py-2.5 ${duplicate ? 'bg-red-500/5' : ''}`}>
+              <div
+                key={group.key}
+                className={`p-3 bg-flux-base rounded border ${duplicate ? 'border-red-500' : 'border-flux-border'}`}
+              >
                 <div className="grid grid-cols-[1fr_60px_1fr_60px_24px] items-center gap-2">
                   {[0, 1].map((slot) => {
                     const stationId = group.stationIds[slot];
@@ -459,6 +462,12 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                 {duplicate && (
                   <p className="mt-1.5 text-[10px] text-red-400">
                     Cette paire existe déjà dans un autre groupe.
+                  </p>
+                )}
+                {isPairComplete(group) && (
+                  <p className="mt-1.5 text-[10px] text-flux-text-muted">
+                    En mode partagé : {stationName(group.stationIds[0])} à {group.productivity[0].toFixed(2)},{' '}
+                    {stationName(group.stationIds[1])} à {group.productivity[1].toFixed(2)}
                   </p>
                 )}
               </div>
