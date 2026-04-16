@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { KBD_CLASS } from './kbdStyles';
 
-export type FooterMode = 'default' | 'jobSelected' | 'picking' | 'jcfModal' | 'flux';
+export type FooterMode = 'default' | 'jobSelected' | 'picking' | 'jcfModal' | 'flux' | 'operatorDefault' | 'operatorJobSelected';
 
 export interface ShortcutFooterProps {
   mode: FooterMode;
@@ -64,6 +64,30 @@ const MODE_CONFIGS: Record<FooterMode, ModeConfig> = {
       { keys: ['Alt', 'F'], label: 'Rechercher' },
       { keys: ['Alt', 'N'], label: 'Nouveau job' },
       { keys: ['Alt', '\u2190', '\u2192'], label: 'Onglets' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
+    ],
+  },
+  operatorDefault: {
+    modeLabel: 'OPÉRATEURS',
+    modeLabelClass: 'text-violet-400',
+    shortcuts: [
+      { keys: ['Home'], label: "Aujourd'hui" },
+      { keys: ['PgUp', 'PgDn'], label: 'Défiler' },
+      { keys: ['Ctrl', '+', '-'], label: 'Zoom' },
+      { keys: ['Alt', 'B'], label: 'Panneau' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
+    ],
+  },
+  operatorJobSelected: {
+    modeLabel: 'OPÉRATEURS',
+    modeLabelClass: 'text-violet-400',
+    shortcuts: [
+      { keys: ['Esc'], label: 'Fermer' },
+      { keys: ['Alt', 'D'], label: 'Départ' },
+      { keys: ['Alt', '\u2191', '\u2193'], label: 'Naviguer' },
+      { keys: ['Alt', 'P'], label: 'Calculer' },
+      { keys: ['Alt', 'F'], label: 'Figer' },
+      { keys: ['Alt', 'Z'], label: 'Effacer tuiles' },
       { keys: ['Alt', 'K'], label: 'Commandes' },
     ],
   },

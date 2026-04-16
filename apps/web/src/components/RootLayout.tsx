@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { SquareSlash } from 'lucide-react';
 import { Sidebar } from './Sidebar/Sidebar';
 import { Toast } from './Toast/Toast';
@@ -14,6 +14,7 @@ import type { CompactHorizon } from '../utils';
 
 function RootLayoutInner() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
   const { toastMessage, dismissToast } = useMercureSubscription();
 
@@ -102,7 +103,8 @@ function RootLayoutInner() {
       }
 
       // Alt+P: chord prefix for placement (when available), else navigate to scheduler
-      if (isAltLetter(e, 'p')) {
+      // Skip when on operator page (/) — it handles Alt+P for selective compute
+      if (isAltLetter(e, 'p') && location.pathname !== '/') {
         e.preventDefault();
         if (allCommands.some(c => c.id === 'asap-placement' || c.id === 'alap-placement')) {
           chordPendingRef.current = 'placement';
@@ -127,7 +129,7 @@ function RootLayoutInner() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, setIsOpen, navigate, allCommands]);
+  }, [isOpen, setIsOpen, navigate, allCommands, location.pathname]);
 
   return (
     <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">

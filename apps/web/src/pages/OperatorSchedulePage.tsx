@@ -29,10 +29,15 @@ import {
   useUpdateElementStatusMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,
+  useClearJobAssignmentsMutation,
+  useBatchSetPinMutation,
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
-import { isCtrlAltLetter } from '../utils/keyboardLayout';
+import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
+import { getTasksForJob } from '../utils';
+import { getErrorMessage } from '../store/api/errorNormalization';
+import { ZOOM_LEVELS } from '../utils/zoom';
 import { isInternalTask, getActiveScheduleForDate } from '@flux/types';
 import type {
   Operator,
@@ -59,9 +64,12 @@ import { UnavailabilityOverlay } from '../components/StationColumns/Unavailabili
 import { TileSegment } from '../components/Tile/TileSegment';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
-import { useVirtualScroll, isAssignmentVisible, useMassUnschedule } from '../hooks';
+import { useVirtualScroll, isAssignmentVisible, useMassUnschedule, useToast } from '../hooks';
 import { MassUnscheduleDialog } from '../components/MassUnscheduleDialog';
 import { ComputeModal } from '../components/ComputeModal/ComputeModal';
+import { SmartCompactModal } from '../components/SmartCompactModal';
+import { ScheduleEvaluationModal } from '../components/ScheduleEvaluationModal';
+import { ShortcutFooter } from '../components/ShortcutFooter/ShortcutFooter';
 
 // ============================================================================
 // Constants (matching App.tsx)
@@ -212,16 +220,22 @@ export default function OperatorSchedulePage() {
   const [updateSTStatus] = useUpdateSTStatusMutation();
   const [splitTask] = useSplitTaskMutation();
   const [fuseTask] = useFuseTaskMutation();
+  const [clearJobAssignments] = useClearJobAssignmentsMutation();
+  const [batchSetPin] = useBatchSetPinMutation();
   const dispatch = useAppDispatch();
   const invalidateSnapshot = useCallback(() => {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
   }, [dispatch]);
+  const { showToast } = useToast();
 
   const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
   const [computeModalJobId, setComputeModalJobId] = useState<string | undefined>(undefined);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const massUnschedule = useMassUnschedule(snapshotData);
-  const [pixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
+  const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isSmartCompactOpen, setIsSmartCompactOpen] = useState(false);
+  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -443,27 +457,151 @@ export default function OperatorSchedulePage() {
     setComputeModalMode('incremental');
   }, []);
 
-  // ---- Keyboard navigation: Alt+Up/Down to cycle jobs ----
+  // Clear all tiles for selected job (Alt+Z)
+  const handleClearJobAssignments = useCallback(async () => {
+    if (!selectedJobId) return;
+    try {
+      const result = await clearJobAssignments(selectedJobId).unwrap();
+      showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
+    } catch (err) {
+      showToast(getErrorMessage(err));
+    }
+  }, [selectedJobId, clearJobAssignments, showToast]);
+
+  // Pin/unpin all placed tiles for selected job (Alt+F)
+  const handlePinAllJobTiles = useCallback(async () => {
+    if (!selectedJobId) return;
+    const jobTaskIds = new Set(
+      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
+    );
+    const jobAssignments = snapshot.assignments.filter((a) => jobTaskIds.has(a.taskId));
+    if (jobAssignments.length === 0) return;
+
+    const allPinned = jobAssignments.every((a) => a.isPinned);
+    const targetPinned = !allPinned;
+    const taskIds = jobAssignments
+      .filter((a) => a.isPinned !== targetPinned)
+      .map((a) => a.taskId);
+
+    if (taskIds.length === 0) return;
+
+    try {
+      await batchSetPin({ taskIds, isPinned: targetPinned }).unwrap();
+      showToast(
+        targetPinned
+          ? `${taskIds.length} tuile(s) épinglée(s)`
+          : `${taskIds.length} tuile(s) désépinglée(s)`,
+        'success'
+      );
+    } catch (err) {
+      showToast(getErrorMessage(err));
+    }
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
+
+  // Smart compaction complete handler
+  const handleSmartCompactComplete = useCallback(() => {
+    invalidateSnapshot();
+  }, [invalidateSnapshot]);
+
+  // Zoom change handler — maintains scroll center position
+  const handleZoomChange = useCallback((newPixelsPerHour: number) => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      setPixelsPerHour(newPixelsPerHour);
+      return;
+    }
+    const viewportH = container.clientHeight;
+    const centerY = container.scrollTop + viewportH / 2;
+    const centerHours = centerY / pixelsPerHour;
+    setPixelsPerHour(newPixelsPerHour);
+    requestAnimationFrame(() => {
+      const newCenterY = centerHours * newPixelsPerHour;
+      container.scrollTop = Math.max(0, newCenterY - viewportH / 2);
+    });
+  }, [pixelsPerHour]);
+
+  // ---- Keyboard shortcuts (harmonized with station schedule) ----
   const orderedJobIds = useMemo(() => snapshot.jobs.map(j => j.id), [snapshot.jobs]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Alt+Z: mass unschedule
+      // ---- Escape: close selected job ----
+      if (e.key === 'Escape' && selectedJobId) {
+        e.preventDefault();
+        setSelectedJobId(null);
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        return;
+      }
+
+      // ---- Home: jump to today ----
+      if (e.key === 'Home' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const container = scrollContainerRef.current;
+        if (container) {
+          const now = new Date();
+          const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
+          const vh = container.clientHeight;
+          container.scrollTo({ top: Math.max(0, y - vh / 2), behavior: 'smooth' });
+        }
+        return;
+      }
+
+      // ---- PageUp / PageDown: scroll ±1 day ----
+      if ((e.key === 'PageUp' || e.key === 'PageDown') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const container = scrollContainerRef.current;
+        if (container) {
+          const oneDayPixels = 24 * pixelsPerHour;
+          const direction = e.key === 'PageUp' ? -1 : 1;
+          container.scrollBy({ top: direction * oneDayPixels, behavior: 'smooth' });
+        }
+        return;
+      }
+
+      // ---- Alt+D: jump to departure/deadline ----
+      if (e.altKey && e.code === 'KeyD' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (selectedJob?.workshopExitDate && scrollContainerRef.current) {
+          const departureDate = new Date(selectedJob.workshopExitDate);
+          const y = timeToYPosition(departureDate, START_HOUR, pixelsPerHour, gridStartDate);
+          const vh = scrollContainerRef.current.clientHeight;
+          scrollContainerRef.current.scrollTo({ top: Math.max(0, y - vh + 100), behavior: 'smooth' });
+        }
+        return;
+      }
+
+      // ---- Ctrl+Alt+C: smart compaction ----
+      if (isCtrlAltLetter(e, 'c')) {
+        e.preventDefault();
+        setIsSmartCompactOpen(true);
+        return;
+      }
+
+      // ---- Ctrl+Alt+E: schedule evaluation ----
+      if (isCtrlAltLetter(e, 'e')) {
+        e.preventDefault();
+        setIsEvaluationOpen(true);
+        return;
+      }
+
+      // ---- Ctrl+Alt+Z: mass unschedule ----
       if (isCtrlAltLetter(e, 'z')) {
         e.preventDefault();
         massUnschedule.trigger();
         return;
       }
 
-      // Ctrl+Alt+P: incremental compute (all unplaced)
+      // ---- Ctrl+Alt+P: incremental compute (all unplaced) ----
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
         handleComputeIncremental();
         return;
       }
 
-      // Alt+P: selective compute (selected job)
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'p') {
+      // ---- Alt+P: selective compute (selected job) ----
+      if (isAltLetter(e, 'p')) {
         e.preventDefault();
         if (selectedJobId) {
           handleComputeJob(selectedJobId);
@@ -471,21 +609,69 @@ export default function OperatorSchedulePage() {
         return;
       }
 
-      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
-      e.preventDefault();
-      if (orderedJobIds.length === 0) return;
-      const direction = e.key === 'ArrowUp' ? -1 : 1;
-      if (!selectedJobId) {
-        setSelectedJobId(orderedJobIds[0]);
+      // ---- Alt+F: pin/unpin all tiles for selected job ----
+      if (isAltLetter(e, 'f') && selectedJobId) {
+        e.preventDefault();
+        handlePinAllJobTiles();
         return;
       }
-      const idx = orderedJobIds.indexOf(selectedJobId);
-      const newIdx = (idx + direction + orderedJobIds.length) % orderedJobIds.length;
-      setSelectedJobId(orderedJobIds[newIdx]);
+
+      // ---- Alt+Z: clear all tiles for selected job ----
+      if (isAltLetter(e, 'z') && selectedJobId) {
+        e.preventDefault();
+        handleClearJobAssignments();
+        return;
+      }
+
+      // ---- Alt+B: toggle sidebar ----
+      if (isAltLetter(e, 'b')) {
+        e.preventDefault();
+        setIsSidebarVisible(prev => !prev);
+        return;
+      }
+
+      // ---- Ctrl+Plus: zoom in ----
+      if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+        if (idx < ZOOM_LEVELS.length - 1) {
+          handleZoomChange(ZOOM_LEVELS[idx + 1].pixelsPerHour);
+        }
+        return;
+      }
+
+      // ---- Ctrl+Minus: zoom out ----
+      if (e.ctrlKey && e.key === '-') {
+        e.preventDefault();
+        const idx = ZOOM_LEVELS.findIndex(z => z.pixelsPerHour === pixelsPerHour);
+        if (idx > 0) {
+          handleZoomChange(ZOOM_LEVELS[idx - 1].pixelsPerHour);
+        }
+        return;
+      }
+
+      // ---- Alt+Up/Down: navigate between jobs ----
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        if (orderedJobIds.length === 0) return;
+        const direction = e.key === 'ArrowUp' ? -1 : 1;
+        if (!selectedJobId) {
+          setSelectedJobId(orderedJobIds[0]);
+          return;
+        }
+        const idx = orderedJobIds.indexOf(selectedJobId);
+        const newIdx = (idx + direction + orderedJobIds.length) % orderedJobIds.length;
+        setSelectedJobId(orderedJobIds[newIdx]);
+        return;
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedJobId, orderedJobIds, setSelectedJobId, massUnschedule]);
+  }, [
+    selectedJobId, selectedJob, orderedJobIds, pixelsPerHour, gridStartDate,
+    massUnschedule, handleComputeIncremental, handleComputeJob,
+    handleClearJobAssignments, handlePinAllJobTiles, handleZoomChange,
+  ]);
 
   // ---- Now line ----
   const [now, setNow] = useState(() => new Date());
@@ -591,8 +777,10 @@ export default function OperatorSchedulePage() {
   const gridMinWidth = 48 + OPERATOR_COLUMN_WIDTH * operators.length; // 48 = timeline w-12
 
   return (
+    <div className="flex-1 flex flex-col overflow-hidden">
     <div className="flex-1 flex overflow-hidden">
       {/* ---- Left sidebar: JobsList ---- */}
+      {isSidebarVisible && (
       <div>
         <JobsList
           jobs={snapshot.jobs}
@@ -605,9 +793,10 @@ export default function OperatorSchedulePage() {
           onSelectJob={setSelectedJobId}
         />
       </div>
+      )}
 
       {/* ---- Job Details Panel (between sidebar and grid) ---- */}
-      {selectedJob && (
+      {isSidebarVisible && selectedJob && (
         <div className="shrink-0">
           <JobDetailsPanel
             job={selectedJob}
@@ -766,6 +955,23 @@ export default function OperatorSchedulePage() {
         onComputeIncremental={handleComputeIncremental}
         onComputeFull={handleComputeSchedule}
       />
+
+      {/* ---- Smart compaction modal ---- */}
+      <SmartCompactModal
+        isOpen={isSmartCompactOpen}
+        onClose={() => setIsSmartCompactOpen(false)}
+        onComplete={handleSmartCompactComplete}
+      />
+
+      {/* ---- Schedule evaluation modal ---- */}
+      <ScheduleEvaluationModal
+        isOpen={isEvaluationOpen}
+        onClose={() => setIsEvaluationOpen(false)}
+      />
+    </div>
+
+      {/* ---- Shortcut footer ---- */}
+      <ShortcutFooter mode={selectedJobId ? 'operatorJobSelected' : 'operatorDefault'} />
     </div>
   );
 }
