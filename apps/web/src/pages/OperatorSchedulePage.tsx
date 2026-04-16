@@ -33,7 +33,7 @@ import {
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
 import { isCtrlAltLetter } from '../utils/keyboardLayout';
-import { isInternalTask } from '@flux/types';
+import { isInternalTask, getActiveScheduleForDate } from '@flux/types';
 import type {
   Operator,
   TaskAssignment,
@@ -95,7 +95,7 @@ const defaultSnapshot: ScheduleSnapshot = {
 // Helpers
 // ============================================================================
 
-/** Get the day schedule for an operator on a given date (checks exceptions first). */
+/** Get the day schedule for an operator on a given date (checks exceptions first, then rotating schedule). */
 function getOperatorDaySchedule(operator: Operator, date: Date): DaySchedule {
   // Check for date-specific exceptions
   if (operator.scheduleExceptions?.length) {
@@ -105,14 +105,18 @@ function getOperatorDaySchedule(operator: Operator, date: Date): DaySchedule {
       return exception.schedule;
     }
   }
-  // Fall back to weekly schedule
-  const schedule = operator.operatingSchedule;
-  if (!schedule) {
+  // Resolve active schedule from rotation
+  const activeSchedule = getActiveScheduleForDate(
+    operator.operatingSchedules,
+    operator.scheduleRotationReferenceWeek,
+    date,
+  );
+  if (!activeSchedule) {
     // No schedule defined = always available (no hatching)
     return { isOperating: true, slots: [{ start: '00:00', end: '24:00' }] };
   }
   const dayName = DAY_NAMES[date.getDay()];
-  return schedule[dayName] ?? { isOperating: false, slots: [] };
+  return activeSchedule[dayName] ?? { isOperating: false, slots: [] };
 }
 
 /** Parse "HH:MM" to minutes since midnight. */

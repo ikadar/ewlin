@@ -23,7 +23,7 @@ import type { StationResponse } from '../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
 import type { StationCategoryResponse } from '../store/api/stationCategoryApi';
 import {
-  OperatingScheduleEditor,
+  RotatingScheduleEditor,
 } from '../components/ScheduleEditor';
 import type { OperatingSchedule } from '../components/ScheduleEditor';
 
@@ -512,7 +512,8 @@ interface OperatorFormModalProps {
     lastName: string;
     role: string;
     totalAttention: number;
-    operatingSchedule: OperatingSchedule;
+    operatingSchedules: OperatingSchedule[];
+    scheduleRotationReferenceWeek: number | null;
     scheduleExceptions: ScheduleExceptionInput[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
@@ -543,13 +544,17 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
     }));
   });
 
-  // Schedule
-  const [schedule, setSchedule] = useState<OperatingSchedule>(() => {
-    if (initial?.operatingSchedule) {
-      return initial.operatingSchedule as unknown as OperatingSchedule;
+  // Rotating schedules
+  const [schedules, setSchedules] = useState<OperatingSchedule[]>(() => {
+    if (initial?.operatingSchedules && initial.operatingSchedules.length > 0) {
+      return initial.operatingSchedules as unknown as OperatingSchedule[];
     }
-    return JSON.parse(JSON.stringify(DEFAULT_SCHEDULE));
+    return [JSON.parse(JSON.stringify(DEFAULT_SCHEDULE))];
   });
+  const [scheduleRotationReferenceWeek, setScheduleRotationReferenceWeek] = useState<number | null>(
+    initial?.scheduleRotationReferenceWeek ?? null
+  );
+  const [activeScheduleIndex, setActiveScheduleIndex] = useState(0);
 
   const [absences, setAbsences] = useState<{ id: string; start: string; end: string; reason: string }[]>(() => {
     if (initial?.scheduleExceptions) {
@@ -656,7 +661,8 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
       lastName: lastName.trim(),
       role: role.trim(),
       totalAttention: 1,
-      operatingSchedule: schedule,
+      operatingSchedules: schedules,
+      scheduleRotationReferenceWeek: schedules.length > 1 ? scheduleRotationReferenceWeek : null,
       scheduleExceptions: absences.filter(a => a.start && a.end).map(a => ({
         start: a.start,
         end: a.end,
@@ -786,13 +792,24 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
             </div>
 
             {scheduleView === 'visual' ? (
-              <OperatingScheduleEditor value={schedule} onChange={setSchedule} />
+              <RotatingScheduleEditor
+                schedules={schedules}
+                activeIndex={activeScheduleIndex}
+                onActiveIndexChange={setActiveScheduleIndex}
+                onSchedulesChange={setSchedules}
+                referenceWeek={scheduleRotationReferenceWeek}
+                onReferenceWeekChange={setScheduleRotationReferenceWeek}
+              />
             ) : (
               <textarea
-                value={JSON.stringify(schedule, null, 2)}
+                value={JSON.stringify({ schedules, scheduleRotationReferenceWeek }, null, 2)}
                 onChange={(e) => {
                   try {
-                    setSchedule(JSON.parse(e.target.value));
+                    const parsed = JSON.parse(e.target.value);
+                    if (Array.isArray(parsed.schedules)) {
+                      setSchedules(parsed.schedules);
+                      setScheduleRotationReferenceWeek(parsed.scheduleRotationReferenceWeek ?? null);
+                    }
                   } catch {
                     // ignore invalid JSON while typing
                   }
@@ -971,7 +988,8 @@ export default function OperatorsPage() {
     lastName: string;
     role: string;
     totalAttention: number;
-    operatingSchedule: OperatingSchedule;
+    operatingSchedules: OperatingSchedule[];
+    scheduleRotationReferenceWeek: number | null;
     scheduleExceptions: unknown[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
@@ -980,7 +998,8 @@ export default function OperatorsPage() {
       firstName: data.firstName,
       lastName: data.lastName,
       role: data.role || null,
-      operatingSchedule: data.operatingSchedule as unknown as Record<string, unknown>,
+      operatingSchedules: data.operatingSchedules as unknown as Array<Record<string, unknown>>,
+      scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
       scheduleExceptions: data.scheduleExceptions,
       skills: data.skills,
     }).unwrap();
@@ -995,7 +1014,8 @@ export default function OperatorsPage() {
     lastName: string;
     role: string;
     totalAttention: number;
-    operatingSchedule: OperatingSchedule;
+    operatingSchedules: OperatingSchedule[];
+    scheduleRotationReferenceWeek: number | null;
     scheduleExceptions: unknown[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
@@ -1007,7 +1027,8 @@ export default function OperatorsPage() {
         firstName: data.firstName,
         lastName: data.lastName,
         role: data.role || null,
-        operatingSchedule: data.operatingSchedule as unknown as Record<string, unknown>,
+        operatingSchedules: data.operatingSchedules as unknown as Array<Record<string, unknown>>,
+        scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
         scheduleExceptions: data.scheduleExceptions,
       },
     }).unwrap();

@@ -1,4 +1,5 @@
 export { OperatingScheduleEditor } from './OperatingScheduleEditor';
+export { RotatingScheduleEditor } from './RotatingScheduleEditor';
 export { ExceptionsEditor } from './ExceptionsEditor';
 export { FluxSelect } from './FluxSelect';
 export type { FluxSelectOption } from './FluxSelect';
