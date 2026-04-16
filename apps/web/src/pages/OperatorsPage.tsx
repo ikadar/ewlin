@@ -514,6 +514,7 @@ interface OperatorFormModalProps {
     totalAttention: number;
     operatingSchedules: OperatingSchedule[];
     scheduleRotationReferenceWeek: number | null;
+    scheduleNames: string[];
     scheduleExceptions: ScheduleExceptionInput[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
@@ -553,6 +554,9 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
   });
   const [scheduleRotationReferenceWeek, setScheduleRotationReferenceWeek] = useState<number | null>(
     initial?.scheduleRotationReferenceWeek ?? null
+  );
+  const [scheduleNames, setScheduleNames] = useState<string[]>(
+    initial?.scheduleNames ?? []
   );
   const [activeScheduleIndex, setActiveScheduleIndex] = useState(0);
 
@@ -663,6 +667,7 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
       totalAttention: 1,
       operatingSchedules: schedules,
       scheduleRotationReferenceWeek: schedules.length > 1 ? scheduleRotationReferenceWeek : null,
+      scheduleNames: schedules.length > 1 ? scheduleNames : [],
       scheduleExceptions: absences.filter(a => a.start && a.end).map(a => ({
         start: a.start,
         end: a.end,
@@ -797,18 +802,21 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
                 activeIndex={activeScheduleIndex}
                 onActiveIndexChange={setActiveScheduleIndex}
                 onSchedulesChange={setSchedules}
+                scheduleNames={scheduleNames}
+                onScheduleNamesChange={setScheduleNames}
                 referenceWeek={scheduleRotationReferenceWeek}
                 onReferenceWeekChange={setScheduleRotationReferenceWeek}
               />
             ) : (
               <textarea
-                value={JSON.stringify({ schedules, scheduleRotationReferenceWeek }, null, 2)}
+                value={JSON.stringify({ schedules, scheduleRotationReferenceWeek, scheduleNames }, null, 2)}
                 onChange={(e) => {
                   try {
                     const parsed = JSON.parse(e.target.value);
                     if (Array.isArray(parsed.schedules)) {
                       setSchedules(parsed.schedules);
                       setScheduleRotationReferenceWeek(parsed.scheduleRotationReferenceWeek ?? null);
+                      setScheduleNames(parsed.scheduleNames ?? []);
                     }
                   } catch {
                     // ignore invalid JSON while typing
@@ -990,6 +998,7 @@ export default function OperatorsPage() {
     totalAttention: number;
     operatingSchedules: OperatingSchedule[];
     scheduleRotationReferenceWeek: number | null;
+    scheduleNames: string[];
     scheduleExceptions: unknown[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
@@ -1000,6 +1009,7 @@ export default function OperatorsPage() {
       role: data.role || null,
       operatingSchedules: data.operatingSchedules as unknown as Array<Record<string, unknown>>,
       scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
+      scheduleNames: data.scheduleNames.length > 0 ? data.scheduleNames : null,
       scheduleExceptions: data.scheduleExceptions,
       skills: data.skills,
     }).unwrap();
@@ -1016,6 +1026,7 @@ export default function OperatorsPage() {
     totalAttention: number;
     operatingSchedules: OperatingSchedule[];
     scheduleRotationReferenceWeek: number | null;
+    scheduleNames: string[];
     scheduleExceptions: unknown[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
@@ -1029,6 +1040,7 @@ export default function OperatorsPage() {
         role: data.role || null,
         operatingSchedules: data.operatingSchedules as unknown as Array<Record<string, unknown>>,
         scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
+        scheduleNames: data.scheduleNames.length > 0 ? data.scheduleNames : null,
         scheduleExceptions: data.scheduleExceptions,
       },
     }).unwrap();

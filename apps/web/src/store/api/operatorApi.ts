@@ -36,6 +36,7 @@ export interface OperatorResponse {
   role: string | null;
   operatingSchedules: Array<Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>> | null;
   scheduleRotationReferenceWeek: number | null;
+  scheduleNames: string[] | null;
   scheduleExceptions: Array<{ date: string; type: string; schedule: unknown; reason: string | null }> | null;
   skills: OperatorSkillResponse[];
   concurrentGroups: ConcurrentGroupResponse[];
@@ -49,6 +50,7 @@ export interface OperatorInput {
   role?: string | null;
   operatingSchedules?: Array<Record<string, unknown>> | null;
   scheduleRotationReferenceWeek?: number | null;
+  scheduleNames?: string[] | null;
   scheduleExceptions?: unknown[] | null;
   skills?: OperatorSkillResponse[] | null;
 }
