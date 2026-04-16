@@ -367,9 +367,23 @@ export const ComputeModal = memo(function ComputeModal({
       .sort((a, b) => a.priority - b.priority || b.lateByMinutes - a.lateByMinutes);
   }, [result, snapshot, snapshotReady]);
 
-  const totalJobs = snapshot.jobs.length;
-  const hasLate = lateJobs.length > 0;
-  const onTimePct = totalJobs > 0 ? Math.round(((totalJobs - lateJobs.length) / totalJobs) * 100) : 100;
+  const targetJob = useMemo(() => {
+    if (!jobId) return null;
+    return snapshot.jobs.find((j: Job) => j.id === jobId) ?? null;
+  }, [jobId, snapshot.jobs]);
+
+  // In selective mode, scope stats to the target job only
+  const scopedLateJobs = useMemo(() => {
+    if (mode === 'selective' && targetJob) {
+      return lateJobs.filter(lj => lj.ref === targetJob.reference);
+    }
+    return lateJobs;
+  }, [mode, targetJob, lateJobs]);
+
+  const isSelective = mode === 'selective' && targetJob != null;
+  const totalJobs = isSelective ? 1 : snapshot.jobs.length;
+  const hasLate = scopedLateJobs.length > 0;
+  const onTimePct = totalJobs > 0 ? Math.round(((totalJobs - scopedLateJobs.length) / totalJobs) * 100) : 100;
 
   const accentColor = error
     ? 'bg-red-500'
@@ -385,11 +399,6 @@ export const ComputeModal = memo(function ComputeModal({
     const timer = setTimeout(onDismiss, 8000);
     return () => clearTimeout(timer);
   }, [isDone, hasLate, onDismiss]);
-
-  const targetJob = useMemo(() => {
-    if (!jobId) return null;
-    return snapshot.jobs.find((j: Job) => j.id === jobId) ?? null;
-  }, [jobId, snapshot.jobs]);
 
   const title = (() => {
     if (mode === 'selective' && targetJob) return `Placement — Job ${targetJob.reference}`;
@@ -463,79 +472,111 @@ export const ComputeModal = memo(function ComputeModal({
           {/* Result */}
           {isDone && result && (
             <>
-              {/* On-time ratio bar */}
-              <div className="mb-3">
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <span className="text-2xl font-bold tabular-nums text-zinc-100">
-                    {onTimePct}%
-                  </span>
-                  <span className="text-[11px] text-zinc-500">
-                    {totalJobs - lateJobs.length} à l'heure sur {totalJobs} jobs
-                  </span>
-                </div>
-                <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
-                  <div
-                    className="h-full rounded-l-full transition-all"
-                    style={{
-                      width: `${onTimePct}%`,
-                      background: '#22c55e',
-                    }}
-                  />
-                  {onTimePct < 100 && (
+              {isSelective && targetJob ? (
+                /* ── Selective mode: compact single-job result ── */
+                <div className="mb-3">
+                  <div className="flex items-center gap-2.5 mb-2">
                     <div
-                      className="h-full rounded-r-full"
-                      style={{
-                        width: `${100 - onTimePct}%`,
-                        background: '#ef4444',
-                      }}
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${hasLate ? 'bg-amber-500' : 'bg-green-500'}`}
                     />
-                  )}
-                </div>
-              </div>
-
-              {/* Key stats */}
-              <div className="flex gap-4 text-[11px] text-zinc-500">
-                <span>
-                  {result.stats.scheduledTasks}/{result.stats.totalTasks} tâches placées
-                </span>
-                <span>
-                  {result.computeTimeMs >= 1000
-                    ? `${(result.computeTimeMs / 1000).toFixed(1)}s`
-                    : `${result.computeTimeMs}ms`}
-                </span>
-                {result.fbiIterations > 0 && (
-                  <span>{result.fbiIterations} passes d'optimisation</span>
-                )}
-              </div>
-
-              {/* Priority breakdown */}
-              <PriorityBreakdown snapshot={snapshot} lateJobs={lateJobs} />
-
-              {/* Late jobs list */}
-              {lateJobs.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-zinc-800">
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-2">
-                    {lateJobs.length > 5 ? `Jobs les plus en retard (${lateJobs.length} au total)` : 'Jobs en retard'}
+                    <span className="text-sm font-semibold text-zinc-100">
+                      Job {targetJob.reference}
+                    </span>
+                    <span className={`text-sm font-medium ${hasLate ? 'text-amber-400' : 'text-green-400'}`}>
+                      {hasLate
+                        ? `en retard de ${formatLateness(scopedLateJobs[0].lateByMinutes)}`
+                        : 'à l\'heure'}
+                    </span>
                   </div>
-                  {lateJobs.slice(0, 5).map((lj, i) => (
-                    <div key={i} className="flex items-center gap-2 py-1 px-1.5 rounded text-xs hover:bg-zinc-800/50">
-                      <div
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ background: PRIORITY_COLORS[lj.priority] ?? PRIORITY_COLORS[2] }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-semibold text-zinc-100">{lj.ref}</span>
-                        <span className="text-zinc-500 ml-1.5">{lj.client}</span>
-                      </div>
-                      <span className={`font-semibold tabular-nums shrink-0 ${lj.lateByMinutes > 7 * 24 * 60 ? 'text-red-400' : 'text-amber-400'}`}>
-                        +{formatLateness(lj.lateByMinutes)}
+                  <div className="flex gap-4 text-[11px] text-zinc-500">
+                    <span>
+                      {result.stats.scheduledTasks}/{result.stats.totalTasks} tâches placées
+                    </span>
+                    <span>
+                      {result.computeTimeMs >= 1000
+                        ? `${(result.computeTimeMs / 1000).toFixed(1)}s`
+                        : `${result.computeTimeMs}ms`}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* ── Full / incremental mode: all-jobs dashboard ── */
+                <>
+                  {/* On-time ratio bar */}
+                  <div className="mb-3">
+                    <div className="flex items-baseline justify-between mb-1.5">
+                      <span className="text-2xl font-bold tabular-nums text-zinc-100">
+                        {onTimePct}%
+                      </span>
+                      <span className="text-[11px] text-zinc-500">
+                        {totalJobs - scopedLateJobs.length} à l'heure sur {totalJobs} jobs
                       </span>
                     </div>
-                  ))}
-                  {lateJobs.length > 5 && (
-                    <div className="text-[11px] text-zinc-500 px-1.5 py-1">et {lateJobs.length - 5} autres...</div>
+                    <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
+                      <div
+                        className="h-full rounded-l-full transition-all"
+                        style={{
+                          width: `${onTimePct}%`,
+                          background: '#22c55e',
+                        }}
+                      />
+                      {onTimePct < 100 && (
+                        <div
+                          className="h-full rounded-r-full"
+                          style={{
+                            width: `${100 - onTimePct}%`,
+                            background: '#ef4444',
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Key stats */}
+                  <div className="flex gap-4 text-[11px] text-zinc-500">
+                    <span>
+                      {result.stats.scheduledTasks}/{result.stats.totalTasks} tâches placées
+                    </span>
+                    <span>
+                      {result.computeTimeMs >= 1000
+                        ? `${(result.computeTimeMs / 1000).toFixed(1)}s`
+                        : `${result.computeTimeMs}ms`}
+                    </span>
+                    {result.fbiIterations > 0 && (
+                      <span>{result.fbiIterations} passes d'optimisation</span>
+                    )}
+                  </div>
+
+                  {/* Priority breakdown */}
+                  <PriorityBreakdown snapshot={snapshot} lateJobs={scopedLateJobs} />
+
+                  {/* Late jobs list */}
+                  {scopedLateJobs.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-zinc-800">
+                      <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-2">
+                        {scopedLateJobs.length > 5 ? `Jobs les plus en retard (${scopedLateJobs.length} au total)` : 'Jobs en retard'}
+                      </div>
+                      {scopedLateJobs.slice(0, 5).map((lj, i) => (
+                        <div key={i} className="flex items-center gap-2 py-1 px-1.5 rounded text-xs hover:bg-zinc-800/50">
+                          <div
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: PRIORITY_COLORS[lj.priority] ?? PRIORITY_COLORS[2] }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="font-semibold text-zinc-100">{lj.ref}</span>
+                            <span className="text-zinc-500 ml-1.5">{lj.client}</span>
+                          </div>
+                          <span className={`font-semibold tabular-nums shrink-0 ${lj.lateByMinutes > 7 * 24 * 60 ? 'text-red-400' : 'text-amber-400'}`}>
+                            +{formatLateness(lj.lateByMinutes)}
+                          </span>
+                        </div>
+                      ))}
+                      {scopedLateJobs.length > 5 && (
+                        <div className="text-[11px] text-zinc-500 px-1.5 py-1">et {scopedLateJobs.length - 5} autres...</div>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </>
           )}
