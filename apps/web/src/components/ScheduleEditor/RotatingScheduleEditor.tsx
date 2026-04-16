@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { OperatingScheduleEditor } from './OperatingScheduleEditor';
 import type { OperatingSchedule } from './OperatingScheduleEditor';
+import { FluxSelect } from './FluxSelect';
 import { getISOWeek } from '@flux/types';
 
 const FALLBACK_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -47,31 +48,36 @@ export function RotatingScheduleEditor({
   const currentISOWeek = getISOWeek(new Date());
   const hasRotation = schedules.length > 1;
 
-  // Naming modal state
-  const [showNameModal, setShowNameModal] = useState(false);
+  // Naming state
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [renamingIndex, setRenamingIndex] = useState<number | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if ((showNameModal || renamingIndex !== null) && nameInputRef.current) {
+    if ((showNamePrompt || renamingIndex !== null) && nameInputRef.current) {
       nameInputRef.current.focus();
       nameInputRef.current.select();
     }
-  }, [showNameModal, renamingIndex]);
+  }, [showNamePrompt, renamingIndex]);
 
-  const openAddModal = () => {
+  // Compute which schedule is active this week
+  const currentScheduleIndex = hasRotation && referenceWeek !== null
+    ? ((currentISOWeek - referenceWeek) % schedules.length + schedules.length) % schedules.length
+    : 0;
+
+  // ─── Add schedule ───
+  const openAddPrompt = () => {
     const nextLetter = FALLBACK_LABELS[schedules.length] ?? `${schedules.length + 1}`;
     setNameInput(`Semaine ${nextLetter}`);
     setRenamingIndex(null);
-    setShowNameModal(true);
+    setShowNamePrompt(true);
   };
 
   const confirmAdd = () => {
     const name = nameInput.trim();
     if (!name) return;
 
-    // Copy current schedule as starting point
     const source = schedules[activeIndex] ?? DEFAULT_SCHEDULE;
     const copy: OperatingSchedule = JSON.parse(JSON.stringify(source));
     const nextSchedules = [...schedules, copy];
@@ -86,13 +92,14 @@ export function RotatingScheduleEditor({
       onReferenceWeekChange(currentISOWeek);
     }
 
-    setShowNameModal(false);
+    setShowNamePrompt(false);
   };
 
+  // ─── Rename schedule ───
   const openRename = (index: number) => {
     setNameInput(scheduleNames[index] || getLabel(scheduleNames, index));
     setRenamingIndex(index);
-    setShowNameModal(false);
+    setShowNamePrompt(false);
   };
 
   const confirmRename = () => {
@@ -105,6 +112,7 @@ export function RotatingScheduleEditor({
     setRenamingIndex(null);
   };
 
+  // ─── Remove schedule ───
   const removeSchedule = (index: number) => {
     if (schedules.length <= 1) return;
     const nextSchedules = schedules.filter((_, i) => i !== index);
@@ -116,49 +124,55 @@ export function RotatingScheduleEditor({
     } else if (activeIndex > index) {
       onActiveIndexChange(activeIndex - 1);
     }
-    // Clear reference week if back to single schedule
     if (nextSchedules.length === 1) {
       onReferenceWeekChange(null);
     }
   };
 
+  // ─── Update current schedule ───
   const updateSchedule = (schedule: OperatingSchedule) => {
     const next = [...schedules];
     next[activeIndex] = schedule;
     onSchedulesChange(next);
   };
 
-  // Compute current active schedule label
-  let currentLabel = '';
-  if (hasRotation && referenceWeek !== null) {
-    const n = schedules.length;
-    const idx = ((currentISOWeek - referenceWeek) % n + n) % n;
-    currentLabel = getLabel(scheduleNames, idx);
-  }
+  // ─── Rotation dropdown change ───
+  const handleRotationChange = (value: string) => {
+    const selectedIdx = parseInt(value, 10);
+    // referenceWeek = currentISOWeek - selectedIdx
+    onReferenceWeekChange(currentISOWeek - selectedIdx);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (renamingIndex !== null) confirmRename();
-      else if (showNameModal) confirmAdd();
+      else if (showNamePrompt) confirmAdd();
     } else if (e.key === 'Escape') {
-      setShowNameModal(false);
+      setShowNamePrompt(false);
       setRenamingIndex(null);
     }
   };
 
+  // FluxSelect options for the rotation dropdown
+  const rotationOptions = schedules.map((_, i) => ({
+    value: String(i),
+    label: getLabel(scheduleNames, i),
+  }));
+
   return (
     <div className="space-y-3">
-      {/* Tab bar */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      {/* ── Cards row ── */}
+      <div className="flex gap-2 flex-wrap">
         {schedules.map((_, i) => {
           const label = getLabel(scheduleNames, i);
-          const isActive = i === activeIndex;
+          const isEditing = i === activeIndex;
+          const isCurrent = hasRotation && i === currentScheduleIndex;
 
           // Inline rename mode
           if (renamingIndex === i) {
             return (
-              <div key={i} className="flex items-center">
+              <div key={i} className="flex items-center px-3 py-2 min-w-[140px] border border-flux-accent rounded-lg bg-flux-elevated">
                 <input
                   ref={nameInputRef}
                   type="text"
@@ -166,7 +180,7 @@ export function RotatingScheduleEditor({
                   onChange={(e) => setNameInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onBlur={confirmRename}
-                  className="px-2 py-1 text-sm bg-flux-surface border border-flux-accent rounded text-flux-text-primary w-32"
+                  className="w-full px-1 py-0.5 text-sm bg-transparent border-none text-flux-text-primary focus:outline-none"
                   maxLength={30}
                 />
               </div>
@@ -174,54 +188,59 @@ export function RotatingScheduleEditor({
           }
 
           return (
-            <div key={i} className="flex items-center group">
-              <button
-                type="button"
-                onClick={() => onActiveIndexChange(i)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-t-md border border-b-0 transition-colors ${
-                  isActive
-                    ? 'bg-flux-surface text-flux-text-primary border-flux-border-light'
-                    : 'bg-flux-base text-flux-text-tertiary border-transparent hover:text-flux-text-secondary hover:border-flux-border-light'
-                }`}
-              >
-                {label}
-              </button>
-              {schedules.length > 1 && (
-                <>
+            <div
+              key={i}
+              onClick={() => onActiveIndexChange(i)}
+              className={`px-3 py-2 min-w-[140px] border rounded-lg cursor-pointer transition-colors ${
+                isEditing
+                  ? 'border-indigo-500/60 bg-flux-elevated'
+                  : 'border-flux-border bg-flux-base hover:border-flux-border-light hover:bg-flux-elevated'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[13px] font-medium text-flux-text-primary">{label}</span>
+                {isCurrent && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/30">
+                    en cours
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2.5 mt-1">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); openRename(i); }}
+                  className="text-[11px] text-flux-text-muted hover:text-flux-text-secondary hover:underline"
+                >
+                  Renommer
+                </button>
+                {schedules.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => openRename(i)}
-                    className="p-1 text-flux-text-tertiary hover:text-flux-text-secondary transition-colors opacity-0 group-hover:opacity-100"
-                    title="Renommer"
+                    onClick={(e) => { e.stopPropagation(); removeSchedule(i); }}
+                    className="text-[11px] text-flux-text-muted hover:text-red-500 hover:underline"
                   >
-                    <Pencil size={11} />
+                    Supprimer
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => removeSchedule(i)}
-                    className="p-1 text-flux-text-tertiary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                    title={`Supprimer ${label}`}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </>
-              )}
+                )}
+              </div>
             </div>
           );
         })}
+
+        {/* Add button */}
         <button
           type="button"
-          onClick={openAddModal}
-          className="flex items-center gap-1 px-2 py-1.5 text-xs text-flux-text-tertiary hover:text-flux-text-secondary transition-colors"
-          title="Ajouter une semaine de rotation"
+          onClick={openAddPrompt}
+          className="px-3 py-2 min-w-[80px] border border-dashed border-flux-border rounded-lg flex items-center justify-center gap-1.5 text-xs text-flux-text-muted hover:text-flux-text-secondary hover:border-flux-border-light hover:bg-flux-elevated transition-colors"
         >
           <Plus size={14} />
+          Ajouter
         </button>
       </div>
 
-      {/* Name modal (inline popup) */}
-      {showNameModal && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-flux-surface border border-flux-border-light rounded-md">
+      {/* ── Name prompt (inline) ── */}
+      {showNamePrompt && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-flux-surface border border-flux-border-light rounded-lg">
           <label className="text-sm text-flux-text-secondary whitespace-nowrap">Nom du planning :</label>
           <input
             ref={nameInputRef}
@@ -229,20 +248,20 @@ export function RotatingScheduleEditor({
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 px-2 py-1 text-sm bg-flux-base border border-flux-border-light rounded text-flux-text-primary"
+            className="flex-1 px-2 py-1 text-sm bg-flux-base border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
             maxLength={30}
             placeholder="ex. Matin, Après-midi…"
           />
           <button
             type="button"
             onClick={confirmAdd}
-            className="px-3 py-1 text-sm bg-flux-accent text-white rounded hover:opacity-90 transition-opacity"
+            className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-500 transition-colors"
           >
             Ajouter
           </button>
           <button
             type="button"
-            onClick={() => setShowNameModal(false)}
+            onClick={() => setShowNamePrompt(false)}
             className="px-2 py-1 text-sm text-flux-text-tertiary hover:text-flux-text-secondary"
           >
             Annuler
@@ -250,29 +269,22 @@ export function RotatingScheduleEditor({
         </div>
       )}
 
-      {/* Active schedule editor */}
+      {/* ── Schedule editor for the active card ── */}
       <OperatingScheduleEditor
         value={schedules[activeIndex]}
         onChange={updateSchedule}
       />
 
-      {/* Reference week + current rotation indicator */}
+      {/* ── Rotation dropdown (below editor, only when 2+ schedules) ── */}
       {hasRotation && (
-        <div className="flex items-center gap-4 px-3 py-2 bg-flux-base border border-flux-border-light rounded-md text-sm">
-          <label className="flex items-center gap-2 text-flux-text-secondary">
-            <span className="whitespace-nowrap">Semaine de référence (ISO) :</span>
-            <input
-              type="number"
-              min={1}
-              max={53}
-              value={referenceWeek ?? currentISOWeek}
-              onChange={(e) => onReferenceWeekChange(parseInt(e.target.value, 10) || 1)}
-              className="w-16 px-2 py-1 bg-flux-surface border border-flux-border-light rounded text-flux-text-primary text-center"
-            />
-          </label>
-          <span className="text-flux-text-tertiary">
-            Cette semaine (S{currentISOWeek}) : <strong className="text-flux-text-secondary">{currentLabel}</strong>
-          </span>
+        <div className="flex items-center gap-2 text-sm text-flux-text-tertiary">
+          <span className="whitespace-nowrap">Planning de la semaine en cours (S{currentISOWeek}) :</span>
+          <FluxSelect
+            options={rotationOptions}
+            value={String(currentScheduleIndex)}
+            onChange={handleRotationChange}
+            className="w-44"
+          />
         </div>
       )}
     </div>

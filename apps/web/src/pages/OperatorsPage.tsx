@@ -24,6 +24,7 @@ import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
 import type { StationCategoryResponse } from '../store/api/stationCategoryApi';
 import {
   RotatingScheduleEditor,
+  FluxSelect,
 } from '../components/ScheduleEditor';
 import type { OperatingSchedule } from '../components/ScheduleEditor';
 
@@ -412,27 +413,20 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                     const stationId = group.stationIds[slot];
                     return (
                       <div key={slot} className="contents">
-                        <select
+                        <FluxSelect
                           value={stationId}
-                          aria-label={`Station ${slot + 1} du groupe concurrent ${idx + 1}`}
-                          onChange={(e) => {
+                          onChange={(val) => {
                             const nextIds = [...group.stationIds] as [string, string];
-                            nextIds[slot] = e.target.value;
+                            nextIds[slot] = val;
                             updateGroup(idx, { stationIds: nextIds });
                           }}
-                          className="px-2 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-                        >
-                          <option value="">— choisir —</option>
-                          {skilledStations.map((s) => (
-                            <option
-                              key={s.id}
-                              value={s.id}
-                              disabled={s.id === group.stationIds[1 - slot]}
-                            >
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
+                          options={[
+                            { value: '', label: '— choisir —' },
+                            ...skilledStations
+                              .filter((s) => s.id !== group.stationIds[1 - slot])
+                              .map((s) => ({ value: s.id, label: s.name })),
+                          ]}
+                        />
                         <input
                           type="number"
                           step="0.05"
