@@ -13,8 +13,8 @@ use super::backward_pass::BackwardOrdering;
 
 use super::backward_pass::{compute_last_values, compute_last_values_with_placements, BackwardPlacement};
 use super::forward_pass::{
-    build_prepared_groups, run_forward_pass, Action, OperatorAvailability, PreparedConcurrentGroup,
-    StationAttrs,
+    build_prepared_groups, run_forward_pass, Action, OperatorAvailability, OperatorScheduleData,
+    PreparedConcurrentGroup, StationAttrs,
 };
 use super::grid::ScheduleGrid;
 use super::pre_split::pre_split;
@@ -86,9 +86,12 @@ pub fn run_with_fbi(
     let operator_groups: Vec<Vec<PreparedConcurrentGroup>> =
         build_prepared_groups(operators, &station_id_to_idx);
 
-    let schedules: Vec<Option<crate::model::operator::OperatingSchedule>> = operators
+    let schedules: Vec<OperatorScheduleData> = operators
         .iter()
-        .map(|op| op.operating_schedule.clone())
+        .map(|op| OperatorScheduleData {
+            schedules: op.operating_schedules.clone(),
+            reference_week: op.schedule_rotation_reference_week,
+        })
         .collect();
 
     let mut best_assignments: Vec<ComputedAssignment> = Vec::new();

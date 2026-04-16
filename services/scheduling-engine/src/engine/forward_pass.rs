@@ -7,6 +7,13 @@ use crate::model::schedule::{ComputedAssignment, OperatorAssignment};
 
 use super::grid::ScheduleGrid;
 
+/// Per-operator schedule data for rotation resolution.
+#[derive(Clone)]
+pub struct OperatorScheduleData {
+    pub schedules: Option<Vec<OperatingSchedule>>,
+    pub reference_week: Option<u32>,
+}
+
 /// Station attributes needed during forward pass
 pub struct StationAttrs {
     pub attention_full: f64,
@@ -154,7 +161,7 @@ pub struct OperatorAvailability {
     data: Vec<Vec<bool>>,
     tick_minutes: u32,
     start_date: NaiveDate,
-    schedules: Vec<Option<OperatingSchedule>>,
+    schedules: Vec<OperatorScheduleData>,
 }
 
 impl OperatorAvailability {
@@ -163,7 +170,7 @@ impl OperatorAvailability {
         initial_ticks: usize,
         tick_minutes: u32,
         start_date: NaiveDate,
-        schedules: Vec<Option<OperatingSchedule>>,
+        schedules: Vec<OperatorScheduleData>,
     ) -> Self {
         let mut avail = Self {
             data: Vec::with_capacity(num_operators),
@@ -201,15 +208,23 @@ impl OperatorAvailability {
         }
     }
 
-    /// Compute availability for a range of ticks
+    /// Compute availability for a range of ticks.
+    /// Resolves rotating schedules per-tick using ISO week.
     fn compute_availability(
         &self,
         op_idx: usize,
         start_tick: usize,
         num_ticks: usize,
     ) -> Vec<bool> {
-        let schedule = match self.schedules.get(op_idx) {
-            Some(Some(s)) => s,
+        let sched_data = match self.schedules.get(op_idx) {
+            Some(sd) => sd,
+            None => {
+                return vec![false; num_ticks];
+            }
+        };
+
+        let schedules = match &sched_data.schedules {
+            Some(s) if !s.is_empty() => s,
             _ => {
                 // No schedule means always available (default work hours: M-F 8-17)
                 return (0..num_ticks)
@@ -235,6 +250,9 @@ impl OperatorAvailability {
             }
         };
 
+        let ref_week = sched_data.reference_week.unwrap_or(1);
+        let n = schedules.len();
+
         (0..num_ticks)
             .map(|i| {
                 let tick = start_tick + i;
@@ -243,6 +261,15 @@ impl OperatorAvailability {
                 let days = total_minutes / (24 * 60);
                 let date = self.start_date + chrono::Duration::days(days as i64);
                 let weekday = date.weekday();
+
+                // Resolve active schedule for this tick's ISO week
+                let schedule = if n == 1 {
+                    &schedules[0]
+                } else {
+                    let iso_week = date.iso_week().week();
+                    let index = ((iso_week as i64 - ref_week as i64).rem_euclid(n as i64)) as usize;
+                    &schedules[index]
+                };
 
                 if let Some(day_sched) = schedule.day_schedule(weekday) {
                     // Check if this tick falls within any slot
@@ -1602,7 +1629,9 @@ mod selection_tests {
     /// (uses the default schedule fallback path).
     fn always_available(num_ops: usize, num_ticks: usize) -> OperatorAvailability {
         // Force all-true by giving each op a schedule with one big slot covering all ticks.
-        let schedules: Vec<Option<OperatingSchedule>> = (0..num_ops).map(|_| None).collect();
+        let schedules: Vec<OperatorScheduleData> = (0..num_ops)
+            .map(|_| OperatorScheduleData { schedules: None, reference_week: None })
+            .collect();
         let mut avail = OperatorAvailability::new(
             num_ops,
             num_ticks,

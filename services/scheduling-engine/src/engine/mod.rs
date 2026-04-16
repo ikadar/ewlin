@@ -1122,7 +1122,8 @@ mod integration_tests {
             first_name: first_name.to_string(),
             last_name: "Test".to_string(),
             role: "operator".to_string(),
-            operating_schedule: None,
+            operating_schedules: None,
+            schedule_rotation_reference_week: None,
             skills: skills
                 .iter()
                 .map(|(s, p)| OperatorSkill {
@@ -1159,7 +1160,8 @@ mod integration_tests {
             first_name: first_name.to_string(),
             last_name: "Test".to_string(),
             role: "operator".to_string(),
-            operating_schedule: Some(schedule),
+            operating_schedules: Some(vec![schedule]),
+            schedule_rotation_reference_week: None,
             skills: skills
                 .iter()
                 .map(|(s, p)| OperatorSkill {

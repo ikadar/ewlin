@@ -6,7 +6,7 @@ use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
 use crate::model::station::StationInput;
 
-use super::forward_pass::{OperatorAvailability, PreparedConcurrentGroup, StationAttrs};
+use super::forward_pass::{OperatorAvailability, OperatorScheduleData, PreparedConcurrentGroup, StationAttrs};
 use super::grid::ScheduleGrid;
 
 /// A placement produced by the backward pass for ALAP scheduling.
@@ -148,8 +148,13 @@ pub fn compute_last_values(
     // Build grid and operator availability for backward pass
     let num_stations = stations.len();
     let num_operators = operators.len();
-    let schedules: Vec<Option<crate::model::operator::OperatingSchedule>> =
-        operators.iter().map(|op| op.operating_schedule.clone()).collect();
+    let schedules: Vec<OperatorScheduleData> = operators
+        .iter()
+        .map(|op| OperatorScheduleData {
+            schedules: op.operating_schedules.clone(),
+            reference_week: op.schedule_rotation_reference_week,
+        })
+        .collect();
 
     let mut grid = ScheduleGrid::new(num_stations, num_operators, effective_horizon, tick_minutes);
     let operator_availability = OperatorAvailability::new(
@@ -298,8 +303,13 @@ pub fn compute_last_values_with_placements(
 
     let num_stations = stations.len();
     let num_operators = operators.len();
-    let schedules: Vec<Option<crate::model::operator::OperatingSchedule>> =
-        operators.iter().map(|op| op.operating_schedule.clone()).collect();
+    let schedules: Vec<OperatorScheduleData> = operators
+        .iter()
+        .map(|op| OperatorScheduleData {
+            schedules: op.operating_schedules.clone(),
+            reference_week: op.schedule_rotation_reference_week,
+        })
+        .collect();
 
     let mut grid = ScheduleGrid::new(num_stations, num_operators, effective_horizon, tick_minutes);
     let operator_availability = OperatorAvailability::new(

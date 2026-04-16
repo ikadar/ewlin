@@ -11,7 +11,9 @@ pub struct OperatorInput {
     #[serde(default = "default_role")]
     pub role: String,
     #[serde(default)]
-    pub operating_schedule: Option<OperatingSchedule>,
+    pub operating_schedules: Option<Vec<OperatingSchedule>>,
+    #[serde(default)]
+    pub schedule_rotation_reference_week: Option<u32>,
     #[serde(default)]
     pub skills: Vec<OperatorSkill>,
     /// Pairs of stations this operator can run concurrently (masked time).
@@ -176,6 +178,22 @@ impl OperatorInput {
 
     pub fn full_name(&self) -> String {
         format!("{} {}", self.first_name, self.last_name)
+    }
+
+    /// Resolve the active weekly schedule for a given ISO week number.
+    /// With a single schedule, always returns it. With N > 1, uses rotation.
+    pub fn active_schedule(&self, iso_week: u32) -> Option<&OperatingSchedule> {
+        let schedules = self.operating_schedules.as_ref()?;
+        if schedules.is_empty() {
+            return None;
+        }
+        let n = schedules.len();
+        if n == 1 {
+            return Some(&schedules[0]);
+        }
+        let ref_week = self.schedule_rotation_reference_week.unwrap_or(1);
+        let index = ((iso_week as i64 - ref_week as i64).rem_euclid(n as i64)) as usize;
+        Some(&schedules[index])
     }
 }
 
