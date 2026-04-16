@@ -464,12 +464,6 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                     Cette paire existe déjà dans un autre groupe.
                   </p>
                 )}
-                {isPairComplete(group) && (
-                  <p className="mt-1.5 text-[10px] text-flux-text-muted">
-                    En mode partagé : {stationName(group.stationIds[0])} à {group.productivity[0].toFixed(2)},{' '}
-                    {stationName(group.stationIds[1])} à {group.productivity[1].toFixed(2)}
-                  </p>
-                )}
               </div>
             );
           })}
