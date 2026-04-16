@@ -701,20 +701,25 @@ fn parse_deadline_to_ticks(deadline: &str, tick_minutes: u32, start_date: NaiveD
 }
 
 fn parse_deadline_minutes(deadline: &str, start_date: NaiveDate) -> Option<u64> {
+    // Try parsing with timezone offset first (ATOM/RFC 3339: 2026-04-14T17:00:00+02:00)
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(deadline) {
+        let naive = dt.naive_local();
+        let days = (naive.date() - start_date).num_days();
+        if days < 0 { return Some(0); }
+        use chrono::Timelike;
+        return Some(days as u64 * 24 * 60 + naive.time().hour() as u64 * 60 + naive.time().minute() as u64);
+    }
+    // Try without timezone (YYYY-MM-DDTHH:MM:SS)
     if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(deadline, "%Y-%m-%dT%H:%M:%S") {
         let days = (dt.date() - start_date).num_days();
-        if days < 0 {
-            return Some(0);
-        }
+        if days < 0 { return Some(0); }
         use chrono::Timelike;
-        let minutes = days as u64 * 24 * 60 + dt.time().hour() as u64 * 60 + dt.time().minute() as u64;
-        return Some(minutes);
+        return Some(days as u64 * 24 * 60 + dt.time().hour() as u64 * 60 + dt.time().minute() as u64);
     }
+    // Try date-only (YYYY-MM-DD)
     if let Ok(d) = chrono::NaiveDate::parse_from_str(deadline, "%Y-%m-%d") {
         let days = (d - start_date).num_days();
-        if days < 0 {
-            return Some(0);
-        }
+        if days < 0 { return Some(0); }
         return Some(days as u64 * 24 * 60 + 17 * 60);
     }
     None
