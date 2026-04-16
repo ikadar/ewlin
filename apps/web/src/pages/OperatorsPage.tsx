@@ -669,12 +669,13 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-flux-text-primary font-medium mb-4">
+      <div className="bg-flux-elevated border border-flux-border-light rounded-lg w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] flex flex-col">
+        <h2 className="text-flux-text-primary font-medium px-6 pt-6 pb-4">
           {initial ? "Modifier l'opérateur" : 'Nouvel opérateur'}
         </h2>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto px-6 pb-4 flex flex-col gap-6">
           {/* Section 1: Identity */}
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -882,8 +883,10 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
             </button>
           </div>
 
-          {/* Footer */}
-          <div className="flex gap-3 justify-end pt-2">
+          </div>{/* end scrollable body */}
+
+          {/* Footer — fixed at bottom */}
+          <div className="flex gap-3 justify-end px-6 py-4 border-t border-flux-border">
             <button
               type="button"
               onClick={onCancel}
