@@ -639,10 +639,45 @@ fn place_backward(
     let mut all_operators: Vec<usize> = Vec::new();
     let mut t = deadline.min(horizon_ticks);
 
+    // Peremption bookkeeping: track consecutive skipped ticks during the
+    // backward walk. If we skip >= peremption_ticks ticks while still
+    // consuming run work (i.e., forward view = run interrupted by a long
+    // idle window), add setup_ticks back to work_remaining. This mirrors
+    // the forward-pass post-setup peremption rule so that LAST estimates
+    // account for re-calage cost across weekends/off-shifts.
+    let peremption_ticks = attrs.peremption_ticks;
+    let mut consecutive_skipped: u32 = 0;
+    let mut peremption_applied: u32 = 0;
+    let apply_peremption_on_skip =
+        |work_remaining: &mut f64, consecutive_skipped: &mut u32, peremption_applied: &mut u32| {
+            if setup_ticks == 0 || peremption_ticks == 0 {
+                return;
+            }
+            if *peremption_applied >= super::forward_pass::MAX_PEREMPTION_RETRIES {
+                return;
+            }
+            // Only applies while we still have run work to go (work_remaining
+            // exceeds setup_ticks in the backward perspective = run phase).
+            if *work_remaining <= setup_ticks as f64 {
+                return;
+            }
+            *consecutive_skipped += 1;
+            if *consecutive_skipped >= peremption_ticks {
+                *work_remaining += setup_ticks as f64;
+                *peremption_applied += 1;
+                *consecutive_skipped = 0;
+            }
+        };
+
     while work_remaining > 0.001 && t > 0 {
         t -= 1;
 
         if !grid.is_station_free(station_idx, t) {
+            apply_peremption_on_skip(
+                &mut work_remaining,
+                &mut consecutive_skipped,
+                &mut peremption_applied,
+            );
             continue;
         }
 
@@ -661,8 +696,16 @@ fn place_backward(
         );
 
         if operators.is_empty() && grid.num_operators > 0 {
+            apply_peremption_on_skip(
+                &mut work_remaining,
+                &mut consecutive_skipped,
+                &mut peremption_applied,
+            );
             continue;
         }
+
+        // Productive tick — reset skip counter.
+        consecutive_skipped = 0;
 
         let productivity: f64 = if operators.is_empty() {
             1.0

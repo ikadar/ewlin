@@ -134,6 +134,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 // these chunked actions are by definition non-pinned.
                 is_pinned: false,
                 pinned_start_tick: None,
+                peremption_count: 0,
             });
 
             prev_chunk_idx = Some(idx);
@@ -187,5 +188,6 @@ pub fn clone_action(a: &Action) -> Action {
         chain_remaining_art: a.chain_remaining_art,
         is_pinned: a.is_pinned,
         pinned_start_tick: a.pinned_start_tick,
+        peremption_count: a.peremption_count,
     }
 }

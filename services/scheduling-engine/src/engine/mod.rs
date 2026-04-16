@@ -684,6 +684,7 @@ pub fn build_actions(
                     chain_remaining_art: 0, // computed below
                     is_pinned: task.is_pinned,
                     pinned_start_tick: task.pinned_start_tick,
+                    peremption_count: 0,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);

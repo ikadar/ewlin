@@ -154,7 +154,18 @@ pub struct Action {
     /// if `is_pinned`). Used by `pre_place_pinned_actions` to set
     /// start_tick / end_tick before the main loop runs.
     pub pinned_start_tick: Option<usize>,
+    /// Number of times this action's setup has expired due to post-setup
+    /// peremption (extended idle after setup completion). Each occurrence
+    /// re-adds setup_ticks of work to art. Capped to prevent runaway loops.
+    pub peremption_count: u32,
 }
+
+/// Cap on how many times an action can re-setup due to peremption before
+/// being rejected. Prevents infinite stalls when an action is repeatedly
+/// interrupted mid-run (e.g., chronically understaffed station). Each
+/// occurrence adds setup_ticks of work; if the action keeps getting
+/// re-pre-empted, the main loop must back off and re-plan.
+pub const MAX_PEREMPTION_RETRIES: u32 = 3;
 
 /// Manages operator availability with dynamic extension
 pub struct OperatorAvailability {
@@ -1156,6 +1167,48 @@ fn apply_chunk_re_setup(actions: &mut Vec<Action>, action_idx: usize, start_t: u
 /// the station-group active count if applicable, and adds the assigned
 /// operators to their operator_stations slots at tick t.
 ///
+/// Apply the peremption rule to a stalled action. Returns true if the rule
+/// triggered a reset (mid-setup rewind or post-setup re-calage).
+///
+/// Two regimes, both gated by peremption_ticks consecutive idle ticks and
+/// the per-action retry cap (MAX_PEREMPTION_RETRIES):
+///
+///   1. Mid-setup (0 < eat < setup_ticks): setup progress lost, eat rewinds
+///      to 0, art gets the lost ticks back. No run work was done.
+///
+///   2. Post-setup (eat >= setup_ticks): calage physically expires (in
+///      offset printing: ink dries, registration shifts), but run progress
+///      is preserved — on resume, operator re-cales then continues from
+///      where run was interrupted. art += setup_ticks (re-setup cost),
+///      eat = 0 (so the `eat < setup_ticks` gate reports setup-phase
+///      again). Run work already done stays accounted for: art only grows
+///      by setup_ticks, not by run progress.
+pub fn apply_peremption_rule(a: &mut Action, setup_ticks: u32, peremption_ticks: u32) -> bool {
+    if peremption_ticks == 0 || a.art == 0 || a.idle_ticks < peremption_ticks {
+        return false;
+    }
+    if a.peremption_count >= MAX_PEREMPTION_RETRIES {
+        return false;
+    }
+    if a.eat > 0 && a.eat < setup_ticks {
+        a.art += a.eat;
+        a.eat = 0;
+        a.work_accumulator = 0.0;
+        a.idle_ticks = 0;
+        a.peremption_count += 1;
+        true
+    } else if a.eat >= setup_ticks && a.eat < setup_ticks + a.run_ticks {
+        a.art += setup_ticks;
+        a.eat = 0;
+        a.work_accumulator = 0.0;
+        a.idle_ticks = 0;
+        a.peremption_count += 1;
+        true
+    } else {
+        false
+    }
+}
+
 /// Side effects on Action state: increments idle_ticks on stall, may
 /// reset eat on peremption.
 fn assign_action_at_tick(
@@ -1255,16 +1308,11 @@ fn assign_action_at_tick(
         if let Some(g) = group_idx {
             grid.increment_group(g, t);
         }
-        // Peremption: if setup stalls too long, reset setup progress
-        if attrs.peremption_ticks > 0
-            && actions[action_idx].idle_ticks >= attrs.peremption_ticks
-            && actions[action_idx].eat > 0
-            && actions[action_idx].eat < setup_ticks
-        {
-            actions[action_idx].art += actions[action_idx].eat;
-            actions[action_idx].eat = 0;
-            actions[action_idx].idle_ticks = 0;
-        }
+        apply_peremption_rule(
+            &mut actions[action_idx],
+            setup_ticks,
+            attrs.peremption_ticks,
+        );
 
         // Skip ahead if NO qualified operator is available at all
         let any_qualified_available = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
@@ -1874,5 +1922,142 @@ mod selection_tests {
             &grid, 5, 0, &skills, &avail, &groups, &[], 1, false,
         );
         assert_eq!(result, vec![1], "no preference → highest prof wins");
+    }
+}
+
+#[cfg(test)]
+mod peremption_tests {
+    use super::*;
+
+    /// Helper: build a minimal Action with the given setup/run and state.
+    fn make_action(setup_ticks: u32, run_ticks: u32, eat: u32, art: u32, idle_ticks: u32) -> Action {
+        Action {
+            idx: 0,
+            task_id: "t".into(),
+            job_id: "j".into(),
+            station_idx: 0,
+            setup_ticks,
+            run_ticks,
+            art,
+            eat,
+            last: u64::MAX,
+            predecessor_idx: None,
+            predecessor_gap_ticks: 0,
+            end_tick: None,
+            assigned_operators: Vec::new(),
+            start_tick: None,
+            chunk_info: None,
+            deadline_priority: 2,
+            job_deadline_tick: u64::MAX,
+            earliest_retry_tick: None,
+            additional_predecessors: Vec::new(),
+            work_accumulator: 0.0,
+            idle_ticks,
+            tick_operator_log: Vec::new(),
+            original_art: setup_ticks + run_ticks,
+            total_productivity: 0.0,
+            ticks_counted: 0,
+            is_pinned: false,
+            chain_remaining_art: setup_ticks + run_ticks,
+            pinned_start_tick: None,
+            peremption_count: 0,
+        }
+    }
+
+    /// Mid-setup peremption: 5 of 15 setup done, stall >= peremption_ticks.
+    /// Expected: eat rewinds to 0, art gets the 5 ticks back, count = 1.
+    /// Regression guard for the original behavior.
+    #[test]
+    fn mid_setup_peremption_rewinds_setup_progress() {
+        // setup=15, run=10, eat=5 (mid-setup), art=20 (25 total - 5 done), idle=8 >= peremption=8
+        let mut a = make_action(15, 10, 5, 20, 8);
+        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        assert!(triggered);
+        assert_eq!(a.eat, 0, "eat rewound to 0");
+        assert_eq!(a.art, 25, "art gets the 5 ticks back (setup restart)");
+        assert_eq!(a.peremption_count, 1);
+        assert_eq!(a.idle_ticks, 0);
+    }
+
+    /// Post-setup peremption: setup fully done, 3 run ticks done, then long stall.
+    /// Expected: eat resets to 0 (setup-phase again), art += setup_ticks,
+    /// run progress (3 ticks) is preserved — i.e. art did NOT grow by run progress too.
+    #[test]
+    fn post_setup_peremption_re_adds_setup_only() {
+        // setup=15, run=10, eat=18 (setup+3 run), art=7 (10-3), idle=10 >= 8
+        let mut a = make_action(15, 10, 18, 7, 10);
+        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        assert!(triggered);
+        assert_eq!(a.eat, 0, "eat resets to 0 → in_setup gate triggers again");
+        assert_eq!(a.art, 7 + 15, "art += setup_ticks only, run progress preserved");
+        assert_eq!(a.peremption_count, 1);
+    }
+
+    /// Cap: MAX_PEREMPTION_RETRIES consecutive peremptions are allowed,
+    /// then further stalls do not reset the action. Prevents infinite loops
+    /// when a station is chronically understaffed.
+    #[test]
+    fn peremption_cap_stops_further_resets() {
+        let mut a = make_action(15, 10, 18, 7, 10);
+        for i in 1..=MAX_PEREMPTION_RETRIES {
+            a.idle_ticks = 10;
+            a.eat = 18;
+            a.art = 7;
+            let triggered = apply_peremption_rule(&mut a, 15, 8);
+            assert!(triggered, "iteration {i} should trigger");
+            assert_eq!(a.peremption_count, i);
+        }
+        // One more attempt should NOT reset.
+        a.idle_ticks = 10;
+        a.eat = 18;
+        a.art = 7;
+        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        assert!(!triggered, "cap prevents further resets");
+        assert_eq!(a.eat, 18, "state unchanged past cap");
+        assert_eq!(a.art, 7);
+    }
+
+    /// Below threshold: idle_ticks < peremption_ticks → no trigger.
+    #[test]
+    fn no_trigger_below_threshold() {
+        let mut a = make_action(15, 10, 18, 7, 5);
+        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        assert!(!triggered);
+        assert_eq!(a.eat, 18);
+        assert_eq!(a.art, 7);
+        assert_eq!(a.peremption_count, 0);
+    }
+
+    /// Peremption disabled (peremption_ticks = 0): never triggers even on long stall.
+    /// Matches the station config peremption_threshold_minutes = null/0 case.
+    #[test]
+    fn peremption_disabled_never_triggers() {
+        let mut a = make_action(15, 10, 18, 7, 10_000);
+        let triggered = apply_peremption_rule(&mut a, 15, 0);
+        assert!(!triggered);
+    }
+
+    /// Edge case: action already complete (art == 0) → no reset.
+    #[test]
+    fn completed_action_not_perempted() {
+        let mut a = make_action(15, 10, 25, 0, 100);
+        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        assert!(!triggered);
+    }
+
+    /// Komori G40 weekend scenario: setup=1 tick (15min at tick=15min),
+    /// run=7 ticks, eat=2 (setup done + 1 run tick), long weekend stall.
+    /// Friday 17:45 → setup tick; 18:00 run starts; weekend idle ~240 ticks;
+    /// Monday tick comes back. Expected: re-calage added before run resume.
+    #[test]
+    fn komori_g40_weekend_triggers_re_calage() {
+        // tick = 15 min. setup=15 min = 1 tick. run=105 min = 7 ticks.
+        // eat=2 means setup tick done + 1 run tick done. art=7-1=6.
+        // peremption_ticks = 120/15 = 8. Weekend idle ~240 >> 8.
+        let mut a = make_action(1, 7, 2, 6, 240);
+        let triggered = apply_peremption_rule(&mut a, 1, 8);
+        assert!(triggered);
+        assert_eq!(a.eat, 0, "re-setup needed after weekend");
+        assert_eq!(a.art, 6 + 1, "run progress preserved, setup_ticks re-added");
     }
 }
