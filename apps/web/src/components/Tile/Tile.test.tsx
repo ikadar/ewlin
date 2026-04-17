@@ -89,8 +89,6 @@ describe('colorUtils', () => {
       states.forEach((state) => {
         const classes = getStateColorClasses(state);
         expect(classes.border).toBeTruthy();
-        expect(classes.setupBg).toBeTruthy();
-        expect(classes.setupBorder).toBeTruthy();
         expect(classes.runBg).toBeTruthy();
         expect(classes.text).toBeTruthy();
       });
@@ -212,7 +210,6 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} />);
 
     expect(screen.getByTestId('tile-setup-section')).toBeInTheDocument();
-    expect(screen.getByTestId('tile-run-section')).toBeInTheDocument();
   });
 
   it('does not render setup section when task has no setup time', () => {
@@ -224,7 +221,7 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} task={taskNoSetup} />);
 
     expect(screen.queryByTestId('tile-setup-section')).not.toBeInTheDocument();
-    expect(screen.getByTestId('tile-run-section')).toBeInTheDocument();
+    expect(screen.getByTestId('tile-assignment-1')).toBeInTheDocument();
   });
 
   it('shows incomplete icon when not completed', () => {
@@ -343,7 +340,7 @@ describe('Tile', () => {
     expect(tile).toHaveStyle({ height: '1280px' });
   });
 
-  it('maintains setup/run ratio for stretched tiles', () => {
+  it('uses real wall-clock duration for setup height on stretched tiles', () => {
     // Assignment that spans overnight: 17:00 to 09:00 next day = 16 hours
     const stretchedAssignment: TaskAssignment = {
       ...mockAssignment,
@@ -355,15 +352,10 @@ describe('Tile', () => {
     render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
 
     const setupSection = screen.getByTestId('tile-setup-section');
-    const runSection = screen.getByTestId('tile-run-section');
-
-    // Original ratio: 30 setup / 90 total = 1/3
-    // Stretched total height: 1280px
-    const setupHeight = parseFloat(setupSection.style.height);
-    const runHeight = parseFloat(runSection.style.height);
-
-    // Check ratio is maintained (setup should be 1/3 of total)
-    expect(setupHeight / (setupHeight + runHeight)).toBeCloseTo(30 / 90, 2);
+    // Setup is 30 real minutes → 40px at 80px/hour, independent of the tile
+    // being stretched over downtime. Matches the operator view's wall-clock
+    // projection so the calage zone renders at its true temporal size.
+    expect(setupSection.style.height).toBe('40px');
   });
 
   it('positions at correct top position', () => {

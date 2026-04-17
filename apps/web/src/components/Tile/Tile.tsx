@@ -98,8 +98,8 @@ export const Tile = memo(function Tile({
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
-  const { setupMinutes, runMinutes } = task.duration;
-  const originalTotalMinutes = setupMinutes + runMinutes;
+  const { setupMinutes } = task.duration;
+  const hasSetup = setupMinutes > 0;
 
   // Calculate total height from scheduled time span (downtime-aware)
   // This reflects actual time on grid, including stretching across non-operating periods
@@ -108,11 +108,10 @@ export const Tile = memo(function Tile({
   const spanMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
   const totalHeight = minutesToPixels(spanMinutes, pixelsPerHour);
 
-  // Calculate setup/run heights proportionally based on original duration ratio
-  // This maintains visual distinction even when tile is stretched
-  const setupRatio = originalTotalMinutes > 0 ? setupMinutes / originalTotalMinutes : 0;
-  const setupHeight = totalHeight * setupRatio;
-  const runHeight = totalHeight * (1 - setupRatio);
+  // Setup height = real wall-clock duration, projected from scheduledStart.
+  // Matches TileSegment's calage-overlay model on the operator view so both
+  // planning views render the calage zone at its real temporal size.
+  const setupHeight = hasSetup ? minutesToPixels(setupMinutes, pixelsPerHour) : 0;
 
   // Task interruption teeth — rendered INWARD so adjacent tiles never overlap
   // visually. The rendered box matches the tile's time span exactly; the
@@ -164,9 +163,6 @@ export const Tile = memo(function Tile({
     onContextMenu?.(e.clientX, e.clientY, assignment.id, isCompleted, assignment.isPinned);
   };
 
-  // Determine if we have setup time to show
-  const hasSetup = setupMinutes > 0;
-
   // Selection outline is handled by CSS selector on [data-job-id] (instant, no re-render needed)
 
   // v0.4.32b: Blocked tiles show dashed border. Border width is driven by
@@ -216,14 +212,15 @@ export const Tile = memo(function Tile({
           overlay, tooltip) are not clipped away on tiles with teeth. The
           left border lives inside the wrapper so it follows the tooth shape. */}
       <div
-        className={`absolute inset-0 ${borderStyleClass} ${colorClasses.border}`}
+        className={`absolute inset-0 ${borderStyleClass} ${colorClasses.border} ${colorClasses.runBg}`}
         style={{ clipPath, borderLeftWidth: `${TILE_BORDER_WIDTH_PX}px` }}
       >
-        {/* Setup section (if has setup time) - background only. Fills the tile's
-            full time span; inward clip-path eats any tooth zone out of backgrounds. */}
+        {/* Setup overlay (if has setup time). Same background as the tile —
+            only the CSS border from data-testid="tile-setup-section" (dotted
+            black) marks the calage zone. Mirrors TileSegment's overlay model. */}
         {hasSetup && (
           <div
-            className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
+            className="absolute left-0 right-0"
             style={{
               top: 0,
               height: `${setupHeight}px`,
@@ -232,20 +229,10 @@ export const Tile = memo(function Tile({
           />
         )}
 
-        {/* Run section - background only */}
-        <div
-          className={`absolute left-0 right-0 ${colorClasses.runBg}`}
-          style={{
-            top: hasSetup ? `${setupHeight}px` : 0,
-            height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
-          }}
-          data-testid="tile-run-section"
-        />
-
-        {/* Re-calage sections (post-peremption setup reruns reported by the
-            engine). Rendered on top of the run section at their time offset;
-            styled via data-testid="tile-recalage-section" in index.css to
-            match the initial setup visuals. */}
+        {/* Re-calage overlays (post-peremption setup reruns reported by the
+            engine). Same background as the tile — styled via
+            data-testid="tile-recalage-section" in index.css (dashed red
+            border-bottom) to flag the zone as a re-calage. */}
         {(assignment.recalages ?? []).map((rc, idx) => {
           const rcStartMs = new Date(rc.start).getTime();
           const rcEndMs = new Date(rc.end).getTime();
@@ -257,7 +244,7 @@ export const Tile = memo(function Tile({
           return (
             <div
               key={`recalage-${idx}`}
-              className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
+              className="absolute left-0 right-0"
               style={{ top: `${rcTop}px`, height: `${rcHeight}px` }}
               data-testid="tile-recalage-section"
             />

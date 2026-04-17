@@ -14,8 +14,6 @@ export type TileState = 'shipped' | 'late' | 'conflict' | 'blocked' | 'completed
 
 export interface ColorClasses {
   border: string;
-  setupBg: string;
-  setupBorder: string;
   runBg: string;
   text: string;
 }
@@ -74,43 +72,31 @@ export const ALL_TILE_STATES = Object.keys(PALETTE) as TileState[];
 const stateColorMap: Record<TileState, ColorClasses> = {
   shipped: {
     border: 'border-l-emerald-500',
-    setupBg: 'bg-emerald-500/[0.14]',
-    setupBorder: 'border-emerald-400/20',
     runBg: 'bg-emerald-500/[0.09]',
     text: 'text-emerald-300',
   },
   default: {
     border: 'border-l-blue-500',
-    setupBg: 'bg-blue-500/[0.12]',
-    setupBorder: 'border-blue-400/20',
     runBg: 'bg-blue-500/[0.12]',
     text: 'text-blue-300',
   },
   completed: {
     border: 'border-l-green-500',
-    setupBg: 'bg-green-500/[0.14]',
-    setupBorder: 'border-green-400/20',
     runBg: 'bg-green-500/[0.09]',
     text: 'text-green-300',
   },
   conflict: {
     border: 'border-l-amber-500',
-    setupBg: 'bg-amber-500/[0.14]',
-    setupBorder: 'border-amber-400/20',
     runBg: 'bg-amber-500/[0.09]',
     text: 'text-amber-300',
   },
   late: {
     border: 'border-l-red-500',
-    setupBg: 'bg-red-500/[0.14]',
-    setupBorder: 'border-red-400/20',
     runBg: 'bg-red-500/[0.09]',
     text: 'text-red-300',
   },
   blocked: {
     border: 'border-l-zinc-500',
-    setupBg: 'bg-zinc-500/[0.10]',
-    setupBorder: 'border-zinc-400/15',
     runBg: 'bg-zinc-500/[0.06]',
     text: 'text-zinc-400',
   },

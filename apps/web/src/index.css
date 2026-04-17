@@ -251,23 +251,6 @@ body {
   border-bottom: 1px dashed rgba(239,68,68,0.9) !important;
 }
 
-/* Run section inner bottom border */
-[data-testid="tile-run-section"] {
-  border-bottom: 3px solid black;
-}
-
-/* Left border notch on run section — breaks visual continuity between stacked tiles */
-[data-testid="tile-run-section"]::before {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: -4px;
-  width: 4px;
-  height: 3px;
-  background: var(--color-flux-base);
-  z-index: 20;
-}
-
 /* Inline-pin kept as a persistent state indicator — shown only when the
    tile is pinned. Folder-tab removed: done/pin actions will be wired
    through a different UI in an upcoming iteration. */
