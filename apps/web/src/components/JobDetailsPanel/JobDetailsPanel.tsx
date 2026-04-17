@@ -233,7 +233,7 @@ export function JobDetailsPanel({
               {job.reference}
             </span>
             <span className="mx-[7px] text-zinc-600">·</span>
-            <span className="text-xs text-zinc-400 truncate">
+            <span className="text-[12px] text-zinc-400 truncate">
               {job.client}
             </span>
           </div>
@@ -257,7 +257,7 @@ export function JobDetailsPanel({
         {/* Deadlines encadré: Départ + BAT */}
         <div className="bg-white/[0.02] border border-white/5 rounded-[3px] p-2 flex flex-col gap-1 mb-2.5">
           <div
-            className={`flex items-center gap-[7px] text-xs text-zinc-200 ${handleDateClick ? 'cursor-pointer hover:text-zinc-50' : ''}`}
+            className={`flex items-center gap-[7px] text-[12px] text-zinc-200 ${handleDateClick ? 'cursor-pointer hover:text-zinc-50' : ''}`}
             onClick={handleDateClick}
           >
             <Calendar className="w-[13px] h-[13px] text-zinc-500 shrink-0" />
@@ -271,7 +271,7 @@ export function JobDetailsPanel({
             )}
           </div>
           {job.batDeadline && (
-            <div className="flex items-center gap-[7px] text-xs text-zinc-200">
+            <div className="flex items-center gap-[7px] text-[12px] text-zinc-200">
               <CalendarCheck className="w-[11px] h-[11px] text-zinc-500 shrink-0" />
               <span>
                 D.L. BAT <strong className="font-semibold text-zinc-50">{formatJobDate(job.batDeadline)}</strong>
@@ -285,7 +285,7 @@ export function JobDetailsPanel({
           <div className="flex flex-wrap gap-y-2 gap-x-4 mb-2.5">
             {requiredJobs.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap" data-testid="job-dependencies">
-                <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Prérequis</span>
+                <span className="text-[10px] uppercase tracking-[0.07em] text-zinc-600 font-medium">Prérequis</span>
                 {requiredJobs.map((rj) => (
                   <button
                     key={rj.id}
@@ -300,7 +300,7 @@ export function JobDetailsPanel({
             )}
             {dependentJobs.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap" data-testid="job-dependents">
-                <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Requis par</span>
+                <span className="text-[10px] uppercase tracking-[0.07em] text-zinc-600 font-medium">Requis par</span>
                 {dependentJobs.map((dj) => (
                   <button
                     key={dj.id}

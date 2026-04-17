@@ -176,7 +176,7 @@ export const TaskTile = memo(function TaskTile({
 
     return (
       <div
-        className={`rounded-[3px] ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''}`}
+        className={`${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''}`}
         style={{ borderLeftColor: style.borderColor }}
         onContextMenu={handleOutsourcedContextMenu}
       >
@@ -305,7 +305,7 @@ export const TaskTile = memo(function TaskTile({
         <button
           ref={tileRef}
           type="button"
-          className={`min-h-[2rem] pt-0.5 px-2 text-sm border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2`}
+          className={`border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2`}
           style={tileInlineStyle}
           data-testid={`task-tile-${task.id}`}
           onClick={handleClick}
@@ -314,7 +314,7 @@ export const TaskTile = memo(function TaskTile({
           onMouseEnter={handleTipEnter}
           onMouseLeave={tipLeave}
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
             <div className="flex items-center gap-1.5 min-w-0">
               <span
                 onClick={handleToggleComplete}
@@ -338,7 +338,7 @@ export const TaskTile = memo(function TaskTile({
               {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
                 <>
                   <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
-                  <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-1.5 py-px font-bold tracking-wider shrink-0">
+                  <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-[5px] py-px font-bold tracking-[0.02em] shrink-0">
                     {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
                   </span>
                 </>
@@ -355,13 +355,13 @@ export const TaskTile = memo(function TaskTile({
             </div>
           </div>
           {operatorAssignments && operatorAssignments.length > 0 && (
-            <div className="px-1.5 pb-1.5 flex flex-col gap-0.5">
+            <div className="flex flex-col pt-0 pl-[11px] pr-[10px] pb-2 gap-[3px]">
               {operatorAssignments.map((op, i) => {
                 const fromStr = op.from ? new Date(op.from).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
                 const toStr = op.to ? new Date(op.to).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
                 const timeRange = fromStr && toStr ? `${fromStr}–${toStr}` : '';
                 return (
-                  <div key={i} className="flex items-center gap-1.5 bg-zinc-800/60 rounded-[3px] px-1.5 py-0.5">
+                  <div key={i} className="flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px]">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
                     <span className="text-[11.5px] text-zinc-300 truncate flex-1">{op.name}</span>
                     <span className="text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
@@ -400,7 +400,7 @@ export const TaskTile = memo(function TaskTile({
   };
 
   // Handle click for pick & place
-  const baseClassName = `h-8 pt-0.5 px-2 text-sm border-l-4 ${style.bg} select-none transition-all duration-150 cursor-default`;
+  const baseClassName = `border-l-4 ${style.bg} select-none transition-all duration-150 cursor-default`;
 
   return (
     <div
@@ -409,7 +409,7 @@ export const TaskTile = memo(function TaskTile({
       data-testid={`task-tile-${task.id}`}
       onContextMenu={handleUnplacedContextMenu}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>
             {displayName}
@@ -417,7 +417,7 @@ export const TaskTile = memo(function TaskTile({
           {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
             <>
               <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
-              <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-1.5 py-px font-bold tracking-wider shrink-0">
+              <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-[5px] py-px font-bold tracking-[0.02em] shrink-0">
                 {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
               </span>
             </>

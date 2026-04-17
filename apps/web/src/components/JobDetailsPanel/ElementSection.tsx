@@ -34,12 +34,12 @@ export function ElementSection({
   return (
     <div className="bg-white/[0.015] border border-white/5 p-2.5 mb-2.5 rounded-none">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10.5px] font-bold tracking-widest uppercase text-zinc-300 truncate min-w-0">
+        <span className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-zinc-200 truncate min-w-0">
           {element.name}
         </span>
         {hasPrecedence && (
-          <div className="ml-auto flex items-center gap-1 shrink-0">
-            <span className="italic text-[9.5px] text-zinc-600 tracking-wider mr-px">après</span>
+          <div className="ml-auto flex items-center gap-[3px] shrink-0">
+            <span className="italic text-[9.5px] text-zinc-600 tracking-[0.03em] mr-px">après</span>
             {precedenceElements.map((e) => (
               <span
                 key={e.id}
