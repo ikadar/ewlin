@@ -7,9 +7,8 @@
  */
 
 import type { TileState } from './colorUtils';
-
-const SAW_AMPLITUDE = 10;
-const SAW_TEETH = 13;
+import type { PhaseSegment } from '@flux/types';
+import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath } from './sawtooth';
 
 // State → colors for SVG.
 const STATE_COLORS: Record<TileState, { bg: string; border: string; text: string }> = {
@@ -54,77 +53,41 @@ interface TileSegmentProps {
   overrideWidth?: string;
   /** Click handler */
   onClick?: () => void;
+  /** Segment start wall-clock time (needed to project calage windows). */
+  segFrom?: Date;
+  /** Segment end wall-clock time. */
+  segTo?: Date;
+  /** Initial setup window of the parent task (wall-clock start + end). */
+  setupWindow?: { start: Date; end: Date };
+  /** Re-calage windows reported by the engine for the parent task. */
+  recalages?: PhaseSegment[];
 }
 
 /**
- * Build an SVG <path> d-attribute for a visible zigzag stroke line.
- * Coordinates are in pixel space matching the container's viewBox.
+ * Intersect [aStart, aEnd] with [bStart, bEnd]. Returns the overlap or null.
  */
-function buildSawtoothSvgPath(
-  width: number,
-  y: number,
-  direction: 'top' | 'bottom',
-): string {
-  const amp = SAW_AMPLITUDE;
-  const teeth = SAW_TEETH;
-  const stepW = width / teeth;
-  const parts: string[] = [];
-
-  if (direction === 'top') {
-    // Top edge: zigzag starting at valley (y + amp), peaking at y
-    parts.push(`M 0 ${y + amp}`);
-    for (let i = 0; i < teeth; i++) {
-      parts.push(`L ${(i * stepW + stepW / 2).toFixed(1)} ${y}`);
-      parts.push(`L ${((i + 1) * stepW).toFixed(1)} ${y + amp}`);
-    }
-  } else {
-    // Bottom edge: zigzag starting at valley (y - amp), peaking at y
-    parts.push(`M 0 ${y - amp}`);
-    for (let i = 0; i < teeth; i++) {
-      parts.push(`L ${(i * stepW + stepW / 2).toFixed(1)} ${y}`);
-      parts.push(`L ${((i + 1) * stepW).toFixed(1)} ${y - amp}`);
-    }
-  }
-
-  return parts.join(' ');
+function intersect(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): { start: Date; end: Date } | null {
+  const start = aStart > bStart ? aStart : bStart;
+  const end = aEnd < bEnd ? aEnd : bEnd;
+  return end > start ? { start, end } : null;
 }
 
 /**
- * Build a CSS clip-path polygon() string.
- * X coordinates use percentages (responsive to container width).
- * Y coordinates use pixels (fixed tooth height).
+ * Project a wall-clock window onto segment pixel coordinates.
+ * Returns {top, height} within the segment body (above the eventual
+ * sawtooth extension, caller adds extTop).
  */
-function buildCssClipPath(h: number, sawTop: boolean, sawBottom: boolean): string | undefined {
-  if (!sawTop && !sawBottom) return undefined;
-
-  const amp = SAW_AMPLITUDE;
-  const teeth = SAW_TEETH;
-  const stepPct = 100 / teeth;
-  const points: string[] = [];
-
-  // Top edge (left to right)
-  if (sawTop) {
-    for (let i = 0; i < teeth; i++) {
-      points.push(`${(i * stepPct).toFixed(2)}% ${amp}px`);
-      points.push(`${(i * stepPct + stepPct / 2).toFixed(2)}% 0px`);
-      points.push(`${((i + 1) * stepPct).toFixed(2)}% ${amp}px`);
-    }
-  } else {
-    points.push('0% 0px', '100% 0px');
-  }
-
-  // Bottom edge (right to left)
-  if (sawBottom) {
-    points.push(`100% ${h - amp}px`);
-    for (let i = teeth - 1; i >= 0; i--) {
-      points.push(`${(i * stepPct + stepPct / 2).toFixed(2)}% ${h}px`);
-      points.push(`${(i * stepPct).toFixed(2)}% ${h - amp}px`);
-    }
-  } else {
-    points.push(`100% ${h}px`, `0% ${h}px`);
-  }
-
-  return `polygon(${points.join(', ')})`;
+function projectWindow(
+  win: { start: Date; end: Date },
+  segFrom: Date,
+  segHeight: number,
+  segMs: number,
+): { top: number; height: number } {
+  const offsetMs = win.start.getTime() - segFrom.getTime();
+  const durMs = win.end.getTime() - win.start.getTime();
+  const top = (offsetMs / segMs) * segHeight;
+  const height = (durMs / segMs) * segHeight;
+  return { top, height };
 }
 
 export function TileSegment({
@@ -144,6 +107,10 @@ export function TileSegment({
   overrideLeft,
   overrideWidth,
   onClick,
+  segFrom,
+  segTo,
+  setupWindow,
+  recalages,
 }: TileSegmentProps) {
   const colors = STATE_COLORS[tileState] || STATE_COLORS.default;
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
@@ -151,6 +118,32 @@ export function TileSegment({
   const totalHeight = height + extTop + extBottom;
   const contentTop = extTop + 2;
   const contentBottom = extBottom + 2;
+
+  // Compute calage-phase overlays: setup section + any re-calage sections
+  // that intersect this segment. Each gets its pixel footprint within the
+  // segment body (above the sawtooth extension).
+  const calageOverlays: Array<{ key: string; kind: 'setup' | 'recalage'; top: number; height: number }> = [];
+  if (segFrom && segTo && height > 0) {
+    const segMs = segTo.getTime() - segFrom.getTime();
+    if (segMs > 0) {
+      if (setupWindow) {
+        const inter = intersect(segFrom, segTo, setupWindow.start, setupWindow.end);
+        if (inter) {
+          const p = projectWindow(inter, segFrom, height, segMs);
+          calageOverlays.push({ key: 'setup', kind: 'setup', top: p.top, height: p.height });
+        }
+      }
+      (recalages ?? []).forEach((rc, idx) => {
+        const rcStart = new Date(rc.start);
+        const rcEnd = new Date(rc.end);
+        const inter = intersect(segFrom, segTo, rcStart, rcEnd);
+        if (inter) {
+          const p = projectWindow(inter, segFrom, height, segMs);
+          calageOverlays.push({ key: `recalage-${idx}`, kind: 'recalage', top: p.top, height: p.height });
+        }
+      });
+    }
+  }
 
   return (
     <div
@@ -181,6 +174,22 @@ export function TileSegment({
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom),
         }}
       />
+
+      {/* Calage phase overlays (initial setup + post-peremption re-calages).
+          Same CSS rule applies to both via data-testid in index.css:
+          1px dashed red border-bottom. */}
+      {calageOverlays.map((ov) => (
+        <div
+          key={ov.key}
+          className="absolute left-0 right-0"
+          style={{
+            top: `${extTop + ov.top}px`,
+            height: `${Math.max(ov.height, 2)}px`,
+            background: colors.bg,
+          }}
+          data-testid={ov.kind === 'setup' ? 'tile-setup-section' : 'tile-recalage-section'}
+        />
+      ))}
 
       {/* SVG zigzag stroke lines — visible teeth at sawtooth edges */}
       {(sawtoothTop || sawtoothBottom) && (

@@ -265,12 +265,11 @@ export default function OperatorSchedulePage() {
       for (const opRef of a.operators) {
         const list = map.get(opRef.operatorId);
         if (list) {
-          // Use operator-specific from/to for tile positioning if available
-          if (opRef.from && opRef.to) {
-            list.push({ ...a, scheduledStart: opRef.from, scheduledEnd: opRef.to });
-          } else {
-            list.push(a);
-          }
+          // Put this specific opRef first and drop the operator's other opRefs, so
+          // computeTileSlices resolves the correct window per push. Other operators
+          // remain visible to findRelayOperator.
+          const otherOperators = a.operators.filter(o => o.operatorId !== opRef.operatorId);
+          list.push({ ...a, operators: [opRef, ...otherOperators] });
         }
       }
     }
@@ -650,6 +649,15 @@ export default function OperatorSchedulePage() {
 
     const label = `${job.reference} · ${job.client}`;
 
+    // Build the setup window (wall-clock start of the task's first tile
+    // + setupMinutes). The engine's scheduled_start is the task's global
+    // start, so the setup window is `[scheduledStart, scheduledStart + setupMinutes]`.
+    const setupMinutes = task.duration?.setupMinutes ?? 0;
+    const taskStart = assignment ? new Date(assignment.scheduledStart) : null;
+    const setupWindow = setupMinutes > 0 && taskStart
+      ? { start: taskStart, end: new Date(taskStart.getTime() + setupMinutes * 60_000) }
+      : undefined;
+
     return (
       <TileSegment
         key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
@@ -667,6 +675,10 @@ export default function OperatorSchedulePage() {
         operatorAttention={operatorAttention}
         isMaskedTime={slice.isMasked}
         onClick={() => setSelectedJobId(job.id)}
+        segFrom={slice.from}
+        segTo={slice.to}
+        setupWindow={setupWindow}
+        recalages={assignment?.recalages}
         {...positionProps}
       />
     );
