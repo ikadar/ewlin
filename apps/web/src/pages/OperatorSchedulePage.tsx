@@ -658,11 +658,6 @@ export default function OperatorSchedulePage() {
         tileState={tileState}
         isMaskedTime={slice.isMasked}
         onClick={() => setSelectedJobId(job.id)}
-        assignmentId={slice.assignmentId}
-        isPinned={assignment?.isPinned ?? false}
-        isCompleted={assignment?.isCompleted ?? false}
-        onToggleComplete={handleToggleComplete}
-        onTogglePin={handleTogglePin}
         segFrom={slice.from}
         segTo={slice.to}
         setupWindow={setupWindow}

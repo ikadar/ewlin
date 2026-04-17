@@ -1910,7 +1910,6 @@ function AppContent() {
           totalDays={DAY_COUNT}
           onSelectJob={setSelectedJobId}
           onDeselect={handleDeselect}
-          onToggleComplete={handleToggleComplete}
           onTogglePin={handleTogglePin}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}

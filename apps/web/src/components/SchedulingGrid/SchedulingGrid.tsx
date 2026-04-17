@@ -63,9 +63,7 @@ export interface SchedulingGridProps {
   onSelectJob?: (jobId: string) => void;
   /** Callback when clicking the grid background (deselect) */
   onDeselect?: () => void;
-  /** Callback when completion icon is clicked */
-  onToggleComplete?: (assignmentId: string) => void;
-  /** Callback when pin icon is clicked */
+  /** Callback when pin icon is clicked (inline state indicator when pinned) */
   onTogglePin?: (assignmentId: string) => void;
   /** Schedule conflicts for conflict visualization (REQ-12) */
   conflicts?: ScheduleConflict[];
@@ -109,7 +107,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       pixelsPerHour = PIXELS_PER_HOUR,
       onSelectJob,
       onDeselect,
-      onToggleComplete,
       onTogglePin,
       conflicts = [],
       groups = [],
@@ -559,7 +556,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         isSelected={selectedJobId === cached.jobId}
                         similarityResults={cached.similarityResults}
                         onSelect={onSelectJob}
-                        onToggleComplete={onToggleComplete}
                         onTogglePin={onTogglePin}
                         hasConflict={cached.hasConflict}
                         tileState={cached.tileState}

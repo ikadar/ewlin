@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
+import { Scissors, Pin } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SimilarityIndicators } from './SimilarityIndicators';
@@ -28,9 +28,7 @@ export interface TileProps {
   similarityResults?: SimilarityResult[];
   /** Whether this tile has a conflict (precedence violation - REQ-12) */
   hasConflict?: boolean;
-  /** Callback when completion icon is clicked */
-  onToggleComplete?: (assignmentId: string) => void;
-  /** Callback when pin icon is clicked */
+  /** Callback when pin icon is clicked (inline state indicator when pinned) */
   onTogglePin?: (assignmentId: string) => void;
   /** Pixels per hour for height calculation (default: 80) */
   pixelsPerHour?: number;
@@ -82,7 +80,6 @@ export const Tile = memo(function Tile({
   isSelected = false,
   similarityResults,
   hasConflict = false,
-  onToggleComplete,
   onTogglePin,
   pixelsPerHour = PIXELS_PER_HOUR,
   onContextMenu,
@@ -155,12 +152,6 @@ export const Tile = memo(function Tile({
     onSelect?.(job.id);
   };
 
-  // Handle completion toggle (v0.3.33)
-  const handleToggleComplete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onToggleComplete?.(assignment.id);
-  };
-
   const handleTogglePin = (e: React.MouseEvent) => {
     e.stopPropagation();
     onTogglePin?.(assignment.id);
@@ -193,12 +184,6 @@ export const Tile = memo(function Tile({
         width: overrideWidth ?? undefined,
         right: overrideWidth ? undefined : 0,
         opacity: overrideOpacity ?? undefined,
-        // State color tokens consumed by the folder tab and any future
-        // state-aware decorations. Set as CSS custom properties so child
-        // layers don't need to know the palette.
-        ['--tile-rgb' as string]: stateRgb.tile,
-        ['--tile-border-rgb' as string]: stateRgb.border,
-        ['--tile-text-rgb' as string]: stateRgb.text,
       }}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -316,21 +301,6 @@ export const Tile = memo(function Tile({
         style={{ top: `${extTop}px`, bottom: `${extBottom}px` }}
       >
         <div className="flex items-start gap-2">
-          <span className="inline-check">
-            {isCompleted ? (
-              <CircleCheck
-                className="w-4 h-4 text-emerald-500 shrink-0 pointer-events-auto cursor-pointer hover:text-emerald-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-completed-icon"
-              />
-            ) : (
-              <Circle
-                className="w-4 h-4 text-zinc-600 shrink-0 pointer-events-auto cursor-pointer hover:text-zinc-400 transition-colors"
-                onClick={handleToggleComplete}
-                data-testid="tile-incomplete-icon"
-              />
-            )}
-          </span>
           <span className="inline-pin">
             <Pin
               className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
@@ -419,7 +389,6 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
 function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
   return (
     prev.onSelect !== next.onSelect ||
-    prev.onToggleComplete !== next.onToggleComplete ||
     prev.onTogglePin !== next.onTogglePin ||
     prev.onContextMenu !== next.onContextMenu
   );
