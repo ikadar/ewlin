@@ -82,7 +82,7 @@ export const JobCard = memo(function JobCard({
   return (
     <button
       type="button"
-      className={`mx-2 mb-[3px] pl-[9px] pr-3 py-[6px] rounded-r-[8px] rounded-l-[2px] cursor-pointer transition-colors focus-visible:ring-1 focus-visible:ring-white/30 border-l-[3px] ${accentClass} ${selectedClass} ${dimClass} text-left w-[calc(100%-1rem)]`}
+      className={`mx-2 mb-[2px] pl-[9px] pr-3 py-[5px] cursor-pointer transition-colors focus-visible:ring-1 focus-visible:ring-white/30 border-l-[3px] ${accentClass} ${selectedClass} ${dimClass} text-left w-[calc(100%-1rem)]`}
       onClick={handleClick}
       data-testid={`job-card-${id}`}
       data-status={status ?? 'normal'}
@@ -97,7 +97,7 @@ export const JobCard = memo(function JobCard({
         )}
       </div>
 
-      <div className={`truncate mb-[2px] text-[12px] ${descColor}`}>{description}</div>
+      <div className={`truncate mb-[1px] text-[12px] ${descColor}`}>{description}</div>
 
       <div className="flex items-center justify-between gap-2">
         <ProgressBar tasks={tasks} assignments={assignments} />

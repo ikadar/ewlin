@@ -31,7 +31,7 @@ export function JobsListHeader({
       <div className="flex gap-2">
         <button
           type="button"
-          className="shrink-0 w-[32px] self-stretch flex items-center justify-center rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 w-[32px] self-stretch flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onAddJob}
           disabled={!onAddJob}
           aria-label="Ajouter un travail"
@@ -46,13 +46,13 @@ export function JobsListHeader({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Rechercher..."
-            className="w-full pl-[30px] pr-[10px] py-[6px] text-[12px] bg-white/[0.04] border border-white/[0.08] rounded-md text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-white/20 focus:bg-white/10"
+            className="w-full pl-[30px] pr-[10px] py-[6px] text-[12px] bg-white/[0.04] border border-white/[0.08] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-white/20 focus:bg-white/10"
           />
         </div>
       </div>
 
       <div
-        className="flex gap-0.5 bg-white/[0.04] rounded-md p-0.5"
+        className="flex gap-0.5 bg-white/[0.04] p-0.5"
         role="tablist"
         aria-label="Filtrer par état de planification"
       >
@@ -111,7 +111,7 @@ function TabButton({ active, onClick, label, count }: TabButtonProps) {
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex-1 text-[11px] px-2 py-[6px] rounded flex items-center justify-center gap-1.5 font-medium transition-colors ${
+      className={`flex-1 text-[11px] px-2 py-[6px] flex items-center justify-center gap-1.5 font-medium transition-colors ${
         active
           ? 'bg-white/10 text-white shadow-[0_1px_2px_rgba(0,0,0,0.2)]'
           : 'text-zinc-400 hover:text-zinc-200'
@@ -145,7 +145,7 @@ function ChipButton({ active, onClick, label, count, variant }: ChipButtonProps)
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`text-[11px] px-2 py-1 rounded-full border font-medium inline-flex items-center gap-1.5 transition-colors ${
+      className={`text-[11px] px-2 py-1 border font-medium inline-flex items-center gap-1.5 transition-colors ${
         active
           ? activeClasses
           : 'bg-white/[0.04] border-white/[0.06] text-zinc-400 hover:bg-white/10 hover:text-zinc-200'

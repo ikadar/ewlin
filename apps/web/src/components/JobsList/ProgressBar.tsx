@@ -23,7 +23,7 @@ export function ProgressBar({ tasks, assignments }: ProgressBarProps) {
 
   return (
     <div
-      className="flex gap-0.5 h-[3px] w-[72px] rounded-sm overflow-hidden shrink-0"
+      className="flex gap-0.5 h-[3px] w-[72px] overflow-hidden shrink-0"
       data-testid="progress-bar"
     >
       {sortedTasks.map((task) => {
@@ -32,7 +32,7 @@ export function ProgressBar({ tasks, assignments }: ProgressBarProps) {
         return (
           <div
             key={task.id}
-            className={`flex-1 min-w-[4px] rounded-[1px] ${STATE_CLASSES[state]}`}
+            className={`flex-1 min-w-[4px] ${STATE_CLASSES[state]}`}
             data-testid={`bar-seg-${task.id}`}
             data-state={state}
             aria-hidden="true"
