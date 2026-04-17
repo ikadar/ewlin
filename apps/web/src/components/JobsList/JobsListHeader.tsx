@@ -27,26 +27,26 @@ export function JobsListHeader({
   chipCounts,
 }: JobsListHeaderProps) {
   return (
-    <div className="shrink-0 p-3 flex flex-col gap-2">
+    <div className="shrink-0 px-3 pt-3 pb-2 flex flex-col gap-2">
       <div className="flex gap-2">
         <button
           type="button"
-          className="shrink-0 w-9 self-stretch flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 w-[32px] self-stretch flex items-center justify-center rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onAddJob}
           disabled={!onAddJob}
           aria-label="Ajouter un travail"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
         </button>
 
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-zinc-500" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Rechercher..."
-            className="w-full pl-9 pr-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-white/20 focus:bg-white/10"
+            className="w-full pl-[30px] pr-[10px] py-[6px] text-[12px] bg-white/[0.04] border border-white/[0.08] rounded-md text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-white/20 focus:bg-white/10"
           />
         </div>
       </div>
@@ -90,7 +90,7 @@ export function JobsListHeader({
           onClick={() => onChipChange('conflict')}
           label="Conflits"
           count={chipCounts.conflict}
-          variant="conflict"
+          variant="neutral"
         />
       </div>
     </div>
@@ -111,9 +111,9 @@ function TabButton({ active, onClick, label, count }: TabButtonProps) {
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex-1 text-xs px-2 py-1.5 rounded flex items-center justify-center gap-1.5 font-medium transition-colors ${
+      className={`flex-1 text-[11px] px-2 py-[6px] rounded flex items-center justify-center gap-1.5 font-medium transition-colors ${
         active
-          ? 'bg-white/10 text-white shadow-sm'
+          ? 'bg-white/10 text-white shadow-[0_1px_2px_rgba(0,0,0,0.2)]'
           : 'text-zinc-400 hover:text-zinc-200'
       }`}
     >
@@ -130,7 +130,7 @@ interface ChipButtonProps {
   onClick: () => void;
   label: string;
   count: number;
-  variant: 'neutral' | 'late' | 'conflict';
+  variant: 'neutral' | 'late';
 }
 
 function ChipButton({ active, onClick, label, count, variant }: ChipButtonProps) {
@@ -138,8 +138,6 @@ function ChipButton({ active, onClick, label, count, variant }: ChipButtonProps)
   const activeClasses =
     variant === 'late'
       ? 'bg-red-500/[0.18] border-red-500/40 text-red-300'
-      : variant === 'conflict'
-      ? 'bg-amber-500/[0.18] border-amber-500/40 text-amber-300'
       : 'bg-blue-500/[0.18] border-blue-500/40 text-blue-300';
 
   return (
@@ -150,11 +148,13 @@ function ChipButton({ active, onClick, label, count, variant }: ChipButtonProps)
       className={`text-[11px] px-2 py-1 rounded-full border font-medium inline-flex items-center gap-1.5 transition-colors ${
         active
           ? activeClasses
-          : 'bg-white/[0.04] border-white/10 text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
+          : 'bg-white/[0.04] border-white/[0.06] text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
       } ${zero && !active ? 'opacity-40' : ''}`}
     >
       <span>{label}</span>
-      <span className="font-mono text-[10px] opacity-75">{count}</span>
+      <span className={`font-mono text-[10px] ${active ? 'opacity-100' : 'opacity-75'}`}>
+        {count}
+      </span>
     </button>
   );
 }

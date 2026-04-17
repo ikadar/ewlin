@@ -238,7 +238,7 @@ export function JobsList({
         chipCounts={chipCounts}
       />
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto jobslist-scroll">
         {visibleJobs.length > 0 ? (
           visibleJobs.map(renderJobCard)
         ) : (
