@@ -48,11 +48,14 @@ export interface TaskTileProps {
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
   /** Operator assignments for this task */
   operatorAssignments?: Array<{
+    operatorId: string;
     name: string;
     attention: number;
     from?: string;
     to?: string;
   }>;
+  /** Callback to scroll the grid to a specific operator slice (operator view) */
+  onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
 }
 
 /** Visual style config per tile state */
@@ -126,6 +129,7 @@ export const TaskTile = memo(function TaskTile({
   onTogglePin,
   onContextMenu,
   operatorAssignments,
+  onJumpToOperatorSlice,
 }: TaskTileProps) {
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
@@ -356,8 +360,23 @@ export const TaskTile = memo(function TaskTile({
                 const fromTime = fromDate ? fromDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
                 const toTime = toDate ? toDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
                 const timeRange = fromTime && toTime ? `${dateStr} ${fromTime}–${toTime}` : '';
+                const isClickable = !!onJumpToOperatorSlice && !!fromDate;
+                const jumpToSlice = (e: React.SyntheticEvent) => {
+                  if (!isClickable || !fromDate) return;
+                  e.stopPropagation();
+                  onJumpToOperatorSlice!(op.operatorId, fromDate);
+                };
                 return (
-                  <div key={i} className="flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px]">
+                  <div
+                    key={i}
+                    role={isClickable ? 'button' : undefined}
+                    tabIndex={isClickable ? 0 : undefined}
+                    onClick={isClickable ? jumpToSlice : undefined}
+                    onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToSlice(e); } } : undefined}
+                    className={`flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px] ${
+                      isClickable ? 'cursor-pointer hover:bg-zinc-700/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30' : ''
+                    }`}
+                  >
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
                     <span className="text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
                     <span className="text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>

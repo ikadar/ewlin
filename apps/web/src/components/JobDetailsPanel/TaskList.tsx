@@ -47,6 +47,8 @@ export interface TaskListProps {
   onContextMenu?: (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => void;
   /** Operators from snapshot (for displaying names on assignments) */
   snapshotOperators?: Array<{ id: string; firstName: string; lastName: string }>;
+  /** Callback to scroll the grid to a specific operator slice (operator view) */
+  onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
 }
 
 /**
@@ -73,6 +75,7 @@ export function TaskList({
   onTogglePin,
   onContextMenu,
   snapshotOperators,
+  onJumpToOperatorSlice,
 }: TaskListProps) {
   // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
   const { assignmentByTaskId, stationById, taskById, providerById } = useMemo(() => ({
@@ -226,12 +229,14 @@ export function TaskList({
             operatorAssignments={assignment?.operators?.map(op => {
               const opObj = snapshotOperators?.find(o => o.id === op.operatorId);
               return {
+                operatorId: op.operatorId,
                 name: opObj ? `${opObj.firstName} ${opObj.lastName}` : op.operatorId.slice(0, 8),
                 attention: op.attention,
                 from: op.from,
                 to: op.to,
               };
             })}
+            onJumpToOperatorSlice={onJumpToOperatorSlice}
           />
         </div>
       );

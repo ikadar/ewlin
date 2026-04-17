@@ -58,6 +58,8 @@ export interface JobDetailsPanelProps {
   onSelectJob?: (jobId: string) => void;
   /** Operators from snapshot (for displaying names on assignments) */
   snapshotOperators?: Array<{ id: string; firstName: string; lastName: string }>;
+  /** Callback to scroll the operator grid to a specific operator slice */
+  onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
 }
 
 /** Format a datetime as DD/MM/YYYY a HHhMM */
@@ -115,6 +117,7 @@ export function JobDetailsPanel({
   allJobs,
   onSelectJob,
   snapshotOperators,
+  onJumpToOperatorSlice,
 }: JobDetailsPanelProps) {
   // Memoize data filtering for this job
   const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
@@ -348,6 +351,7 @@ export function JobDetailsPanel({
         onTogglePin={onTogglePin}
         onContextMenu={handleTileContextMenu}
         snapshotOperators={snapshotOperators}
+        onJumpToOperatorSlice={onJumpToOperatorSlice}
       />
 
       {contextMenu && (

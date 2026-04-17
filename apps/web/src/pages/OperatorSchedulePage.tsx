@@ -284,6 +284,66 @@ export default function OperatorSchedulePage() {
     scrollContainerRef.current.scrollTo({ top: y, behavior: 'smooth' });
   }, [pixelsPerHour, gridStartDate]);
 
+  // ---- Scroll grid to a specific operator slice (operatorId + from time) ----
+  // Used by JobCard click (1st non-completed tile of job) and mini-row click in JobDetailsPanel.
+  // Y: ~20% from top (matches App.tsx:1289). X: operator column centered horizontally.
+  const scrollToOperatorSlice = useCallback((operatorId: string, from: Date) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const operatorIndex = operators.findIndex((op) => op.id === operatorId);
+    if (operatorIndex < 0) return;
+
+    const y = timeToYPosition(from, START_HOUR, pixelsPerHour, gridStartDate);
+    const top = Math.max(0, y - container.clientHeight * 0.2);
+
+    // Timeline (48px sticky) + px-3 (12px) + index * (column + gap-3 (12px))
+    const columnX = 48 + 12 + operatorIndex * (OPERATOR_COLUMN_WIDTH + 12);
+    const left = Math.max(0, columnX - container.clientWidth / 2 + OPERATOR_COLUMN_WIDTH / 2);
+
+    container.scrollTo({ top, left, behavior: 'smooth' });
+  }, [operators, pixelsPerHour, gridStartDate]);
+
+  // ---- JobCard click: select + center grid on 1st non-completed tile of the job ----
+  const handleSelectJob = useCallback((jobId: string | null) => {
+    // Toggle: if re-clicking the selected card, deselect (no scroll)
+    if (jobId === null || jobId === selectedJobId) {
+      setSelectedJobId(null);
+      return;
+    }
+    setSelectedJobId(jobId);
+
+    // Find tasks of this job (via elementMap)
+    const jobTaskIds = new Set<string>();
+    for (const t of snapshot.tasks) {
+      const el = elementMap.get(t.elementId);
+      if (el?.jobId === jobId) jobTaskIds.add(t.id);
+    }
+    if (jobTaskIds.size === 0) return;
+
+    // 1st non-completed assignment, sorted by scheduledStart
+    let firstAssignment: TaskAssignment | null = null;
+    for (const a of snapshot.assignments) {
+      if (!jobTaskIds.has(a.taskId) || a.isCompleted) continue;
+      if (!a.operators || a.operators.length === 0) continue;
+      if (!firstAssignment || new Date(a.scheduledStart) < new Date(firstAssignment.scheduledStart)) {
+        firstAssignment = a;
+      }
+    }
+    if (!firstAssignment || !firstAssignment.operators) return;
+
+    // Pick the opRef that starts earliest (smallest from)
+    let earliestOp: { operatorId: string; from?: string } | null = null;
+    for (const op of firstAssignment.operators) {
+      if (!op.from) continue;
+      if (!earliestOp || !earliestOp.from || new Date(op.from) < new Date(earliestOp.from)) {
+        earliestOp = op;
+      }
+    }
+    if (!earliestOp?.from) return;
+
+    scrollToOperatorSlice(earliestOp.operatorId, new Date(earliestOp.from));
+  }, [selectedJobId, snapshot.tasks, snapshot.assignments, elementMap, scrollToOperatorSlice]);
+
   // ---- Compute schedule ----
   const handleComputeSchedule = useCallback(() => {
     setComputeModalJobId(undefined);
@@ -690,7 +750,7 @@ export default function OperatorSchedulePage() {
           lateJobs={snapshot.lateJobs}
           conflicts={snapshot.conflicts}
           selectedJobId={selectedJobId}
-          onSelectJob={setSelectedJobId}
+          onSelectJob={handleSelectJob}
         />
       </div>
       )}
@@ -720,6 +780,7 @@ export default function OperatorSchedulePage() {
             allJobs={snapshot.jobs}
             onSelectJob={setSelectedJobId}
             snapshotOperators={snapshot.operators}
+            onJumpToOperatorSlice={scrollToOperatorSlice}
           />
         </div>
       )}
