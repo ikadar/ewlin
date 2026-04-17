@@ -1848,7 +1848,6 @@ function AppContent() {
               conflicts={snapshot.conflicts}
               selectedJobId={selectedJobId}
               onSelectJob={setSelectedJobId}
-              onAddJob={handleOpenJcf}
             />
           </div>
         )}

@@ -523,36 +523,12 @@ describe('JobsListHeader', () => {
     expect(screen.getByPlaceholderText('Rechercher...')).toBeInTheDocument();
   });
 
-  it('renders add job button', () => {
-    render(<JobsListHeader searchQuery="" onSearchChange={() => {}} {...headerStubs} />);
-    expect(screen.getByLabelText('Ajouter un travail')).toBeInTheDocument();
-  });
-
   it('calls onSearchChange when typing', () => {
     const onSearchChange = vi.fn();
     render(<JobsListHeader searchQuery="" onSearchChange={onSearchChange} {...headerStubs} />);
     const input = screen.getByPlaceholderText('Rechercher...');
     fireEvent.change(input, { target: { value: 'test' } });
     expect(onSearchChange).toHaveBeenCalledWith('test');
-  });
-
-  it('disables add button when no handler provided', () => {
-    render(<JobsListHeader searchQuery="" onSearchChange={() => {}} {...headerStubs} />);
-    expect(screen.getByLabelText('Ajouter un travail')).toBeDisabled();
-  });
-
-  it('calls onAddJob when add button clicked', () => {
-    const onAddJob = vi.fn();
-    render(
-      <JobsListHeader
-        searchQuery=""
-        onSearchChange={() => {}}
-        onAddJob={onAddJob}
-        {...headerStubs}
-      />
-    );
-    fireEvent.click(screen.getByLabelText('Ajouter un travail'));
-    expect(onAddJob).toHaveBeenCalled();
   });
 
   it('renders both tabs with counts', () => {

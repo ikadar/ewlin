@@ -1,4 +1,4 @@
-import { Plus, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export type JobTab = 'planified' | 'unplanified';
 export type JobChip = 'all' | 'late' | 'conflict';
@@ -6,7 +6,6 @@ export type JobChip = 'all' | 'late' | 'conflict';
 export interface JobsListHeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onAddJob?: () => void;
   activeTab: JobTab;
   onTabChange: (tab: JobTab) => void;
   tabCounts: { planified: number; unplanified: number };
@@ -18,7 +17,6 @@ export interface JobsListHeaderProps {
 export function JobsListHeader({
   searchQuery,
   onSearchChange,
-  onAddJob,
   activeTab,
   onTabChange,
   tabCounts,
@@ -28,31 +26,19 @@ export function JobsListHeader({
 }: JobsListHeaderProps) {
   return (
     <div className="shrink-0 px-3 pt-3 pb-2 flex flex-col gap-2">
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className="shrink-0 w-[32px] self-stretch flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={onAddJob}
-          disabled={!onAddJob}
-          aria-label="Ajouter un travail"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-
-        <div className="relative flex-1">
-          <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-zinc-500" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Rechercher..."
-            className="w-full pl-[30px] pr-[10px] py-[6px] text-[12px] bg-white/[0.04] border border-white/[0.08] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-white/20 focus:bg-white/10"
-          />
-        </div>
+      <div className="relative">
+        <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-zinc-500" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Rechercher..."
+          className="w-full pl-[30px] pr-[10px] py-[6px] text-[12px] bg-white/[0.04] border border-white/[0.08] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-white/20 focus:bg-white/10"
+        />
       </div>
 
       <div
-        className="flex gap-0.5 bg-white/[0.04] p-0.5"
+        className="flex bg-white/[0.04] rounded-md overflow-hidden"
         role="tablist"
         aria-label="Filtrer par état de planification"
       >
@@ -113,7 +99,7 @@ function TabButton({ active, onClick, label, count }: TabButtonProps) {
       onClick={onClick}
       className={`flex-1 text-[11px] px-2 py-[6px] flex items-center justify-center gap-1.5 font-medium transition-colors ${
         active
-          ? 'bg-white/10 text-white shadow-[0_1px_2px_rgba(0,0,0,0.2)]'
+          ? 'bg-white/10 text-white'
           : 'text-zinc-400 hover:text-zinc-200'
       }`}
     >
@@ -145,7 +131,7 @@ function ChipButton({ active, onClick, label, count, variant }: ChipButtonProps)
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`text-[11px] px-2 py-1 border font-medium inline-flex items-center gap-1.5 transition-colors ${
+      className={`text-[11px] px-2 py-1 rounded-full border font-medium inline-flex items-center gap-1.5 transition-colors ${
         active
           ? activeClasses
           : 'bg-white/[0.04] border-white/[0.06] text-zinc-400 hover:bg-white/10 hover:text-zinc-200'

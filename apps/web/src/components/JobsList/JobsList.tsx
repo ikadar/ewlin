@@ -13,7 +13,6 @@ export interface JobsListProps {
   conflicts: ScheduleConflict[];
   selectedJobId?: string | null;
   onSelectJob?: (jobId: string | null) => void;
-  onAddJob?: () => void;
 }
 
 export function JobsList({
@@ -25,7 +24,6 @@ export function JobsList({
   conflicts,
   selectedJobId,
   onSelectJob,
-  onAddJob,
 }: JobsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<JobTab>('planified');
@@ -216,6 +214,7 @@ export function JobsList({
         isCompleted={isJobCompleted(job.id)}
         bufferLabel={computeBufferLabel(job, jobTasks, jobAssignments)}
         isSelected={selectedJobId === job.id}
+        dim={selectedJobId != null && selectedJobId !== job.id}
         onClick={handleJobToggle}
       />
     );
@@ -229,7 +228,6 @@ export function JobsList({
       <JobsListHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onAddJob={onAddJob}
         activeTab={activeTab}
         onTabChange={handleTabChange}
         tabCounts={{ planified: planifiedJobs.length, unplanified: unplanifiedJobs.length }}

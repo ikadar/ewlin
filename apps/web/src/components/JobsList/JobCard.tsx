@@ -17,6 +17,8 @@ export interface JobCardProps {
   /** Whether all tasks are completed (distinct from problemType). */
   isCompleted?: boolean;
   isSelected?: boolean;
+  /** Dim this card because another job is selected (spotlight pattern). */
+  dim?: boolean;
   bufferLabel?: string;
   onClick?: (jobId: string) => void;
 }
@@ -35,6 +37,7 @@ export const JobCard = memo(function JobCard({
   isCompleted = false,
   bufferLabel,
   isSelected = false,
+  dim = false,
   onClick,
 }: JobCardProps) {
   const handleClick = useCallback(() => {
@@ -54,7 +57,12 @@ export const JobCard = memo(function JobCard({
   })();
 
   const selectedClass = isSelected ? 'bg-white/10' : 'hover:bg-white/5';
-  const dimClass = status === 'completed' ? 'opacity-[0.72] hover:opacity-100' : '';
+  const dimClass = (() => {
+    if (isSelected) return '';
+    if (dim) return 'opacity-[0.5] hover:opacity-100';
+    if (status === 'completed') return 'opacity-[0.72] hover:opacity-100';
+    return '';
+  })();
 
   const refColor = (() => {
     if (status === 'late') return 'text-red-300';
@@ -82,7 +90,7 @@ export const JobCard = memo(function JobCard({
   return (
     <button
       type="button"
-      className={`mx-2 mb-[2px] pl-[9px] pr-3 py-[5px] cursor-pointer transition-colors focus-visible:ring-1 focus-visible:ring-white/30 border-l-[3px] ${accentClass} ${selectedClass} ${dimClass} text-left w-[calc(100%-1rem)]`}
+      className={`mx-2 mb-[6px] pl-[9px] pr-3 py-[3px] cursor-pointer transition-[background-color,opacity] duration-150 focus-visible:ring-1 focus-visible:ring-white/30 border-l-[3px] ${accentClass} ${selectedClass} ${dimClass} text-left w-[calc(100%-1rem)]`}
       onClick={handleClick}
       data-testid={`job-card-${id}`}
       data-status={status ?? 'normal'}
