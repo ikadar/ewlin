@@ -518,6 +518,8 @@ function AppContent() {
     let restoreUrl: string;
     if (fromRoute?.startsWith('/flux')) {
       restoreUrl = fromRoute;
+    } else if (fromRoute === '/') {
+      restoreUrl = '/';
     } else if (savedJobId) {
       restoreUrl = `/stations/job/${savedJobId}`;
     } else {

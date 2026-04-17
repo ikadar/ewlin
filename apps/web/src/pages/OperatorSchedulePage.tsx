@@ -342,6 +342,12 @@ export default function OperatorSchedulePage() {
     setComputeModalMode('selective');
   }, []);
 
+  // Open JCF in edit mode for the selected job, returning to operator view on close
+  const handleEditJob = useCallback(() => {
+    if (!selectedJobId) return;
+    navigate('/stations/job/new', { state: { editJobId: selectedJobId, from: '/' } });
+  }, [navigate, selectedJobId]);
+
   // Incremental compute: place all unplaced jobs in the gaps
   const handleComputeIncremental = useCallback(() => {
     setComputeModalJobId(undefined);
@@ -709,7 +715,7 @@ export default function OperatorSchedulePage() {
             onReturnChange={handleOutsourcingReturnChange}
             onSplitTask={handleSplitTask}
             onFuseTask={handleFuseTask}
-            onComputeJob={handleComputeJob}
+            onEditJob={handleEditJob}
             lateJobIds={lateJobIds}
             allJobs={snapshot.jobs}
             onSelectJob={setSelectedJobId}

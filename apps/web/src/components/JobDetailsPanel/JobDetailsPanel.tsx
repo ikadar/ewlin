@@ -44,8 +44,6 @@ export interface JobDetailsPanelProps {
   conflictTaskIds?: Set<string>;
   /** v0.5.13b: Callback when edit button is clicked */
   onEditJob?: () => void;
-  /** Callback when "Calculer ce job" is clicked */
-  onComputeJob?: (jobId: string) => void;
   /** Job IDs that are late (past workshop exit date) */
   lateJobIds?: Set<string>;
   /** Job IDs that are shipped (highest priority tile coloring) */
@@ -110,7 +108,6 @@ export function JobDetailsPanel({
   onDepartureChange,
   onReturnChange,
   onEditJob,
-  onComputeJob,
   lateJobIds,
   shippedJobIds,
   onSplitTask,
@@ -316,27 +313,15 @@ export function JobDetailsPanel({
           </div>
         )}
 
-        {/* Action buttons at bottom */}
-        {(onEditJob || onComputeJob) && (
+        {onEditJob && (
           <div className="flex gap-1.5">
-            {onEditJob && (
-              <button
-                onClick={onEditJob}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-medium rounded bg-white/[0.04] border border-white/[0.09] text-zinc-200 hover:bg-white/[0.09] hover:text-zinc-50 transition-colors"
-                data-testid="job-details-edit-button"
-              >
-                Modifier
-              </button>
-            )}
-            {onComputeJob && (
-              <button
-                onClick={() => onComputeJob(job.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-medium rounded bg-blue-500/20 border border-blue-500 text-blue-300 hover:brightness-125 transition-all"
-                data-testid="job-details-compute-button"
-              >
-                Calculer ce job
-              </button>
-            )}
+            <button
+              onClick={onEditJob}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-medium rounded bg-white/[0.04] border border-white/[0.09] text-zinc-200 hover:bg-white/[0.09] hover:text-zinc-50 transition-colors"
+              data-testid="job-details-edit-button"
+            >
+              Modifier
+            </button>
           </div>
         )}
       </div>
