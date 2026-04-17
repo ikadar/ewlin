@@ -1,40 +1,28 @@
 import { memo, useCallback } from 'react';
 import type { Task, TaskAssignment } from '@flux/types';
-import { AlertCircle, Shuffle } from 'lucide-react';
-import { ProgressDots } from './ProgressDots';
+import { AlertCircle, Shuffle, Check } from 'lucide-react';
+import { ProgressBar } from './ProgressBar';
 
 export type JobProblemType = 'late' | 'conflict' | null;
 
 export interface JobCardProps {
-  /** Job ID */
   id: string;
-  /** Job reference number */
   reference: string;
-  /** Client name */
   client: string;
-  /** Job description */
   description: string;
-  /** Tasks for this job */
   tasks: Task[];
-  /** Assignments for this job's tasks */
   assignments: TaskAssignment[];
-  /** Deadline date string (e.g., "17/12") */
   deadline?: string;
-  /** Problem type if any */
   problemType?: JobProblemType;
-  /** Whether the job is selected */
+  /** Whether all tasks are completed (distinct from problemType). */
+  isCompleted?: boolean;
   isSelected?: boolean;
-  /** Buffer time label for fully-scheduled jobs (e.g., "+2j 4h") */
   bufferLabel?: string;
-  /** Click handler — receives job ID */
   onClick?: (jobId: string) => void;
 }
 
-/**
- * Individual job card with reference, client, description, and progress segments.
- * Supports normal, late, conflict, and selected states.
- * v0.3.46: Memoized to prevent unnecessary re-renders during selection changes.
- */
+type JobStatus = 'late' | 'conflict' | 'completed' | null;
+
 export const JobCard = memo(function JobCard({
   id,
   reference,
@@ -44,85 +32,78 @@ export const JobCard = memo(function JobCard({
   assignments,
   deadline,
   problemType,
+  isCompleted = false,
   bufferLabel,
   isSelected = false,
   onClick,
 }: JobCardProps) {
-  // Step 2c: Stable per-card click handler
   const handleClick = useCallback(() => {
     onClick?.(id);
   }, [onClick, id]);
 
-  // REQ-05: block display respects margins (w-full + margins caused overflow)
-  const baseClasses = 'mx-2 mb-1 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors focus-visible:ring-1 focus-visible:ring-white/30';
+  const status: JobStatus =
+    problemType === 'late' ? 'late' :
+    problemType === 'conflict' ? 'conflict' :
+    isCompleted ? 'completed' : null;
 
-  const stateClasses = (() => {
-    if (problemType === 'late') {
-      return isSelected
-        ? 'bg-red-500/20 border border-red-500/30'
-        : 'bg-red-500/10 border border-red-500/20 hover:bg-red-500/15';
-    }
-    if (problemType === 'conflict') {
-      return isSelected
-        ? 'bg-amber-500/20 border border-amber-500/30'
-        : 'bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15';
-    }
-    return isSelected
-      ? 'bg-white/10 border border-white/10'
-      : 'hover:bg-white/5';
+  const accentClass = (() => {
+    if (status === 'late') return 'border-l-red-500';
+    if (status === 'conflict') return 'border-l-amber-500';
+    if (status === 'completed') return 'border-l-emerald-500';
+    return 'border-l-transparent';
   })();
 
-  const referenceColor = (() => {
-    if (problemType === 'late') return 'text-red-300';
-    if (problemType === 'conflict') return 'text-amber-300';
+  const selectedClass = isSelected ? 'bg-white/10' : 'hover:bg-white/5';
+  const dimClass = status === 'completed' && !isSelected ? 'opacity-70 hover:opacity-100' : '';
+
+  const refColor = (() => {
+    if (status === 'late') return 'text-red-300';
+    if (status === 'conflict') return 'text-amber-300';
+    if (status === 'completed') return 'text-emerald-300';
     return 'text-zinc-500';
   })();
 
-  const iconColor = problemType === 'late' ? 'text-red-400' : 'text-amber-400';
+  const descColor = status ? 'text-zinc-100' : 'text-zinc-300';
 
-  // Render problem icon based on type (avoids creating component during render)
-  const renderProblemIcon = () => {
-    if (problemType === 'late') {
-      return <AlertCircle className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />;
-    }
-    if (problemType === 'conflict') {
-      return <Shuffle className={`w-4 h-4 ml-auto shrink-0 ${iconColor}`} />;
-    }
+  const statusIcon = (() => {
+    if (status === 'late') return <AlertCircle className="w-4 h-4 ml-auto shrink-0 text-red-400" />;
+    if (status === 'conflict') return <Shuffle className="w-4 h-4 ml-auto shrink-0 text-amber-400" />;
+    if (status === 'completed') return <Check className="w-4 h-4 ml-auto shrink-0 text-emerald-400" />;
     return null;
-  };
+  })();
+
+  const statusBadge = (() => {
+    if (status === 'late') return <span className="text-xs font-medium text-red-400">En retard</span>;
+    if (status === 'conflict') return <span className="text-xs font-medium text-amber-400">Conflit</span>;
+    if (status === 'completed') return <span className="text-xs font-medium text-emerald-400">Terminé</span>;
+    return null;
+  })();
 
   return (
     <button
       type="button"
-      className={`${baseClasses} ${stateClasses} text-left w-[calc(100%-1rem)]`}
+      className={`mx-2 mb-1 pl-[9px] pr-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors focus-visible:ring-1 focus-visible:ring-white/30 border-l-[3px] ${accentClass} ${selectedClass} ${dimClass} text-left w-[calc(100%-1rem)]`}
       onClick={handleClick}
       data-testid={`job-card-${id}`}
+      data-status={status ?? 'normal'}
     >
-      {/* Header row: reference · client + date/icon - REQ-05: overflow fix */}
       <div className="flex items-center gap-2 mb-1 overflow-hidden min-w-0">
-        <span className={`font-mono text-base shrink-0 ${referenceColor}`}>{reference}</span>
+        <span className={`font-mono text-base shrink-0 ${refColor}`}>{reference}</span>
         <span className="text-zinc-600 shrink-0">·</span>
         <span className="text-zinc-400 truncate min-w-0">{client}</span>
-        {renderProblemIcon()}
-        {!problemType && deadline && <span className="text-zinc-600 text-xs ml-auto shrink-0">{deadline}</span>}
+        {statusIcon}
+        {!status && deadline && (
+          <span className="text-zinc-600 text-xs ml-auto shrink-0">{deadline}</span>
+        )}
       </div>
 
-      {/* Description */}
-      <div className={`truncate mb-1.5 ${problemType ? 'text-zinc-100' : 'text-zinc-300'}`}>
-        {description}
-      </div>
+      <div className={`truncate mb-1.5 ${descColor}`}>{description}</div>
 
-      {/* Footer: progress dots (left) + badge/buffer (right) */}
-      <div className="flex items-center justify-between">
-        <ProgressDots tasks={tasks} assignments={assignments} />
+      <div className="flex items-center justify-between gap-2">
+        <ProgressBar tasks={tasks} assignments={assignments} />
         <div className="flex items-center gap-2">
-          {problemType === 'late' && (
-            <span className="text-xs font-medium text-red-400">En retard</span>
-          )}
-          {problemType === 'conflict' && (
-            <span className="text-xs font-medium text-amber-400">Conflit</span>
-          )}
-          {bufferLabel && (
+          {statusBadge}
+          {bufferLabel && status !== 'completed' && (
             <span className={`text-xs font-medium ${bufferLabel.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
               {bufferLabel}
             </span>

@@ -1,35 +1,21 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
-import { JobsListHeader } from './JobsListHeader';
-import { ProblemsSection } from './ProblemsSection';
-import { JobsSection } from './JobsSection';
+import { JobsListHeader, type JobTab, type JobChip } from './JobsListHeader';
 import { JobCard, type JobProblemType } from './JobCard';
 import { getJobIdForTask, groupTasksByJob, createTaskToJobMap } from '../../utils/taskHelpers';
 
 export interface JobsListProps {
-  /** All jobs */
   jobs: Job[];
-  /** All tasks */
   tasks: Task[];
-  /** All elements */
   elements: Element[];
-  /** All assignments */
   assignments: TaskAssignment[];
-  /** Late jobs */
   lateJobs: LateJob[];
-  /** Schedule conflicts */
   conflicts: ScheduleConflict[];
-  /** Currently selected job ID */
   selectedJobId?: string | null;
-  /** Job selection handler (null to deselect - REQ-03 toggle) */
   onSelectJob?: (jobId: string | null) => void;
-  /** Add job handler (opens JCF modal) */
   onAddJob?: () => void;
 }
 
-/**
- * Jobs List component showing all jobs with problems section at top.
- */
 export function JobsList({
   jobs,
   tasks,
@@ -42,8 +28,9 @@ export function JobsList({
   onAddJob,
 }: JobsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<JobTab>('planified');
+  const [activeChip, setActiveChip] = useState<JobChip>('all');
 
-  // Create sets for quick lookup
   const lateJobIds = useMemo(
     () => new Set(lateJobs.map((lj) => lj.jobId)),
     [lateJobs]
@@ -52,10 +39,7 @@ export function JobsList({
   const conflictJobIds = useMemo(() => {
     const ids = new Set<string>();
     conflicts.forEach((c) => {
-      // ApprovalGateConflict and DeadlineConflict are warnings, not scheduling conflicts.
-      // They have their own indicators (dashed border / late badge).
       if (c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict') return;
-      // Get job IDs from tasks involved in conflicts
       const task = tasks.find((t) => t.id === c.taskId);
       if (task) {
         const jobId = getJobIdForTask(task, elements);
@@ -65,15 +49,10 @@ export function JobsList({
     return ids;
   }, [conflicts, tasks, elements]);
 
-  // Group tasks by job ID using elements
-  const tasksByJob = useMemo(() => {
-    return groupTasksByJob(tasks, elements);
-  }, [tasks, elements]);
+  const tasksByJob = useMemo(() => groupTasksByJob(tasks, elements), [tasks, elements]);
 
-  // Group assignments by job ID (via tasks and elements)
   const assignmentsByJob = useMemo(() => {
     const taskJobMap = createTaskToJobMap(tasks, elements);
-
     const map = new Map<string, TaskAssignment[]>();
     assignments.forEach((assignment) => {
       const jobId = taskJobMap.get(assignment.taskId);
@@ -86,7 +65,31 @@ export function JobsList({
     return map;
   }, [tasks, elements, assignments]);
 
-  // Filter jobs by search query
+  const isJobPlanified = useCallback(
+    (jobId: string): boolean => (assignmentsByJob.get(jobId)?.length ?? 0) > 0,
+    [assignmentsByJob]
+  );
+
+  const isJobCompleted = useCallback(
+    (jobId: string): boolean => {
+      const jobTasks = tasksByJob.get(jobId) ?? [];
+      if (jobTasks.length === 0) return false;
+      const jobAssignments = assignmentsByJob.get(jobId) ?? [];
+      const assignmentByTask = new Map(jobAssignments.map((a) => [a.taskId, a]));
+      return jobTasks.every((t) => assignmentByTask.get(t.id)?.isCompleted === true);
+    },
+    [tasksByJob, assignmentsByJob]
+  );
+
+  const getProblemType = useCallback(
+    (jobId: string): JobProblemType => {
+      if (lateJobIds.has(jobId)) return 'late';
+      if (conflictJobIds.has(jobId)) return 'conflict';
+      return null;
+    },
+    [lateJobIds, conflictJobIds]
+  );
+
   const filteredJobs = useMemo(() => {
     if (!searchQuery.trim()) return jobs;
     const query = searchQuery.toLowerCase();
@@ -98,47 +101,50 @@ export function JobsList({
     );
   }, [jobs, searchQuery]);
 
-  // Separate problem jobs from normal jobs
-  const { problemJobs, normalJobs, getProblemType } = useMemo(() => {
-    // Determine problem type for a job
-    const getType = (jobId: string): JobProblemType => {
-      if (lateJobIds.has(jobId)) return 'late';
-      if (conflictJobIds.has(jobId)) return 'conflict';
-      return null;
+  const { planifiedJobs, unplanifiedJobs } = useMemo(() => {
+    const p: Job[] = [];
+    const u: Job[] = [];
+    filteredJobs.forEach((job) => {
+      if (isJobPlanified(job.id)) p.push(job);
+      else u.push(job);
+    });
+    return { planifiedJobs: p, unplanifiedJobs: u };
+  }, [filteredJobs, isJobPlanified]);
+
+  const tabJobs = activeTab === 'planified' ? planifiedJobs : unplanifiedJobs;
+
+  const chipCounts = useMemo(
+    () => ({
+      all: tabJobs.length,
+      late: tabJobs.filter((j) => lateJobIds.has(j.id)).length,
+      conflict: tabJobs.filter((j) => conflictJobIds.has(j.id)).length,
+    }),
+    [tabJobs, lateJobIds, conflictJobIds]
+  );
+
+  const visibleJobs = useMemo(() => {
+    let list = tabJobs;
+    if (activeChip === 'late') list = list.filter((j) => lateJobIds.has(j.id));
+    else if (activeChip === 'conflict') list = list.filter((j) => conflictJobIds.has(j.id));
+
+    // Flat sort: late → conflict → in-progress (has completed task) → normal → completed
+    const rank = (job: Job): number => {
+      if (lateJobIds.has(job.id)) return 0;
+      if (conflictJobIds.has(job.id)) return 1;
+      if (isJobCompleted(job.id)) return 4;
+      const jobAssignments = assignmentsByJob.get(job.id) ?? [];
+      const hasCompletedTask = jobAssignments.some((a) => a.isCompleted);
+      return hasCompletedTask ? 2 : 3;
     };
 
-    const problems: Job[] = [];
-    const normal: Job[] = [];
+    return [...list].sort((a, b) => rank(a) - rank(b));
+  }, [tabJobs, activeChip, lateJobIds, conflictJobIds, assignmentsByJob, isJobCompleted]);
 
-    filteredJobs.forEach((job) => {
-      const problemType = getType(job.id);
-      if (problemType) {
-        problems.push(job);
-      } else {
-        normal.push(job);
-      }
-    });
+  const handleTabChange = useCallback((tab: JobTab) => {
+    setActiveTab(tab);
+    setActiveChip('all');
+  }, []);
 
-    // Sort problems: late first, then conflicts
-    problems.sort((a, b) => {
-      const aType = getType(a.id);
-      const bType = getType(b.id);
-      if (aType === 'late' && bType !== 'late') return -1;
-      if (aType !== 'late' && bType === 'late') return 1;
-      return 0;
-    });
-
-    // Sort normal jobs: not fully scheduled first
-    normal.sort((a, b) => {
-      if (!a.fullyScheduled && b.fullyScheduled) return -1;
-      if (a.fullyScheduled && !b.fullyScheduled) return 1;
-      return 0;
-    });
-
-    return { problemJobs: problems, normalJobs: normal, getProblemType: getType };
-  }, [filteredJobs, lateJobIds, conflictJobIds]);
-
-  // Format date as DD/MM HH:mm
   const formatDeadline = (dateStr: string): string => {
     if (dateStr.includes('T')) {
       const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
@@ -147,26 +153,32 @@ export function JobsList({
         return `${day}/${month} ${hours}:${minutes}`;
       }
     }
-    // Date-only fallback
     const date = new Date(dateStr);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     return `${day}/${month} 14:00`;
   };
 
-  // Step 2a: Stable toggle callback using ref to avoid inline closures per card
   const selectedJobIdRef = useRef(selectedJobId);
-  useEffect(() => { selectedJobIdRef.current = selectedJobId; });
+  useEffect(() => {
+    selectedJobIdRef.current = selectedJobId;
+  });
 
-  const handleJobToggle = useCallback((jobId: string) => {
-    onSelectJob?.(selectedJobIdRef.current === jobId ? null : jobId);
-  }, [onSelectJob]);
+  const handleJobToggle = useCallback(
+    (jobId: string) => {
+      onSelectJob?.(selectedJobIdRef.current === jobId ? null : jobId);
+    },
+    [onSelectJob]
+  );
 
-  const computeBufferLabel = (job: Job, jobTasks: Task[], jobAssignments: TaskAssignment[]): string | undefined => {
+  const computeBufferLabel = (
+    job: Job,
+    jobTasks: Task[],
+    jobAssignments: TaskAssignment[]
+  ): string | undefined => {
     if (jobTasks.length === 0 || jobAssignments.length === 0 || !job.workshopExitDate) return undefined;
-    // Consider fully scheduled when every task has at least one assignment
-    const assignedTaskIds = new Set(jobAssignments.map(a => a.taskId));
-    const allTasksAssigned = jobTasks.every(t => assignedTaskIds.has(t.id));
+    const assignedTaskIds = new Set(jobAssignments.map((a) => a.taskId));
+    const allTasksAssigned = jobTasks.every((t) => assignedTaskIds.has(t.id));
     if (!allTasksAssigned) return undefined;
 
     const lastEnd = jobAssignments.reduce((max, a) => {
@@ -201,6 +213,7 @@ export function JobsList({
         assignments={jobAssignments}
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
         problemType={getProblemType(job.id)}
+        isCompleted={isJobCompleted(job.id)}
         bufferLabel={computeBufferLabel(job, jobTasks, jobAssignments)}
         isSelected={selectedJobId === job.id}
         onClick={handleJobToggle}
@@ -209,26 +222,28 @@ export function JobsList({
   };
 
   return (
-    <aside className="w-72 shrink-0 bg-zinc-900 flex flex-col border-r border-white/5 h-full" data-testid="jobs-list">
+    <aside
+      className="w-72 shrink-0 bg-zinc-900 flex flex-col border-r border-white/5 h-full"
+      data-testid="jobs-list"
+    >
       <JobsListHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onAddJob={onAddJob}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        tabCounts={{ planified: planifiedJobs.length, unplanified: unplanifiedJobs.length }}
+        activeChip={activeChip}
+        onChipChange={setActiveChip}
+        chipCounts={chipCounts}
       />
 
       <div className="flex-1 overflow-y-auto">
-        {/* Problems section */}
-        <ProblemsSection count={problemJobs.length}>
-          {problemJobs.map(renderJobCard)}
-        </ProblemsSection>
-
-        {/* Jobs section */}
-        <JobsSection>{normalJobs.map(renderJobCard)}</JobsSection>
-
-        {/* Empty state */}
-        {filteredJobs.length === 0 && (
+        {visibleJobs.length > 0 ? (
+          visibleJobs.map(renderJobCard)
+        ) : (
           <div className="px-3 py-8 text-center text-zinc-500 text-sm">
-            {searchQuery ? 'Aucun travail trouvé' : 'Aucun travail'}
+            {searchQuery ? 'Aucun travail trouvé' : 'Aucun travail dans cette vue'}
           </div>
         )}
       </div>

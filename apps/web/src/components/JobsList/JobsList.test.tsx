@@ -2,13 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { JobsList } from './JobsList';
 import { JobCard } from './JobCard';
-import { ProgressDots } from './ProgressDots';
-import { ProblemsSection } from './ProblemsSection';
-import { JobsSection } from './JobsSection';
 import { JobsListHeader } from './JobsListHeader';
 import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
 
-// Mock data
 const mockJobs: Job[] = [
   {
     id: 'job-1',
@@ -170,7 +166,7 @@ const mockAssignments: TaskAssignment[] = [
 
 const mockLateJobs: LateJob[] = [
   {
-    jobId: 'job-3',
+    jobId: 'job-1',
     deadline: '2025-12-10',
     expectedCompletion: '2025-12-18',
     delayDays: 8,
@@ -178,6 +174,15 @@ const mockLateJobs: LateJob[] = [
 ];
 
 const _mockConflicts: ScheduleConflict[] = [];
+
+const headerStubs = {
+  activeTab: 'planified' as const,
+  onTabChange: () => {},
+  tabCounts: { planified: 0, unplanified: 0 },
+  activeChip: 'all' as const,
+  onChipChange: () => {},
+  chipCounts: { all: 0, late: 0, conflict: 0 },
+};
 
 describe('JobsList', () => {
   it('renders without crashing', () => {
@@ -194,7 +199,7 @@ describe('JobsList', () => {
     expect(screen.getByPlaceholderText('Rechercher...')).toBeInTheDocument();
   });
 
-  it('displays all jobs', () => {
+  it('renders tabs for planified / unplanified', () => {
     render(
       <JobsList
         jobs={mockJobs}
@@ -205,12 +210,46 @@ describe('JobsList', () => {
         conflicts={[]}
       />
     );
-    expect(screen.getByText('12345')).toBeInTheDocument();
-    expect(screen.getByText('12346')).toBeInTheDocument();
-    expect(screen.getByText('12347')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Planifiées/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Non planifiées/ })).toBeInTheDocument();
   });
 
-  it('shows problems section when there are late jobs', () => {
+  it('defaults to planified tab and shows jobs with assignments', () => {
+    render(
+      <JobsList
+        jobs={mockJobs}
+        tasks={mockTasks}
+        elements={mockElements}
+        assignments={mockAssignments}
+        lateJobs={[]}
+        conflicts={[]}
+      />
+    );
+    // job-1 has assignments (planified) — should be visible on default tab
+    expect(screen.getByText('12345')).toBeInTheDocument();
+    // job-2 has no assignments (unplanified) — hidden on default tab
+    expect(screen.queryByText('12346')).not.toBeInTheDocument();
+  });
+
+  it('switches to unplanified tab and shows jobs without assignments', () => {
+    render(
+      <JobsList
+        jobs={mockJobs}
+        tasks={mockTasks}
+        elements={mockElements}
+        assignments={mockAssignments}
+        lateJobs={[]}
+        conflicts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Non planifiées/ }));
+
+    expect(screen.getByText('12346')).toBeInTheDocument();
+    expect(screen.queryByText('12345')).not.toBeInTheDocument();
+  });
+
+  it('shows late badge for late jobs in the list', () => {
     render(
       <JobsList
         jobs={mockJobs}
@@ -221,7 +260,6 @@ describe('JobsList', () => {
         conflicts={[]}
       />
     );
-    expect(screen.getByText('Problèmes')).toBeInTheDocument();
     expect(screen.getByText('En retard')).toBeInTheDocument();
   });
 
@@ -238,10 +276,10 @@ describe('JobsList', () => {
     );
 
     const searchInput = screen.getByPlaceholderText('Rechercher...');
-    fireEvent.change(searchInput, { target: { value: 'Another' } });
+    fireEvent.change(searchInput, { target: { value: 'Test Client' } });
 
-    expect(screen.getByText('12346')).toBeInTheDocument();
-    expect(screen.queryByText('12345')).not.toBeInTheDocument();
+    expect(screen.getByText('12345')).toBeInTheDocument();
+    expect(screen.queryByText('12346')).not.toBeInTheDocument();
   });
 
   it('shows empty state when no jobs match search', () => {
@@ -293,13 +331,11 @@ describe('JobsList', () => {
       />
     );
 
-    // JobCard is now a proper button element
     const jobCard = screen.getByText('12345').closest('button');
     expect(jobCard).toHaveClass('bg-white/10');
   });
 });
 
-// Helper to create test tasks
 const createTestTask = (id: string, elementId: string): Task => ({
   id,
   elementId,
@@ -312,7 +348,6 @@ const createTestTask = (id: string, elementId: string): Task => ({
   updatedAt: new Date().toISOString(),
 });
 
-// Helper to create test assignments
 const createTestAssignment = (taskId: string, isCompleted: boolean): TaskAssignment => ({
   id: `assign-${taskId}`,
   taskId,
@@ -331,7 +366,6 @@ describe('JobCard', () => {
     const tasks = [
       createTestTask('t1', 'job-1'),
       createTestTask('t2', 'job-1'),
-      createTestTask('t3', 'job-1'),
     ];
     const assignments = [createTestAssignment('t1', true)];
 
@@ -353,8 +387,7 @@ describe('JobCard', () => {
   });
 
   it('shows deadline on normal cards', () => {
-    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
-
+    const tasks = [createTestTask('t1', 'job-1')];
     render(
       <JobCard
         id="job-1"
@@ -370,17 +403,8 @@ describe('JobCard', () => {
     expect(screen.getByText('17/12')).toBeInTheDocument();
   });
 
-  it('shows progress segments on normal cards', () => {
-    const tasks = [
-      createTestTask('t1', 'job-1'),
-      createTestTask('t2', 'job-1'),
-      createTestTask('t3', 'job-1'),
-    ];
-    const assignments = [
-      createTestAssignment('t1', true),
-      createTestAssignment('t2', true),
-    ];
-
+  it('renders the progress bar', () => {
+    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
     render(
       <JobCard
         id="job-1"
@@ -388,82 +412,83 @@ describe('JobCard', () => {
         client="Test Client"
         description="Test Description"
         tasks={tasks}
-        assignments={assignments}
+        assignments={[createTestAssignment('t1', true)]}
       />
     );
-
-    // Check that segments are rendered
-    expect(screen.getByTestId('segment-t1')).toBeInTheDocument();
-    expect(screen.getByTestId('segment-t2')).toBeInTheDocument();
-    expect(screen.getByTestId('segment-t3')).toBeInTheDocument();
+    expect(screen.getByTestId('progress-bar')).toBeInTheDocument();
   });
 
-  it('shows late badge AND progress segments when problem type is late', () => {
-    const tasks = [
-      createTestTask('t1', 'job-1'),
-      createTestTask('t2', 'job-1'),
-      createTestTask('t3', 'job-1'),
-    ];
-    const assignments = [createTestAssignment('t1', true)];
-
+  it('shows "En retard" badge for late problem type', () => {
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={tasks}
-        assignments={assignments}
+        tasks={[createTestTask('t1', 'job-1')]}
+        assignments={[]}
         problemType="late"
       />
     );
-
     expect(screen.getByText('En retard')).toBeInTheDocument();
-    // Progress segments should also be shown for problem cards
-    expect(screen.getByTestId('progress-segments')).toBeInTheDocument();
   });
 
-  it('shows conflict badge AND progress segments when problem type is conflict', () => {
-    const tasks = [
-      createTestTask('t1', 'job-1'),
-      createTestTask('t2', 'job-1'),
-      createTestTask('t3', 'job-1'),
-      createTestTask('t4', 'job-1'),
-    ];
-    const assignments = [
-      createTestAssignment('t1', true),
-      createTestAssignment('t2', true),
-      createTestAssignment('t3', true),
-      createTestAssignment('t4', true),
-    ];
-
+  it('shows "Conflit" badge for conflict problem type', () => {
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={tasks}
-        assignments={assignments}
+        tasks={[createTestTask('t1', 'job-1')]}
+        assignments={[]}
         problemType="conflict"
       />
     );
-
     expect(screen.getByText('Conflit')).toBeInTheDocument();
-    // Progress segments should also be shown for problem cards
-    expect(screen.getByTestId('progress-segments')).toBeInTheDocument();
   });
 
-  it('applies selected styling', () => {
-    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
-
+  it('shows "Terminé" badge when isCompleted', () => {
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={tasks}
+        tasks={[createTestTask('t1', 'job-1')]}
+        assignments={[createTestAssignment('t1', true)]}
+        isCompleted
+      />
+    );
+    expect(screen.getByText('Terminé')).toBeInTheDocument();
+  });
+
+  it('prioritizes problem type over completed in status', () => {
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
+        tasks={[createTestTask('t1', 'job-1')]}
+        assignments={[createTestAssignment('t1', true)]}
+        problemType="late"
+        isCompleted
+      />
+    );
+    // Late wins over completed
+    expect(screen.getByText('En retard')).toBeInTheDocument();
+    expect(screen.queryByText('Terminé')).not.toBeInTheDocument();
+  });
+
+  it('applies selected styling', () => {
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
+        tasks={[createTestTask('t1', 'job-1')]}
         assignments={[]}
         isSelected
       />
@@ -475,147 +500,44 @@ describe('JobCard', () => {
 
   it('calls onClick when clicked', () => {
     const onClick = vi.fn();
-    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
-
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={tasks}
+        tasks={[createTestTask('t1', 'job-1')]}
         assignments={[]}
         onClick={onClick}
       />
     );
 
     fireEvent.click(screen.getByRole('button'));
-    expect(onClick).toHaveBeenCalled();
-  });
-
-  it('handles keyboard navigation', () => {
-    const onClick = vi.fn();
-    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
-
-    render(
-      <JobCard
-        id="job-1"
-        reference="12345"
-        client="Test Client"
-        description="Test Description"
-        tasks={tasks}
-        assignments={[]}
-        onClick={onClick}
-      />
-    );
-
-    // Button elements natively handle Enter key - simulate with click
-    const card = screen.getByRole('button');
-    fireEvent.click(card);
-    expect(onClick).toHaveBeenCalled();
-  });
-});
-
-describe('ProgressDots', () => {
-  it('renders correct number of dots', () => {
-    const { container } = render(<ProgressDots total={5} completed={2} />);
-    const dots = container.querySelectorAll('span');
-    expect(dots).toHaveLength(5);
-  });
-
-  it('renders completed dots with filled style', () => {
-    const { container } = render(<ProgressDots total={3} completed={2} />);
-    const dots = container.querySelectorAll('span');
-
-    expect(dots[0]).toHaveClass('bg-emerald-500');
-    expect(dots[1]).toHaveClass('bg-emerald-500');
-    expect(dots[2]).not.toHaveClass('bg-emerald-500');
-  });
-
-  it('renders pending dots with outline style', () => {
-    const { container } = render(<ProgressDots total={3} completed={1} />);
-    const dots = container.querySelectorAll('span');
-
-    expect(dots[1]).toHaveClass('border-zinc-700');
-    expect(dots[2]).toHaveClass('border-zinc-700');
-  });
-
-  it('returns null when total is 0', () => {
-    const { container } = render(<ProgressDots total={0} completed={0} />);
-    expect(container.firstChild).toBeNull();
-  });
-});
-
-describe('ProblemsSection', () => {
-  it('renders section with count', () => {
-    render(
-      <ProblemsSection count={2}>
-        <div>Problem 1</div>
-        <div>Problem 2</div>
-      </ProblemsSection>
-    );
-
-    expect(screen.getByText('Problèmes')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
-  });
-
-  it('returns null when count is 0', () => {
-    const { container } = render(
-      <ProblemsSection count={0}>
-        <div>No problems</div>
-      </ProblemsSection>
-    );
-    expect(container.firstChild).toBeNull();
-  });
-});
-
-describe('JobsSection', () => {
-  it('renders section with header', () => {
-    render(
-      <JobsSection>
-        <div>Job 1</div>
-      </JobsSection>
-    );
-
-    expect(screen.getByText('Travaux')).toBeInTheDocument();
-    expect(screen.getByText('Job 1')).toBeInTheDocument();
+    expect(onClick).toHaveBeenCalledWith('job-1');
   });
 });
 
 describe('JobsListHeader', () => {
   it('renders search field', () => {
-    render(
-      <JobsListHeader searchQuery="" onSearchChange={() => {}} />
-    );
-
+    render(<JobsListHeader searchQuery="" onSearchChange={() => {}} {...headerStubs} />);
     expect(screen.getByPlaceholderText('Rechercher...')).toBeInTheDocument();
   });
 
   it('renders add job button', () => {
-    render(
-      <JobsListHeader searchQuery="" onSearchChange={() => {}} />
-    );
-
+    render(<JobsListHeader searchQuery="" onSearchChange={() => {}} {...headerStubs} />);
     expect(screen.getByLabelText('Ajouter un travail')).toBeInTheDocument();
   });
 
   it('calls onSearchChange when typing', () => {
     const onSearchChange = vi.fn();
-    render(
-      <JobsListHeader searchQuery="" onSearchChange={onSearchChange} />
-    );
-
+    render(<JobsListHeader searchQuery="" onSearchChange={onSearchChange} {...headerStubs} />);
     const input = screen.getByPlaceholderText('Rechercher...');
     fireEvent.change(input, { target: { value: 'test' } });
-
     expect(onSearchChange).toHaveBeenCalledWith('test');
   });
 
   it('disables add button when no handler provided', () => {
-    render(
-      <JobsListHeader searchQuery="" onSearchChange={() => {}} />
-    );
-
+    render(<JobsListHeader searchQuery="" onSearchChange={() => {}} {...headerStubs} />);
     expect(screen.getByLabelText('Ajouter un travail')).toBeDisabled();
   });
 
@@ -626,10 +548,67 @@ describe('JobsListHeader', () => {
         searchQuery=""
         onSearchChange={() => {}}
         onAddJob={onAddJob}
+        {...headerStubs}
       />
     );
-
     fireEvent.click(screen.getByLabelText('Ajouter un travail'));
     expect(onAddJob).toHaveBeenCalled();
+  });
+
+  it('renders both tabs with counts', () => {
+    render(
+      <JobsListHeader
+        searchQuery=""
+        onSearchChange={() => {}}
+        {...headerStubs}
+        tabCounts={{ planified: 7, unplanified: 8 }}
+      />
+    );
+    const planifiedTab = screen.getByRole('tab', { name: /Planifiées/ });
+    const unplanifiedTab = screen.getByRole('tab', { name: /Non planifiées/ });
+    expect(planifiedTab).toHaveTextContent('7');
+    expect(unplanifiedTab).toHaveTextContent('8');
+  });
+
+  it('calls onTabChange when switching tab', () => {
+    const onTabChange = vi.fn();
+    render(
+      <JobsListHeader
+        searchQuery=""
+        onSearchChange={() => {}}
+        {...headerStubs}
+        onTabChange={onTabChange}
+      />
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Non planifiées/ }));
+    expect(onTabChange).toHaveBeenCalledWith('unplanified');
+  });
+
+  it('renders all three chips: Toutes / En retard / Conflits', () => {
+    render(
+      <JobsListHeader
+        searchQuery=""
+        onSearchChange={() => {}}
+        {...headerStubs}
+        chipCounts={{ all: 10, late: 3, conflict: 2 }}
+      />
+    );
+    expect(screen.getByRole('button', { name: /Toutes/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /En retard/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Conflits/ })).toBeInTheDocument();
+  });
+
+  it('calls onChipChange when clicking a chip', () => {
+    const onChipChange = vi.fn();
+    render(
+      <JobsListHeader
+        searchQuery=""
+        onSearchChange={() => {}}
+        {...headerStubs}
+        onChipChange={onChipChange}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /En retard/ }));
+    expect(onChipChange).toHaveBeenCalledWith('late');
   });
 });

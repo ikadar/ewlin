@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JobsList — Exploration UX</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #050505;
+    color: #e4e4e7;
+    font-size: 13px;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  input { font: inherit; }
+
+  /* ========== App layout ========== */
+  .app { display: flex; height: 100vh; }
+  .controls {
+    width: 320px;
+    background: #0c0c0d;
+    border-right: 1px solid #1a1a1d;
+    padding: 18px 16px 22px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-toolbar {
+    padding: 10px 16px;
+    background: #0c0c0d;
+    border-bottom: 1px solid #1a1a1d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .preview-toolbar .title {
+    font-size: 11px; color: #71717a;
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .preview-toolbar .meta {
+    font-size: 11px; color: #a1a1aa;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+  .preview-stage {
+    flex: 1;
+    overflow-y: auto;
+    background: radial-gradient(ellipse at top, #0f0f12 0%, #050505 60%);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 32px 24px 24px;
+  }
+
+  /* ========== Controls styling ========== */
+  .controls h1 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .controls .subtitle {
+    font-size: 11px;
+    color: #71717a;
+    margin-bottom: 22px;
+    line-height: 1.55;
+  }
+  .ctrl-group { margin-bottom: 20px; }
+  .ctrl-group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: #71717a;
+    margin-bottom: 10px;
+  }
+  .radio-list { display: flex; flex-direction: column; gap: 6px; }
+  .radio-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 9px 10px;
+    border: 1px solid #1a1a1d;
+    border-radius: 6px;
+    transition: all 0.12s;
+    background: #0f0f11;
+  }
+  .radio-option:hover { background: #141417; border-color: #26262a; }
+  .radio-option.active {
+    background: #1a1f2e;
+    border-color: #3b82f6;
+  }
+  .radio-option input { margin-top: 2px; accent-color: #3b82f6; cursor: pointer; }
+  .radio-option .label-main {
+    font-size: 12px;
+    color: #e4e4e7;
+    font-weight: 500;
+  }
+  .radio-option .label-sub {
+    font-size: 11px;
+    color: #71717a;
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 10px;
+    border: 1px solid #1a1a1d;
+    border-radius: 6px;
+    background: #0f0f11;
+    margin-bottom: 6px;
+  }
+  .toggle-row .label-main { font-size: 12px; color: #e4e4e7; }
+  .toggle-row .label-sub { font-size: 10px; color: #71717a; margin-top: 1px; }
+  .switch {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    background: #26262a;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .switch.on { background: #3b82f6; }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .switch.on::after { transform: translateX(14px); }
+
+  /* ========== Mock grid ========== */
+  .grid-mock {
+    display: flex;
+    height: calc(100vh - 140px);
+    max-height: 720px;
+    width: 100%;
+    max-width: 1100px;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .sidebar {
+    width: 288px;
+    background: #18181b;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .sidebar.compare-mode { width: auto; flex: 1; display: flex; }
+  .sidebar.compare-mode .compare-col {
+    width: 288px;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar.compare-mode .compare-col:last-child { border-right: 0; }
+  .compare-label {
+    padding: 6px 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: #a1a1aa;
+    background: #0c0c0d;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+
+  /* ========== Sidebar header (tabs + chips + search) ========== */
+  .sb-header { flex-shrink: 0; padding: 12px 12px 8px; }
+  .sb-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .tab {
+    flex: 1;
+    font-size: 11px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    color: #a1a1aa;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: all 0.12s;
+  }
+  .tab:hover { color: #e4e4e7; }
+  .tab.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  .tab .count {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 10px;
+    opacity: 0.7;
+  }
+  .tab.active .count { opacity: 1; }
+  .sb-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .chip {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+  }
+  .chip:hover { background: rgba(255, 255, 255, 0.08); color: #e4e4e7; }
+  .chip.active { background: rgba(59, 130, 246, 0.18); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd; }
+  .chip.late.active { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+  .chip .count {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 10px;
+    opacity: 0.75;
+  }
+  .chip.active .count { opacity: 1; }
+
+  .sb-search-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .sb-add {
+    width: 32px;
+    background: #2563eb;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .sb-add:hover { background: #1d4ed8; }
+  .sb-search {
+    flex: 1;
+    position: relative;
+  }
+  .sb-search svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #71717a;
+    width: 14px;
+    height: 14px;
+  }
+  .sb-search input {
+    width: 100%;
+    padding: 6px 10px 6px 30px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    color: #e4e4e7;
+    font-size: 12px;
+    outline: none;
+  }
+  .sb-search input::placeholder { color: #52525b; }
+  .sb-search input:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+
+  /* ========== Sidebar body ========== */
+  .sb-body { flex: 1; overflow-y: auto; }
+  .sb-body::-webkit-scrollbar { width: 6px; }
+  .sb-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 3px; }
+
+  .sb-section { padding: 0 0 6px 0; }
+  .sb-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #71717a;
+    font-weight: 600;
+  }
+  .sb-section-header .pill {
+    font-size: 10px;
+    padding: 1px 7px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    color: #a1a1aa;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* ========== Job card: base ========== */
+  .job {
+    margin: 0 8px 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.12s;
+    display: block;
+    width: calc(100% - 16px);
+    text-align: left;
+  }
+  .job:hover { background: rgba(255, 255, 255, 0.05); }
+  .job-row-1 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+    min-width: 0;
+  }
+  .job-ref {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 15px;
+    color: #71717a;
+    flex-shrink: 0;
+    font-weight: 500;
+  }
+  .job-sep { color: #52525b; flex-shrink: 0; }
+  .job-client {
+    color: #a1a1aa;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+  }
+  .job-deadline {
+    color: #52525b;
+    font-size: 11px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .job-desc {
+    color: #d4d4d8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 5px;
+    font-size: 13px;
+  }
+  .job-row-3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .dots {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.unscheduled { background: #52525b; }
+  .dot.scheduled { background: #3b82f6; }
+  .dot.completed { background: #10b981; }
+  .dot.late { background: #ef4444; }
+  .job-right { display: flex; align-items: center; gap: 8px; }
+  .badge {
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .badge.late { color: #f87171; }
+  .badge.conflict { color: #fbbf24; }
+  .buffer { font-size: 11px; font-weight: 500; }
+  .buffer.positive { color: #34d399; }
+  .buffer.negative { color: #f87171; }
+  .problem-icon { flex-shrink: 0; margin-left: auto; }
+  .problem-icon.late { color: #f87171; }
+  .problem-icon.conflict { color: #fbbf24; }
+
+  /* ========== Status reference colors (always on, independent of highlight style) ========== */
+  .job.late .job-ref { color: #fca5a5; }
+  .job.late .job-desc { color: #f4f4f5; }
+  .job.conflict .job-ref { color: #fcd34d; }
+  .job.conflict .job-desc { color: #f4f4f5; }
+  .job.completed .job-ref { color: #86efac; }
+  .job.completed { opacity: 0.72; }
+  .job.completed:hover { opacity: 1; }
+  .problem-icon.completed { color: #34d399; }
+  .badge.completed { color: #34d399; }
+
+  /* ========== Highlight styles (A/B/C/D) ========== */
+  /* A. Tint — background + subtle border (current) */
+  .highlight-tint .job.late {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.18);
+  }
+  .highlight-tint .job.late:hover { background: rgba(239, 68, 68, 0.14); }
+  .highlight-tint .job.conflict {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.18);
+  }
+  .highlight-tint .job.conflict:hover { background: rgba(245, 158, 11, 0.14); }
+  .highlight-tint .job.completed {
+    background: rgba(16, 185, 129, 0.06);
+    border-color: rgba(16, 185, 129, 0.14);
+  }
+
+  /* B. Accent bar left */
+  .highlight-accent .job {
+    border-left-width: 3px;
+    border-left-style: solid;
+    border-left-color: transparent;
+    padding-left: 9px;
+    border-top-left-radius: 2px;
+    border-bottom-left-radius: 2px;
+  }
+  .highlight-accent .job.late { border-left-color: #ef4444; }
+  .highlight-accent .job.conflict { border-left-color: #f59e0b; }
+  .highlight-accent .job.completed { border-left-color: #10b981; }
+
+  /* C. Border only */
+  .highlight-border .job.late { border-color: rgba(239, 68, 68, 0.5); }
+  .highlight-border .job.conflict { border-color: rgba(245, 158, 11, 0.5); }
+  .highlight-border .job.completed { border-color: rgba(16, 185, 129, 0.45); }
+
+  /* D. Minimal — no card-level highlight, rely on icon + badge + ref color only */
+  .highlight-minimal .job { /* intentionally empty */ }
+
+  /* ========== V2 Compact ========== */
+  .variant-V2 .job { padding: 6px 12px; margin-bottom: 3px; }
+  .variant-V2 .job-row-1 { margin-bottom: 1px; gap: 5px; }
+  .variant-V2 .job-ref { font-size: 13px; }
+  .variant-V2 .job-client { font-size: 12px; }
+  .variant-V2 .job-desc { font-size: 12px; margin-bottom: 2px; }
+  .variant-V2 .badge { font-size: 10px; }
+  .variant-V2 .buffer { font-size: 10px; }
+  .variant-V2 .job-deadline { font-size: 10px; }
+  .variant-V2 .dot { width: 5px; height: 5px; }
+
+  /* ========== V3 Reorg (2 lines + underline bar) ========== */
+  .variant-V3 .job { padding: 7px 12px 6px; margin-bottom: 3px; }
+  .variant-V3 .job-row-1 {
+    margin-bottom: 2px;
+  }
+  .variant-V3 .job-row-1-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .variant-V3 .job-ref { font-size: 13px; }
+  .variant-V3 .job-client { font-size: 12px; flex: 0 1 auto; }
+  .variant-V3 .meta-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .variant-V3 .job-deadline { margin: 0; font-size: 11px; }
+  .variant-V3 .buffer { font-size: 10px; }
+  .variant-V3 .job-desc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .variant-V3 .job-desc {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+  }
+  /* Progress bar (used full-width under the card, or inline in the bottom row) */
+  .bar {
+    display: flex;
+    gap: 2px;
+    height: 3px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-seg {
+    flex: 1;
+    height: 100%;
+    border-radius: 1px;
+    min-width: 4px;
+  }
+  .bar.bar-inline {
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  /* ========== Hide-description mode ========== */
+  .hide-desc .job-desc,
+  .hide-desc .job-desc-row .job-desc { display: none; }
+  .variant-V1.hide-desc .job { padding-top: 11px; padding-bottom: 11px; }
+  .variant-V3.hide-desc .job-desc-row { display: none; }
+  .variant-V3.hide-desc .bar { margin-top: 4px; }
+
+  /* ========== Grid placeholder (right side) ========== */
+  .grid-placeholder {
+    flex: 1;
+    background:
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 64px),
+      radial-gradient(ellipse at center, #1c1c1f 0%, #111113 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3f3f46;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+
+  /* ========== Prompt bar ========== */
+  .prompt-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #0c0c0d;
+    border-top: 1px solid #1a1a1d;
+    padding: 12px 16px;
+    flex-shrink: 0;
+  }
+  .prompt-text {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 11px;
+    color: #a1a1aa;
+    line-height: 1.55;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+  .copy-btn {
+    padding: 7px 14px;
+    background: #3b82f6;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: #2563eb; }
+  .copy-btn.copied { background: #10b981; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ===================== CONTROLS ===================== -->
+  <aside class="controls">
+    <h1>JobsList — Exploration UX</h1>
+    <p class="subtitle">
+      Compare trois densités de carte et deux headers différents.
+      <b>Chips de filtre en haut</b> + <b>cards plus compactes</b>.
+    </p>
+
+    <div class="ctrl-group">
+      <h3>Densité du card</h3>
+      <div class="radio-list" id="variant-list">
+        <label class="radio-option" data-value="V1">
+          <input type="radio" name="variant" value="V1" checked>
+          <div>
+            <div class="label-main">V1 — Confort (actuel)</div>
+            <div class="label-sub">3 lignes aérées, padding 10px. Référence du design existant.</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="V2">
+          <input type="radio" name="variant" value="V2">
+          <div>
+            <div class="label-main">V2 — Compact</div>
+            <div class="label-sub">Même structure, padding resserré, typo -1px. Gain vertical ~25%.</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="V3">
+          <input type="radio" name="variant" value="V3">
+          <div>
+            <div class="label-main">V3 — Réorganisé</div>
+            <div class="label-sub">2 lignes + barre de progression en dessous (full-width). Plus dense.</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="compare">
+          <input type="radio" name="variant" value="compare">
+          <div>
+            <div class="label-main">Comparer les 3 côte à côte</div>
+            <div class="label-sub">Trois colonnes en parallèle pour A/B/C direct.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h3>Pastilles d'avancement</h3>
+      <div class="radio-list" id="progress-list">
+        <label class="radio-option active" data-value="dots">
+          <input type="radio" name="progress" value="dots" checked>
+          <div>
+            <div class="label-main">Pastilles ●●●○</div>
+            <div class="label-sub">Points individuels, un par tâche. État lisible étape par étape.</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="bar">
+          <input type="radio" name="progress" value="bar">
+          <div>
+            <div class="label-main">Barre segmentée ▬▬▬▬</div>
+            <div class="label-sub">Segments colorés continus. Plus graphique, moins "comptable".</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="none">
+          <input type="radio" name="progress" value="none">
+          <div>
+            <div class="label-main">Masquées</div>
+            <div class="label-sub">Aucun indicateur d'avancement dans la liste (détail au clic).</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h3>Bordure d'accentuation</h3>
+      <div class="radio-list" id="highlight-list">
+        <label class="radio-option active" data-value="tint">
+          <input type="radio" name="highlight" value="tint" checked>
+          <div>
+            <div class="label-main">A — Teinte pleine</div>
+            <div class="label-sub">Fond coloré + bordure subtile. Le plus visible, sature si beaucoup de retards.</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="accent">
+          <input type="radio" name="highlight" value="accent">
+          <div>
+            <div class="label-main">B — Accent gauche</div>
+            <div class="label-sub">Barre verticale 3px colorée à gauche, fond neutre. Discret mais scannable.</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="border">
+          <input type="radio" name="highlight" value="border">
+          <div>
+            <div class="label-main">C — Bordure colorée</div>
+            <div class="label-sub">Contour coloré, pas de fond. Intermédiaire entre A et B.</div>
+          </div>
+        </label>
+        <label class="radio-option" data-value="minimal">
+          <input type="radio" name="highlight" value="minimal">
+          <div>
+            <div class="label-main">D — Minimal</div>
+            <div class="label-sub">Ni fond ni bordure. Repose uniquement sur icône + badge + couleur de la réf.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h3>Options</h3>
+      <div class="toggle-row" data-toggle="showDesc">
+        <div>
+          <div class="label-main">Afficher la description</div>
+          <div class="label-sub">Toggler pour voir l'impact visuel sans.</div>
+        </div>
+        <div class="switch on" data-for="showDesc"></div>
+      </div>
+      <div class="toggle-row" data-toggle="showChips">
+        <div>
+          <div class="label-main">Afficher les chips de filtre</div>
+          <div class="label-sub">A/B avec le header actuel (search + bouton).</div>
+        </div>
+        <div class="switch on" data-for="showChips"></div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h3>Onglet actif</h3>
+      <div class="radio-list" id="tab-list">
+        <label class="radio-option active" data-value="planified">
+          <input type="radio" name="tab" value="planified" checked>
+          <div><div class="label-main">Planifiées</div>
+               <div class="label-sub">Jobs avec au moins une tâche assignée.</div></div>
+        </label>
+        <label class="radio-option" data-value="unplanified">
+          <input type="radio" name="tab" value="unplanified">
+          <div><div class="label-main">Non planifiées</div>
+               <div class="label-sub">Jobs sans aucune assignation.</div></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h3>Filtre chip actif</h3>
+      <div class="radio-list" id="filter-list">
+        <label class="radio-option active" data-value="all">
+          <input type="radio" name="filter" value="all" checked>
+          <div><div class="label-main">Toutes</div></div>
+        </label>
+        <label class="radio-option" data-value="late">
+          <input type="radio" name="filter" value="late">
+          <div><div class="label-main">En retard</div></div>
+        </label>
+        <label class="radio-option" data-value="conflict">
+          <input type="radio" name="filter" value="conflict">
+          <div><div class="label-main">Conflits</div></div>
+        </label>
+        <label class="radio-option" data-value="inprogress">
+          <input type="radio" name="filter" value="inprogress">
+          <div><div class="label-main">En cours</div></div>
+        </label>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== PREVIEW ===================== -->
+  <main class="preview">
+    <div class="preview-toolbar">
+      <span class="title">Aperçu — contexte SchedulingGrid</span>
+      <span class="meta" id="meta">288px · V1 Confort · 15 jobs</span>
+    </div>
+    <div class="preview-stage">
+      <div class="grid-mock" id="grid-mock">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+    <footer class="prompt-bar">
+      <div class="prompt-text" id="prompt-text">...</div>
+      <button class="copy-btn" id="copy-btn">Copier la spec</button>
+    </footer>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// Data — 15 realistic French print-shop jobs
+// ============================================================
+const JOBS = [
+  // 3 late
+  { id: 'j1', ref: '2847', client: 'Éditions Martin', desc: 'Catalogue 48p dos carré collé 300×200',
+    deadline: '15/04 17h', buffer: '-1j 2h', problem: 'late',
+    tasks: ['completed','completed','late','unscheduled'] },
+  { id: 'j2', ref: '2851', client: 'Papier+ Bordeaux', desc: 'Flyer A5 R/V quadri pelliculage mat',
+    deadline: '14/04 12h', buffer: '-3h', problem: 'late',
+    tasks: ['completed','late','unscheduled'] },
+  { id: 'j3', ref: '2863', client: 'Atelier du Livre', desc: 'Brochure 24p agrafage 2 points',
+    deadline: '16/04 09h', buffer: '-5h', problem: 'late',
+    tasks: ['late','unscheduled','unscheduled'] },
+  // 2 conflicts
+  { id: 'j4', ref: '2874', client: 'Printmaster SAS', desc: 'Carte de visite 85×55 pelliculage soft touch',
+    deadline: '18/04 14h', buffer: null, problem: 'conflict',
+    tasks: ['scheduled','scheduled','unscheduled'] },
+  { id: 'j5', ref: '2891', client: 'Éditions Dupont', desc: 'Livre broché 120p couverture souple',
+    deadline: '22/04 10h', buffer: null, problem: 'conflict',
+    tasks: ['scheduled','unscheduled','unscheduled','unscheduled'] },
+  // 2 in progress
+  { id: 'j6', ref: '2905', client: 'Imprimerie Loire', desc: 'Affiche A2 recto quadri offset',
+    deadline: '19/04 16h', buffer: '+2h', problem: null,
+    tasks: ['completed','completed','scheduled'] },
+  { id: 'j7', ref: '2912', client: 'Galerie Contemporaine', desc: 'Catalogue expo 32p papier couché 150g',
+    deadline: '20/04 11h', buffer: '+4h', problem: null,
+    tasks: ['completed','scheduled','scheduled'] },
+  // 2 completed (all tasks done)
+  { id: 'j16', ref: '2958', client: 'Théâtre Municipal', desc: 'Programme saison 48p dos collé',
+    deadline: '10/04 16h', buffer: '+1j', problem: null,
+    tasks: ['completed','completed','completed'] },
+  { id: 'j17', ref: '2961', client: 'Hôpital Saint-Louis', desc: 'Rapport annuel 64p reliure spirale',
+    deadline: '08/04 14h', buffer: '+3h', problem: null,
+    tasks: ['completed','completed','completed','completed'] },
+  // 8 non-scheduled
+  { id: 'j8', ref: '2918', client: 'Mairie de Lyon', desc: 'Programme culturel A4 40p',
+    deadline: '25/04 14h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled','unscheduled'] },
+  { id: 'j9', ref: '2920', client: 'Collège Saint-Exupéry', desc: 'Affichette A3 recto quadri',
+    deadline: '26/04 10h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled'] },
+  { id: 'j10', ref: '2924', client: 'Boulangerie Paul', desc: 'Étiquettes adhésives rondes 60mm',
+    deadline: '27/04 16h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled','unscheduled','unscheduled'] },
+  { id: 'j11', ref: '2931', client: 'Festival Nuits Sonores', desc: 'Dépliant 3 volets A4 quadri R/V',
+    deadline: '28/04 12h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled','unscheduled'] },
+  { id: 'j12', ref: '2937', client: 'Cabinet Dubois', desc: 'Plaquette commerciale 16p dos carré',
+    deadline: '30/04 15h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled','unscheduled'] },
+  { id: 'j13', ref: '2942', client: 'École des Beaux-Arts', desc: 'Portfolio étudiant A3 48p spirale',
+    deadline: '02/05 11h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled','unscheduled','unscheduled'] },
+  { id: 'j14', ref: '2948', client: 'Boucherie Moreau', desc: 'Cartes fidélité 85×55 pelliculage',
+    deadline: '03/05 17h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled'] },
+  { id: 'j15', ref: '2953', client: 'Association Les Amis', desc: 'Bulletin trimestriel A4 8p',
+    deadline: '05/05 10h', buffer: null, problem: null,
+    tasks: ['unscheduled','unscheduled','unscheduled'] },
+];
+
+function isCompleted(job) {
+  return job.tasks.every(t => t === 'completed');
+}
+
+function jobStatusClass(job) {
+  if (job.problem === 'late') return 'late';
+  if (job.problem === 'conflict') return 'conflict';
+  if (isCompleted(job)) return 'completed';
+  return '';
+}
+
+function isPlanified(job) {
+  return job.tasks.some(t => t !== 'unscheduled');
+}
+
+function matchesChip(job, chip) {
+  if (chip === 'all') return true;
+  if (chip === 'late') return job.problem === 'late';
+  if (chip === 'conflict') return job.problem === 'conflict';
+  if (chip === 'inprogress') return !job.problem && job.tasks.some(t => t === 'completed');
+  return true;
+}
+
+function filterJobs(jobs) {
+  return jobs
+    .filter(j => state.tab === 'planified' ? isPlanified(j) : !isPlanified(j))
+    .filter(j => matchesChip(j, state.filter));
+}
+
+const CHIPS = [
+  { id: 'all',        label: 'Toutes' },
+  { id: 'late',       label: 'En retard' },
+  { id: 'conflict',   label: 'Conflits' },
+  { id: 'inprogress', label: 'En cours' },
+];
+
+// ============================================================
+// State
+// ============================================================
+const state = {
+  variant: 'V1',         // V1 | V2 | V3 | compare
+  progress: 'dots',      // dots | bar | none
+  highlight: 'tint',     // tint | accent | border | minimal
+  showDesc: true,
+  showChips: true,
+  tab: 'planified',      // planified | unplanified
+  filter: 'all',
+};
+
+const VARIANT_LABEL = { V1: 'V1 Confort', V2: 'V2 Compact', V3: 'V3 Réorganisé', compare: 'Comparaison' };
+
+// ============================================================
+// Icons
+// ============================================================
+const ICONS = {
+  plus:       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+  search:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+  alertCircle:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  shuffle:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><polyline points="18 2 22 6 18 10"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><polyline points="18 14 22 18 18 22"/></svg>',
+  check:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+};
+
+// ============================================================
+// Rendering
+// ============================================================
+function dotsHTML(tasks) {
+  return `<div class="dots">${tasks.map(t => `<span class="dot ${t}"></span>`).join('')}</div>`;
+}
+
+function barHTML(tasks, inline) {
+  const COLORS = { unscheduled: '#52525b', scheduled: '#3b82f6', completed: '#10b981', late: '#ef4444' };
+  const cls = inline ? 'bar bar-inline' : 'bar';
+  return `<div class="${cls}">${tasks.map(t => `<span class="bar-seg" style="background:${COLORS[t]}"></span>`).join('')}</div>`;
+}
+
+// Progress slot — decoupled from the card variant.
+// `inline` = true for V1/V2 bottom-left slot, false for V3 full-width below.
+function progressHTML(tasks, inline) {
+  if (state.progress === 'none') return '<span></span>';
+  if (state.progress === 'bar') return barHTML(tasks, inline);
+  return dotsHTML(tasks);
+}
+
+function statusIconHTML(status) {
+  if (status === 'late') return `<span class="problem-icon late">${ICONS.alertCircle}</span>`;
+  if (status === 'conflict') return `<span class="problem-icon conflict">${ICONS.shuffle}</span>`;
+  if (status === 'completed') return `<span class="problem-icon completed">${ICONS.check}</span>`;
+  return '';
+}
+
+function statusBadgeHTML(job, status) {
+  const parts = [];
+  if (status === 'late') parts.push('<span class="badge late">En retard</span>');
+  else if (status === 'conflict') parts.push('<span class="badge conflict">Conflit</span>');
+  else if (status === 'completed') parts.push('<span class="badge completed">Terminé</span>');
+  if (job.buffer && status !== 'completed') {
+    const sign = job.buffer.startsWith('-') ? 'negative' : 'positive';
+    parts.push(`<span class="buffer ${sign}">${job.buffer}</span>`);
+  }
+  return parts.join('');
+}
+
+// V1 + V2 (same structure, differ by CSS)
+function cardV1V2HTML(job) {
+  const status = jobStatusClass(job);
+  const showDeadline = !status && job.deadline;
+  return `
+    <button class="job ${status}">
+      <div class="job-row-1">
+        <span class="job-ref">${job.ref}</span>
+        <span class="job-sep">·</span>
+        <span class="job-client">${job.client}</span>
+        ${statusIconHTML(status)}
+        ${showDeadline ? `<span class="job-deadline">${job.deadline}</span>` : ''}
+      </div>
+      <div class="job-desc">${job.desc}</div>
+      <div class="job-row-3">
+        ${progressHTML(job.tasks, true)}
+        <div class="job-right">${statusBadgeHTML(job, status)}</div>
+      </div>
+    </button>`;
+}
+
+// V3: 2 lines + bar underneath
+function cardV3HTML(job) {
+  const status = jobStatusClass(job);
+  const deadline = job.deadline;
+  const sign = job.buffer ? (job.buffer.startsWith('-') ? 'negative' : 'positive') : '';
+  const badge = status === 'late' ? '<span class="badge late">En retard</span>'
+              : status === 'conflict' ? '<span class="badge conflict">Conflit</span>'
+              : status === 'completed' ? '<span class="badge completed">Terminé</span>' : '';
+  return `
+    <button class="job ${status}">
+      <div class="job-row-1">
+        <div class="job-row-1-wrap">
+          <span class="job-ref">${job.ref}</span>
+          <span class="job-sep">·</span>
+          <span class="job-client">${job.client}</span>
+          <div class="meta-right">
+            <span class="job-deadline">${deadline}</span>
+            ${job.buffer && status !== 'completed' ? `<span class="buffer ${sign}">${job.buffer}</span>` : ''}
+            ${statusIconHTML(status)}
+          </div>
+        </div>
+      </div>
+      <div class="job-desc-row">
+        <div class="job-desc">${job.desc}</div>
+        <div class="job-right">${badge}</div>
+      </div>
+      ${progressHTML(job.tasks, false)}
+    </button>`;
+}
+
+function chipsHTML() {
+  // Counts are scoped to the active tab
+  const tabJobs = JOBS.filter(j => state.tab === 'planified' ? isPlanified(j) : !isPlanified(j));
+  const counts = {
+    all:        tabJobs.length,
+    late:       tabJobs.filter(j => matchesChip(j, 'late')).length,
+    conflict:   tabJobs.filter(j => matchesChip(j, 'conflict')).length,
+    inprogress: tabJobs.filter(j => matchesChip(j, 'inprogress')).length,
+  };
+  return CHIPS.map(c => {
+    const isActive = state.filter === c.id;
+    const isLate = c.id === 'late';
+    const zero = counts[c.id] === 0 && c.id !== 'all';
+    return `<button class="chip ${isActive ? 'active' : ''} ${isLate ? 'late' : ''}" data-chip="${c.id}" ${zero ? 'style="opacity:0.4"' : ''}>
+      ${c.label} <span class="count">${counts[c.id]}</span>
+    </button>`;
+  }).join('');
+}
+
+function tabsHTML() {
+  const planCount = JOBS.filter(isPlanified).length;
+  const unplanCount = JOBS.length - planCount;
+  return `<div class="sb-tabs">
+    <button class="tab ${state.tab === 'planified' ? 'active' : ''}" data-tab="planified">
+      Planifiées <span class="count">${planCount}</span>
+    </button>
+    <button class="tab ${state.tab === 'unplanified' ? 'active' : ''}" data-tab="unplanified">
+      Non planifiées <span class="count">${unplanCount}</span>
+    </button>
+  </div>`;
+}
+
+function searchRowHTML() {
+  return `<div class="sb-search-row">
+    <button class="sb-add" aria-label="Ajouter un travail">${ICONS.plus}</button>
+    <div class="sb-search">
+      ${ICONS.search}
+      <input type="text" placeholder="Rechercher...">
+    </div>
+  </div>`;
+}
+
+function headerHTML() {
+  return `<div class="sb-header">
+    ${searchRowHTML()}
+    <div style="height:8px"></div>
+    ${tabsHTML()}
+    ${state.showChips ? `<div class="sb-chips">${chipsHTML()}</div>` : ''}
+  </div>`;
+}
+
+function renderCards(jobs, variant) {
+  const render = variant === 'V3' ? cardV3HTML : cardV1V2HTML;
+  return jobs.map(render).join('');
+}
+
+function sidebarBodyHTML(variant) {
+  const filtered = filterJobs(JOBS);
+  // Flat list — no problem/normal grouping.
+  // Sort: retards → conflits → en cours → planifiés OK → complétés (dernier, "hors priorité")
+  filtered.sort((a, b) => {
+    const rank = j => {
+      if (j.problem === 'late') return 0;
+      if (j.problem === 'conflict') return 1;
+      if (isCompleted(j)) return 4;
+      if (j.tasks.some(t => t === 'completed')) return 2;
+      return 3;
+    };
+    return rank(a) - rank(b);
+  });
+  if (filtered.length === 0) {
+    return `<div class="sb-body"><div style="padding:32px 16px;text-align:center;color:#52525b;font-size:12px">Aucun travail dans cette vue</div></div>`;
+  }
+  return `<div class="sb-body">${renderCards(filtered, variant)}</div>`;
+}
+
+function renderSidebar(variant) {
+  return `<div class="sidebar variant-${variant} highlight-${state.highlight} ${state.showDesc ? '' : 'hide-desc'}">
+    ${headerHTML()}
+    ${sidebarBodyHTML(variant)}
+  </div>`;
+}
+
+function renderCompareColumn(variant) {
+  return `<div class="compare-col variant-${variant} highlight-${state.highlight} ${state.showDesc ? '' : 'hide-desc'}">
+    <div class="compare-label">${VARIANT_LABEL[variant]}</div>
+    ${headerHTML()}
+    ${sidebarBodyHTML(variant)}
+  </div>`;
+}
+
+function render() {
+  const mock = document.getElementById('grid-mock');
+  if (state.variant === 'compare') {
+    mock.innerHTML = `
+      <div class="sidebar compare-mode">
+        ${renderCompareColumn('V1')}
+        ${renderCompareColumn('V2')}
+        ${renderCompareColumn('V3')}
+      </div>`;
+  } else {
+    mock.innerHTML = `
+      ${renderSidebar(state.variant)}
+      <div class="grid-placeholder">Zone grille (mock)</div>`;
+  }
+
+  // Wire chip + tab clicks in preview
+  mock.querySelectorAll('[data-chip]').forEach(el => {
+    el.addEventListener('click', () => setFilter(el.dataset.chip));
+  });
+  mock.querySelectorAll('[data-tab]').forEach(el => {
+    el.addEventListener('click', () => setTab(el.dataset.tab));
+  });
+
+  // Meta
+  const filtered = filterJobs(JOBS);
+  const tabLabel = state.tab === 'planified' ? 'Planifiées' : 'Non planifiées';
+  document.getElementById('meta').textContent =
+    `288px · ${VARIANT_LABEL[state.variant]} · ${tabLabel} · ${filtered.length} jobs`;
+
+  updatePrompt();
+}
+
+// ============================================================
+// Prompt output
+// ============================================================
+function updatePrompt() {
+  const parts = [];
+  const labels = {
+    V1: 'garde la densité actuelle (V1 Confort)',
+    V2: 'applique la densité compacte (V2 : padding resserré, typo -1px)',
+    V3: 'applique la réorganisation (V3 : 2 lignes + barre de progression en dessous)',
+    compare: 'compare les 3 variantes côte à côte',
+  };
+  parts.push(`Dans la colonne \`JobsList\` (288px, SchedulingGrid + OperatorSchedulePage), ${labels[state.variant]}.`);
+
+  parts.push(`Ordre du header (du haut vers le bas) : 1. champ de recherche + bouton "+", 2. onglets \`Planifiées\` / \`Non planifiées\`, 3. chips de filtre. Remplace le groupement actuel "Problèmes / Travaux" — la liste est plate à l'intérieur de chaque onglet.`);
+
+  const progressLabels = {
+    dots: 'pastilles individuelles ●●●○ (un point par tâche, comme aujourd\'hui)',
+    bar: 'barre segmentée ▬▬▬▬ (segments continus colorés)',
+    none: 'pas d\'indicateur d\'avancement dans la liste (détail uniquement au clic)',
+  };
+  parts.push(`Pastilles d'avancement : ${progressLabels[state.progress]}.`);
+
+  const highlightLabels = {
+    tint: 'teinte pleine (fond coloré + bordure subtile)',
+    accent: 'accent gauche (barre verticale 3px colorée, fond neutre)',
+    border: 'bordure colorée seule (pas de fond)',
+    minimal: 'minimal (ni fond ni bordure — icône + badge + couleur de la référence uniquement)',
+  };
+  parts.push(`Bordure d'accentuation pour les jobs "spéciaux" (retard / conflit / complété) : style \`${state.highlight}\` — ${highlightLabels[state.highlight]}. Couleurs : rouge pour retard, ambre pour conflit, vert pour complété. Les jobs complétés ont en plus une opacité réduite (0.72) et un badge "Terminé" + icône ✓.`);
+
+  if (state.showChips) {
+    parts.push(`Sous les onglets, ajoute une rangée de chips de filtre secondaire : \`Toutes\`, \`En retard\`, \`Conflits\`, \`En cours\`. Les compteurs se recalculent en fonction de l'onglet actif (un chip à 0 est visuellement atténué). Sélection exclusive. Changer d'onglet réinitialise le chip à \`Toutes\`.`);
+  } else {
+    parts.push(`Pas de chips de filtre secondaire — uniquement les onglets + recherche.`);
+  }
+
+  if (!state.showDesc) {
+    parts.push(`Retire la description du card (elle reste visible dans le JobDetailsPanel au clic).`);
+  }
+
+  parts.push(`Ordre dans la liste (tri stable) : retards → conflits → en cours → reste.`);
+
+  if (state.filter !== 'all') {
+    const filterLabels = { late: 'En retard', conflict: 'Conflits', inprogress: 'En cours' };
+    parts.push(`Filtre démontré : \`${filterLabels[state.filter]}\` actif sur l'onglet \`${state.tab === 'planified' ? 'Planifiées' : 'Non planifiées'}\`.`);
+  }
+
+  parts.push(`Fichiers à modifier : \`apps/web/src/components/JobsList/JobsListHeader.tsx\` (tabs + chips), \`JobCard.tsx\` (densité/layout), \`JobsList.tsx\` (état tab/filter + partitionnement + suppression de ProblemsSection/JobsSection).`);
+
+  document.getElementById('prompt-text').textContent = parts.join('\n\n');
+}
+
+// ============================================================
+// Controls
+// ============================================================
+function setVariant(v) {
+  state.variant = v;
+  document.querySelectorAll('#variant-list .radio-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.value === v);
+    const input = el.querySelector('input');
+    if (input) input.checked = (el.dataset.value === v);
+  });
+  render();
+}
+
+function setHighlight(h) {
+  state.highlight = h;
+  document.querySelectorAll('#highlight-list .radio-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.value === h);
+    const input = el.querySelector('input');
+    if (input) input.checked = (el.dataset.value === h);
+  });
+  render();
+}
+
+function setProgress(p) {
+  state.progress = p;
+  document.querySelectorAll('#progress-list .radio-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.value === p);
+    const input = el.querySelector('input');
+    if (input) input.checked = (el.dataset.value === p);
+  });
+  render();
+}
+
+function setFilter(f) {
+  state.filter = f;
+  document.querySelectorAll('#filter-list .radio-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.value === f);
+    const input = el.querySelector('input');
+    if (input) input.checked = (el.dataset.value === f);
+  });
+  render();
+}
+
+function setTab(t) {
+  state.tab = t;
+  state.filter = 'all'; // reset chip filter when switching tab
+  document.querySelectorAll('#tab-list .radio-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.value === t);
+    const input = el.querySelector('input');
+    if (input) input.checked = (el.dataset.value === t);
+  });
+  document.querySelectorAll('#filter-list .radio-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.value === 'all');
+    const input = el.querySelector('input');
+    if (input) input.checked = (el.dataset.value === 'all');
+  });
+  render();
+}
+
+function setToggle(key, on) {
+  state[key] = on;
+  const sw = document.querySelector(`.switch[data-for="${key}"]`);
+  if (sw) sw.classList.toggle('on', on);
+  render();
+}
+
+// Wire controls
+document.querySelectorAll('#variant-list .radio-option').forEach(el => {
+  el.addEventListener('click', () => setVariant(el.dataset.value));
+});
+document.querySelectorAll('#highlight-list .radio-option').forEach(el => {
+  el.addEventListener('click', () => setHighlight(el.dataset.value));
+});
+document.querySelectorAll('#progress-list .radio-option').forEach(el => {
+  el.addEventListener('click', () => setProgress(el.dataset.value));
+});
+document.querySelectorAll('#tab-list .radio-option').forEach(el => {
+  el.addEventListener('click', () => setTab(el.dataset.value));
+});
+document.querySelectorAll('#filter-list .radio-option').forEach(el => {
+  el.addEventListener('click', () => setFilter(el.dataset.value));
+});
+document.querySelectorAll('.toggle-row').forEach(row => {
+  row.addEventListener('click', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    const key = row.dataset.toggle;
+    setToggle(key, !state[key]);
+  });
+});
+
+// Copy button
+document.getElementById('copy-btn').addEventListener('click', () => {
+  const text = document.getElementById('prompt-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copié !';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copier la spec';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>
