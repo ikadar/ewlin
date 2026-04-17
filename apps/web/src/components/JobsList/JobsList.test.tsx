@@ -363,20 +363,12 @@ const createTestAssignment = (taskId: string, isCompleted: boolean): TaskAssignm
 
 describe('JobCard', () => {
   it('renders job information with separator', () => {
-    const tasks = [
-      createTestTask('t1', 'job-1'),
-      createTestTask('t2', 'job-1'),
-    ];
-    const assignments = [createTestAssignment('t1', true)];
-
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={tasks}
-        assignments={assignments}
       />
     );
 
@@ -387,15 +379,12 @@ describe('JobCard', () => {
   });
 
   it('shows deadline on normal cards', () => {
-    const tasks = [createTestTask('t1', 'job-1')];
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={tasks}
-        assignments={[]}
         deadline="17/12"
       />
     );
@@ -403,64 +392,58 @@ describe('JobCard', () => {
     expect(screen.getByText('17/12')).toBeInTheDocument();
   });
 
-  it('renders the progress bar', () => {
-    const tasks = [createTestTask('t1', 'job-1'), createTestTask('t2', 'job-1')];
+  it('shows deadline even when the job is late (color carries the status)', () => {
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={tasks}
-        assignments={[createTestAssignment('t1', true)]}
-      />
-    );
-    expect(screen.getByTestId('progress-bar')).toBeInTheDocument();
-  });
-
-  it('shows "En retard" badge for late problem type', () => {
-    render(
-      <JobCard
-        id="job-1"
-        reference="12345"
-        client="Test Client"
-        description="Test Description"
-        tasks={[createTestTask('t1', 'job-1')]}
-        assignments={[]}
+        deadline="17/12"
         problemType="late"
       />
     );
-    expect(screen.getByText('En retard')).toBeInTheDocument();
+
+    expect(screen.getByText('17/12')).toBeInTheDocument();
   });
 
-  it('shows "Conflit" badge for conflict problem type', () => {
+  it('encodes late status via data-status attribute', () => {
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={[createTestTask('t1', 'job-1')]}
-        assignments={[]}
+        problemType="late"
+      />
+    );
+    expect(screen.getByTestId('job-card-job-1')).toHaveAttribute('data-status', 'late');
+  });
+
+  it('encodes conflict status via data-status attribute', () => {
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
         problemType="conflict"
       />
     );
-    expect(screen.getByText('Conflit')).toBeInTheDocument();
+    expect(screen.getByTestId('job-card-job-1')).toHaveAttribute('data-status', 'conflict');
   });
 
-  it('shows "Terminé" badge when isCompleted', () => {
+  it('encodes completed status via data-status attribute', () => {
     render(
       <JobCard
         id="job-1"
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={[createTestTask('t1', 'job-1')]}
-        assignments={[createTestAssignment('t1', true)]}
         isCompleted
       />
     );
-    expect(screen.getByText('Terminé')).toBeInTheDocument();
+    expect(screen.getByTestId('job-card-job-1')).toHaveAttribute('data-status', 'completed');
   });
 
   it('prioritizes problem type over completed in status', () => {
@@ -470,15 +453,11 @@ describe('JobCard', () => {
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={[createTestTask('t1', 'job-1')]}
-        assignments={[createTestAssignment('t1', true)]}
         problemType="late"
         isCompleted
       />
     );
-    // Late wins over completed
-    expect(screen.getByText('En retard')).toBeInTheDocument();
-    expect(screen.queryByText('Terminé')).not.toBeInTheDocument();
+    expect(screen.getByTestId('job-card-job-1')).toHaveAttribute('data-status', 'late');
   });
 
   it('applies selected styling', () => {
@@ -488,8 +467,6 @@ describe('JobCard', () => {
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={[createTestTask('t1', 'job-1')]}
-        assignments={[]}
         isSelected
       />
     );
@@ -506,8 +483,6 @@ describe('JobCard', () => {
         reference="12345"
         client="Test Client"
         description="Test Description"
-        tasks={[createTestTask('t1', 'job-1')]}
-        assignments={[]}
         onClick={onClick}
       />
     );

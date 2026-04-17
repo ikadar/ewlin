@@ -47,17 +47,6 @@ export function JobsList({
     return ids;
   }, [conflicts, tasks, elements]);
 
-  // Task-level conflict set (same filter as conflictJobIds but keyed by taskId).
-  // Passed to ProgressBar so each segment can reflect per-task conflict state.
-  const conflictTaskIds = useMemo(() => {
-    const ids = new Set<string>();
-    conflicts.forEach((c) => {
-      if (c.type === 'ApprovalGateConflict' || c.type === 'DeadlineConflict') return;
-      ids.add(c.taskId);
-    });
-    return ids;
-  }, [conflicts]);
-
   const tasksByJob = useMemo(() => groupTasksByJob(tasks, elements), [tasks, elements]);
 
   const assignmentsByJob = useMemo(() => {
@@ -218,17 +207,12 @@ export function JobsList({
         reference={job.reference}
         client={job.client}
         description={job.description}
-        tasks={jobTasks}
-        assignments={jobAssignments}
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
         problemType={getProblemType(job.id)}
         isCompleted={isJobCompleted(job.id)}
         bufferLabel={computeBufferLabel(job, jobTasks, jobAssignments)}
         isSelected={selectedJobId === job.id}
         dim={selectedJobId != null && selectedJobId !== job.id}
-        isShipped={job.shipped}
-        isJobLate={lateJobIds.has(job.id)}
-        conflictTaskIds={conflictTaskIds}
         onClick={handleJobToggle}
       />
     );

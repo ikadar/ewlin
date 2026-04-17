@@ -1,8 +1,8 @@
 export { Sidebar, SidebarButton } from './Sidebar';
 export type { SidebarButtonProps } from './Sidebar';
 
-export { JobsList, JobsListHeader, JobCard, ProgressBar, ProgressDots, getDotState } from './JobsList';
-export type { JobsListProps, JobsListHeaderProps, JobTab, JobChip, JobCardProps, JobProblemType, ProgressBarProps, ProgressDotsProps, DotState } from './JobsList';
+export { JobsList, JobsListHeader, JobCard, ProgressDots, getDotState } from './JobsList';
+export type { JobsListProps, JobsListHeaderProps, JobTab, JobChip, JobCardProps, JobProblemType, ProgressDotsProps, DotState } from './JobsList';
 
 export { JobDetailsPanel, JobInfo, InfoField, TaskList, TaskTile, ElementSection, OutsourcingMiniForm, WorkDaysInput, DateTimePicker } from './JobDetailsPanel';
 export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, OutsourcingMiniFormProps, WorkDaysInputProps, DateTimePickerProps } from './JobDetailsPanel';
