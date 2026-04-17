@@ -6,7 +6,6 @@
  * and a relay label ("→ pause" / "reprise →").
  */
 
-import { Circle, CircleCheck, Pin } from 'lucide-react';
 import type { TileState } from './colorUtils';
 import { getStateRgb } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
@@ -128,23 +127,6 @@ export function TileSegment({
 }: TileSegmentProps) {
   const colors = STATE_COLORS[tileState] || STATE_COLORS.default;
   const stateRgb = getStateRgb(tileState);
-  // Folder-tab is shown on every segment that has an assignment id, including
-  // relay/reprise segments (sawtoothTop = true). With inward teeth the tab no
-  // longer protrudes past the segment's body top (original rationale for
-  // gating on !sawtoothTop), and hiding it would otherwise make completion/pin
-  // actions unreachable on any segment that isn't the first one of a split.
-  const showFolderTab =
-    !!assignmentId && (onTogglePin !== undefined || onToggleComplete !== undefined);
-
-  const handleToggleComplete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (assignmentId) onToggleComplete?.(assignmentId);
-  };
-
-  const handleTogglePin = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (assignmentId) onTogglePin?.(assignmentId);
-  };
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
   const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
   // Teeth are rendered INWARD: the rendered box matches the segment's time
@@ -278,35 +260,6 @@ export function TileSegment({
           </div>
         )}
       </div>
-
-      {/* Folder tab (hover-only): completion + pin actions. Only rendered
-          on the top segment of an assignment (no sawtoothTop) so the tab
-          doesn't stick up into the segment above. */}
-      {showFolderTab && (
-        <div className="folder-tab">
-          <button
-            onClick={handleToggleComplete}
-            title={isCompleted ? 'Marquer non complété' : 'Marquer complété'}
-            data-testid="tile-tab-complete"
-          >
-            {isCompleted ? (
-              <CircleCheck className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <Circle className="w-4 h-4" style={{ color: `rgb(${stateRgb.text})` }} />
-            )}
-          </button>
-          <button
-            onClick={handleTogglePin}
-            title={isPinned ? 'Désépingler' : 'Épingler'}
-            data-testid="tile-tab-pin"
-          >
-            <Pin
-              className="w-3 h-3"
-              style={{ color: isPinned ? '#f59e0b' : `rgb(${stateRgb.text})` }}
-            />
-          </button>
-        </div>
-      )}
 
       {/* Relay labels */}
       {relayLabelBottom && (

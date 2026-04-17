@@ -310,32 +310,6 @@ export const Tile = memo(function Tile({
         )}
       </div>
 
-      {/* Folder tab (hover-only): completion + pin actions. Out of the
-          label overlay so the tile body stays clean by default. */}
-      <div className="folder-tab">
-        <button
-          onClick={handleToggleComplete}
-          title={isCompleted ? 'Marquer non complété' : 'Marquer complété'}
-          data-testid="tile-tab-complete"
-        >
-          {isCompleted ? (
-            <CircleCheck className="w-4 h-4 text-emerald-400" />
-          ) : (
-            <Circle className="w-4 h-4" style={{ color: `rgb(${stateRgb.text})` }} />
-          )}
-        </button>
-        <button
-          onClick={handleTogglePin}
-          title={assignment.isPinned ? 'Désépingler' : 'Épingler'}
-          data-testid="tile-tab-pin"
-        >
-          <Pin
-            className="w-3 h-3"
-            style={{ color: assignment.isPinned ? '#f59e0b' : `rgb(${stateRgb.text})` }}
-          />
-        </button>
-      </div>
-
       {/* Label overlay spanning both sections */}
       <div
         className="absolute left-0 right-0 z-10 pt-0.5 px-2 pointer-events-none overflow-hidden"
