@@ -71,6 +71,34 @@ export function FocusStationColumn({
     return filtered;
   }, [snapshot.assignments, station.id]);
 
+  const taskInterruption = useMemo(() => {
+    const byTask = new Map<string, { start: number; end: number }[]>();
+    for (const a of snapshot.assignments) {
+      if (a.isOutsourced) continue;
+      const list = byTask.get(a.taskId) ?? [];
+      list.push({
+        start: new Date(a.scheduledStart).getTime(),
+        end: new Date(a.scheduledEnd).getTime(),
+      });
+      byTask.set(a.taskId, list);
+    }
+    const result = new Map<string, { top: boolean; bottom: boolean }>();
+    for (const a of snapshot.assignments) {
+      if (a.isOutsourced) continue;
+      const peers = byTask.get(a.taskId);
+      if (!peers || peers.length <= 1) {
+        result.set(a.id, { top: false, bottom: false });
+        continue;
+      }
+      const s = new Date(a.scheduledStart).getTime();
+      const e = new Date(a.scheduledEnd).getTime();
+      const hasBefore = peers.some((p) => p.end <= s + 30000 && p.start < s);
+      const hasAfter = peers.some((p) => p.start >= e - 30000 && p.end > e);
+      result.set(a.id, { top: hasBefore, bottom: hasAfter });
+    }
+    return result;
+  }, [snapshot.assignments]);
+
   const taskMap = useMemo(() => new Map(snapshot.tasks.map((t) => [t.id, t])), [snapshot.tasks]);
   const elementMap = useMemo(
     () => new Map(snapshot.elements.map((e) => [e.id, e])),
@@ -263,6 +291,7 @@ export function FocusStationColumn({
       {stationAssignments.map((assignment) => {
         const cached = tileDataCache.get(assignment.id);
         if (!cached) return null;
+        const interrupt = taskInterruption.get(assignment.id);
         return (
           <Tile
             key={assignment.id}
@@ -279,6 +308,8 @@ export function FocusStationColumn({
             blockingInfo={cached.blockingInfo}
             tirageLabel={cached.tirageLabel}
             operatorNames={cached.operatorNames}
+            sawtoothTop={interrupt?.top}
+            sawtoothBottom={interrupt?.bottom}
           />
         );
       })}

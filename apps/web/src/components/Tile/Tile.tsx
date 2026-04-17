@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
@@ -9,7 +9,7 @@ import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useTooltipDelay } from '../../hooks';
-import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath } from './sawtooth';
+import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 
 export interface TileProps {
   /** Task assignment data */
@@ -117,12 +117,31 @@ export const Tile = memo(function Tile({
   const setupHeight = totalHeight * setupRatio;
   const runHeight = totalHeight * (1 - setupRatio);
 
-  // Task interruption teeth — protrude outward from the tile body
+  // Task interruption teeth — rendered INWARD so adjacent tiles never overlap
+  // visually. The rendered box matches the tile's time span exactly; the
+  // clip-path carves the teeth out of the body, and content is offset by
+  // extTop/extBottom to stay clear of the tooth zone.
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
   const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
-  const renderHeight = totalHeight + extTop + extBottom;
+  const renderHeight = totalHeight;
   const hasSaw = sawtoothTop || sawtoothBottom;
-  const clipPath = buildCssClipPath(renderHeight, sawtoothTop, sawtoothBottom);
+
+  // Measure the rendered pixel width so the teeth count adapts to it:
+  // each tooth keeps a roughly constant px size instead of stretching.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+  useEffect(() => {
+    if (!hasSaw) return;
+    const el = rootRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) setMeasuredWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasSaw]);
+  const teethCount = computeTeethCount(measuredWidth);
+  const clipPath = buildCssClipPath(renderHeight, sawtoothTop, sawtoothBottom, teethCount);
 
   // Get state-based color classes
   const colorClasses = getStateColorClasses(tileState);
@@ -165,9 +184,10 @@ export const Tile = memo(function Tile({
   // Cursor: grab for selected pickable tiles, pointer for all others
   return (
     <div
+      ref={rootRef}
       className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
-        top: `${top - extTop}px`,
+        top: `${top}px`,
         height: `${renderHeight}px`,
         left: overrideLeft ?? 0,
         width: overrideWidth ?? undefined,
@@ -205,12 +225,13 @@ export const Tile = memo(function Tile({
         <SimilarityIndicators results={similarityResults} />
       )}
 
-      {/* Setup section (if has setup time) - background only */}
+      {/* Setup section (if has setup time) - background only. Fills the tile's
+          full time span; inward clip-path eats any tooth zone out of backgrounds. */}
       {hasSetup && (
         <div
           className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
           style={{
-            top: `${extTop}px`,
+            top: 0,
             height: `${setupHeight}px`,
           }}
           data-testid="tile-setup-section"
@@ -221,7 +242,7 @@ export const Tile = memo(function Tile({
       <div
         className={`absolute left-0 right-0 ${colorClasses.runBg}`}
         style={{
-          top: `${extTop + (hasSetup ? setupHeight : 0)}px`,
+          top: hasSetup ? `${setupHeight}px` : 0,
           height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
         }}
         data-testid="tile-run-section"
@@ -237,7 +258,7 @@ export const Tile = memo(function Tile({
         const offsetMinutes = (rcStartMs - startTime.getTime()) / 60000;
         const durationMinutes = (rcEndMs - rcStartMs) / 60000;
         if (durationMinutes <= 0) return null;
-        const rcTop = extTop + minutesToPixels(offsetMinutes, pixelsPerHour);
+        const rcTop = minutesToPixels(offsetMinutes, pixelsPerHour);
         const rcHeight = minutesToPixels(durationMinutes, pixelsPerHour);
         return (
           <div
@@ -260,7 +281,7 @@ export const Tile = memo(function Tile({
         >
           {sawtoothTop && (
             <path
-              d={buildSawtoothSvgPath(100, 0, 'top')}
+              d={buildSawtoothSvgPath(100, 0, 'top', teethCount)}
               fill="none"
               stroke={`rgb(${stateRgb.border})`}
               strokeWidth={1.5}
@@ -270,7 +291,7 @@ export const Tile = memo(function Tile({
           )}
           {sawtoothBottom && (
             <path
-              d={buildSawtoothSvgPath(100, renderHeight, 'bottom')}
+              d={buildSawtoothSvgPath(100, renderHeight, 'bottom', teethCount)}
               fill="none"
               stroke={`rgb(${stateRgb.border})`}
               strokeWidth={1.5}

@@ -1,10 +1,21 @@
 /**
  * Shared sawtooth geometry helpers for tiles (operator + station).
  * Teeth indicate an interrupted task — the tile continues elsewhere in time.
+ *
+ * Tooth width is driven by a target pixel size (TOOTH_WIDTH), not a fixed
+ * count — so narrow and wide tiles show teeth of the same visual size,
+ * just in different quantities.
  */
 
-export const SAW_AMPLITUDE = 10;
-export const SAW_TEETH = 13;
+export const SAW_AMPLITUDE = 7;
+export const TOOTH_WIDTH = 14;
+const MIN_TEETH = 3;
+
+/** Pick a teeth count that keeps each tooth ~TOOTH_WIDTH px regardless of tile width. */
+export function computeTeethCount(tileWidth: number): number {
+  if (!Number.isFinite(tileWidth) || tileWidth <= 0) return MIN_TEETH;
+  return Math.max(MIN_TEETH, Math.round(tileWidth / TOOTH_WIDTH));
+}
 
 /**
  * Build an SVG <path> d-attribute for a visible zigzag stroke line.
@@ -14,9 +25,9 @@ export function buildSawtoothSvgPath(
   width: number,
   y: number,
   direction: 'top' | 'bottom',
+  teeth: number = computeTeethCount(width),
 ): string {
   const amp = SAW_AMPLITUDE;
-  const teeth = SAW_TEETH;
   const stepW = width / teeth;
   const parts: string[] = [];
 
@@ -40,12 +51,18 @@ export function buildSawtoothSvgPath(
 /**
  * Build a CSS clip-path polygon() string.
  * X coordinates use percentages (responsive). Y uses pixels (fixed tooth height).
+ * `teeth` controls tooth density — callers compute it from tile pixel width
+ * (via `computeTeethCount`) so teeth keep a consistent visual size.
  */
-export function buildCssClipPath(h: number, sawTop: boolean, sawBottom: boolean): string | undefined {
+export function buildCssClipPath(
+  h: number,
+  sawTop: boolean,
+  sawBottom: boolean,
+  teeth: number = MIN_TEETH,
+): string | undefined {
   if (!sawTop && !sawBottom) return undefined;
 
   const amp = SAW_AMPLITUDE;
-  const teeth = SAW_TEETH;
   const stepPct = 100 / teeth;
   const points: string[] = [];
 

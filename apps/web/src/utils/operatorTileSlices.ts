@@ -168,14 +168,25 @@ export function computeTileSlices(
 ): TileSlice[] {
   if (assignments.length === 0) return [];
 
-  const entries = assignments.map(a => ({
-    id: a.id,
-    taskId: a.taskId,
-    startMs: new Date(a.scheduledStart).getTime(),
-    endMs: new Date(a.scheduledEnd).getTime(),
-    isMasked: a.isMaskedTime ?? false,
-    assignment: a,
-  }));
+  const entries = assignments.map(a => {
+    const opRef = a.operators?.find(o => o.operatorId === operator.id);
+    const assignStart = new Date(a.scheduledStart).getTime();
+    const assignEnd = new Date(a.scheduledEnd).getTime();
+    const opFrom = opRef?.from ? new Date(opRef.from).getTime() : assignStart;
+    const opTo = opRef?.to ? new Date(opRef.to).getTime() : assignEnd;
+    return {
+      id: a.id,
+      taskId: a.taskId,
+      startMs: opFrom,
+      endMs: opTo,
+      assignStartMs: assignStart,
+      assignEndMs: assignEnd,
+      relayBefore: opFrom > assignStart + 30000,
+      relayAfter: opTo < assignEnd - 30000,
+      isMasked: a.isMaskedTime ?? false,
+      assignment: a,
+    };
+  });
 
   const boundarySet = new Set<number>();
   for (const e of entries) {
@@ -222,6 +233,7 @@ export function computeTileSlices(
   const finalSlices: TileSlice[] = [];
 
   for (const slice of rawSlices) {
+    const entry = entries.find(e => e.id === slice.assignmentId);
     const gaps = findOperatorGaps(operator, slice.from, slice.to);
     const ss = slice.from.getTime();
     const se = slice.to.getTime();
@@ -234,8 +246,39 @@ export function computeTileSlices(
       return hasWorkBefore || hasWorkAfter;
     });
 
+    const atEntryStart = entry ? Math.abs(ss - entry.startMs) < 30000 : false;
+    const atEntryEnd = entry ? Math.abs(se - entry.endMs) < 30000 : false;
+    const relayBeforeActive = !!(entry?.relayBefore && atEntryStart);
+    const relayAfterActive = !!(entry?.relayAfter && atEntryEnd);
+
+    const resolveRelayBeforeLabel = (): string | undefined => {
+      if (!entry || !relayBeforeActive) return undefined;
+      if (slice.isMasked) return 'reprise →';
+      const syntheticGap = { gapStart: new Date(entry.assignStartMs), gapEnd: new Date(entry.startMs) };
+      const otherOp = findRelayOperator(entries, slice.assignmentId, operator, syntheticGap, allOperators);
+      return otherOp ? otherOp.replace('→ ', '') + ' →' : 'reprise →';
+    };
+
+    const resolveRelayAfterLabel = (): string | undefined => {
+      if (!entry || !relayAfterActive) return undefined;
+      if (slice.isMasked) return '→ pause';
+      const syntheticGap = { gapStart: new Date(entry.endMs), gapEnd: new Date(entry.assignEndMs) };
+      const otherOp = findRelayOperator(entries, slice.assignmentId, operator, syntheticGap, allOperators);
+      return otherOp ?? '→ pause';
+    };
+
     if (splittingGaps.length === 0) {
-      finalSlices.push(slice);
+      if (relayBeforeActive || relayAfterActive) {
+        finalSlices.push({
+          ...slice,
+          sawtoothTop: relayBeforeActive,
+          sawtoothBottom: relayAfterActive,
+          relayLabelTop: resolveRelayBeforeLabel(),
+          relayLabelBottom: resolveRelayAfterLabel(),
+        });
+      } else {
+        finalSlices.push(slice);
+      }
       continue;
     }
 
@@ -260,8 +303,8 @@ export function computeTileSlices(
     for (let i = 0; i < segments.length; i++) {
       const isFirst = i === 0;
       const isLast = i === segments.length - 1;
-      const sawBottom = !isLast || tileEndsInGap;
-      const sawTop = !isFirst || tileStartsInGap;
+      let sawBottom = !isLast || tileEndsInGap;
+      let sawTop = !isFirst || tileStartsInGap;
 
       let relayBottom: string | undefined;
       let relayTop: string | undefined;
@@ -287,6 +330,15 @@ export function computeTileSlices(
       }
       if (isLast && tileEndsInGap) {
         relayBottom = '→ pause';
+      }
+
+      if (isFirst && relayBeforeActive) {
+        sawTop = true;
+        relayTop = relayTop ?? resolveRelayBeforeLabel();
+      }
+      if (isLast && relayAfterActive) {
+        sawBottom = true;
+        relayBottom = relayBottom ?? resolveRelayAfterLabel();
       }
 
       finalSlices.push({

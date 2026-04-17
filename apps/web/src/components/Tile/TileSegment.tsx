@@ -10,7 +10,7 @@ import { Circle, CircleCheck, Pin } from 'lucide-react';
 import type { TileState } from './colorUtils';
 import { getStateRgb } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
-import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath } from './sawtooth';
+import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 
 // State → colors for SVG.
 const STATE_COLORS: Record<TileState, { bg: string; border: string; text: string }> = {
@@ -142,9 +142,14 @@ export function TileSegment({
   };
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
   const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
-  const totalHeight = height + extTop + extBottom;
+  // Teeth are rendered INWARD: the rendered box matches the segment's time
+  // span exactly so adjacent tiles never overlap, and the clip-path eats the
+  // tooth zone out of the body. Content/overlays get offset by extTop/extBottom
+  // to stay clear of the tooth area.
+  const totalHeight = height;
   const contentTop = extTop + 2;
   const contentBottom = extBottom + 2;
+  const teethCount = computeTeethCount(width);
 
   // Compute calage-phase overlays: setup section + any re-calage sections
   // that intersect this segment. Each gets its pixel footprint within the
@@ -176,7 +181,7 @@ export function TileSegment({
     <div
       className="absolute cursor-pointer"
       style={{
-        top: `${top - extTop + (sawtoothTop ? 0 : 1)}px`,
+        top: `${top + (sawtoothTop ? 0 : 1)}px`,
         height: `${totalHeight - (sawtoothTop ? 0 : 1) - (sawtoothBottom ? 0 : 1)}px`,
         left: overrideLeft ?? 0,
         width: overrideWidth ?? undefined,
@@ -196,7 +201,7 @@ export function TileSegment({
         className="absolute inset-0"
         style={{
           background: colors.bg,
-          clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom),
+          clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
           borderRadius: (!sawtoothTop && !sawtoothBottom) ? '2px' : undefined,
         }}
       />
@@ -204,7 +209,7 @@ export function TileSegment({
         className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{
           background: colors.border,
-          clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom),
+          clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
         }}
       />
 
@@ -216,7 +221,7 @@ export function TileSegment({
           key={ov.key}
           className="absolute left-0 right-0"
           style={{
-            top: `${extTop + ov.top}px`,
+            top: `${ov.top}px`,
             height: `${Math.max(ov.height, 2)}px`,
             background: colors.bg,
           }}
@@ -235,7 +240,7 @@ export function TileSegment({
         >
           {sawtoothTop && (
             <path
-              d={buildSawtoothSvgPath(width, 0, 'top')}
+              d={buildSawtoothSvgPath(width, 0, 'top', teethCount)}
               fill="none"
               stroke={colors.border}
               strokeWidth={1.5}
@@ -244,7 +249,7 @@ export function TileSegment({
           )}
           {sawtoothBottom && (
             <path
-              d={buildSawtoothSvgPath(width, totalHeight, 'bottom')}
+              d={buildSawtoothSvgPath(width, totalHeight, 'bottom', teethCount)}
               fill="none"
               stroke={colors.border}
               strokeWidth={1.5}
