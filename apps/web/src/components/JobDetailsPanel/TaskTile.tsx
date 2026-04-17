@@ -1,7 +1,6 @@
-import { memo, useRef, useState } from 'react';
+import { memo } from 'react';
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask, InternalTask } from '@flux/types';
 import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
-import { useTooltipDelay } from '../../hooks';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
 
@@ -22,7 +21,7 @@ export interface TaskTileProps {
   isActivePlacement?: boolean;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
-  /** Callback when a scheduled task is double-clicked (recall) */
+  /** Callback to recall (unschedule) a task, triggered via context menu */
   onRecallTask?: (assignmentId: string) => void;
   /** v0.5.11: Provider for outsourced tasks */
   provider?: OutsourcedProvider;
@@ -204,19 +203,6 @@ export const TaskTile = memo(function TaskTile({
   const isScheduled = !!assignment;
   const style = TILE_STYLES[tileState];
 
-  // Tooltip for scheduled tiles (recall hint)
-  const { isVisible: showRecallTip, onMouseEnter: tipEnter, onMouseLeave: tipLeave } = useTooltipDelay();
-  const tileRef = useRef<HTMLButtonElement>(null);
-  const [tipPos, setTipPos] = useState({ top: 0, left: 0 });
-
-  const handleTipEnter = () => {
-    if (tileRef.current) {
-      const rect = tileRef.current.getBoundingClientRect();
-      setTipPos({ top: rect.top - 4, left: rect.left + rect.width / 2 });
-    }
-    tipEnter();
-  };
-
   // Format a minute count as "Xh MM"
   const formatMinutes = (m: number): string => {
     const hours = Math.floor(m / 60);
@@ -277,12 +263,6 @@ export const TaskTile = memo(function TaskTile({
       }
     };
 
-    const handleDoubleClick = () => {
-      if (onRecallTask && assignment) {
-        onRecallTask(assignment.id);
-      }
-    };
-
     const handleContextMenu = (e: React.MouseEvent) => {
       if (onContextMenu && assignment) {
         e.preventDefault();
@@ -291,115 +271,96 @@ export const TaskTile = memo(function TaskTile({
     };
 
     return (
-      <>
-        <button
-          ref={tileRef}
-          type="button"
-          className={`border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2`}
-          style={tileInlineStyle}
-          data-testid={`task-tile-${task.id}`}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onContextMenu={handleContextMenu}
-          onMouseEnter={handleTipEnter}
-          onMouseLeave={tipLeave}
-        >
-          <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span
-                onClick={handleToggleComplete}
-                className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
-                  isCompleted ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'
-                }`}
-                title={isCompleted ? 'Marquer non terminée' : 'Marquer terminée'}
-              >
-                {isCompleted ? <CircleCheck className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
-              </span>
-              <span
-                onClick={handleTogglePin}
-                className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
-                  isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'
-                }`}
-                title={isPinned ? 'Désépingler' : 'Épingler'}
-              >
-                <Pin className="w-3 h-3" />
-              </span>
-              <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>{displayName}</span>
-              {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
-                <>
-                  <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
-                  <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-[5px] py-px font-bold tracking-[0.02em] shrink-0">
-                    {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
-                  </span>
-                </>
-              )}
-            </div>
-            <span className="text-[11px] shrink-0 font-mono">
-              {hasEffDelta ? (
-                <>
-                  <span className="text-zinc-600 line-through">{formatMinutes(theoMinutes)}</span>
-                  <span className="text-amber-400 font-semibold"> → {formatMinutes(effMinutes!)}</span>
-                </>
-              ) : (
-                <span className="text-zinc-400">{formatMinutes(theoMinutes)}</span>
-              )}
+      <button
+        type="button"
+        className={`border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2`}
+        style={tileInlineStyle}
+        data-testid={`task-tile-${task.id}`}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+      >
+        <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span
+              onClick={handleToggleComplete}
+              className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
+                isCompleted ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'
+              }`}
+              title={isCompleted ? 'Marquer non terminée' : 'Marquer terminée'}
+            >
+              {isCompleted ? <CircleCheck className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
             </span>
+            <span
+              onClick={handleTogglePin}
+              className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
+                isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'
+              }`}
+              title={isPinned ? 'Désépingler' : 'Épingler'}
+            >
+              <Pin className="w-3 h-3" />
+            </span>
+            <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>{displayName}</span>
+            {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
+              <>
+                <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
+                <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-[5px] py-px font-bold tracking-[0.02em] shrink-0">
+                  {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
+                </span>
+              </>
+            )}
           </div>
-          {operatorAssignments && operatorAssignments.length > 0 && (
-            <div className="flex flex-col pt-0 pl-[11px] pr-[10px] pb-2 gap-[3px]">
-              {operatorAssignments.map((op, i) => {
-                const nameParts = op.name.split(' ');
-                const displayName = nameParts.length >= 2
-                  ? `${nameParts[0].charAt(0)}. ${nameParts.slice(1).join(' ')}`
-                  : op.name;
-                const fromDate = op.from ? new Date(op.from) : null;
-                const toDate = op.to ? new Date(op.to) : null;
-                const dateStr = fromDate
-                  ? `${String(fromDate.getDate()).padStart(2, '0')}/${String(fromDate.getMonth() + 1).padStart(2, '0')}`
-                  : '';
-                const fromTime = fromDate ? fromDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-                const toTime = toDate ? toDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-                const timeRange = fromTime && toTime ? `${dateStr} ${fromTime}–${toTime}` : '';
-                const isClickable = !!onJumpToOperatorSlice && !!fromDate;
-                const jumpToSlice = (e: React.SyntheticEvent) => {
-                  if (!isClickable || !fromDate) return;
-                  e.stopPropagation();
-                  onJumpToOperatorSlice!(op.operatorId, fromDate);
-                };
-                return (
-                  <div
-                    key={i}
-                    role={isClickable ? 'button' : undefined}
-                    tabIndex={isClickable ? 0 : undefined}
-                    onClick={isClickable ? jumpToSlice : undefined}
-                    onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToSlice(e); } } : undefined}
-                    className={`flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px] ${
-                      isClickable ? 'cursor-pointer hover:bg-zinc-700/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30' : ''
-                    }`}
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                    <span className="text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
-                    <span className="text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </button>
-        {showRecallTip && (
-          <div
-            className="fixed z-50 pointer-events-none"
-            style={{ left: tipPos.left, top: tipPos.top, transform: 'translate(-50%, -100%)' }}
-          >
-            <div className="flux-tooltip whitespace-nowrap">
-              <span className="text-[var(--tt-text)]">Double-clic pour rappeler</span>
-            </div>
-            <div className="flex justify-center">
-              <div className="flux-tooltip-arrow" />
-            </div>
+          <span className="text-[11px] shrink-0 font-mono">
+            {hasEffDelta ? (
+              <>
+                <span className="text-zinc-600 line-through">{formatMinutes(theoMinutes)}</span>
+                <span className="text-amber-400 font-semibold"> → {formatMinutes(effMinutes!)}</span>
+              </>
+            ) : (
+              <span className="text-zinc-400">{formatMinutes(theoMinutes)}</span>
+            )}
+          </span>
+        </div>
+        {operatorAssignments && operatorAssignments.length > 0 && (
+          <div className="flex flex-col pt-0 pl-[11px] pr-[10px] pb-2 gap-[3px]">
+            {operatorAssignments.map((op, i) => {
+              const nameParts = op.name.split(' ');
+              const displayName = nameParts.length >= 2
+                ? `${nameParts[0].charAt(0)}. ${nameParts.slice(1).join(' ')}`
+                : op.name;
+              const fromDate = op.from ? new Date(op.from) : null;
+              const toDate = op.to ? new Date(op.to) : null;
+              const dateStr = fromDate
+                ? `${String(fromDate.getDate()).padStart(2, '0')}/${String(fromDate.getMonth() + 1).padStart(2, '0')}`
+                : '';
+              const fromTime = fromDate ? fromDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+              const toTime = toDate ? toDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+              const timeRange = fromTime && toTime ? `${dateStr} ${fromTime}–${toTime}` : '';
+              const isClickable = !!onJumpToOperatorSlice && !!fromDate;
+              const jumpToSlice = (e: React.SyntheticEvent) => {
+                if (!isClickable || !fromDate) return;
+                e.stopPropagation();
+                onJumpToOperatorSlice!(op.operatorId, fromDate);
+              };
+              return (
+                <div
+                  key={i}
+                  role={isClickable ? 'button' : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  onClick={isClickable ? jumpToSlice : undefined}
+                  onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToSlice(e); } } : undefined}
+                  className={`flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px] ${
+                    isClickable ? 'cursor-pointer hover:bg-zinc-700/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30' : ''
+                  }`}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                  <span className="text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
+                  <span className="text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
+                </div>
+              );
+            })}
           </div>
         )}
-      </>
+      </button>
     );
   }
 

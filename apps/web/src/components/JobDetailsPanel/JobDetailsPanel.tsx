@@ -24,7 +24,7 @@ export interface JobDetailsPanelProps {
   activeTaskId?: string | null;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
-  /** Callback when a scheduled task is double-clicked (recall) */
+  /** Callback to recall (unschedule) a task, triggered via context menu */
   onRecallTask?: (assignmentId: string) => void;
   /** Callback when close button is clicked (REQ-02) */
   onClose?: () => void;

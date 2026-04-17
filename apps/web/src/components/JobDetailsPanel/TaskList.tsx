@@ -31,7 +31,7 @@ export interface TaskListProps {
   shippedJobIds?: Set<string>;
   /** Callback when a scheduled task is clicked (jump to grid) */
   onJumpToTask?: (assignment: TaskAssignment) => void;
-  /** Callback when a scheduled task is double-clicked (recall) */
+  /** Callback to recall (unschedule) a task, triggered via context menu */
   onRecallTask?: (assignmentId: string) => void;
   /** v0.5.11: Callback when manual departure changes for outsourced task */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
