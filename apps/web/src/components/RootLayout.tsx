@@ -28,7 +28,7 @@ function RootLayoutInner() {
   const sharedCommands = useCommands({
     onNavigateScheduler: useCallback(() => navigate('/'), [navigate]),
     onNavigateFlux: useCallback(() => navigate('/flux'), [navigate]),
-    onNewJob: useCallback(() => navigate('/job/new'), [navigate]),
+    onNewJob: useCallback(() => navigate('/stations/job/new'), [navigate]),
     onSearchJobs: useCallback(() => navigate('/flux'), [navigate]),
     onCompactTimeline: useCallback((_h: CompactHorizon) => {
       // No-op at root level — compaction is page-specific and registered via context

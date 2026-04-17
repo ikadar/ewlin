@@ -308,13 +308,13 @@ function AppContent() {
   // Local state for immediate UI response
   const [selectedJobId, setSelectedJobIdLocal] = useState<string | null>(() => {
     // Initialize from URL on mount
-    if (location.pathname === '/job/new') return null;
+    if (location.pathname === '/stations/job/new') return null;
     return urlJobId ?? null;
   });
 
   // Sync URL → state when URL changes (browser back/forward, direct navigation)
   useEffect(() => {
-    const urlSelectedJobId = location.pathname === '/job/new' ? null : (urlJobId ?? null);
+    const urlSelectedJobId = location.pathname === '/stations/job/new' ? null : (urlJobId ?? null);
     if (urlSelectedJobId !== selectedJobId) {
       setSelectedJobIdLocal(urlSelectedJobId);
     }
@@ -324,7 +324,7 @@ function AppContent() {
   const setSelectedJobId = useCallback((jobId: string | null) => {
     setSelectedJobIdLocal(jobId); // Immediate UI update
     // Update URL silently using History API - no React Router re-render
-    const newUrl = jobId ? `/job/${jobId}` : '/';
+    const newUrl = jobId ? `/stations/job/${jobId}` : '/stations';
     window.history.replaceState(null, '', newUrl);
   }, []);
 
@@ -363,7 +363,7 @@ function AppContent() {
 
   // v0.4.38: JCF modal state derived from URL
   // Modal opens when URL is /job/new
-  const isJcfModalOpen = location.pathname === '/job/new';
+  const isJcfModalOpen = location.pathname === '/stations/job/new';
   const isJcfFromFlux = isJcfModalOpen && (location.state as { from?: string } | null)?.from?.startsWith('/flux');
   // Remember which job was selected before JCF opened, so we can restore on close
   const preJcfSelectedJobIdRef = useRef<string | null>(null);
@@ -507,7 +507,7 @@ function AppContent() {
   const handleOpenJcf = useCallback(() => {
     preJcfSelectedJobIdRef.current = selectedJobId;
     setJcfJobId(generateJobId());
-    navigate('/job/new');
+    navigate('/stations/job/new');
   }, [navigate, selectedJobId]);
 
   // v0.4.38: Navigate away from /job/new to close modal
@@ -520,9 +520,9 @@ function AppContent() {
     if (fromRoute?.startsWith('/flux')) {
       restoreUrl = fromRoute;
     } else if (savedJobId) {
-      restoreUrl = `/job/${savedJobId}`;
+      restoreUrl = `/stations/job/${savedJobId}`;
     } else {
-      restoreUrl = '/';
+      restoreUrl = '/stations';
     }
 
     navigate(restoreUrl, { replace: true });
@@ -746,7 +746,7 @@ function AppContent() {
     if (!selectedJob) return;
     populateJcfFromJob(selectedJob);
     preJcfSelectedJobIdRef.current = selectedJobId;
-    navigate('/job/new');
+    navigate('/stations/job/new');
   }, [selectedJob, selectedJobId, populateJcfFromJob, navigate]);
 
   // Auto-populate JCF when arriving at /job/new with editJobId in state (from Flux)
@@ -1768,7 +1768,7 @@ function AppContent() {
     onNavigateFlux: useCallback(() => navigate('/flux'), [navigate]),
     onEditJob: handleEditJob,
     onNewJob: useCallback(() => {
-      navigate('/job/new');
+      navigate('/stations/job/new');
     }, [navigate]),
     onSearchJobs: useCallback(() => {
       navigate('/flux');

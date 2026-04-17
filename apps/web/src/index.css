@@ -241,10 +241,12 @@ body {
 /* Calage phase separator — dashed red divider marks the end of any calage
    phase (initial setup OR post-peremption re-calage). The dashed red reads
    as "fragile / perishable state" and is F variant from the calage-phases
-   playground. Setup and re-calage share the same visual treatment. */
+   playground. Setup and re-calage share the same visual treatment.
+   !important is needed because Tailwind v4 utilities layer at higher
+   priority than regular rules. */
 [data-testid="tile-setup-section"],
 [data-testid="tile-recalage-section"] {
-  border-bottom: 1px dashed rgba(239,68,68,0.9);
+  border-bottom: 1px dashed rgba(239,68,68,0.9) !important;
 }
 
 /* Run section inner bottom border */

@@ -135,7 +135,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   }, []);
 
   const handleNewJob = useCallback(() => {
-    navigate('/job/new', { state: { from: location.pathname } });
+    navigate('/stations/job/new', { state: { from: location.pathname } });
   }, [navigate, location.pathname]);
 
   /**
@@ -242,7 +242,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     // FluxJob.internalId is the scheduler Job UUID; FluxJob.id is the display reference.
     const fluxJob = jobs.find(j => j.id === jobId);
     const editId = fluxJob?.internalId ?? jobId;
-    navigate('/job/new', { state: { editJobId: editId, from: location.pathname } });
+    navigate('/stations/job/new', { state: { editJobId: editId, from: location.pathname } });
   }, [navigate, location.pathname, jobs]);
 
   // ── Keyboard shortcuts (spec 3.4) ────────────────────────────────────────
@@ -264,7 +264,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
       }
       if (isAltLetter(e, 'n')) {
         e.preventDefault();
-        navigate('/job/new', { state: { from: location.pathname } });
+        navigate('/stations/job/new', { state: { from: location.pathname } });
         return;
       }
 

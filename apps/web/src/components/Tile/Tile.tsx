@@ -211,7 +211,7 @@ export const Tile = memo(function Tile({
       {/* Setup section (if has setup time) - background only */}
       {hasSetup && (
         <div
-          className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder}`}
+          className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
           style={{
             top: `${extTop}px`,
             height: `${setupHeight}px`,

@@ -28,7 +28,7 @@ export function Sidebar() {
 
   const isSettings = location.pathname.startsWith('/settings');
   const fromRoute = (location.state as { from?: string } | null)?.from;
-  const isJcfFromFlux = location.pathname === '/job/new' && fromRoute?.startsWith('/flux');
+  const isJcfFromFlux = location.pathname === '/stations/job/new' && fromRoute?.startsWith('/flux');
   const isFlux = location.pathname.startsWith('/flux') || isJcfFromFlux;
   const isStationSchedule = location.pathname.startsWith('/stations');
   const isStats = location.pathname.startsWith('/stats');
