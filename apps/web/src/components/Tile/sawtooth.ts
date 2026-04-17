@@ -7,8 +7,8 @@
  * just in different quantities.
  */
 
-export const SAW_AMPLITUDE = 5;
-export const TOOTH_WIDTH = 10;
+export const SAW_AMPLITUDE = 3;
+export const TOOTH_WIDTH = 7;
 const MIN_TEETH = 3;
 
 /**
