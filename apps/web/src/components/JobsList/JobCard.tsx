@@ -73,38 +73,38 @@ export const JobCard = memo(function JobCard({
   })();
 
   const statusBadge = (() => {
-    if (status === 'late') return <span className="text-[11px] font-medium text-red-400">En retard</span>;
-    if (status === 'conflict') return <span className="text-[11px] font-medium text-amber-400">Conflit</span>;
-    if (status === 'completed') return <span className="text-[11px] font-medium text-emerald-400">Terminé</span>;
+    if (status === 'late') return <span className="text-[10px] font-medium text-red-400">En retard</span>;
+    if (status === 'conflict') return <span className="text-[10px] font-medium text-amber-400">Conflit</span>;
+    if (status === 'completed') return <span className="text-[10px] font-medium text-emerald-400">Terminé</span>;
     return null;
   })();
 
   return (
     <button
       type="button"
-      className={`mx-2 mb-1 pl-[9px] pr-3 py-[10px] rounded-r-[8px] rounded-l-[2px] cursor-pointer transition-colors focus-visible:ring-1 focus-visible:ring-white/30 border-l-[3px] ${accentClass} ${selectedClass} ${dimClass} text-left w-[calc(100%-1rem)]`}
+      className={`mx-2 mb-[3px] pl-[9px] pr-3 py-[6px] rounded-r-[8px] rounded-l-[2px] cursor-pointer transition-colors focus-visible:ring-1 focus-visible:ring-white/30 border-l-[3px] ${accentClass} ${selectedClass} ${dimClass} text-left w-[calc(100%-1rem)]`}
       onClick={handleClick}
       data-testid={`job-card-${id}`}
       data-status={status ?? 'normal'}
     >
-      <div className="flex items-center gap-[6px] mb-[3px] overflow-hidden min-w-0">
-        <span className={`font-mono text-[15px] font-medium shrink-0 ${refColor}`}>{reference}</span>
+      <div className="flex items-center gap-[5px] mb-[1px] overflow-hidden min-w-0">
+        <span className={`font-mono text-[13px] font-medium shrink-0 ${refColor}`}>{reference}</span>
         <span className="text-zinc-600 shrink-0">·</span>
-        <span className="text-zinc-400 truncate min-w-0 flex-1">{client}</span>
+        <span className="text-zinc-400 text-[12px] truncate min-w-0 flex-1">{client}</span>
         {statusIcon}
         {!status && deadline && (
-          <span className="text-zinc-600 text-[11px] ml-auto shrink-0">{deadline}</span>
+          <span className="text-zinc-600 text-[10px] ml-auto shrink-0">{deadline}</span>
         )}
       </div>
 
-      <div className={`truncate mb-[5px] text-[13px] ${descColor}`}>{description}</div>
+      <div className={`truncate mb-[2px] text-[12px] ${descColor}`}>{description}</div>
 
       <div className="flex items-center justify-between gap-2">
         <ProgressBar tasks={tasks} assignments={assignments} />
         <div className="flex items-center gap-2">
           {statusBadge}
           {bufferLabel && status !== 'completed' && (
-            <span className={`text-[11px] font-medium ${bufferLabel.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
+            <span className={`text-[10px] font-medium ${bufferLabel.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
               {bufferLabel}
             </span>
           )}
