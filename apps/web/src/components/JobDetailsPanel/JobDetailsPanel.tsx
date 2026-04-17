@@ -223,7 +223,7 @@ export function JobDetailsPanel({
     : undefined;
 
   return (
-    <div className="w-[400px] shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col h-full" data-testid="job-details-panel">
+    <div className="w-[300px] shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col h-full" data-testid="job-details-panel">
       {/* Header */}
       <div className="px-4 pt-3.5 pb-3 border-b border-white/5 flex flex-col">
         {/* Topline: ref · client + close */}

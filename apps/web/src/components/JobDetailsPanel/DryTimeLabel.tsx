@@ -1,7 +1,7 @@
 import { Timer } from 'lucide-react';
 
 /**
- * DryTimeLabel component displays the "+4h drying" label between printing tasks
+ * DryTimeLabel component displays the "+4h séchage" label between printing tasks
  * and their successors in the JobDetailsPanel task list.
  */
 export function DryTimeLabel() {
@@ -12,7 +12,7 @@ export function DryTimeLabel() {
     >
       <div className="flex-1 h-px bg-amber-400/30" />
       <Timer className="w-3 h-3" />
-      <span>+4h drying</span>
+      <span>+4h séchage</span>
       <div className="flex-1 h-px bg-amber-400/30" />
     </div>
   );
