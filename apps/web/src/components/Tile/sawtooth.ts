@@ -11,6 +11,16 @@ export const SAW_AMPLITUDE = 7;
 export const TOOTH_WIDTH = 14;
 const MIN_TEETH = 3;
 
+/**
+ * Left-border width used on both Tile (station view) and TileSegment
+ * (operator view). Lives here rather than in a CSS class so the two
+ * components — which render borders via different techniques — can't
+ * drift numerically. Tile consumes it via inline `borderLeftWidth`;
+ * TileSegment consumes it as the width of a dedicated div that
+ * follows the sawtooth clip-path.
+ */
+export const TILE_BORDER_WIDTH_PX = 4;
+
 /** Pick a teeth count that keeps each tooth ~TOOTH_WIDTH px regardless of tile width. */
 export function computeTeethCount(tileWidth: number): number {
   if (!Number.isFinite(tileWidth) || tileWidth <= 0) return MIN_TEETH;

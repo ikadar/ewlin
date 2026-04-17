@@ -9,7 +9,7 @@ import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useTooltipDelay } from '../../hooks';
-import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
+import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 
 export interface TileProps {
   /** Task assignment data */
@@ -169,8 +169,10 @@ export const Tile = memo(function Tile({
 
   // Selection outline is handled by CSS selector on [data-job-id] (instant, no re-render needed)
 
-  // v0.4.32b: Blocked tiles show dashed border
-  const borderStyleClass = isBlocked ? 'border-l-4 border-dashed' : 'border-l-4';
+  // v0.4.32b: Blocked tiles show dashed border. Border width is driven by
+  // TILE_BORDER_WIDTH_PX (inline style below) so it stays identical to
+  // TileSegment's left-border div on the operator view.
+  const borderStyleClass = isBlocked ? 'border-dashed' : '';
 
   // Cursor: grab for selected pickable tiles, pointer for all others
   return (
@@ -215,7 +217,7 @@ export const Tile = memo(function Tile({
           left border lives inside the wrapper so it follows the tooth shape. */}
       <div
         className={`absolute inset-0 ${borderStyleClass} ${colorClasses.border}`}
-        style={{ clipPath }}
+        style={{ clipPath, borderLeftWidth: `${TILE_BORDER_WIDTH_PX}px` }}
       >
         {/* Setup section (if has setup time) - background only. Fills the tile's
             full time span; inward clip-path eats any tooth zone out of backgrounds. */}

@@ -8,7 +8,7 @@
 
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
-import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
+import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 
 interface TileSegmentProps {
   /** Unique key for this segment */
@@ -160,8 +160,9 @@ export function TileSegment({
         }}
       />
       <div
-        className="absolute left-0 top-0 bottom-0 w-[4px]"
+        className="absolute left-0 top-0 bottom-0"
         style={{
+          width: `${TILE_BORDER_WIDTH_PX}px`,
           background: colors.border,
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
         }}
