@@ -220,22 +220,8 @@ export const TaskTile = memo(function TaskTile({
     return `${hours}h${minutes.toString().padStart(2, '0')}`;
   };
 
-  // Theoretical duration (setup + run minutes)
+  // Theoretical duration (setup + run minutes) — used for unplaced tiles.
   const theoMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-
-  // Effective duration = sum of (operator.to - operator.from) for each operator
-  // assigned to this task. Returns null if no operators or if any from/to is missing.
-  const effMinutes: number | null = (() => {
-    if (!assignment?.operators?.length) return null;
-    let total = 0;
-    for (const op of assignment.operators) {
-      if (!op.from || !op.to) return null;
-      total += (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60000;
-    }
-    return Math.round(total);
-  })();
-
-  const hasEffDelta = effMinutes !== null && effMinutes !== theoMinutes;
 
   // Format scheduled datetime as "Di 15/12 07:00"
   const formatScheduledTime = (isoString: string): string => {
@@ -344,28 +330,28 @@ export const TaskTile = memo(function TaskTile({
                 </>
               )}
             </div>
-            <div className="flex items-center gap-1.5 shrink-0 font-mono">
-              <span className="text-[11px] text-zinc-400">{formatScheduledTime(assignment.scheduledStart)}</span>
-              {hasEffDelta && (
-                <span className="text-[10.5px]">
-                  <span className="text-zinc-600 line-through">{formatMinutes(theoMinutes)}</span>
-                  <span className="text-amber-400 font-semibold"> → {formatMinutes(effMinutes!)}</span>
-                </span>
-              )}
-            </div>
+            <span className="text-[11px] text-zinc-400 shrink-0 font-mono">{formatScheduledTime(assignment.scheduledStart)}</span>
           </div>
           {operatorAssignments && operatorAssignments.length > 0 && (
             <div className="flex flex-col pt-0 pl-[11px] pr-[10px] pb-2 gap-[3px]">
               {operatorAssignments.map((op, i) => {
-                const fromStr = op.from ? new Date(op.from).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-                const toStr = op.to ? new Date(op.to).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-                const timeRange = fromStr && toStr ? `${fromStr}–${toStr}` : '';
+                const nameParts = op.name.split(' ');
+                const displayName = nameParts.length >= 2
+                  ? `${nameParts[0].charAt(0)}. ${nameParts.slice(1).join(' ')}`
+                  : op.name;
+                const fromDate = op.from ? new Date(op.from) : null;
+                const toDate = op.to ? new Date(op.to) : null;
+                const dateStr = fromDate
+                  ? `${String(fromDate.getDate()).padStart(2, '0')}/${String(fromDate.getMonth() + 1).padStart(2, '0')}`
+                  : '';
+                const fromTime = fromDate ? fromDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+                const toTime = toDate ? toDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+                const timeRange = fromTime && toTime ? `${dateStr} ${fromTime}–${toTime}` : '';
                 return (
                   <div key={i} className="flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px]">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                    <span className="text-[11.5px] text-zinc-300 truncate flex-1">{op.name}</span>
+                    <span className="text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
                     <span className="text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
-                    <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-700 rounded-[3px] px-1.5 py-px shrink-0 font-mono">{op.attention}</span>
                   </div>
                 );
               })}
