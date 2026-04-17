@@ -10,7 +10,7 @@ import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { GlobalToast } from './components/GlobalToast';
 import { MaintenanceState } from './components/MaintenanceState';
-import type { JcfElement, ElementStatusUpdate } from './components';
+import type { JcfElement } from './components';
 import { DEFAULT_ELEMENT } from './components';
 import { ScheduleSaveLoadModal } from './components/ScheduleSaveLoad';
 import { ComputeModal } from './components/ComputeModal/ComputeModal';
@@ -22,7 +22,7 @@ import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { updateSnapshot } from './mock';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useUpdateElementStatusMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
@@ -289,7 +289,6 @@ function AppContent() {
   const [autoPlaceJob] = useAutoPlaceJobMutation();
   const [autoPlaceJobAlap] = useAutoPlaceJobAlapMutation();
   const [saveSchedule] = useSaveScheduleMutation();
-  const [updateElementStatus] = useUpdateElementStatusMutation();
   const [createTemplate] = useCreateTemplateMutation();
   const [updateTemplate] = useUpdateTemplateMutation();
   const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
@@ -1348,16 +1347,6 @@ function AppContent() {
     }
   }, [snapshot.assignments, unassignTask, showToast]);
 
-  // v0.4.32a: Handle element prerequisite status change
-  const handleElementStatusChange = useCallback(async (update: ElementStatusUpdate) => {
-    try {
-      await updateElementStatus(update).unwrap();
-    } catch (err) {
-      console.error('Failed to update element status:', err);
-      showToast(getErrorMessage(err));
-    }
-  }, [updateElementStatus, showToast]);
-
   // v0.5.11: Handle outsourcing work days change (local state only)
   const handleOutsourcingWorkDaysChange = useCallback((taskId: string, workDays: number) => {
     updateSnapshot((currentSnapshot) => {
@@ -1880,7 +1869,6 @@ function AppContent() {
           onRecallTask={handleRecallAssignment}
           onClose={() => setSelectedJobId(null)}
           onDateClick={handleDateClick}
-          onElementStatusChange={handleElementStatusChange}
           onToggleComplete={handleToggleComplete}
           onToggleOutsourcedDone={handleToggleOutsourcedDone}
           onTogglePin={handleTogglePin}

@@ -26,7 +26,6 @@ import {
   useTogglePinMutation,
   useUpdateOutsourcingDatesMutation,
   useUnassignTaskMutation,
-  useUpdateElementStatusMutation,
   useSplitTaskMutation,
   useFuseTaskMutation,
   useClearJobAssignmentsMutation,
@@ -59,7 +58,6 @@ import {
   timeToYPosition,
 } from '../components';
 import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
-import type { ElementStatusUpdate } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
 import { OperatorHeader } from '../components/OperatorHeaders';
@@ -115,7 +113,6 @@ export default function OperatorSchedulePage() {
   const [togglePin] = useTogglePinMutation();
   const [updateOutsourcingDates] = useUpdateOutsourcingDatesMutation();
   const [unassignTask] = useUnassignTaskMutation();
-  const [updateElementStatus] = useUpdateElementStatusMutation();
   const [updateSTStatus] = useUpdateSTStatusMutation();
   const [splitTask] = useSplitTaskMutation();
   const [fuseTask] = useFuseTaskMutation();
@@ -300,10 +297,6 @@ export default function OperatorSchedulePage() {
     if (!assignment) return;
     try { await unassignTask(assignment.taskId).unwrap(); } catch { /* ignore */ }
   }, [snapshot.assignments, unassignTask]);
-
-  const handleElementStatusChange = useCallback(async (update: ElementStatusUpdate) => {
-    try { await updateElementStatus(update).unwrap(); } catch { /* ignore */ }
-  }, [updateElementStatus]);
 
   const handleOutsourcingDepartureChange = useCallback(async (taskId: string, departure: Date | undefined) => {
     try {
@@ -719,7 +712,6 @@ export default function OperatorSchedulePage() {
             providers={snapshot.providers}
             onClose={() => setSelectedJobId(null)}
             onRecallTask={handleRecallAssignment}
-            onElementStatusChange={handleElementStatusChange}
             onToggleComplete={handleToggleComplete}
             onToggleOutsourcedDone={handleToggleOutsourcedDone}
             onTogglePin={handleTogglePin}

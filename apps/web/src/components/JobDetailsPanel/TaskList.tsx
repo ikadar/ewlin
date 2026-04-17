@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
-import type { Task, TaskAssignment, Station, StationCategory, Job, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
-import { isMultiElementJob, DIE_CUTTING_KEYWORDS } from '@flux/types';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, OutsourcedProvider, InternalTask } from '@flux/types';
+import { isMultiElementJob } from '@flux/types';
 import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
-import type { ElementStatusUpdate } from './JobDetailsPanel';
 
 export interface TaskListProps {
   /** Tasks to display */
@@ -34,8 +33,6 @@ export interface TaskListProps {
   onJumpToTask?: (assignment: TaskAssignment) => void;
   /** Callback when a scheduled task is double-clicked (recall) */
   onRecallTask?: (assignmentId: string) => void;
-  /** Callback when element prerequisite status changes (v0.4.32a) */
-  onElementStatusChange?: (update: ElementStatusUpdate) => void;
   /** v0.5.11: Callback when manual departure changes for outsourced task */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
@@ -69,7 +66,6 @@ export function TaskList({
   shippedJobIds,
   onJumpToTask,
   onRecallTask,
-  onElementStatusChange,
   onDepartureChange,
   onReturnChange,
   onToggleComplete,
@@ -105,57 +101,13 @@ export function TaskList({
 
   /**
    * Check if a task is assigned to a printing station (offset press).
+   * Used by the dry-time separator to render between print and follow-up tasks.
    */
   const isPrintingTask = (task: Task): boolean => {
     if (task.type !== 'Internal') return false;
     const station = stationById.get(task.stationId);
     if (!station) return false;
     return getCategoryName(station.categoryId).includes('offset');
-  };
-
-  /**
-   * Check if an element has any offset printing tasks.
-   */
-  const elementHasOffset = (element: Element): boolean => {
-    return element.taskIds.some((taskId) => {
-      const task = taskById.get(taskId);
-      return task ? isPrintingTask(task) : false;
-    });
-  };
-
-  /**
-   * Check if a task is a die-cutting task (internal or outsourced).
-   */
-  const isDieCuttingTask = (task: Task): boolean => {
-    if (task.type === 'Internal') {
-      const station = stationById.get(task.stationId);
-      if (!station) return false;
-      return getCategoryName(station.categoryId).includes('découpe') || getCategoryName(station.categoryId).includes('die-cut');
-    }
-    if (task.type === 'Outsourced') {
-      const actionLower = task.actionType?.toLowerCase() || '';
-      return DIE_CUTTING_KEYWORDS.some((keyword) => actionLower.includes(keyword));
-    }
-    return false;
-  };
-
-  /**
-   * Check if an element has any die-cutting tasks.
-   */
-  const elementHasDieCutting = (element: Element): boolean => {
-    return element.taskIds.some((taskId) => {
-      const task = taskById.get(taskId);
-      return task ? isDieCuttingTask(task) : false;
-    });
-  };
-
-  /**
-   * Check if an element is an assembly element (no printing or die-cutting tasks).
-   * Uses structural task-type check rather than mutable status values so that
-   * manually setting all statuses to 'none' doesn't hide the dropdowns.
-   */
-  const isAssemblyElement = (element: Element): boolean => {
-    return !elementHasOffset(element) && !elementHasDieCutting(element);
   };
 
   /**
@@ -297,24 +249,9 @@ export function TaskList({
   return (
     <div className="p-3 overflow-y-auto flex-grow bg-transparent">
       {jobElements.map((element) => {
-        // Get tasks for this element
         const elementTasks = element.taskIds
           .map((id) => taskById.get(id))
           .filter((t): t is Task => t !== undefined);
-
-        // Create status change handlers for this element
-        const handlePaperStatusChange = onElementStatusChange
-          ? (value: PaperStatus) => onElementStatusChange({ elementId: element.id, field: 'paperStatus', value })
-          : undefined;
-        const handleBatStatusChange = onElementStatusChange
-          ? (value: BatStatus) => onElementStatusChange({ elementId: element.id, field: 'batStatus', value })
-          : undefined;
-        const handlePlateStatusChange = onElementStatusChange
-          ? (value: PlateStatus) => onElementStatusChange({ elementId: element.id, field: 'plateStatus', value })
-          : undefined;
-        const handleFormeStatusChange = onElementStatusChange
-          ? (value: FormeStatus) => onElementStatusChange({ elementId: element.id, field: 'formeStatus', value })
-          : undefined;
 
         return (
           <ElementSection
@@ -322,13 +259,6 @@ export function TaskList({
             element={element}
             allElements={jobElements}
             isSingleElement={isSingleElement}
-            hasOffset={elementHasOffset(element)}
-            hasDieCutting={elementHasDieCutting(element)}
-            isAssembly={isAssemblyElement(element)}
-            onPaperStatusChange={handlePaperStatusChange}
-            onBatStatusChange={handleBatStatusChange}
-            onPlateStatusChange={handlePlateStatusChange}
-            onFormeStatusChange={handleFormeStatusChange}
           >
             {renderTaskTiles(elementTasks, element)}
           </ElementSection>

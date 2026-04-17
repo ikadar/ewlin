@@ -149,12 +149,11 @@ export const TaskTile = memo(function TaskTile({
       <>
         <button
           type="button"
-          className={`shrink-0 cursor-pointer transition-colors ${
+          className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
             stStatus === 'done' ? 'text-emerald-500 hover:text-emerald-400'
             : stStatus === 'progress' ? 'text-amber-500 hover:text-amber-400'
             : 'text-zinc-500 hover:text-zinc-400'
           }`}
-          style={{ background: 'none', border: 'none', padding: 0 }}
           onClick={handleOutsourcedToggleComplete}
         >
           {stStatus === 'done' && <DoneIcon />}
@@ -162,11 +161,15 @@ export const TaskTile = memo(function TaskTile({
           {stStatus === 'pending' && <PendingIcon />}
         </button>
         {assignment && (
-          <Pin
-            className={`w-3 h-3 shrink-0 cursor-pointer transition-colors ${isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`}
+          <span
             onClick={handleOutsourcedTogglePin}
+            className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
+              isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'
+            }`}
             title={isPinned ? 'Désépingler' : 'Épingler'}
-          />
+          >
+            <Pin className="w-3 h-3" />
+          </span>
         )}
       </>
     ) : undefined;
@@ -210,13 +213,29 @@ export const TaskTile = memo(function TaskTile({
     tipEnter();
   };
 
-  // Format duration as Xh YY
-  const formatDuration = (): string => {
-    const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
+  // Format a minute count as "Xh MM"
+  const formatMinutes = (m: number): string => {
+    const hours = Math.floor(m / 60);
+    const minutes = m % 60;
     return `${hours}h${minutes.toString().padStart(2, '0')}`;
   };
+
+  // Theoretical duration (setup + run minutes)
+  const theoMinutes = task.duration.setupMinutes + task.duration.runMinutes;
+
+  // Effective duration = sum of (operator.to - operator.from) for each operator
+  // assigned to this task. Returns null if no operators or if any from/to is missing.
+  const effMinutes: number | null = (() => {
+    if (!assignment?.operators?.length) return null;
+    let total = 0;
+    for (const op of assignment.operators) {
+      if (!op.from || !op.to) return null;
+      total += (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60000;
+    }
+    return Math.round(total);
+  })();
+
+  const hasEffDelta = effMinutes !== null && effMinutes !== theoMinutes;
 
   // Format scheduled datetime as "Di 15/12 07:00"
   const formatScheduledTime = (isoString: string): string => {
@@ -286,7 +305,7 @@ export const TaskTile = memo(function TaskTile({
         <button
           ref={tileRef}
           type="button"
-          className={`min-h-[2rem] pt-0.5 px-2 text-sm border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full`}
+          className={`min-h-[2rem] pt-0.5 px-2 text-sm border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2`}
           style={tileInlineStyle}
           data-testid={`task-tile-${task.id}`}
           onClick={handleClick}
@@ -297,39 +316,43 @@ export const TaskTile = memo(function TaskTile({
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              {isCompleted ? (
-                <CircleCheck
-                  className="w-3.5 h-3.5 text-emerald-500 shrink-0 cursor-pointer hover:text-emerald-400 transition-colors"
-                  onClick={handleToggleComplete}
-                />
-              ) : (
-                <Circle
-                  className="w-3.5 h-3.5 text-zinc-600 shrink-0 cursor-pointer hover:text-zinc-400 transition-colors"
-                  onClick={handleToggleComplete}
-                />
-              )}
-              <Pin
-                className={`w-3 h-3 shrink-0 cursor-pointer transition-colors ${
-                  isPinned
-                    ? 'text-amber-500 hover:text-amber-400'
-                    : 'text-zinc-700 hover:text-zinc-400'
+              <span
+                onClick={handleToggleComplete}
+                className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
+                  isCompleted ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'
                 }`}
+                title={isCompleted ? 'Marquer non terminée' : 'Marquer terminée'}
+              >
+                {isCompleted ? <CircleCheck className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
+              </span>
+              <span
                 onClick={handleTogglePin}
+                className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
+                  isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'
+                }`}
                 title={isPinned ? 'Désépingler' : 'Épingler'}
-              />
+              >
+                <Pin className="w-3 h-3" />
+              </span>
               <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>{displayName}</span>
               {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
                 <>
                   <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
-                  <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1 py-px font-semibold shrink-0">
+                  <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-1.5 py-px font-bold tracking-wider shrink-0">
                     {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
                   </span>
                 </>
               )}
             </div>
-            <span className="text-zinc-500 shrink-0">
-              {formatScheduledTime(assignment.scheduledStart)}
-            </span>
+            <div className="flex items-center gap-1.5 shrink-0 font-mono">
+              <span className="text-[11px] text-zinc-400">{formatScheduledTime(assignment.scheduledStart)}</span>
+              {hasEffDelta && (
+                <span className="text-[10.5px]">
+                  <span className="text-zinc-600 line-through">{formatMinutes(theoMinutes)}</span>
+                  <span className="text-amber-400 font-semibold"> → {formatMinutes(effMinutes!)}</span>
+                </span>
+              )}
+            </div>
           </div>
           {operatorAssignments && operatorAssignments.length > 0 && (
             <div className="px-1.5 pb-1.5 flex flex-col gap-0.5">
@@ -338,11 +361,11 @@ export const TaskTile = memo(function TaskTile({
                 const toStr = op.to ? new Date(op.to).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
                 const timeRange = fromStr && toStr ? `${fromStr}–${toStr}` : '';
                 return (
-                  <div key={i} className="flex items-center gap-1.5 bg-zinc-800/60 rounded px-1.5 py-0.5">
+                  <div key={i} className="flex items-center gap-1.5 bg-zinc-800/60 rounded-[3px] px-1.5 py-0.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                    <span className="text-[10px] text-zinc-300 truncate flex-1">{op.name}</span>
-                    <span className="text-[9px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
-                    <span className="text-[8px] font-semibold text-zinc-400 bg-zinc-700 rounded-sm px-1 py-px shrink-0">{op.attention}</span>
+                    <span className="text-[11.5px] text-zinc-300 truncate flex-1">{op.name}</span>
+                    <span className="text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
+                    <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-700 rounded-[3px] px-1.5 py-px shrink-0 font-mono">{op.attention}</span>
                   </div>
                 );
               })}
@@ -394,13 +417,13 @@ export const TaskTile = memo(function TaskTile({
           {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
             <>
               <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
-              <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1 py-px font-semibold shrink-0">
+              <span className="text-[10.5px] tabular-nums text-blue-500 bg-blue-500/[0.15] rounded-[3px] px-1.5 py-px font-bold tracking-wider shrink-0">
                 {((task as InternalTask).splitIndex ?? 0) + 1}/{(task as InternalTask).splitTotal ?? 1}
               </span>
             </>
           )}
         </div>
-        <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
+        <span className="text-zinc-400 shrink-0 font-mono text-[10.5px]">{formatMinutes(theoMinutes)}</span>
       </div>
     </div>
   );

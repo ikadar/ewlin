@@ -1,99 +1,57 @@
-import type { Element, PaperStatus, BatStatus, PlateStatus, FormeStatus } from '@flux/types';
-import { PrerequisiteStatus } from './PrerequisiteStatus';
+import type { Element } from '@flux/types';
 
 export interface ElementSectionProps {
   /** The element to display */
   element: Element;
-  /** All elements in the job (for resolving prerequisite suffixes) */
+  /** All elements in the job (for resolving upstream precedence names) */
   allElements: Element[];
-  /** Whether this is a single-element job (hides the section header) */
+  /** Whether this is a single-element job (bypasses card + header) */
   isSingleElement?: boolean;
-  /** Whether this element has offset printing tasks (show plates dropdown) */
-  hasOffset?: boolean;
-  /** Whether this element has die-cutting tasks (show forme dropdown) */
-  hasDieCutting?: boolean;
-  /** Whether this is an assembly element (show "pas de prérequis") */
-  isAssembly?: boolean;
-  /** Callback when paper status changes */
-  onPaperStatusChange?: (status: PaperStatus) => void;
-  /** Callback when BAT status changes */
-  onBatStatusChange?: (status: BatStatus) => void;
-  /** Callback when plate status changes */
-  onPlateStatusChange?: (status: PlateStatus) => void;
-  /** Callback when forme status changes */
-  onFormeStatusChange?: (status: FormeStatus) => void;
   /** Children (task tiles) */
   children: React.ReactNode;
 }
 
 /**
- * Section header for an element in the JobDetailsPanel.
- * Shows the element suffix, prerequisite elements, and production statuses.
+ * Section for an element in the JobDetailsPanel.
+ * Renders a card with the element name and its upstream precedences (if any)
+ * inline-right of the name. Single-element jobs bypass the card entirely.
  */
 export function ElementSection({
   element,
   allElements,
   isSingleElement = false,
-  hasOffset = true,
-  hasDieCutting = false,
-  isAssembly = false,
-  onPaperStatusChange,
-  onBatStatusChange,
-  onPlateStatusChange,
-  onFormeStatusChange,
   children,
 }: ElementSectionProps) {
-  const prerequisiteStatusElement = (
-    <PrerequisiteStatus
-      paperStatus={element.paperStatus}
-      batStatus={element.batStatus}
-      plateStatus={element.plateStatus}
-      formeStatus={element.formeStatus}
-      hasOffset={hasOffset}
-      hasDieCutting={hasDieCutting}
-      isAssembly={isAssembly}
-      onPaperStatusChange={onPaperStatusChange}
-      onBatStatusChange={onBatStatusChange}
-      onPlateStatusChange={onPlateStatusChange}
-      onFormeStatusChange={onFormeStatusChange}
-      paperOrderedAt={element.paperOrderedAt}
-      paperDeliveredAt={element.paperDeliveredAt}
-      filesReceivedAt={element.filesReceivedAt}
-      batSentAt={element.batSentAt}
-      batApprovedAt={element.batApprovedAt}
-      formeOrderedAt={element.formeOrderedAt}
-      formeDeliveredAt={element.formeDeliveredAt}
-    />
-  );
-
-  // For single-element jobs, show prerequisite status but not the element header
   if (isSingleElement) {
-    return (
-      <div className="space-y-1.5">
-        <div className="px-1 mb-2">
-          {prerequisiteStatusElement}
-        </div>
-        {children}
-      </div>
-    );
+    return <div className="space-y-1">{children}</div>;
   }
 
-  return (
-    <div className="mb-6">
-      {/* Element header: name + prerequisite pills on same row */}
-      <div className="flex items-center justify-between mb-1 px-1">
-        <span className="text-xs font-semibold text-zinc-400 tracking-wide truncate min-w-0 shrink">
-          {element.name.toUpperCase()}
-        </span>
-        <div className="shrink-0">
-          {prerequisiteStatusElement}
-        </div>
-      </div>
+  const precedenceElements = element.prerequisiteElementIds
+    .map((id) => allElements.find((e) => e.id === id))
+    .filter((e): e is Element => e !== undefined);
+  const hasPrecedence = precedenceElements.length > 0;
 
-      {/* Tasks */}
-      <div className="space-y-1.5">
-        {children}
+  return (
+    <div className="bg-white/[0.015] border border-white/5 p-2.5 mb-2.5 rounded-none">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[10.5px] font-bold tracking-widest uppercase text-zinc-300 truncate min-w-0">
+          {element.name}
+        </span>
+        {hasPrecedence && (
+          <div className="ml-auto flex items-center gap-1 shrink-0">
+            <span className="italic text-[9.5px] text-zinc-600 tracking-wider mr-px">après</span>
+            {precedenceElements.map((e) => (
+              <span
+                key={e.id}
+                className="inline-flex items-center px-1.5 py-px rounded-[3px] text-[9.5px] font-medium bg-white/[0.04] border border-white/5 text-zinc-400"
+              >
+                {e.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
+      <div className="space-y-1">{children}</div>
     </div>
   );
 }

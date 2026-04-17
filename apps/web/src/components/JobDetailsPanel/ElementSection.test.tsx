@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 import { ElementSection } from './ElementSection';
 import type { Element } from '@flux/types';
 
-// Helper to create test element
 function createElement(overrides: Partial<Element> = {}): Element {
   return {
     id: 'elem-job-00001-couv',
@@ -23,8 +22,8 @@ function createElement(overrides: Partial<Element> = {}): Element {
 }
 
 describe('ElementSection', () => {
-  it('renders element name in uppercase', () => {
-    const element = createElement({ name: 'couv' });
+  it('renders element name', () => {
+    const element = createElement({ name: 'COUV' });
 
     render(
       <ElementSection element={element} allElements={[element]}>
@@ -35,35 +34,7 @@ describe('ElementSection', () => {
     expect(screen.getByText('COUV')).toBeInTheDocument();
   });
 
-  it('renders prerequisite pills on same row as element name', () => {
-    const element = createElement({ name: 'COUV' });
-
-    render(
-      <ElementSection element={element} allElements={[element]}>
-        <div>Task content</div>
-      </ElementSection>
-    );
-
-    // Prerequisite status pills should be rendered
-    expect(screen.getByTestId('prerequisite-status')).toBeInTheDocument();
-  });
-
-  it('hides header for single-element jobs', () => {
-    const element = createElement({ name: 'ELT' });
-
-    render(
-      <ElementSection element={element} allElements={[element]} isSingleElement>
-        <div data-testid="child">Task content</div>
-      </ElementSection>
-    );
-
-    // Header should not be visible
-    expect(screen.queryByText('ELT')).not.toBeInTheDocument();
-    // But children should still render
-    expect(screen.getByTestId('child')).toBeInTheDocument();
-  });
-
-  it('renders children', () => {
+  it('renders children tasks', () => {
     const element = createElement();
 
     render(
@@ -75,5 +46,51 @@ describe('ElementSection', () => {
 
     expect(screen.getByTestId('task-1')).toBeInTheDocument();
     expect(screen.getByTestId('task-2')).toBeInTheDocument();
+  });
+
+  it('renders upstream precedence pills inline on same row as name', () => {
+    const couv = createElement({ id: 'elem-couv', name: 'COUV', prerequisiteElementIds: [] });
+    const inter = createElement({ id: 'elem-int', name: 'INTERIEUR', prerequisiteElementIds: [] });
+    const finition = createElement({
+      id: 'elem-fin',
+      name: 'FINITION',
+      prerequisiteElementIds: ['elem-couv', 'elem-int'],
+    });
+
+    render(
+      <ElementSection element={finition} allElements={[couv, inter, finition]}>
+        <div>tile</div>
+      </ElementSection>
+    );
+
+    expect(screen.getByText('FINITION')).toBeInTheDocument();
+    expect(screen.getByText('après')).toBeInTheDocument();
+    expect(screen.getByText('COUV')).toBeInTheDocument();
+    expect(screen.getByText('INTERIEUR')).toBeInTheDocument();
+  });
+
+  it('does not render "après" label when element has no precedence', () => {
+    const element = createElement({ name: 'COUV', prerequisiteElementIds: [] });
+
+    render(
+      <ElementSection element={element} allElements={[element]}>
+        <div>tile</div>
+      </ElementSection>
+    );
+
+    expect(screen.queryByText('après')).not.toBeInTheDocument();
+  });
+
+  it('bypasses card + header for single-element jobs', () => {
+    const element = createElement({ name: 'ELT' });
+
+    render(
+      <ElementSection element={element} allElements={[element]} isSingleElement>
+        <div data-testid="child">Task content</div>
+      </ElementSection>
+    );
+
+    expect(screen.queryByText('ELT')).not.toBeInTheDocument();
+    expect(screen.getByTestId('child')).toBeInTheDocument();
   });
 });

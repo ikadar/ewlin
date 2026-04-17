@@ -1,16 +1,9 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { Job, Task, TaskAssignment, Station, StationCategory, Element, PaperStatus, BatStatus, PlateStatus, FormeStatus, OutsourcedProvider, InternalTask } from '@flux/types';
-import { X } from 'lucide-react';
+import type { Job, Task, TaskAssignment, Station, StationCategory, Element, OutsourcedProvider, InternalTask } from '@flux/types';
+import { X, Calendar, CalendarCheck } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { JobDetailContextMenu } from './JobDetailContextMenu';
 import { getTasksForJob } from '../../utils/taskHelpers';
-
-/** Payload for element prerequisite status updates */
-export interface ElementStatusUpdate {
-  elementId: string;
-  field: 'paperStatus' | 'batStatus' | 'plateStatus' | 'formeStatus';
-  value: PaperStatus | BatStatus | PlateStatus | FormeStatus;
-}
 
 export interface JobDetailsPanelProps {
   /** Selected job to display (null if none selected) */
@@ -37,8 +30,6 @@ export interface JobDetailsPanelProps {
   onClose?: () => void;
   /** REQ-02: Callback when departure date is clicked (scrolls grid to date) */
   onDateClick?: (date: Date) => void;
-  /** Callback when element prerequisite status changes (v0.4.32a) */
-  onElementStatusChange?: (update: ElementStatusUpdate) => void;
   /** v0.5.11: Callback when manual departure changes for outsourced task */
   onDepartureChange?: (taskId: string, departure: Date | undefined) => void;
   /** v0.5.11: Callback when manual return changes for outsourced task */
@@ -71,13 +62,12 @@ export interface JobDetailsPanelProps {
   snapshotOperators?: Array<{ id: string; firstName: string; lastName: string }>;
 }
 
-/** Format workshop exit date as DD/MM/YYYY a HHhMM */
-function formatDepartureDate(dateStr: string): string {
+/** Format a datetime as DD/MM/YYYY a HHhMM */
+function formatJobDate(dateStr: string): string {
   const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
   if (match) {
-    const [, , month, day, hours, minutes] = match;
-    const year = match[1];
-    return `Dep. ${day}/${month}/${year} a ${hours}h${minutes}`;
+    const [, year, month, day, hours, minutes] = match;
+    return `${day}/${month}/${year} a ${hours}h${minutes}`;
   }
   const date = new Date(dateStr);
   const day = date.getDate().toString().padStart(2, '0');
@@ -85,19 +75,16 @@ function formatDepartureDate(dateStr: string): string {
   const year = date.getFullYear();
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `Dep. ${day}/${month}/${year} a ${hours}h${minutes}`;
+  return `${day}/${month}/${year} a ${hours}h${minutes}`;
 }
 
-/** Format BAT deadline as DD/MM/YYYY a HHhMM */
-function formatBatDeadline(dateStr: string): string {
-  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
-  if (match) {
-    const [, , month, day, hours, minutes] = match;
-    const year = match[1];
-    return `D.L. BAT ${day}/${month}/${year} a ${hours}h${minutes}`;
-  }
-  return `D.L. BAT ${dateStr}`;
-}
+const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'] as const;
+const PRIORITY_CHIP_CLASSES = [
+  'bg-red-500/15 text-red-400',
+  'bg-amber-500/15 text-amber-400',
+  '',
+  'bg-blue-500/15 text-blue-400',
+];
 
 /**
  * Job Details Panel showing selected job information and task list.
@@ -117,7 +104,6 @@ export function JobDetailsPanel({
   onRecallTask,
   onClose,
   onDateClick,
-  onElementStatusChange,
   onToggleComplete,
   onToggleOutsourcedDone,
   onTogglePin,
@@ -237,62 +223,106 @@ export function JobDetailsPanel({
     : undefined;
 
   return (
-    <div className="w-80 shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col h-full" data-testid="job-details-panel">
-      {/* Compact info header */}
-      <div className="px-3 pt-3 pb-3 border-b border-white/5 space-y-1">
-        {/* Line 1: reference - client + close button */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-zinc-200 truncate min-w-0">
-            {job.reference} &ndash; {job.client}
-          </span>
+    <div className="w-[400px] shrink-0 bg-zinc-900 border-r border-white/5 flex flex-col h-full" data-testid="job-details-panel">
+      {/* Header */}
+      <div className="px-4 pt-3.5 pb-3 border-b border-white/5 flex flex-col">
+        {/* Topline: ref · client + close */}
+        <div className="flex items-start justify-between gap-2.5 mb-1.5">
+          <div className="flex flex-row items-baseline flex-wrap min-w-0 flex-1">
+            <span className="font-mono font-semibold text-[14.5px] text-zinc-50 leading-none">
+              {job.reference}
+            </span>
+            <span className="mx-[7px] text-zinc-600">·</span>
+            <span className="text-xs text-zinc-400 truncate">
+              {job.client}
+            </span>
+          </div>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 ml-2"
+            className="p-1 -m-1 rounded shrink-0 text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors"
             aria-label="Fermer"
             data-testid="job-details-close-button"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Line 2: description */}
-        <div className="text-xs text-zinc-400 truncate">{job.description}</div>
+        {/* Description */}
+        {job.description && (
+          <div className="text-[12.5px] text-zinc-300 truncate mb-2.5">
+            {job.description}
+          </div>
+        )}
 
-        {/* Line 3: departure date */}
-        <div
-          className={`text-xs text-zinc-400 ${handleDateClick ? 'cursor-pointer hover:text-zinc-200' : ''}`}
-          onClick={handleDateClick}
-        >
-          {formatDepartureDate(job.workshopExitDate)}
+        {/* Deadlines encadré: Départ + BAT */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-[3px] p-2 flex flex-col gap-1 mb-2.5">
+          <div
+            className={`flex items-center gap-[7px] text-xs text-zinc-200 ${handleDateClick ? 'cursor-pointer hover:text-zinc-50' : ''}`}
+            onClick={handleDateClick}
+          >
+            <Calendar className="w-[13px] h-[13px] text-zinc-500 shrink-0" />
+            <span>
+              Dep. <strong className="font-semibold text-zinc-50">{formatJobDate(job.workshopExitDate)}</strong>
+            </span>
+            {job.deadlinePriority !== undefined && job.deadlinePriority !== 2 && (
+              <span className={`inline-flex items-center px-1.5 py-px rounded-[3px] text-[10px] font-semibold tracking-wide shrink-0 ${PRIORITY_CHIP_CLASSES[job.deadlinePriority]}`}>
+                {PRIORITY_LABELS[job.deadlinePriority]}
+              </span>
+            )}
+          </div>
+          {job.batDeadline && (
+            <div className="flex items-center gap-[7px] text-xs text-zinc-200">
+              <CalendarCheck className="w-[11px] h-[11px] text-zinc-500 shrink-0" />
+              <span>
+                D.L. BAT <strong className="font-semibold text-zinc-50">{formatJobDate(job.batDeadline)}</strong>
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Line 3b: BAT deadline (if set) */}
-        {job.batDeadline && (
-          <div className="text-xs text-zinc-400">
-            {formatBatDeadline(job.batDeadline)}
+        {/* Dependencies inline */}
+        {(requiredJobs.length > 0 || dependentJobs.length > 0) && (
+          <div className="flex flex-wrap gap-y-2 gap-x-4 mb-2.5">
+            {requiredJobs.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap" data-testid="job-dependencies">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Prérequis</span>
+                {requiredJobs.map((rj) => (
+                  <button
+                    key={rj.id}
+                    onClick={() => onSelectJob?.(rj.id)}
+                    className="inline-flex items-center px-2 py-px rounded-[3px] text-[10.5px] font-mono bg-purple-500/10 border border-purple-500/25 text-purple-300 hover:bg-purple-500/20 transition-colors truncate max-w-[140px]"
+                    title={`${rj.reference} - ${rj.client}`}
+                  >
+                    {rj.reference}
+                  </button>
+                ))}
+              </div>
+            )}
+            {dependentJobs.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap" data-testid="job-dependents">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Requis par</span>
+                {dependentJobs.map((dj) => (
+                  <button
+                    key={dj.id}
+                    onClick={() => onSelectJob?.(dj.id)}
+                    className="inline-flex items-center px-2 py-px rounded-[3px] text-[10.5px] font-mono bg-purple-500/10 border border-purple-500/25 text-purple-300 hover:bg-purple-500/20 transition-colors truncate max-w-[140px]"
+                    title={`${dj.reference} - ${dj.client}`}
+                  >
+                    {dj.reference}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Line 3c: Deadline priority (if not standard) */}
-        {job.deadlinePriority !== undefined && job.deadlinePriority !== 2 && (
-          <div className="text-xs">
-            <span className={
-              job.deadlinePriority === 0 ? 'text-red-400' :
-              job.deadlinePriority === 1 ? 'text-orange-400' :
-              'text-blue-400'
-            }>
-              {['Impératif', 'Important', 'Standard', 'Flexible'][job.deadlinePriority]}
-            </span>
-          </div>
-        )}
-
-        {/* Action buttons */}
+        {/* Action buttons at bottom */}
         {(onEditJob || onComputeJob) && (
-          <div className="pt-1 flex gap-1.5">
+          <div className="flex gap-1.5">
             {onEditJob && (
               <button
                 onClick={onEditJob}
-                className="bg-white/[0.06] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-100 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-medium rounded bg-white/[0.04] border border-white/[0.09] text-zinc-200 hover:bg-white/[0.09] hover:text-zinc-50 transition-colors"
                 data-testid="job-details-edit-button"
               >
                 Modifier
@@ -301,7 +331,7 @@ export function JobDetailsPanel({
             {onComputeJob && (
               <button
                 onClick={() => onComputeJob(job.id)}
-                className="bg-blue-600/20 border border-blue-500/30 rounded px-2.5 py-1.5 text-xs text-blue-400 hover:text-blue-200 hover:bg-blue-600/30 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-medium rounded bg-blue-500/20 border border-blue-500 text-blue-300 hover:brightness-125 transition-all"
                 data-testid="job-details-compute-button"
               >
                 Calculer ce job
@@ -309,33 +339,6 @@ export function JobDetailsPanel({
             )}
           </div>
         )}
-
-        {/* Dependencies section */}
-        {requiredJobs.length > 0 && (
-          <div className="pt-1.5" data-testid="job-dependencies">
-            <div className="text-xs text-zinc-500 mb-1">Prérequis:</div>
-            <div className="flex flex-wrap gap-1">
-              {requiredJobs.map((rj) => (
-                <button
-                  key={rj.id}
-                  onClick={() => onSelectJob?.(rj.id)}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-purple-900/30 border border-purple-700/30 text-purple-300 hover:bg-purple-900/50 transition-colors truncate max-w-[140px]"
-                  title={`${rj.reference} - ${rj.client}`}
-                >
-                  {rj.reference}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {dependentJobs.length > 0 && (
-          <div className="pt-1" data-testid="job-dependents">
-            <div className="text-xs text-zinc-500">
-              Requis par: {dependentJobs.map((j) => j.reference).join(', ')}
-            </div>
-          </div>
-        )}
-
       </div>
 
       {/* Task tiles grouped by element */}
@@ -353,7 +356,6 @@ export function JobDetailsPanel({
         shippedJobIds={shippedJobIds}
         onJumpToTask={onJumpToTask}
         onRecallTask={onRecallTask}
-        onElementStatusChange={onElementStatusChange}
         onDepartureChange={onDepartureChange}
         onReturnChange={onReturnChange}
         onToggleComplete={onToggleComplete}

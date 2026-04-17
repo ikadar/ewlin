@@ -4,8 +4,8 @@ export type { SidebarButtonProps } from './Sidebar';
 export { JobsList, JobsListHeader, JobCard, ProgressBar, ProgressDots, getDotState } from './JobsList';
 export type { JobsListProps, JobsListHeaderProps, JobTab, JobChip, JobCardProps, JobProblemType, ProgressBarProps, ProgressDotsProps, DotState } from './JobsList';
 
-export { JobDetailsPanel, JobInfo, InfoField, TaskList, TaskTile, ElementSection, PrerequisiteStatus, OutsourcingMiniForm, WorkDaysInput, DateTimePicker } from './JobDetailsPanel';
-export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, PrerequisiteStatusProps, ElementStatusUpdate, OutsourcingMiniFormProps, WorkDaysInputProps, DateTimePickerProps } from './JobDetailsPanel';
+export { JobDetailsPanel, JobInfo, InfoField, TaskList, TaskTile, ElementSection, OutsourcingMiniForm, WorkDaysInput, DateTimePicker } from './JobDetailsPanel';
+export type { JobDetailsPanelProps, JobInfoProps, InfoFieldProps, TaskListProps, TaskTileProps, ElementSectionProps, OutsourcingMiniFormProps, WorkDaysInputProps, DateTimePickerProps } from './JobDetailsPanel';
 
 export { DateStrip, DateCell, TaskMarkers, ViewportIndicator, ExitTriangle } from './DateStrip';
 export type { DateStripProps, DateCellProps, TaskMarker, TaskMarkerStatus, TaskMarkersProps, ViewportIndicatorProps, ExitTriangleProps } from './DateStrip';
