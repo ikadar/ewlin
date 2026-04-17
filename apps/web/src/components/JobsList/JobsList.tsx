@@ -208,6 +208,7 @@ export function JobsList({
         client={job.client}
         description={job.description}
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
+        batDeadline={job.batDeadline ? formatDeadline(job.batDeadline) : undefined}
         problemType={getProblemType(job.id)}
         isCompleted={isJobCompleted(job.id)}
         bufferLabel={computeBufferLabel(job, jobTasks, jobAssignments)}

@@ -1,4 +1,5 @@
 import { memo, useCallback } from 'react';
+import { Calendar, CalendarCheck } from 'lucide-react';
 
 export type JobProblemType = 'late' | 'conflict' | null;
 
@@ -7,7 +8,10 @@ export interface JobCardProps {
   reference: string;
   client: string;
   description: string;
+  /** Workshop exit date (departure), already formatted. */
   deadline?: string;
+  /** BAT deadline, already formatted. Shown below the departure date when present. */
+  batDeadline?: string;
   problemType?: JobProblemType;
   /** Whether all tasks are completed (distinct from problemType). */
   isCompleted?: boolean;
@@ -26,6 +30,7 @@ export const JobCard = memo(function JobCard({
   client,
   description,
   deadline,
+  batDeadline,
   problemType,
   isCompleted = false,
   bufferLabel,
@@ -76,24 +81,36 @@ export const JobCard = memo(function JobCard({
       data-testid={`job-card-${id}`}
       data-status={status ?? 'normal'}
     >
-      <div className="flex items-center gap-[5px] mb-[1px] overflow-hidden min-w-0">
-        <span className={`font-mono text-[13px] font-medium shrink-0 ${refColor}`}>{reference}</span>
-        <span className="text-zinc-600 shrink-0">·</span>
-        <span className="text-zinc-400 text-[12px] truncate min-w-0 flex-1">{client}</span>
-        {deadline && (
-          <span className="text-zinc-600 text-[10px] ml-auto shrink-0">{deadline}</span>
-        )}
-      </div>
-
-      <div className={`truncate mb-[1px] text-[12px] ${descColor}`}>{description}</div>
-
-      {showBuffer && (
-        <div className="flex justify-end">
-          <span className={`text-[10px] font-medium ${bufferLabel!.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
-            {bufferLabel}
-          </span>
+      <div className="flex items-start gap-[10px]">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-[5px] overflow-hidden min-w-0">
+            <span className={`font-mono text-[13px] font-medium shrink-0 ${refColor}`}>{reference}</span>
+            <span className="text-zinc-600 shrink-0">·</span>
+            <span className="text-zinc-400 text-[12px] truncate min-w-0 flex-1">{client}</span>
+          </div>
+          <div className={`truncate text-[12px] ${descColor}`}>{description}</div>
         </div>
-      )}
+
+        <div className="flex flex-col items-end shrink-0">
+          {deadline && (
+            <div className="flex items-center gap-[4px] text-[10px] text-zinc-400">
+              <Calendar className="w-[11px] h-[11px] text-zinc-500 shrink-0" />
+              <span>{deadline}</span>
+            </div>
+          )}
+          {batDeadline && (
+            <div className="flex items-center gap-[4px] text-[10px] text-zinc-400">
+              <CalendarCheck className="w-[11px] h-[11px] text-zinc-500 shrink-0" />
+              <span>{batDeadline}</span>
+            </div>
+          )}
+          {showBuffer && (
+            <span className={`text-[10px] font-medium ${bufferLabel!.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
+              {bufferLabel}
+            </span>
+          )}
+        </div>
+      </div>
     </button>
   );
 });

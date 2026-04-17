@@ -392,6 +392,33 @@ describe('JobCard', () => {
     expect(screen.getByText('17/12')).toBeInTheDocument();
   });
 
+  it('renders batDeadline when provided', () => {
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
+        deadline="17/12"
+        batDeadline="10/12 14:00"
+      />
+    );
+    expect(screen.getByText('10/12 14:00')).toBeInTheDocument();
+  });
+
+  it('does not render a second date row when batDeadline is absent', () => {
+    render(
+      <JobCard
+        id="job-1"
+        reference="12345"
+        client="Test Client"
+        description="Test Description"
+        deadline="17/12"
+      />
+    );
+    expect(screen.getAllByText(/\d+\/\d+/)).toHaveLength(1);
+  });
+
   it('shows deadline even when the job is late (color carries the status)', () => {
     render(
       <JobCard
