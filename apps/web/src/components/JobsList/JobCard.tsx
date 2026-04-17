@@ -20,6 +20,10 @@ export interface JobCardProps {
   /** Dim this card because another job is selected (spotlight pattern). */
   dim?: boolean;
   bufferLabel?: string;
+  /** Job-level flags forwarded to the ProgressBar for TileState-aligned coloring. */
+  isShipped?: boolean;
+  isJobLate?: boolean;
+  conflictTaskIds?: Set<string>;
   onClick?: (jobId: string) => void;
 }
 
@@ -38,6 +42,9 @@ export const JobCard = memo(function JobCard({
   bufferLabel,
   isSelected = false,
   dim = false,
+  isShipped = false,
+  isJobLate = false,
+  conflictTaskIds,
   onClick,
 }: JobCardProps) {
   const handleClick = useCallback(() => {
@@ -108,7 +115,13 @@ export const JobCard = memo(function JobCard({
       <div className={`truncate mb-[1px] text-[12px] ${descColor}`}>{description}</div>
 
       <div className="flex items-center justify-between gap-2">
-        <ProgressBar tasks={tasks} assignments={assignments} />
+        <ProgressBar
+          tasks={tasks}
+          assignments={assignments}
+          isJobShipped={isShipped}
+          isJobLate={isJobLate}
+          conflictTaskIds={conflictTaskIds}
+        />
         <div className="flex items-center gap-2">
           {statusBadge}
           {bufferLabel && status !== 'completed' && (
