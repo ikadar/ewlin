@@ -103,27 +103,32 @@ export function DateStrip({
     return getVisibleDates(startDate, virtualScroll.visibleRange);
   }, [startDate, virtualScroll.visibleRange]);
 
-  // v0.3.46: Track scroll position
+  // v0.3.46: Track scroll position + viewport height.
+  // ResizeObserver on the container catches layout shifts that don't fire a
+  // window resize (panel toggles, sidebar), which otherwise leave
+  // viewportHeight stale and can collapse the virtual range.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    setViewportHeight(container.clientHeight);
+    const syncViewportHeight = () => {
+      const h = container.clientHeight;
+      if (h > 0) setViewportHeight(h);
+    };
 
     const handleScroll = () => {
       setScrollTop(container.scrollTop);
     };
 
-    const handleResize = () => {
-      setViewportHeight(container.clientHeight);
-    };
+    syncViewportHeight();
 
+    const resizeObserver = new ResizeObserver(syncViewportHeight);
+    resizeObserver.observe(container);
     container.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize);
 
     return () => {
+      resizeObserver.disconnect();
       container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
     };
   }, []);
 

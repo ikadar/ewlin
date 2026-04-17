@@ -63,7 +63,6 @@ export default function FocusPage({ mode }: FocusPageProps) {
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
-    setViewportHeight(container.clientHeight);
 
     const handleScroll = () => {
       const newScrollTop = container.scrollTop;
@@ -78,17 +77,31 @@ export default function FocusPage({ mode }: FocusPageProps) {
       setViewportEndHour((newScrollTop + vh) / PIXELS_PER_HOUR);
     };
 
-    const handleResize = () => setViewportHeight(container.clientHeight);
-
     container.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize);
     handleScroll();
 
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
     };
   }, [gridStartDate]);
+
+  // ResizeObserver keeps viewportHeight in sync when layout shifts without a
+  // window resize — otherwise a stale viewport can collapse the virtual range.
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const syncViewportHeight = () => {
+      const h = container.clientHeight;
+      if (h > 0) setViewportHeight(h);
+    };
+
+    syncViewportHeight();
+    const resizeObserver = new ResizeObserver(syncViewportHeight);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   const scrollToNow = useCallback(() => {
     const container = scrollRef.current;

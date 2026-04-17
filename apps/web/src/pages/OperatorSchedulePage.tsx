@@ -167,7 +167,6 @@ export default function OperatorSchedulePage() {
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    setViewportHeight(container.clientHeight);
 
     const handleScroll = () => {
       const newScrollTop = container.scrollTop;
@@ -188,19 +187,34 @@ export default function OperatorSchedulePage() {
       setViewportEndHour(endH);
     };
 
-    const handleResize = () => {
-      setViewportHeight(container.clientHeight);
-    };
-
     container.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize);
     requestAnimationFrame(() => handleScroll()); // initial sync after layout
 
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
     };
   }, [pixelsPerHour, gridStartDate]);
+
+  // Keep viewportHeight in sync with the container via ResizeObserver, so panel
+  // toggles (JobDetailsPanel, sidebar, SmartCompact, Evaluation) that change
+  // layout without a window resize don't leave it stale — a stale viewport
+  // combined with scrollTop races can collapse the virtual range and hide
+  // hachures + arrière-plan.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const syncViewportHeight = () => {
+      const h = container.clientHeight;
+      if (h > 0) setViewportHeight(h);
+    };
+
+    syncViewportHeight();
+    const resizeObserver = new ResizeObserver(syncViewportHeight);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Scroll to current time on mount (use rAF to ensure scroll listener is attached first)
   useEffect(() => {
