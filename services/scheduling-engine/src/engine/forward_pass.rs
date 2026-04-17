@@ -158,10 +158,14 @@ pub struct Action {
     /// peremption (extended idle after setup completion). Each occurrence
     /// re-adds setup_ticks of work to art. Capped to prevent runaway loops.
     pub peremption_count: u32,
-    /// Tick at which the current in-flight re-calage started. Set when the
-    /// post-setup peremption regime fires, cleared when re-setup completes
-    /// (eat climbs back to setup_ticks). None outside of a re-calage window
-    /// and before any peremption has fired.
+    /// True after post-setup peremption fires and until the first productive
+    /// tick of the re-setup starts, at which point `current_recalage_start`
+    /// is set to that tick and this flag is cleared. Decouples "peremption
+    /// occurred" from "re-setup actually began" so the recorded segment
+    /// reflects only the productive re-setup window, not the preceding idle.
+    pub pending_recalage: bool,
+    /// Tick at which the current in-flight re-calage started (first
+    /// productive tick after peremption). None outside of a re-calage window.
     pub current_recalage_start: Option<u32>,
     /// Completed re-calage segments (start_tick, end_tick_exclusive). One
     /// entry per post-setup peremption whose re-setup actually ran to
@@ -1197,7 +1201,7 @@ pub fn apply_peremption_rule(
     a: &mut Action,
     setup_ticks: u32,
     peremption_ticks: u32,
-    current_tick: u32,
+    _current_tick: u32,
 ) -> bool {
     if peremption_ticks == 0 || a.art == 0 || a.idle_ticks < peremption_ticks {
         return false;
@@ -1218,9 +1222,11 @@ pub fn apply_peremption_rule(
         a.work_accumulator = 0.0;
         a.idle_ticks = 0;
         a.peremption_count += 1;
-        // Mark the start of a re-calage window. The segment is finalized
-        // later when eat climbs back to setup_ticks (re-setup complete).
-        a.current_recalage_start = Some(current_tick);
+        // Flag that a re-calage is pending. The actual segment start is
+        // recorded later in advance_action_at_tick, at the first productive
+        // tick of the re-setup, so the segment reflects only productive
+        // work (not the preceding idle that triggered peremption).
+        a.pending_recalage = true;
         true
     } else {
         false
@@ -1409,6 +1415,14 @@ fn advance_action_at_tick(
 
     let setup_ticks = actions[action_idx].setup_ticks;
     let eat_before = actions[action_idx].eat;
+
+    // First productive tick after a pending peremption: record the re-calage
+    // window's actual start here, so the segment spans only productive
+    // re-setup work, not the idle period that triggered the peremption.
+    if actions[action_idx].pending_recalage {
+        actions[action_idx].current_recalage_start = Some(t as u32);
+        actions[action_idx].pending_recalage = false;
+    }
 
     actions[action_idx].work_accumulator += productivity;
     let work_done = actions[action_idx].work_accumulator.floor() as u32;
@@ -2004,6 +2018,7 @@ mod peremption_tests {
             chain_remaining_art: setup_ticks + run_ticks,
             pinned_start_tick: None,
             peremption_count: 0,
+            pending_recalage: false,
             current_recalage_start: None,
             recalage_segments: Vec::new(),
         }

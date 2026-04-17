@@ -693,6 +693,7 @@ pub fn build_actions(
                     is_pinned: task.is_pinned,
                     pinned_start_tick: task.pinned_start_tick,
                     peremption_count: 0,
+                    pending_recalage: false,
                     current_recalage_start: None,
                     recalage_segments: Vec::new(),
                 });
