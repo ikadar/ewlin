@@ -6,20 +6,9 @@
  * and a relay label ("→ pause" / "reprise →").
  */
 
-import type { TileState } from './colorUtils';
+import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
-
-// State → colors for SVG. Opacities mirror the station Tile's runBg/setupBg
-// from colorUtils.ts so both views share the same visual weight.
-const STATE_COLORS: Record<TileState, { bg: string; border: string; text: string }> = {
-  default:   { bg: 'rgba(59,130,246,0.12)',  border: '#3b82f6', text: '#93c5fd' },
-  completed: { bg: 'rgba(34,197,94,0.09)',   border: '#22c55e', text: '#86efac' },
-  late:      { bg: 'rgba(239,68,68,0.09)',   border: '#ef4444', text: '#fca5a5' },
-  conflict:  { bg: 'rgba(245,158,11,0.09)',  border: '#f59e0b', text: '#fcd34d' },
-  blocked:   { bg: 'rgba(113,113,122,0.06)', border: '#71717a', text: '#a1a1aa' },
-  shipped:   { bg: 'rgba(16,185,129,0.09)',  border: '#10b981', text: '#6ee7b7' },
-};
 
 interface TileSegmentProps {
   /** Unique key for this segment */
@@ -110,7 +99,7 @@ export function TileSegment({
   setupWindow,
   recalages,
 }: TileSegmentProps) {
-  const colors = STATE_COLORS[tileState] || STATE_COLORS.default;
+  const colors = getStateInlineColors(tileState);
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
   const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
   // Teeth are rendered INWARD: the rendered box matches the segment's time
