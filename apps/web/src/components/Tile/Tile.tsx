@@ -4,7 +4,7 @@ import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SimilarityIndicators } from './SimilarityIndicators';
 import { TileTooltip } from './TileTooltip';
-import { getStateColorClasses } from './colorUtils';
+import { getStateColorClasses, getStateRgb } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
@@ -115,6 +115,7 @@ export const Tile = memo(function Tile({
 
   // Get state-based color classes
   const colorClasses = getStateColorClasses(tileState);
+  const stateRgb = getStateRgb(tileState);
 
   // Completion state
   const isCompleted = assignment.isCompleted;
@@ -161,6 +162,12 @@ export const Tile = memo(function Tile({
         width: overrideWidth ?? undefined,
         right: overrideWidth ? undefined : 0,
         opacity: overrideOpacity ?? undefined,
+        // State color tokens consumed by the folder tab and any future
+        // state-aware decorations. Set as CSS custom properties so child
+        // layers don't need to know the palette.
+        ['--tile-rgb' as string]: stateRgb.tile,
+        ['--tile-border-rgb' as string]: stateRgb.border,
+        ['--tile-text-rgb' as string]: stateRgb.text,
       }}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -174,6 +181,7 @@ export const Tile = memo(function Tile({
       data-station-id={task.stationId}
       data-has-conflict={hasConflict ? 'true' : undefined}
       data-is-blocked={isBlocked ? 'true' : undefined}
+      data-pinned={assignment.isPinned ? 'true' : 'false'}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -207,30 +215,60 @@ export const Tile = memo(function Tile({
         data-testid="tile-run-section"
       />
 
+      {/* Folder tab (hover-only): completion + pin actions. Out of the
+          label overlay so the tile body stays clean by default. */}
+      <div className="folder-tab">
+        <button
+          onClick={handleToggleComplete}
+          title={isCompleted ? 'Marquer non complété' : 'Marquer complété'}
+          data-testid="tile-tab-complete"
+        >
+          {isCompleted ? (
+            <CircleCheck className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <Circle className="w-4 h-4" style={{ color: `rgb(${stateRgb.text})` }} />
+          )}
+        </button>
+        <button
+          onClick={handleTogglePin}
+          title={assignment.isPinned ? 'Désépingler' : 'Épingler'}
+          data-testid="tile-tab-pin"
+        >
+          <Pin
+            className="w-3 h-3"
+            style={{ color: assignment.isPinned ? '#f59e0b' : `rgb(${stateRgb.text})` }}
+          />
+        </button>
+      </div>
+
       {/* Label overlay spanning both sections */}
       <div className="absolute inset-0 z-10 pt-0.5 px-2 pointer-events-none overflow-hidden">
         <div className="flex items-start gap-2">
-          {isCompleted ? (
-            <CircleCheck
-              className="w-4 h-4 text-emerald-500 shrink-0 pointer-events-auto cursor-pointer hover:text-emerald-400 transition-colors"
-              onClick={handleToggleComplete}
-              data-testid="tile-completed-icon"
+          <span className="inline-check">
+            {isCompleted ? (
+              <CircleCheck
+                className="w-4 h-4 text-emerald-500 shrink-0 pointer-events-auto cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={handleToggleComplete}
+                data-testid="tile-completed-icon"
+              />
+            ) : (
+              <Circle
+                className="w-4 h-4 text-zinc-600 shrink-0 pointer-events-auto cursor-pointer hover:text-zinc-400 transition-colors"
+                onClick={handleToggleComplete}
+                data-testid="tile-incomplete-icon"
+              />
+            )}
+          </span>
+          <span className="inline-pin">
+            <Pin
+              className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
+                assignment.isPinned
+                  ? 'text-amber-500 hover:text-amber-400'
+                  : 'text-zinc-700 hover:text-zinc-400'
+              }`}
+              onClick={handleTogglePin}
             />
-          ) : (
-            <Circle
-              className="w-4 h-4 text-zinc-600 shrink-0 pointer-events-auto cursor-pointer hover:text-zinc-400 transition-colors"
-              onClick={handleToggleComplete}
-              data-testid="tile-incomplete-icon"
-            />
-          )}
-          <Pin
-            className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
-              assignment.isPinned
-                ? 'text-amber-500 hover:text-amber-400'
-                : 'text-zinc-700 hover:text-zinc-400'
-            }`}
-            onClick={handleTogglePin}
-          />
+          </span>
           <span
             className={`${colorClasses.text} font-medium break-words min-w-0 leading-tight`}
             data-testid="tile-content"

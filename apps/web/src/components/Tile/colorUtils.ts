@@ -100,3 +100,22 @@ const stateGlowColorMap: Record<TileState, string> = {
 export function getStateGlowColor(state: TileState): string {
   return stateGlowColorMap[state];
 }
+
+/**
+ * Raw RGB triplets per state, used as CSS custom properties on the tile so
+ * that dependent layers (folder tab, calage-phase accents, etc.) can
+ * consume the same palette without duplicating the mapping.
+ * Values are "r,g,b" strings to plug directly into `rgb(...)` / `rgba(...)`.
+ */
+const stateRgbMap: Record<TileState, { tile: string; border: string; text: string }> = {
+  shipped:   { tile: '16,185,129',  border: '16,185,129',  text: '110,231,183' },
+  default:   { tile: '59,130,246',  border: '59,130,246',  text: '147,197,253' },
+  completed: { tile: '34,197,94',   border: '34,197,94',   text: '134,239,172' },
+  conflict:  { tile: '245,158,11',  border: '245,158,11',  text: '252,211,77'  },
+  late:      { tile: '239,68,68',   border: '239,68,68',   text: '252,165,165' },
+  blocked:   { tile: '113,113,122', border: '113,113,122', text: '161,161,170' },
+};
+
+export function getStateRgb(state: TileState): { tile: string; border: string; text: string } {
+  return stateRgbMap[state];
+}

@@ -238,9 +238,13 @@ body {
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), inset 0 -1px 2px rgba(0,0,0,0.04);
 }
 
-/* Setup section inner bottom border (border-box keeps it inside the element height) */
-[data-testid="tile-setup-section"] {
-  border-bottom: 1px dotted black;
+/* Calage phase separator — dashed red divider marks the end of any calage
+   phase (initial setup OR post-peremption re-calage). The dashed red reads
+   as "fragile / perishable state" and is F variant from the calage-phases
+   playground. Setup and re-calage share the same visual treatment. */
+[data-testid="tile-setup-section"],
+[data-testid="tile-recalage-section"] {
+  border-bottom: 1px dashed rgba(239,68,68,0.9);
 }
 
 /* Run section inner bottom border */
@@ -259,6 +263,59 @@ body {
   background: var(--color-flux-base);
   z-index: 20;
 }
+
+/* ── Folder tab (hover-only action surface) ──
+   The tab protrudes above the tile and houses the completion + pin
+   controls, keeping the tile body clean for job/operator info. The tab
+   visually belongs to the tile: same border-left color, solid bg
+   pre-composed from the column bg and the state color. */
+[data-testid^="tile-"] .folder-tab {
+  position: absolute;
+  top: -22px;
+  left: -4px;
+  height: 22px;
+  padding: 0 7px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--color-flux-base) 78%, rgb(var(--tile-rgb)) 22%);
+  color: rgb(var(--tile-text-rgb));
+  border-left: 4px solid rgb(var(--tile-border-rgb));
+  border-top: 1px solid rgba(0,0,0,0.25);
+  border-right: 1px solid rgba(0,0,0,0.25);
+  border-radius: 3px 3px 0 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 100ms ease-out, transform 100ms ease-out;
+  pointer-events: none;
+  z-index: 25;
+}
+[data-testid^="tile-"]:hover .folder-tab {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+[data-testid^="tile-"] .folder-tab button {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: background 100ms;
+}
+[data-testid^="tile-"] .folder-tab button:hover { background: rgba(255,255,255,0.08); }
+
+/* Circle (completion action) always lives in the tab, never inline. */
+[data-testid^="tile-"] .inline-check { display: none; }
+
+/* Pin is an action in the tab AND a state indicator inline. It stays inline
+   ONLY when the tile is actually pinned. */
+[data-testid^="tile-"] .inline-pin { display: none; }
+[data-testid^="tile-"][data-pinned="true"] .inline-pin { display: inline-flex; }
 
 /* ── Light mode tile separation adjustments ── */
 html.light [data-testid^="tile-"] {
