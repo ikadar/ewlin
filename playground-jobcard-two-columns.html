@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Playground — JobCard 2 colonnes</title>
+<style>
+  * { box-sizing: border-box; }
+  html { font-size: 13px; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #09090b;
+    color: #e4e4e7;
+    min-height: 100vh;
+  }
+  .page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-size: 13px; font-weight: 600; margin: 24px 0 10px; color: #d4d4d8; letter-spacing: 0.02em; text-transform: uppercase; }
+  .subtitle { color: #a1a1aa; font-size: 12px; margin-bottom: 28px; }
+  .note { color: #a1a1aa; font-size: 11px; margin-top: -4px; margin-bottom: 12px; }
+
+  .columns { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 24px; align-items: start; }
+
+  .panel {
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .panel-head {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .panel-title { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: #d4d4d8; }
+  .panel-tag { font-size: 10px; color: #71717a; }
+  .panel.current .panel-tag { color: #fca5a5; }
+  .panel.proposed .panel-tag { color: #86efac; }
+
+  .list { width: 270px; padding: 8px 0; }
+
+  /* ───────────────────────── CURRENT (Option B déjà implémentée) ───────────────────────── */
+  .current .card {
+    display: block;
+    background: transparent;
+    border: none;
+    width: calc(100% - 1rem);
+    margin: 0 8px 6px;
+    padding: 3px 12px 3px 9px;
+    border-left: 3px solid transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .current .row1 { display: flex; align-items: center; gap: 5px; margin-bottom: 1px; overflow: hidden; min-width: 0; }
+  .current .row2 { margin-bottom: 1px; font-size: 12px; color: #d4d4d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .current .row3 { display: flex; justify-content: flex-end; }
+
+  /* ───────────────────────── NEW (2 colonnes, compact) ───────────────────────── */
+  .proposed .card {
+    display: flex;
+    gap: 10px;
+    background: transparent;
+    border: none;
+    width: calc(100% - 1rem);
+    margin: 0 8px 6px;
+    padding: 3px 12px 3px 9px;
+    border-left: 3px solid transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    align-items: flex-start;
+  }
+  .proposed .left { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+  .proposed .right { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; }
+  .proposed .right .line { display: flex; align-items: center; gap: 4px; }
+
+  /* Shared text styles */
+  .card:hover { background: rgba(255,255,255,0.05); }
+  .card.selected { background: rgba(255,255,255,0.10); }
+
+  .card.late { border-left-color: #ef4444; }
+  .card.conflict { border-left-color: #f59e0b; }
+  .card.completed { border-left-color: #10b981; opacity: 0.72; }
+
+  .ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 500; flex-shrink: 0; color: #71717a; }
+  .ref.late { color: #fca5a5; }
+  .ref.conflict { color: #fcd34d; }
+  .ref.completed { color: #86efac; }
+
+  .dot { color: #52525b; flex-shrink: 0; }
+  .client { color: #a1a1aa; font-size: 12px; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .desc { font-size: 12px; color: #d4d4d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .late .desc, .conflict .desc { color: #f4f4f5; }
+
+  /* Right column items */
+  .date, .bat { font-size: 10px; color: #a1a1aa; white-space: nowrap; line-height: 1.5; }
+  .icon { color: #71717a; display: inline-flex; align-items: center; }
+
+  .buffer { font-size: 10px; font-weight: 500; line-height: 1.5; }
+  .buffer.neg { color: #f87171; }
+  .buffer.pos { color: #34d399; }
+
+  /* CURRENT-only classes */
+  .current .deadline-inline { color: #71717a; font-size: 10px; margin-left: auto; flex-shrink: 0; }
+  .current .buffer-row { display: flex; justify-content: flex-end; }
+
+  /* ───────────────────────── META / COMPARE BLOCKS ───────────────────────── */
+  .ruler {
+    margin-left: 12px;
+    display: flex;
+    flex-direction: column;
+    font-size: 10px;
+    color: #71717a;
+    gap: 8px;
+  }
+  .ruler .measure { display: flex; align-items: center; gap: 6px; }
+  .ruler .bar { display: inline-block; background: rgba(255,255,255,0.06); border-radius: 2px; }
+
+  .compare-row { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+  .compare-row .label { width: 180px; flex-shrink: 0; font-size: 11px; color: #a1a1aa; padding-top: 6px; }
+  .compare-row .cards-pair { display: flex; gap: 24px; flex: 1; }
+  .compare-row .single { flex: 0 0 270px; }
+  .compare-row .tag { font-size: 9px; color: #71717a; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+
+  .notes { padding: 12px 14px; font-size: 11px; color: #a1a1aa; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); }
+  .notes b { color: #e4e4e7; font-weight: 600; }
+  .notes ul { margin: 6px 0 0 16px; padding: 0; }
+  .notes li { margin: 3px 0; }
+
+  .card-frame { background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 4px; padding: 1px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>JobCard — layout 2 colonnes</h1>
+  <div class="subtitle">
+    Gauche = qui (ref · client / description). Droite = quand (date départ / D.L. BAT / écart planning).<br/>
+    Hauteur de carte = nombre de contraintes visibles : 2 lignes par défaut, 3 seulement si BAT + buffer.
+  </div>
+
+  <h2>1. Comparaison directe (job normal, avec buffer)</h2>
+  <div class="note">Même job rendu dans les 2 layouts. Montre pourquoi l'actuel paraît 3 lignes et le proposé reste 2.</div>
+  <div class="columns">
+    <section class="panel current">
+      <header class="panel-head"><span class="panel-title">Actuel</span><span class="panel-tag">3 rangs empilés</span></header>
+      <div class="list">
+        <button class="card">
+          <div class="row1">
+            <span class="ref">BL-24871</span>
+            <span class="dot">·</span>
+            <span class="client">Éditions Lumière</span>
+            <span class="deadline-inline">jeu. 25</span>
+          </div>
+          <div class="row2">Dépliant A5 recto/verso — 2 000 ex.</div>
+          <div class="row3">
+            <span class="buffer pos">+1j</span>
+          </div>
+        </button>
+      </div>
+      <div class="notes">
+        <b>Pourquoi ça paraît 3 lignes</b>
+        <ul>
+          <li>Le buffer <span style="color:#34d399">+1j</span> est un rang à part, sous la description.</li>
+          <li>Donc dès qu'il y a un buffer (= la plupart des jobs), la carte fait 3 lignes.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel proposed">
+      <header class="panel-head"><span class="panel-title">Proposé</span><span class="panel-tag">2 colonnes</span></header>
+      <div class="list">
+        <button class="card">
+          <div class="left">
+            <div class="row1">
+              <span class="ref">BL-24871</span>
+              <span class="dot">·</span>
+              <span class="client">Éditions Lumière</span>
+            </div>
+            <div class="desc">Dépliant A5 recto/verso — 2 000 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>jeu. 25</span>
+            </div>
+            <div class="line"><span class="buffer pos">+1j</span></div>
+          </div>
+        </button>
+      </div>
+      <div class="notes">
+        <b>Pourquoi ça reste 2 lignes</b>
+        <ul>
+          <li>Le buffer est posé sous la date, dans la colonne droite.</li>
+          <li>La droite fait 2 lignes, la gauche fait 2 lignes → la carte fait 2 lignes.</li>
+          <li>Hauteur estimée : ~34 px (contre ~50 px actuellement avec buffer).</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <h2>2. Configurations de la colonne droite (statut normal)</h2>
+  <div class="note">Démontre les 4 cas selon BAT présent/absent × buffer présent/absent.</div>
+  <div class="columns">
+    <section class="panel proposed">
+      <header class="panel-head"><span class="panel-title">Variantes</span><span class="panel-tag">proposé</span></header>
+      <div class="list">
+
+        <!-- A. Sans BAT, sans buffer -->
+        <button class="card">
+          <div class="left">
+            <div class="row1">
+              <span class="ref">BL-24870</span>
+              <span class="dot">·</span>
+              <span class="client">Studio Rive Gauche</span>
+            </div>
+            <div class="desc">Cartes de visite — 500 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>jeu. 25</span>
+            </div>
+          </div>
+        </button>
+
+        <!-- B. Sans BAT, avec buffer -->
+        <button class="card">
+          <div class="left">
+            <div class="row1">
+              <span class="ref">BL-24871</span>
+              <span class="dot">·</span>
+              <span class="client">Éditions Lumière</span>
+            </div>
+            <div class="desc">Dépliant A5 recto/verso — 2 000 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>jeu. 25</span>
+            </div>
+            <div class="line"><span class="buffer pos">+1j</span></div>
+          </div>
+        </button>
+
+        <!-- C. Avec BAT, sans buffer -->
+        <button class="card">
+          <div class="left">
+            <div class="row1">
+              <span class="ref">BL-24872</span>
+              <span class="dot">·</span>
+              <span class="client">Coopérative Zéro Déchet</span>
+            </div>
+            <div class="desc">Catalogue 48 p. quadri — 800 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>ven. 26</span>
+            </div>
+            <div class="line bat">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 12 17 17 12"/></svg></span>
+              <span>lun. 22</span>
+            </div>
+          </div>
+        </button>
+
+        <!-- D. Avec BAT et buffer -->
+        <button class="card">
+          <div class="left">
+            <div class="row1">
+              <span class="ref">BL-24873</span>
+              <span class="dot">·</span>
+              <span class="client">Mairie de Sainte-Foy</span>
+            </div>
+            <div class="desc">Programme saison 24/25 — 1 500 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>mar. 30</span>
+            </div>
+            <div class="line bat">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 12 17 17 12"/></svg></span>
+              <span>mer. 23</span>
+            </div>
+            <div class="line"><span class="buffer neg">-2j</span></div>
+          </div>
+        </button>
+
+      </div>
+      <div class="notes">
+        <b>Lecture de la hauteur</b>
+        <ul>
+          <li><b>A</b> sans BAT sans buffer → droite 1 ligne, gauche 2 lignes → carte 2 lignes.</li>
+          <li><b>B</b> avec buffer seul → droite 2 lignes, gauche 2 lignes → carte 2 lignes. 🎯</li>
+          <li><b>C</b> avec BAT seule → droite 2 lignes, gauche 2 lignes → carte 2 lignes.</li>
+          <li><b>D</b> BAT + buffer → droite 3 lignes → carte 3 lignes (le seul cas qui grandit).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header class="panel-head"><span class="panel-title">Mêmes données, layout actuel</span><span class="panel-tag">pour mémoire</span></header>
+      <div class="list">
+
+        <button class="card current-style" style="display:block; padding:3px 12px 3px 9px; width:calc(100% - 1rem); margin:0 8px 6px; text-align:left; border-left:3px solid transparent;">
+          <div style="display:flex; align-items:center; gap:5px; overflow:hidden; min-width:0; margin-bottom:1px;">
+            <span class="ref">BL-24870</span>
+            <span class="dot">·</span>
+            <span class="client">Studio Rive Gauche</span>
+            <span class="deadline-inline" style="color:#71717a; font-size:10px; margin-left:auto;">jeu. 25</span>
+          </div>
+          <div class="desc" style="margin-bottom:1px;">Cartes de visite — 500 ex.</div>
+        </button>
+
+        <button class="card current-style" style="display:block; padding:3px 12px 3px 9px; width:calc(100% - 1rem); margin:0 8px 6px; text-align:left; border-left:3px solid transparent;">
+          <div style="display:flex; align-items:center; gap:5px; overflow:hidden; min-width:0; margin-bottom:1px;">
+            <span class="ref">BL-24871</span>
+            <span class="dot">·</span>
+            <span class="client">Éditions Lumière</span>
+            <span class="deadline-inline" style="color:#71717a; font-size:10px; margin-left:auto;">jeu. 25</span>
+          </div>
+          <div class="desc" style="margin-bottom:1px;">Dépliant A5 recto/verso — 2 000 ex.</div>
+          <div style="display:flex; justify-content:flex-end;"><span class="buffer pos">+1j</span></div>
+        </button>
+
+        <button class="card current-style" style="display:block; padding:3px 12px 3px 9px; width:calc(100% - 1rem); margin:0 8px 6px; text-align:left; border-left:3px solid transparent;">
+          <div style="display:flex; align-items:center; gap:5px; overflow:hidden; min-width:0; margin-bottom:1px;">
+            <span class="ref">BL-24872</span>
+            <span class="dot">·</span>
+            <span class="client">Coopérative Zéro Déchet</span>
+            <span class="deadline-inline" style="color:#71717a; font-size:10px; margin-left:auto;">ven. 26</span>
+          </div>
+          <div class="desc" style="margin-bottom:1px;">Catalogue 48 p. quadri — 800 ex.</div>
+          <!-- BAT invisible actuellement -->
+        </button>
+
+        <button class="card current-style" style="display:block; padding:3px 12px 3px 9px; width:calc(100% - 1rem); margin:0 8px 6px; text-align:left; border-left:3px solid transparent;">
+          <div style="display:flex; align-items:center; gap:5px; overflow:hidden; min-width:0; margin-bottom:1px;">
+            <span class="ref">BL-24873</span>
+            <span class="dot">·</span>
+            <span class="client">Mairie de Sainte-Foy</span>
+            <span class="deadline-inline" style="color:#71717a; font-size:10px; margin-left:auto;">mar. 30</span>
+          </div>
+          <div class="desc" style="margin-bottom:1px;">Programme saison 24/25 — 1 500 ex.</div>
+          <div style="display:flex; justify-content:flex-end;"><span class="buffer neg">-2j</span></div>
+          <!-- BAT invisible actuellement -->
+        </button>
+      </div>
+      <div class="notes">
+        <b>Ce que le layout actuel ne montre pas</b>
+        <ul>
+          <li>La D.L. BAT n'est pas visible du tout aujourd'hui (cartes C et D).</li>
+          <li>Le buffer, quand présent, ajoute un rang et étire la carte à 3 lignes (cartes B et D).</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <h2>3. Les 4 statuts, configuration maximale (BAT + buffer)</h2>
+  <div class="note">Montre la cohabitation couleur de statut (bordure + ref) + icônes dates.</div>
+  <div class="columns">
+    <section class="panel proposed">
+      <header class="panel-head"><span class="panel-title">États · layout proposé</span><span class="panel-tag">proposé</span></header>
+      <div class="list">
+
+        <button class="card">
+          <div class="left">
+            <div class="row1">
+              <span class="ref">BL-24901</span>
+              <span class="dot">·</span>
+              <span class="client">Éditions Lumière</span>
+            </div>
+            <div class="desc">Dépliant A5 — 2 000 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>jeu. 25</span>
+            </div>
+            <div class="line bat">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 12 17 17 12"/></svg></span>
+              <span>lun. 22</span>
+            </div>
+            <div class="line"><span class="buffer pos">+1j</span></div>
+          </div>
+        </button>
+
+        <button class="card late">
+          <div class="left">
+            <div class="row1">
+              <span class="ref late">BL-24903</span>
+              <span class="dot">·</span>
+              <span class="client">Atelier Verso</span>
+            </div>
+            <div class="desc">Brochure piquée 16 p. — 500 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>lun. 21</span>
+            </div>
+            <div class="line bat">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 12 17 17 12"/></svg></span>
+              <span>jeu. 17</span>
+            </div>
+            <div class="line"><span class="buffer neg">-2j</span></div>
+          </div>
+        </button>
+
+        <button class="card conflict">
+          <div class="left">
+            <div class="row1">
+              <span class="ref conflict">BL-24915</span>
+              <span class="dot">·</span>
+              <span class="client">Imprimerie Nord</span>
+            </div>
+            <div class="desc">Pochettes 2 volets — 1 500 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>mer. 23</span>
+            </div>
+            <div class="line bat">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 12 17 17 12"/></svg></span>
+              <span>ven. 19</span>
+            </div>
+          </div>
+        </button>
+
+        <button class="card completed">
+          <div class="left">
+            <div class="row1">
+              <span class="ref completed">BL-24702</span>
+              <span class="dot">·</span>
+              <span class="client">Mairie de Sainte-Foy</span>
+            </div>
+            <div class="desc">Affiches A2 quadri — 250 ex.</div>
+          </div>
+          <div class="right">
+            <div class="line date">
+              <span class="icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span>ven. 19</span>
+            </div>
+          </div>
+        </button>
+
+      </div>
+      <div class="notes">
+        <b>Observations</b>
+        <ul>
+          <li>Bordure gauche colorée + référence colorée portent le statut, comme en Option B.</li>
+          <li>Job terminé : pas de buffer (règle existante), pas de BAT affichée si absente — reste sur 2 lignes.</li>
+          <li>Icônes dates en <span style="color:#71717a">zinc-500</span>, petites (11 px) — signal discret.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header class="panel-head"><span class="panel-title">Détails techniques</span><span class="panel-tag">à valider</span></header>
+      <div class="notes" style="border-top: none;">
+        <b>Points à arbitrer avant code</b>
+        <ul>
+          <li><b>Taille d'icône</b> : j'ai pris 11×11 px (le plus petit utilisé dans JobDetailsPanel). Le JobDetailsPanel utilise 13×13 pour Calendar et 11×11 pour CalendarCheck. Dans une carte compacte, 11 pour les 2 me semble plus cohérent.</li>
+          <li><b>Couleur d'icône</b> : zinc-500 (#71717a) comme dans JobDetailsPanel.</li>
+          <li><b>Format de date</b> : "jeu. 25" (jour court + n°). Confirme que c'est le format voulu, ou tu préfères "25/04" ?</li>
+          <li><b>Gap entre colonnes</b> : 10 px testé. À resserrer à 8 px ou étirer à 12 px ?</li>
+          <li><b>Top-alignement des colonnes</b> : la droite s'aligne au haut, le buffer se "pose" naturellement sous les dates même si la description gauche est plus haute.</li>
+          <li><b>Hover</b> : on garde le même (bg-white/5 sur hover, bg-white/10 quand sélectionné).</li>
+          <li><b>Quand description wrappe</b> : elle truncate toujours (1 ligne max). À confirmer.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JobDetailsPanel — Variantes header v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #050505;
+    color: #e4e4e7;
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ========== App layout ========== */
+  .app { display: flex; height: 100vh; }
+  .controls {
+    width: 340px;
+    background: #0c0c0d;
+    border-right: 1px solid #1a1a1d;
+    padding: 18px 16px 22px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-toolbar {
+    padding: 10px 16px;
+    background: #0c0c0d;
+    border-bottom: 1px solid #1a1a1d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .preview-toolbar .title {
+    font-size: 11px; color: #71717a;
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .preview-toolbar .meta {
+    font-size: 11px; color: #a1a1aa;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .preview-stage {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 32px 24px 40px;
+    overflow-y: auto;
+    background: radial-gradient(ellipse at top, #0f0f12 0%, #050505 60%);
+  }
+
+  /* ========== Controls ========== */
+  .controls h1 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .controls .subtitle {
+    font-size: 11px;
+    color: #71717a;
+    margin-bottom: 22px;
+    line-height: 1.55;
+  }
+  .controls .subtitle b { color: #a1a1aa; font-weight: 500; }
+
+  .variant-group { margin-bottom: 18px; }
+  .variant-group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: #52525b;
+    margin-bottom: 7px;
+    font-weight: 600;
+  }
+  .variant-group p.hint {
+    font-size: 10px;
+    color: #52525b;
+    margin-top: 5px;
+    line-height: 1.45;
+  }
+  .segmented {
+    display: flex;
+    gap: 3px;
+    background: #0a0a0b;
+    border: 1px solid #1a1a1d;
+    border-radius: 5px;
+    padding: 3px;
+  }
+  .segmented button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #71717a;
+    padding: 6px 4px;
+    font-size: 10.5px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.12s;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .segmented button:hover { color: #d4d4d8; background: rgba(255,255,255,0.04); }
+  .segmented button.active {
+    background: rgba(59,130,246,0.18);
+    color: #93c5fd;
+    box-shadow: inset 0 0 0 1px rgba(59,130,246,0.3);
+  }
+
+  #reset {
+    width: 100%;
+    background: #141417;
+    border: 1px solid #27272a;
+    color: #a1a1aa;
+    padding: 9px 0;
+    font-size: 11.5px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.12s;
+    margin-top: 10px;
+  }
+  #reset:hover { background: #1c1c21; color: #e4e4e7; }
+
+  /* ========== Panel — LOCKED BASELINE ========== */
+  .panel {
+    width: 400px;
+    --radius-tile: 0;
+    --radius-btn: 4px;
+    --radius-badge: 3px;
+
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    flex-shrink: 0;
+    color: #e4e4e7;
+    min-height: 700px;
+    max-height: calc(100vh - 110px);
+  }
+
+  /* -------- Header (standard density, locked) -------- */
+  .panel-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+  }
+  .header-topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .header-identity {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0;
+    min-width: 0;
+    flex: 1;
+  }
+  .header-identity .job-ref::after {
+    content: " · ";
+    color: #52525b;
+    margin: 0 7px;
+    font-family: Inter, sans-serif;
+    font-weight: normal;
+  }
+  .job-ref {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #fafafa;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .header-client {
+    font-size: 12px;
+    color: #a1a1aa;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    color: #71717a;
+    cursor: pointer;
+    padding: 4px;
+    margin: -4px;
+    flex-shrink: 0;
+    border-radius: var(--radius-btn);
+  }
+  .close-btn:hover { color: #e4e4e7; background: rgba(255,255,255,0.05); }
+
+  .header-desc {
+    font-size: 12.5px;
+    color: #d4d4d8;
+    margin-bottom: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* -------- Deadlines box (encadré baseline) -------- */
+  .deadlines-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: var(--radius-badge);
+    padding: 8px 10px;
+    margin-bottom: 11px;
+  }
+  .deadline-primary {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #e4e4e7;
+    cursor: pointer;
+  }
+  .deadline-primary:hover { color: #fafafa; }
+  .deadline-primary .ico { color: #71717a; flex-shrink: 0; }
+  .deadline-primary strong { font-weight: 600; color: #fafafa; }
+  .priority-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: var(--radius-badge);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: rgba(245,158,11,0.15);
+    color: #fbbf24;
+    flex-shrink: 0;
+  }
+  .deadline-bat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #e4e4e7;
+    cursor: pointer;
+  }
+  .deadline-bat:hover { color: #fafafa; }
+  .deadline-bat .bat-ico { color: #71717a; flex-shrink: 0; }
+  .deadline-bat strong { font-weight: 600; color: #fafafa; }
+
+  /* -------- Meta box (deps + maybe BAT) -------- */
+  .meta-box {
+    margin-bottom: 11px;
+  }
+  .deps-block {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+  .dep-row-label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .dep-label {
+    font-size: 10px;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .dep-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+  .dep-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: var(--radius-badge);
+    font-size: 10.5px;
+    background: rgba(168,85,247,0.12);
+    border: 1px solid rgba(168,85,247,0.25);
+    color: #d8b4fe;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .dep-pill:hover { background: rgba(168,85,247,0.2); color: #e9d5ff; }
+
+  /* BAT placement toggles — two copies in HTML, one hidden per mode */
+  .bat-in-meta { display: none; }
+
+  /* Action buttons */
+  .action-buttons { display: flex; gap: 6px; }
+  .btn-modify, .btn-compute {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    font-size: 11.5px;
+    font-weight: 500;
+    border-radius: var(--radius-btn);
+    cursor: pointer;
+    border: 1px solid;
+    font-family: inherit;
+    transition: all 0.12s;
+  }
+  .btn-modify {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.09);
+    color: #e4e4e7;
+  }
+  .btn-modify:hover { background: rgba(255,255,255,0.09); color: #fafafa; }
+  .btn-compute {
+    background: rgba(59,130,246,0.18);
+    border-color: #3b82f6;
+    color: #93c5fd;
+  }
+  .btn-compute:hover { filter: brightness(1.15); }
+
+  /* -------- Task list -------- */
+  .task-list {
+    padding: 12px 12px 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .element-section {
+    background: rgba(255,255,255,0.015);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: var(--radius-tile);
+    padding: 10px 10px 11px;
+    margin-bottom: 10px;
+  }
+  .element-section:last-child { margin-bottom: 0; }
+
+  .element-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 9px;
+  }
+  .element-name {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #e4e4e7;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .element-precedence {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 10px;
+    color: #71717a;
+  }
+  .element-precedence-below { margin: -4px 0 10px 0; }
+  .element-precedence-inline-right {
+    margin-left: auto;
+    flex-wrap: nowrap;
+    gap: 3px;
+  }
+  .precedence-label {
+    font-style: italic;
+    font-size: 9.5px;
+    color: #52525b;
+    letter-spacing: 0.03em;
+    margin-right: 1px;
+  }
+  .elem-prereq-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: var(--radius-badge);
+    background: rgba(255,255,255,0.04);
+    color: #a1a1aa;
+    font-size: 9.5px;
+    font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+
+  /* -------- Task tiles -------- */
+  .tiles { display: flex; flex-direction: column; gap: 4px; }
+
+  .task-tile {
+    position: relative;
+    background: transparent;
+    border-radius: var(--radius-tile);
+    overflow: hidden;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: filter 0.12s;
+  }
+  .task-tile:hover { filter: brightness(1.15); }
+
+  .task-tile.state-unplaced {
+    background: rgba(59,130,246,0.09);
+    border-left-color: #3b82f6;
+  }
+  .task-tile.state-default,
+  .task-tile.state-scheduled {
+    background: rgba(255,255,255,0.02);
+    border-left-color: #3b82f6;
+    outline: 1px solid rgba(59,130,246,0.2);
+    outline-offset: -1px;
+  }
+  .task-tile.state-completed {
+    background: rgba(34,197,94,0.08);
+    border-left-color: #22c55e;
+    opacity: 0.55;
+  }
+  .task-tile.state-late {
+    background: rgba(239,68,68,0.09);
+    border-left-color: #ef4444;
+  }
+  .task-tile.state-conflict {
+    background: rgba(245,158,11,0.09);
+    border-left-color: #f59e0b;
+  }
+
+  .tile-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px 7px 11px;
+    min-height: 32px;
+  }
+
+  .status-icon-btn, .pin-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 4px;
+    margin: -4px;
+    border-radius: var(--radius-btn);
+    cursor: pointer;
+    color: #71717a;
+  }
+  .status-icon-btn:hover, .pin-icon-btn:hover {
+    color: #e4e4e7;
+    background: rgba(255,255,255,0.06);
+  }
+  .status-icon-btn.done { color: #10b981; }
+  .pin-icon-btn.active { color: #f59e0b; }
+
+  .tile-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #e4e4e7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .state-unplaced .tile-name,
+  .state-default .tile-name,
+  .state-scheduled .tile-name { color: #93c5fd; }
+  .state-completed .tile-name { color: #6ee7b7; }
+  .state-late .tile-name { color: #fca5a5; }
+  .state-conflict .tile-name { color: #fbbf24; }
+
+  .scissors-ico { color: #3b82f6; opacity: 0.45; flex-shrink: 0; }
+
+  .split-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border-radius: var(--radius-badge);
+    background: rgba(59,130,246,0.18);
+    color: #60a5fa;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+  }
+
+  .tile-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .tile-time {
+    font-size: 11px;
+    color: #a1a1aa;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tile-duration {
+    font-size: 10.5px;
+    color: #71717a;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .dur-theo {
+    color: #52525b;
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    text-decoration-color: rgba(82,82,91,0.7);
+  }
+  .dur-eff { color: #fbbf24; font-weight: 600; }
+
+  .operator-rows {
+    padding: 0 10px 8px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .operator-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 7px;
+    background: rgba(63,63,70,0.45);
+    border-radius: var(--radius-badge);
+  }
+  .op-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #60a5fa; flex-shrink: 0;
+  }
+  .op-name {
+    font-size: 11.5px;
+    color: #e4e4e7;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .op-time {
+    font-size: 10.5px; color: #71717a;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .op-attention {
+    font-size: 10px; font-weight: 700;
+    padding: 1px 5px;
+    border-radius: var(--radius-badge);
+    background: #52525b; color: #e4e4e7;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .outsourced-tile { padding: 9px 11px; }
+  .out-head {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 6px;
+    margin-bottom: 6px;
+  }
+  .out-action {
+    font-size: 12.5px; font-weight: 600; color: #fafafa;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .state-unplaced .out-action { color: #93c5fd; }
+  .out-provider { font-size: 11px; color: #a1a1aa; margin-bottom: 6px; }
+  .out-dates {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    font-size: 10.5px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .out-dates .label { color: #71717a; }
+  .out-dates .value { color: #e4e4e7; }
+  .out-dates .value.missing { color: #52525b; font-style: italic; }
+  .out-modal-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: #60a5fa;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: rgba(96,165,250,0.3);
+  }
+  .out-modal-link:hover { text-decoration-color: currentColor; }
+
+  .dry-label {
+    font-size: 10px; color: #f59e0b;
+    text-align: center; padding: 3px 0;
+    opacity: 0.75; font-style: italic;
+  }
+
+  .panel *:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 1px;
+  }
+
+  /* ============ HEADER VARIANT OVERRIDES ============ */
+
+  /* --- Hiérarchie identité --- */
+
+  /* ref-primary = baseline, no override */
+
+  /* desc-primary: description devient le titre */
+  .panel[data-id-hierarchy="desc-primary"] .header-topline { order: 2; margin-bottom: 0; margin-top: 2px; }
+  .panel[data-id-hierarchy="desc-primary"] .header-desc {
+    order: 1;
+    font-size: 14px;
+    color: #fafafa;
+    font-weight: 500;
+    margin-bottom: 2px;
+    line-height: 1.35;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: initial;
+  }
+  .panel[data-id-hierarchy="desc-primary"] .job-ref {
+    font-size: 11px;
+    color: #a1a1aa;
+    font-weight: 500;
+  }
+  .panel[data-id-hierarchy="desc-primary"] .header-client {
+    font-size: 11px;
+    color: #71717a;
+  }
+  .panel[data-id-hierarchy="desc-primary"] .header-identity {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  .panel[data-id-hierarchy="desc-primary"] .job-ref::after {
+    content: " · ";
+    color: #52525b;
+    margin: 0 5px;
+    font-family: Inter, sans-serif;
+    font-weight: normal;
+  }
+
+  /* compact: ref · client sur ligne 1, description à taille intermédiaire ligne 2 */
+  .panel[data-id-hierarchy="compact"] .header-identity {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  .panel[data-id-hierarchy="compact"] .job-ref::after {
+    content: " · ";
+    color: #52525b;
+    margin: 0 6px;
+    font-family: Inter, sans-serif;
+    font-weight: normal;
+  }
+  .panel[data-id-hierarchy="compact"] .header-desc {
+    font-size: 13px;
+    color: #e4e4e7;
+    font-weight: 500;
+    margin-top: 3px;
+    line-height: 1.35;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: initial;
+  }
+
+  /* --- Layout BAT + dépendances --- */
+
+  /* separate = baseline (encadré Départ+BAT, deps hors boîte) */
+  .panel[data-meta-layout="separate"] .bat-in-meta { display: none; }
+  .panel[data-meta-layout="separate"] .meta-box {
+    /* no box styling */
+  }
+
+  /* bat-with-deps: Départ seul (sans boîte), BAT+deps dans une boîte.
+     Négative margin -11px + padding 10px + border 1px → contenu aligné à x=16
+     (pareil que Départ, qui sit au content-edge de panel-header). */
+  .panel[data-meta-layout="bat-with-deps"] .deadlines-box {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin-bottom: 9px;
+  }
+  .panel[data-meta-layout="bat-with-deps"] .bat-in-deadlines { display: none; }
+  .panel[data-meta-layout="bat-with-deps"] .meta-box {
+    margin: 0 -11px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: var(--radius-badge);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+  }
+  .panel[data-meta-layout="bat-with-deps"] .bat-in-meta {
+    display: flex;
+    padding-left: 0;
+  }
+  .panel[data-meta-layout="bat-with-deps"] .deps-block {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    width: 100%;
+  }
+  .panel[data-meta-layout="bat-with-deps"] .dep-row-label {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .panel[data-meta-layout="bat-with-deps"] .dep-label {
+    font-size: 11px;
+    color: #a1a1aa;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    margin-bottom: 0;
+  }
+
+  /* --- Précédence élément --- */
+
+  /* below = baseline */
+  .element-precedence-inline-right { display: none; }
+
+  .panel[data-prec-pos="inline-right"] .element-precedence-inline-right { display: flex; }
+  .panel[data-prec-pos="inline-right"] .element-precedence-below { display: none; }
+
+  /* ========== Prompt area ========== */
+  .prompt-area {
+    border-top: 1px solid #1a1a1d;
+    padding: 12px 16px 14px;
+    background: #0c0c0d;
+    flex-shrink: 0;
+  }
+  .prompt-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .prompt-head h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: #52525b;
+    font-weight: 600;
+  }
+  .copy-btn {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: background 0.12s;
+  }
+  .copy-btn:hover { background: #2563eb; }
+  .copy-btn.copied { background: #10b981; }
+  .prompt-box {
+    background: #050507;
+    border: 1px solid #1a1a1d;
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: #a1a1aa;
+    line-height: 1.55;
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside class="controls">
+  <h1>Variantes header — v2</h1>
+  <div class="subtitle">
+    Baseline et choix de header v1 <b>figés</b>. Focus sur 3 axes que tu m'as demandés :
+    identité+client+désignation, BAT+deps groupés, précédence élément en ligne à droite.
+  </div>
+
+  <div class="variant-group">
+    <h3>Hiérarchie identité (ref · client · désignation)</h3>
+    <div class="segmented" data-variant="id-hierarchy">
+      <button data-value="ref-primary">Ref en tête</button>
+      <button data-value="desc-primary">Désignation</button>
+      <button data-value="compact">Compact</button>
+    </div>
+    <p class="hint">Ref en tête : ref mono large + client + description muette. Désignation : la description devient le titre, ref·client en pied. Compact : ref·client fusionnés ligne 1, description medium ligne 2.</p>
+  </div>
+
+  <div class="variant-group">
+    <h3>Layout BAT + dépendances</h3>
+    <div class="segmented" data-variant="meta-layout">
+      <button data-value="separate">Séparés</button>
+      <button data-value="bat-with-deps">BAT + deps</button>
+    </div>
+    <p class="hint">Séparés : Départ+BAT dans l'encadré deadlines, deps inline hors boîte (v1). BAT+deps : Départ seul en tête, BAT et dépendances ensemble dans un même encadré aligné à gauche.</p>
+  </div>
+
+  <div class="variant-group">
+    <h3>Précédence élément</h3>
+    <div class="segmented" data-variant="prec-pos">
+      <button data-value="below">Sous le nom</button>
+      <button data-value="inline-right">En ligne à droite</button>
+    </div>
+    <p class="hint">"Après Couverture Intérieur" apparaît soit sous le titre de l'élément, soit sur la même ligne calé à droite.</p>
+  </div>
+
+  <button id="reset">Réinitialiser</button>
+</aside>
+
+<main class="preview">
+  <div class="preview-toolbar">
+    <div class="title">Aperçu temps réel</div>
+    <div class="meta">header v2 · baseline figée</div>
+  </div>
+  <div class="preview-stage">
+    <div class="panel" id="panel"
+         data-id-hierarchy="ref-primary"
+         data-meta-layout="bat-with-deps"
+         data-prec-pos="inline-right">
+
+      <!-- ===== HEADER ===== -->
+      <div class="panel-header">
+        <div class="header-topline">
+          <div class="header-identity">
+            <span class="job-ref">25-1234-A</span>
+            <span class="header-client">Éditions Lumière</span>
+          </div>
+          <button class="close-btn" aria-label="Fermer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="header-desc">Catalogue Printemps 2026 · 4 pages A4 + couverture, dos carré</div>
+
+        <!-- Deadlines box -->
+        <div class="deadlines-box">
+          <div class="deadline-primary">
+            <svg class="ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Dep. <strong>22/04/2026 · 14h00</strong></span>
+            <span class="priority-chip">⚑ Important</span>
+          </div>
+          <div class="deadline-bat bat-in-deadlines">
+            <svg class="bat-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <span>D.L. BAT <strong>19/04/2026 · 17h00</strong></span>
+          </div>
+        </div>
+
+        <!-- Meta box (BAT + deps) -->
+        <div class="meta-box">
+          <div class="deadline-bat bat-in-meta">
+            <svg class="bat-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <span>D.L. BAT <strong>19/04/2026 · 17h00</strong></span>
+          </div>
+          <div class="deps-block">
+            <div class="dep-row-label">
+              <div class="dep-label">Prérequis</div>
+              <div class="dep-pills">
+                <button class="dep-pill">25-1231-B</button>
+              </div>
+            </div>
+            <div class="dep-row-label">
+              <div class="dep-label">Requis par</div>
+              <div class="dep-pills">
+                <button class="dep-pill">25-1250-C</button>
+                <button class="dep-pill">25-1260-A</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn-modify">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Modifier
+          </button>
+          <button class="btn-compute">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Calculer ce job
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== TASK LIST ===== -->
+      <div class="task-list">
+
+        <div class="element-section">
+          <div class="element-header">
+            <span class="element-name">Couverture</span>
+          </div>
+          <div class="tiles">
+            <div class="task-tile state-unplaced" tabindex="0">
+              <div class="tile-main">
+                <span class="tile-name">Heidelberg SM74</span>
+                <span class="tile-right">
+                  <span class="tile-duration">3h20</span>
+                </span>
+              </div>
+            </div>
+            <div class="task-tile state-default" tabindex="0">
+              <div class="tile-main">
+                <button class="status-icon-btn" aria-label="Terminer">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+                <button class="pin-icon-btn" aria-label="Épingler">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 002-2V2H6v2a2 2 0 002 2h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/></svg>
+                </button>
+                <span class="tile-name">Plastification UV</span>
+                <span class="tile-right">
+                  <span class="tile-time">Me 21/04 09:30</span>
+                  <span class="tile-duration"> · 1h30</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-section">
+          <div class="element-header">
+            <span class="element-name">Intérieur</span>
+          </div>
+          <div class="tiles">
+            <div class="task-tile state-scheduled" tabindex="0">
+              <div class="tile-main">
+                <button class="status-icon-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+                <button class="pin-icon-btn active">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 002-2V2H6v2a2 2 0 002 2h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/></svg>
+                </button>
+                <span class="tile-name">Heidelberg XL106</span>
+                <svg class="scissors-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                <span class="split-badge">1/3</span>
+                <span class="tile-right">
+                  <span class="tile-time">Je 22/04 05:00</span>
+                  <span class="tile-duration"> · 4h00</span>
+                </span>
+              </div>
+              <div class="operator-rows">
+                <div class="operator-row">
+                  <div class="op-dot"></div>
+                  <div class="op-name">Pierre Marland</div>
+                  <div class="op-time">05:00–09:00</div>
+                  <div class="op-attention">100</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dry-label">↯ Séchage 4h</div>
+
+            <div class="task-tile state-conflict" tabindex="0">
+              <div class="tile-main">
+                <button class="status-icon-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+                <button class="pin-icon-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 002-2V2H6v2a2 2 0 002 2h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/></svg>
+                </button>
+                <span class="tile-name">Heidelberg XL106</span>
+                <span class="split-badge">2/3</span>
+                <span class="tile-right">
+                  <span class="tile-time">Je 22/04 13:00</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="task-tile state-late" tabindex="0">
+              <div class="tile-main">
+                <button class="status-icon-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+                <button class="pin-icon-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 002-2V2H6v2a2 2 0 002 2h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/></svg>
+                </button>
+                <span class="tile-name">Heidelberg XL106</span>
+                <span class="split-badge">3/3</span>
+                <span class="tile-right">
+                  <span class="tile-time">Ve 23/04 16:00</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-section">
+          <div class="element-header">
+            <span class="element-name">Finition</span>
+            <div class="element-precedence element-precedence-inline-right">
+              <span class="precedence-label">après</span>
+              <span class="elem-prereq-pill">Couverture</span>
+              <span class="elem-prereq-pill">Intérieur</span>
+            </div>
+          </div>
+          <div class="element-precedence element-precedence-below">
+            <span class="precedence-label">après</span>
+            <span class="elem-prereq-pill">Couverture</span>
+            <span class="elem-prereq-pill">Intérieur</span>
+          </div>
+          <div class="tiles">
+            <div class="task-tile state-unplaced outsourced-tile" tabindex="0">
+              <div class="out-head">
+                <span class="out-action">Dorure à chaud</span>
+              </div>
+              <div class="out-provider">Atelier Dorélis · 1 JO</div>
+              <div class="out-dates">
+                <span class="label">Départ</span><span class="value missing">non calculable</span>
+                <span class="label">Retour</span><span class="value missing">non calculable</span>
+              </div>
+              <a class="out-modal-link" tabindex="0">✎ Saisir des dates manuelles</a>
+            </div>
+
+            <div class="task-tile state-scheduled" tabindex="0">
+              <div class="tile-main">
+                <button class="status-icon-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+                <button class="pin-icon-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 002-2V2H6v2a2 2 0 002 2h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/></svg>
+                </button>
+                <span class="tile-name">Brochage dos carré</span>
+                <span class="tile-right">
+                  <span class="tile-time">Lu 21/04 10:00</span>
+                  <span class="tile-duration"> · <span class="dur-theo">2h10</span><span class="dur-eff"> → 2h33</span></span>
+                </span>
+              </div>
+              <div class="operator-rows">
+                <div class="operator-row">
+                  <div class="op-dot"></div>
+                  <div class="op-name">Marie Tessier</div>
+                  <div class="op-time">10:00–12:33</div>
+                  <div class="op-attention">60</div>
+                </div>
+                <div class="operator-row">
+                  <div class="op-dot"></div>
+                  <div class="op-name">Thomas Bréal</div>
+                  <div class="op-time">10:00–12:33</div>
+                  <div class="op-attention">25</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div class="prompt-area">
+    <div class="prompt-head">
+      <h3>Récap prompt — copie pour l'implémentation</h3>
+      <button class="copy-btn" id="copy-prompt">Copier</button>
+    </div>
+    <div class="prompt-box" id="prompt-box"></div>
+  </div>
+</main>
+
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'jdp-variants-v4';
+  const panel = document.getElementById('panel');
+  const promptBox = document.getElementById('prompt-box');
+  const copyBtn = document.getElementById('copy-prompt');
+  const segmentedGroups = Array.from(document.querySelectorAll('.segmented'));
+
+  const defaults = {
+    'id-hierarchy': 'ref-primary',
+    'meta-layout': 'bat-with-deps',
+    'prec-pos': 'inline-right',
+  };
+
+  const LABELS = {
+    'id-hierarchy': {
+      'ref-primary': 'Ref en tête',
+      'desc-primary': 'Désignation en tête',
+      'compact': 'Compact (ref·client inline)',
+    },
+    'meta-layout': {
+      'separate': 'Séparés (v1 baseline)',
+      'bat-with-deps': 'BAT + deps groupés',
+    },
+    'prec-pos': {
+      'below': 'Sous le nom',
+      'inline-right': 'En ligne à droite',
+    },
+  };
+  const GROUP_TITLES = {
+    'id-hierarchy': 'Hiérarchie identité',
+    'meta-layout': 'Layout BAT + dépendances',
+    'prec-pos': 'Précédence élément',
+  };
+
+  function kebabToCamel(s) {
+    return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { ...defaults };
+      return { ...defaults, ...JSON.parse(raw) };
+    } catch { return { ...defaults }; }
+  }
+
+  function saveState(s) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  }
+
+  let state = loadState();
+
+  function applyState() {
+    Object.entries(state).forEach(([k, v]) => {
+      panel.dataset[kebabToCamel(k)] = v;
+    });
+    segmentedGroups.forEach((group) => {
+      const variant = group.dataset.variant;
+      const current = state[variant];
+      Array.from(group.querySelectorAll('button')).forEach((b) => {
+        b.classList.toggle('active', b.dataset.value === current);
+      });
+    });
+    saveState(state);
+    refreshPrompt();
+  }
+
+  function generatePrompt() {
+    const v = Object.entries(state)
+      .map(([k, val]) => `- ${GROUP_TITLES[k]}: ${LABELS[k]?.[val] ?? val}`)
+      .join('\n');
+    return `# JobDetailsPanel — Header v2
+
+Largeur: 400px · palette zinc · accent bleu
+
+## Aesthetic baseline (figée):
+- Densité des tuiles: Standard
+- Style de section d'élément: Carte (bg léger + border)
+- Coins des tuiles: Carrés (0)
+- Coins des boutons: Légers (4px)
+- Coins des badges / pastilles: Légers (3px)
+
+## Header v1 (figé):
+- Identité: En pile
+- Description: Visible
+- Densité du header: Standard
+- Bloc deadlines: Encadré (quand meta-layout=separate)
+- Bloc dépendances: Inline (quand meta-layout=separate)
+
+## Header v2 — variantes choisies:
+${v}
+
+## Fonctionnalités baseline (figées):
+- Référence + client sur 2 lignes
+- Priorité en chip attachée à la date
+- BAT deadline démoté (indenté, plus petit)
+- "Requis par" en pastilles cliquables
+- Boutons action en bas du header
+- Précédence entre éléments (sens amont)
+- Cibles de clic élargies (hit-area 24px+)
+- Durées théo → effective (théo barrée + eff ambre)
+- Badge split lisible (10.5px, tabular-nums)
+- Polices opérateur agrandies (11.5/10.5/10)
+- Anneau focus-visible
+
+## Rejeté (ne pas ré-introduire):
+Pastille couleur job, signal retard, départ atelier promu, bandeau statut,
+sommaire prérequis, pastilles Papier/BAT/Plaques/Forme (colonne entière),
+point synthèse élément, badge type élément, pastille assemblage affirmative,
+couleur job séparée de l'état, conflict/late renforcés, icône type tuile,
+dual-time, alerte outsourced, dates inline, chip attention coloré,
+menu kebab/rappel hover, raccourcis kbd.
+
+## Fichiers à modifier:
+apps/web/src/components/JobDetailsPanel/
+- JobDetailsPanel.tsx
+- ElementSection.tsx
+- TaskTile.tsx
+- TaskList.tsx
+- OutsourcingMiniForm/OutsourcingMiniForm.tsx
+
+Implémente en respectant les conventions du repo (Tailwind, vitest).`;
+  }
+
+  function refreshPrompt() {
+    promptBox.textContent = generatePrompt();
+  }
+
+  segmentedGroups.forEach((group) => {
+    const variant = group.dataset.variant;
+    group.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      state[variant] = btn.dataset.value;
+      applyState();
+    });
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    state = { ...defaults };
+    applyState();
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(generatePrompt());
+      copyBtn.classList.add('copied');
+      copyBtn.textContent = 'Copié ✓';
+      setTimeout(() => {
+        copyBtn.classList.remove('copied');
+        copyBtn.textContent = 'Copier';
+      }, 1800);
+    } catch (e) {
+      copyBtn.textContent = 'Erreur';
+      setTimeout(() => { copyBtn.textContent = 'Copier'; }, 1600);
+    }
+  });
+
+  applyState();
+})();
+</script>
+
+</body>
+</html>

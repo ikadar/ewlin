@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Playground — Tile calage phases</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --color-flux-base: #0a0a0a;
+  }
+  html, body { background: var(--color-flux-base); color: #e4e4e7; }
+  body { font-family: -apple-system, "SF Pro Text", "Inter", Segoe UI, sans-serif; }
+
+  /* === EXACT REPLICA of real tile CSS from apps/web/src/index.css === */
+  [data-testid^="tile-"] {
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), inset 0 -1px 2px rgba(0,0,0,0.04);
+  }
+  [data-testid="tile-setup-section"] {
+    border-bottom: 1px dotted black;
+  }
+  [data-testid="tile-run-section"] {
+    border-bottom: 3px solid black;
+    position: relative;
+  }
+  [data-testid="tile-run-section"]::before {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: -4px;
+    width: 4px;
+    height: 3px;
+    background: var(--color-flux-base);
+    z-index: 20;
+  }
+
+  /* Station column background */
+  .station-col {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 4px;
+    width: 180px;
+    position: relative;
+    overflow: visible;
+  }
+  .station-header {
+    padding: 8px;
+    border-bottom: 1px solid #27272a;
+    font-size: 11px;
+    color: #a1a1aa;
+    font-weight: 500;
+    text-align: center;
+    background: #1f1f23;
+  }
+  .timeline {
+    position: relative;
+    overflow: visible;
+    padding-top: 28px; /* breathing room for folder tab above first tile */
+  }
+  .hour-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255,255,255,0.03);
+  }
+  .hour-label {
+    position: absolute;
+    right: 100%;
+    margin-right: 8px;
+    font-size: 10px;
+    color: #52525b;
+    transform: translateY(-50%);
+    white-space: nowrap;
+  }
+  .weekend-band {
+    position: absolute;
+    left: -4px;
+    right: -4px;
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(239,68,68,0.05),
+      rgba(239,68,68,0.05) 4px,
+      rgba(239,68,68,0.10) 4px,
+      rgba(239,68,68,0.10) 8px
+    );
+    border-top: 1px dashed rgba(239,68,68,0.35);
+    border-bottom: 1px dashed rgba(239,68,68,0.35);
+    z-index: 1;
+  }
+  .weekend-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    font-size: 9px;
+    color: rgba(239,68,68,0.6);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Lucide icon approximations */
+  .ico { width: 16px; height: 16px; flex-shrink: 0; }
+  .ico-sm { width: 12px; height: 12px; flex-shrink: 0; }
+
+  /* Base tile (matches Tile.tsx output) */
+  .tile {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-left-width: 4px;
+    border-left-style: solid;
+  }
+
+  /* ───────────────────────────────────────────────────────────── */
+  /* OPTION-SPECIFIC OVERLAYS (non-destructive add-ons)            */
+  /* Re-calage sections look IDENTICAL to initial setup sections.  */
+  /* The only distinguishing mark is the red `↻` badge at their    */
+  /* junction point. The calage phase itself is a calage, period — */
+  /* the UI doesn't need to rehash the peremption signal across    */
+  /* the whole phase.                                              */
+  /* ───────────────────────────────────────────────────────────── */
+
+  /* Re-calage section inherits the base tile-setup-section styling. */
+  [data-testid="tile-recalage-section"] {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-bottom: 1px dotted black;
+  }
+
+  /* OPTION C: left accent bar on any calage phase (setup or re-calage) */
+  .opt-c [data-testid="tile-setup-section"],
+  .opt-c [data-testid="tile-recalage-section"] {
+    box-shadow: inset 4px 0 0 rgba(251,191,36,0.9);
+  }
+
+  /* OPTION F: red dashed divider + slightly denser bg on any calage.
+     Red pointillés are F's signature marker for calage phases. */
+  .opt-f [data-testid="tile-setup-section"],
+  .opt-f [data-testid="tile-recalage-section"] {
+    border-bottom: 1px dashed rgba(239,68,68,0.9);
+    background: rgba(59,130,246,0.16) !important;
+  }
+
+  .tile-lost {
+    opacity: 0.4;
+    filter: grayscale(0.5);
+  }
+
+  /* ───────── Folder tab (hover actions) ─────────
+     Integrated into the tile as a protruding flap:
+     - Same bg tint as the tile's setup section (slightly denser to
+       compensate for showing against the darker column bg instead of
+       being layered on the tile).
+     - Border-left inherits the tile's state color and is aligned flush
+       with the tile's border-left (left: -4px).
+     - Top & right borders mimic the tile's inset shadow (rgba(0,0,0,0.08)).
+     - Bottom seam is intentionally invisible: tab bg meets tile setup bg
+       with no divider, so the two surfaces read as one continuous piece.
+     - 2px negative bottom keeps the tab's inner edge slightly below the
+       tile's top inset line, hiding the 1px shadow under the tab. */
+  .folder-tab {
+    position: absolute;
+    top: -22px;
+    left: -4px;
+    height: 22px;
+    padding: 0 7px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--tile-text);
+    /* Solid pre-composited color (column bg mixed with state color).
+       Avoids alpha-stacking artifacts where the tab meets the tile. */
+    background: color-mix(in srgb, #18181b 78%, rgb(var(--tile-rgb)) 22%);
+    border-left: 4px solid var(--tile-border);
+    border-top: 1px solid rgba(0,0,0,0.25);
+    border-right: 1px solid rgba(0,0,0,0.25);
+    border-radius: 3px 3px 0 0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity 100ms ease-out, transform 100ms ease-out;
+    pointer-events: none;
+    z-index: 25;
+  }
+  .tab-on .tile:hover .folder-tab,
+  .tab-on .tile.show-tab .folder-tab {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .folder-tab button {
+    background: transparent;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: background 100ms;
+    z-index: 2;
+    position: relative;
+  }
+  .folder-tab button:hover { background: rgba(255,255,255,0.08); }
+  /* Default: both inline actions visible (mirrors current Tile.tsx). */
+  .inline-check, .inline-pin { display: inline-flex; align-items: center; }
+  /* Tab-on mode: Circle (complete action) always moves to the tab.
+     The pin stays inline ONLY if actually pinned (it conveys state, not
+     just an action, so it must remain visible without hover). */
+  .tab-on .inline-check { display: none; }
+  .tab-on .inline-pin { display: none; }
+  .tab-on .tile[data-pinned="true"] .inline-pin { display: inline-flex; }
+
+  /* Controls */
+  .ctrl { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl label { font-size: 10px; text-transform: uppercase; color: #71717a; letter-spacing: 0.05em; }
+  .ctrl input, .ctrl select {
+    background: #27272a;
+    color: #e4e4e7;
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+  .ctrl input[type=range] { padding: 0; }
+  .ctrl .v { color: #fbbf24; font-size: 11px; font-weight: 600; }
+</style>
+</head>
+<body class="p-6">
+
+<h1 class="text-lg font-semibold mb-1">Playground — Phases de calage sur tuile existante</h1>
+<p class="text-xs text-zinc-500 mb-6">
+  Base = tuile actuelle (Tile.tsx · border-l-4, setup/run bg-blue-500/0.12, dotted divider, inset shadow, 3px bottom).
+  Chaque option est une <em>variation additive</em> sur cette base.
+</p>
+
+<!-- Controls -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 bg-zinc-900 p-4 rounded-lg mb-6">
+  <div class="ctrl">
+    <label>Setup (min)</label>
+    <input type="range" id="setupMin" min="5" max="120" value="30" />
+    <span class="v" id="setupMinVal">30 min</span>
+  </div>
+  <div class="ctrl">
+    <label>Run (min)</label>
+    <input type="range" id="runMin" min="30" max="600" value="180" />
+    <span class="v" id="runMinVal">180 min</span>
+  </div>
+  <div class="ctrl">
+    <label>Scénario</label>
+    <select id="scenario">
+      <option value="normal">Normal</option>
+      <option value="weekend">Weekend → re-calage</option>
+      <option value="shift">Fin shift → setup perdu</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>État tuile</label>
+    <select id="state">
+      <option value="default">Default (bleu)</option>
+      <option value="late">Late (rouge)</option>
+      <option value="completed">Completed (vert)</option>
+      <option value="conflict">Conflict (ambre)</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Zoom (px/heure)</label>
+    <input type="range" id="zoom" min="40" max="160" value="80" />
+    <span class="v" id="zoomVal">80 px/h</span>
+  </div>
+  <div class="ctrl">
+    <label>Onglet hover</label>
+    <select id="tabMode">
+      <option value="off">Off (icônes inline actuelles)</option>
+      <option value="on">On (folder tab au hover)</option>
+      <option value="sticky">On + sticky (visible en permanence pour démo)</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Tuile épinglée</label>
+    <select id="pinned">
+      <option value="false">Non</option>
+      <option value="true">Oui</option>
+    </select>
+  </div>
+</div>
+
+<!-- Options grid -->
+<!-- Prompt builder -->
+<div class="bg-zinc-900 p-4 rounded-lg mb-6 border border-zinc-800">
+  <h2 class="text-sm font-semibold text-amber-400 mb-1">🧰 Prompt builder</h2>
+  <p class="text-xs text-zinc-500 mb-4">Coche ce que tu veux conserver, puis copie le prompt pour lancer l'implémentation.</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div class="ctrl">
+      <label>Style de phase calage</label>
+      <select id="pb_style">
+        <option value="c">C — Barre accent jaune</option>
+        <option value="f">F — Pointillés rouges</option>
+      </select>
+    </div>
+    <div class="ctrl">
+      <label>Onglet hover dossier</label>
+      <select id="pb_tab">
+        <option value="no">Ne pas inclure</option>
+        <option value="yes">Inclure (check + pin au hover)</option>
+      </select>
+    </div>
+    <div class="ctrl">
+      <label>Re-calage visuellement distinct ?</label>
+      <select id="pb_recalage">
+        <option value="same">Non, identique au setup initial</option>
+        <option value="different">Oui (marqueur distinct)</option>
+      </select>
+    </div>
+  </div>
+
+  <textarea id="pb_output" readonly rows="14"
+    class="w-full bg-zinc-950 text-zinc-200 border border-zinc-700 rounded p-3 text-xs font-mono leading-relaxed"
+    style="resize: vertical"></textarea>
+
+  <div class="flex gap-2 mt-3">
+    <button id="pb_copy" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded text-xs font-semibold">
+      📋 Copier le prompt
+    </button>
+    <span id="pb_copied" class="text-xs text-emerald-400 self-center opacity-0 transition-opacity">Copié ✓</span>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="options">
+  <div class="option" data-opt="base">
+    <h3 class="text-sm font-semibold text-amber-400 mb-1">BASE (actuel)</h3>
+    <p class="text-xs text-zinc-500 mb-3">Tuile telle qu'elle est aujourd'hui. Référence.</p>
+    <div class="flex justify-center"><div class="station-col"><div class="station-header">Komori G40</div><div class="timeline opt-base" data-gantt="base"></div></div></div>
+  </div>
+  <div class="option" data-opt="c">
+    <h3 class="text-sm font-semibold text-amber-400 mb-1">C — Barre accent sur setup</h3>
+    <p class="text-xs text-zinc-500 mb-3">Trait de 4px en couleur d'accent (jaune setup, rouge re-calage) à gauche de la zone calage uniquement.</p>
+    <div class="flex justify-center"><div class="station-col"><div class="station-header">Komori G40</div><div class="timeline opt-c" data-gantt="c"></div></div></div>
+  </div>
+  <div class="option" data-opt="f">
+    <h3 class="text-sm font-semibold text-amber-400 mb-1">F — Divider renforcé</h3>
+    <p class="text-xs text-zinc-500 mb-3">Border-bottom dashed coloré + bg un peu plus dense. Re-calage dashed rouge.</p>
+    <div class="flex justify-center"><div class="station-col"><div class="station-header">Komori G40</div><div class="timeline opt-f" data-gantt="f"></div></div></div>
+  </div>
+</div>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const controls = ['setupMin','runMin','scenario','state','zoom','tabMode','pinned'].map(id => document.getElementById(id));
+
+  // State color map (Tailwind blue-500, red-500, green-500, amber-500)
+  const STATE = {
+    default:   { rgb: '59,130,246',   border: 'rgb(59,130,246)',   text: 'rgb(147,197,253)'  },
+    late:      { rgb: '239,68,68',    border: 'rgb(239,68,68)',    text: 'rgb(252,165,165)'  },
+    completed: { rgb: '34,197,94',    border: 'rgb(34,197,94)',    text: 'rgb(134,239,172)'  },
+    conflict:  { rgb: '245,158,11',   border: 'rgb(245,158,11)',   text: 'rgb(253,211,147)'  },
+  };
+
+  function buildSegments() {
+    const s = +$('#setupMin').value;
+    const r = +$('#runMin').value;
+    const mode = $('#scenario').value;
+    if (mode === 'normal') {
+      return [
+        { type: 'setup', start: 0, dur: s },
+        { type: 'run',   start: s, dur: r, label: true },
+      ];
+    }
+    if (mode === 'shift') {
+      const partial = Math.floor(s * 0.4);
+      const gap = 14 * 60;
+      return [
+        { type: 'setup-lost', start: 0, dur: partial },
+        { type: 'gap',        start: partial, dur: gap, label: 'Nuit' },
+        { type: 'setup',      start: partial + gap, dur: s },
+        { type: 'run',        start: partial + gap + s, dur: r, label: true },
+      ];
+    }
+    if (mode === 'weekend') {
+      const runA = Math.floor(r * 0.35);
+      const gap = 60 * 60;
+      const runB = r - runA;
+      return [
+        { type: 'setup', start: 0, dur: s },
+        { type: 'run',   start: s, dur: runA },
+        { type: 'gap',   start: s + runA, dur: gap, label: 'Weekend' },
+        { type: 'recalage', start: s + runA + gap, dur: s },
+        { type: 'run',      start: s + runA + gap + s, dur: runB, label: true },
+      ];
+    }
+  }
+
+  function renderAll() {
+    $('#setupMinVal').textContent = $('#setupMin').value + ' min';
+    $('#runMinVal').textContent = $('#runMin').value + ' min';
+    $('#zoomVal').textContent = $('#zoom').value + ' px/h';
+
+    const segs = buildSegments();
+    const pxPerMin = +$('#zoom').value / 60;
+    const totalMin = segs.reduce((a, s) => Math.max(a, s.start + s.dur), 0);
+    const H = Math.ceil(totalMin * pxPerMin + 20);
+    const state = $('#state').value;
+    const C = STATE[state];
+
+    const tabMode = $('#tabMode').value;
+    const pinned = $('#pinned').value === 'true';
+    document.querySelectorAll('[data-gantt]').forEach(tl => {
+      tl.style.height = H + 'px';
+      tl.classList.toggle('tab-on', tabMode !== 'off');
+      renderTimeline(tl, segs, pxPerMin, C, state, pinned);
+      if (tabMode === 'sticky') {
+        tl.querySelectorAll('.tile').forEach(t => t.classList.add('show-tab'));
+      }
+    });
+  }
+
+  function renderTimeline(tl, segs, pxPerMin, C, state, pinned) {
+    tl.innerHTML = '';
+    const totalMin = segs.reduce((a, s) => Math.max(a, s.start + s.dur), 0);
+
+    // hour grid
+    const totalHours = Math.ceil(totalMin / 60);
+    for (let h = 1; h <= totalHours; h++) {
+      const y = h * 60 * pxPerMin;
+      const l = document.createElement('div');
+      l.className = 'hour-line';
+      l.style.top = y + 'px';
+      tl.appendChild(l);
+      if (h % 2 === 0) {
+        const lbl = document.createElement('div');
+        lbl.className = 'hour-label';
+        lbl.style.top = y + 'px';
+        lbl.textContent = h + 'h';
+        tl.appendChild(lbl);
+      }
+    }
+
+    // weekend / night band
+    segs.filter(s => s.type === 'gap').forEach(s => {
+      const b = document.createElement('div');
+      b.className = 'weekend-band';
+      b.style.top = (s.start * pxPerMin) + 'px';
+      b.style.height = (s.dur * pxPerMin) + 'px';
+      const lbl = document.createElement('div');
+      lbl.className = 'weekend-label';
+      lbl.textContent = s.label;
+      b.appendChild(lbl);
+      tl.appendChild(b);
+    });
+
+    // Render tile(s) — one visual tile per contiguous non-gap sequence
+    const blocks = [];
+    let curr = null;
+    segs.forEach(s => {
+      if (s.type === 'gap') {
+        if (curr) { blocks.push(curr); curr = null; }
+      } else {
+        if (!curr) curr = { start: s.start, segs: [] };
+        curr.segs.push(s);
+      }
+    });
+    if (curr) blocks.push(curr);
+
+    blocks.forEach((block, bi) => {
+      renderTile(tl, block, pxPerMin, C, state, bi, pinned);
+    });
+
+  }
+
+  function renderTile(tl, block, pxPerMin, C, state, blockIdx, pinned) {
+    // Aggregate: the block contains one or more of: setup, run, recalage, setup-lost
+    // The "tile" is one absolute container spanning the block
+    const tileTop = block.start * pxPerMin;
+    const tileBottom = (block.segs[block.segs.length - 1].start + block.segs[block.segs.length - 1].dur) * pxPerMin;
+    const tileHeight = tileBottom - tileTop;
+
+    const tile = document.createElement('div');
+    tile.className = 'tile' + (block.segs.some(s => s.type === 'setup-lost') ? ' tile-lost' : '');
+    tile.style.top = tileTop + 'px';
+    tile.style.height = tileHeight + 'px';
+    tile.style.borderLeftColor = C.border;
+    tile.style.setProperty('--tile-border', C.border);
+    tile.style.setProperty('--tile-rgb', C.rgb);
+    tile.style.setProperty('--tile-text', C.text);
+    tile.setAttribute('data-testid', 'tile-block-' + blockIdx);
+    tile.setAttribute('data-pinned', pinned ? 'true' : 'false');
+
+    // Apply dashed border if "lost" (mimics blocked state)
+    if (block.segs.some(s => s.type === 'setup-lost')) {
+      tile.style.borderLeftStyle = 'dashed';
+    }
+
+    // Stack inner sections
+    block.segs.forEach(s => {
+      const relTop = (s.start - block.start) * pxPerMin;
+      const h = s.dur * pxPerMin;
+      if (s.type === 'setup' || s.type === 'setup-lost') {
+        const d = document.createElement('div');
+        d.setAttribute('data-testid', 'tile-setup-section');
+        d.style.position = 'absolute';
+        d.style.left = '0';
+        d.style.right = '0';
+        d.style.top = relTop + 'px';
+        d.style.height = h + 'px';
+        // setup bg at 0.12 (default) or 0.14 (others)
+        const setupAlpha = state === 'default' ? 0.12 : 0.14;
+        d.style.background = `rgba(${C.rgb},${setupAlpha})`;
+        tile.appendChild(d);
+
+      } else if (s.type === 'run') {
+        const d = document.createElement('div');
+        d.setAttribute('data-testid', 'tile-run-section');
+        d.style.position = 'absolute';
+        d.style.left = '0';
+        d.style.right = '0';
+        d.style.top = relTop + 'px';
+        d.style.height = h + 'px';
+        const runAlpha = state === 'default' ? 0.12 : 0.09;
+        d.style.background = `rgba(${C.rgb},${runAlpha})`;
+        tile.appendChild(d);
+      } else if (s.type === 'recalage') {
+        // Recalage is visually identical to a setup section (same state
+        // tint, same motif per variant). The red `↻` badge at the junction
+        // is the only disambiguation — the calage phase itself is "just"
+        // a calage.
+        const d = document.createElement('div');
+        d.setAttribute('data-testid', 'tile-recalage-section');
+        d.style.top = relTop + 'px';
+        d.style.height = h + 'px';
+        const setupAlpha = state === 'default' ? 0.12 : 0.14;
+        d.style.background = `rgba(${C.rgb},${setupAlpha})`;
+        tile.appendChild(d);
+      }
+    });
+
+    // Folder tab (hover-only action surface): completion + pin move here,
+    // keeping inline-actions as the fallback when tab is off.
+    const tabPinStroke = pinned ? '#f59e0b' : C.text;
+    const tab = document.createElement('div');
+    tab.className = 'folder-tab';
+    tab.innerHTML = `
+      <button title="Marquer complété">${circleSvg(16, C.text)}</button>
+      <button title="Épingler">${pinSvg(12, tabPinStroke)}</button>`;
+    tile.appendChild(tab);
+
+    // Label overlay (matches Tile.tsx: circle + pin + "ref · client" + attention)
+    if (tileHeight > 24) {
+      const pinStroke = pinned ? '#f59e0b' : '#3f3f46';
+      const lbl = document.createElement('div');
+      lbl.style.cssText = 'position:absolute;inset:0;z-index:10;padding:2px 8px 0;pointer-events:none;overflow:hidden';
+      lbl.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:6px">
+          <span class="inline-check">${circleSvg()}</span>
+          <span class="inline-pin">${pinSvg(12, pinStroke)}</span>
+          <span style="color:${C.text};font-size:13px;font-weight:500;line-height:1.2;overflow:hidden;min-width:0">
+            4588 · Imprimerie Dupont
+          </span>
+        </div>
+        <div style="font-size:9px;color:#a1a1aa;margin-top:2px;line-height:1.2;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
+          Jean-Marc · Sophie
+        </div>`;
+      tile.appendChild(lbl);
+    }
+
+    tl.appendChild(tile);
+  }
+
+  function circleSvg(size = 16, stroke = '#52525b') {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/></svg>`;
+  }
+  function pinSvg(size = 12, stroke = '#3f3f46') {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>`;
+  }
+
+  controls.forEach(el => el.addEventListener('input', renderAll));
+  renderAll();
+
+  // ─── Prompt builder ────────────────────────────────────────────────
+  const PB_STYLES = {
+    c: {
+      name: 'C — Barre accent à gauche sur la zone de calage',
+      css: `/* Setup + re-calage : accent bar jaune à gauche */
+.opt-c [data-testid="tile-setup-section"],
+.opt-c [data-testid="tile-recalage-section"] {
+  box-shadow: inset 4px 0 0 rgba(251,191,36,0.9);
+}`,
+    },
+    f: {
+      name: 'F — Pointillés rouges sur la bordure basse de la zone de calage',
+      css: `/* Setup + re-calage : pointillés rouges + bg un peu plus dense */
+.opt-f [data-testid="tile-setup-section"],
+.opt-f [data-testid="tile-recalage-section"] {
+  border-bottom: 1px dashed rgba(239,68,68,0.9);
+  background: rgba(59,130,246,0.16);
+}`,
+    },
+  };
+
+  const PB_TAB_CSS = `/* Folder tab : apparaît au hover, intégré visuellement à la tuile */
+.folder-tab {
+  position: absolute;
+  top: -22px;
+  left: -4px;
+  height: 22px;
+  padding: 0 7px 0 10px;
+  display: flex; align-items: center; gap: 5px;
+  background: color-mix(in srgb, #18181b 78%, rgb(var(--tile-rgb)) 22%);
+  color: var(--tile-text);
+  border-left: 4px solid var(--tile-border);
+  border-top: 1px solid rgba(0,0,0,0.25);
+  border-right: 1px solid rgba(0,0,0,0.25);
+  border-radius: 3px 3px 0 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  opacity: 0; transform: translateY(3px);
+  transition: opacity 100ms, transform 100ms;
+  pointer-events: none; z-index: 25;
+}
+.tile:hover .folder-tab { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+/* Tab-on mode: Circle always moves to tab. Pin stays inline only if pinned. */
+.tile .inline-check { display: none; }
+.tile .inline-pin { display: none; }
+.tile[data-pinned="true"] .inline-pin { display: inline-flex; }`;
+
+  function buildPrompt() {
+    const style = $('#pb_style').value;
+    const withTab = $('#pb_tab').value === 'yes';
+    const recalageDifferent = $('#pb_recalage').value === 'different';
+
+    const chosen = PB_STYLES[style];
+    const parts = [];
+
+    parts.push(`# Tâche : afficher les phases de calage sur les tuiles de scheduling
+
+## Contexte
+Le moteur Rust modélise désormais la péremption post-setup (cf. commit ee04a56 sur branche \`setup-peremption-improvement\`). Quand une action est interrompue par un weekend ou une longue pause, le run reprend après une nouvelle phase de calage (re-calage) dont la durée est ajoutée à l'action.
+
+Côté frontend (\`apps/web/src/components/Tile/Tile.tsx\`), les tuiles existent déjà avec une section setup (data-testid="tile-setup-section") et une section run (data-testid="tile-run-section"). Il faut maintenant :
+
+1. **Marquer visuellement la phase de calage** (initiale ET éventuelles re-calages) avec le style ci-dessous.
+2. **Ajouter un nouveau type de section** \`tile-recalage-section\` pour les phases de re-calage post-péremption, qui DOIT avoir exactement la même apparence qu'une section setup normale.
+`);
+
+    parts.push(`
+## Style choisi : ${chosen.name}
+
+\`\`\`css
+${chosen.css}
+\`\`\`
+
+À ajouter dans \`apps/web/src/index.css\` à la suite des règles \`[data-testid^="tile-"]\` (ligne ~237).
+Le sélecteur \`.opt-${style}\` peut être remplacé par un sélecteur global si l'option est retenue en production — ou gardé sous feature flag.
+`);
+
+    if (recalageDifferent) {
+      parts.push(`
+## Re-calage visuellement distinct
+Le style de re-calage doit différer légèrement du setup initial (à préciser — ex : couleur d'accent rouge au lieu de jaune pour variante C). À designer dans le playground d'abord.
+`);
+    } else {
+      parts.push(`
+## Re-calage = même apparence que setup initial
+Pas de marqueur visuel spécifique pour distinguer une re-calage d'un setup initial. La présence de re-calage est implicite dans la structure (tuile scindée par un gap + seconde phase de calage).
+`);
+    }
+
+    parts.push(`
+## Côté Tile.tsx
+- Ajouter \`hasRecalage\` + \`recalageHeight\`/\`recalagePosition\` props (ou dériver depuis l'assignment).
+- Rendre un \`<div data-testid="tile-recalage-section">\` positionné dans la tuile à l'offset approprié.
+- Le rendering doit se faire pour chaque événement de re-calage reporté par le moteur (potentiellement plusieurs dans une même tuile si plusieurs péremptions successives — cappé à MAX_PEREMPTION_RETRIES=3 côté Rust).
+
+## Côté API
+- Le schéma \`ComputedAssignment\` doit exposer les timestamps de re-calage (start/end de chaque phase). À ajouter dans \`services/scheduling-engine/src/model/schedule.rs\` si pas encore fait.
+- Le PHP/Symfony \`ScheduleComputeController\` doit forwarder l'info sans transformation.
+`);
+
+    if (withTab) {
+      parts.push(`
+## En plus : onglet hover "dossier"
+Déplacer les boutons Circle (complétion) et Pin (épinglage) dans un onglet qui apparaît au hover de la tuile, comme un onglet de dossier qui dépasse par le haut.
+
+Règles :
+- Circle (action) : TOUJOURS dans l'onglet en mode feature-on.
+- Pin : dans l'onglet. Reste aussi affiché inline SI la tuile est effectivement épinglée (état, pas action).
+- L'onglet doit visuellement faire corps avec la tuile (même border-left 4px, bg solide teinté état, aucun chevauchement).
+
+CSS à ajouter dans \`apps/web/src/index.css\` :
+
+\`\`\`css
+${PB_TAB_CSS}
+\`\`\`
+
+Markup Tile.tsx :
+- Séparer Circle et Pin en deux \`<span>\` distincts avec classes \`.inline-check\` et \`.inline-pin\`.
+- Ajouter \`<div class="folder-tab">\` en tout début de tuile avec deux \`<button>\` (même onClick que les icônes inline actuelles).
+- Ajouter \`data-pinned="\${isPinned}"\` sur l'élément racine de la tuile.
+- Passer \`--tile-rgb\`, \`--tile-border\`, \`--tile-text\` comme CSS custom properties sur la tuile (depuis \`stateColorMap\` dans colorUtils.ts).
+`);
+    }
+
+    parts.push(`
+## Tests
+- Ajouter un test Playwright \`apps/web/playwright/calage-phases.spec.ts\` : vérifier que pour une tuile avec re-calage, la section \`[data-testid="tile-recalage-section"]\` est présente et positionnée correctement.
+- Screenshot test pour la variante ${style.toUpperCase()}.
+${withTab ? '- Test hover sur tuile : onglet apparaît, Circle disparaît de inline, Pin reste si épinglée.\n' : ''}
+## Checklist
+- [ ] CSS ajouté dans index.css
+- [ ] Tile.tsx rend la section re-calage
+- [ ] API expose les timestamps de re-calage
+${withTab ? '- [ ] Folder tab implémenté, Circle/Pin refactorisés\n' : ''}- [ ] Test Playwright
+- [ ] Documenté dans docs/releases/vX.X.X-calage-phases.md
+`);
+
+    return parts.join('');
+  }
+
+  function updatePrompt() {
+    $('#pb_output').value = buildPrompt().trim();
+  }
+  ['pb_style','pb_tab','pb_recalage'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updatePrompt);
+  });
+  $('#pb_copy').addEventListener('click', async () => {
+    await navigator.clipboard.writeText($('#pb_output').value);
+    const c = $('#pb_copied');
+    c.style.opacity = '1';
+    setTimeout(() => c.style.opacity = '0', 1500);
+  });
+  updatePrompt();
+</script>
+
+</body>
+</html>
