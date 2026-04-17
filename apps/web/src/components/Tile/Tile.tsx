@@ -185,7 +185,7 @@ export const Tile = memo(function Tile({
   return (
     <div
       ref={rootRef}
-      className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      className={`absolute text-sm group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
         top: `${top}px`,
         height: `${renderHeight}px`,
@@ -193,7 +193,6 @@ export const Tile = memo(function Tile({
         width: overrideWidth ?? undefined,
         right: overrideWidth ? undefined : 0,
         opacity: overrideOpacity ?? undefined,
-        clipPath,
         // State color tokens consumed by the folder tab and any future
         // state-aware decorations. Set as CSS custom properties so child
         // layers don't need to know the palette.
@@ -225,82 +224,91 @@ export const Tile = memo(function Tile({
         <SimilarityIndicators results={similarityResults} />
       )}
 
-      {/* Setup section (if has setup time) - background only. Fills the tile's
-          full time span; inward clip-path eats any tooth zone out of backgrounds. */}
-      {hasSetup && (
-        <div
-          className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
-          style={{
-            top: 0,
-            height: `${setupHeight}px`,
-          }}
-          data-testid="tile-setup-section"
-        />
-      )}
-
-      {/* Run section - background only */}
+      {/* Clipped body wrapper. The clip-path is applied here (not on the root)
+          so that the folder-tab and other overflow-outside children (label
+          overlay, tooltip) are not clipped away on tiles with teeth. The
+          left border lives inside the wrapper so it follows the tooth shape. */}
       <div
-        className={`absolute left-0 right-0 ${colorClasses.runBg}`}
-        style={{
-          top: hasSetup ? `${setupHeight}px` : 0,
-          height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
-        }}
-        data-testid="tile-run-section"
-      />
-
-      {/* Re-calage sections (post-peremption setup reruns reported by the
-          engine). Rendered on top of the run section at their time offset;
-          styled via data-testid="tile-recalage-section" in index.css to
-          match the initial setup visuals. */}
-      {(assignment.recalages ?? []).map((rc, idx) => {
-        const rcStartMs = new Date(rc.start).getTime();
-        const rcEndMs = new Date(rc.end).getTime();
-        const offsetMinutes = (rcStartMs - startTime.getTime()) / 60000;
-        const durationMinutes = (rcEndMs - rcStartMs) / 60000;
-        if (durationMinutes <= 0) return null;
-        const rcTop = minutesToPixels(offsetMinutes, pixelsPerHour);
-        const rcHeight = minutesToPixels(durationMinutes, pixelsPerHour);
-        return (
+        className={`absolute inset-0 ${borderStyleClass} ${colorClasses.border}`}
+        style={{ clipPath }}
+      >
+        {/* Setup section (if has setup time) - background only. Fills the tile's
+            full time span; inward clip-path eats any tooth zone out of backgrounds. */}
+        {hasSetup && (
           <div
-            key={`recalage-${idx}`}
             className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
-            style={{ top: `${rcTop}px`, height: `${rcHeight}px` }}
-            data-testid="tile-recalage-section"
+            style={{
+              top: 0,
+              height: `${setupHeight}px`,
+            }}
+            data-testid="tile-setup-section"
           />
-        );
-      })}
+        )}
 
-      {/* Sawtooth stroke lines for interrupted tiles */}
-      {hasSaw && (
-        <svg
-          className="absolute inset-0 pointer-events-none"
-          width="100%"
-          height={renderHeight}
-          viewBox={`0 0 100 ${renderHeight}`}
-          preserveAspectRatio="none"
-        >
-          {sawtoothTop && (
-            <path
-              d={buildSawtoothSvgPath(100, 0, 'top', teethCount)}
-              fill="none"
-              stroke={`rgb(${stateRgb.border})`}
-              strokeWidth={1.5}
-              strokeOpacity={0.7}
-              vectorEffect="non-scaling-stroke"
+        {/* Run section - background only */}
+        <div
+          className={`absolute left-0 right-0 ${colorClasses.runBg}`}
+          style={{
+            top: hasSetup ? `${setupHeight}px` : 0,
+            height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
+          }}
+          data-testid="tile-run-section"
+        />
+
+        {/* Re-calage sections (post-peremption setup reruns reported by the
+            engine). Rendered on top of the run section at their time offset;
+            styled via data-testid="tile-recalage-section" in index.css to
+            match the initial setup visuals. */}
+        {(assignment.recalages ?? []).map((rc, idx) => {
+          const rcStartMs = new Date(rc.start).getTime();
+          const rcEndMs = new Date(rc.end).getTime();
+          const offsetMinutes = (rcStartMs - startTime.getTime()) / 60000;
+          const durationMinutes = (rcEndMs - rcStartMs) / 60000;
+          if (durationMinutes <= 0) return null;
+          const rcTop = minutesToPixels(offsetMinutes, pixelsPerHour);
+          const rcHeight = minutesToPixels(durationMinutes, pixelsPerHour);
+          return (
+            <div
+              key={`recalage-${idx}`}
+              className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
+              style={{ top: `${rcTop}px`, height: `${rcHeight}px` }}
+              data-testid="tile-recalage-section"
             />
-          )}
-          {sawtoothBottom && (
-            <path
-              d={buildSawtoothSvgPath(100, renderHeight, 'bottom', teethCount)}
-              fill="none"
-              stroke={`rgb(${stateRgb.border})`}
-              strokeWidth={1.5}
-              strokeOpacity={0.7}
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-        </svg>
-      )}
+          );
+        })}
+
+        {/* Sawtooth stroke lines for interrupted tiles */}
+        {hasSaw && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width="100%"
+            height={renderHeight}
+            viewBox={`0 0 100 ${renderHeight}`}
+            preserveAspectRatio="none"
+          >
+            {sawtoothTop && (
+              <path
+                d={buildSawtoothSvgPath(100, 0, 'top', teethCount)}
+                fill="none"
+                stroke={`rgb(${stateRgb.border})`}
+                strokeWidth={1.5}
+                strokeOpacity={0.7}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+            {sawtoothBottom && (
+              <path
+                d={buildSawtoothSvgPath(100, renderHeight, 'bottom', teethCount)}
+                fill="none"
+                stroke={`rgb(${stateRgb.border})`}
+                strokeWidth={1.5}
+                strokeOpacity={0.7}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+          </svg>
+        )}
+      </div>
 
       {/* Folder tab (hover-only): completion + pin actions. Out of the
           label overlay so the tile body stays clean by default. */}
