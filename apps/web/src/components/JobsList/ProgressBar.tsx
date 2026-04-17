@@ -23,7 +23,7 @@ export function ProgressBar({ tasks, assignments }: ProgressBarProps) {
 
   return (
     <div
-      className="flex gap-0.5 h-[3px] w-[72px] overflow-hidden shrink-0"
+      className="flex gap-0.5 h-[3px] w-[108px] overflow-hidden shrink-0"
       data-testid="progress-bar"
     >
       {sortedTasks.map((task) => {
