@@ -49,6 +49,8 @@ interface TileSegmentProps {
   setupWindow?: { start: Date; end: Date };
   /** Re-calage windows reported by the engine for the parent task. */
   recalages?: PhaseSegment[];
+  /** Job id — drives the CSS selection ring via [data-job-id] selector (matches station view). */
+  jobId?: string;
 }
 
 /**
@@ -98,6 +100,7 @@ export function TileSegment({
   segTo,
   setupWindow,
   recalages,
+  jobId,
 }: TileSegmentProps) {
   const colors = getStateInlineColors(tileState);
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
@@ -149,6 +152,7 @@ export function TileSegment({
       }}
       onClick={onClick}
       data-testid={`tile-segment-${segmentKey}`}
+      data-job-id={jobId}
     >
       {/* Background + left border, clipped by CSS polygon */}
       <div

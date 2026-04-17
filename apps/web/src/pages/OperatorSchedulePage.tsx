@@ -728,6 +728,7 @@ export default function OperatorSchedulePage() {
         segTo={slice.to}
         setupWindow={setupWindow}
         recalages={assignment?.recalages}
+        jobId={job.id}
         {...positionProps}
       />
     );
