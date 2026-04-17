@@ -142,8 +142,10 @@ pub fn run_with_fbi(
         // for imperative (tier 0) + important (tier 1) jobs.
         let initial_ticks_for_last = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
 
+        // ALAP pre-reservation: protect high-priority jobs from lower-priority ones.
+        // Skip for single-job payloads — no competing jobs to protect against.
         let has_priority_jobs = jobs.iter().any(|j| j.deadline_priority <= 1);
-        let last_values = if iteration == 0 && has_priority_jobs && ordering == BackwardOrdering::TierFirst {
+        let last_values = if iteration == 0 && has_priority_jobs && ordering == BackwardOrdering::TierFirst && jobs.len() > 1 {
             let (lv, placements) = compute_last_values_with_placements(
                 jobs_for_backward, stations, operators,
                 &station_attrs, &operator_skills, &operator_groups,
@@ -399,6 +401,7 @@ pub fn run_with_fbi(
                 is_degraded: false,
                 effective_productivity: 1.0,
                 is_masked_time: false,
+                recalages: Vec::new(),
             });
         }
 

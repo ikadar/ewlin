@@ -520,6 +520,13 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
             1.0
         };
 
+        // Concatenate recalage phases from all chunks — a peremption in
+        // chunk N remains a peremption of the merged task.
+        let merged_recalages = chunks
+            .iter()
+            .flat_map(|c| c.recalages.iter().cloned())
+            .collect();
+
         result.push(ComputedAssignment {
             task_id: original_task_id,
             station_id: first.station_id.clone(),
@@ -530,6 +537,7 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
             is_degraded,
             effective_productivity: avg_productivity,
             is_masked_time,
+            recalages: merged_recalages,
         });
     }
 
@@ -685,6 +693,8 @@ pub fn build_actions(
                     is_pinned: task.is_pinned,
                     pinned_start_tick: task.pinned_start_tick,
                     peremption_count: 0,
+                    current_recalage_start: None,
+                    recalage_segments: Vec::new(),
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);

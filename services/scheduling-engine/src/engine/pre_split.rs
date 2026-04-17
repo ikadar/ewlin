@@ -135,6 +135,8 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 is_pinned: false,
                 pinned_start_tick: None,
                 peremption_count: 0,
+                current_recalage_start: None,
+                recalage_segments: Vec::new(),
             });
 
             prev_chunk_idx = Some(idx);
@@ -189,5 +191,7 @@ pub fn clone_action(a: &Action) -> Action {
         is_pinned: a.is_pinned,
         pinned_start_tick: a.pinned_start_tick,
         peremption_count: a.peremption_count,
+        current_recalage_start: a.current_recalage_start,
+        recalage_segments: a.recalage_segments.clone(),
     }
 }

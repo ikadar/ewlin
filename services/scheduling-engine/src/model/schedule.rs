@@ -138,6 +138,22 @@ pub struct ComputedAssignment {
     /// True if the task ran in masked time mode on its station
     #[serde(default)]
     pub is_masked_time: bool,
+    /// Post-peremption re-calage phases. Each entry is a (start, end) window
+    /// during which the operator re-staged the press because the previous
+    /// calage had expired (idle beyond the station's peremption threshold).
+    /// Empty when the action never triggered peremption.
+    #[serde(default)]
+    pub recalages: Vec<PhaseSegment>,
+}
+
+/// A generic phase window within an assignment, used today for re-calage
+/// events. Timestamps are RFC 3339 strings aligned with scheduled_start /
+/// scheduled_end.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhaseSegment {
+    pub start: String,
+    pub end: String,
 }
 
 fn default_productivity() -> f64 {

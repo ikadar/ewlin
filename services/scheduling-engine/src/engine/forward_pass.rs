@@ -158,6 +158,16 @@ pub struct Action {
     /// peremption (extended idle after setup completion). Each occurrence
     /// re-adds setup_ticks of work to art. Capped to prevent runaway loops.
     pub peremption_count: u32,
+    /// Tick at which the current in-flight re-calage started. Set when the
+    /// post-setup peremption regime fires, cleared when re-setup completes
+    /// (eat climbs back to setup_ticks). None outside of a re-calage window
+    /// and before any peremption has fired.
+    pub current_recalage_start: Option<u32>,
+    /// Completed re-calage segments (start_tick, end_tick_exclusive). One
+    /// entry per post-setup peremption whose re-setup actually ran to
+    /// completion. Surfaced in ComputedAssignment so the UI can render a
+    /// calage-phase section per event.
+    pub recalage_segments: Vec<(u32, u32)>,
 }
 
 /// Cap on how many times an action can re-setup due to peremption before
@@ -1183,7 +1193,12 @@ fn apply_chunk_re_setup(actions: &mut Vec<Action>, action_idx: usize, start_t: u
 ///      eat = 0 (so the `eat < setup_ticks` gate reports setup-phase
 ///      again). Run work already done stays accounted for: art only grows
 ///      by setup_ticks, not by run progress.
-pub fn apply_peremption_rule(a: &mut Action, setup_ticks: u32, peremption_ticks: u32) -> bool {
+pub fn apply_peremption_rule(
+    a: &mut Action,
+    setup_ticks: u32,
+    peremption_ticks: u32,
+    current_tick: u32,
+) -> bool {
     if peremption_ticks == 0 || a.art == 0 || a.idle_ticks < peremption_ticks {
         return false;
     }
@@ -1203,6 +1218,9 @@ pub fn apply_peremption_rule(a: &mut Action, setup_ticks: u32, peremption_ticks:
         a.work_accumulator = 0.0;
         a.idle_ticks = 0;
         a.peremption_count += 1;
+        // Mark the start of a re-calage window. The segment is finalized
+        // later when eat climbs back to setup_ticks (re-setup complete).
+        a.current_recalage_start = Some(current_tick);
         true
     } else {
         false
@@ -1312,6 +1330,7 @@ fn assign_action_at_tick(
             &mut actions[action_idx],
             setup_ticks,
             attrs.peremption_ticks,
+            t as u32,
         );
 
         // Skip ahead if NO qualified operator is available at all
@@ -1388,6 +1407,9 @@ fn advance_action_at_tick(
 
     actions[action_idx].tick_operator_log.push((t, operators_this_tick.to_vec()));
 
+    let setup_ticks = actions[action_idx].setup_ticks;
+    let eat_before = actions[action_idx].eat;
+
     actions[action_idx].work_accumulator += productivity;
     let work_done = actions[action_idx].work_accumulator.floor() as u32;
     actions[action_idx].work_accumulator -= work_done as f64;
@@ -1395,6 +1417,17 @@ fn advance_action_at_tick(
     actions[action_idx].eat += 1;
     actions[action_idx].total_productivity += productivity;
     actions[action_idx].ticks_counted += 1;
+
+    // Finalize an in-flight re-calage segment when setup re-completes.
+    // Detected by eat crossing the setup_ticks threshold while a recalage
+    // window is open.
+    if actions[action_idx].current_recalage_start.is_some()
+        && eat_before < setup_ticks
+        && actions[action_idx].eat >= setup_ticks
+    {
+        let start = actions[action_idx].current_recalage_start.take().unwrap();
+        actions[action_idx].recalage_segments.push((start, (t + 1) as u32));
+    }
 
     if actions[action_idx].art == 0 {
         actions[action_idx].end_tick = Some(t + 1);
@@ -1537,6 +1570,15 @@ fn build_assignment_for(
         None
     };
 
+    let recalages = action
+        .recalage_segments
+        .iter()
+        .map(|&(s, e)| crate::model::schedule::PhaseSegment {
+            start: super::format_minutes(s as u64 * tick_minutes as u64, start_date),
+            end: super::format_minutes(e as u64 * tick_minutes as u64, start_date),
+        })
+        .collect();
+
     ComputedAssignment {
         task_id: action.task_id.clone(),
         station_id: format!("station_idx:{}", station_idx),
@@ -1547,6 +1589,7 @@ fn build_assignment_for(
         is_degraded: false,
         effective_productivity: (avg_productivity * 100.0).round() / 100.0,
         is_masked_time: false, // Set in post-processing by compute()
+        recalages,
     }
 }
 
@@ -1961,6 +2004,8 @@ mod peremption_tests {
             chain_remaining_art: setup_ticks + run_ticks,
             pinned_start_tick: None,
             peremption_count: 0,
+            current_recalage_start: None,
+            recalage_segments: Vec::new(),
         }
     }
 
@@ -1971,7 +2016,7 @@ mod peremption_tests {
     fn mid_setup_peremption_rewinds_setup_progress() {
         // setup=15, run=10, eat=5 (mid-setup), art=20 (25 total - 5 done), idle=8 >= peremption=8
         let mut a = make_action(15, 10, 5, 20, 8);
-        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        let triggered = apply_peremption_rule(&mut a, 15, 8, 100);
         assert!(triggered);
         assert_eq!(a.eat, 0, "eat rewound to 0");
         assert_eq!(a.art, 25, "art gets the 5 ticks back (setup restart)");
@@ -1986,7 +2031,7 @@ mod peremption_tests {
     fn post_setup_peremption_re_adds_setup_only() {
         // setup=15, run=10, eat=18 (setup+3 run), art=7 (10-3), idle=10 >= 8
         let mut a = make_action(15, 10, 18, 7, 10);
-        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        let triggered = apply_peremption_rule(&mut a, 15, 8, 100);
         assert!(triggered);
         assert_eq!(a.eat, 0, "eat resets to 0 → in_setup gate triggers again");
         assert_eq!(a.art, 7 + 15, "art += setup_ticks only, run progress preserved");
@@ -2003,7 +2048,7 @@ mod peremption_tests {
             a.idle_ticks = 10;
             a.eat = 18;
             a.art = 7;
-            let triggered = apply_peremption_rule(&mut a, 15, 8);
+            let triggered = apply_peremption_rule(&mut a, 15, 8, 100);
             assert!(triggered, "iteration {i} should trigger");
             assert_eq!(a.peremption_count, i);
         }
@@ -2011,7 +2056,7 @@ mod peremption_tests {
         a.idle_ticks = 10;
         a.eat = 18;
         a.art = 7;
-        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        let triggered = apply_peremption_rule(&mut a, 15, 8, 100);
         assert!(!triggered, "cap prevents further resets");
         assert_eq!(a.eat, 18, "state unchanged past cap");
         assert_eq!(a.art, 7);
@@ -2021,7 +2066,7 @@ mod peremption_tests {
     #[test]
     fn no_trigger_below_threshold() {
         let mut a = make_action(15, 10, 18, 7, 5);
-        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        let triggered = apply_peremption_rule(&mut a, 15, 8, 100);
         assert!(!triggered);
         assert_eq!(a.eat, 18);
         assert_eq!(a.art, 7);
@@ -2033,7 +2078,7 @@ mod peremption_tests {
     #[test]
     fn peremption_disabled_never_triggers() {
         let mut a = make_action(15, 10, 18, 7, 10_000);
-        let triggered = apply_peremption_rule(&mut a, 15, 0);
+        let triggered = apply_peremption_rule(&mut a, 15, 0, 100);
         assert!(!triggered);
     }
 
@@ -2041,7 +2086,7 @@ mod peremption_tests {
     #[test]
     fn completed_action_not_perempted() {
         let mut a = make_action(15, 10, 25, 0, 100);
-        let triggered = apply_peremption_rule(&mut a, 15, 8);
+        let triggered = apply_peremption_rule(&mut a, 15, 8, 100);
         assert!(!triggered);
     }
 
@@ -2055,7 +2100,7 @@ mod peremption_tests {
         // eat=2 means setup tick done + 1 run tick done. art=7-1=6.
         // peremption_ticks = 120/15 = 8. Weekend idle ~240 >> 8.
         let mut a = make_action(1, 7, 2, 6, 240);
-        let triggered = apply_peremption_rule(&mut a, 1, 8);
+        let triggered = apply_peremption_rule(&mut a, 1, 8, 100);
         assert!(triggered);
         assert_eq!(a.eat, 0, "re-setup needed after weekend");
         assert_eq!(a.art, 6 + 1, "run progress preserved, setup_ticks re-added");
