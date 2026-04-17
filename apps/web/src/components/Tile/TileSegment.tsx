@@ -128,8 +128,13 @@ export function TileSegment({
 }: TileSegmentProps) {
   const colors = STATE_COLORS[tileState] || STATE_COLORS.default;
   const stateRgb = getStateRgb(tileState);
+  // Folder-tab is shown on every segment that has an assignment id, including
+  // relay/reprise segments (sawtoothTop = true). With inward teeth the tab no
+  // longer protrudes past the segment's body top (original rationale for
+  // gating on !sawtoothTop), and hiding it would otherwise make completion/pin
+  // actions unreachable on any segment that isn't the first one of a split.
   const showFolderTab =
-    !sawtoothTop && !!assignmentId && (onTogglePin !== undefined || onToggleComplete !== undefined);
+    !!assignmentId && (onTogglePin !== undefined || onToggleComplete !== undefined);
 
   const handleToggleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
