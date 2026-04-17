@@ -223,7 +223,7 @@ export function JobsList({
 
   return (
     <aside
-      className="w-72 shrink-0 bg-zinc-900 flex flex-col border-r border-white/5 h-full"
+      className="w-[300px] shrink-0 bg-zinc-900 flex flex-col border-r border-white/5 h-full"
       data-testid="jobs-list"
     >
       <JobsListHeader
