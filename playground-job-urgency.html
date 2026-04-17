@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Job urgency — exploration visuelle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #050505;
+    --bg-2: #0c0c0d;
+    --bg-3: #09090b;
+    --border: rgba(255,255,255,0.05);
+    --border-hi: #27272a;
+    --text: #e4e4e7;
+    --text-2: #a1a1aa;
+    --text-3: #71717a;
+    --text-4: #52525b;
+
+    --l0: #3f3f46;
+    --l1: #84cc16;
+    --l2: #eab308;
+    --l3: #f97316;
+    --l4: #ef4444;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: radial-gradient(ellipse at top, #0f0f12 0%, var(--bg) 60%);
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 28px 40px 22px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: rgba(5,5,5,0.92);
+    backdrop-filter: blur(6px);
+    z-index: 10;
+  }
+  header h1 {
+    font-size: 18px; font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  header p.lead {
+    font-size: 12.5px; color: var(--text-2);
+    margin-top: 4px; max-width: 780px; line-height: 1.55;
+  }
+  header p.lead code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px; color: var(--text);
+    background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px;
+  }
+
+  .time-slider {
+    margin-top: 16px;
+    display: flex; align-items: center; gap: 12px;
+    max-width: 600px;
+  }
+  .time-slider label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--text-3); min-width: 80px;
+  }
+  .time-slider input[type=range] {
+    flex: 1;
+    accent-color: #3b82f6;
+    height: 4px;
+  }
+  .time-slider .value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px; color: var(--text-2);
+    min-width: 130px; text-align: right;
+  }
+
+  main {
+    padding: 26px 40px 32px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+    gap: 18px;
+  }
+
+  .option {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .option-head {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .option-head h2 {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--text);
+  }
+  .option-head .desc {
+    font-size: 11px; color: var(--text-3);
+    margin-top: 3px; line-height: 1.45;
+  }
+  .joblist {
+    padding: 6px 0 10px;
+    background: var(--bg-3);
+    flex: 1;
+  }
+
+  .card {
+    position: relative;
+    margin: 0 8px 5px;
+    padding: 3px 10px 3px 9px;
+    border-left: 3px solid transparent;
+    overflow: hidden;
+    transition: background 0.25s ease, border-color 0.25s ease;
+  }
+  .card .row1 {
+    display: flex; align-items: center; gap: 5px;
+    overflow: hidden; min-width: 0;
+    padding-right: 68px;
+  }
+  .card .ref {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12.5px; font-weight: 500;
+    color: var(--text-3); flex-shrink: 0;
+  }
+  .card .sep { color: #3f3f46; flex-shrink: 0; }
+  .card .client {
+    font-size: 11.5px; color: var(--text-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0; flex: 1;
+  }
+  .card .desc {
+    font-size: 11.5px; color: #d4d4d8;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding-right: 68px;
+  }
+  .card .right {
+    position: absolute;
+    top: 3px; right: 10px;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: var(--text-2);
+  }
+  .card .date {
+    display: flex; align-items: center; gap: 3px;
+  }
+  .card .date svg { opacity: 0.7; }
+
+  /* ── A. Countdown badge ── */
+  .opt-countdown .badge {
+    display: inline-flex; align-items: center;
+    padding: 0 4px; border-radius: 3px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9.5px; font-weight: 600;
+    line-height: 13px;
+  }
+  .opt-countdown [data-level="0"] .badge { background: rgba(113,113,122,0.22); color: var(--text-3); }
+  .opt-countdown [data-level="1"] .badge { background: rgba(132,204,22,0.18);  color: #bef264; }
+  .opt-countdown [data-level="2"] .badge { background: rgba(234,179,8,0.22);   color: #fde047; }
+  .opt-countdown [data-level="3"] .badge { background: rgba(249,115,22,0.28);  color: #fdba74; }
+  .opt-countdown [data-level="4"] .badge { background: rgba(239,68,68,0.32);   color: #fecaca; }
+
+  /* ── B. Graded border ── */
+  .opt-border [data-level="1"] { border-left-color: rgba(132,204,22,0.55); }
+  .opt-border [data-level="2"] { border-left-color: var(--l2); }
+  .opt-border [data-level="3"] { border-left-color: var(--l3); }
+  .opt-border [data-level="4"] { border-left-color: var(--l4); }
+
+  /* ── C. Pressure bar ── */
+  .opt-bar .card { padding-bottom: 6px; }
+  .opt-bar .pressure {
+    position: absolute;
+    left: 3px; bottom: 1px;
+    height: 2px; border-radius: 2px;
+    transition: width 0.3s, background 0.3s;
+  }
+  .opt-bar [data-level="0"] .pressure { width: 8%;  background: #3f3f46; }
+  .opt-bar [data-level="1"] .pressure { width: 28%; background: var(--l1); }
+  .opt-bar [data-level="2"] .pressure { width: 55%; background: var(--l2); }
+  .opt-bar [data-level="3"] .pressure { width: 80%; background: var(--l3); }
+  .opt-bar [data-level="4"] .pressure { width: 96%; background: var(--l4); }
+
+  /* ── D. Intensity triangles ── */
+  .opt-tri .tri {
+    letter-spacing: -1.5px;
+    font-size: 9px; font-weight: 700;
+    line-height: 1;
+  }
+  .opt-tri [data-level="0"] .tri { visibility: hidden; }
+  .opt-tri [data-level="1"] .tri { color: #bef264; }
+  .opt-tri [data-level="2"] .tri { color: #fde047; }
+  .opt-tri [data-level="3"] .tri { color: #fdba74; }
+  .opt-tri [data-level="4"] .tri { color: #fca5a5; }
+
+  /* ── E. Background tint ── */
+  .opt-tint [data-level="1"] { background: linear-gradient(90deg, rgba(132,204,22,0.05)  0%, transparent 80%); }
+  .opt-tint [data-level="2"] { background: linear-gradient(90deg, rgba(234,179,8,0.09)   0%, transparent 85%); }
+  .opt-tint [data-level="3"] { background: linear-gradient(90deg, rgba(249,115,22,0.12)  0%, transparent 90%); }
+  .opt-tint [data-level="4"] { background: linear-gradient(90deg, rgba(239,68,68,0.18)   0%, transparent 95%); }
+
+  /* ── Baseline (current state) — only reacts to status, not urgency level ── */
+  .opt-baseline [data-status="late"]      { border-left-color: var(--l4); }
+  .opt-baseline [data-status="late"] .ref { color: #fca5a5; }
+  .opt-baseline [data-status="late"] .desc { color: #f4f4f5; }
+  .opt-baseline [data-status="completed"] { border-left-color: #10b981; opacity: 0.72; }
+  .opt-baseline [data-status="completed"] .ref { color: #86efac; }
+
+  /* ── F. Combined (border + badge) — the likely winner ── */
+  .opt-combo [data-level="1"] { border-left-color: rgba(132,204,22,0.55); }
+  .opt-combo [data-level="2"] { border-left-color: var(--l2); }
+  .opt-combo [data-level="3"] { border-left-color: var(--l3); }
+  .opt-combo [data-level="4"] { border-left-color: var(--l4); }
+  .opt-combo .badge {
+    display: inline-flex; align-items: center;
+    padding: 0 4px; border-radius: 3px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9.5px; font-weight: 600;
+    line-height: 13px;
+  }
+  .opt-combo [data-level="0"] .badge { display: none; }
+  .opt-combo [data-level="1"] .badge { background: rgba(132,204,22,0.18);  color: #bef264; }
+  .opt-combo [data-level="2"] .badge { background: rgba(234,179,8,0.22);   color: #fde047; }
+  .opt-combo [data-level="3"] .badge { background: rgba(249,115,22,0.28);  color: #fdba74; }
+  .opt-combo [data-level="4"] .badge { background: rgba(239,68,68,0.32);   color: #fecaca; }
+
+  /* ── G. Épaisseur monochrome (même couleur, largeur variable) ── */
+  .opt-thick .card {
+    border-left: none;
+    padding-left: 16px;
+  }
+  .opt-thick .card::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 2px; bottom: 2px;
+    background: #a1a1aa;
+    border-radius: 0 2px 2px 0;
+    transition: width 0.25s ease;
+  }
+  .opt-thick [data-level="0"]::before { width: 1px; background: #3f3f46; }
+  .opt-thick [data-level="1"]::before { width: 2px; background: #71717a; }
+  .opt-thick [data-level="2"]::before { width: 3px; background: #a1a1aa; }
+  .opt-thick [data-level="3"]::before { width: 5px; background: #d4d4d8; }
+  .opt-thick [data-level="4"]::before { width: 7px; background: #f4f4f5; }
+
+  /* ── I. Symboles typographiques  - = + !  ── */
+  .opt-typo .sym {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    min-width: 9px;
+    text-align: center;
+    display: inline-block;
+  }
+  .opt-typo [data-level="0"] .sym { visibility: hidden; }
+  .opt-typo [data-level="1"] .sym { color: #a1a1aa; }
+  .opt-typo [data-level="2"] .sym { color: #fde047; }
+  .opt-typo [data-level="3"] .sym { color: #fb923c; }
+  .opt-typo [data-level="4"] .sym { color: #f87171; }
+
+  /* ── H. Épaisseur + couleur (double encodage sur le même canal) ── */
+  .opt-thickcolor .card {
+    border-left: none;
+    padding-left: 16px;
+  }
+  .opt-thickcolor .card::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 2px; bottom: 2px;
+    border-radius: 0 2px 2px 0;
+    transition: width 0.25s ease, background 0.25s ease;
+  }
+  .opt-thickcolor [data-level="0"]::before { width: 1px; background: var(--l0); }
+  .opt-thickcolor [data-level="1"]::before { width: 2px; background: var(--l1); }
+  .opt-thickcolor [data-level="2"]::before { width: 3px; background: var(--l2); }
+  .opt-thickcolor [data-level="3"]::before { width: 5px; background: var(--l3); }
+  .opt-thickcolor [data-level="4"]::before { width: 7px; background: var(--l4); }
+
+  /* ── Footer ── */
+  footer {
+    padding: 0 40px 44px;
+  }
+  .legend {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+  }
+  .legend h3 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--text-3); margin-bottom: 10px;
+  }
+  .legend ul {
+    list-style: none; padding: 0;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px;
+  }
+  .legend li { color: var(--text-2); font-size: 12px; line-height: 1.5; }
+  .legend li strong { color: var(--text); font-weight: 600; }
+  .legend li .swatch {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 2px; margin-right: 4px; vertical-align: middle;
+  }
+  .scale-row {
+    display: flex; gap: 6px; align-items: center; margin-top: 12px;
+    font-size: 11px; color: var(--text-3);
+  }
+  .scale-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 7px; border-radius: 4px;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Impérativité d'un job — 6 pistes visuelles</h1>
+  <p class="lead">
+    L'impérativité se dérive de <code>workshopExitDate − now</code>, découpée en 5 niveaux
+    (<span class="swatch" style="width:8px;height:8px;display:inline-block;border-radius:2px;background:var(--l0);vertical-align:middle;margin:0 2px 1px"></span>0 large
+    → <span class="swatch" style="width:8px;height:8px;display:inline-block;border-radius:2px;background:var(--l4);vertical-align:middle;margin:0 2px 1px"></span>4 critique).
+    Même jeu de 7 jobs dans chaque colonne. Glisse le curseur pour faire avancer/reculer le temps et voir la réactivité de chaque piste.
+  </p>
+  <div class="time-slider">
+    <label>Décalage :</label>
+    <input type="range" id="tslider" min="-3" max="10" step="1" value="0" />
+    <span class="value" id="tvalue">aujourd'hui</span>
+  </div>
+</header>
+
+<main id="grid"></main>
+
+<footer>
+  <div class="legend">
+    <h3>Lecture des pistes</h3>
+    <ul>
+      <li><strong>Baseline</strong> — binaire : rouge si en retard, vert si fini, sinon silence. Les jobs bientôt critiques passent inaperçus.</li>
+      <li><strong>A. Badge J-N</strong> — explicite et chiffré. Ajoute un élément à lire mais laisse zéro ambiguïté sur l'échéance.</li>
+      <li><strong>B. Bordure graduée</strong> — réutilise la bordure existante, coût visuel nul. Perçu comme un continuum de température.</li>
+      <li><strong>C. Barre de pression</strong> — analogique, lit-at-a-glance, canal indépendant (bas de carte). Évoque une jauge qui se remplit.</li>
+      <li><strong>D. Triangles ▲</strong> — échelle discrète compacte, pictogramme. Moins naturel à scanner qu'une couleur.</li>
+      <li><strong>E. Teinte de fond</strong> — la plus immersive, risque de bruit général si beaucoup de cartes s'allument.</li>
+      <li><strong>F. Bordure + badge (combo)</strong> — couleur pour le scan global, badge pour le détail. Redondance volontaire, canaux complémentaires.</li>
+      <li><strong>G. Épaisseur seule</strong> — poids visuel sans couleur. Accessible daltoniens, moins bruyant, mais moins affirmatif sur le critique.</li>
+      <li><strong>H. Épaisseur + couleur</strong> — le canal gauche porte tout : plus la barre est épaisse, plus elle est rouge. Signal fort à distance.</li>
+      <li><strong>I. Symboles <code style="font-family:'JetBrains Mono',monospace">- = + !</code></strong> — échelle typographique auto-explicative. Minimaliste et imprimable N&B. Moins fort que la couleur en vision périphérique.</li>
+    </ul>
+    <div class="scale-row">
+      <span>Paliers :</span>
+      <span class="scale-chip"><span class="swatch" style="background:var(--l0)"></span>&gt; 7 j</span>
+      <span class="scale-chip"><span class="swatch" style="background:var(--l1)"></span>4–7 j</span>
+      <span class="scale-chip"><span class="swatch" style="background:var(--l2)"></span>2–3 j</span>
+      <span class="scale-chip"><span class="swatch" style="background:var(--l3)"></span>1 j</span>
+      <span class="scale-chip"><span class="swatch" style="background:var(--l4)"></span>J-0 ou en retard</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+const options = [
+  { key: 'baseline',    title: 'Baseline (actuel)',         desc: 'Statut binaire : retard rouge, terminé vert, sinon rien.' },
+  { key: 'countdown',   title: 'A. Badge J-N',              desc: 'Petit badge « J-3 / J-0 / J+2 » à gauche de la date.' },
+  { key: 'border',      title: 'B. Bordure graduée',        desc: 'La bordure gauche varie du vert au rouge selon l\'urgence.' },
+  { key: 'bar',         title: 'C. Barre de pression',      desc: 'Fine barre 2 px en bas — largeur et couleur selon urgence.' },
+  { key: 'tri',         title: 'D. Triangles ▲',            desc: 'Pictogrammes ▲, ▲▲, ▲▲▲, ▲▲▲▲ selon le palier.' },
+  { key: 'tint',        title: 'E. Teinte de fond',         desc: 'Dégradé horizontal subtil sur le fond de carte.' },
+  { key: 'combo',       title: 'F. Bordure + badge',        desc: 'Combine B et A : couleur pour le scan, badge pour le détail.' },
+  { key: 'thick',       title: 'G. Épaisseur seule',        desc: 'Bordure gauche monochrome, 1 → 7 px selon l\'urgence.' },
+  { key: 'thickcolor',  title: 'H. Épaisseur + couleur',    desc: 'Double encodage : la bordure grossit et rougit en même temps.' },
+  { key: 'typo',        title: 'I. Symboles − = + !',       desc: 'Caractère unique en monospace, progression sémantique auto-lisible.' },
+];
+
+// 7 jobs — couvrant tous les paliers d'urgence, plus un complété et un en retard
+const jobs = [
+  { ref: '25412', client: 'Laboratoires Clarté',  desc: '200 boîtes sérum anti-âge',        daysFromToday:  9, completed: false },
+  { ref: '25398', client: 'Vignobles Rossigny',    desc: '1500 étiquettes cuvée 2025',       daysFromToday:  5, completed: false },
+  { ref: '25402', client: 'Éditions Horizon',      desc: 'Couverture roman — tirage 3000',   daysFromToday:  3, completed: false },
+  { ref: '25377', client: 'Pharma Belvedère',      desc: 'Notices pliées — lot trimestriel', daysFromToday:  1, completed: false },
+  { ref: '25354', client: 'Atelier Lune',          desc: 'Cartons pliants collection été',   daysFromToday:  0, completed: false },
+  { ref: '25221', client: 'Distrib Express',       desc: 'PLV roll-up enseigne franchisée',  daysFromToday: -2, completed: false },
+  { ref: '25189', client: 'Chocolats Maréchal',    desc: 'Coffrets Pâques — bouclé hier',    daysFromToday:  1, completed: true  },
+];
+
+function urgencyLevel(daysAway, effectiveStatus) {
+  if (effectiveStatus === 'completed') return 0;
+  if (daysAway <= 0) return 4;
+  if (daysAway <= 1) return 3;
+  if (daysAway <= 3) return 2;
+  if (daysAway <= 7) return 1;
+  return 0;
+}
+
+function effectiveStatus(job, effectiveDays) {
+  if (job.completed) return 'completed';
+  if (effectiveDays < 0) return 'late';
+  return 'normal';
+}
+
+function labelCountdown(daysAway) {
+  if (daysAway === 0) return 'J-0';
+  if (daysAway > 0)   return 'J-' + daysAway;
+  return 'J+' + (-daysAway);
+}
+
+function labelDate(daysAway) {
+  const now = new Date('2026-04-18T00:00:00');
+  const d = new Date(now.getTime() + daysAway * 86400000);
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function triangles(level) {
+  return '▲'.repeat(level);
+}
+
+const calendarSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`;
+
+function renderCard(opt, job, offset) {
+  const effectiveDays = job.daysFromToday - offset;
+  const status = effectiveStatus(job, effectiveDays);
+  const level  = urgencyLevel(effectiveDays, status);
+
+  let prefix = '';
+  if ((opt.key === 'countdown' || opt.key === 'combo') && level > 0 && status !== 'completed') {
+    prefix = `<span class="badge">${labelCountdown(effectiveDays)}</span>`;
+  }
+  if (opt.key === 'tri' && level > 0 && status !== 'completed') {
+    prefix = `<span class="tri">${triangles(level)}</span>`;
+  }
+  if (opt.key === 'typo' && status !== 'completed') {
+    const SYM = { 0: '', 1: '-', 2: '=', 3: '+', 4: '!' };
+    prefix = `<span class="sym">${SYM[level]}</span>`;
+  }
+
+  const pressure = opt.key === 'bar' ? '<div class="pressure"></div>' : '';
+
+  return `
+    <div class="card" data-level="${level}" data-status="${status}">
+      <div class="row1">
+        <span class="ref">${job.ref}</span>
+        <span class="sep">·</span>
+        <span class="client">${job.client}</span>
+      </div>
+      <div class="desc">${job.desc}</div>
+      <div class="right">
+        ${prefix}
+        <div class="date" style="color: var(--text-3)">${calendarSvg}<span>${labelDate(effectiveDays)}</span></div>
+      </div>
+      ${pressure}
+    </div>`;
+}
+
+function render(offset) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = options.map((opt) => `
+    <section class="option opt-${opt.key}">
+      <div class="option-head">
+        <h2>${opt.title}</h2>
+        <div class="desc">${opt.desc}</div>
+      </div>
+      <div class="joblist">
+        ${jobs.map((j) => renderCard(opt, j, offset)).join('')}
+      </div>
+    </section>
+  `).join('');
+}
+
+const slider = document.getElementById('tslider');
+const value  = document.getElementById('tvalue');
+function updateLabel() {
+  const v = parseInt(slider.value, 10);
+  if (v === 0)      value.textContent = "aujourd'hui";
+  else if (v > 0)   value.textContent = "+ " + v + " jour" + (v > 1 ? 's' : '');
+  else              value.textContent = "− " + (-v) + " jour" + (v < -1 ? 's' : '');
+  render(v);
+}
+slider.addEventListener('input', updateLabel);
+updateLabel();
+</script>
+</body>
+</html>
