@@ -176,8 +176,10 @@ export const Tile = memo(function Tile({
       ref={rootRef}
       className={`absolute text-sm group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
-        top: `${top}px`,
-        height: `${renderHeight}px`,
+        // 1px inset top + bottom (when no sawtooth) to expose the separation
+        // between consecutive tiles — matches the operator view's TileSegment.
+        top: `${top + (sawtoothTop ? 0 : 1)}px`,
+        height: `${renderHeight - (sawtoothTop ? 0 : 1) - (sawtoothBottom ? 0 : 1)}px`,
         left: overrideLeft ?? 0,
         width: overrideWidth ?? undefined,
         right: overrideWidth ? undefined : 0,
