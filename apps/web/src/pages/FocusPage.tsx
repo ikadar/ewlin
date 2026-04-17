@@ -227,7 +227,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
           viewportEndHour={viewportEndHour}
         />
         <div ref={scrollRef} className="flex-1 overflow-auto min-w-0">
-          <div className="flex justify-center relative" style={{ height: `${totalHeight}px` }}>
+          <div className="flex justify-start relative" style={{ height: `${totalHeight}px` }}>
             <div className="sticky left-0 z-20 shrink-0 bg-zinc-950">
               <TimelineColumn
                 startHour={START_HOUR}
