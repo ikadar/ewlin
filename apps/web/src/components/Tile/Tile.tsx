@@ -50,8 +50,6 @@ export interface TileProps {
   tileState?: TileState;
   /** Comma-separated operator names assigned to this tile */
   operatorNames?: string;
-  /** Operator attention value for bottom-right badge (operator view) */
-  operatorAttention?: number;
   /** Override left/right/width for side-by-side masked time layout */
   overrideLeft?: string;
   overrideWidth?: string;
@@ -95,7 +93,6 @@ export const Tile = memo(function Tile({
   tirageLabel,
   tileState = 'default',
   operatorNames,
-  operatorAttention,
   overrideLeft,
   overrideWidth,
   overrideOpacity,
@@ -362,16 +359,6 @@ export const Tile = memo(function Tile({
           </div>
         )}
       </div>
-
-      {/* Attention badge (bottom-right, operator view) */}
-      {operatorAttention !== undefined && (
-        <div
-          className="absolute right-1 z-10 text-[8px] font-semibold text-zinc-200 bg-zinc-800 border border-zinc-600 rounded-sm px-1.5 py-px leading-tight pointer-events-none"
-          style={{ bottom: `${extBottom + 4}px` }}
-        >
-          {operatorAttention}
-        </div>
-      )}
 
       {/* Fázis D: Rich tooltip (shown after 500ms hover on all tiles) */}
       <TileTooltip

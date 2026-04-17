@@ -154,13 +154,6 @@ export function FocusOperatorColumn({
         const overrideLeft = slice.position === 'right' ? '50%' : undefined;
         const overrideWidth = slice.position === 'full' ? undefined : '50%';
 
-        const opRef = assignment?.operators?.find(
-          (o) =>
-            o.operatorId === operator.id &&
-            new Date(o.from) < slice.to &&
-            new Date(o.to) > slice.from,
-        ) ?? assignment?.operators?.find((o) => o.operatorId === operator.id);
-
         return (
           <TileSegment
             key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
@@ -175,7 +168,6 @@ export function FocusOperatorColumn({
             relayLabelBottom={slice.relayLabelBottom}
             relayLabelTop={slice.relayLabelTop}
             tileState={tileState}
-            operatorAttention={opRef?.attention}
             isMaskedTime={slice.isMasked}
             overrideLeft={overrideLeft}
             overrideWidth={overrideWidth}

@@ -6,7 +6,9 @@
  * and a relay label ("→ pause" / "reprise →").
  */
 
+import { Circle, CircleCheck, Pin } from 'lucide-react';
 import type { TileState } from './colorUtils';
+import { getStateRgb } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath } from './sawtooth';
 
@@ -43,8 +45,6 @@ interface TileSegmentProps {
   relayLabelTop?: string;
   /** Tile color state */
   tileState: TileState;
-  /** Operator attention value for badge */
-  operatorAttention?: number;
   /** Whether this segment is masked time */
   isMaskedTime?: boolean;
   /** Override left position for side-by-side layout */
@@ -53,6 +53,16 @@ interface TileSegmentProps {
   overrideWidth?: string;
   /** Click handler */
   onClick?: () => void;
+  /** Parent assignment id (needed to wire pin/complete actions). */
+  assignmentId?: string;
+  /** Whether the parent assignment is pinned (for tab icon state). */
+  isPinned?: boolean;
+  /** Whether the parent assignment is completed (for tab icon state). */
+  isCompleted?: boolean;
+  /** Callback when completion icon is clicked in the folder tab. */
+  onToggleComplete?: (assignmentId: string) => void;
+  /** Callback when pin icon is clicked in the folder tab. */
+  onTogglePin?: (assignmentId: string) => void;
   /** Segment start wall-clock time (needed to project calage windows). */
   segFrom?: Date;
   /** Segment end wall-clock time. */
@@ -102,17 +112,34 @@ export function TileSegment({
   relayLabelBottom,
   relayLabelTop,
   tileState = 'default',
-  operatorAttention,
   isMaskedTime,
   overrideLeft,
   overrideWidth,
   onClick,
+  assignmentId,
+  isPinned = false,
+  isCompleted = false,
+  onToggleComplete,
+  onTogglePin,
   segFrom,
   segTo,
   setupWindow,
   recalages,
 }: TileSegmentProps) {
   const colors = STATE_COLORS[tileState] || STATE_COLORS.default;
+  const stateRgb = getStateRgb(tileState);
+  const showFolderTab =
+    !sawtoothTop && !!assignmentId && (onTogglePin !== undefined || onToggleComplete !== undefined);
+
+  const handleToggleComplete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (assignmentId) onToggleComplete?.(assignmentId);
+  };
+
+  const handleTogglePin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (assignmentId) onTogglePin?.(assignmentId);
+  };
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
   const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
   const totalHeight = height + extTop + extBottom;
@@ -154,9 +181,15 @@ export function TileSegment({
         left: overrideLeft ?? 0,
         width: overrideWidth ?? undefined,
         right: overrideWidth ? undefined : 0,
+        // Publish state color tokens so the folder tab CSS can render
+        // matching background/border/text without re-declaring the palette.
+        ['--tile-rgb' as string]: stateRgb.tile,
+        ['--tile-border-rgb' as string]: stateRgb.border,
+        ['--tile-text-rgb' as string]: stateRgb.text,
       }}
       onClick={onClick}
       data-testid={`tile-segment-${segmentKey}`}
+      data-pinned={isPinned ? 'true' : 'false'}
     >
       {/* Background + left border, clipped by CSS polygon */}
       <div
@@ -236,13 +269,32 @@ export function TileSegment({
         )}
       </div>
 
-      {/* Attention badge — only on segments without sawtooth bottom (last segment) */}
-      {operatorAttention !== undefined && !sawtoothBottom && (
-        <div
-          className="absolute right-1 z-10 text-[8px] font-semibold text-zinc-200 bg-zinc-800 border border-zinc-600 rounded-sm px-1.5 py-px leading-tight pointer-events-none"
-          style={{ bottom: `${contentBottom + 1}px` }}
-        >
-          {operatorAttention}
+      {/* Folder tab (hover-only): completion + pin actions. Only rendered
+          on the top segment of an assignment (no sawtoothTop) so the tab
+          doesn't stick up into the segment above. */}
+      {showFolderTab && (
+        <div className="folder-tab">
+          <button
+            onClick={handleToggleComplete}
+            title={isCompleted ? 'Marquer non complété' : 'Marquer complété'}
+            data-testid="tile-tab-complete"
+          >
+            {isCompleted ? (
+              <CircleCheck className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <Circle className="w-4 h-4" style={{ color: `rgb(${stateRgb.text})` }} />
+            )}
+          </button>
+          <button
+            onClick={handleTogglePin}
+            title={isPinned ? 'Désépingler' : 'Épingler'}
+            data-testid="tile-tab-pin"
+          >
+            <Pin
+              className="w-3 h-3"
+              style={{ color: isPinned ? '#f59e0b' : `rgb(${stateRgb.text})` }}
+            />
+          </button>
         </div>
       )}
 

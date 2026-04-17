@@ -612,16 +612,7 @@ export default function OperatorSchedulePage() {
     const station = stationMap.get(task.stationId);
     const stationName = station?.name;
 
-    // Find assignment for this slice (to get operator attention)
     const assignment = snapshot.assignments.find(a => a.id === slice.assignmentId);
-    // Match operator segment by ID AND time overlap (an operator can have multiple
-    // segments with different attention values: concurrent vs solo periods)
-    const opRef = assignment?.operators?.find(o =>
-      o.operatorId === operatorId &&
-      new Date(o.from) < slice.to &&
-      new Date(o.to) > slice.from
-    ) ?? assignment?.operators?.find(o => o.operatorId === operatorId);
-    const operatorAttention = opRef?.attention;
 
     const isLate = lateJobIds.has(job.id) || (!assignment?.isCompleted && new Date(slice.to) < now);
     const tileState = computeTileState(false, isLate, false, false, assignment?.isCompleted ?? false);
@@ -665,9 +656,13 @@ export default function OperatorSchedulePage() {
         relayLabelBottom={slice.relayLabelBottom}
         relayLabelTop={slice.relayLabelTop}
         tileState={tileState}
-        operatorAttention={operatorAttention}
         isMaskedTime={slice.isMasked}
         onClick={() => setSelectedJobId(job.id)}
+        assignmentId={slice.assignmentId}
+        isPinned={assignment?.isPinned ?? false}
+        isCompleted={assignment?.isCompleted ?? false}
+        onToggleComplete={handleToggleComplete}
+        onTogglePin={handleTogglePin}
         segFrom={slice.from}
         segTo={slice.to}
         setupWindow={setupWindow}
