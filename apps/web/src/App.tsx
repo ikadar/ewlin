@@ -1312,6 +1312,34 @@ function AppContent() {
     });
   }, [activeStations, categoryMap, pixelsPerHour, gridStartDate]);
 
+  // JobCard click: select + center grid on the earliest non-completed tile of the job
+  // (mirrors OperatorSchedulePage.handleSelectJob for behavioral parity between views).
+  const handleSelectJob = useCallback((jobId: string | null) => {
+    if (jobId === null) {
+      setSelectedJobId(null);
+      return;
+    }
+    setSelectedJobId(jobId);
+
+    const jobTaskIds = new Set<string>();
+    for (const t of snapshot.tasks) {
+      const el = snapshot.elements.find((e) => e.id === t.elementId);
+      if (el?.jobId === jobId) jobTaskIds.add(t.id);
+    }
+    if (jobTaskIds.size === 0) return;
+
+    let firstAssignment: TaskAssignment | null = null;
+    for (const a of snapshot.assignments) {
+      if (!jobTaskIds.has(a.taskId) || a.isCompleted) continue;
+      if (!firstAssignment || new Date(a.scheduledStart) < new Date(firstAssignment.scheduledStart)) {
+        firstAssignment = a;
+      }
+    }
+    if (!firstAssignment) return;
+
+    handleJumpToTask(firstAssignment);
+  }, [snapshot.tasks, snapshot.elements, snapshot.assignments, setSelectedJobId, handleJumpToTask]);
+
   // F9: Deep-link from Flux dashboard — ?task= URL param → scroll to task
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1849,7 +1877,7 @@ function AppContent() {
               lateJobs={snapshot.lateJobs}
               conflicts={snapshot.conflicts}
               selectedJobId={selectedJobId}
-              onSelectJob={setSelectedJobId}
+              onSelectJob={handleSelectJob}
             />
           </div>
         )}
