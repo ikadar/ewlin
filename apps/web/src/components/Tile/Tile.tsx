@@ -9,6 +9,7 @@ import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useTooltipDelay } from '../../hooks';
+import { SAW_AMPLITUDE, buildSawtoothSvgPath, buildCssClipPath } from './sawtooth';
 
 export interface TileProps {
   /** Task assignment data */
@@ -55,6 +56,10 @@ export interface TileProps {
   overrideLeft?: string;
   overrideWidth?: string;
   overrideOpacity?: number;
+  /** Task interruption indicator — another assignment of the same task exists earlier */
+  sawtoothTop?: boolean;
+  /** Task interruption indicator — another assignment of the same task exists later */
+  sawtoothBottom?: boolean;
 }
 
 /**
@@ -94,6 +99,8 @@ export const Tile = memo(function Tile({
   overrideLeft,
   overrideWidth,
   overrideOpacity,
+  sawtoothTop = false,
+  sawtoothBottom = false,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
@@ -112,6 +119,13 @@ export const Tile = memo(function Tile({
   const setupRatio = originalTotalMinutes > 0 ? setupMinutes / originalTotalMinutes : 0;
   const setupHeight = totalHeight * setupRatio;
   const runHeight = totalHeight * (1 - setupRatio);
+
+  // Task interruption teeth — protrude outward from the tile body
+  const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
+  const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
+  const renderHeight = totalHeight + extTop + extBottom;
+  const hasSaw = sawtoothTop || sawtoothBottom;
+  const clipPath = buildCssClipPath(renderHeight, sawtoothTop, sawtoothBottom);
 
   // Get state-based color classes
   const colorClasses = getStateColorClasses(tileState);
@@ -156,12 +170,13 @@ export const Tile = memo(function Tile({
     <div
       className={`absolute text-sm ${borderStyleClass} ${colorClasses.border} group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
       style={{
-        top: `${top}px`,
-        height: `${totalHeight}px`,
+        top: `${top - extTop}px`,
+        height: `${renderHeight}px`,
         left: overrideLeft ?? 0,
         width: overrideWidth ?? undefined,
         right: overrideWidth ? undefined : 0,
         opacity: overrideOpacity ?? undefined,
+        clipPath,
         // State color tokens consumed by the folder tab and any future
         // state-aware decorations. Set as CSS custom properties so child
         // layers don't need to know the palette.
@@ -198,7 +213,7 @@ export const Tile = memo(function Tile({
         <div
           className={`absolute left-0 right-0 ${colorClasses.setupBg} border-b ${colorClasses.setupBorder}`}
           style={{
-            top: 0,
+            top: `${extTop}px`,
             height: `${setupHeight}px`,
           }}
           data-testid="tile-setup-section"
@@ -209,11 +224,65 @@ export const Tile = memo(function Tile({
       <div
         className={`absolute left-0 right-0 ${colorClasses.runBg}`}
         style={{
-          top: hasSetup ? `${setupHeight}px` : 0,
+          top: `${extTop + (hasSetup ? setupHeight : 0)}px`,
           height: hasSetup ? `${runHeight}px` : `${totalHeight}px`,
         }}
         data-testid="tile-run-section"
       />
+
+      {/* Re-calage sections (post-peremption setup reruns reported by the
+          engine). Rendered on top of the run section at their time offset;
+          styled via data-testid="tile-recalage-section" in index.css to
+          match the initial setup visuals. */}
+      {(assignment.recalages ?? []).map((rc, idx) => {
+        const rcStartMs = new Date(rc.start).getTime();
+        const rcEndMs = new Date(rc.end).getTime();
+        const offsetMinutes = (rcStartMs - startTime.getTime()) / 60000;
+        const durationMinutes = (rcEndMs - rcStartMs) / 60000;
+        if (durationMinutes <= 0) return null;
+        const rcTop = extTop + minutesToPixels(offsetMinutes, pixelsPerHour);
+        const rcHeight = minutesToPixels(durationMinutes, pixelsPerHour);
+        return (
+          <div
+            key={`recalage-${idx}`}
+            className={`absolute left-0 right-0 ${colorClasses.setupBg}`}
+            style={{ top: `${rcTop}px`, height: `${rcHeight}px` }}
+            data-testid="tile-recalage-section"
+          />
+        );
+      })}
+
+      {/* Sawtooth stroke lines for interrupted tiles */}
+      {hasSaw && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width="100%"
+          height={renderHeight}
+          viewBox={`0 0 100 ${renderHeight}`}
+          preserveAspectRatio="none"
+        >
+          {sawtoothTop && (
+            <path
+              d={buildSawtoothSvgPath(100, 0, 'top')}
+              fill="none"
+              stroke={`rgb(${stateRgb.border})`}
+              strokeWidth={1.5}
+              strokeOpacity={0.7}
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {sawtoothBottom && (
+            <path
+              d={buildSawtoothSvgPath(100, renderHeight, 'bottom')}
+              fill="none"
+              stroke={`rgb(${stateRgb.border})`}
+              strokeWidth={1.5}
+              strokeOpacity={0.7}
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+        </svg>
+      )}
 
       {/* Folder tab (hover-only): completion + pin actions. Out of the
           label overlay so the tile body stays clean by default. */}
@@ -242,7 +311,10 @@ export const Tile = memo(function Tile({
       </div>
 
       {/* Label overlay spanning both sections */}
-      <div className="absolute inset-0 z-10 pt-0.5 px-2 pointer-events-none overflow-hidden">
+      <div
+        className="absolute left-0 right-0 z-10 pt-0.5 px-2 pointer-events-none overflow-hidden"
+        style={{ top: `${extTop}px`, bottom: `${extBottom}px` }}
+      >
         <div className="flex items-start gap-2">
           <span className="inline-check">
             {isCompleted ? (
@@ -293,7 +365,10 @@ export const Tile = memo(function Tile({
 
       {/* Attention badge (bottom-right, operator view) */}
       {operatorAttention !== undefined && (
-        <div className="absolute bottom-1 right-1 z-10 text-[8px] font-semibold text-zinc-200 bg-zinc-800 border border-zinc-600 rounded-sm px-1.5 py-px leading-tight pointer-events-none">
+        <div
+          className="absolute right-1 z-10 text-[8px] font-semibold text-zinc-200 bg-zinc-800 border border-zinc-600 rounded-sm px-1.5 py-px leading-tight pointer-events-none"
+          style={{ bottom: `${extBottom + 4}px` }}
+        >
           {operatorAttention}
         </div>
       )}
@@ -341,7 +416,9 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.displayMode !== next.displayMode ||
     prev.tirageLabel !== next.tirageLabel ||
     prev.tileState !== next.tileState ||
-    prev.operatorNames !== next.operatorNames
+    prev.operatorNames !== next.operatorNames ||
+    prev.sawtoothTop !== next.sawtoothTop ||
+    prev.sawtoothBottom !== next.sawtoothBottom
   );
 }
 

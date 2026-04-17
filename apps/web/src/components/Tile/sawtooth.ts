@@ -1,0 +1,73 @@
+/**
+ * Shared sawtooth geometry helpers for tiles (operator + station).
+ * Teeth indicate an interrupted task — the tile continues elsewhere in time.
+ */
+
+export const SAW_AMPLITUDE = 10;
+export const SAW_TEETH = 13;
+
+/**
+ * Build an SVG <path> d-attribute for a visible zigzag stroke line.
+ * Coordinates are in pixel space matching the container's viewBox.
+ */
+export function buildSawtoothSvgPath(
+  width: number,
+  y: number,
+  direction: 'top' | 'bottom',
+): string {
+  const amp = SAW_AMPLITUDE;
+  const teeth = SAW_TEETH;
+  const stepW = width / teeth;
+  const parts: string[] = [];
+
+  if (direction === 'top') {
+    parts.push(`M 0 ${y + amp}`);
+    for (let i = 0; i < teeth; i++) {
+      parts.push(`L ${(i * stepW + stepW / 2).toFixed(1)} ${y}`);
+      parts.push(`L ${((i + 1) * stepW).toFixed(1)} ${y + amp}`);
+    }
+  } else {
+    parts.push(`M 0 ${y - amp}`);
+    for (let i = 0; i < teeth; i++) {
+      parts.push(`L ${(i * stepW + stepW / 2).toFixed(1)} ${y}`);
+      parts.push(`L ${((i + 1) * stepW).toFixed(1)} ${y - amp}`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+/**
+ * Build a CSS clip-path polygon() string.
+ * X coordinates use percentages (responsive). Y uses pixels (fixed tooth height).
+ */
+export function buildCssClipPath(h: number, sawTop: boolean, sawBottom: boolean): string | undefined {
+  if (!sawTop && !sawBottom) return undefined;
+
+  const amp = SAW_AMPLITUDE;
+  const teeth = SAW_TEETH;
+  const stepPct = 100 / teeth;
+  const points: string[] = [];
+
+  if (sawTop) {
+    for (let i = 0; i < teeth; i++) {
+      points.push(`${(i * stepPct).toFixed(2)}% ${amp}px`);
+      points.push(`${(i * stepPct + stepPct / 2).toFixed(2)}% 0px`);
+      points.push(`${((i + 1) * stepPct).toFixed(2)}% ${amp}px`);
+    }
+  } else {
+    points.push('0% 0px', '100% 0px');
+  }
+
+  if (sawBottom) {
+    points.push(`100% ${h - amp}px`);
+    for (let i = teeth - 1; i >= 0; i--) {
+      points.push(`${(i * stepPct + stepPct / 2).toFixed(2)}% ${h}px`);
+      points.push(`${(i * stepPct).toFixed(2)}% ${h - amp}px`);
+    }
+  } else {
+    points.push(`100% ${h}px`, `0% ${h}px`);
+  }
+
+  return `polygon(${points.join(', ')})`;
+}
