@@ -1146,6 +1146,7 @@ mod integration_tests {
                 })
                 .collect(),
             concurrent_groups: groups,
+            absences: Vec::new(),
         }
     }
 
@@ -1184,6 +1185,7 @@ mod integration_tests {
                 })
                 .collect(),
             concurrent_groups: groups,
+            absences: Vec::new(),
         }
     }
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use chrono::NaiveDateTime;
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +22,44 @@ pub struct OperatorInput {
     /// Currently ignored by the engine — Phase 1 ingestion only.
     #[serde(default)]
     pub concurrent_groups: Vec<ConcurrentGroupInput>,
+    /// Datetime-range absences (vacation, sick leave, …). The scheduler
+    /// excludes any tick falling within any of these ranges from this
+    /// operator's availability. Endpoints are inclusive.
+    #[serde(default)]
+    pub absences: Vec<Absence>,
+}
+
+/// Naive local datetime range during which the operator is unavailable.
+///
+/// Serialized as ISO 8601 naive (no timezone), e.g. `"2026-04-20T14:00:00"`.
+/// Accepts both `YYYY-MM-DDTHH:MM:SS` and `YYYY-MM-DDTHH:MM` on deserialize
+/// to match the HTML `datetime-local` format.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Absence {
+    #[serde(deserialize_with = "deserialize_naive_datetime")]
+    pub start_at: NaiveDateTime,
+    #[serde(deserialize_with = "deserialize_naive_datetime")]
+    pub end_at: NaiveDateTime,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+impl Absence {
+    /// True when `moment` is within this absence (endpoints inclusive).
+    pub fn covers(&self, moment: NaiveDateTime) -> bool {
+        moment >= self.start_at && moment <= self.end_at
+    }
+}
+
+fn deserialize_naive_datetime<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S")
+        .or_else(|_| NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M"))
+        .map_err(serde::de::Error::custom)
 }
 
 /// A pair of stations an operator can run concurrently, with a per-station
