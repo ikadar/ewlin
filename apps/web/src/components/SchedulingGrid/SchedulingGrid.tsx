@@ -132,6 +132,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     const [scrollTop, setScrollTop] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(600);
 
+    // Stable ref for onScroll so the scroll-listener effect doesn't re-attach
+    // every time the parent recreates its callback identity.
+    const onScrollRef = useRef(onScroll);
+    useEffect(() => {
+      onScrollRef.current = onScroll;
+    }, [onScroll]);
+
     // v0.3.46: Calculate day height from pixels per hour
     const dayHeightPx = 24 * pixelsPerHour;
 
@@ -178,36 +185,40 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return () => clearInterval(interval);
   }, []);
 
-  // v0.3.46: Track scroll position and viewport size for virtual scrolling
-  // Also REQ-09.2: Notify parent of scroll position for DateStrip sync
+  // v0.3.46: Track scroll position and viewport size for virtual scrolling.
+  // Also REQ-09.2: Notify parent of scroll position for DateStrip sync.
+  // Uses ResizeObserver so internal layout shifts (sidebar toggle, panel
+  // open/close) keep viewportHeight in sync — window.resize alone misses those,
+  // which could collapse visibleDayRange and hide overlays + grid lines.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // Update viewport height
-    setViewportHeight(container.clientHeight);
+    const syncViewportHeight = () => {
+      const h = container.clientHeight;
+      if (h > 0) setViewportHeight(h);
+    };
 
     const handleScroll = () => {
       const newScrollTop = container.scrollTop;
       setScrollTop(newScrollTop);
-      onScroll?.(newScrollTop, container.scrollLeft);
+      onScrollRef.current?.(newScrollTop, container.scrollLeft);
     };
 
-    const handleResize = () => {
-      setViewportHeight(container.clientHeight);
-    };
+    syncViewportHeight();
 
+    const resizeObserver = new ResizeObserver(syncViewportHeight);
+    resizeObserver.observe(container);
     container.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize);
 
     // Report initial scroll position
     handleScroll();
 
     return () => {
+      resizeObserver.disconnect();
       container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
     };
-  }, [onScroll]);
+  }, []);
 
   // v0.3.46: Use virtual scroll total height for proper scrollbar sizing
   const totalHeight = virtualScroll.totalHeight;

@@ -66,22 +66,34 @@ export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResu
   // Calculate total virtual height
   const totalHeight = totalDays * dayHeightPx;
 
+  // Guard against pathological inputs (zero height, stale scroll past content,
+  // NaN from zoom races) that could otherwise yield start > end and collapse
+  // the rendered range to nothing — which hides overlays + grid lines together.
+  const maxDayIndex = Math.max(0, totalDays - 1);
+  const safeDayHeight = dayHeightPx > 0 ? dayHeightPx : 1;
+  const safeScrollTop = Number.isFinite(scrollTop) ? Math.max(0, scrollTop) : 0;
+  const safeViewportHeight = Number.isFinite(viewportHeight) && viewportHeight > 0
+    ? viewportHeight
+    : 600;
+
   // Calculate focused day index from scroll position (for reference/sync purposes)
   // The focused day is the one at the center of the viewport
-  const centerY = scrollTop + viewportHeight / 2;
-  const focusedDayIndex = Math.floor(centerY / dayHeightPx);
+  const centerY = safeScrollTop + safeViewportHeight / 2;
+  const focusedDayIndex = Math.floor(centerY / safeDayHeight);
 
   // Clamp to valid range
-  const clampedFocusedDay = Math.max(0, Math.min(totalDays - 1, focusedDayIndex));
+  const clampedFocusedDay = Math.max(0, Math.min(maxDayIndex, focusedDayIndex));
 
-  // Calculate visible range based on actual viewport bounds
-  // This ensures the entire viewport is always covered with content
-  const firstVisibleDay = Math.floor(scrollTop / dayHeightPx);
-  const lastVisibleDay = Math.ceil((scrollTop + viewportHeight) / dayHeightPx);
+  // Calculate visible range based on actual viewport bounds, clamped into the
+  // valid day index space before buffer expansion.
+  const rawFirst = Math.floor(safeScrollTop / safeDayHeight);
+  const rawLast = Math.ceil((safeScrollTop + safeViewportHeight) / safeDayHeight);
+  const firstVisibleDay = Math.max(0, Math.min(maxDayIndex, rawFirst));
+  const lastVisibleDay = Math.max(firstVisibleDay, Math.min(maxDayIndex, rawLast));
 
   // Add buffer around the actual visible range (not around center)
   const start = Math.max(0, firstVisibleDay - bufferDays);
-  const end = Math.min(totalDays - 1, lastVisibleDay + bufferDays);
+  const end = Math.min(maxDayIndex, lastVisibleDay + bufferDays);
 
   // Calculate Y offset for positioning rendered content
   const offsetY = start * dayHeightPx;
