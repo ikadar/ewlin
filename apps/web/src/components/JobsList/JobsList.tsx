@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { Job, Task, TaskAssignment, LateJob, ScheduleConflict, Element } from '@flux/types';
+import { getDeadlineDate } from '@flux/types';
 import { JobsListHeader, type JobTab, type JobChip } from './JobsListHeader';
 import { JobCard, type JobProblemType } from './JobCard';
 import { getJobIdForTask, groupTasksByJob, createTaskToJobMap } from '../../utils/taskHelpers';
@@ -125,18 +126,11 @@ export function JobsList({
     if (activeChip === 'late') list = list.filter((j) => lateJobIds.has(j.id));
     else if (activeChip === 'conflict') list = list.filter((j) => conflictJobIds.has(j.id));
 
-    // Flat sort: late → conflict → in-progress (has completed task) → normal → completed
-    const rank = (job: Job): number => {
-      if (lateJobIds.has(job.id)) return 0;
-      if (conflictJobIds.has(job.id)) return 1;
-      if (isJobCompleted(job.id)) return 4;
-      const jobAssignments = assignmentsByJob.get(job.id) ?? [];
-      const hasCompletedTask = jobAssignments.some((a) => a.isCompleted);
-      return hasCompletedTask ? 2 : 3;
-    };
+    const deadlineTime = (job: Job): number =>
+      job.workshopExitDate ? getDeadlineDate(job.workshopExitDate).getTime() : Infinity;
 
-    return [...list].sort((a, b) => rank(a) - rank(b));
-  }, [tabJobs, activeChip, lateJobIds, conflictJobIds, assignmentsByJob, isJobCompleted]);
+    return [...list].sort((a, b) => deadlineTime(a) - deadlineTime(b));
+  }, [tabJobs, activeChip, lateJobIds, conflictJobIds]);
 
   const handleTabChange = useCallback((tab: JobTab) => {
     setActiveTab(tab);
@@ -145,16 +139,16 @@ export function JobsList({
 
   const formatDeadline = (dateStr: string): string => {
     if (dateStr.includes('T')) {
-      const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+      const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})T/);
       if (match) {
-        const [, , month, day, hours, minutes] = match;
-        return `${day}/${month} ${hours}:${minutes}`;
+        const [, , month, day] = match;
+        return `${day}/${month}`;
       }
     }
     const date = new Date(dateStr);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    return `${day}/${month} 14:00`;
+    return `${day}/${month}`;
   };
 
   const selectedJobIdRef = useRef(selectedJobId);
@@ -208,10 +202,12 @@ export function JobsList({
         client={job.client}
         description={job.description}
         deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
-        batDeadline={job.batDeadline && !isJobPlanified(job.id) ? formatDeadline(job.batDeadline) : undefined}
+        batDeadline={job.batDeadline ? formatDeadline(job.batDeadline) : undefined}
         problemType={getProblemType(job.id)}
         isCompleted={isJobCompleted(job.id)}
+        isPlanified={isJobPlanified(job.id)}
         bufferLabel={computeBufferLabel(job, jobTasks, jobAssignments)}
+        deadlinePriority={job.deadlinePriority}
         isSelected={selectedJobId === job.id}
         dim={selectedJobId != null && selectedJobId !== job.id}
         onClick={handleJobToggle}

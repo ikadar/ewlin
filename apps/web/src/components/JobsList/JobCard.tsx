@@ -15,14 +15,18 @@ export interface JobCardProps {
   problemType?: JobProblemType;
   /** Whether all tasks are completed (distinct from problemType). */
   isCompleted?: boolean;
+  /** Whether the job has at least one scheduled assignment. */
+  isPlanified?: boolean;
   isSelected?: boolean;
   /** Dim this card because another job is selected (spotlight pattern). */
   dim?: boolean;
   bufferLabel?: string;
+  /** JCF deadline priority tier: 0=Imperative, 1=Important, 2=Standard, 3=Flexible. */
+  deadlinePriority?: number;
   onClick?: (jobId: string) => void;
 }
 
-type JobStatus = 'late' | 'conflict' | 'completed' | null;
+type JobStatus = 'late' | 'conflict' | 'completed' | 'planified' | null;
 
 export const JobCard = memo(function JobCard({
   id,
@@ -33,7 +37,9 @@ export const JobCard = memo(function JobCard({
   batDeadline,
   problemType,
   isCompleted = false,
+  isPlanified = false,
   bufferLabel,
+  deadlinePriority,
   isSelected = false,
   dim = false,
   onClick,
@@ -45,12 +51,14 @@ export const JobCard = memo(function JobCard({
   const status: JobStatus =
     problemType === 'late' ? 'late' :
     problemType === 'conflict' ? 'conflict' :
-    isCompleted ? 'completed' : null;
+    isCompleted ? 'completed' :
+    isPlanified ? 'planified' : null;
 
   const accentClass = (() => {
     if (status === 'late') return 'border-l-red-500';
     if (status === 'conflict') return 'border-l-amber-500';
     if (status === 'completed') return 'border-l-emerald-500';
+    if (status === 'planified') return 'border-l-blue-500';
     return 'border-l-transparent';
   })();
 
@@ -66,12 +74,34 @@ export const JobCard = memo(function JobCard({
     if (status === 'late') return 'text-red-300';
     if (status === 'conflict') return 'text-amber-300';
     if (status === 'completed') return 'text-green-300';
+    if (status === 'planified') return 'text-blue-300';
     return 'text-zinc-500';
   })();
 
   const descColor = status === 'late' || status === 'conflict' ? 'text-zinc-100' : 'text-zinc-300';
 
   const showBuffer = bufferLabel && status !== 'completed';
+
+  const prioritySymbol = (() => {
+    if (isCompleted || deadlinePriority == null) return null;
+    switch (deadlinePriority) {
+      case 0: return '!';
+      case 1: return '+';
+      case 2: return '=';
+      case 3: return '-';
+      default: return null;
+    }
+  })();
+
+  const priorityColor = (() => {
+    switch (deadlinePriority) {
+      case 0: return 'text-red-400';
+      case 1: return 'text-orange-400';
+      case 2: return 'text-yellow-300';
+      case 3: return 'text-zinc-400';
+      default: return '';
+    }
+  })();
 
   return (
     <button
@@ -96,6 +126,11 @@ export const JobCard = memo(function JobCard({
             <div className="flex items-center gap-[4px] text-[10px] text-zinc-400">
               <Calendar className="w-[11px] h-[11px] text-zinc-500 shrink-0" />
               <span>{deadline}</span>
+              {prioritySymbol && (
+                <span className={`font-mono text-[12px] font-bold leading-none ${priorityColor}`}>
+                  {prioritySymbol}
+                </span>
+              )}
             </div>
           )}
           {batDeadline && (
