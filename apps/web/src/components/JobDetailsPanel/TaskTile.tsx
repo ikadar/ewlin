@@ -220,20 +220,20 @@ export const TaskTile = memo(function TaskTile({
     return `${hours}h${minutes.toString().padStart(2, '0')}`;
   };
 
-  // Theoretical duration (setup + run minutes) — used for unplaced tiles.
+  // Theoretical duration (setup + run minutes) and effective duration
+  // (sum of operator to - from). Shown in place of the scheduled date/time
+  // on placed tiles, since the date + time window is carried by operator rows.
   const theoMinutes = task.duration.setupMinutes + task.duration.runMinutes;
-
-  // Format scheduled datetime as "Di 15/12 07:00"
-  const formatScheduledTime = (isoString: string): string => {
-    const date = new Date(isoString);
-    const dayNames = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
-    const dayName = dayNames[date.getDay()];
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${dayName} ${day}/${month} ${hours}:${minutes}`;
-  };
+  const effMinutes: number | null = (() => {
+    if (!assignment?.operators?.length) return null;
+    let total = 0;
+    for (const op of assignment.operators) {
+      if (!op.from || !op.to) return null;
+      total += (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60000;
+    }
+    return Math.round(total);
+  })();
+  const hasEffDelta = effMinutes !== null && effMinutes !== theoMinutes;
 
   // Get display name (station name for internal tasks)
   const displayName = station?.name || 'Unknown';
@@ -330,7 +330,16 @@ export const TaskTile = memo(function TaskTile({
                 </>
               )}
             </div>
-            <span className="text-[11px] text-zinc-400 shrink-0 font-mono">{formatScheduledTime(assignment.scheduledStart)}</span>
+            <span className="text-[11px] shrink-0 font-mono">
+              {hasEffDelta ? (
+                <>
+                  <span className="text-zinc-600 line-through">{formatMinutes(theoMinutes)}</span>
+                  <span className="text-amber-400 font-semibold"> → {formatMinutes(effMinutes!)}</span>
+                </>
+              ) : (
+                <span className="text-zinc-400">{formatMinutes(theoMinutes)}</span>
+              )}
+            </span>
           </div>
           {operatorAssignments && operatorAssignments.length > 0 && (
             <div className="flex flex-col pt-0 pl-[11px] pr-[10px] pb-2 gap-[3px]">
