@@ -160,6 +160,59 @@
     font-size: 10px;
   }
 
+  /* Prompt output */
+  textarea#promptOutput {
+    width: 100%;
+    min-height: 180px;
+    max-height: 280px;
+    resize: vertical;
+    padding: 10px 12px;
+    background: var(--bg-base);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    line-height: 1.55;
+    outline: none;
+    white-space: pre;
+    overflow: auto;
+  }
+  textarea#promptOutput:focus {
+    border-color: rgba(59, 130, 246, 0.45);
+  }
+  .prompt-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  #copyPromptBtn {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms;
+    font-family: inherit;
+  }
+  #copyPromptBtn:hover {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.6);
+  }
+  #copyPromptBtn:active { transform: translateY(1px); }
+  #copyStatus {
+    font-size: 11px;
+    color: #86efac;
+    opacity: 0;
+    transition: opacity 140ms ease-out;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+  #copyStatus.visible { opacity: 1; }
+
   /* Derived value display */
   .derived {
     background: rgba(59, 130, 246, 0.06);
@@ -551,6 +604,16 @@
       from <code>apps/web/src/components/Tile/colorUtils.ts</code>. Base
       ratio is <code>80 px/h</code> (from <code>TimelineColumn.tsx</code>).
     </div>
+
+    <!-- Output prompt -->
+    <div class="control-group" style="margin-top:20px;">
+      <span class="label">Implementation prompt</span>
+      <textarea id="promptOutput" readonly spellcheck="false"></textarea>
+      <div class="prompt-actions">
+        <button id="copyPromptBtn" type="button">Copy to clipboard</button>
+        <span id="copyStatus"></span>
+      </div>
+    </div>
   </aside>
 
   <!-- ═══════════════ STAGE ═══════════════ -->
@@ -757,6 +820,76 @@
     document.getElementById('dLens').textContent = `${lpx.toFixed(0)} px/h`;
     document.getElementById('dWindow').textContent = `${win.toFixed(1)} min`;
     document.getElementById('dSmallest').textContent = `${smallestPx.toFixed(0)} px`;
+    updatePromptOutput();
+  }
+
+  function generatePrompt() {
+    const lpx = lensPxPerHour();
+    const win = lensWindowMinutes();
+    const smallestPx = (2 / 60) * lpx;
+    const modeLabel = state.mode === 'snap' ? 'snap to tile' : 'follow cursor';
+
+    return `# Timeline magnifying lens — implementation spec
+
+## Goal
+On tile hover in the schedule view, display a floating lens that
+re-renders the station column at a higher px/hour ratio, vertically
+centered on the hovered tile's midtime (snap) or on the cursor's Y
+position (follow). Tiles stay at legible size; the lens preserves
+temporal context by showing neighbors before/after the focal time.
+
+Keep orthogonal to the existing 500ms rich tooltip — the lens is for
+scanning/readability, the tooltip is for deep inspection.
+
+## Settings validated in the playground
+- Tracking mode:      ${modeLabel}
+- Time zoom:          ${state.zoom.toFixed(1)}×  (base 80 → lens ${lpx.toFixed(0)} px/h)
+- Lens dimensions:    ${state.lensWidth} × ${state.lensHeight} px
+- Visible window:     ${win.toFixed(1)} min
+- Smallest tile (2m): ${smallestPx.toFixed(0)} px high in the lens
+- Position:           ${state.position} of station column
+- Hover delay:        ${state.delay} ms
+- Connector line:     ${state.showConnector ? 'shown' : 'hidden'}
+- Only short tiles:   ${state.onlyTiny ? 'trigger only when height ≤ 20 px' : 'trigger on any tile'}
+
+## Time grid inside the lens (multi-tier)
+| Step   | Line opacity | Label style                 |
+| ------ | ------------ | --------------------------- |
+| 60 min | 0.09         | HH:MM, primary text         |
+| 30 min | 0.06         | HH:MM, muted                |
+| 15 min | 0.04         | HH:MM, tiny (8 px), dim     |
+| 5  min | 0.02         | HH:MM, tiny (8 px), dim     |
+A dedup Set ensures coarser tiers win when a minute belongs to several.
+
+## Interaction
+- snap: \`mouseenter\` tile → after delay, center lens on tile midtime
+- follow: \`mousemove\` on timeline → center lens on cursor's Y → minute
+- \`mouseleave\` station column → schedule hide (140 ms grace)
+- \`mouseenter\` on lens → cancel pending hide (bridge)
+- \`Esc\` → close immediately
+- In snap mode, the focal tile gets a \`lens-focus\` outline
+
+## Reference files
+- Playground:           playground-tile-zoom-loupe.html
+- Tile component:       apps/web/src/components/Tile/Tile.tsx
+- Palette (reuse):      apps/web/src/components/Tile/colorUtils.ts
+- Station container:    apps/web/src/components/StationColumns/StationColumn.tsx
+- Existing tooltip:     apps/web/src/hooks/useTooltipDelay.ts  (keep both)
+
+## Implementation notes
+- Portal the lens into a high-z container so it overlaps neighboring
+  columns cleanly.
+- Reuse PALETTE / state classes verbatim for 1:1 visual match with tiles.
+- Do NOT replace the tooltip; the two layers serve different intents.
+- The visible window is derived: \`lensHeight / (80 × zoom) × 60\`.
+  If min tile duration shrinks below 2 min in the future, either raise
+  zoom or clamp a min visual height (breaks strict temporal scaling —
+  flag explicitly in the UI if done).`;
+  }
+
+  function updatePromptOutput() {
+    const el = document.getElementById('promptOutput');
+    if (el) el.value = generatePrompt();
   }
 
   function getColumnsRect() {
@@ -1116,6 +1249,7 @@
       seg.querySelectorAll('label').forEach(lbl => {
         lbl.classList.toggle('active', lbl.querySelector('input').checked);
       });
+      updatePromptOutput();
       if (onChange) onChange();
     });
   }
@@ -1149,12 +1283,32 @@
       const el = document.getElementById(id);
       el.addEventListener('change', () => {
         state[stateKey] = el.checked;
+        updatePromptOutput();
         if (state.activeCol) renderLens(state.activeCol, state.centerTimeMin);
       });
     };
     bindCheck('hourMarkers', 'showHourMarkers');
     bindCheck('connector', 'showConnector');
     bindCheck('onlyTiny', 'onlyTiny');
+
+    // Copy prompt button
+    const copyBtn = document.getElementById('copyPromptBtn');
+    const copyStatus = document.getElementById('copyStatus');
+    copyBtn.addEventListener('click', async () => {
+      const text = generatePrompt();
+      try {
+        await navigator.clipboard.writeText(text);
+        copyStatus.textContent = 'Copied ✓';
+      } catch (err) {
+        // Fallback: select the textarea so user can manual-copy
+        const ta = document.getElementById('promptOutput');
+        ta.focus();
+        ta.select();
+        copyStatus.textContent = 'Selected — press ⌘C';
+      }
+      copyStatus.classList.add('visible');
+      setTimeout(() => copyStatus.classList.remove('visible'), 1800);
+    });
 
     // Esc to close
     document.addEventListener('keydown', (e) => {
