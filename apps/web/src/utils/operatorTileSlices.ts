@@ -19,15 +19,8 @@ export interface TileSlice {
   relayLabelBottom?: string;
 }
 
-/** Get the day schedule for an operator on a given date (checks exceptions first, then rotating schedule). */
+/** Get the day schedule for an operator on a given date (rotating schedule only — absences are handled separately). */
 export function getOperatorDaySchedule(operator: Operator, date: Date): DaySchedule {
-  if (operator.scheduleExceptions?.length) {
-    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const exception = operator.scheduleExceptions.find((e) => e.date === dateStr);
-    if (exception) {
-      return exception.schedule;
-    }
-  }
   const activeSchedule = getActiveScheduleForDate(
     operator.operatingSchedules,
     operator.scheduleRotationReferenceWeek,

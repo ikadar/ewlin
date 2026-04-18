@@ -29,6 +29,17 @@ export interface ConcurrentGroupPayload {
   effectiveProductivity: Record<string, number>;
 }
 
+/**
+ * A datetime-range absence (vacation, sick leave, appointment…).
+ * Endpoints are ISO 8601 naive local datetimes — e.g. `"2026-04-20T14:00:00"`.
+ * The Rust scheduler excludes any tick inside the range (inclusive on both sides).
+ */
+export interface AbsencePayload {
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+}
+
 export interface OperatorResponse {
   id: string;
   firstName: string;
@@ -37,7 +48,7 @@ export interface OperatorResponse {
   operatingSchedules: Array<Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>> | null;
   scheduleRotationReferenceWeek: number | null;
   scheduleNames: string[] | null;
-  scheduleExceptions: Array<{ date: string; type: string; schedule: unknown; reason: string | null }> | null;
+  absences: AbsencePayload[] | null;
   skills: OperatorSkillResponse[];
   concurrentGroups: ConcurrentGroupResponse[];
   createdAt: string;
@@ -51,7 +62,7 @@ export interface OperatorInput {
   operatingSchedules?: Array<Record<string, unknown>> | null;
   scheduleRotationReferenceWeek?: number | null;
   scheduleNames?: string[] | null;
-  scheduleExceptions?: unknown[] | null;
+  absences?: AbsencePayload[] | null;
   skills?: OperatorSkillResponse[] | null;
 }
 

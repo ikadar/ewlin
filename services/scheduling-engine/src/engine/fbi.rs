@@ -91,6 +91,7 @@ pub fn run_with_fbi(
         .map(|op| OperatorScheduleData {
             schedules: op.operating_schedules.clone(),
             reference_week: op.schedule_rotation_reference_week,
+            absences: op.absences.clone(),
         })
         .collect();
 

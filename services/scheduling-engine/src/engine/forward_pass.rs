@@ -2,16 +2,19 @@ use std::collections::HashMap;
 
 use chrono::{Datelike, NaiveDate};
 
-use crate::model::operator::OperatingSchedule;
+use crate::model::operator::{Absence, OperatingSchedule};
 use crate::model::schedule::{ComputedAssignment, OperatorAssignment};
 
 use super::grid::ScheduleGrid;
 
-/// Per-operator schedule data for rotation resolution.
+/// Per-operator schedule data for rotation resolution and availability computation.
 #[derive(Clone)]
 pub struct OperatorScheduleData {
     pub schedules: Option<Vec<OperatingSchedule>>,
     pub reference_week: Option<u32>,
+    /// Datetime-range absences. A tick falling within any range is marked
+    /// unavailable regardless of what the weekly schedule says.
+    pub absences: Vec<Absence>,
 }
 
 /// Station attributes needed during forward pass
@@ -234,7 +237,12 @@ impl OperatorAvailability {
     }
 
     /// Compute availability for a range of ticks.
-    /// Resolves rotating schedules per-tick using ISO week.
+    ///
+    /// Two-step model:
+    /// 1. Base availability from operating schedules (rotating, ISO-week-resolved,
+    ///    or default M-F 8:00–17:00 when no schedule is defined).
+    /// 2. Override: if any absence covers the tick's naive local datetime, the
+    ///    tick is marked unavailable regardless of step 1.
     fn compute_availability(
         &self,
         op_idx: usize,
@@ -248,36 +256,6 @@ impl OperatorAvailability {
             }
         };
 
-        let schedules = match &sched_data.schedules {
-            Some(s) if !s.is_empty() => s,
-            _ => {
-                // No schedule means always available (default work hours: M-F 8-17)
-                return (0..num_ticks)
-                    .map(|i| {
-                        let tick = start_tick + i;
-                        let total_minutes = tick as u64 * self.tick_minutes as u64;
-                        let day_minutes = total_minutes % (24 * 60);
-                        let days = total_minutes / (24 * 60);
-                        let date = self.start_date + chrono::Duration::days(days as i64);
-                        let weekday = date.weekday();
-                        // Default: Mon-Fri 8:00-17:00
-                        matches!(
-                            weekday,
-                            chrono::Weekday::Mon
-                                | chrono::Weekday::Tue
-                                | chrono::Weekday::Wed
-                                | chrono::Weekday::Thu
-                                | chrono::Weekday::Fri
-                        ) && day_minutes >= 8 * 60
-                            && day_minutes < 17 * 60
-                    })
-                    .collect();
-            }
-        };
-
-        let ref_week = sched_data.reference_week.unwrap_or(1);
-        let n = schedules.len();
-
         (0..num_ticks)
             .map(|i| {
                 let tick = start_tick + i;
@@ -287,25 +265,59 @@ impl OperatorAvailability {
                 let date = self.start_date + chrono::Duration::days(days as i64);
                 let weekday = date.weekday();
 
-                // Resolve active schedule for this tick's ISO week
-                let schedule = if n == 1 {
-                    &schedules[0]
-                } else {
-                    let iso_week = date.iso_week().week();
-                    let index = ((iso_week as i64 - ref_week as i64).rem_euclid(n as i64)) as usize;
-                    &schedules[index]
+                // Step 1: base availability from the operating schedule (or the
+                // default M-F 8-17 fallback when none is configured).
+                let base_available = match &sched_data.schedules {
+                    Some(schedules) if !schedules.is_empty() => {
+                        let schedule = if schedules.len() == 1 {
+                            &schedules[0]
+                        } else {
+                            let ref_week = sched_data.reference_week.unwrap_or(1);
+                            let iso_week = date.iso_week().week();
+                            let index = ((iso_week as i64 - ref_week as i64)
+                                .rem_euclid(schedules.len() as i64))
+                                as usize;
+                            &schedules[index]
+                        };
+                        if let Some(day_sched) = schedule.day_schedule(weekday) {
+                            day_sched.slots.iter().any(|slot| {
+                                let slot_start = slot.start_minutes();
+                                let slot_end = slot.end_minutes();
+                                day_minutes >= slot_start && day_minutes < slot_end
+                            })
+                        } else {
+                            false
+                        }
+                    }
+                    _ => {
+                        // Default M-F 8:00-17:00 when no schedule is defined.
+                        matches!(
+                            weekday,
+                            chrono::Weekday::Mon
+                                | chrono::Weekday::Tue
+                                | chrono::Weekday::Wed
+                                | chrono::Weekday::Thu
+                                | chrono::Weekday::Fri
+                        ) && day_minutes >= 8 * 60
+                            && day_minutes < 17 * 60
+                    }
                 };
 
-                if let Some(day_sched) = schedule.day_schedule(weekday) {
-                    // Check if this tick falls within any slot
-                    day_sched.slots.iter().any(|slot| {
-                        let slot_start = slot.start_minutes();
-                        let slot_end = slot.end_minutes();
-                        day_minutes >= slot_start && day_minutes < slot_end
-                    })
-                } else {
-                    false
+                if !base_available {
+                    return false;
                 }
+
+                // Step 2: absence override.
+                if sched_data.absences.is_empty() {
+                    return true;
+                }
+                let hour = day_minutes / 60;
+                let minute = day_minutes % 60;
+                let tick_dt = match date.and_hms_opt(hour, minute, 0) {
+                    Some(dt) => dt,
+                    None => return base_available,
+                };
+                !sched_data.absences.iter().any(|abs| abs.covers(tick_dt))
             })
             .collect()
     }
@@ -1735,7 +1747,11 @@ mod selection_tests {
     fn always_available(num_ops: usize, num_ticks: usize) -> OperatorAvailability {
         // Force all-true by giving each op a schedule with one big slot covering all ticks.
         let schedules: Vec<OperatorScheduleData> = (0..num_ops)
-            .map(|_| OperatorScheduleData { schedules: None, reference_week: None })
+            .map(|_| OperatorScheduleData {
+                schedules: None,
+                reference_week: None,
+                absences: Vec::new(),
+            })
             .collect();
         let mut avail = OperatorAvailability::new(
             num_ops,
@@ -2119,5 +2135,132 @@ mod peremption_tests {
         assert!(triggered);
         assert_eq!(a.eat, 0, "re-setup needed after weekend");
         assert_eq!(a.art, 6 + 1, "run progress preserved, setup_ticks re-added");
+    }
+}
+
+#[cfg(test)]
+mod availability_tests {
+    //! Tests for `OperatorAvailability::compute_availability` absence handling.
+    //!
+    //! Grid: 15-min ticks, start_date = Monday 2026-04-20.
+    //! Base schedule used throughout: Mon-Fri 08:00-17:00.
+    //! Ticks of interest (Monday): 32 = 08:00, 56 = 14:00, 68 = 17:00,
+    //! 128 = Tuesday 08:00, 224 = Wednesday 08:00.
+
+    use super::*;
+    use crate::model::operator::{Absence, DaySchedule, OperatingSchedule, TimeSlot};
+    use chrono::{NaiveDate, NaiveDateTime};
+
+    fn mf_8_to_17() -> OperatingSchedule {
+        let day = Some(DaySchedule {
+            slots: vec![TimeSlot { start: "08:00".into(), end: "17:00".into() }],
+        });
+        OperatingSchedule {
+            monday: day.clone(),
+            tuesday: day.clone(),
+            wednesday: day.clone(),
+            thursday: day.clone(),
+            friday: day,
+            saturday: None,
+            sunday: None,
+        }
+    }
+
+    fn dt(s: &str) -> NaiveDateTime {
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").unwrap()
+    }
+
+    fn build_availability(absences: Vec<Absence>, num_ticks: usize) -> OperatorAvailability {
+        OperatorAvailability::new(
+            1,
+            num_ticks,
+            15,
+            NaiveDate::from_ymd_opt(2026, 4, 20).unwrap(),
+            vec![OperatorScheduleData {
+                schedules: Some(vec![mf_8_to_17()]),
+                reference_week: None,
+                absences,
+            }],
+        )
+    }
+
+    #[test]
+    fn no_absence_matches_schedule() {
+        let a = build_availability(vec![], 100);
+        assert!(!a.is_available(0, 31), "Monday 07:45 outside schedule");
+        assert!(a.is_available(0, 32), "Monday 08:00 in schedule");
+        assert!(a.is_available(0, 56), "Monday 14:00 in schedule");
+        assert!(!a.is_available(0, 68), "Monday 17:00 end-exclusive");
+    }
+
+    #[test]
+    fn absence_blocks_ticks_inside_range() {
+        // Partial-day absence: Monday 14:00–17:00.
+        let absences = vec![Absence {
+            start_at: dt("2026-04-20T14:00:00"),
+            end_at: dt("2026-04-20T17:00:00"),
+            reason: Some("RDV".into()),
+        }];
+        let a = build_availability(absences, 100);
+
+        assert!(a.is_available(0, 32), "Monday 08:00 — before absence, still available");
+        assert!(a.is_available(0, 55), "Monday 13:45 — 15 min before absence");
+        assert!(!a.is_available(0, 56), "Monday 14:00 — absence start (inclusive)");
+        assert!(!a.is_available(0, 60), "Monday 15:00 — inside absence");
+        // Tick 67 = 16:45 is covered by the absence (still inside 14:00-17:00).
+        assert!(!a.is_available(0, 67), "Monday 16:45 — inside absence");
+    }
+
+    #[test]
+    fn absence_outside_schedule_has_no_extra_effect() {
+        // Absence overlaps a non-working period (Monday 18:00-20:00).
+        // Schedule already marks these ticks unavailable; the absence check
+        // doesn't promote them.
+        let absences = vec![Absence {
+            start_at: dt("2026-04-20T18:00:00"),
+            end_at: dt("2026-04-20T20:00:00"),
+            reason: None,
+        }];
+        let a = build_availability(absences, 100);
+        assert!(!a.is_available(0, 72), "Monday 18:00 — outside schedule");
+    }
+
+    #[test]
+    fn multi_day_absence_spans_whole_range() {
+        // Monday 00:00 through Wednesday 23:59:59 — covers ALL three working days.
+        let absences = vec![Absence {
+            start_at: dt("2026-04-20T00:00:00"),
+            end_at: dt("2026-04-22T23:59:59"),
+            reason: Some("Congés".into()),
+        }];
+        // Horizon long enough to span Thursday too.
+        let a = build_availability(absences, 400);
+
+        assert!(!a.is_available(0, 32), "Monday 08:00 — covered");
+        assert!(!a.is_available(0, 128), "Tuesday 08:00 — covered");
+        assert!(!a.is_available(0, 224), "Wednesday 08:00 — covered");
+        assert!(a.is_available(0, 320), "Thursday 08:00 — outside absence range");
+    }
+
+    #[test]
+    fn multiple_absences_are_union_of_coverage() {
+        let absences = vec![
+            Absence {
+                start_at: dt("2026-04-20T10:00:00"),
+                end_at: dt("2026-04-20T11:00:00"),
+                reason: None,
+            },
+            Absence {
+                start_at: dt("2026-04-20T14:00:00"),
+                end_at: dt("2026-04-20T15:00:00"),
+                reason: None,
+            },
+        ];
+        let a = build_availability(absences, 100);
+
+        assert!(!a.is_available(0, 40), "Monday 10:00 — first absence");
+        assert!(a.is_available(0, 48), "Monday 12:00 — between absences");
+        assert!(!a.is_available(0, 56), "Monday 14:00 — second absence");
+        assert!(a.is_available(0, 64), "Monday 16:00 — after both absences");
     }
 }

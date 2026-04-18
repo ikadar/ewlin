@@ -153,6 +153,7 @@ pub fn compute_last_values(
         .map(|op| OperatorScheduleData {
             schedules: op.operating_schedules.clone(),
             reference_week: op.schedule_rotation_reference_week,
+            absences: op.absences.clone(),
         })
         .collect();
 
@@ -308,6 +309,7 @@ pub fn compute_last_values_with_placements(
         .map(|op| OperatorScheduleData {
             schedules: op.operating_schedules.clone(),
             reference_week: op.schedule_rotation_reference_week,
+            absences: op.absences.clone(),
         })
         .collect();
 

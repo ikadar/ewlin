@@ -17,7 +17,7 @@ import {
   useReplaceSkillsMutation,
   useReplaceConcurrentGroupsMutation,
 } from '../store/api/operatorApi';
-import type { OperatorResponse, OperatorSkillResponse, ConcurrentGroupPayload } from '../store/api/operatorApi';
+import type { OperatorResponse, OperatorSkillResponse, ConcurrentGroupPayload, AbsencePayload } from '../store/api/operatorApi';
 import { useGetStationsQuery } from '../store/api/stationApi';
 import type { StationResponse } from '../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
@@ -50,6 +50,23 @@ const INPUT_CLASS = 'w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base bor
 
 function snap(v: number): number {
   return Math.round(v * 20) / 20;
+}
+
+/** Format a Date as HTML `datetime-local` value: "YYYY-MM-DDTHH:MM". */
+function formatForDatetimeLocal(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+/** Default range for a fresh absence row: today 00:00 → today 23:59 (full day). */
+function todayFullDayRange(): { startAt: string; endAt: string } {
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return { startAt: `${date}T00:00`, endAt: `${date}T23:59` };
 }
 
 /** Build a map of stationId -> proficiency from the skills array */
@@ -503,7 +520,7 @@ interface OperatorFormModalProps {
     operatingSchedules: OperatingSchedule[];
     scheduleRotationReferenceWeek: number | null;
     scheduleNames: string[];
-    scheduleExceptions: ScheduleExceptionInput[];
+    absences: AbsencePayload[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
   }) => Promise<void>;
@@ -548,13 +565,16 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
   );
   const [activeScheduleIndex, setActiveScheduleIndex] = useState(0);
 
-  const [absences, setAbsences] = useState<{ id: string; start: string; end: string; reason: string }[]>(() => {
-    if (initial?.scheduleExceptions) {
-      return initial.scheduleExceptions.map((ex, i) => ({
+  // Form rows use HTML `datetime-local` format ("YYYY-MM-DDTHH:MM") — the
+  // input trims off seconds, so we strip them on load from the API payload
+  // (which is canonical "YYYY-MM-DDTHH:MM:SS"). Seconds are re-added by PHP.
+  const [absences, setAbsences] = useState<{ id: string; startAt: string; endAt: string; reason: string }[]>(() => {
+    if (initial?.absences) {
+      return initial.absences.map((ab, i) => ({
         id: String(i),
-        start: (ex as { date: string }).date ? (ex as { date: string }).date + 'T08:00' : '',
-        end: (ex as { date: string }).date ? (ex as { date: string }).date + 'T17:00' : '',
-        reason: (ex as { reason?: string | null }).reason ?? '',
+        startAt: ab.startAt.slice(0, 16),
+        endAt: ab.endAt.slice(0, 16),
+        reason: ab.reason ?? '',
       }));
     }
     return [];
@@ -601,7 +621,18 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
     return true;
   }, [concurrentGroups]);
 
-  const canSave = firstName.trim() !== '' && lastName.trim() !== '' && concurrentGroupsValid;
+  // Absences are valid only if every filled row has startAt <= endAt.
+  // Empty rows (both fields blank) are tolerated and filtered out on submit.
+  const absencesValid = useMemo(() => {
+    for (const a of absences) {
+      if (!a.startAt && !a.endAt) continue;
+      if (!a.startAt || !a.endAt) return false;
+      if (a.startAt > a.endAt) return false;
+    }
+    return true;
+  }, [absences]);
+
+  const canSave = firstName.trim() !== '' && lastName.trim() !== '' && concurrentGroupsValid && absencesValid;
 
   const handleProficiencyCommit = useCallback((stationId: string, value: number) => {
     setSkillMap((prev) => {
@@ -656,12 +687,13 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
       operatingSchedules: schedules,
       scheduleRotationReferenceWeek: schedules.length > 1 ? scheduleRotationReferenceWeek : null,
       scheduleNames: schedules.length > 1 ? scheduleNames : [],
-      scheduleExceptions: absences.filter(a => a.start && a.end).map(a => ({
-        start: a.start,
-        end: a.end,
-        type: 'ABSENCE',
-        reason: a.reason || null,
-      })),
+      absences: absences
+        .filter(a => a.startAt && a.endAt && a.startAt <= a.endAt)
+        .map(a => ({
+          startAt: a.startAt,
+          endAt: a.endAt,
+          reason: a.reason.trim() || null,
+        })),
       skills,
       concurrentGroups: concurrentGroupsPayload,
     });
@@ -823,60 +855,69 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
             </p>
             {absences.length > 0 && (
               <div className="flex flex-col gap-3 mb-3">
-                {absences.map((absence, idx) => (
-                  <div key={absence.id} className="flex flex-col gap-1.5 p-3 bg-flux-base rounded border border-flux-border">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-flux-text-muted w-8">Du</label>
-                      <input
-                        type="datetime-local"
-                        value={absence.start}
-                        onChange={(e) => {
-                          const next = [...absences];
-                          next[idx] = { ...next[idx], start: e.target.value };
-                          setAbsences(next);
-                        }}
-                        className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-                      />
-                      <label className="text-xs text-flux-text-muted w-8 text-center">au</label>
-                      <input
-                        type="datetime-local"
-                        value={absence.end}
-                        onChange={(e) => {
-                          const next = [...absences];
-                          next[idx] = { ...next[idx], end: e.target.value };
-                          setAbsences(next);
-                        }}
-                        className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setAbsences(absences.filter((_, i) => i !== idx))}
-                        className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none px-1"
-                      >
-                        ×
-                      </button>
+                {absences.map((absence, idx) => {
+                  const isInvalid = !!absence.startAt && !!absence.endAt && absence.startAt > absence.endAt;
+                  return (
+                    <div key={absence.id} className="flex flex-col gap-1.5 p-3 bg-flux-base rounded border border-flux-border">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-flux-text-muted w-8">Du</label>
+                        <input
+                          type="datetime-local"
+                          value={absence.startAt}
+                          onChange={(e) => {
+                            const next = [...absences];
+                            next[idx] = { ...next[idx], startAt: e.target.value };
+                            setAbsences(next);
+                          }}
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                        />
+                        <label className="text-xs text-flux-text-muted w-8 text-center">au</label>
+                        <input
+                          type="datetime-local"
+                          value={absence.endAt}
+                          onChange={(e) => {
+                            const next = [...absences];
+                            next[idx] = { ...next[idx], endAt: e.target.value };
+                            setAbsences(next);
+                          }}
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setAbsences(absences.filter((_, i) => i !== idx))}
+                          className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none px-1"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-flux-text-muted w-8">Motif</label>
+                        <input
+                          type="text"
+                          value={absence.reason}
+                          onChange={(e) => {
+                            const next = [...absences];
+                            next[idx] = { ...next[idx], reason: e.target.value };
+                            setAbsences(next);
+                          }}
+                          placeholder="Optionnel"
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                        />
+                      </div>
+                      {isInvalid && (
+                        <p className="text-[11px] text-red-400 pl-10">La date de début doit être antérieure ou égale à la date de fin.</p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-flux-text-muted w-8">Motif</label>
-                      <input
-                        type="text"
-                        value={absence.reason}
-                        onChange={(e) => {
-                          const next = [...absences];
-                          next[idx] = { ...next[idx], reason: e.target.value };
-                          setAbsences(next);
-                        }}
-                        placeholder="Optionnel"
-                        className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <button
               type="button"
-              onClick={() => setAbsences([...absences, { id: String(Date.now()), start: '', end: '', reason: '' }])}
+              onClick={() => {
+                const range = todayFullDayRange();
+                setAbsences([...absences, { id: String(Date.now()), startAt: range.startAt, endAt: range.endAt, reason: '' }]);
+              }}
               className="w-full py-2 text-xs text-flux-text-muted border border-dashed border-flux-border-light rounded hover:border-blue-500 hover:text-blue-500 transition-colors"
             >
               + Ajouter une absence
@@ -990,7 +1031,7 @@ export default function OperatorsPage() {
     operatingSchedules: OperatingSchedule[];
     scheduleRotationReferenceWeek: number | null;
     scheduleNames: string[];
-    scheduleExceptions: unknown[];
+    absences: AbsencePayload[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
   }) => {
@@ -1001,7 +1042,7 @@ export default function OperatorsPage() {
       operatingSchedules: data.operatingSchedules as unknown as Array<Record<string, unknown>>,
       scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
       scheduleNames: data.scheduleNames.length > 0 ? data.scheduleNames : null,
-      scheduleExceptions: data.scheduleExceptions,
+      absences: data.absences,
       skills: data.skills,
     }).unwrap();
     if (data.concurrentGroups.length > 0) {
@@ -1018,7 +1059,7 @@ export default function OperatorsPage() {
     operatingSchedules: OperatingSchedule[];
     scheduleRotationReferenceWeek: number | null;
     scheduleNames: string[];
-    scheduleExceptions: unknown[];
+    absences: AbsencePayload[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
   }) => {
@@ -1032,7 +1073,7 @@ export default function OperatorsPage() {
         operatingSchedules: data.operatingSchedules as unknown as Array<Record<string, unknown>>,
         scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
         scheduleNames: data.scheduleNames.length > 0 ? data.scheduleNames : null,
-        scheduleExceptions: data.scheduleExceptions,
+        absences: data.absences,
       },
     }).unwrap();
     // Skills must be saved BEFORE concurrent groups: the backend cascade
