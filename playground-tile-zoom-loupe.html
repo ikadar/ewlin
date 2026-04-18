@@ -854,10 +854,10 @@
     if (state.showHourMarkers) {
       const bodyH = parseFloat(body.style.height);
       const tiers = [
-        { step: 60, lineOpacity: 0.09, label: true,  labelStrong: true  },  // hour
-        { step: 30, lineOpacity: 0.06, label: true,  labelStrong: false },  // half
-        { step: 15, lineOpacity: 0.04, label: true,  labelStrong: false, tiny: true },  // quarter
-        { step:  5, lineOpacity: 0.02, label: false                    },   // 5-min
+        { step: 60, lineOpacity: 0.09, label: true,  labelStrong: true  },                  // hour
+        { step: 30, lineOpacity: 0.06, label: true,  labelStrong: false },                  // half
+        { step: 15, lineOpacity: 0.04, label: true,  labelStrong: false, tiny: true },       // quarter
+        { step:  5, lineOpacity: 0.02, label: true,  labelStrong: false, tiny: true },       // 5-min
       ];
       const drawnMinutes = new Set();
       tiers.forEach(tier => {
