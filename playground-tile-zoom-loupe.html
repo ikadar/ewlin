@@ -365,27 +365,6 @@
     z-index: 3;
     pointer-events: none;
   }
-  .time-lens-center-line {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: rgba(147, 197, 253, 0.25);
-    pointer-events: none;
-    z-index: 4;
-  }
-  .time-lens-center-label {
-    position: absolute;
-    right: 6px;
-    font-size: 9px;
-    color: #93c5fd;
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-    transform: translateY(-50%);
-    z-index: 5;
-    pointer-events: none;
-    background: var(--bg-col);
-    padding: 0 3px;
-  }
   .time-lens-edge-fade {
     position: absolute;
     left: 0;
@@ -499,14 +478,14 @@
     <div class="control-group">
       <div class="slider-row">
         <span class="label" style="margin:0;">Time zoom</span>
-        <span class="val" id="zoomVal">4.0×</span>
+        <span class="val" id="zoomVal">9.5×</span>
       </div>
-      <input type="range" id="zoom" min="2" max="8" step="0.5" value="4" />
+      <input type="range" id="zoom" min="2" max="12" step="0.5" value="9.5" />
       <div class="derived" id="derived" style="margin-top:10px;">
         <div class="line"><span class="k">base</span><span class="v">80 px/h</span></div>
-        <div class="line"><span class="k">lens</span><span class="v" id="dLens">320 px/h</span></div>
-        <div class="line"><span class="k">visible window</span><span class="v" id="dWindow">45 min</span></div>
-        <div class="line"><span class="k">5-min tile</span><span class="v" id="dFive">27 px</span></div>
+        <div class="line"><span class="k">lens</span><span class="v" id="dLens">760 px/h</span></div>
+        <div class="line"><span class="k">visible window</span><span class="v" id="dWindow">24 min</span></div>
+        <div class="line"><span class="k">2-min tile</span><span class="v" id="dSmallest">25 px</span></div>
       </div>
     </div>
 
@@ -520,9 +499,9 @@
 
       <div class="slider-row" style="margin-top:14px;">
         <span class="label" style="margin:0;">Lens height</span>
-        <span class="val" id="heightVal">240 px</span>
+        <span class="val" id="heightVal">300 px</span>
       </div>
-      <input type="range" id="height" min="140" max="380" step="10" value="240" />
+      <input type="range" id="height" min="140" max="420" step="10" value="300" />
     </div>
 
     <!-- Position -->
@@ -546,11 +525,7 @@
       <span class="label">Options</span>
       <label class="check-row">
         <input type="checkbox" id="hourMarkers" checked />
-        <span>Show hour markers inside lens</span>
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="centerLine" checked />
-        <span>Show center-time indicator</span>
+        <span>Show time grid (hours, 15-min, 5-min)</span>
       </label>
       <label class="check-row">
         <input type="checkbox" id="connector" />
@@ -750,12 +725,11 @@
   // ══════════════════════════════════════════════════════════════
   const state = {
     mode: 'snap',            // snap | follow
-    zoom: 4,                 // × multiplier on 80 px/h
+    zoom: 9.5,               // × multiplier on 80 px/h (default targets ~25 px / 2-min tile)
     lensWidth: 240,
-    lensHeight: 240,
+    lensHeight: 300,
     position: 'right',       // right | left | overlay
     showHourMarkers: true,
-    showCenterLine: true,
     showConnector: false,
     onlyTiny: false,
     delay: 80,
@@ -779,10 +753,10 @@
   function updateDerived() {
     const lpx = lensPxPerHour();
     const win = lensWindowMinutes();
-    const fivePx = (5 / 60) * lpx;
+    const smallestPx = (2 / 60) * lpx;
     document.getElementById('dLens').textContent = `${lpx.toFixed(0)} px/h`;
     document.getElementById('dWindow').textContent = `${win.toFixed(1)} min`;
-    document.getElementById('dFive').textContent = `${fivePx.toFixed(0)} px`;
+    document.getElementById('dSmallest').textContent = `${smallestPx.toFixed(0)} px`;
   }
 
   function getColumnsRect() {
@@ -874,53 +848,47 @@
     body.style.height = `${state.lensHeight - 28}px`; // minus header
     lens.appendChild(body);
 
-    // Hour markers inside the body
+    // Multi-tier time grid inside the body.
+    // Tiers (coarsest → finest), each added on top of the previous so a
+    // hour mark also has the 30/15/5 styling suppressed below it.
     if (state.showHourMarkers) {
-      const firstHour = Math.ceil(startMin / 60) * 60;
-      for (let m = firstHour; m <= endMin; m += 60) {
-        const y = ((m - startMin) / 60) * lpx;
-        if (y < 0 || y > parseFloat(body.style.height)) continue;
-
-        const line = document.createElement('div');
-        line.className = 'time-lens-hour-line';
-        line.style.top = `${y}px`;
-        body.appendChild(line);
-
-        const lbl = document.createElement('div');
-        lbl.className = 'time-lens-hour-label';
-        lbl.style.top = `${y}px`;
-        lbl.textContent = formatHour(DAY_START_MIN + m);
-        body.appendChild(lbl);
-      }
-
-      // Also render half-hour ticks for a denser grid
-      const firstHalf = Math.ceil(startMin / 30) * 30;
-      for (let m = firstHalf; m <= endMin; m += 30) {
-        if (m % 60 === 0) continue; // already drawn
-        const y = ((m - startMin) / 60) * lpx;
-        if (y < 0 || y > parseFloat(body.style.height)) continue;
-        const line = document.createElement('div');
-        line.className = 'time-lens-hour-line';
-        line.style.top = `${y}px`;
-        line.style.background = 'rgba(255,255,255,0.025)';
-        body.appendChild(line);
-      }
-    }
-
-    // Center line at the focal time
-    if (state.showCenterLine) {
       const bodyH = parseFloat(body.style.height);
-      const centerY = bodyH / 2;
-      const line = document.createElement('div');
-      line.className = 'time-lens-center-line';
-      line.style.top = `${centerY}px`;
-      body.appendChild(line);
+      const tiers = [
+        { step: 60, lineOpacity: 0.09, label: true,  labelStrong: true  },  // hour
+        { step: 30, lineOpacity: 0.06, label: true,  labelStrong: false },  // half
+        { step: 15, lineOpacity: 0.04, label: true,  labelStrong: false, tiny: true },  // quarter
+        { step:  5, lineOpacity: 0.02, label: false                    },   // 5-min
+      ];
+      const drawnMinutes = new Set();
+      tiers.forEach(tier => {
+        const first = Math.ceil(startMin / tier.step) * tier.step;
+        for (let m = first; m <= endMin; m += tier.step) {
+          if (drawnMinutes.has(m)) continue;
+          drawnMinutes.add(m);
+          const y = ((m - startMin) / 60) * lpx;
+          if (y < 0 || y > bodyH) continue;
 
-      const lbl = document.createElement('div');
-      lbl.className = 'time-lens-center-label';
-      lbl.style.top = `${centerY}px`;
-      lbl.textContent = formatHour(DAY_START_MIN + centerMin);
-      body.appendChild(lbl);
+          const line = document.createElement('div');
+          line.className = 'time-lens-hour-line';
+          line.style.top = `${y}px`;
+          line.style.background = `rgba(255,255,255,${tier.lineOpacity})`;
+          body.appendChild(line);
+
+          if (tier.label) {
+            const lbl = document.createElement('div');
+            lbl.className = 'time-lens-hour-label';
+            lbl.style.top = `${y}px`;
+            lbl.textContent = formatHour(DAY_START_MIN + m);
+            if (tier.tiny) {
+              lbl.style.fontSize = '8px';
+              lbl.style.color = 'var(--text-dim)';
+            } else if (!tier.labelStrong) {
+              lbl.style.color = 'var(--text-dim)';
+            }
+            body.appendChild(lbl);
+          }
+        }
+      });
     }
 
     // Tiles visible in the window
@@ -1185,7 +1153,6 @@
       });
     };
     bindCheck('hourMarkers', 'showHourMarkers');
-    bindCheck('centerLine', 'showCenterLine');
     bindCheck('connector', 'showConnector');
     bindCheck('onlyTiny', 'onlyTiny');
 
