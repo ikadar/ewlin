@@ -1910,6 +1910,7 @@ function AppContent() {
           onFuseTask={handlePanelFuseTask}
           allJobs={snapshot.jobs}
           onSelectJob={setSelectedJobId}
+          snapshotOperators={snapshot.operators}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 flex overflow-hidden">
