@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scénarios V3 — Bande fine + FAB</title>
+<style>
+  /* ========== Base (aligned with apps/web) ========== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 13px; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: rgb(15, 15, 15);
+    color: rgb(245, 245, 245);
+    height: 100vh;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  input, textarea { font: inherit; color: inherit; }
+  kbd {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    padding: 2px 6px;
+    background: rgb(26, 26, 26);
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 4px;
+    color: rgb(161, 161, 161);
+  }
+
+  /* ========== App shell ========== */
+  .app { display: flex; flex-direction: column; height: 100vh; position: relative; }
+
+  /* ========== Thin top band (scenario mode only) ========== */
+  .scenario-band {
+    height: 4px; flex-shrink: 0;
+    background: var(--scope-accent, transparent);
+    transition: background 0.2s, height 0.2s;
+  }
+  .scenario-band.prod { height: 0; }
+
+  /* ========== Ambient viewport halo (scenario mode only) ========== */
+  .halo-top, .halo-bottom, .halo-left, .halo-right {
+    position: fixed; pointer-events: none; z-index: 30;
+    transition: opacity 0.25s;
+    opacity: 0;
+  }
+  .halo-top    { top: 0; left: 0; right: 0; height: 60px;
+                 background: linear-gradient(180deg, var(--scope-accent-rgb, transparent) 0%, transparent 100%); }
+  .halo-bottom { bottom: 0; left: 0; right: 0; height: 80px;
+                 background: linear-gradient(0deg, var(--scope-accent-rgb, transparent) 0%, transparent 100%); }
+  .halo-left   { top: 0; bottom: 0; left: 0; width: 50px;
+                 background: linear-gradient(90deg, var(--scope-accent-rgb, transparent) 0%, transparent 100%); }
+  .halo-right  { top: 0; bottom: 0; right: 0; width: 50px;
+                 background: linear-gradient(270deg, var(--scope-accent-rgb, transparent) 0%, transparent 100%); }
+  body.scenario-mode .halo-top,
+  body.scenario-mode .halo-bottom,
+  body.scenario-mode .halo-left,
+  body.scenario-mode .halo-right { opacity: 0.08; }
+
+  /* Scope palettes */
+  :root {
+    --scope-accent: rgb(82, 82, 91);
+    --scope-accent-rgb: rgba(82, 82, 91, 1);
+    --scope-accent-dim: rgb(39, 39, 42);
+    --scope-label: rgb(161, 161, 161);
+  }
+  .scope-blue {
+    --scope-accent: rgb(59, 130, 246);
+    --scope-accent-rgb: rgba(59, 130, 246, 1);
+    --scope-accent-dim: rgb(23, 37, 84);
+    --scope-label: rgb(147, 197, 253);
+  }
+  .scope-emerald {
+    --scope-accent: rgb(16, 185, 129);
+    --scope-accent-rgb: rgba(16, 185, 129, 1);
+    --scope-accent-dim: rgb(6, 78, 59);
+    --scope-label: rgb(110, 231, 183);
+  }
+  .scope-purple {
+    --scope-accent: rgb(168, 85, 247);
+    --scope-accent-rgb: rgba(168, 85, 247, 1);
+    --scope-accent-dim: rgb(59, 7, 100);
+    --scope-label: rgb(216, 180, 254);
+  }
+  .scope-amber {
+    --scope-accent: rgb(245, 158, 11);
+    --scope-accent-rgb: rgba(245, 158, 11, 1);
+    --scope-accent-dim: rgb(69, 26, 3);
+    --scope-label: rgb(252, 211, 77);
+  }
+
+  /* ========== Flux toolbar (real app mirror) ========== */
+  .flux-toolbar {
+    border-bottom: 1px solid rgb(42, 42, 42);
+    background: rgb(36, 36, 36);
+    padding: 14px 22px;
+    flex-shrink: 0;
+  }
+  .flux-title-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .flux-title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .flux-newjob {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px;
+    background: rgb(37, 99, 235);
+    color: #fff; font-weight: 500;
+    border-radius: 4px; border: 1px solid rgb(37, 99, 235);
+    font-size: 13px;
+  }
+  .flux-newjob:hover { background: rgb(29, 78, 216); }
+  .flux-search { position: relative; }
+  .flux-search input {
+    width: 100%;
+    padding: 7px 12px 7px 34px;
+    background: rgb(44, 44, 44);
+    border: 1px solid rgb(42, 42, 42);
+    border-radius: 6px; outline: 0;
+    font-size: 13px;
+  }
+  .flux-search input::placeholder { color: rgb(128, 128, 128); }
+  .flux-search .icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: rgb(161, 161, 161); font-size: 14px;
+  }
+
+  /* ========== Flux tabs ========== */
+  .flux-tabs {
+    display: flex; align-items: flex-end;
+    padding: 0 14px;
+    background: rgb(36, 36, 36);
+    border-bottom: 1px solid rgb(42, 42, 42);
+    flex-shrink: 0;
+  }
+  .flux-tab {
+    padding: 8px 14px;
+    font-size: 12px; font-weight: 500;
+    color: rgb(209, 209, 209);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .flux-tab.active {
+    color: #fff;
+    border-bottom-color: rgb(59, 130, 246);
+  }
+  .flux-tab:hover:not(.active) { color: #fff; background: rgba(44,44,44,0.5); }
+  .flux-tab .count {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; color: rgb(128, 128, 128);
+  }
+  .flux-tab.active .count { color: rgb(161, 161, 161); }
+
+  /* ========== Flux content ========== */
+  .flux-content {
+    flex: 1; overflow: auto;
+    padding: 16px;
+    background: rgb(15, 15, 15);
+  }
+  .flux-table-wrap {
+    background: rgb(36, 36, 36);
+    border: 1px solid rgb(42, 42, 42);
+    border-radius: 8px; overflow: hidden;
+  }
+  .flux-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .flux-table thead th {
+    text-align: left; padding: 10px 14px;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: rgb(128, 128, 128); font-weight: 600;
+    background: rgb(26, 26, 26);
+    border-bottom: 1px solid rgb(42, 42, 42);
+  }
+  .flux-table tbody td {
+    padding: 10px 14px; color: rgb(209, 209, 209);
+    border-bottom: 1px solid rgb(26, 26, 26);
+  }
+  .flux-table tbody tr:hover td { background: rgba(44, 44, 44, 0.5); }
+  .flux-prio {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    padding: 2px 7px; border-radius: 4px;
+  }
+  .flux-prio.imp { background: rgba(248, 113, 113, 0.14); color: rgb(252, 165, 165); }
+  .flux-prio.urg { background: rgba(251, 146, 60, 0.14); color: rgb(253, 186, 116); }
+  .flux-prio.norm { background: rgba(161, 161, 170, 0.12); color: rgb(209, 209, 209); }
+  .flux-prio.low { background: rgba(82, 82, 91, 0.2); color: rgb(161, 161, 161); }
+  .flux-jobid {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    color: rgb(148, 163, 184); font-size: 11.5px;
+  }
+  .flux-dates {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; color: rgb(161, 161, 161);
+  }
+
+  /* ========== FAB (bottom-right scenario button) ========== */
+  .fab-wrap {
+    position: fixed;
+    bottom: 18px; right: 18px;
+    z-index: 80;
+    display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 10px;
+  }
+  .fab {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 8px 12px 8px 10px;
+    background: rgb(26, 26, 26);
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 999px;
+    color: rgb(209, 209, 209);
+    font-size: 12px; font-weight: 500;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    transition: all 0.15s;
+    cursor: pointer;
+    max-width: 320px;
+  }
+  .fab:hover { background: rgb(36, 36, 36); border-color: rgb(82, 82, 91); }
+  .fab.scenario {
+    background: var(--scope-accent-dim);
+    border-color: var(--scope-accent);
+    color: var(--scope-label);
+    padding: 9px 14px 9px 12px;
+    font-weight: 600;
+  }
+  .fab.scenario:hover {
+    background: var(--scope-accent);
+    color: #fff;
+  }
+  .fab .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--scope-accent);
+    flex-shrink: 0;
+  }
+  .fab.scenario .dot { background: rgba(255, 255, 255, 0.8); }
+  .fab .label-small {
+    font-size: 9.5px;
+    text-transform: uppercase; letter-spacing: 0.11em;
+    color: var(--scope-label);
+    font-weight: 700;
+    opacity: 0.75;
+  }
+  .fab .sep { width: 1px; height: 12px; background: rgba(255,255,255,0.2); }
+  .fab .scope-nm {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  .fab .chev { font-size: 12px; opacity: 0.75; line-height: 1; margin-top: 1px; }
+
+  /* Inline action buttons for scenario mode (above the FAB) */
+  .fab-actions {
+    display: flex; flex-direction: column; gap: 6px;
+    align-items: flex-end;
+    opacity: 0; pointer-events: none;
+    transform: translateY(4px);
+    transition: all 0.15s;
+  }
+  body.scenario-mode .fab-actions {
+    opacity: 1; pointer-events: auto; transform: translateY(0);
+  }
+  .fab-act {
+    padding: 6px 12px;
+    font-size: 11px; font-weight: 500;
+    border-radius: 6px;
+    background: rgb(26, 26, 26);
+    border: 1px solid rgb(58, 58, 58);
+    color: rgb(209, 209, 209);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+  }
+  .fab-act.promote {
+    background: var(--scope-accent-dim);
+    border-color: var(--scope-accent);
+    color: var(--scope-label);
+  }
+  .fab-act.promote:hover { background: var(--scope-accent); color: #fff; }
+  .fab-act.discard:hover {
+    background: rgb(127, 29, 29);
+    border-color: rgb(185, 28, 28);
+    color: rgb(254, 226, 226);
+  }
+
+  /* ========== Switcher popover (anchored above FAB) ========== */
+  .switcher-popover {
+    position: fixed;
+    bottom: 66px; right: 18px;
+    width: 420px;
+    background: rgb(26, 26, 26);
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+    z-index: 90;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    max-height: 72vh;
+    animation: pop-in 0.14s ease-out;
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .switcher-popover[hidden] { display: none; }
+
+  .switcher-header {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid rgb(42, 42, 42);
+    background: rgb(20, 20, 20);
+  }
+  .switcher-header .current-scope {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 2px;
+  }
+  .switcher-header .current-scope .dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .switcher-header .current-scope .nm {
+    font-weight: 600; color: rgb(245, 245, 245); font-size: 13px;
+  }
+  .switcher-header .current-scope .pill {
+    font-size: 9px; padding: 2px 7px;
+    border-radius: 999px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .pill-prod { background: rgba(34, 197, 94, 0.14); color: rgb(134, 239, 172); }
+  .pill-draft { background: rgba(59, 130, 246, 0.14); color: rgb(147, 197, 253); }
+  .pill-archive { background: rgba(161, 161, 170, 0.14); color: rgb(161, 161, 161); }
+  .switcher-header .base-info {
+    font-size: 10.5px; color: rgb(128, 128, 128);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    margin-left: 19px;
+  }
+
+  .switcher-input {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgb(42, 42, 42);
+  }
+  .switcher-input input {
+    flex: 1; background: transparent; border: 0; outline: 0;
+    color: #fff; font-size: 13px;
+  }
+  .switcher-input input::placeholder { color: rgb(82, 82, 91); }
+
+  .switcher-list { overflow-y: auto; padding: 6px; flex: 1; }
+  .switcher-group-label {
+    font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: 0.12em; color: rgb(82, 82, 91);
+    padding: 10px 10px 6px;
+  }
+  .switcher-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+  }
+  .switcher-item:hover { background: rgb(44, 44, 44); }
+  .switcher-item.current {
+    background: rgba(255, 255, 255, 0.04);
+    cursor: default;
+  }
+  .switcher-item .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .switcher-item .name { flex: 1; font-weight: 500; color: rgb(245, 245, 245); }
+  .switcher-item .base {
+    font-size: 10.5px; color: rgb(128, 128, 128);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  .switcher-item .status {
+    font-size: 9.5px; padding: 2px 7px;
+    border-radius: 999px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .status-prod { background: rgba(34, 197, 94, 0.14); color: rgb(134, 239, 172); }
+  .status-draft { background: rgba(59, 130, 246, 0.14); color: rgb(147, 197, 253); }
+  .status-archive { background: rgba(161, 161, 170, 0.14); color: rgb(161, 161, 161); }
+  .status-current { background: rgba(255,255,255,0.08); color: rgb(161, 161, 161); }
+
+  .switcher-footer {
+    padding: 10px 12px;
+    border-top: 1px solid rgb(42, 42, 42);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px;
+    background: rgb(20, 20, 20);
+  }
+  .switcher-footer .new {
+    color: rgb(147, 197, 253); font-weight: 500; cursor: pointer;
+  }
+  .switcher-footer .new:hover { color: rgb(191, 219, 254); }
+  .switcher-footer .manage {
+    color: rgb(161, 161, 161); cursor: pointer;
+  }
+  .switcher-footer .manage:hover { color: #fff; }
+
+  /* ========== Modals (reused from V2) ========== */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 80px;
+    z-index: 100;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal {
+    width: 500px; max-width: 92%;
+    background: rgb(26, 26, 26);
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 10px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    max-height: 85vh;
+  }
+  .modal-large { width: 620px; }
+  .modal-header { padding: 16px 20px; border-bottom: 1px solid rgb(42, 42, 42); }
+  .modal-header h2 {
+    font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+    color: rgb(245, 245, 245);
+  }
+  .modal-header p {
+    font-size: 11.5px; color: rgb(161, 161, 161);
+    margin-top: 4px; line-height: 1.5;
+  }
+  .modal-body {
+    padding: 18px 20px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .modal-footer {
+    padding: 12px 20px; border-top: 1px solid rgb(42, 42, 42);
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: 0.11em; color: rgb(128, 128, 128); font-weight: 600;
+  }
+  .field input, .field textarea {
+    background: rgb(15, 15, 15);
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 6px; padding: 8px 10px; outline: 0;
+  }
+  .field input:focus, .field textarea:focus { border-color: rgb(59, 130, 246); }
+  .field textarea { resize: vertical; min-height: 54px; font-family: inherit; }
+  .color-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-swatch {
+    width: 26px; height: 26px; border-radius: 50%;
+    cursor: pointer; transition: all 0.1s;
+    border: 2px solid transparent;
+  }
+  .color-swatch.selected { border-color: #fff; transform: scale(1.1); }
+  .color-swatch:hover { transform: scale(1.08); }
+
+  .btn {
+    padding: 8px 14px;
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 6px;
+    background: rgb(44, 44, 44);
+    color: rgb(245, 245, 245);
+    font-size: 12.5px;
+    transition: all 0.12s;
+  }
+  .btn:hover:not(:disabled) { background: rgb(58, 58, 58); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary {
+    background: rgb(37, 99, 235);
+    border-color: rgb(37, 99, 235);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) { background: rgb(29, 78, 216); }
+  .btn-danger {
+    background: rgb(127, 29, 29);
+    border-color: rgb(185, 28, 28);
+    color: rgb(254, 226, 226);
+  }
+  .btn-danger:hover:not(:disabled) { background: rgb(153, 27, 27); }
+  .btn-ghost {
+    background: transparent;
+    border-color: rgb(58, 58, 58);
+    color: rgb(161, 161, 161);
+  }
+  .btn-ghost:hover { background: rgb(26, 26, 26); color: #fff; }
+
+  .callout {
+    padding: 12px 14px; border-radius: 7px;
+    font-size: 11.5px; line-height: 1.5;
+  }
+  .callout-warn {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(146, 64, 14, 0.6);
+    color: rgb(252, 211, 77);
+  }
+  .callout-info {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(30, 58, 138, 0.6);
+    color: rgb(147, 197, 253);
+  }
+  .callout strong { font-weight: 600; }
+
+  .diff-list {
+    background: rgb(15, 15, 15);
+    border: 1px solid rgb(42, 42, 42);
+    border-radius: 7px; padding: 4px;
+  }
+  .diff-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; border-radius: 5px; font-size: 12px;
+  }
+  .diff-item + .diff-item { border-top: 1px solid rgb(26, 26, 26); }
+  .diff-item .chg-icon {
+    width: 18px; height: 18px; border-radius: 4px;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .diff-item.added .chg-icon { background: rgba(34, 197, 94, 0.14); color: rgb(134, 239, 172); }
+  .diff-item.modified .chg-icon { background: rgba(59, 130, 246, 0.14); color: rgb(147, 197, 253); }
+  .diff-item.removed .chg-icon { background: rgba(248, 113, 113, 0.14); color: rgb(252, 165, 165); }
+  .diff-item .what { flex: 1; color: rgb(209, 209, 209); }
+  .diff-item .meta { color: rgb(128, 128, 128); font-size: 10.5px; }
+
+  .checkbox {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; user-select: none;
+    padding: 8px 0; font-size: 12px; color: rgb(209, 209, 209);
+  }
+  .checkbox input { display: none; }
+  .checkbox .box {
+    width: 15px; height: 15px;
+    border: 1.5px solid rgb(82, 82, 91);
+    border-radius: 3px;
+    display: grid; place-items: center;
+    transition: all 0.1s;
+  }
+  .checkbox input:checked + .box {
+    background: rgb(59, 130, 246); border-color: rgb(59, 130, 246);
+  }
+  .checkbox input:checked + .box::after {
+    content: '✓'; color: #fff; font-size: 10px; font-weight: 700;
+  }
+
+  /* ========== Toast ========== */
+  .toast {
+    position: fixed;
+    top: 16px; left: 50%; transform: translateX(-50%);
+    background: rgba(5, 46, 22, 0.96);
+    border: 1px solid rgb(22, 101, 52);
+    border-radius: 8px;
+    padding: 10px 14px 10px 12px;
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 110;
+    min-width: 400px;
+    animation: toast-in 0.3s ease-out;
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translate(-50%, -8px); }
+    to { opacity: 1; transform: translateX(-50%); }
+  }
+  .toast[hidden] { display: none; }
+  .toast .check {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgb(22, 163, 74); color: #fff;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .toast .txt { flex: 1; font-size: 12px; color: rgb(187, 247, 208); line-height: 1.45; }
+  .toast .txt strong { color: rgb(240, 253, 244); }
+  .toast .undo {
+    background: transparent;
+    border: 1px solid rgb(22, 163, 74);
+    color: rgb(134, 239, 172);
+    padding: 5px 10px; border-radius: 5px;
+    font-size: 11px; font-weight: 600;
+  }
+  .toast .undo:hover { background: rgb(20, 83, 45); }
+  .toast .countdown {
+    color: rgb(74, 222, 128);
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+  }
+
+  /* ========== Scenarios management page ========== */
+  .scenarios-page {
+    position: fixed; inset: 0;
+    background: rgb(15, 15, 15);
+    z-index: 105;
+    padding: 24px 28px;
+    display: flex; flex-direction: column;
+  }
+  .scenarios-page[hidden] { display: none; }
+  .scenarios-page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .scenarios-page-header h1 {
+    font-size: 18px; font-weight: 600; letter-spacing: -0.015em;
+  }
+  .scenarios-page-header p {
+    font-size: 11.5px; color: rgb(128, 128, 128); margin-top: 3px;
+  }
+  .scenarios-tabs {
+    display: flex; gap: 2px; margin-bottom: 14px;
+    border-bottom: 1px solid rgb(42, 42, 42);
+  }
+  .scenarios-tab {
+    padding: 8px 14px;
+    font-size: 11.5px; color: rgb(128, 128, 128);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    margin-bottom: -1px;
+  }
+  .scenarios-tab.active { color: #fff; border-bottom-color: rgb(59, 130, 246); }
+  .scenarios-table-wrap {
+    flex: 1; overflow: auto;
+    background: rgb(36, 36, 36);
+    border: 1px solid rgb(42, 42, 42);
+    border-radius: 8px;
+  }
+  .scenarios-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .scenarios-table th {
+    text-align: left;
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.1em; color: rgb(128, 128, 128); font-weight: 600;
+    padding: 9px 14px;
+    background: rgb(26, 26, 26);
+    border-bottom: 1px solid rgb(42, 42, 42);
+    position: sticky; top: 0;
+  }
+  .scenarios-table td {
+    padding: 10px 14px; border-bottom: 1px solid rgb(26, 26, 26);
+    color: rgb(209, 209, 209);
+  }
+  .scenarios-table td .name-cell { display: flex; align-items: center; gap: 10px; }
+  .scenarios-table td .dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .scenarios-table td .base, .scenarios-table td .created {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px; color: rgb(161, 161, 161);
+  }
+  .scenarios-table td .actions {
+    display: flex; gap: 6px; justify-content: flex-end;
+  }
+  .scenarios-table td .act {
+    font-size: 10.5px; padding: 4px 10px;
+    border: 1px solid rgb(58, 58, 58); border-radius: 4px;
+    color: rgb(161, 161, 161); background: transparent;
+  }
+  .scenarios-table td .act:hover { background: rgb(26, 26, 26); color: #fff; }
+  .scenarios-table td .act.promote-act { border-color: rgb(6, 95, 70); color: rgb(110, 231, 183); }
+  .scenarios-table td .act.promote-act:hover { background: rgb(6, 78, 59); color: rgb(187, 247, 208); }
+  .scenarios-table td .act.delete-act:hover { background: rgb(127, 29, 29); border-color: rgb(185, 28, 28); color: rgb(254, 202, 202); }
+
+  /* ========== Playground scaffolding ========== */
+  .scaffold {
+    position: fixed;
+    left: 14px; bottom: 14px;
+    z-index: 200;
+    background: rgba(15, 15, 15, 0.93);
+    border: 1px solid rgb(58, 58, 58);
+    border-radius: 10px;
+    padding: 10px 12px 10px 12px;
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 11px;
+    min-width: 220px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+  .scaffold.collapsed {
+    min-width: 0;
+    padding: 6px 10px;
+  }
+  .scaffold.collapsed .scaffold-body { display: none; }
+  .scaffold .label {
+    color: rgb(128, 128, 128);
+    text-transform: uppercase; letter-spacing: 0.11em;
+    font-size: 9.5px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .scaffold .fold {
+    color: rgb(82, 82, 91); cursor: pointer; padding: 0 4px;
+  }
+  .scaffold .fold:hover { color: #fff; }
+  .scaffold-btn {
+    text-align: left;
+    padding: 6px 8px;
+    border-radius: 4px;
+    color: rgb(209, 209, 209);
+    background: rgb(26, 26, 26);
+    border: 1px solid rgb(42, 42, 42);
+    font-size: 11px;
+  }
+  .scaffold-btn:hover { background: rgb(44, 44, 44); }
+  .scaffold-help {
+    color: rgb(82, 82, 91); font-size: 10px; line-height: 1.4;
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- Thin top band (scenario mode only) -->
+  <div class="scenario-band prod" id="band"></div>
+
+  <!-- Normal app: Flux toolbar -->
+  <div class="flux-toolbar">
+    <div class="flux-title-row">
+      <h1 class="flux-title">Flux de production</h1>
+      <button class="flux-newjob">＋ Nouveau job</button>
+    </div>
+    <div class="flux-search">
+      <span class="icon">🔍</span>
+      <input type="text" placeholder="Rechercher…">
+    </div>
+  </div>
+
+  <div class="flux-tabs">
+    <div class="flux-tab active">Tous <span class="count">(1 247)</span></div>
+    <div class="flux-tab">Prépresse <span class="count">(186)</span></div>
+    <div class="flux-tab">En production <span class="count">(742)</span></div>
+    <div class="flux-tab">Expédition <span class="count">(215)</span></div>
+    <div class="flux-tab">Facturé <span class="count">(104)</span></div>
+  </div>
+
+  <div class="flux-content">
+    <div class="flux-table-wrap">
+      <table class="flux-table">
+        <thead>
+          <tr>
+            <th style="width:110px;">Job</th>
+            <th>Client</th>
+            <th style="width:110px;">Priorité</th>
+            <th style="width:120px;">Deadline</th>
+            <th style="width:160px;">Avancement</th>
+            <th style="width:100px;">Étape</th>
+          </tr>
+        </thead>
+        <tbody id="flux-rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Ambient halo (scenario mode adds peripheral colour) -->
+<div class="halo-top"></div>
+<div class="halo-bottom"></div>
+<div class="halo-left"></div>
+<div class="halo-right"></div>
+
+<!-- FAB + contextual action buttons -->
+<div class="fab-wrap">
+  <div class="fab-actions">
+    <button class="fab-act promote" onclick="openPromoteModal()">Promouvoir en prod…</button>
+    <button class="fab-act discard" onclick="openDiscardModal()">Écarter le scénario</button>
+  </div>
+  <button class="fab" id="fab" onclick="toggleSwitcher(event)">
+    <span class="dot"></span>
+    <span class="label-small" id="fab-label">PROD</span>
+    <span class="sep"></span>
+    <span class="scope-nm" id="fab-nm">Baseline active</span>
+    <span class="chev">⌄</span>
+  </button>
+</div>
+
+<!-- Switcher popover (anchored above FAB) -->
+<div class="switcher-popover" id="switcher" hidden>
+  <div class="switcher-header">
+    <div class="current-scope">
+      <span class="dot" id="sw-current-dot"></span>
+      <span class="nm" id="sw-current-nm">Baseline active</span>
+      <span class="pill" id="sw-current-pill">LIVE</span>
+    </div>
+    <div class="base-info" id="sw-current-base">baseline · promue le 18/04 09:12</div>
+  </div>
+  <div class="switcher-input">
+    <span style="color:rgb(82,82,91);">🔍</span>
+    <input type="text" placeholder="Rechercher un scénario…" id="switcher-search" autocomplete="off">
+    <kbd>Esc</kbd>
+  </div>
+  <div class="switcher-list" id="switcher-list"></div>
+  <div class="switcher-footer">
+    <span class="new" onclick="openCreateModal(); closeSwitcher();">＋ Nouveau scénario</span>
+    <span class="manage" onclick="openScenariosPage(); closeSwitcher();">Gérer tous les scénarios →</span>
+  </div>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="overlay-create" hidden onclick="closeModal('overlay-create', event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Créer un scénario</h2>
+      <p>Un scénario est une copie complète de la production (jobs, opérateurs, machines, groupes, productivités). Tu y travailles en isolation, puis tu peux le promouvoir en prod ou l'écarter.</p>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Nom</label>
+        <input type="text" placeholder="Ex. Test priorité job 1234" id="create-name">
+      </div>
+      <div class="field">
+        <label>Description (optionnel)</label>
+        <textarea placeholder="À quoi sert ce scénario ?" id="create-desc"></textarea>
+      </div>
+      <div class="field">
+        <label>Couleur d'identification</label>
+        <div class="color-picker" id="create-colors">
+          <span class="color-swatch selected" data-color="blue" style="background:rgb(59, 130, 246);"></span>
+          <span class="color-swatch" data-color="emerald" style="background:rgb(16, 185, 129);"></span>
+          <span class="color-swatch" data-color="purple" style="background:rgb(168, 85, 247);"></span>
+          <span class="color-swatch" data-color="amber" style="background:rgb(245, 158, 11);"></span>
+        </div>
+      </div>
+      <div class="callout callout-info">
+        Copie de la <strong>production actuelle (18/04/2026 16:24)</strong> : 1 247 jobs · 28 opérateurs · 15 machines · 6 groupes de productivité.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('overlay-create')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmCreate()">Créer le scénario</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="overlay-promote" hidden onclick="closeModal('overlay-promote', event)">
+  <div class="modal modal-large" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Promouvoir <span id="promote-name">ce scénario</span> en production</h2>
+      <p>L'état actuel de la production sera remplacé. Une archive automatique sera créée : tu pourras revenir en arrière pendant 5 minutes.</p>
+    </div>
+    <div class="modal-body">
+      <div class="callout callout-warn">
+        <strong>Action à forte portée.</strong> Le nouveau planning sera immédiatement visible par tous les utilisateurs de la production.
+      </div>
+      <div>
+        <label style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.11em; color:rgb(128,128,128); font-weight:600;">Ce qui va changer</label>
+        <div class="diff-list" style="margin-top:8px;">
+          <div class="diff-item modified"><span class="chg-icon">~</span><span class="what">12 jobs ont une priorité modifiée</span><span class="meta">sur 1 247</span></div>
+          <div class="diff-item modified"><span class="chg-icon">~</span><span class="what">4 opérateurs réaffectés</span><span class="meta">sur 28</span></div>
+          <div class="diff-item added"><span class="chg-icon">+</span><span class="what">1 nouveau groupe de productivité</span><span class="meta">"Binôme offset"</span></div>
+          <div class="diff-item modified"><span class="chg-icon">~</span><span class="what">Planning complet regénéré</span><span class="meta">86,4 % deadlines ↑ +2,1 pts</span></div>
+        </div>
+      </div>
+      <div class="callout callout-info">
+        <strong>Archive automatique</strong> : la prod actuelle sera sauvegardée sous <em>"Prod 18/04/2026 16:24 (auto-archive)"</em>, accessible à vie.
+      </div>
+      <label class="checkbox">
+        <input type="checkbox" id="promote-confirm" onchange="togglePromoteBtn()">
+        <span class="box"></span>
+        <span>J'ai vérifié le diff et je veux remplacer la production.</span>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('overlay-promote')">Annuler</button>
+      <button class="btn btn-danger" id="promote-btn" disabled onclick="confirmPromote()">Promouvoir en production</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="overlay-discard" hidden onclick="closeModal('overlay-discard', event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Écarter <span id="discard-name">ce scénario</span> ?</h2>
+      <p>Toutes les données de ce scénario seront supprimées définitivement. La production n'est pas affectée.</p>
+    </div>
+    <div class="modal-body">
+      <div class="callout callout-warn">
+        Les modifications faites dans ce scénario seront perdues. Cette action est irréversible.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('overlay-discard')">Annuler</button>
+      <button class="btn btn-danger" onclick="confirmDiscard()">Écarter le scénario</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scenarios management page -->
+<div class="scenarios-page" id="scenarios-page" hidden>
+  <div class="scenarios-page-header">
+    <div>
+      <h1>Scénarios</h1>
+      <p>Gestion de tous les scénarios : actifs, promus en prod, auto-archivés, écartés.</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-ghost" onclick="closeScenariosPage()">Fermer</button>
+      <button class="btn btn-primary" onclick="openCreateModal()">＋ Nouveau scénario</button>
+    </div>
+  </div>
+  <div class="scenarios-tabs">
+    <div class="scenarios-tab active" data-tab="active" onclick="switchScenariosTab(this, 'active')">Actifs · 4</div>
+    <div class="scenarios-tab" data-tab="archive" onclick="switchScenariosTab(this, 'archive')">Auto-archives · 8</div>
+    <div class="scenarios-tab" data-tab="discarded" onclick="switchScenariosTab(this, 'discarded')">Écartés · 14</div>
+  </div>
+  <div class="scenarios-table-wrap">
+    <table class="scenarios-table">
+      <thead>
+        <tr>
+          <th style="width:40%;">Nom</th>
+          <th>Basé sur</th>
+          <th>Créé</th>
+          <th>Statut</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="scenarios-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Success toast -->
+<div class="toast" id="toast-promoted" hidden>
+  <span class="check">✓</span>
+  <div class="txt">
+    <strong id="toast-name">Scénario</strong> est maintenant la production.<br>
+    <span class="countdown">Annulable pendant <span id="undo-countdown">5:00</span></span>
+  </div>
+  <button class="undo" onclick="undoPromotion()">Annuler la promotion</button>
+</div>
+
+<!-- Playground scaffolding -->
+<div class="scaffold" id="scaffold">
+  <div class="label">
+    <span>Playground · contrôles de démo</span>
+    <span class="fold" onclick="toggleScaffold()" id="fold-ico">−</span>
+  </div>
+  <div class="scaffold-body">
+    <div class="scaffold-help">Ces boutons n'existent pas dans le produit. Sers-toi du FAB en bas à droite pour naviguer comme un vrai utilisateur.</div>
+    <button class="scaffold-btn" onclick="openCreateModal()">→ Créer un scénario (modal)</button>
+    <button class="scaffold-btn" onclick="openPromoteModal()">→ Promouvoir (modal)</button>
+    <button class="scaffold-btn" onclick="openDiscardModal()">→ Écarter (modal)</button>
+    <button class="scaffold-btn" onclick="openScenariosPage()">→ Page de gestion</button>
+    <button class="scaffold-btn" onclick="showPromotedToast()">→ Simuler succès + undo</button>
+  </div>
+</div>
+
+<script>
+  const scopes = {
+    prod: {
+      id: 'prod', name: 'Baseline active', color: 'prod',
+      label: 'Production',
+      base: 'baseline · promue le 18/04 09:12',
+      status: 'prod', isProduction: true,
+    },
+    'sc-1': {
+      id: 'sc-1', name: 'Test priorité job 1234', color: 'blue',
+      label: 'Scénario',
+      base: 'basé sur prod 18/04 14:20',
+      status: 'draft',
+    },
+    'sc-2': {
+      id: 'sc-2', name: 'Plan semaine prochaine', color: 'emerald',
+      label: 'Scénario',
+      base: 'basé sur prod 18/04 09:05',
+      status: 'draft',
+    },
+    'sc-3': {
+      id: 'sc-3', name: 'Simulation +2 opé offset', color: 'purple',
+      label: 'Scénario',
+      base: 'basé sur prod 17/04 17:45',
+      status: 'draft',
+    },
+  };
+  const archives = [
+    { id: 'ar-1', name: 'Prod 17/04 18:00 (auto-archive)', base: '—', created: '17/04 18:00', color: 'prod', status: 'archive' },
+    { id: 'ar-2', name: 'Prod 15/04 22:10 (auto-archive)', base: '—', created: '15/04 22:10', color: 'prod', status: 'archive' },
+  ];
+  const colorLabels = {
+    prod: 'rgb(82, 82, 91)',
+    blue: 'rgb(59, 130, 246)',
+    emerald: 'rgb(16, 185, 129)',
+    purple: 'rgb(168, 85, 247)',
+    amber: 'rgb(245, 158, 11)',
+  };
+
+  let currentScope = 'prod';
+  let selectedColor = 'blue';
+  let undoTimer = null;
+
+  function init() {
+    applyScope();
+    renderSwitcherList();
+    renderFluxRows();
+    renderScenariosTable();
+    bindColorPicker();
+    bindKeyboard();
+  }
+
+  function applyScope() {
+    const s = scopes[currentScope];
+    // Body class for scenario halo
+    document.body.classList.toggle('scenario-mode', !s.isProduction);
+    // Root colour vars via class on app root
+    const app = document.getElementById('app');
+    app.className = 'app scope-' + s.color;
+    // Root colour vars on body for halo pseudo-elements
+    document.body.className = (document.body.className.replace(/scope-\S+/g, '') + ' scope-' + s.color + (s.isProduction ? '' : ' scenario-mode')).trim();
+    // Top band
+    const band = document.getElementById('band');
+    band.className = 'scenario-band' + (s.isProduction ? ' prod' : '');
+    // FAB
+    const fab = document.getElementById('fab');
+    fab.className = 'fab' + (s.isProduction ? '' : ' scenario');
+    document.getElementById('fab-label').textContent = s.label.toUpperCase();
+    document.getElementById('fab-nm').textContent = s.name;
+    // Switcher current block
+    document.getElementById('sw-current-dot').style.background = colorLabels[s.color];
+    document.getElementById('sw-current-nm').textContent = s.name;
+    const pill = document.getElementById('sw-current-pill');
+    pill.className = 'pill pill-' + (s.isProduction ? 'prod' : 'draft');
+    pill.textContent = s.isProduction ? 'LIVE' : 'DRAFT';
+    document.getElementById('sw-current-base').textContent = s.base;
+  }
+
+  function renderFluxRows() {
+    const rows = [
+      ['J-1234', 'Catalogue printemps · Galaxie Éditions', 'imp', 'Impératif', '22/04', '▂▃▅▆', 'En prod'],
+      ['J-1235', 'Flyer promo été · Novéa Retail', 'urg', 'Urgent', '24/04', '▂▃▅', 'Prépresse'],
+      ['J-1239', 'Livret CRM · Atelier Polaris', 'norm', 'Normal', '26/04', '▂', 'Prépresse'],
+      ['J-1241', 'Affiche saison · Maison Dubray', 'norm', 'Normal', '28/04', '▂▃', 'Prépresse'],
+      ['J-1245', 'Packaging fragile · Orléans Parfum', 'urg', 'Urgent', '23/04', '▂▃▅▆▇', 'Expédition'],
+      ['J-1251', 'Carnet notes · Volutes Studio', 'norm', 'Normal', '29/04', '▂', 'Prépresse'],
+      ['J-1258', 'Livre d\'or mariage · Privé', 'low', 'Bas', '02/05', '—', 'Attente'],
+      ['J-1262', 'Dépliant immobilier · Arbre & Pierre', 'urg', 'Urgent', '25/04', '▂▃▅▆', 'En prod'],
+      ['J-1270', 'Étiquettes bouteilles · Vignoble Mercier', 'norm', 'Normal', '30/04', '▂▃', 'Prépresse'],
+      ['J-1278', 'Cartes vœux entreprise · Pixia SAS', 'imp', 'Impératif', '21/04', '▂▃▅▆▇█', 'Expédition'],
+    ];
+    document.getElementById('flux-rows').innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="flux-jobid">${r[0]}</span></td>
+        <td>${r[1]}</td>
+        <td><span class="flux-prio ${r[2]}">${r[3]}</span></td>
+        <td><span class="flux-dates">${r[4]}</span></td>
+        <td><span class="flux-dates" style="color:rgb(148,163,184);">${r[5]}</span></td>
+        <td style="font-size:11px; color:rgb(161,161,161);">${r[6]}</td>
+      </tr>`).join('');
+  }
+
+  // Switcher
+  function toggleSwitcher(e) {
+    if (e) e.stopPropagation();
+    const sw = document.getElementById('switcher');
+    if (sw.hidden) {
+      sw.hidden = false;
+      renderSwitcherList();
+      setTimeout(() => document.getElementById('switcher-search').focus(), 10);
+    } else {
+      sw.hidden = true;
+    }
+  }
+  function closeSwitcher() { document.getElementById('switcher').hidden = true; }
+
+  function renderSwitcherList(filter = '') {
+    const f = filter.toLowerCase().trim();
+    const matches = s => (s.name || '').toLowerCase().includes(f);
+    const list = document.getElementById('switcher-list');
+    list.innerHTML = '';
+
+    const prod = scopes.prod;
+    const activeDrafts = Object.values(scopes).filter(s => !s.isProduction);
+
+    if (matches(prod)) {
+      list.innerHTML += `<div class="switcher-group-label">Production</div>`;
+      list.innerHTML += switcherItem(prod);
+    }
+    const fd = activeDrafts.filter(matches);
+    if (fd.length) {
+      list.innerHTML += `<div class="switcher-group-label">Scénarios actifs</div>`;
+      list.innerHTML += fd.map(switcherItem).join('');
+    }
+    const fa = archives.filter(a => a.name.toLowerCase().includes(f));
+    if (fa.length) {
+      list.innerHTML += `<div class="switcher-group-label">Auto-archives · en lecture</div>`;
+      list.innerHTML += fa.map(switcherItem).join('');
+    }
+  }
+
+  function switcherItem(s) {
+    const current = s.id === currentScope;
+    const statusClass = current ? 'status-current' :
+      (s.isProduction ? 'status-prod' : (s.status === 'archive' ? 'status-archive' : 'status-draft'));
+    const statusLabel = current ? 'ACTUEL' :
+      (s.isProduction ? 'LIVE' : (s.status === 'archive' ? 'ARCHIVE' : 'DRAFT'));
+    return `
+      <div class="switcher-item${current ? ' current' : ''}" ${current ? '' : `onclick="switcherPick('${s.id}')"`}>
+        <span class="dot" style="background:${colorLabels[s.color]};"></span>
+        <span class="name">${s.name}</span>
+        <span class="base">${s.base || ''}</span>
+        <span class="status ${statusClass}">${statusLabel}</span>
+      </div>`;
+  }
+
+  function switcherPick(id) {
+    if (scopes[id]) {
+      currentScope = id;
+      applyScope();
+    }
+    closeSwitcher();
+  }
+
+  // Create modal
+  function bindColorPicker() {
+    document.querySelectorAll('#create-colors .color-swatch').forEach(sw => {
+      sw.onclick = () => {
+        document.querySelectorAll('#create-colors .color-swatch').forEach(s => s.classList.remove('selected'));
+        sw.classList.add('selected');
+        selectedColor = sw.dataset.color;
+      };
+    });
+  }
+  function openCreateModal() {
+    document.getElementById('overlay-create').hidden = false;
+    setTimeout(() => document.getElementById('create-name').focus(), 10);
+  }
+  function confirmCreate() {
+    const name = document.getElementById('create-name').value.trim() || 'Nouveau scénario';
+    const newId = 'sc-new-' + Date.now();
+    scopes[newId] = {
+      id: newId, name, color: selectedColor,
+      label: 'Scénario', base: 'basé sur prod 18/04 16:24', status: 'draft',
+    };
+    currentScope = newId;
+    closeModal('overlay-create');
+    applyScope();
+    document.getElementById('create-name').value = '';
+    document.getElementById('create-desc').value = '';
+  }
+
+  // Promote
+  function openPromoteModal() {
+    if (scopes[currentScope].isProduction) {
+      alert('Tu es sur la production — passe d\'abord sur un scénario (via le FAB) pour le promouvoir.');
+      return;
+    }
+    document.getElementById('promote-name').textContent = scopes[currentScope].name;
+    document.getElementById('promote-confirm').checked = false;
+    togglePromoteBtn();
+    document.getElementById('overlay-promote').hidden = false;
+  }
+  function togglePromoteBtn() {
+    const c = document.getElementById('promote-confirm').checked;
+    document.getElementById('promote-btn').disabled = !c;
+  }
+  function confirmPromote() {
+    const name = scopes[currentScope].name;
+    closeModal('overlay-promote');
+    showPromotedToast(name);
+  }
+  function showPromotedToast(name) {
+    const label = name || scopes[currentScope].name || 'Scénario';
+    document.getElementById('toast-name').textContent = label;
+    document.getElementById('toast-promoted').hidden = false;
+    startUndoCountdown();
+  }
+  function startUndoCountdown() {
+    let remaining = 5 * 60;
+    const el = document.getElementById('undo-countdown');
+    clearInterval(undoTimer);
+    const tick = () => {
+      const m = Math.floor(remaining / 60);
+      const s = (remaining % 60).toString().padStart(2, '0');
+      el.textContent = `${m}:${s}`;
+      remaining--;
+      if (remaining < 0) hideToast();
+    };
+    tick();
+    undoTimer = setInterval(tick, 1000);
+  }
+  function hideToast() { clearInterval(undoTimer); document.getElementById('toast-promoted').hidden = true; }
+  function undoPromotion() { hideToast(); }
+
+  // Discard
+  function openDiscardModal() {
+    if (scopes[currentScope].isProduction) {
+      alert('On ne peut pas écarter la production.');
+      return;
+    }
+    document.getElementById('discard-name').textContent = scopes[currentScope].name;
+    document.getElementById('overlay-discard').hidden = false;
+  }
+  function confirmDiscard() {
+    const target = currentScope;
+    closeModal('overlay-discard');
+    currentScope = 'prod';
+    delete scopes[target];
+    applyScope();
+  }
+
+  // Scenarios management
+  function openScenariosPage() { document.getElementById('scenarios-page').hidden = false; }
+  function closeScenariosPage() { document.getElementById('scenarios-page').hidden = true; }
+  function switchScenariosTab(el, tab) {
+    document.querySelectorAll('.scenarios-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderScenariosTable(tab);
+  }
+  function renderScenariosTable(tab = 'active') {
+    const tbody = document.getElementById('scenarios-tbody');
+    let rows = [];
+    if (tab === 'active') {
+      rows.push({ color: 'prod', name: 'Baseline active (Production)', base: '—', created: 'promue 18/04 09:12', status: 'LIVE', statusClass: 'status-prod', actions: ['Ouvrir'] });
+      Object.values(scopes).filter(s => !s.isProduction).forEach(s => {
+        rows.push({
+          color: s.color, name: s.name, base: s.base.replace('basé sur ', ''),
+          created: 'auj. 14:20', status: 'DRAFT', statusClass: 'status-draft',
+          actions: ['Ouvrir', 'Promouvoir', 'Écarter'],
+        });
+      });
+    } else if (tab === 'archive') {
+      for (let i = 0; i < 8; i++) {
+        rows.push({
+          color: 'prod',
+          name: `Prod 1${i+1}/04 ${['08:12','10:40','12:05','14:15','15:30','16:50','17:20','22:45'][i]} (auto-archive)`,
+          base: '—', created: `1${i+1}/04`, status: 'ARCHIVE', statusClass: 'status-archive',
+          actions: ['Ouvrir en lecture', 'Restaurer en prod'],
+        });
+      }
+    } else {
+      for (let i = 0; i < 14; i++) {
+        rows.push({
+          color: ['blue','emerald','purple','amber'][i%4],
+          name: ['Test prio A','Test prio B','Simu +1 opé','Flux X','Scénario vide','Debug groupe 3','Test dimanche','Rapport mars','Bench presses','Simulation salon','Essai amont','Test offset','Prio fin quart','Test binôme'][i],
+          base: `prod ${String(i%20+1).padStart(2,'0')}/04 ${['08:12','10:40','12:05','14:15','15:30','16:50','17:20','18:45'][i%8]}`,
+          created: `${String(i+1).padStart(2,'0')}/04`, status: 'ÉCARTÉ', statusClass: 'status-archive',
+          actions: [],
+        });
+      }
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>
+          <div class="name-cell">
+            <span class="dot" style="background:${colorLabels[r.color]};"></span>
+            ${r.name}
+          </div>
+        </td>
+        <td><span class="base">${r.base}</span></td>
+        <td><span class="created">${r.created}</span></td>
+        <td><span class="status ${r.statusClass}">${r.status}</span></td>
+        <td>
+          <div class="actions">
+            ${r.actions.map(a => {
+              let cls = 'act';
+              if (a.includes('Promouvoir')) cls += ' promote-act';
+              if (a === 'Écarter') cls += ' delete-act';
+              return `<button class="${cls}">${a}</button>`;
+            }).join('')}
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  // Helpers
+  function closeModal(id, e) {
+    if (e && e.target.id !== id) return;
+    document.getElementById(id).hidden = true;
+  }
+  function toggleScaffold() {
+    const sc = document.getElementById('scaffold');
+    sc.classList.toggle('collapsed');
+    document.getElementById('fold-ico').textContent = sc.classList.contains('collapsed') ? '+' : '−';
+  }
+  function bindKeyboard() {
+    document.getElementById('switcher-search').addEventListener('input', (e) => {
+      renderSwitcherList(e.target.value);
+    });
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault(); toggleSwitcher();
+      }
+      if (e.key === 'Escape') {
+        closeSwitcher();
+        document.querySelectorAll('.modal-overlay:not([hidden])').forEach(o => o.hidden = true);
+      }
+    });
+    document.addEventListener('click', (e) => {
+      const sw = document.getElementById('switcher');
+      const fab = document.getElementById('fab');
+      if (!sw.hidden && !sw.contains(e.target) && !fab.contains(e.target)) {
+        closeSwitcher();
+      }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>
