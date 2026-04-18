@@ -28,6 +28,15 @@ export default function FocusPage({ mode }: FocusPageProps) {
   const navigate = useNavigate();
   const { data: snapshot, isLoading, isError, refetch } = useGetSnapshotQuery();
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Callback-ref state: the scroll container mounts only after the
+  // `if (isLoading) return <LoadingSpinner/>` gate below, which is after these
+  // effects first run. Tracking it as state re-runs the effects when the
+  // container actually exists, so listeners + ResizeObserver actually attach.
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const setScrollRef = useCallback((el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    setScrollEl(el);
+  }, []);
 
   const gridStartDate = useMemo(() => {
     const d = new Date();
@@ -61,8 +70,8 @@ export default function FocusPage({ mode }: FocusPageProps) {
 
   // Track scroll position for virtual scrolling + DateStrip sync
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
+    if (!scrollEl) return;
+    const container = scrollEl;
 
     const handleScroll = () => {
       const newScrollTop = container.scrollTop;
@@ -83,13 +92,13 @@ export default function FocusPage({ mode }: FocusPageProps) {
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [gridStartDate]);
+  }, [scrollEl, gridStartDate]);
 
   // ResizeObserver keeps viewportHeight in sync when layout shifts without a
   // window resize — otherwise a stale viewport can collapse the virtual range.
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
+    if (!scrollEl) return;
+    const container = scrollEl;
 
     const syncViewportHeight = () => {
       const h = container.clientHeight;
@@ -101,7 +110,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
     resizeObserver.observe(container);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [scrollEl]);
 
   const scrollToNow = useCallback(() => {
     const container = scrollRef.current;
@@ -112,13 +121,13 @@ export default function FocusPage({ mode }: FocusPageProps) {
 
   // Scroll to NOW on mount and on entity change (no animation, immediate)
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
+    if (!scrollEl) return;
+    const container = scrollEl;
     requestAnimationFrame(() => {
       const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate);
       container.scrollTop = Math.max(0, y - container.clientHeight / 2);
     });
-  }, [gridStartDate, mode, id, snapshot]);
+  }, [scrollEl, gridStartDate, mode, id, snapshot]);
 
   // Home key = scroll to now
   useEffect(() => {
@@ -226,7 +235,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
           viewportStartHour={viewportStartHour}
           viewportEndHour={viewportEndHour}
         />
-        <div ref={scrollRef} className="flex-1 overflow-auto min-w-0">
+        <div ref={setScrollRef} className="flex-1 overflow-auto min-w-0">
           <div className="flex justify-start relative" style={{ height: `${totalHeight}px` }}>
             <div className="sticky left-0 z-20 shrink-0 bg-zinc-950">
               <TimelineColumn

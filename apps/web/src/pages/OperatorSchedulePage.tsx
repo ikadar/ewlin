@@ -134,6 +134,16 @@ export default function OperatorSchedulePage() {
   const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Callback-ref state: the scroll container JSX is rendered below an
+  // `if (isLoading) return <LoadingSpinner/>` gate, so the container mounts
+  // *after* the effects below first run. Tracking it as state re-runs the
+  // effects once the container actually exists, so listeners + ResizeObserver
+  // attach instead of silently no-op'ing forever.
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
+  const setScrollContainerRef = useCallback((el: HTMLDivElement | null) => {
+    scrollContainerRef.current = el;
+    setScrollContainer(el);
+  }, []);
 
   const snapshot = useMemo(() => snapshotData ?? defaultSnapshot, [snapshotData]);
   const operators = snapshot.operators ?? [];
@@ -165,8 +175,8 @@ export default function OperatorSchedulePage() {
   const [viewportEndHour, setViewportEndHour] = useState<number>(8);
 
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!scrollContainer) return;
+    const container = scrollContainer;
 
     const handleScroll = () => {
       const newScrollTop = container.scrollTop;
@@ -193,7 +203,7 @@ export default function OperatorSchedulePage() {
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [pixelsPerHour, gridStartDate]);
+  }, [scrollContainer, pixelsPerHour, gridStartDate]);
 
   // Keep viewportHeight in sync with the container via ResizeObserver, so panel
   // toggles (JobDetailsPanel, sidebar, SmartCompact, Evaluation) that change
@@ -201,8 +211,8 @@ export default function OperatorSchedulePage() {
   // combined with scrollTop races can collapse the virtual range and hide
   // hachures + arrière-plan.
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!scrollContainer) return;
+    const container = scrollContainer;
 
     const syncViewportHeight = () => {
       const h = container.clientHeight;
@@ -214,20 +224,19 @@ export default function OperatorSchedulePage() {
     resizeObserver.observe(container);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [scrollContainer]);
 
   // Scroll to current time on mount (use rAF to ensure scroll listener is attached first)
   useEffect(() => {
-    if (!scrollContainerRef.current) return;
+    if (!scrollContainer) return;
+    const container = scrollContainer;
     requestAnimationFrame(() => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
       const now = new Date();
       const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
       const vh = container.clientHeight;
       container.scrollTop = Math.max(0, y - vh / 3);
     });
-  }, [pixelsPerHour, gridStartDate]);
+  }, [scrollContainer, pixelsPerHour, gridStartDate]);
 
   // ---- Data lookups ----
   const jobMap = useMemo(() => {
@@ -814,7 +823,7 @@ export default function OperatorSchedulePage() {
           />
 
           {/* Timeline + Operator columns */}
-          <div className="flex-1 overflow-auto min-w-0" ref={scrollContainerRef} data-testid="operator-scheduling-grid">
+          <div className="flex-1 overflow-auto min-w-0" ref={setScrollContainerRef} data-testid="operator-scheduling-grid">
             <div className="inline-flex flex-col" style={{ minWidth: 'fit-content', minHeight: '100%' }}>
               {/* ---- Header row (sticky top) ---- */}
               <div className="flex sticky top-0 z-30 bg-zinc-900">
