@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Playground — Tile zoom loupe on hover</title>
+<style>
+  :root {
+    --bg-base: rgb(15, 15, 15);
+    --bg-surface: rgb(26, 26, 26);
+    --bg-elevated: rgb(36, 36, 36);
+    --bg-col: #18181b;
+    --bg-col-header: #1f1f23;
+    --border-subtle: #27272a;
+    --text-primary: #e4e4e7;
+    --text-muted: #a1a1aa;
+    --text-dim: #52525b;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: -apple-system, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    min-height: 100vh;
+  }
+  .panel {
+    border-right: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    padding: 20px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .panel h1 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.01em;
+  }
+  .panel .subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .control-group {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .control-group:last-child { border-bottom: none; }
+  .control-group .label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+
+  /* Radio variants */
+  .variants { display: flex; flex-direction: column; gap: 6px; }
+  .variant-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms;
+  }
+  .variant-option:hover { background: #2a2a2a; }
+  .variant-option.active {
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+  .variant-option input { margin: 2px 0 0 0; }
+  .variant-option .name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .variant-option .desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  /* Sliders */
+  .slider-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .slider-row .val {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    color: var(--text-primary);
+    font-size: 11px;
+  }
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--bg-elevated);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    transition: transform 120ms;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+  /* Checkboxes */
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-primary);
+    padding: 6px 0;
+    cursor: pointer;
+  }
+  .check-row input { cursor: pointer; }
+
+  /* Legend block */
+  .legend {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.55;
+    padding: 10px 12px;
+    border: 1px dashed var(--border-subtle);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.01);
+  }
+  .legend strong { color: var(--text-muted); }
+  .legend code {
+    background: var(--bg-elevated);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+  }
+
+  /* ── Stage ──────────────────────────────────────────────────── */
+  .stage {
+    padding: 40px 60px;
+    overflow: auto;
+    min-height: 100vh;
+  }
+  .stage-header {
+    margin-bottom: 28px;
+    max-width: 900px;
+  }
+  .stage-header h2 {
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0 0 6px 0;
+  }
+  .stage-header p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .columns {
+    display: flex;
+    gap: 60px;
+    padding-left: 48px;
+    position: relative;
+  }
+
+  /* Station column (mimics StationColumn.tsx) */
+  .station-col {
+    background: var(--bg-col);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    width: 180px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: visible;
+  }
+  .station-header {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: center;
+    background: var(--bg-col-header);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .timeline {
+    position: relative;
+    overflow: visible;
+  }
+  .hour-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.04);
+    pointer-events: none;
+  }
+  .hour-label {
+    position: absolute;
+    right: 100%;
+    margin-right: 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  /* Tile visual (mimics Tile.tsx output) */
+  .tile {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-left-width: 4px;
+    border-left-style: solid;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: transform 140ms ease-out,
+                box-shadow 140ms ease-out,
+                filter 140ms ease-out;
+    transform-origin: left center;
+    will-change: transform;
+  }
+  .tile-setup-divider {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-bottom: 1px dotted black;
+    pointer-events: none;
+  }
+
+  /* Label overlay (mimics Tile.tsx lines 289-325) */
+  .tile-label {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    padding: 2px 8px 0 8px;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 2;
+  }
+  .tile-label-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .tile-pin {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .tile-title {
+    font-weight: 500;
+    line-height: 1.2;
+    font-size: 11px;
+    word-break: break-word;
+    min-width: 0;
+  }
+  .tile-operator {
+    font-size: 9px;
+    color: #a1a1aa;
+    line-height: 1.2;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Variant 1 — scale-in-place */
+  .tile.variant-scale-active {
+    z-index: 50;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .columns.dim-neighbors .tile:not(.variant-scale-active) {
+    filter: brightness(0.55);
+  }
+
+  /* Floating loupe (variants 2 and 3) */
+  .loupe {
+    position: absolute;
+    z-index: 60;
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-radius: 3px;
+    padding: 6px 10px 7px 10px;
+    outline: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45),
+                0 0 0 1px rgba(0, 0, 0, 0.15);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 120ms ease-out, transform 120ms ease-out;
+    min-height: 56px;
+    width: 180px;
+  }
+  .loupe.visible { opacity: 1; transform: translateY(0); }
+
+  .loupe .loupe-title {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    word-break: break-word;
+    margin-bottom: 2px;
+  }
+  .loupe .loupe-operator {
+    font-size: 11px;
+    color: #d4d4d8;
+    line-height: 1.3;
+  }
+  .loupe .loupe-meta {
+    font-size: 10px;
+    color: #a1a1aa;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .loupe.under-original-visible {
+    outline: 1px solid rgba(59, 130, 246, 0.25);
+  }
+
+  /* Leader line for variant lens-to-right */
+  .loupe-leader {
+    position: absolute;
+    height: 1px;
+    background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.3) 0%,
+      rgba(255, 255, 255, 0.08) 100%);
+    z-index: 55;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms;
+  }
+  .loupe-leader.visible { opacity: 1; }
+
+  /* Highlight on the origin tile when loupe is active (variants 2/3) */
+  .tile.origin-active {
+    outline: 1px solid rgba(255, 255, 255, 0.18);
+    outline-offset: -1px;
+    z-index: 40;
+  }
+
+  /* Column title above each station */
+  .col-caption {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 8px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  /* Footer hint */
+  .hint {
+    position: fixed;
+    bottom: 16px;
+    right: 20px;
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    padding: 6px 10px;
+    border-radius: 4px;
+  }
+  .hint kbd {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 2px;
+    padding: 1px 4px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+  }
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- ═══════════════ CONTROLS ═══════════════ -->
+  <aside class="panel">
+    <h1>Tile zoom loupe</h1>
+    <p class="subtitle">
+      Compare 4 magnifying-glass variants for unreadable tiny tiles.
+      Hover any tile to trigger — tiny tiles (below the threshold) are
+      the real target.
+    </p>
+
+    <!-- Variants -->
+    <div class="control-group">
+      <span class="label">Variant</span>
+      <div class="variants" id="variants">
+        <label class="variant-option active" data-variant="scale-in-place">
+          <input type="radio" name="variant" value="scale-in-place" checked />
+          <div>
+            <div class="name">Scale in place</div>
+            <div class="desc">Tile scales itself via transform; z-index jumps above neighbors.</div>
+          </div>
+        </label>
+        <label class="variant-option" data-variant="floating-clone">
+          <input type="radio" name="variant" value="floating-clone" />
+          <div>
+            <div class="name">Floating clone</div>
+            <div class="desc">A readable clone pops above the tile, same X, min height 56px. Layout untouched.</div>
+          </div>
+        </label>
+        <label class="variant-option" data-variant="lens-to-right">
+          <input type="radio" name="variant" value="lens-to-right" />
+          <div>
+            <div class="name">Lens to right</div>
+            <div class="desc">Floating card opens beside the column with a leader line. No overlap.</div>
+          </div>
+        </label>
+        <label class="variant-option" data-variant="smart-grow-push">
+          <input type="radio" name="variant" value="smart-grow-push" />
+          <div>
+            <div class="name">Smart grow + push</div>
+            <div class="desc">Tile grows, pushes siblings down. Likely bad — breaks timeline scale.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Threshold -->
+    <div class="control-group">
+      <div class="slider-row">
+        <span class="label" style="margin:0;">Trigger threshold</span>
+        <span class="val" id="thresholdVal">24 px</span>
+      </div>
+      <input type="range" id="threshold" min="0" max="60" step="1" value="24" />
+      <div class="legend" style="margin-top:8px;">
+        <strong>0</strong> = loupe on every tile. <strong>60</strong> = only on very short ones.
+      </div>
+    </div>
+
+    <!-- Delay -->
+    <div class="control-group">
+      <div class="slider-row">
+        <span class="label" style="margin:0;">Hover delay</span>
+        <span class="val" id="delayVal">150 ms</span>
+      </div>
+      <input type="range" id="delay" min="0" max="500" step="10" value="150" />
+      <div class="legend" style="margin-top:8px;">
+        Existing rich tooltip uses <code>500ms</code>. A loupe should feel snappier.
+      </div>
+    </div>
+
+    <!-- Zoom factor -->
+    <div class="control-group">
+      <div class="slider-row">
+        <span class="label" style="margin:0;">Zoom factor</span>
+        <span class="val" id="zoomVal">1.6×</span>
+      </div>
+      <input type="range" id="zoom" min="1.2" max="2.5" step="0.1" value="1.6" />
+      <div class="legend" style="margin-top:8px;">
+        Applied to <strong>scale-in-place</strong> and <strong>smart-grow-push</strong>.
+        Floating variants use a fixed readable size instead.
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="control-group">
+      <span class="label">Options</span>
+      <label class="check-row">
+        <input type="checkbox" id="dimNeighbors" checked />
+        <span>Dim neighbors while loupe active</span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="showMeta" />
+        <span>Include duration + start time in loupe</span>
+      </label>
+    </div>
+
+    <div class="legend">
+      <strong>Source of truth:</strong> <code>Tile.tsx</code> renders
+      job.reference · job.client (medium), plus operator names in
+      <code>text-[9px]</code>. The loupe shows the same content —
+      just legibly sized, never extra info.
+    </div>
+  </aside>
+
+  <!-- ═══════════════ STAGE ═══════════════ -->
+  <main class="stage">
+    <header class="stage-header">
+      <h2>Station column — 7-hour window, mixed job durations</h2>
+      <p>
+        Heights follow the real mapping <code style="color:#93c5fd;">80 px / hour</code>.
+        A 2-minute tile = <strong>2.7px</strong>, a 5-min = <strong>6.7px</strong>,
+        a 10-min = <strong>13px</strong> — the real lisibility pain-points.
+      </p>
+    </header>
+
+    <div class="columns" id="columns">
+      <!-- First column: main playground -->
+      <div style="display:flex; flex-direction:column;">
+        <div class="station-col" id="stationA">
+          <div class="station-header">ST-01 · Offset Press</div>
+          <div class="timeline" id="timelineA"></div>
+        </div>
+        <div class="col-caption">mixed short + long</div>
+      </div>
+
+      <!-- Second column: dense small tiles only -->
+      <div style="display:flex; flex-direction:column;">
+        <div class="station-col" id="stationB">
+          <div class="station-header">ST-02 · Finishing</div>
+          <div class="timeline" id="timelineB"></div>
+        </div>
+        <div class="col-caption">dense short tiles</div>
+      </div>
+    </div>
+
+    <div class="hint">
+      Hover tiles — <kbd>Esc</kbd> closes an active loupe.
+    </div>
+  </main>
+</div>
+
+<script>
+  // ══════════════════════════════════════════════════════════════
+  // Data — tile fixtures. Each tile is defined by start + duration
+  // in minutes. `setup` is a prefix in minutes. State maps to the
+  // real PALETTE copied from apps/web/src/components/Tile/colorUtils.ts
+  // ══════════════════════════════════════════════════════════════
+  const PIXELS_PER_HOUR = 80;
+  const TIMELINE_MINUTES = 7 * 60;
+
+  // Canonical palette — copied verbatim from colorUtils.ts so the
+  // playground renders the real production colors (no guessing).
+  const PALETTE = {
+    default:   { rgb: '59,130,246',  borderHex: '#3b82f6', textHex: '#93c5fd', opRun: 0.12, opSetup: 0.12 },
+    completed: { rgb: '34,197,94',   borderHex: '#22c55e', textHex: '#86efac', opRun: 0.09, opSetup: 0.14 },
+    conflict:  { rgb: '245,158,11',  borderHex: '#f59e0b', textHex: '#fcd34d', opRun: 0.09, opSetup: 0.14 },
+    late:      { rgb: '239,68,68',   borderHex: '#ef4444', textHex: '#fca5a5', opRun: 0.09, opSetup: 0.14 },
+    blocked:   { rgb: '113,113,122', borderHex: '#71717a', textHex: '#a1a1aa', opRun: 0.06, opSetup: 0.10 },
+  };
+
+  // Column A — realistic mix
+  const tilesA = [
+    { start:   0, duration: 120, setup: 15, state: 'default',   ref: 'J-1042',  client: 'Éditions Nord',   operator: 'Marie D.' },
+    { start: 125, duration:  30, setup:  0, state: 'default',   ref: 'J-1047',  client: 'Imprim+',          operator: 'Karim B.' },
+    { start: 158, duration:   2, setup:  0, state: 'conflict',  ref: 'J-1055',  client: 'Atelier Lumière', operator: 'Sophie R.' },
+    { start: 162, duration:  10, setup:  0, state: 'default',   ref: 'J-1056',  client: 'Mairie Lyon',     operator: 'Marie D.' },
+    { start: 175, duration:   5, setup:  0, state: 'completed', ref: 'J-1058',  client: 'Art & Print',     operator: 'Julien P.' },
+    { start: 183, duration:   3, setup:  0, state: 'late',      ref: 'J-1061',  client: 'Bistrot Central', operator: 'Karim B.' },
+    { start: 190, duration:  60, setup: 10, state: 'default',   ref: 'J-1063',  client: 'Librairie Gibert', operator: 'Sophie R.' },
+    { start: 255, duration:  45, setup:  0, state: 'default',   ref: 'J-1068',  client: 'Manufacture H.',  operator: 'Marie D.' },
+    { start: 305, duration:   4, setup:  0, state: 'conflict',  ref: 'J-1071',  client: 'École A. Dumas',  operator: 'Julien P.' },
+    { start: 312, duration:  25, setup:  0, state: 'default',   ref: 'J-1073',  client: 'Groupe Moreau',   operator: 'Karim B.' },
+    { start: 340, duration:  55, setup:  5, state: 'default',   ref: 'J-1076',  client: 'Studio 9',         operator: 'Marie D.' },
+  ];
+
+  // Column B — dense small tiles (stress-test the loupe)
+  const tilesB = [
+    { start:   0, duration:  15, setup:  0, state: 'default',   ref: 'J-2001', client: 'PrintExpress',    operator: 'Anna K.' },
+    { start:  18, duration:   3, setup:  0, state: 'late',      ref: 'J-2002', client: 'Café Noir',        operator: 'Anna K.' },
+    { start:  23, duration:   2, setup:  0, state: 'conflict',  ref: 'J-2003', client: 'Boutique Zoé',    operator: 'Tom L.' },
+    { start:  27, duration:   5, setup:  0, state: 'default',   ref: 'J-2004', client: 'Restaurant Kō',    operator: 'Tom L.' },
+    { start:  34, duration:   7, setup:  0, state: 'default',   ref: 'J-2005', client: 'Galerie Sud',      operator: 'Anna K.' },
+    { start:  43, duration:   4, setup:  0, state: 'completed', ref: 'J-2006', client: 'Librairie Pli',    operator: 'Tom L.' },
+    { start:  49, duration:  10, setup:  0, state: 'default',   ref: 'J-2007', client: 'Mairie Annecy',    operator: 'Anna K.' },
+    { start:  61, duration:   3, setup:  0, state: 'blocked',   ref: 'J-2008', client: 'Éclats & Co',      operator: 'Tom L.' },
+    { start:  66, duration:   6, setup:  0, state: 'default',   ref: 'J-2009', client: 'Bureau Vert',      operator: 'Anna K.' },
+    { start:  74, duration:  14, setup:  0, state: 'default',   ref: 'J-2010', client: 'Hôtel Lumière',    operator: 'Tom L.' },
+    { start:  90, duration:   2, setup:  0, state: 'conflict',  ref: 'J-2011', client: 'Pain & Sel',        operator: 'Anna K.' },
+    { start:  94, duration:  11, setup:  0, state: 'default',   ref: 'J-2012', client: 'Studio Aube',      operator: 'Tom L.' },
+    { start: 107, duration:   5, setup:  0, state: 'default',   ref: 'J-2013', client: 'Atelier Rouge',    operator: 'Anna K.' },
+    { start: 114, duration:  20, setup:  0, state: 'default',   ref: 'J-2014', client: 'Centre Médical M', operator: 'Tom L.' },
+    { start: 136, duration:   3, setup:  0, state: 'late',      ref: 'J-2015', client: 'Maison Violette', operator: 'Anna K.' },
+    { start: 141, duration:  45, setup:  5, state: 'default',   ref: 'J-2016', client: 'Groupe Fort',      operator: 'Tom L.' },
+  ];
+
+  // ══════════════════════════════════════════════════════════════
+  // Render
+  // ══════════════════════════════════════════════════════════════
+  function minutesToPx(min) { return (min / 60) * PIXELS_PER_HOUR; }
+
+  function formatHour(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  function formatDuration(mins) {
+    if (mins < 60) return `${mins} min`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`;
+  }
+
+  function renderTimeline(timelineEl, tiles) {
+    const heightPx = minutesToPx(TIMELINE_MINUTES);
+    timelineEl.style.height = `${heightPx}px`;
+
+    // Hour lines + labels
+    for (let h = 0; h <= TIMELINE_MINUTES / 60; h++) {
+      const line = document.createElement('div');
+      line.className = 'hour-line';
+      line.style.top = `${minutesToPx(h * 60)}px`;
+      timelineEl.appendChild(line);
+
+      const label = document.createElement('div');
+      label.className = 'hour-label';
+      label.style.top = `${minutesToPx(h * 60)}px`;
+      label.textContent = `${String(8 + h).padStart(2, '0')}:00`;
+      timelineEl.appendChild(label);
+    }
+
+    // Tiles
+    tiles.forEach((t, idx) => {
+      const tileEl = document.createElement('div');
+      tileEl.className = 'tile';
+      const palette = PALETTE[t.state];
+      const top = minutesToPx(t.start);
+      const height = minutesToPx(t.duration);
+      tileEl.style.top = `${top + 1}px`;
+      tileEl.style.height = `${height - 2}px`;
+      tileEl.style.borderLeftColor = palette.borderHex;
+      tileEl.style.background = `rgba(${palette.rgb}, ${palette.opRun})`;
+      tileEl.dataset.idx = idx;
+      tileEl.dataset.state = t.state;
+      tileEl.dataset.ref = t.ref;
+      tileEl.dataset.client = t.client;
+      tileEl.dataset.operator = t.operator;
+      tileEl.dataset.start = t.start;
+      tileEl.dataset.duration = t.duration;
+      tileEl.dataset.tileHeight = height;
+      tileEl.dataset.top = top;
+
+      // Setup divider (inside the tile)
+      if (t.setup > 0) {
+        const divider = document.createElement('div');
+        divider.className = 'tile-setup-divider';
+        divider.style.top = `${minutesToPx(t.setup)}px`;
+        tileEl.appendChild(divider);
+      }
+
+      // Label overlay
+      const label = document.createElement('div');
+      label.className = 'tile-label';
+      label.innerHTML = `
+        <div class="tile-label-row">
+          <span class="tile-pin"></span>
+          <span class="tile-title" style="color: ${palette.textHex}">${t.ref} · ${t.client}</span>
+        </div>
+        <div class="tile-operator">${t.operator}</div>
+      `;
+      tileEl.appendChild(label);
+
+      attachHoverHandlers(tileEl);
+      timelineEl.appendChild(tileEl);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // Loupe logic
+  // ══════════════════════════════════════════════════════════════
+  const state = {
+    variant: 'scale-in-place',
+    threshold: 24,
+    delay: 150,
+    zoom: 1.6,
+    dimNeighbors: true,
+    showMeta: false,
+    activeTile: null,
+    showTimer: null,
+    hideTimer: null,
+    activeLoupe: null,
+    activeLeader: null,
+    storedPositions: null, // for smart-grow-push
+  };
+
+  function shouldTriggerLoupe(tileEl) {
+    const h = parseFloat(tileEl.dataset.tileHeight);
+    return h <= state.threshold;
+  }
+
+  function attachHoverHandlers(tileEl) {
+    tileEl.addEventListener('mouseenter', () => {
+      if (!shouldTriggerLoupe(tileEl)) return;
+      clearTimeout(state.hideTimer);
+      state.hideTimer = null;
+      if (state.activeTile === tileEl) return;
+      state.showTimer = setTimeout(() => showLoupe(tileEl), state.delay);
+    });
+
+    tileEl.addEventListener('mouseleave', (e) => {
+      clearTimeout(state.showTimer);
+      state.showTimer = null;
+      // For floating variants, allow a small grace window so cursor can cross to loupe.
+      if (state.activeTile === tileEl) {
+        scheduleHide();
+      }
+    });
+  }
+
+  function showLoupe(tileEl) {
+    // Always clean up any previously active loupe first
+    hideLoupe(true);
+    state.activeTile = tileEl;
+
+    document.querySelector('.columns').classList.toggle('dim-neighbors', state.dimNeighbors);
+
+    switch (state.variant) {
+      case 'scale-in-place':
+        applyScaleInPlace(tileEl);
+        break;
+      case 'floating-clone':
+        applyFloatingClone(tileEl);
+        break;
+      case 'lens-to-right':
+        applyLensToRight(tileEl);
+        break;
+      case 'smart-grow-push':
+        applySmartGrowPush(tileEl);
+        break;
+    }
+  }
+
+  function scheduleHide() {
+    clearTimeout(state.hideTimer);
+    state.hideTimer = setTimeout(() => hideLoupe(), 120);
+  }
+
+  function hideLoupe(immediate = false) {
+    clearTimeout(state.hideTimer);
+    clearTimeout(state.showTimer);
+    state.hideTimer = null;
+    state.showTimer = null;
+    if (!state.activeTile && !state.activeLoupe) return;
+
+    document.querySelector('.columns').classList.remove('dim-neighbors');
+
+    if (state.activeTile) {
+      state.activeTile.classList.remove('variant-scale-active', 'origin-active');
+      state.activeTile.style.transform = '';
+      state.activeTile.style.zIndex = '';
+      // Undo smart-grow-push displacement
+      if (state.storedPositions) {
+        state.storedPositions.forEach(({ el, top }) => {
+          el.style.transition = 'top 160ms ease-out';
+          el.style.top = `${top}px`;
+          setTimeout(() => { el.style.transition = ''; }, 180);
+        });
+        state.storedPositions = null;
+        // Reset the grown tile's own height
+        const h = parseFloat(state.activeTile.dataset.tileHeight);
+        state.activeTile.style.height = `${h - 2}px`;
+      }
+    }
+
+    if (state.activeLoupe) {
+      const loupe = state.activeLoupe;
+      const leader = state.activeLeader;
+      loupe.classList.remove('visible');
+      if (leader) leader.classList.remove('visible');
+      setTimeout(() => {
+        loupe.remove();
+        if (leader) leader.remove();
+      }, immediate ? 0 : 140);
+    }
+
+    state.activeTile = null;
+    state.activeLoupe = null;
+    state.activeLeader = null;
+  }
+
+  // ───── Variant 1: scale-in-place
+  function applyScaleInPlace(tileEl) {
+    tileEl.classList.add('variant-scale-active');
+    tileEl.style.transform = `scale(${state.zoom})`;
+    tileEl.style.zIndex = '50';
+  }
+
+  // ───── Variant 2: floating-clone
+  function applyFloatingClone(tileEl) {
+    tileEl.classList.add('origin-active');
+    const loupe = buildLoupeElement(tileEl);
+    const top = parseFloat(tileEl.dataset.top);
+    const palette = PALETTE[tileEl.dataset.state];
+    const tileHeight = parseFloat(tileEl.dataset.tileHeight);
+    // Center-ish the loupe vertically over the tile's center
+    const loupeTop = top + tileHeight / 2 - 28;
+    loupe.style.position = 'absolute';
+    loupe.style.top = `${loupeTop}px`;
+    loupe.style.left = '0px';
+    tileEl.parentElement.appendChild(loupe);
+    requestAnimationFrame(() => loupe.classList.add('visible'));
+    state.activeLoupe = loupe;
+    attachLoupeHandlers(loupe);
+  }
+
+  // ───── Variant 3: lens-to-right
+  function applyLensToRight(tileEl) {
+    tileEl.classList.add('origin-active');
+    const loupe = buildLoupeElement(tileEl);
+    // Position it relative to the column (outside the station-col)
+    const stationCol = tileEl.closest('.station-col');
+    const top = parseFloat(tileEl.dataset.top);
+    const tileHeight = parseFloat(tileEl.dataset.tileHeight);
+    const stationRect = stationCol.getBoundingClientRect();
+    const timelineEl = tileEl.parentElement;
+    const timelineRect = timelineEl.getBoundingClientRect();
+    const colRect = stationCol.getBoundingClientRect();
+
+    // We absolutely position the loupe inside .columns (its parent grid)
+    const columnsEl = document.querySelector('.columns');
+    const columnsRect = columnsEl.getBoundingClientRect();
+
+    loupe.style.position = 'absolute';
+    loupe.style.left = `${colRect.right - columnsRect.left + 24}px`;
+    // Align loupe center to tile center
+    const tileAbsTop = timelineRect.top - columnsRect.top + top + tileHeight / 2 - 28;
+    loupe.style.top = `${tileAbsTop}px`;
+    columnsEl.appendChild(loupe);
+    requestAnimationFrame(() => loupe.classList.add('visible'));
+
+    // Leader line from tile edge to loupe
+    const leader = document.createElement('div');
+    leader.className = 'loupe-leader';
+    leader.style.left = `${colRect.right - columnsRect.left}px`;
+    leader.style.top = `${timelineRect.top - columnsRect.top + top + tileHeight / 2}px`;
+    leader.style.width = `24px`;
+    columnsEl.appendChild(leader);
+    requestAnimationFrame(() => leader.classList.add('visible'));
+
+    state.activeLoupe = loupe;
+    state.activeLeader = leader;
+    attachLoupeHandlers(loupe);
+  }
+
+  // ───── Variant 4: smart-grow-push
+  function applySmartGrowPush(tileEl) {
+    const originalHeight = parseFloat(tileEl.dataset.tileHeight);
+    const targetHeight = Math.max(originalHeight * state.zoom, 56);
+    const delta = targetHeight - originalHeight;
+    const top = parseFloat(tileEl.dataset.top);
+
+    // Store all siblings below and shift them
+    const timeline = tileEl.parentElement;
+    const siblingTiles = Array.from(timeline.querySelectorAll('.tile'))
+      .filter(el => el !== tileEl && parseFloat(el.dataset.top) > top);
+
+    state.storedPositions = siblingTiles.map(el => ({
+      el,
+      top: parseFloat(el.dataset.top) + 1, // baseline +1 from render
+    }));
+
+    tileEl.style.transition = 'height 180ms ease-out';
+    tileEl.style.height = `${targetHeight - 2}px`;
+    tileEl.style.zIndex = '50';
+
+    siblingTiles.forEach(el => {
+      const origTop = parseFloat(el.dataset.top) + 1;
+      el.style.transition = 'top 180ms ease-out';
+      el.style.top = `${origTop + delta}px`;
+    });
+
+    setTimeout(() => { tileEl.style.transition = ''; }, 200);
+  }
+
+  // ───── Build loupe DOM (for floating variants)
+  function buildLoupeElement(tileEl) {
+    const loupe = document.createElement('div');
+    loupe.className = 'loupe';
+    const state_ = tileEl.dataset.state;
+    const palette = PALETTE[state_];
+    loupe.style.borderLeftColor = palette.borderHex;
+    loupe.style.background = `rgba(${palette.rgb}, 0.22)`;
+    loupe.style.backdropFilter = 'blur(6px)';
+
+    const title = document.createElement('div');
+    title.className = 'loupe-title';
+    title.style.color = palette.textHex;
+    title.textContent = `${tileEl.dataset.ref} · ${tileEl.dataset.client}`;
+
+    const op = document.createElement('div');
+    op.className = 'loupe-operator';
+    op.textContent = tileEl.dataset.operator;
+
+    loupe.appendChild(title);
+    loupe.appendChild(op);
+
+    if (state.showMeta) {
+      const meta = document.createElement('div');
+      meta.className = 'loupe-meta';
+      const start = parseFloat(tileEl.dataset.start);
+      const dur = parseFloat(tileEl.dataset.duration);
+      meta.innerHTML = `
+        <span>${formatHour(480 + start)}</span>
+        <span>${formatDuration(dur)}</span>
+      `;
+      loupe.appendChild(meta);
+    }
+    return loupe;
+  }
+
+  function attachLoupeHandlers(loupe) {
+    loupe.addEventListener('mouseenter', () => {
+      clearTimeout(state.hideTimer);
+      state.hideTimer = null;
+    });
+    loupe.addEventListener('mouseleave', () => {
+      scheduleHide();
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // Controls wiring
+  // ══════════════════════════════════════════════════════════════
+  function wireControls() {
+    // Variants
+    document.getElementById('variants').addEventListener('change', (e) => {
+      if (e.target.name === 'variant') {
+        state.variant = e.target.value;
+        // Visual active state on the card
+        document.querySelectorAll('.variant-option').forEach(el => {
+          el.classList.toggle('active', el.dataset.variant === state.variant);
+        });
+        hideLoupe(true);
+      }
+    });
+
+    // Threshold
+    const thresholdEl = document.getElementById('threshold');
+    const thresholdVal = document.getElementById('thresholdVal');
+    thresholdEl.addEventListener('input', () => {
+      state.threshold = parseInt(thresholdEl.value, 10);
+      thresholdVal.textContent = `${state.threshold} px`;
+    });
+
+    // Delay
+    const delayEl = document.getElementById('delay');
+    const delayVal = document.getElementById('delayVal');
+    delayEl.addEventListener('input', () => {
+      state.delay = parseInt(delayEl.value, 10);
+      delayVal.textContent = `${state.delay} ms`;
+    });
+
+    // Zoom
+    const zoomEl = document.getElementById('zoom');
+    const zoomVal = document.getElementById('zoomVal');
+    zoomEl.addEventListener('input', () => {
+      state.zoom = parseFloat(zoomEl.value);
+      zoomVal.textContent = `${state.zoom.toFixed(1)}×`;
+    });
+
+    // Options
+    document.getElementById('dimNeighbors').addEventListener('change', (e) => {
+      state.dimNeighbors = e.target.checked;
+    });
+    document.getElementById('showMeta').addEventListener('change', (e) => {
+      state.showMeta = e.target.checked;
+      // If a loupe is currently visible, rebuild it
+      if (state.activeTile && (state.variant === 'floating-clone' || state.variant === 'lens-to-right')) {
+        const tileEl = state.activeTile;
+        hideLoupe(true);
+        showLoupe(tileEl);
+      }
+    });
+
+    // Esc closes
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') hideLoupe(true);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // Boot
+  // ══════════════════════════════════════════════════════════════
+  renderTimeline(document.getElementById('timelineA'), tilesA);
+  renderTimeline(document.getElementById('timelineB'), tilesB);
+  wireControls();
+</script>
+</body>
+</html>
