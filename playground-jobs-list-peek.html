@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JobsList — Peek sticky playground</title>
+<style>
+  /* ========== Base (aligned with apps/web) ========== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 13px; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: rgb(10, 10, 11);
+    color: rgb(228, 228, 231);
+    min-height: 100vh;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; text-align: left; }
+  input { font: inherit; color: inherit; }
+
+  /* ========== Layout ========== */
+  .page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .page-title { font-size: 20px; font-weight: 600; color: rgb(244, 244, 245); }
+  .page-sub { font-size: 13px; color: rgb(161, 161, 170); margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: 270px 1fr; gap: 32px; align-items: start; margin-top: 24px; }
+
+  /* ========== JobsList aside (clone of apps/web) ========== */
+  .jobs-aside {
+    width: 270px; flex-shrink: 0;
+    background: rgb(24, 24, 27);
+    display: flex; flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    height: 640px;
+    position: relative;
+  }
+
+  .jobs-header {
+    flex-shrink: 0;
+    padding: 12px 12px 8px 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    background: rgb(24, 24, 27);
+    position: relative; z-index: 20;
+  }
+
+  .search-wrap { position: relative; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: rgb(113, 113, 122); pointer-events: none; }
+  .search-input {
+    width: 100%; padding: 6px 10px 6px 30px;
+    font-size: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgb(228, 228, 231);
+  }
+  .search-input::placeholder { color: rgb(113, 113, 122); }
+  .search-input:focus { outline: none; border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); }
+
+  .tabs { display: flex; background: rgba(255,255,255,0.04); border-radius: 6px; overflow: hidden; }
+  .tab { flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 500; color: rgb(161, 161, 170); display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .tab.active { background: rgba(255,255,255,0.1); color: white; }
+  .tab .count { font-family: ui-monospace, monospace; font-size: 10px; opacity: 0.7; }
+  .tab.active .count { opacity: 1; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.04); color: rgb(161, 161, 170); font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+  .chip .count { font-family: ui-monospace, monospace; font-size: 10px; opacity: 0.75; }
+  .chip.active-blue { background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.4); color: rgb(147, 197, 253); }
+
+  /* ========== Scroll list ==========
+     body-wrap is the positioning context for the absolute-placed peeks.
+     The scroll-list fills body-wrap; peeks overlay on top without
+     being part of the scroll flow. This avoids sticky quirks entirely. */
+  .body-wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .scroll-list {
+    position: absolute; inset: 0;
+    overflow-y: auto;
+  }
+  .scroll-list::-webkit-scrollbar { width: 6px; }
+  .scroll-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+  .scroll-list::-webkit-scrollbar-track { background: transparent; }
+
+  .jobs-container { padding: 6px 0; }
+
+  /* ========== JobCard clone (mirrors apps/web/.../JobCard.tsx exactly) ========== */
+  .job-card {
+    display: block;
+    margin: 0 8px 6px 8px;
+    padding: 3px 12px 3px 9px;
+    cursor: pointer;
+    transition: background-color 150ms ease, opacity 150ms ease;
+    border-left: 3px solid transparent;
+    width: calc(100% - 16px);
+  }
+  .job-card:hover { background: rgba(255,255,255,0.05); }
+  .job-card.selected { background: rgba(255,255,255,0.1); }
+  .job-card.selected:hover { background: rgba(255,255,255,0.1); }
+  .job-card.dim { opacity: 0.5; }
+  .job-card.dim:hover { opacity: 1; }
+  .job-card.completed-dim { opacity: 0.72; }
+  .job-card.completed-dim:hover { opacity: 1; }
+
+  /* Accents */
+  .job-card.late       { border-left-color: rgb(239, 68, 68); }
+  .job-card.conflict   { border-left-color: rgb(245, 158, 11); }
+  .job-card.completed  { border-left-color: rgb(16, 185, 129); }
+  .job-card.planified  { border-left-color: rgb(59, 130, 246); }
+
+  .row { display: flex; align-items: flex-start; gap: 10px; }
+  .col-main { flex: 1; min-width: 0; }
+  .col-side { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+
+  .ref-line { display: flex; align-items: center; gap: 5px; overflow: hidden; min-width: 0; }
+  .ref {
+    font-family: ui-monospace, 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    flex-shrink: 0;
+    color: rgb(113, 113, 122);
+  }
+  .ref.late       { color: rgb(252, 165, 165); }
+  .ref.conflict   { color: rgb(252, 211, 77); }
+  .ref.completed  { color: rgb(134, 239, 172); }
+  .ref.planified  { color: rgb(147, 197, 253); }
+
+  .dot-sep { color: rgb(82, 82, 91); flex-shrink: 0; }
+  .client { color: rgb(161, 161, 170); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .desc { font-size: 12px; color: rgb(212, 212, 216); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .desc.alert { color: rgb(244, 244, 245); }
+
+  .meta-line { display: flex; align-items: center; gap: 4px; font-size: 10px; color: rgb(161, 161, 170); }
+  .meta-line svg { width: 11px; height: 11px; color: rgb(113, 113, 122); flex-shrink: 0; }
+  .prio { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; line-height: 1; }
+  .prio-0 { color: rgb(248, 113, 113); }
+  .prio-1 { color: rgb(251, 146, 60); }
+  .prio-2 { color: rgb(253, 224, 71); }
+  .prio-3 { color: rgb(161, 161, 170); }
+
+  .buffer { font-size: 10px; font-weight: 500; }
+  .buffer.pos { color: rgb(52, 211, 153); }
+  .buffer.neg { color: rgb(248, 113, 113); }
+
+  /* ========== Peek (overlay on body-wrap, not inside scroll-list) ========== */
+  .peek-slot {
+    position: absolute;
+    left: 0; right: 6px;            /* leave 6px for scrollbar */
+    z-index: 10;
+    background: rgb(24, 24, 27);
+    display: none;
+  }
+  .peek-slot.visible { display: block; }
+  .peek-top { top: 0; box-shadow: 0 6px 12px -4px rgba(0,0,0,0.6), 0 2px 4px -1px rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .peek-bottom { bottom: 0; box-shadow: 0 -6px 12px -4px rgba(0,0,0,0.6), 0 -2px 4px -1px rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.06); }
+
+  /* Symmetric vertical spacing for the cloned card inside the peek */
+  .peek-slot .job-card { margin: 6px 8px; }
+
+  /* Flash the origin card when user clicks peek to return */
+  @keyframes originFlash {
+    0%, 100% { background-color: rgba(255,255,255,0.10); }
+    50%      { background-color: rgba(96, 165, 250, 0.35); }
+  }
+  .origin-flash { animation: originFlash 700ms ease-in-out; }
+
+  /* ========== Controls / notes ========== */
+  .panel {
+    background: rgba(24, 24, 27, 0.6);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel + .panel { margin-top: 20px; }
+  .panel h2 { font-size: 13px; font-weight: 600; color: rgb(228, 228, 231); margin-bottom: 12px; }
+
+  .ctrl-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; color: rgb(212, 212, 216); cursor: pointer; }
+  .ctrl-row input { width: 16px; height: 16px; accent-color: rgb(59, 130, 246); }
+
+  .telemetry { margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: rgb(161, 161, 170); }
+  .telemetry div { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+  .telemetry .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .telemetry .dot.blue { background: rgb(96, 165, 250); }
+  .telemetry .dot.gray { background: rgb(113, 113, 122); }
+  .telemetry .val { color: rgb(228, 228, 231); font-family: ui-monospace, monospace; }
+
+  ol, ul { padding-left: 18px; }
+  .panel ol li, .panel ul li { font-size: 12px; color: rgb(161, 161, 170); margin-bottom: 6px; }
+  .panel strong { color: rgb(228, 228, 231); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header>
+    <div class="page-title">
+      JobsList — Peek sticky playground
+      <span style="background: rgb(34, 197, 94); color: black; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 10px; vertical-align: middle;">v3 · absolute overlay</span>
+    </div>
+    <div class="page-sub">Faithful clone of the JobCard. Select a job, scroll the list — when the selected card leaves the viewport, a peek appears (top if card is above, bottom if below).</div>
+  </header>
+
+  <div class="grid">
+
+    <!-- JobsList clone -->
+    <aside class="jobs-aside">
+      <div class="jobs-header">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" class="search-input" placeholder="Rechercher..." />
+        </div>
+        <div class="tabs">
+          <button class="tab active"><span>Planifiées</span><span class="count">22</span></button>
+          <button class="tab"><span>Non planifiées</span><span class="count">3</span></button>
+        </div>
+        <div class="chips">
+          <span class="chip active-blue"><span>Toutes</span><span class="count">22</span></span>
+          <span class="chip"><span>En retard</span><span class="count">4</span></span>
+          <span class="chip"><span>Conflits</span><span class="count">2</span></span>
+        </div>
+      </div>
+
+      <div class="body-wrap">
+        <div class="scroll-list" id="scrollList">
+          <div id="jobsContainer" class="jobs-container"></div>
+        </div>
+        <div id="peekTop" class="peek-slot peek-top"></div>
+        <div id="peekBottom" class="peek-slot peek-bottom"></div>
+      </div>
+    </aside>
+
+    <!-- Control panel + notes -->
+    <div>
+      <div class="panel">
+        <h2>Controls</h2>
+        <label class="ctrl-row"><span>Enable peek</span><input type="checkbox" id="togglePeek" checked /></label>
+        <label class="ctrl-row"><span>Direction-aware (top/bottom)</span><input type="checkbox" id="toggleDirectional" checked /></label>
+        <label class="ctrl-row"><span>Click peek → scroll to origin</span><input type="checkbox" id="toggleClickScroll" checked /></label>
+        <div class="telemetry">
+          <div><span class="dot blue"></span><span>Selection: <span class="val" id="telSel">—</span></span></div>
+          <div><span class="dot gray"></span><span>Peek: <span class="val" id="telPeek">—</span></span></div>
+          <div><span class="dot gray"></span><span>Card relative to viewport: <span class="val" id="telRel">—</span></span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>How to try</h2>
+        <ol>
+          <li>Click any job card to select it (click again to deselect).</li>
+          <li>Scroll the list up/down.</li>
+          <li>When the selected card leaves the viewport, the peek shows up at the top (if card is above) or bottom (if card is below).</li>
+          <li>Click the peek to scroll back to the original card position (if enabled).</li>
+          <li>Toggle "direction-aware" off to compare with a peek locked at the top.</li>
+        </ol>
+      </div>
+
+      <div class="panel">
+        <h2>Notes</h2>
+        <ul>
+          <li>The peek is a <strong>faithful clone</strong> of the JobCard (same accent, priority symbol, deadlines, buffer).</li>
+          <li>Clicking the peek does <strong>not</strong> toggle selection — that would deselect the job and defeat the purpose. It scrolls back to origin with a brief flash.</li>
+          <li>Direction-aware is the more informative default: the peek position tells you where to scroll to find the job.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+console.log('[peek-playground] v3 loaded — absolute overlay mode');
+
+/* Icon SVG strings (reused) */
+const SVG_CAL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+const SVG_CAL_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 15 2 2 4-4"/></svg>`;
+
+/* Mock data (varied to exercise all card states) */
+const JOBS = [
+  { id:'01', reference:'A-1042', client:'Wheel Digital',      description:'Brochure 32 pages A4',            deadline:'18/04',                   problemType:'late',     isCompleted:false, isPlanified:true, deadlinePriority:0, bufferLabel:'-4h' },
+  { id:'02', reference:'A-1043', client:'Atelier Martin',     description:'Affiches événement concert',      deadline:'19/04', batDeadline:'17/04', problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:1, bufferLabel:'+6h' },
+  { id:'03', reference:'B-2011', client:'Studio Fontaine',    description:'Dépliant 3 volets quadri',        deadline:'19/04',                   problemType:'conflict', isCompleted:false, isPlanified:true, deadlinePriority:1 },
+  { id:'04', reference:'A-1044', client:'Maison Dupont',      description:'Cartes de visite 500 ex.',        deadline:'20/04',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:2, bufferLabel:'+1j 2h' },
+  { id:'05', reference:'C-3001', client:'Éditions Nord',      description:'Roman 240 pages reliure cousue',  deadline:'20/04', batDeadline:'18/04', problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:0, bufferLabel:'+3h' },
+  { id:'06', reference:'A-1045', client:'Wheel Digital',      description:'Flyers A5 recto/verso',           deadline:'21/04',                   problemType:null,     isCompleted:true,  isPlanified:true, deadlinePriority:2 },
+  { id:'07', reference:'D-4102', client:'Librairie Sud',      description:'Catalogue produits été',          deadline:'22/04',                   problemType:'late',   isCompleted:false, isPlanified:true, deadlinePriority:0, bufferLabel:'-1j 6h' },
+  { id:'08', reference:'B-2012', client:'Atelier Martin',     description:'Invitations mariage dorure',      deadline:'22/04', batDeadline:'19/04', problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:1 },
+  { id:'09', reference:'A-1046', client:'Studio Fontaine',    description:'Packaging boîte chocolats',       deadline:'23/04',                   problemType:'conflict', isCompleted:false, isPlanified:true, deadlinePriority:2 },
+  { id:'10', reference:'E-5201', client:'Mairie de Lille',    description:'Programme culturel trimestriel',  deadline:'23/04',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:1, bufferLabel:'+12h' },
+  { id:'11', reference:'A-1047', client:'Maison Dupont',      description:'Menus restaurant lamination',     deadline:'24/04',                   problemType:null,     isCompleted:true,  isPlanified:true, deadlinePriority:2 },
+  { id:'12', reference:'F-6001', client:'Pharmacie Centrale', description:'Affichage vitrine promo',         deadline:'24/04',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:3, bufferLabel:'+2j' },
+  { id:'13', reference:'B-2013', client:'Éditions Nord',      description:'Couverture magazine quadri',      deadline:'25/04', batDeadline:'22/04', problemType:'late',   isCompleted:false, isPlanified:true, deadlinePriority:0, bufferLabel:'-3h' },
+  { id:'14', reference:'C-3002', client:'Wheel Digital',      description:'Kakémonos stand salon',           deadline:'25/04',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:2 },
+  { id:'15', reference:'A-1048', client:'Atelier Martin',     description:'Stickers logo format rond',       deadline:'26/04',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:2, bufferLabel:'+1j 4h' },
+  { id:'16', reference:'G-7010', client:'Librairie Sud',      description:'Marque-pages dorés',              deadline:'26/04',                   problemType:null,     isCompleted:true,  isPlanified:true, deadlinePriority:3 },
+  { id:'17', reference:'D-4103', client:'Studio Fontaine',    description:'Plaquette institutionnelle 24p',  deadline:'27/04', batDeadline:'24/04', problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:1, bufferLabel:'+8h' },
+  { id:'18', reference:'H-8050', client:'Mairie de Lille',    description:'Guide du quartier',               deadline:'28/04',                   problemType:'late',   isCompleted:false, isPlanified:true, deadlinePriority:1, bufferLabel:'-2h' },
+  { id:'19', reference:'A-1049', client:'Maison Dupont',      description:'Étiquettes bouteilles vin',       deadline:'29/04',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:2 },
+  { id:'20', reference:'B-2014', client:'Pharmacie Centrale', description:'Flyers prévention saisonniers',   deadline:'30/04',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:3, bufferLabel:'+3j' },
+  { id:'21', reference:'C-3003', client:'Wheel Digital',      description:'Rapport annuel 48 pages',         deadline:'02/05', batDeadline:'28/04', problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:1 },
+  { id:'22', reference:'E-5202', client:'Éditions Nord',      description:'Tirage affiche collector',        deadline:'05/05',                   problemType:null,     isCompleted:false, isPlanified:true, deadlinePriority:2, bufferLabel:'+5j' },
+];
+
+let selectedJobId = null;
+let peekEnabled = true;
+let directional = true;
+let clickScroll = true;
+
+const scrollEl = document.getElementById('scrollList');
+const container = document.getElementById('jobsContainer');
+const peekTopEl = document.getElementById('peekTop');
+const peekBottomEl = document.getElementById('peekBottom');
+const telSel = document.getElementById('telSel');
+const telPeek = document.getElementById('telPeek');
+const telRel = document.getElementById('telRel');
+
+/* Controls */
+document.getElementById('togglePeek').addEventListener('change', (e) => { peekEnabled = e.target.checked; updatePeek(); });
+document.getElementById('toggleDirectional').addEventListener('change', (e) => { directional = e.target.checked; updatePeek(); });
+document.getElementById('toggleClickScroll').addEventListener('change', (e) => { clickScroll = e.target.checked; });
+
+/* === Status helpers =================================================== */
+function statusOf(job) {
+  if (job.problemType === 'late') return 'late';
+  if (job.problemType === 'conflict') return 'conflict';
+  if (job.isCompleted) return 'completed';
+  if (job.isPlanified) return 'planified';
+  return null;
+}
+
+function prioritySymbol(job) {
+  if (job.isCompleted || job.deadlinePriority == null) return null;
+  return ['!', '+', '=', '-'][job.deadlinePriority] ?? null;
+}
+
+/* === JobCard clone (HTML string) ====================================== */
+function jobCardHTML(job, { isSelected, dim }) {
+  const status = statusOf(job);
+  const classes = ['job-card'];
+  if (status) classes.push(status);
+  if (isSelected) classes.push('selected');
+  else if (dim) classes.push('dim');
+  else if (status === 'completed') classes.push('completed-dim');
+
+  const refClass = status ? `ref ${status}` : 'ref';
+  const descClass = (status === 'late' || status === 'conflict') ? 'desc alert' : 'desc';
+  const showBuffer = job.bufferLabel && status !== 'completed';
+  const prio = prioritySymbol(job);
+  const prioClass = job.deadlinePriority != null ? `prio prio-${job.deadlinePriority}` : 'prio';
+
+  const bufferClass = job.bufferLabel && job.bufferLabel.startsWith('-') ? 'buffer neg' : 'buffer pos';
+
+  return `
+    <button class="${classes.join(' ')}" data-id="${job.id}">
+      <div class="row">
+        <div class="col-main">
+          <div class="ref-line">
+            <span class="${refClass}">${job.reference}</span>
+            <span class="dot-sep">·</span>
+            <span class="client">${job.client}</span>
+          </div>
+          <div class="${descClass}">${job.description}</div>
+        </div>
+        <div class="col-side">
+          ${job.deadline ? `
+            <div class="meta-line">
+              ${SVG_CAL}<span>${job.deadline}</span>
+              ${prio ? `<span class="${prioClass}">${prio}</span>` : ''}
+            </div>` : ''}
+          ${job.batDeadline ? `
+            <div class="meta-line">
+              ${SVG_CAL_CHECK}<span>${job.batDeadline}</span>
+            </div>` : ''}
+          ${showBuffer ? `<span class="${bufferClass}">${job.bufferLabel}</span>` : ''}
+        </div>
+      </div>
+    </button>
+  `;
+}
+
+/* === Render =========================================================== */
+function render() {
+  container.innerHTML = JOBS.map(job => jobCardHTML(job, {
+    isSelected: selectedJobId === job.id,
+    dim: selectedJobId != null && selectedJobId !== job.id,
+  })).join('');
+
+  container.querySelectorAll('.job-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      selectedJobId = selectedJobId === id ? null : id;
+      render();
+      updatePeek();
+    });
+  });
+
+  telSel.textContent = selectedJobId ?? '—';
+}
+
+/* === Peek logic ======================================================= */
+function getSelectedCard() {
+  if (!selectedJobId) return null;
+  return container.querySelector(`.job-card[data-id="${selectedJobId}"]`);
+}
+
+function hidePeek(slot) {
+  slot.classList.remove('visible');
+  slot.innerHTML = '';
+}
+
+function showPeek(slot, position) {
+  const job = JOBS.find(j => j.id === selectedJobId);
+  if (!job) return;
+  slot.innerHTML = jobCardHTML(job, { isSelected: true, dim: false });
+  slot.classList.add('visible');
+
+  const card = slot.querySelector('.job-card');
+  if (card) {
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!clickScroll) return;
+      const origin = getSelectedCard();
+      if (!origin) return;
+      origin.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      origin.classList.remove('origin-flash');
+      void origin.offsetWidth; /* restart animation */
+      origin.classList.add('origin-flash');
+      setTimeout(() => origin.classList.remove('origin-flash'), 700);
+    });
+  }
+  telPeek.textContent = position;
+}
+
+function updatePeek() {
+  if (!peekEnabled || !selectedJobId) {
+    hidePeek(peekTopEl); hidePeek(peekBottomEl);
+    telPeek.textContent = peekEnabled ? '—' : 'disabled';
+    telRel.textContent = '—';
+    return;
+  }
+  const card = getSelectedCard();
+  if (!card) {
+    hidePeek(peekTopEl); hidePeek(peekBottomEl);
+    telPeek.textContent = '—';
+    telRel.textContent = '—';
+    return;
+  }
+
+  const scrollRect = scrollEl.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
+
+  /* Consider peek heights (if currently shown) to avoid flicker */
+  const topPeekH = peekTopEl.classList.contains('visible') ? peekTopEl.offsetHeight : 0;
+  const botPeekH = peekBottomEl.classList.contains('visible') ? peekBottomEl.offsetHeight : 0;
+
+  const visibleTop    = scrollRect.top + topPeekH;
+  const visibleBottom = scrollRect.bottom - botPeekH;
+
+  const aboveViewport = cardRect.bottom <= visibleTop + 2;   /* +2 to avoid hairline flicker */
+  const belowViewport = cardRect.top    >= visibleBottom - 2;
+
+  if (!aboveViewport && !belowViewport) {
+    hidePeek(peekTopEl); hidePeek(peekBottomEl);
+    telPeek.textContent = 'hidden (card in view)';
+    telRel.textContent = 'in view';
+    return;
+  }
+
+  if (directional) {
+    if (aboveViewport) {
+      hidePeek(peekBottomEl);
+      showPeek(peekTopEl, 'top (card above)');
+      telRel.textContent = 'above';
+      console.log('[peek] show TOP', { cardBottom: cardRect.bottom, visibleTop });
+    } else {
+      hidePeek(peekTopEl);
+      showPeek(peekBottomEl, 'bottom (card below)');
+      telRel.textContent = 'below';
+      console.log('[peek] show BOTTOM', { cardTop: cardRect.top, visibleBottom });
+    }
+  } else {
+    hidePeek(peekBottomEl);
+    showPeek(peekTopEl, 'top (fixed)');
+    telRel.textContent = aboveViewport ? 'above' : 'below';
+  }
+}
+
+scrollEl.addEventListener('scroll', updatePeek, { passive: true });
+window.addEventListener('resize', updatePeek);
+
+render();
+updatePeek();
+</script>
+</body>
+</html>

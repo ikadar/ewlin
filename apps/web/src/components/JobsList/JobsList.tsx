@@ -30,6 +30,10 @@ export function JobsList({
   const [activeTab, setActiveTab] = useState<JobTab>('planified');
   const [activeChip, setActiveChip] = useState<JobChip>('all');
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const peekRef = useRef<HTMLDivElement>(null);
+  const [peekPosition, setPeekPosition] = useState<'above' | 'below' | null>(null);
+
   const lateJobIds = useMemo(
     () => new Set(lateJobs.map((lj) => lj.jobId)),
     [lateJobs]
@@ -163,6 +167,61 @@ export function JobsList({
     [onSelectJob]
   );
 
+  const updatePeek = useCallback(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl || !selectedJobId) {
+      setPeekPosition(null);
+      return;
+    }
+    const card = scrollEl.querySelector<HTMLElement>(
+      `[data-testid="job-card-${selectedJobId}"]`
+    );
+    if (!card) {
+      setPeekPosition(null);
+      return;
+    }
+    const scrollRect = scrollEl.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    // Guard against jsdom/pre-paint where rects are all zero.
+    if (scrollRect.height === 0 || cardRect.height === 0) return;
+
+    const peekH = peekRef.current?.offsetHeight ?? 0;
+    const effectiveTop = scrollRect.top + (peekPosition === 'above' ? peekH : 0);
+    const effectiveBottom = scrollRect.bottom - (peekPosition === 'below' ? peekH : 0);
+
+    if (cardRect.bottom <= effectiveTop + 2) setPeekPosition('above');
+    else if (cardRect.top >= effectiveBottom - 2) setPeekPosition('below');
+    else setPeekPosition(null);
+  }, [selectedJobId, peekPosition]);
+
+  // Attach scroll/resize listeners once via a ref to the latest updatePeek,
+  // so changing peekPosition doesn't re-bind the listeners on every tick.
+  const updatePeekRef = useRef(updatePeek);
+  useEffect(() => {
+    updatePeekRef.current = updatePeek;
+  }, [updatePeek]);
+
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    const handler = () => updatePeekRef.current();
+    scrollEl.addEventListener('scroll', handler, { passive: true });
+    window.addEventListener('resize', handler);
+    return () => {
+      scrollEl.removeEventListener('scroll', handler);
+      window.removeEventListener('resize', handler);
+    };
+  }, []);
+
+  const handlePeekClick = useCallback(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl || !selectedJobId) return;
+    const card = scrollEl.querySelector<HTMLElement>(
+      `[data-testid="job-card-${selectedJobId}"]`
+    );
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [selectedJobId]);
+
   const computeBufferLabel = (
     job: Job,
     jobTasks: Task[],
@@ -190,30 +249,46 @@ export function JobsList({
     return `${sign}${hours}h`;
   };
 
-  const renderJobCard = (job: Job) => {
+  const getJobCardProps = (job: Job) => {
     const jobTasks = tasksByJob.get(job.id) || [];
     const jobAssignments = assignmentsByJob.get(job.id) || [];
-
-    return (
-      <JobCard
-        key={job.id}
-        id={job.id}
-        reference={job.reference}
-        client={job.client}
-        description={job.description}
-        deadline={job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined}
-        batDeadline={job.batDeadline ? formatDeadline(job.batDeadline) : undefined}
-        problemType={getProblemType(job.id)}
-        isCompleted={isJobCompleted(job.id)}
-        isPlanified={isJobPlanified(job.id)}
-        bufferLabel={computeBufferLabel(job, jobTasks, jobAssignments)}
-        deadlinePriority={job.deadlinePriority}
-        isSelected={selectedJobId === job.id}
-        dim={selectedJobId != null && selectedJobId !== job.id}
-        onClick={handleJobToggle}
-      />
-    );
+    return {
+      id: job.id,
+      reference: job.reference,
+      client: job.client,
+      description: job.description,
+      deadline: job.workshopExitDate ? formatDeadline(job.workshopExitDate) : undefined,
+      batDeadline: job.batDeadline ? formatDeadline(job.batDeadline) : undefined,
+      problemType: getProblemType(job.id),
+      isCompleted: isJobCompleted(job.id),
+      isPlanified: isJobPlanified(job.id),
+      bufferLabel: computeBufferLabel(job, jobTasks, jobAssignments),
+      deadlinePriority: job.deadlinePriority,
+    };
   };
+
+  const renderJobCard = (job: Job) => (
+    <JobCard
+      key={job.id}
+      {...getJobCardProps(job)}
+      isSelected={selectedJobId === job.id}
+      dim={selectedJobId != null && selectedJobId !== job.id}
+      onClick={handleJobToggle}
+    />
+  );
+
+  const selectedJob = useMemo(
+    () => jobs.find((j) => j.id === selectedJobId) ?? null,
+    [jobs, selectedJobId]
+  );
+
+  // Re-check peek position on selection change and whenever the visible list
+  // changes (filter/sort/tab). Deferred via rAF so the setState isn't
+  // synchronous within the effect body (avoids cascading renders).
+  useEffect(() => {
+    const id = requestAnimationFrame(() => updatePeekRef.current());
+    return () => cancelAnimationFrame(id);
+  }, [selectedJobId, visibleJobs]);
 
   return (
     <aside
@@ -231,12 +306,32 @@ export function JobsList({
         chipCounts={chipCounts}
       />
 
-      <div className="flex-1 overflow-y-auto jobslist-scroll">
-        {visibleJobs.length > 0 ? (
-          visibleJobs.map(renderJobCard)
-        ) : (
-          <div className="px-3 py-8 text-center text-zinc-500 text-sm">
-            {searchQuery ? 'Aucun travail trouvé' : 'Aucun travail dans cette vue'}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        <div ref={scrollRef} className="absolute inset-0 overflow-y-auto jobslist-scroll">
+          {visibleJobs.length > 0 ? (
+            visibleJobs.map(renderJobCard)
+          ) : (
+            <div className="px-3 py-8 text-center text-zinc-500 text-sm">
+              {searchQuery ? 'Aucun travail trouvé' : 'Aucun travail dans cette vue'}
+            </div>
+          )}
+        </div>
+        {peekPosition && selectedJob && (
+          <div
+            ref={peekRef}
+            data-testid="job-card-peek"
+            className={`absolute left-0 right-[6px] z-10 bg-zinc-900 pt-[6px] ${
+              peekPosition === 'above'
+                ? 'top-0 shadow-[0_6px_12px_-4px_rgba(0,0,0,0.6)] border-b border-white/5'
+                : 'bottom-0 shadow-[0_-6px_12px_-4px_rgba(0,0,0,0.6)] border-t border-white/5'
+            }`}
+          >
+            <JobCard
+              {...getJobCardProps(selectedJob)}
+              isSelected
+              dim={false}
+              onClick={handlePeekClick}
+            />
           </div>
         )}
       </div>
