@@ -397,6 +397,13 @@
     position: relative;
     overflow: hidden;
   }
+  .time-lens-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    will-change: transform;
+  }
   .time-lens-hour-line {
     position: absolute;
     left: 0;
@@ -588,6 +595,24 @@
         <input type="checkbox" id="onlyTiny" />
         <span>Only trigger on short tiles (≤ 20 px)</span>
       </label>
+    </div>
+
+    <!-- Motion -->
+    <div class="control-group">
+      <span class="label">Motion (snap mode)</span>
+      <label class="check-row">
+        <input type="checkbox" id="smoothScroll" checked />
+        <span>Smooth scroll between tiles</span>
+      </label>
+      <div class="slider-row" style="margin-top:10px;">
+        <span class="label" style="margin:0;">Scroll duration</span>
+        <span class="val" id="scrollDurationVal">260 ms</span>
+      </div>
+      <input type="range" id="scrollDuration" min="80" max="500" step="20" value="260" />
+      <div class="legend" style="margin-top:8px;">
+        Only animates when the center moves within the same column.
+        Zoom/size changes rebuild instantly.
+      </div>
     </div>
 
     <!-- Delay -->
@@ -796,6 +821,8 @@
     showConnector: false,
     onlyTiny: false,
     delay: 80,
+    smoothScroll: true,
+    scrollDuration: 260,
 
     // Runtime
     activeCol: null,         // current column being hovered
@@ -806,6 +833,7 @@
     showTimer: null,
     hideTimer: null,
     pendingCol: null,
+    lastLayoutSig: null,     // signature of current DOM structure (for fast path)
   };
 
   function lensPxPerHour() { return PIXELS_PER_HOUR * state.zoom; }
@@ -851,6 +879,7 @@ scanning/readability, the tooltip is for deep inspection.
 - Hover delay:        ${state.delay} ms
 - Connector line:     ${state.showConnector ? 'shown' : 'hidden'}
 - Only short tiles:   ${state.onlyTiny ? 'trigger only when height ≤ 20 px' : 'trigger on any tile'}
+- Smooth scroll:      ${state.smoothScroll ? `enabled — ${state.scrollDuration} ms cubic-bezier(0.2, 0.8, 0.2, 1)` : 'disabled (instant snap)'}
 
 ## Time grid inside the lens (multi-tier)
 | Step   | Line opacity | Label style                 |
@@ -884,7 +913,14 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
 - The visible window is derived: \`lensHeight / (80 × zoom) × 60\`.
   If min tile duration shrinks below 2 min in the future, either raise
   zoom or clamp a min visual height (breaks strict temporal scaling —
-  flag explicitly in the UI if done).`;
+  flag explicitly in the UI if done).
+- For smooth scroll: render ALL tiles + grid of the column into an inner
+  wrapper (\`height = timelineMinutes × lensPxPerHour / 60\`) that sits
+  inside a fixed-height, overflow-hidden body. Animate the wrapper's
+  \`translateY\` — not the individual tiles — so tiles that enter/leave
+  the viewport during the transition stay mounted and move together.
+  Animate only within the same column; cross-column jumps should rebuild
+  instantly.`;
   }
 
   function updatePromptOutput() {
@@ -924,161 +960,176 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     return c;
   }
 
-  function renderLens(col, centerMin) {
+  function layoutSignature(col) {
+    return `${col.id}|${state.zoom}|${state.lensWidth}|${state.lensHeight}|${state.position}|${state.showHourMarkers}`;
+  }
+
+  function renderLens(col, centerMin, opts = {}) {
+    const { animate = false } = opts;
     const lens = ensureLensDom();
+    const lpx = lensPxPerHour();
+    const bodyH = state.lensHeight - 28; // minus header
+    const fullHeight = (TIMELINE_MINUTES / 60) * lpx;
+    const targetY = bodyH / 2 - (centerMin / 60) * lpx;
+
+    // ── Position the lens envelope ──
     lens.style.width = `${state.lensWidth}px`;
     lens.style.height = `${state.lensHeight}px`;
 
-    const lpx = lensPxPerHour();
-    const winMins = lensWindowMinutes();
-    const startMin = centerMin - winMins / 2;
-    const endMin = centerMin + winMins / 2;
-
-    // Compute position relative to .columns
     const colsRect = getColumnsRect();
     const timelineRect = getTimelineRect(col);
     const stationEl = document.getElementById(col.stationId);
     const stationRect = stationEl.getBoundingClientRect();
 
-    // Vertical center of lens = the pixel Y on the page where centerMin lies
     const centerYPage = timelineRect.top + minutesToPx(centerMin);
     let lensTop = centerYPage - state.lensHeight / 2 - colsRect.top;
-
-    // Clamp to stage vertical range (lens shouldn't scroll off-screen awkwardly)
     const minTop = 0;
     const maxTop = Math.max(0, document.querySelector('.stage').scrollHeight - state.lensHeight - 80);
     lensTop = Math.max(minTop, Math.min(maxTop, lensTop));
 
     let lensLeft;
     switch (state.position) {
-      case 'right':
-        lensLeft = stationRect.right - colsRect.left + 40;
-        break;
-      case 'left':
-        lensLeft = stationRect.left - colsRect.left - state.lensWidth - 40;
-        break;
-      case 'overlay':
-        lensLeft = stationRect.left - colsRect.left + (stationRect.width - state.lensWidth) / 2;
-        break;
+      case 'right':   lensLeft = stationRect.right - colsRect.left + 40; break;
+      case 'left':    lensLeft = stationRect.left  - colsRect.left - state.lensWidth - 40; break;
+      case 'overlay': lensLeft = stationRect.left  - colsRect.left + (stationRect.width - state.lensWidth) / 2; break;
     }
+    const sig = layoutSignature(col);
+    const fastPath = state.lastLayoutSig === sig && lens.querySelector('.time-lens-content');
+    const willAnimate = fastPath && animate && state.smoothScroll;
+    const easing = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+
+    // Envelope transition — synced with inner scroll when animating, else CSS default
+    lens.style.transition = willAnimate
+      ? `opacity 120ms ease-out, transform 140ms ease-out, top ${state.scrollDuration}ms ${easing}, left ${state.scrollDuration}ms ${easing}`
+      : '';
 
     lens.style.top = `${lensTop}px`;
     lens.style.left = `${lensLeft}px`;
 
-    // ── Body contents ───────────────────────────────────────────
-    lens.innerHTML = '';
+    if (fastPath) {
+      // ── Recenter only: translate the inner wrapper (animated if requested) ──
+      const inner = lens.querySelector('.time-lens-content');
+      inner.style.transition = willAnimate
+        ? `transform ${state.scrollDuration}ms ${easing}`
+        : 'none';
+      inner.style.transform = `translateY(${targetY}px)`;
 
-    const header = document.createElement('div');
-    header.className = 'time-lens-header';
-    header.innerHTML = `
-      <span class="title">${col.name}</span>
-      <span>${formatHour(DAY_START_MIN + centerMin)}</span>
-    `;
-    lens.appendChild(header);
+      // Update header time label in place
+      const timeSpan = lens.querySelector('.time-lens-header > span:last-child');
+      if (timeSpan) timeSpan.textContent = formatHour(DAY_START_MIN + centerMin);
+    } else {
+      // ── Full rebuild: renders the entire timeline into the inner wrapper ──
+      lens.innerHTML = '';
 
-    const body = document.createElement('div');
-    body.className = 'time-lens-body';
-    body.style.height = `${state.lensHeight - 28}px`; // minus header
-    lens.appendChild(body);
+      const header = document.createElement('div');
+      header.className = 'time-lens-header';
+      header.innerHTML = `<span class="title">${col.name}</span><span>${formatHour(DAY_START_MIN + centerMin)}</span>`;
+      lens.appendChild(header);
 
-    // Multi-tier time grid inside the body.
-    // Tiers (coarsest → finest), each added on top of the previous so a
-    // hour mark also has the 30/15/5 styling suppressed below it.
-    if (state.showHourMarkers) {
-      const bodyH = parseFloat(body.style.height);
-      const tiers = [
-        { step: 60, lineOpacity: 0.09, label: true,  labelStrong: true  },                  // hour
-        { step: 30, lineOpacity: 0.06, label: true,  labelStrong: false },                  // half
-        { step: 15, lineOpacity: 0.04, label: true,  labelStrong: false, tiny: true },       // quarter
-        { step:  5, lineOpacity: 0.02, label: true,  labelStrong: false, tiny: true },       // 5-min
-      ];
-      const drawnMinutes = new Set();
-      tiers.forEach(tier => {
-        const first = Math.ceil(startMin / tier.step) * tier.step;
-        for (let m = first; m <= endMin; m += tier.step) {
-          if (drawnMinutes.has(m)) continue;
-          drawnMinutes.add(m);
-          const y = ((m - startMin) / 60) * lpx;
-          if (y < 0 || y > bodyH) continue;
+      const body = document.createElement('div');
+      body.className = 'time-lens-body';
+      body.style.height = `${bodyH}px`;
+      lens.appendChild(body);
 
-          const line = document.createElement('div');
-          line.className = 'time-lens-hour-line';
-          line.style.top = `${y}px`;
-          line.style.background = `rgba(255,255,255,${tier.lineOpacity})`;
-          body.appendChild(line);
+      const inner = document.createElement('div');
+      inner.className = 'time-lens-content';
+      inner.style.height = `${fullHeight}px`;
+      body.appendChild(inner);
 
-          if (tier.label) {
-            const lbl = document.createElement('div');
-            lbl.className = 'time-lens-hour-label';
-            lbl.style.top = `${y}px`;
-            lbl.textContent = formatHour(DAY_START_MIN + m);
-            if (tier.tiny) {
-              lbl.style.fontSize = '8px';
-              lbl.style.color = 'var(--text-dim)';
-            } else if (!tier.labelStrong) {
-              lbl.style.color = 'var(--text-dim)';
+      // Multi-tier time grid — absolute positions within the full timeline
+      if (state.showHourMarkers) {
+        const tiers = [
+          { step: 60, lineOpacity: 0.09, label: true,  labelStrong: true  },
+          { step: 30, lineOpacity: 0.06, label: true,  labelStrong: false },
+          { step: 15, lineOpacity: 0.04, label: true,  labelStrong: false, tiny: true },
+          { step:  5, lineOpacity: 0.02, label: true,  labelStrong: false, tiny: true },
+        ];
+        const drawnMinutes = new Set();
+        tiers.forEach(tier => {
+          for (let m = 0; m <= TIMELINE_MINUTES; m += tier.step) {
+            if (drawnMinutes.has(m)) continue;
+            drawnMinutes.add(m);
+            const y = (m / 60) * lpx;
+            const line = document.createElement('div');
+            line.className = 'time-lens-hour-line';
+            line.style.top = `${y}px`;
+            line.style.background = `rgba(255,255,255,${tier.lineOpacity})`;
+            inner.appendChild(line);
+
+            if (tier.label) {
+              const lbl = document.createElement('div');
+              lbl.className = 'time-lens-hour-label';
+              lbl.style.top = `${y}px`;
+              lbl.textContent = formatHour(DAY_START_MIN + m);
+              if (tier.tiny) {
+                lbl.style.fontSize = '8px';
+                lbl.style.color = 'var(--text-dim)';
+              } else if (!tier.labelStrong) {
+                lbl.style.color = 'var(--text-dim)';
+              }
+              inner.appendChild(lbl);
             }
-            body.appendChild(lbl);
           }
-        }
-      });
-    }
-
-    // Tiles visible in the window
-    const visibleTiles = col.tiles.filter(t =>
-      (t.start + t.duration) > startMin && t.start < endMin
-    );
-
-    visibleTiles.forEach(t => {
-      const palette = PALETTE[t.state];
-      const relStart = (t.start - startMin) / 60 * lpx;
-      const h = minutesToPx(t.duration, lpx);
-
-      const tileEl = document.createElement('div');
-      tileEl.className = 'tile';
-      tileEl.style.position = 'absolute';
-      tileEl.style.left = '40px'; // leave room for hour label
-      tileEl.style.right = '4px';
-      tileEl.style.top = `${relStart}px`;
-      tileEl.style.height = `${h - 2}px`;
-      tileEl.style.borderLeftColor = palette.borderHex;
-      tileEl.style.background = `rgba(${palette.rgb}, ${palette.opRun})`;
-      tileEl.style.cursor = 'default';
-
-      if (t.setup > 0) {
-        const divider = document.createElement('div');
-        divider.className = 'tile-setup-divider';
-        divider.style.top = `${minutesToPx(t.setup, lpx)}px`;
-        tileEl.appendChild(divider);
+        });
       }
 
-      const label = document.createElement('div');
-      label.className = 'tile-label';
-      label.innerHTML = `
-        <div class="tile-label-row">
-          <span class="tile-pin"></span>
-          <span class="tile-title" style="color: ${palette.textHex}">${t.ref} · ${t.client}</span>
-        </div>
-        <div class="tile-operator">${t.operator}</div>
-      `;
-      tileEl.appendChild(label);
-      body.appendChild(tileEl);
-    });
+      // All tiles — absolute positions within the full timeline
+      col.tiles.forEach(t => {
+        const palette = PALETTE[t.state];
+        const top = (t.start / 60) * lpx;
+        const h = (t.duration / 60) * lpx;
 
-    // Top/bottom fade masks for gentle edges
-    const fadeTop = document.createElement('div');
-    fadeTop.className = 'time-lens-edge-fade top';
-    body.appendChild(fadeTop);
-    const fadeBot = document.createElement('div');
-    fadeBot.className = 'time-lens-edge-fade bottom';
-    body.appendChild(fadeBot);
+        const tileEl = document.createElement('div');
+        tileEl.className = 'tile';
+        tileEl.style.position = 'absolute';
+        tileEl.style.left = '40px';
+        tileEl.style.right = '4px';
+        tileEl.style.top = `${top}px`;
+        tileEl.style.height = `${h - 2}px`;
+        tileEl.style.borderLeftColor = palette.borderHex;
+        tileEl.style.background = `rgba(${palette.rgb}, ${palette.opRun})`;
+        tileEl.style.cursor = 'default';
 
-    // Connector
+        if (t.setup > 0) {
+          const divider = document.createElement('div');
+          divider.className = 'tile-setup-divider';
+          divider.style.top = `${minutesToPx(t.setup, lpx)}px`;
+          tileEl.appendChild(divider);
+        }
+        const label = document.createElement('div');
+        label.className = 'tile-label';
+        label.innerHTML = `
+          <div class="tile-label-row">
+            <span class="tile-pin"></span>
+            <span class="tile-title" style="color: ${palette.textHex}">${t.ref} · ${t.client}</span>
+          </div>
+          <div class="tile-operator">${t.operator}</div>
+        `;
+        tileEl.appendChild(label);
+        inner.appendChild(tileEl);
+      });
+
+      // Edge fades — pinned to the body viewport (don't scroll with content)
+      const fadeTop = document.createElement('div');
+      fadeTop.className = 'time-lens-edge-fade top';
+      body.appendChild(fadeTop);
+      const fadeBot = document.createElement('div');
+      fadeBot.className = 'time-lens-edge-fade bottom';
+      body.appendChild(fadeBot);
+
+      // First frame: no transition; apply transform directly
+      inner.style.transition = 'none';
+      inner.style.transform = `translateY(${targetY}px)`;
+    }
+
+    // Connector — repositions instantly; no animation
     if (state.showConnector) {
       renderConnector(col, centerMin, lensLeft, lensTop);
     } else if (state.connectorEl) {
       state.connectorEl.classList.remove('visible');
     }
+
+    state.lastLayoutSig = sig;
   }
 
   function renderConnector(col, centerMin, lensLeft, lensTop) {
@@ -1144,7 +1195,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     if (tiles[idx]) tiles[idx].classList.add('lens-focus');
   }
 
-  function showLens(col, centerMin, focusIdx = null) {
+  function showLens(col, centerMin, focusIdx = null, opts = {}) {
     clearTimeout(state.hideTimer);
     state.hideTimer = null;
     state.activeCol = col;
@@ -1156,7 +1207,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       clearFocusTile();
       state.focusTileIdx = null;
     }
-    renderLens(col, centerMin);
+    renderLens(col, centerMin, opts);
     requestAnimationFrame(() => state.lensEl.classList.add('visible'));
   }
 
@@ -1173,6 +1224,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     clearFocusTile();
     state.activeCol = null;
     state.focusTileIdx = null;
+    state.lastLayoutSig = null; // next open triggers a fresh structural build
   }
 
   function tileMidTimeMin(t) {
@@ -1185,8 +1237,10 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     const centerMin = tileMidTimeMin(tile);
 
     if (state.lensEl && state.lensEl.classList.contains('visible')) {
-      // Already visible — just re-center
-      showLens(col, centerMin, idx);
+      // Already visible — re-center; animate if smooth-scroll enabled and
+      // we stay on the same column (cross-column jumps are not animated).
+      const sameCol = state.activeCol && state.activeCol.id === col.id;
+      showLens(col, centerMin, idx, { animate: sameCol });
       return;
     }
     clearTimeout(state.showTimer);
@@ -1278,6 +1332,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     bindSlider('width', 'lensWidth', v => `${v} px`);
     bindSlider('height', 'lensHeight', v => `${v} px`);
     bindSlider('delay', 'delay', v => `${v} ms`);
+    bindSlider('scrollDuration', 'scrollDuration', v => `${v} ms`);
 
     const bindCheck = (id, stateKey) => {
       const el = document.getElementById(id);
@@ -1290,6 +1345,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     bindCheck('hourMarkers', 'showHourMarkers');
     bindCheck('connector', 'showConnector');
     bindCheck('onlyTiny', 'onlyTiny');
+    bindCheck('smoothScroll', 'smoothScroll');
 
     // Copy prompt button
     const copyBtn = document.getElementById('copyPromptBtn');
