@@ -330,7 +330,12 @@ export function TimelineLens({
                   top: `${top}px`,
                   height: `${height}px`,
                   pointerEvents: 'none',
-                  zIndex: 1,
+                  // NO z-index: let the natural DOM order stack hatches
+                  // above the grid (rendered before them) and below the
+                  // tileContent (rendered after them). Setting z:1 here
+                  // would lift hatches above tiles — so in an
+                  // unavailability-heavy column (e.g. a vacation day)
+                  // the tiles disappear under the stripes.
                 }}
               />
             );
