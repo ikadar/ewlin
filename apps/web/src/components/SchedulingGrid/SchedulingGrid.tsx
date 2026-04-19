@@ -476,10 +476,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
   }, [lensActiveTiles]);
 
-  const lensColumnTitle = lens.state.activeColumnId
-    ? stationMap.get(lens.state.activeColumnId)?.name ?? ''
-    : '';
-
   // Event delegation: a single mouseover on the columns wrapper covers every tile.
   const handleColumnsMouseOver = (e: ReactMouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -682,7 +678,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         visible={lens.state.visible}
         activeColumnId={lens.state.activeColumnId}
         anchor={lens.state.anchor}
-        columnTitle={lensColumnTitle}
         tiles={lensActiveTiles}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}

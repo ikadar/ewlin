@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { LensTile } from './LensTile';
 import type { TileState } from '../Tile/colorUtils';
 import {
-  LENS_WIDTH, LENS_HEIGHT, LENS_HEADER_HEIGHT, LENS_PIXELS_PER_HOUR,
+  LENS_WIDTH, LENS_HEIGHT, LENS_PIXELS_PER_HOUR,
   LENS_FADE_IN_MS, LENS_FADE_OUT_MS, LENS_SCROLL_DURATION_MS, LENS_SCROLL_EASING,
   LENS_SMOOTH_SCROLL, LENS_OFFSET_FROM_COLUMN, LENS_Z_INDEX,
 } from './lensConfig';
@@ -38,7 +38,6 @@ export interface TimelineLensProps {
    *  animates (same column = scroll smoothly; cross-column = snap). */
   activeColumnId: string | null;
   anchor: LensAnchor | null;
-  columnTitle: string;
   tiles: LensTileData[];
   /** Absolute ms used as the Y=0 reference for tile positions inside the lens. */
   gridStartMs: number;
@@ -72,10 +71,12 @@ function formatHHMM(ms: number): string {
  *                         changes within the same column
  */
 export function TimelineLens({
-  visible, activeColumnId, anchor, columnTitle, tiles, gridStartMs, gridEndMs, centerTimeMs,
+  visible, activeColumnId, anchor, tiles, gridStartMs, gridEndMs, centerTimeMs,
   onMouseEnter, onMouseLeave,
 }: TimelineLensProps) {
-  const bodyH = LENS_HEIGHT - LENS_HEADER_HEIGHT;
+  // The lens is header-less, so the whole envelope is the body — tiles at the
+  // body's vertical midpoint align pixel-for-pixel with the source tile Y.
+  const bodyH = LENS_HEIGHT;
   const lpx = LENS_PIXELS_PER_HOUR;
   const fullH = Math.max(0, ((gridEndMs - gridStartMs) / 3_600_000) * lpx);
   const centerOffset = ((centerTimeMs - gridStartMs) / 3_600_000) * lpx;
@@ -235,8 +236,6 @@ export function TimelineLens({
     pointerEvents: visible ? 'auto' : 'none',
   };
 
-  const currentTimeLabel = formatHHMM(centerTimeMs);
-
   return createPortal(
     <div
       style={lensStyle}
@@ -244,35 +243,6 @@ export function TimelineLens({
       onMouseLeave={onMouseLeave}
       aria-hidden={!visible}
     >
-      <div
-        style={{
-          padding: '5px 8px',
-          borderBottom: '1px solid #27272a',
-          fontSize: '10px',
-          color: '#a1a1aa',
-          background: 'rgb(31, 31, 35)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: '8px',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          height: `${LENS_HEADER_HEIGHT}px`,
-          boxSizing: 'border-box',
-        }}
-      >
-        <span
-          style={{
-            color: '#e4e4e7',
-            fontWeight: 500,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {columnTitle}
-        </span>
-        <span>{currentTimeLabel}</span>
-      </div>
-
       <div style={{ position: 'relative', overflow: 'hidden', height: `${bodyH}px` }}>
         <div
           ref={innerRef}

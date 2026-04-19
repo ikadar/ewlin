@@ -754,12 +754,6 @@ export default function OperatorSchedulePage() {
     return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
   }, [lensActiveTiles]);
 
-  const lensColumnTitle = useMemo(() => {
-    if (!lens.state.activeColumnId) return '';
-    const op = operators.find(o => o.id === lens.state.activeColumnId);
-    return op ? `${op.firstName} ${op.lastName}` : '';
-  }, [lens.state.activeColumnId, operators]);
-
   const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const segmentEl = target.closest('[data-testid^="tile-segment-"]') as HTMLElement | null;
@@ -1074,7 +1068,6 @@ export default function OperatorSchedulePage() {
         visible={lens.state.visible}
         activeColumnId={lens.state.activeColumnId}
         anchor={lens.state.anchor}
-        columnTitle={lensColumnTitle}
         tiles={lensActiveTiles}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}

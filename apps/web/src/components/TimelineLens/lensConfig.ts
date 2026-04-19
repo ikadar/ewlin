@@ -7,14 +7,16 @@
  * Values validated in `playground-tile-zoom-loupe.html`.
  */
 
-/** Fixed lens density so a 2-min tile always renders ~25 px tall, regardless of the
- *  user's current zoom on the source grid. */
-export const LENS_PIXELS_PER_HOUR = 750;
+/** Fixed lens density so short tiles are comfortably readable regardless of the
+ *  user's current zoom on the source grid. At 500 px/h a 2-min tile is ~17 px
+ *  tall and a 5-min tile ~42 px — enough headroom for the `11 px` title + the
+ *  `9 px` subtitle without magnifying so hard that context shrinks to a few
+ *  minutes on each side. */
+export const LENS_PIXELS_PER_HOUR = 500;
 
 /** Lens envelope dimensions. */
 export const LENS_WIDTH = 300;
 export const LENS_HEIGHT = 400;
-export const LENS_HEADER_HEIGHT = 28;
 export const LENS_LEFT_GUTTER = 40;
 
 /** Any tile rendered at ≤ this many pixels in the source grid is considered "small"
