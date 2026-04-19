@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  LENS_HOVER_DELAY_MS, LENS_HIDE_GRACE_MS, LENS_AUTO_CLOSE_MS,
-  LENS_SMALL_TILE_THRESHOLD_PX, LENS_ONLY_TINY,
+  LENS_HIDE_GRACE_MS, LENS_AUTO_CLOSE_MS,
+  computeDwellMs, isTileTriggerable,
 } from './lensConfig';
 import type { LensAnchor } from './TimelineLens';
 
@@ -89,8 +89,9 @@ export function useTimelineLens() {
   }, [hide]);
 
   const handleTileEnter = useCallback((input: TileEnterInput) => {
-    const small = input.tileHeightPx <= LENS_SMALL_TILE_THRESHOLD_PX;
     const current = stateRef.current;
+    const triggerable = isTileTriggerable(input.tileHeightPx);
+    const dwellMs = computeDwellMs(input.tileHeightPx);
 
     // ── Cross-column: instantly hide the current lens (fade-out), then
     // schedule a fresh open if the new tile qualifies. Prevents the lens
@@ -104,7 +105,7 @@ export function useTimelineLens() {
       clearHideTimer();
       clearCloseTimer();
       setState(INITIAL_STATE);
-      if (small) {
+      if (triggerable) {
         showTimerRef.current = window.setTimeout(() => {
           showTimerRef.current = null;
           setState({
@@ -113,54 +114,38 @@ export function useTimelineLens() {
             centerTimeMs: input.tileMidTimeMs,
             anchor: input.anchor,
           });
-        }, LENS_HOVER_DELAY_MS);
+        }, dwellMs);
       }
       return;
     }
 
-    if (small) {
+    if (triggerable) {
       clearCloseTimer();
       clearHideTimer();
 
-      if (current.visible) {
-        // Same session — update the target instantly; the lens component
-        // will transition translateY to the new center.
+      // Already visible — follow-cursor handles position; nothing to do here.
+      // Moving from one triggerable tile to another inside the same column
+      // doesn't reset the lens; the cursor itself drives centerTimeMs.
+      if (current.visible) return;
+
+      // Fresh open: cancel any previous pending show and schedule one with
+      // this tile's height-dependent dwell.
+      clearShowTimer();
+      showTimerRef.current = window.setTimeout(() => {
+        showTimerRef.current = null;
         setState({
           visible: true,
           activeColumnId: input.columnId,
           centerTimeMs: input.tileMidTimeMs,
           anchor: input.anchor,
         });
-        return;
-      }
-
-      // Not yet visible — schedule the first open
-      if (showTimerRef.current === null) {
-        showTimerRef.current = window.setTimeout(() => {
-          showTimerRef.current = null;
-          setState({
-            visible: true,
-            activeColumnId: input.columnId,
-            centerTimeMs: input.tileMidTimeMs,
-            anchor: input.anchor,
-          });
-        }, LENS_HOVER_DELAY_MS);
-      }
+      }, dwellMs);
       return;
     }
 
-    // Tall tile
+    // Tile too tall to trigger even at max dwell → treat like a dead zone:
+    // arm the auto-close (no-op if the lens is hidden).
     if (!current.visible) return;
-    if (!LENS_ONLY_TINY) {
-      // If we ever turn off the onlyTiny gate, tall-tile hovers would re-center
-      // the lens on the tall tile here. Kept as a hook for future flexibility.
-      setState({
-        visible: true,
-        activeColumnId: input.columnId,
-        centerTimeMs: input.tileMidTimeMs,
-        anchor: input.anchor,
-      });
-    }
     armCloseTimer();
   }, [clearShowTimer, clearCloseTimer, clearHideTimer, armCloseTimer]);
 

@@ -26,12 +26,32 @@ export function computeLensHeight(viewportHeight: number): number {
   return Math.max(viewportHeight * LENS_VIEWPORT_HEIGHT_RATIO, LENS_MIN_HEIGHT);
 }
 
-/** Any tile rendered at ≤ this many pixels in the source grid is considered "small"
- *  (the lens's reason to exist). Taller tiles are already readable. */
+/** Reference threshold: at exactly LENS_HOVER_DELAY_MS of dwell, tiles ≤ this
+ *  many pixels trigger the lens. Taller tiles can still trigger — they just
+ *  need proportionally more dwell, capped at LENS_MAX_DWELL_MS (see
+ *  `computeDwellMs`). */
 export const LENS_SMALL_TILE_THRESHOLD_PX = 20;
 
 /** Timings (ms). */
 export const LENS_HOVER_DELAY_MS = 80;
+/** Upper bound on the dwell required to trigger the lens. Tiles bigger than
+ *  `(LENS_MAX_DWELL_MS / LENS_HOVER_DELAY_MS) × LENS_SMALL_TILE_THRESHOLD_PX`
+ *  never trigger — they are treated like dead zones for auto-close purposes. */
+export const LENS_MAX_DWELL_MS = 600;
+
+/** Required dwell (ms) before the lens opens on a tile of the given rendered
+ *  height. Linear scaling: 20 px → 80 ms, 40 px → 160 ms, 100 px → 400 ms, … */
+export function computeDwellMs(tileHeightPx: number): number {
+  if (tileHeightPx <= 0) return LENS_HOVER_DELAY_MS;
+  return Math.ceil(
+    (tileHeightPx / LENS_SMALL_TILE_THRESHOLD_PX) * LENS_HOVER_DELAY_MS,
+  );
+}
+
+/** Whether the given tile height is reachable within LENS_MAX_DWELL_MS. */
+export function isTileTriggerable(tileHeightPx: number): boolean {
+  return computeDwellMs(tileHeightPx) <= LENS_MAX_DWELL_MS;
+}
 export const LENS_FADE_IN_MS = 500;
 export const LENS_FADE_OUT_MS = 500;
 /** Dwell before auto-closing on a tall tile or hatched unavailability zone.
