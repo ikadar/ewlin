@@ -25,8 +25,21 @@ pub struct OperatorInput {
     /// Datetime-range absences (vacation, sick leave, …). The scheduler
     /// excludes any tick falling within any of these ranges from this
     /// operator's availability. Endpoints are inclusive.
-    #[serde(default)]
+    ///
+    /// Accepts both missing field and explicit `null` from the client
+    /// (PHP serializers often encode empty collections as `null` rather
+    /// than `[]`). `#[serde(default)]` alone handles missing but rejects
+    /// null, so we need the explicit null-tolerant deserializer.
+    #[serde(default, deserialize_with = "deserialize_vec_null_as_empty")]
     pub absences: Vec<Absence>,
+}
+
+fn deserialize_vec_null_as_empty<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<Vec<T>>::deserialize(deserializer).map(|opt| opt.unwrap_or_default())
 }
 
 /// Naive local datetime range during which the operator is unavailable.
