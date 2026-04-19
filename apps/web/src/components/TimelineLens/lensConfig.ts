@@ -25,12 +25,12 @@ export const LENS_SMALL_TILE_THRESHOLD_PX = 20;
 
 /** Timings (ms). */
 export const LENS_HOVER_DELAY_MS = 80;
-export const LENS_FADE_IN_MS = 120;
-export const LENS_FADE_OUT_MS = 140;
-/** Generous dwell before auto-closing on a tall tile. Lower values felt like
- *  the lens "evaporated" mid-inspection, especially now that follow-cursor
- *  makes it natural to hover a tall tile for a moment while scanning around. */
-export const LENS_AUTO_CLOSE_MS = 3000;
+export const LENS_FADE_IN_MS = 500;
+export const LENS_FADE_OUT_MS = 500;
+/** Dwell before auto-closing on a tall tile or hatched unavailability zone.
+ *  Halved from the previous 3000 ms per user feedback — with 500 ms fade-out,
+ *  the total perceived "lens is leaving" time stays around 2 s end-to-end. */
+export const LENS_AUTO_CLOSE_MS = 1500;
 export const LENS_HIDE_GRACE_MS = 140;
 /** Duration used both for the envelope (top/left) gliding when the lens docks
  *  against a new tile, and for the inner translateY when the focal time
