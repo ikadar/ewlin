@@ -148,6 +148,18 @@ export function useTimelineLens() {
   }, [clearShowTimer, clearHideTimer, hide]);
 
   /**
+   * Cursor moved into a non-tile area of the column (hatched unavailability
+   * overlay, hour grid line, empty space between tiles, …). Treated exactly
+   * like entering a tall tile: arms the auto-close timer once, without
+   * resetting an already-running one.
+   */
+  const handleDeadZoneEnter = useCallback(() => {
+    const current = stateRef.current;
+    if (!current.visible) return;
+    armCloseTimer();
+  }, [armCloseTimer]);
+
+  /**
    * Continuous follow: once the lens is already visible and the cursor moves
    * within the same column, re-center on the cursor's current Y. No-op if the
    * lens is hidden (won't force-open) or if the cursor is over a different
@@ -206,6 +218,7 @@ export function useTimelineLens() {
     state,
     handlers: {
       handleTileEnter,
+      handleDeadZoneEnter,
       handleColumnMouseMove,
       handleStationLeave,
       handleLensEnter,

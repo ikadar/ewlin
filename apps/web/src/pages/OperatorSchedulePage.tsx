@@ -757,7 +757,16 @@ export default function OperatorSchedulePage() {
   const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const segmentEl = target.closest('[data-testid^="tile-segment-"]') as HTMLElement | null;
-    if (!segmentEl) return;
+
+    if (!segmentEl) {
+      // Dead zone (hatched overlay, hour grid line, column bg) — arm auto-close.
+      if (lastHoveredSegmentKeyRef.current !== '__deadzone__') {
+        lastHoveredSegmentKeyRef.current = '__deadzone__';
+        lens.handlers.handleDeadZoneEnter();
+      }
+      return;
+    }
+
     const testId = segmentEl.getAttribute('data-testid');
     const segmentKey = testId ? testId.slice('tile-segment-'.length) : null;
     if (!segmentKey || segmentKey === lastHoveredSegmentKeyRef.current) return;

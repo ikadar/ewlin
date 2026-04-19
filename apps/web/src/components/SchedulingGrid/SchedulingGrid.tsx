@@ -476,11 +476,24 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
   }, [lensActiveTiles]);
 
-  // Event delegation: a single mouseover on the columns wrapper covers every tile.
+  // Event delegation: a single mouseover on the columns wrapper covers every
+  // tile + every non-tile area (hatched unavailability overlay, hour-grid
+  // lines, column background). Both paths reach the lens — tiles via
+  // handleTileEnter, the rest via handleDeadZoneEnter.
   const handleColumnsMouseOver = (e: ReactMouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const tileEl = target.closest('[data-testid^="tile-"]') as HTMLElement | null;
-    if (!tileEl) return;
+
+    if (!tileEl) {
+      // Dead zone — mark a sentinel so we only arm the timer once per
+      // continuous non-tile run.
+      if (lastHoveredTileIdRef.current !== '__deadzone__') {
+        lastHoveredTileIdRef.current = '__deadzone__';
+        lens.handlers.handleDeadZoneEnter();
+      }
+      return;
+    }
+
     const testId = tileEl.getAttribute('data-testid');
     const assignmentId = testId ? testId.slice('tile-'.length) : null;
     if (!assignmentId || assignmentId === lastHoveredTileIdRef.current) return;
