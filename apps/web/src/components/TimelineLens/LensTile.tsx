@@ -59,7 +59,11 @@ export const LensTile = memo(function LensTile({
   const colors = getStateInlineColors(state);
 
   const teethCount = computeTeethCount(LENS_TILE_INNER_WIDTH);
-  const clipPath = buildCssClipPath(heightPx, sawtoothTop, sawtoothBottom, teethCount);
+  // Match Tile.tsx exactly: clip-path + SVG both keyed on the raw (un-insetted)
+  // height. The outer box is slightly smaller (`heightPx`) thanks to the 1 px
+  // inset on non-sawtooth edges, but the teeth geometry must extend to the
+  // full span so the SVG stroke aligns with the clip-path boundary.
+  const clipPath = buildCssClipPath(rawHeight, sawtoothTop, sawtoothBottom, teethCount);
   const stateRgb = getStateRgb(state);
   const hasSaw = sawtoothTop || sawtoothBottom;
 
@@ -103,9 +107,9 @@ export const LensTile = memo(function LensTile({
           />
         )}
 
-        {/* Zigzag stroke outlining the teeth — same treatment as Tile.tsx /
-            TileSegment.tsx. Without this, teeth are invisibly clipped; with
-            it, the split-task signal reads exactly like on the main grid. */}
+        {/* Zigzag stroke outlining the teeth — identical to Tile.tsx:
+            SVG height + viewBox use the raw (un-insetted) height so the
+            stroke aligns with the clip-path. */}
         {hasSaw && (
           <svg
             style={{
@@ -114,8 +118,8 @@ export const LensTile = memo(function LensTile({
               pointerEvents: 'none',
             }}
             width="100%"
-            height={heightPx}
-            viewBox={`0 0 100 ${heightPx}`}
+            height={rawHeight}
+            viewBox={`0 0 100 ${rawHeight}`}
             preserveAspectRatio="none"
           >
             {sawtoothTop && (
@@ -130,7 +134,7 @@ export const LensTile = memo(function LensTile({
             )}
             {sawtoothBottom && (
               <path
-                d={buildSawtoothSvgPath(100, heightPx, 'bottom', teethCount)}
+                d={buildSawtoothSvgPath(100, rawHeight, 'bottom', teethCount)}
                 fill="none"
                 stroke={`rgb(${stateRgb.border})`}
                 strokeWidth={1.5}
