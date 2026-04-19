@@ -40,6 +40,7 @@ import { ZOOM_LEVELS } from '../utils/zoom';
 import { computeTileSlices, getOperatorDaySchedule, type TileSlice } from '../utils/operatorTileSlices';
 import { isInternalTask } from '@flux/types';
 import { TimelineLens, useTimelineLens, type LensTileData } from '../components/TimelineLens';
+import { computeOperatorUnavailabilitySegments } from '../components/TimelineLens/unavailability';
 import type {
   Operator,
   TaskAssignment,
@@ -754,6 +755,15 @@ export default function OperatorSchedulePage() {
     return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
   }, [lensActiveTiles]);
 
+  const lensUnavailabilitySegments = useMemo(() => {
+    if (!lens.state.activeColumnId) return [];
+    const op = operators.find(o => o.id === lens.state.activeColumnId);
+    if (!op) return [];
+    return computeOperatorUnavailabilitySegments(
+      op, lensRange.gridStartMs, lensRange.gridEndMs,
+    );
+  }, [lens.state.activeColumnId, operators, lensRange.gridStartMs, lensRange.gridEndMs]);
+
   const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const segmentEl = target.closest('[data-testid^="tile-segment-"]') as HTMLElement | null;
@@ -1105,6 +1115,7 @@ export default function OperatorSchedulePage() {
         activeColumnId={lens.state.activeColumnId}
         anchor={lens.state.anchor}
         tiles={lensActiveTiles}
+        unavailabilitySegments={lensUnavailabilitySegments}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}
         centerTimeMs={lens.state.centerTimeMs}

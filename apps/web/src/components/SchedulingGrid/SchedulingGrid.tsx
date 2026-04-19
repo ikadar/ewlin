@@ -12,6 +12,7 @@ import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } from '../../utils/stationTileData';
 import { TimelineLens, useTimelineLens, type LensTileData } from '../TimelineLens';
+import { computeStationUnavailabilitySegments } from '../TimelineLens/unavailability';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -476,6 +477,15 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
   }, [lensActiveTiles]);
 
+  const lensUnavailabilitySegments = useMemo(() => {
+    if (!lens.state.activeColumnId) return [];
+    const station = stationMap.get(lens.state.activeColumnId);
+    if (!station) return [];
+    return computeStationUnavailabilitySegments(
+      station, lensRange.gridStartMs, lensRange.gridEndMs,
+    );
+  }, [lens.state.activeColumnId, stationMap, lensRange.gridStartMs, lensRange.gridEndMs]);
+
   // Event delegation: a single mouseover on the columns wrapper covers every
   // tile + every non-tile area (hatched unavailability overlay, hour-grid
   // lines, column background). Both paths reach the lens — tiles via
@@ -722,6 +732,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         activeColumnId={lens.state.activeColumnId}
         anchor={lens.state.anchor}
         tiles={lensActiveTiles}
+        unavailabilitySegments={lensUnavailabilitySegments}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}
         centerTimeMs={lens.state.centerTimeMs}

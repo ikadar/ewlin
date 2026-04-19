@@ -39,6 +39,8 @@ export interface TimelineLensProps {
   activeColumnId: string | null;
   anchor: LensAnchor | null;
   tiles: LensTileData[];
+  /** Hatched unavailability bands for the active column, absolute ms. */
+  unavailabilitySegments?: Array<{ startMs: number; endMs: number }>;
   /** Absolute ms used as the Y=0 reference for tile positions inside the lens. */
   gridStartMs: number;
   /** Absolute ms of the farthest point the lens may need to show. */
@@ -71,7 +73,8 @@ function formatHHMM(ms: number): string {
  *                         changes within the same column
  */
 export function TimelineLens({
-  visible, activeColumnId, anchor, tiles, gridStartMs, gridEndMs, centerTimeMs,
+  visible, activeColumnId, anchor, tiles, unavailabilitySegments = [],
+  gridStartMs, gridEndMs, centerTimeMs,
   onMouseEnter, onMouseLeave,
 }: TimelineLensProps) {
   // The lens is header-less, so the whole envelope is the body — tiles at the
@@ -291,6 +294,27 @@ export function TimelineLens({
           }}
         >
           {gridElements}
+          {unavailabilitySegments.map((seg, idx) => {
+            const top = ((seg.startMs - gridStartMs) / 3_600_000) * lpx;
+            const height = Math.max(
+              1,
+              ((seg.endMs - seg.startMs) / 3_600_000) * lpx,
+            );
+            return (
+              <div
+                key={`u-${idx}-${seg.startMs}`}
+                className="bg-stripes-dark"
+                style={{
+                  position: 'absolute',
+                  left: 0, right: 0,
+                  top: `${top}px`,
+                  height: `${height}px`,
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }}
+              />
+            );
+          })}
           {tiles.map((t) => (
             <LensTile
               key={t.id}
