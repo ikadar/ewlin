@@ -365,7 +365,6 @@
     text-overflow: ellipsis;
   }
 
-  /* Highlight on the "focused" tile (the one the lens is centered on) */
   .tile.lens-focus {
     outline: 1px solid rgba(147, 197, 253, 0.5);
     outline-offset: -1px;
@@ -374,6 +373,8 @@
 
   /* ── The lens itself ───────────────────────────────────────── */
   .time-lens {
+    --fade-duration: 120ms;
+    --scroll-duration: 140ms;
     position: absolute;
     z-index: 60;
     background: var(--bg-col);
@@ -384,9 +385,11 @@
     overflow: hidden;
     opacity: 0;
     transform: translateY(-4px) scale(0.98);
-    transition: opacity 120ms ease-out,
-                transform 140ms ease-out,
-                top 120ms ease-out;
+    transition:
+      opacity var(--fade-duration) ease-out,
+      transform var(--fade-duration) ease-out,
+      top var(--scroll-duration) cubic-bezier(0.2, 0.8, 0.2, 1),
+      left var(--scroll-duration) cubic-bezier(0.2, 0.8, 0.2, 1);
     pointer-events: auto;
   }
   .time-lens.visible {
@@ -409,7 +412,6 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: rgba(255, 255, 255, 0.06);
     pointer-events: none;
   }
   .time-lens-hour-label {
@@ -457,7 +459,6 @@
     color: var(--text-primary);
   }
 
-  /* Connector line from source tile to lens */
   .lens-connector {
     position: absolute;
     pointer-events: none;
@@ -466,12 +467,8 @@
     transition: opacity 140ms ease-out;
   }
   .lens-connector.visible { opacity: 1; }
-  .lens-connector svg {
-    display: block;
-    overflow: visible;
-  }
+  .lens-connector svg { display: block; overflow: visible; }
 
-  /* Column caption */
   .col-caption {
     font-size: 10px;
     color: var(--text-dim);
@@ -480,7 +477,6 @@
     font-family: "JetBrains Mono", ui-monospace, monospace;
   }
 
-  /* Floating hint */
   .hint {
     position: fixed;
     bottom: 16px;
@@ -510,27 +506,21 @@
   <aside class="panel">
     <h1>Timeline magnifying lens</h1>
     <p class="subtitle">
-      A floating lens that re-renders the station column at a different
-      time/px ratio, vertically centered on the hovered tile's time.
-      Tiles inside the lens keep their relative temporal positions —
-      just at a readable scale.
+      Floating lens that re-renders the station column at a higher
+      px/hour ratio, centered on the focal time. Keep orthogonal to
+      the existing 500 ms rich tooltip.
     </p>
 
     <!-- Tracking mode -->
     <div class="control-group">
       <span class="label">Tracking mode</span>
       <div class="segmented" id="modeSeg">
-        <label class="active" data-mode="snap">
-          <input type="radio" name="mode" value="snap" checked />Snap to tile
+        <label data-mode="snap">
+          <input type="radio" name="mode" value="snap" />Snap to tile
         </label>
-        <label data-mode="follow">
-          <input type="radio" name="mode" value="follow" />Follow cursor
+        <label class="active" data-mode="follow">
+          <input type="radio" name="mode" value="follow" checked />Follow cursor
         </label>
-      </div>
-      <div class="legend" style="margin-top:10px;">
-        <strong>Snap</strong> centers the lens on the hovered tile's midtime.
-        <strong>Follow</strong> tracks the cursor Y position continuously
-        along the column.
       </div>
     </div>
 
@@ -541,10 +531,10 @@
         <span class="val" id="zoomVal">9.5×</span>
       </div>
       <input type="range" id="zoom" min="2" max="12" step="0.5" value="9.5" />
-      <div class="derived" id="derived" style="margin-top:10px;">
+      <div class="derived" style="margin-top:10px;">
         <div class="line"><span class="k">base</span><span class="v">80 px/h</span></div>
         <div class="line"><span class="k">lens</span><span class="v" id="dLens">760 px/h</span></div>
-        <div class="line"><span class="k">visible window</span><span class="v" id="dWindow">24 min</span></div>
+        <div class="line"><span class="k">visible window</span><span class="v" id="dWindow">31.6 min</span></div>
         <div class="line"><span class="k">2-min tile</span><span class="v" id="dSmallest">25 px</span></div>
       </div>
     </div>
@@ -553,15 +543,15 @@
     <div class="control-group">
       <div class="slider-row">
         <span class="label" style="margin:0;">Lens width</span>
-        <span class="val" id="widthVal">240 px</span>
+        <span class="val" id="widthVal">300 px</span>
       </div>
-      <input type="range" id="width" min="180" max="360" step="10" value="240" />
+      <input type="range" id="width" min="180" max="360" step="10" value="300" />
 
       <div class="slider-row" style="margin-top:14px;">
         <span class="label" style="margin:0;">Lens height</span>
-        <span class="val" id="heightVal">300 px</span>
+        <span class="val" id="heightVal">400 px</span>
       </div>
-      <input type="range" id="height" min="140" max="420" step="10" value="300" />
+      <input type="range" id="height" min="140" max="500" step="10" value="400" />
     </div>
 
     <!-- Position -->
@@ -588,40 +578,65 @@
         <span>Show time grid (hours, 15-min, 5-min)</span>
       </label>
       <label class="check-row">
-        <input type="checkbox" id="connector" />
+        <input type="checkbox" id="showHeader" checked />
+        <span>Show lens title bar</span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="connector" checked />
         <span>Show connector line tile → lens</span>
       </label>
       <label class="check-row">
-        <input type="checkbox" id="onlyTiny" />
+        <input type="checkbox" id="onlyTiny" checked />
         <span>Only trigger on short tiles (≤ 20 px)</span>
       </label>
+    </div>
+
+    <!-- Timing -->
+    <div class="control-group">
+      <span class="label">Timing</span>
+
+      <div class="slider-row">
+        <span style="font-size:11px; color:var(--text-muted)">Hover delay (to open)</span>
+        <span class="val" id="delayVal">80 ms</span>
+      </div>
+      <input type="range" id="delay" min="0" max="500" step="10" value="80" />
+
+      <div class="slider-row" style="margin-top:14px;">
+        <span style="font-size:11px; color:var(--text-muted)">Fade-in duration</span>
+        <span class="val" id="fadeInDurationVal">120 ms</span>
+      </div>
+      <input type="range" id="fadeInDuration" min="0" max="500" step="10" value="120" />
+
+      <div class="slider-row" style="margin-top:14px;">
+        <span style="font-size:11px; color:var(--text-muted)">Fade-out duration</span>
+        <span class="val" id="fadeOutDurationVal">140 ms</span>
+      </div>
+      <input type="range" id="fadeOutDuration" min="0" max="500" step="10" value="140" />
+
+      <div class="slider-row" style="margin-top:14px;">
+        <span style="font-size:11px; color:var(--text-muted)">Idle close on tile &gt; 20 px</span>
+        <span class="val" id="nonSmallCloseDelayVal">800 ms</span>
+      </div>
+      <input type="range" id="nonSmallCloseDelay" min="0" max="3000" step="100" value="800" />
+      <div class="legend" style="margin-top:8px;">
+        Counts while the cursor hovers a tile &gt; 20 px tall. Entering a
+        small tile cancels it; leaving the tile cancels it. At 0 ms the
+        feature is off.
+      </div>
     </div>
 
     <!-- Motion -->
     <div class="control-group">
       <span class="label">Motion (snap mode)</span>
       <label class="check-row">
-        <input type="checkbox" id="smoothScroll" checked />
+        <input type="checkbox" id="smoothScroll" />
         <span>Smooth scroll between tiles</span>
       </label>
       <div class="slider-row" style="margin-top:10px;">
-        <span class="label" style="margin:0;">Scroll duration</span>
+        <span style="font-size:11px; color:var(--text-muted)">Scroll duration</span>
         <span class="val" id="scrollDurationVal">260 ms</span>
       </div>
       <input type="range" id="scrollDuration" min="80" max="500" step="20" value="260" />
-      <div class="legend" style="margin-top:8px;">
-        Only animates when the center moves within the same column.
-        Zoom/size changes rebuild instantly.
-      </div>
-    </div>
-
-    <!-- Delay -->
-    <div class="control-group">
-      <div class="slider-row">
-        <span class="label" style="margin:0;">Hover delay</span>
-        <span class="val" id="delayVal">80 ms</span>
-      </div>
-      <input type="range" id="delay" min="0" max="500" step="10" value="80" />
     </div>
 
     <div class="legend">
@@ -646,10 +661,9 @@
     <header class="stage-header">
       <h2>Station column — the lens re-samples it at a higher px/h ratio</h2>
       <p>
-        Hover any tile. In <strong>follow</strong> mode, also try sliding the
-        cursor along the column without stopping — the lens glides with you.
-        The vertical center of the lens always maps to the same wall-clock
-        time as the mouse/tile it tracks.
+        Hover any tile. Small tiles (≤ 20 px tall) open or keep the lens
+        alive. Tiles &gt; 20 px (completely readable already) arm an
+        auto-close countdown.
       </p>
     </header>
 
@@ -672,7 +686,7 @@
     </div>
 
     <div class="hint">
-      Hover tiles or the column — <kbd>Esc</kbd> closes the lens.
+      Hover tiles — <kbd>Esc</kbd> closes the lens.
     </div>
   </main>
 </div>
@@ -681,9 +695,10 @@
   // ══════════════════════════════════════════════════════════════
   // Constants + data
   // ══════════════════════════════════════════════════════════════
-  const PIXELS_PER_HOUR = 80;       // matches TimelineColumn.tsx
-  const TIMELINE_MINUTES = 7 * 60;  // 7-hour window
-  const DAY_START_MIN = 8 * 60;     // shown as 08:00 baseline
+  const PIXELS_PER_HOUR = 80;
+  const TIMELINE_MINUTES = 7 * 60;
+  const DAY_START_MIN = 8 * 60;
+  const SMALL_TILE_THRESHOLD_PX = 20;
 
   // Palette copied verbatim from apps/web/src/components/Tile/colorUtils.ts
   const PALETTE = {
@@ -738,13 +753,11 @@
   function minutesToPx(min, pxPerHour = PIXELS_PER_HOUR) {
     return (min / 60) * pxPerHour;
   }
-
   function formatHour(absMin) {
     const h = Math.floor(absMin / 60);
     const m = Math.round(absMin) % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
-
   function formatDuration(mins) {
     if (mins < 60) return `${mins} min`;
     const h = Math.floor(mins / 60);
@@ -753,7 +766,7 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Render base column
+  // Render base column (source view, 80 px/h)
   // ══════════════════════════════════════════════════════════════
   function renderBaseColumn(col) {
     const timelineEl = document.getElementById(col.timelineId);
@@ -803,43 +816,49 @@
         <div class="tile-operator">${t.operator}</div>
       `;
       tileEl.appendChild(label);
-
       timelineEl.appendChild(tileEl);
     });
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Lens state + render
+  // Lens state
   // ══════════════════════════════════════════════════════════════
   const state = {
-    mode: 'snap',            // snap | follow
-    zoom: 9.5,               // × multiplier on 80 px/h (default targets ~25 px / 2-min tile)
-    lensWidth: 240,
-    lensHeight: 300,
-    position: 'right',       // right | left | overlay
+    // Validated-spec defaults
+    mode: 'follow',
+    zoom: 9.5,
+    lensWidth: 300,
+    lensHeight: 400,
+    position: 'right',
     showHourMarkers: true,
-    showConnector: false,
-    onlyTiny: false,
-    delay: 80,
-    smoothScroll: true,
+    showHeader: true,
+    showConnector: true,
+    onlyTiny: true,
+    smoothScroll: false,
     scrollDuration: 260,
+    delay: 80,
+
+    // NEW timing controls
+    fadeInDuration: 120,
+    fadeOutDuration: 140,
+    nonSmallCloseDelay: 800,
 
     // Runtime
-    activeCol: null,         // current column being hovered
-    centerTimeMin: 0,        // absolute minute (from timeline start, not DAY_START)
-    focusTileIdx: null,      // highlighted tile in snap mode
+    activeCol: null,
+    centerTimeMin: 0,
+    focusTileIdx: null,
     lensEl: null,
     connectorEl: null,
     showTimer: null,
     hideTimer: null,
+    closeTimer: null,        // idle-close on non-small tile
+    pendingCenterMin: 0,
     pendingCol: null,
-    lastLayoutSig: null,     // signature of current DOM structure (for fast path)
+    lastLayoutSig: null,
   };
 
   function lensPxPerHour() { return PIXELS_PER_HOUR * state.zoom; }
-  function lensWindowMinutes() {
-    return (state.lensHeight / lensPxPerHour()) * 60;
-  }
+  function lensWindowMinutes() { return (state.lensHeight / lensPxPerHour()) * 60; }
 
   function updateDerived() {
     const lpx = lensPxPerHour();
@@ -851,6 +870,9 @@
     updatePromptOutput();
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // Prompt generator
+  // ══════════════════════════════════════════════════════════════
   function generatePrompt() {
     const lpx = lensPxPerHour();
     const win = lensWindowMinutes();
@@ -866,7 +888,7 @@ centered on the hovered tile's midtime (snap) or on the cursor's Y
 position (follow). Tiles stay at legible size; the lens preserves
 temporal context by showing neighbors before/after the focal time.
 
-Keep orthogonal to the existing 500ms rich tooltip — the lens is for
+Keep orthogonal to the existing 500 ms rich tooltip — the lens is for
 scanning/readability, the tooltip is for deep inspection.
 
 ## Settings validated in the playground
@@ -876,23 +898,27 @@ scanning/readability, the tooltip is for deep inspection.
 - Visible window:     ${win.toFixed(1)} min
 - Smallest tile (2m): ${smallestPx.toFixed(0)} px high in the lens
 - Position:           ${state.position} of station column
-- Hover delay:        ${state.delay} ms
+- Title bar:          ${state.showHeader ? 'visible' : 'hidden'}
 - Connector line:     ${state.showConnector ? 'shown' : 'hidden'}
 - Only short tiles:   ${state.onlyTiny ? 'trigger only when height ≤ 20 px' : 'trigger on any tile'}
+- Hover delay:        ${state.delay} ms (before opening)
+- Fade-in / -out:     ${state.fadeInDuration} ms / ${state.fadeOutDuration} ms
+- Auto-close on tall: ${state.nonSmallCloseDelay > 0 ? `${state.nonSmallCloseDelay} ms hover on a tile > 20 px closes the lens` : 'disabled'}
 - Smooth scroll:      ${state.smoothScroll ? `enabled — ${state.scrollDuration} ms cubic-bezier(0.2, 0.8, 0.2, 1)` : 'disabled (instant snap)'}
 
 ## Time grid inside the lens (multi-tier)
-| Step   | Line opacity | Label style                 |
-| ------ | ------------ | --------------------------- |
-| 60 min | 0.09         | HH:MM, primary text         |
-| 30 min | 0.06         | HH:MM, muted                |
-| 15 min | 0.04         | HH:MM, tiny (8 px), dim     |
-| 5  min | 0.02         | HH:MM, tiny (8 px), dim     |
+| Step   | Line opacity | Label style             |
+| ------ | ------------ | ----------------------- |
+| 60 min | 0.09         | HH:MM, primary text     |
+| 30 min | 0.06         | HH:MM, muted            |
+| 15 min | 0.04         | HH:MM, tiny (8 px), dim |
+| 5  min | 0.02         | HH:MM, tiny (8 px), dim |
 A dedup Set ensures coarser tiers win when a minute belongs to several.
 
 ## Interaction
-- snap: \`mouseenter\` tile → after delay, center lens on tile midtime
-- follow: \`mousemove\` on timeline → center lens on cursor's Y → minute
+- snap: \`mouseenter\` on small tile → after delay, center lens on tile midtime
+- snap: \`mouseenter\` on tile > 20 px arms the auto-close timer (if lens visible); does NOT re-center when onlyTiny=true
+- follow: \`mousemove\` on timeline → center lens on cursor's Y → minute; tile > 20 px still arms auto-close
 - \`mouseleave\` station column → schedule hide (140 ms grace)
 - \`mouseenter\` on lens → cancel pending hide (bridge)
 - \`Esc\` → close immediately
@@ -910,16 +936,21 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
   columns cleanly.
 - Reuse PALETTE / state classes verbatim for 1:1 visual match with tiles.
 - Do NOT replace the tooltip; the two layers serve different intents.
-- The visible window is derived: \`lensHeight / (80 × zoom) × 60\`.
-  If min tile duration shrinks below 2 min in the future, either raise
-  zoom or clamp a min visual height (breaks strict temporal scaling —
-  flag explicitly in the UI if done).
+- Derive visible window as \`lensHeight / (80 × zoom) × 60\`. If min tile
+  duration shrinks below 2 min in the future, either raise zoom or
+  clamp a min visual height (breaks strict temporal scaling).
+- Fade-in / fade-out durations drive opacity + scale/translate
+  transitions on the lens container (CSS custom properties \`--fade-duration\`
+  swapped inline before toggling visibility).
+- Auto-close on tall tile: on tile mouseenter, if duration * pxPerHour / 60
+  > 20, start a setTimeout(nonSmallCloseDelay); on mouseleave or on
+  mouseenter of a small tile, clear it.
 - For smooth scroll: render ALL tiles + grid of the column into an inner
   wrapper (\`height = timelineMinutes × lensPxPerHour / 60\`) that sits
   inside a fixed-height, overflow-hidden body. Animate the wrapper's
   \`translateY\` — not the individual tiles — so tiles that enter/leave
   the viewport during the transition stay mounted and move together.
-  Animate only within the same column; cross-column jumps should rebuild
+  Animate only within the same column; cross-column jumps rebuild
   instantly.`;
   }
 
@@ -928,14 +959,15 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     if (el) el.value = generatePrompt();
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // DOM helpers
+  // ══════════════════════════════════════════════════════════════
   function getColumnsRect() {
     return document.getElementById('columns').getBoundingClientRect();
   }
-
   function getTimelineRect(col) {
     return document.getElementById(col.timelineId).getBoundingClientRect();
   }
-
   function ensureLensDom() {
     if (state.lensEl) return state.lensEl;
     const lens = document.createElement('div');
@@ -949,7 +981,6 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     state.lensEl = lens;
     return lens;
   }
-
   function ensureConnectorDom() {
     if (state.connectorEl) return state.connectorEl;
     const c = document.createElement('div');
@@ -959,20 +990,29 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     state.connectorEl = c;
     return c;
   }
+  function applyFadeDuration(ms) {
+    if (state.lensEl) state.lensEl.style.setProperty('--fade-duration', `${ms}ms`);
+  }
+  function applyScrollDuration(ms) {
+    if (state.lensEl) state.lensEl.style.setProperty('--scroll-duration', `${ms}ms`);
+  }
 
+  // ══════════════════════════════════════════════════════════════
+  // Render lens
+  // ══════════════════════════════════════════════════════════════
   function layoutSignature(col) {
-    return `${col.id}|${state.zoom}|${state.lensWidth}|${state.lensHeight}|${state.position}|${state.showHourMarkers}`;
+    return `${col.id}|${state.zoom}|${state.lensWidth}|${state.lensHeight}|${state.position}|${state.showHourMarkers}|${state.showHeader}`;
   }
 
   function renderLens(col, centerMin, opts = {}) {
     const { animate = false } = opts;
     const lens = ensureLensDom();
     const lpx = lensPxPerHour();
-    const bodyH = state.lensHeight - 28; // minus header
+    const headerH = state.showHeader ? 28 : 0;
+    const bodyH = state.lensHeight - headerH;
     const fullHeight = (TIMELINE_MINUTES / 60) * lpx;
     const targetY = bodyH / 2 - (centerMin / 60) * lpx;
 
-    // ── Position the lens envelope ──
     lens.style.width = `${state.lensWidth}px`;
     lens.style.height = `${state.lensHeight}px`;
 
@@ -993,38 +1033,34 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       case 'left':    lensLeft = stationRect.left  - colsRect.left - state.lensWidth - 40; break;
       case 'overlay': lensLeft = stationRect.left  - colsRect.left + (stationRect.width - state.lensWidth) / 2; break;
     }
+
     const sig = layoutSignature(col);
     const fastPath = state.lastLayoutSig === sig && lens.querySelector('.time-lens-content');
     const willAnimate = fastPath && animate && state.smoothScroll;
-    const easing = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
-    // Envelope transition — synced with inner scroll when animating, else CSS default
-    lens.style.transition = willAnimate
-      ? `opacity 120ms ease-out, transform 140ms ease-out, top ${state.scrollDuration}ms ${easing}, left ${state.scrollDuration}ms ${easing}`
-      : '';
-
+    // Sync envelope transitions
+    applyScrollDuration(willAnimate ? state.scrollDuration : 140);
     lens.style.top = `${lensTop}px`;
     lens.style.left = `${lensLeft}px`;
 
     if (fastPath) {
-      // ── Recenter only: translate the inner wrapper (animated if requested) ──
       const inner = lens.querySelector('.time-lens-content');
       inner.style.transition = willAnimate
-        ? `transform ${state.scrollDuration}ms ${easing}`
+        ? `transform ${state.scrollDuration}ms cubic-bezier(0.2, 0.8, 0.2, 1)`
         : 'none';
       inner.style.transform = `translateY(${targetY}px)`;
 
-      // Update header time label in place
       const timeSpan = lens.querySelector('.time-lens-header > span:last-child');
       if (timeSpan) timeSpan.textContent = formatHour(DAY_START_MIN + centerMin);
     } else {
-      // ── Full rebuild: renders the entire timeline into the inner wrapper ──
       lens.innerHTML = '';
 
-      const header = document.createElement('div');
-      header.className = 'time-lens-header';
-      header.innerHTML = `<span class="title">${col.name}</span><span>${formatHour(DAY_START_MIN + centerMin)}</span>`;
-      lens.appendChild(header);
+      if (state.showHeader) {
+        const header = document.createElement('div');
+        header.className = 'time-lens-header';
+        header.innerHTML = `<span class="title">${col.name}</span><span>${formatHour(DAY_START_MIN + centerMin)}</span>`;
+        lens.appendChild(header);
+      }
 
       const body = document.createElement('div');
       body.className = 'time-lens-body';
@@ -1036,7 +1072,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       inner.style.height = `${fullHeight}px`;
       body.appendChild(inner);
 
-      // Multi-tier time grid — absolute positions within the full timeline
+      // Multi-tier time grid
       if (state.showHourMarkers) {
         const tiers = [
           { step: 60, lineOpacity: 0.09, label: true,  labelStrong: true  },
@@ -1073,7 +1109,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
         });
       }
 
-      // All tiles — absolute positions within the full timeline
+      // All tiles at absolute timeline positions
       col.tiles.forEach(t => {
         const palette = PALETTE[t.state];
         const top = (t.start / 60) * lpx;
@@ -1109,7 +1145,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
         inner.appendChild(tileEl);
       });
 
-      // Edge fades — pinned to the body viewport (don't scroll with content)
+      // Edge fades pinned to body viewport (don't scroll)
       const fadeTop = document.createElement('div');
       fadeTop.className = 'time-lens-edge-fade top';
       body.appendChild(fadeTop);
@@ -1117,12 +1153,11 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       fadeBot.className = 'time-lens-edge-fade bottom';
       body.appendChild(fadeBot);
 
-      // First frame: no transition; apply transform directly
+      // Fresh content: snap to target without animating inner
       inner.style.transition = 'none';
       inner.style.transform = `translateY(${targetY}px)`;
     }
 
-    // Connector — repositions instantly; no animation
     if (state.showConnector) {
       renderConnector(col, centerMin, lensLeft, lensTop);
     } else if (state.connectorEl) {
@@ -1139,10 +1174,8 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     const stationEl = document.getElementById(col.stationId);
     const stationRect = stationEl.getBoundingClientRect();
 
-    // Source point: right or left edge of the source tile at centerMin
     const srcY = timelineRect.top - colsRect.top + minutesToPx(centerMin);
-    let srcX;
-    let dstX;
+    let srcX, dstX;
     if (state.position === 'right' || state.position === 'overlay') {
       srcX = stationRect.right - colsRect.left;
       dstX = lensLeft;
@@ -1152,7 +1185,6 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     }
     const dstY = lensTop + state.lensHeight / 2;
 
-    // SVG bounding box
     const minX = Math.min(srcX, dstX) - 4;
     const minY = Math.min(srcY, dstY) - 4;
     const maxX = Math.max(srcX, dstX) + 4;
@@ -1182,12 +1214,11 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Hover handling
+  // Hover logic
   // ══════════════════════════════════════════════════════════════
   function clearFocusTile() {
     document.querySelectorAll('.tile.lens-focus').forEach(t => t.classList.remove('lens-focus'));
   }
-
   function setFocusTile(col, idx) {
     clearFocusTile();
     const timeline = document.getElementById(col.timelineId);
@@ -1198,6 +1229,10 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
   function showLens(col, centerMin, focusIdx = null, opts = {}) {
     clearTimeout(state.hideTimer);
     state.hideTimer = null;
+    ensureLensDom();
+    const wasVisible = state.lensEl.classList.contains('visible');
+    applyFadeDuration(state.fadeInDuration);
+
     state.activeCol = col;
     state.centerTimeMin = centerMin;
     if (focusIdx !== null) {
@@ -1208,7 +1243,9 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       state.focusTileIdx = null;
     }
     renderLens(col, centerMin, opts);
-    requestAnimationFrame(() => state.lensEl.classList.add('visible'));
+    if (!wasVisible) {
+      requestAnimationFrame(() => state.lensEl.classList.add('visible'));
+    }
   }
 
   function scheduleHide() {
@@ -1217,36 +1254,83 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
   }
 
   function hideLens() {
-    clearTimeout(state.showTimer);
-    state.showTimer = null;
-    if (state.lensEl) state.lensEl.classList.remove('visible');
+    clearTimeout(state.showTimer); state.showTimer = null;
+    clearCloseTimer();
+    if (state.lensEl) {
+      applyFadeDuration(state.fadeOutDuration);
+      state.lensEl.classList.remove('visible');
+    }
     if (state.connectorEl) state.connectorEl.classList.remove('visible');
     clearFocusTile();
     state.activeCol = null;
     state.focusTileIdx = null;
-    state.lastLayoutSig = null; // next open triggers a fresh structural build
+    state.lastLayoutSig = null;
   }
 
+  // ── Close timer (idle on non-small tile) ──
+  function startCloseTimer() {
+    clearCloseTimer();
+    if (state.nonSmallCloseDelay <= 0) return;
+    state.closeTimer = setTimeout(() => {
+      state.closeTimer = null;
+      hideLens();
+    }, state.nonSmallCloseDelay);
+  }
+  function clearCloseTimer() {
+    if (state.closeTimer) {
+      clearTimeout(state.closeTimer);
+      state.closeTimer = null;
+    }
+  }
+
+  function isTileSmall(tile) {
+    return minutesToPx(tile.duration) <= SMALL_TILE_THRESHOLD_PX;
+  }
   function tileMidTimeMin(t) {
     return t.start + t.duration / 2;
   }
 
-  function handleTileEnter(col, idx) {
+  // ── Tile events ──
+  function onTileMouseEnter(col, idx) {
     const tile = col.tiles[idx];
-    if (state.onlyTiny && minutesToPx(tile.duration) > 20) return;
-    const centerMin = tileMidTimeMin(tile);
+    const small = isTileSmall(tile);
 
-    if (state.lensEl && state.lensEl.classList.contains('visible')) {
-      // Already visible — re-center; animate if smooth-scroll enabled and
-      // we stay on the same column (cross-column jumps are not animated).
-      const sameCol = state.activeCol && state.activeCol.id === col.id;
-      showLens(col, centerMin, idx, { animate: sameCol });
+    if (small) {
+      clearCloseTimer();
+      if (state.mode === 'snap') {
+        const centerMin = tileMidTimeMin(tile);
+        if (state.lensEl && state.lensEl.classList.contains('visible')) {
+          const sameCol = state.activeCol && state.activeCol.id === col.id;
+          showLens(col, centerMin, idx, { animate: sameCol });
+        } else {
+          clearTimeout(state.showTimer);
+          state.showTimer = setTimeout(() => showLens(col, centerMin, idx), state.delay);
+        }
+      }
       return;
     }
-    clearTimeout(state.showTimer);
-    state.showTimer = setTimeout(() => showLens(col, centerMin, idx), state.delay);
+
+    // Non-small tile
+    if (state.lensEl && state.lensEl.classList.contains('visible')) {
+      startCloseTimer();
+    }
+    if (state.mode === 'snap' && !state.onlyTiny) {
+      const centerMin = tileMidTimeMin(tile);
+      if (state.lensEl && state.lensEl.classList.contains('visible')) {
+        const sameCol = state.activeCol && state.activeCol.id === col.id;
+        showLens(col, centerMin, idx, { animate: sameCol });
+      } else {
+        clearTimeout(state.showTimer);
+        state.showTimer = setTimeout(() => showLens(col, centerMin, idx), state.delay);
+      }
+    }
   }
 
+  function onTileMouseLeave() {
+    clearCloseTimer();
+  }
+
+  // Follow mode: track cursor Y continuously
   function handleTimelineMove(col, evt) {
     if (state.mode !== 'follow') return;
     const timelineEl = document.getElementById(col.timelineId);
@@ -1255,7 +1339,6 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     const centerMin = (y / rect.height) * TIMELINE_MINUTES;
     if (centerMin < 0 || centerMin > TIMELINE_MINUTES) return;
 
-    // Track the latest pending target; don't reset an already-running timer.
     state.pendingCol = col;
     state.pendingCenterMin = centerMin;
 
@@ -1277,23 +1360,19 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
 
   function wireTimeline(col) {
     const timeline = document.getElementById(col.timelineId);
-    // Tile enter in SNAP mode
     timeline.querySelectorAll('.tile').forEach((tileEl, idx) => {
-      tileEl.addEventListener('mouseenter', () => {
-        if (state.mode === 'snap') handleTileEnter(col, idx);
-      });
+      tileEl.addEventListener('mouseenter', () => onTileMouseEnter(col, idx));
+      tileEl.addEventListener('mouseleave', () => onTileMouseLeave());
     });
-    // Follow mode: move-anywhere-in-column
     timeline.addEventListener('mousemove', (e) => {
       if (state.mode === 'follow') handleTimelineMove(col, e);
     });
-    // Leave
     const station = document.getElementById(col.stationId);
     station.addEventListener('mouseleave', handleColumnLeave);
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Controls wiring
+  // Controls
   // ══════════════════════════════════════════════════════════════
   function wireSegmented(segId, stateKey, onChange) {
     const seg = document.getElementById(segId);
@@ -1309,29 +1388,29 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
   }
 
   function wireControls() {
-    wireSegmented('modeSeg', 'mode', () => {
-      hideLens();
-    });
+    wireSegmented('modeSeg', 'mode', () => hideLens());
     wireSegmented('posSeg', 'position', () => {
       if (state.activeCol) renderLens(state.activeCol, state.centerTimeMin);
     });
 
-    const bindSlider = (id, stateKey, formatter, onChange) => {
+    const bindSlider = (id, stateKey, formatter) => {
       const input = document.getElementById(id);
       const valEl = document.getElementById(id + 'Val');
       input.addEventListener('input', () => {
         state[stateKey] = parseFloat(input.value);
         if (valEl) valEl.textContent = formatter(state[stateKey]);
         updateDerived();
-        if (onChange) onChange();
         if (state.activeCol) renderLens(state.activeCol, state.centerTimeMin);
       });
     };
-
     bindSlider('zoom', 'zoom', v => `${v.toFixed(1)}×`);
     bindSlider('width', 'lensWidth', v => `${v} px`);
     bindSlider('height', 'lensHeight', v => `${v} px`);
     bindSlider('delay', 'delay', v => `${v} ms`);
+    bindSlider('fadeInDuration', 'fadeInDuration', v => `${v} ms`);
+    bindSlider('fadeOutDuration', 'fadeOutDuration', v => `${v} ms`);
+    bindSlider('nonSmallCloseDelay', 'nonSmallCloseDelay',
+      v => v === 0 ? 'off' : `${v} ms`);
     bindSlider('scrollDuration', 'scrollDuration', v => `${v} ms`);
 
     const bindCheck = (id, stateKey) => {
@@ -1343,11 +1422,12 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       });
     };
     bindCheck('hourMarkers', 'showHourMarkers');
+    bindCheck('showHeader', 'showHeader');
     bindCheck('connector', 'showConnector');
     bindCheck('onlyTiny', 'onlyTiny');
     bindCheck('smoothScroll', 'smoothScroll');
 
-    // Copy prompt button
+    // Copy prompt
     const copyBtn = document.getElementById('copyPromptBtn');
     const copyStatus = document.getElementById('copyStatus');
     copyBtn.addEventListener('click', async () => {
@@ -1356,7 +1436,6 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
         await navigator.clipboard.writeText(text);
         copyStatus.textContent = 'Copied ✓';
       } catch (err) {
-        // Fallback: select the textarea so user can manual-copy
         const ta = document.getElementById('promptOutput');
         ta.focus();
         ta.select();
@@ -1366,7 +1445,6 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       setTimeout(() => copyStatus.classList.remove('visible'), 1800);
     });
 
-    // Esc to close
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') hideLens();
     });
