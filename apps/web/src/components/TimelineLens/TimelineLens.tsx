@@ -335,20 +335,12 @@ export function TimelineLens({
               />
             );
           })}
-          {/* Actual Tile / TileSegment components provided by the view,
-              rendered at LENS_PIXELS_PER_HOUR. Wrapped in a no-interaction
-              wrapper so drag / click / tooltip logic doesn't run inside the
-              lens. Left-inset by LENS_LEFT_GUTTER so it doesn't overflow
-              into the hour-label column. */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0, bottom: 0,
-              left: `${LENS_LEFT_GUTTER}px`,
-              right: '4px',
-              pointerEvents: 'none',
-            }}
-          >
+          {/* Actual Tile / TileSegment components. The view supplies each
+              element with overrideLeft / overrideWidth matching the lens
+              gutter so they don't overlap the hour-label column to the left.
+              `inset: 0` here gives tiles a positioning context that exactly
+              matches the inner wrapper. */}
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
             {tileContent}
           </div>
         </div>

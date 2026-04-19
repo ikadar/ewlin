@@ -758,13 +758,16 @@ export default function OperatorSchedulePage() {
       const segBottom = timeToYPosition(slice.to, START_HOUR, LENS_PIXELS_PER_HOUR, lensOrigin);
       const segHeight = Math.max(segBottom - segTop, 8);
 
+      // In the lens we force full-width placement (the gutter is handled
+      // by `overrideLeft`), regardless of slice.position — we're not
+      // rendering adjacent paired operators in the lens, so a split-column
+      // layout would just look cramped.
       const colWidth = LENS_COL_WIDTH - 8;
-      const positionProps = slice.position === 'left'
-        ? { overrideLeft: '0', overrideWidth: '49%' }
-        : slice.position === 'right'
-          ? { overrideLeft: '51%', overrideWidth: '49%' }
-          : {};
-      const svgWidth = slice.position === 'full' ? colWidth : Math.floor(colWidth * 0.48);
+      const positionProps = {
+        overrideLeft: '40px',
+        overrideWidth: 'calc(100% - 44px)',
+      };
+      const svgWidth = colWidth;
 
       const label = `${job.reference} · ${job.client}`;
       const setupMinutes = task.duration?.setupMinutes ?? 0;

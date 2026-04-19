@@ -492,6 +492,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           operatorNames={cached.operatorNames}
           sawtoothTop={interrupt?.top}
           sawtoothBottom={interrupt?.bottom}
+          overrideLeft={`40px`}
+          overrideWidth={`calc(100% - 44px)`}
         />
       );
     });
