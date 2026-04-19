@@ -732,10 +732,10 @@ export default function OperatorSchedulePage() {
     const slices = lensActiveSlices;
     if (slices.length === 0) return null;
 
-    const lensOrigin = new Date(lensRange.gridStartMs);
     // Lens inner tile area: LENS_WIDTH (300) - LENS_LEFT_GUTTER (40) - right-pad (4).
     const LENS_COL_WIDTH = 256;
     const noop = () => { /* interactions disabled inside the lens */ };
+    const originMs = lensRange.gridStartMs;
 
     return slices.map((slice) => {
       const task = taskMap.get(slice.taskId);
@@ -754,8 +754,15 @@ export default function OperatorSchedulePage() {
         false, isLate, false, false, assignment?.isCompleted ?? false,
       );
 
-      const segTop = timeToYPosition(slice.from, START_HOUR, LENS_PIXELS_PER_HOUR, lensOrigin);
-      const segBottom = timeToYPosition(slice.to, START_HOUR, LENS_PIXELS_PER_HOUR, lensOrigin);
+      // Direct time-diff from the lens origin — NOT `timeToYPosition`, which
+      // treats the `startDate` arg as midnight and positions by hour-of-day.
+      // Our origin is `earliestSliceStart - 1 h` (arbitrary wall-clock hour),
+      // so timeToYPosition would push tops by `hour_of_day * lpx` and send
+      // tiles clean off the inner wrapper whenever the origin isn't 00:00.
+      const segTop =
+        ((slice.from.getTime() - originMs) / 3_600_000) * LENS_PIXELS_PER_HOUR;
+      const segBottom =
+        ((slice.to.getTime() - originMs) / 3_600_000) * LENS_PIXELS_PER_HOUR;
       const segHeight = Math.max(segBottom - segTop, 8);
 
       // In the lens we force full-width placement (the gutter is handled
