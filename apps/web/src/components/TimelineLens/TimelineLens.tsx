@@ -335,14 +335,33 @@ export function TimelineLens({
               />
             );
           })}
-          {/* Actual Tile / TileSegment components. The view supplies each
-              element with overrideLeft / overrideWidth matching the lens
-              gutter so they don't overlap the hour-label column to the left.
-              `inset: 0` here gives tiles a positioning context that exactly
-              matches the inner wrapper. */}
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-            {tileContent}
+          {/* DEBUG: bright marker at the focal time (body center when the
+              inner wrapper is translated into place). If THIS shows but
+              the real tiles below don't, the bug is inside Tile/TileSegment;
+              if NEITHER shows, the inner wrapper or its transform is broken. */}
+          <div
+            style={{
+              position: 'absolute',
+              top: `${centerOffset - 40}px`,
+              left: '40px',
+              width: '200px',
+              height: '80px',
+              background: 'rgba(255, 0, 0, 0.75)',
+              color: 'white',
+              fontWeight: 700,
+              padding: '4px 8px',
+              zIndex: 999,
+              fontSize: '14px',
+              border: '2px solid white',
+            }}
+          >
+            DEBUG: pipeline OK
           </div>
+          {/* Actual Tile / TileSegment components provided by the view.
+              Rendered directly in the inner wrapper (no extra positioning
+              div) — each tile handles its own left/width via
+              overrideLeft / overrideWidth to stay clear of the gutter. */}
+          {tileContent}
         </div>
         <div
           style={{
