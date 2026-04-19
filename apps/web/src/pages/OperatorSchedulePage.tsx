@@ -783,9 +783,9 @@ export default function OperatorSchedulePage() {
       tileMidTimeMs: (hit.lensTile.startMs + hit.lensTile.endMs) / 2,
       tileHeightPx: tileRect.height,
       anchor: {
-        left: colRect.left, right: colRect.right,
-        top: colRect.top, bottom: colRect.bottom,
-        width: colRect.width, height: colRect.height,
+        columnLeft: colRect.left,
+        columnRight: colRect.right,
+        tileCenterY: tileRect.top + tileRect.height / 2,
       },
     });
   };
@@ -1072,6 +1072,7 @@ export default function OperatorSchedulePage() {
       {/* ---- Timeline magnifying lens ---- */}
       <TimelineLens
         visible={lens.state.visible}
+        activeColumnId={lens.state.activeColumnId}
         anchor={lens.state.anchor}
         columnTitle={lensColumnTitle}
         tiles={lensActiveTiles}

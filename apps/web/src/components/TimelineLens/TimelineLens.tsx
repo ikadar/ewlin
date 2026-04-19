@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { LensTile } from './LensTile';
 import type { TileState } from '../Tile/colorUtils';
@@ -18,17 +18,25 @@ export interface LensTileData {
   subtitle?: string;
 }
 
+/**
+ * Where to dock the lens. Viewport-relative coordinates captured at the
+ * moment the user hovered a tile. We derive the lens's vertical position
+ * from the tile's center (NOT the column's — station/operator columns
+ * extend far beyond the viewport in multi-day views, so their bounding
+ * rect is useless for centering).
+ */
 export interface LensAnchor {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-  width: number;
-  height: number;
+  columnLeft: number;
+  columnRight: number;
+  /** Viewport Y of the hovered tile's vertical midpoint. */
+  tileCenterY: number;
 }
 
 export interface TimelineLensProps {
   visible: boolean;
+  /** The column currently under the lens. Used to decide whether inner-scroll
+   *  animates (same column = scroll smoothly; cross-column = snap). */
+  activeColumnId: string | null;
   anchor: LensAnchor | null;
   columnTitle: string;
   tiles: LensTileData[];
@@ -42,7 +50,7 @@ export interface TimelineLensProps {
   onMouseLeave: () => void;
 }
 
-const SCROLL_TRANSITION = `transform ${LENS_SCROLL_DURATION_MS}ms ${LENS_SCROLL_EASING}`;
+const INNER_SCROLL_TRANSITION = `transform ${LENS_SCROLL_DURATION_MS}ms ${LENS_SCROLL_EASING}`;
 
 function formatHHMM(ms: number): string {
   const d = new Date(ms);
@@ -51,65 +59,93 @@ function formatHHMM(ms: number): string {
 
 /**
  * Floating, portaled panel that re-renders a column at LENS_PIXELS_PER_HOUR,
- * vertically centered on `centerTimeMs`. All tiles and grid markers live in
- * an inner wrapper that is `translateY`'d to center on the focal time —
- * tiles entering / leaving the viewport during a smooth-scroll remain mounted.
+ * vertically centered on `centerTimeMs`. Tiles + grid live in an inner
+ * wrapper that is `translateY`'d to re-center on the focal time — tiles
+ * entering / leaving the viewport during a smooth-scroll remain mounted.
+ *
+ * Three transitions layered:
+ *   • opacity/transform → fade-in / fade-out (always on)
+ *   • top/left          → position glide when docking to a new anchor
+ *                         (only after first positioning, else a first
+ *                         appearance "flies in" from the placeholder -9999)
+ *   • inner translateY  → smooth temporal scroll when the focal time
+ *                         changes within the same column
  */
 export function TimelineLens({
-  visible, anchor, columnTitle, tiles, gridStartMs, gridEndMs, centerTimeMs,
+  visible, activeColumnId, anchor, columnTitle, tiles, gridStartMs, gridEndMs, centerTimeMs,
   onMouseEnter, onMouseLeave,
 }: TimelineLensProps) {
   const bodyH = LENS_HEIGHT - LENS_HEADER_HEIGHT;
   const lpx = LENS_PIXELS_PER_HOUR;
-  const fullH = ((gridEndMs - gridStartMs) / 3_600_000) * lpx;
+  const fullH = Math.max(0, ((gridEndMs - gridStartMs) / 3_600_000) * lpx);
   const centerOffset = ((centerTimeMs - gridStartMs) / 3_600_000) * lpx;
   const targetY = bodyH / 2 - centerOffset;
 
   const innerRef = useRef<HTMLDivElement | null>(null);
   const prevCenterRef = useRef<number | null>(null);
   const prevVisibleRef = useRef<boolean>(false);
+  const prevColumnRef = useRef<string | null>(null);
 
-  // Translate the inner wrapper to center on centerTimeMs. Animates only when
-  // the lens stays visible AND the column layout hasn't changed across updates.
+  // ── Gate top/left transitions on readyToAnimate ────────────────────
+  // First frame after visible=true: no top/left transition (so the lens
+  // snaps to its docking position). One rAF later: enable top/left, so
+  // moves to a different tile glide in.
+  const [readyToAnimate, setReadyToAnimate] = useState(false);
   useEffect(() => {
+    if (!visible) {
+      setReadyToAnimate(false);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setReadyToAnimate(true));
+    return () => cancelAnimationFrame(raf);
+  }, [visible]);
+
+  // ── Inner translate: snap on first visible / cross-column, animate on ──
+  // same-column focal-time changes. useLayoutEffect runs pre-paint so the
+  // transition property is set before the browser composits, avoiding a
+  // dropped first frame on rapid hover transitions.
+  useLayoutEffect(() => {
     const inner = innerRef.current;
     if (!inner) return;
 
     if (!visible) {
       prevCenterRef.current = null;
       prevVisibleRef.current = false;
+      prevColumnRef.current = null;
       return;
     }
 
     const wasVisible = prevVisibleRef.current;
+    const wasSameColumn = prevColumnRef.current === activeColumnId;
     const wasSameCenter = prevCenterRef.current === centerTimeMs;
-    const shouldAnimate = LENS_SMOOTH_SCROLL && wasVisible && !wasSameCenter;
+    const shouldAnimate = LENS_SMOOTH_SCROLL && wasVisible && wasSameColumn && !wasSameCenter;
 
-    inner.style.transition = shouldAnimate ? SCROLL_TRANSITION : 'none';
+    inner.style.transition = shouldAnimate ? INNER_SCROLL_TRANSITION : 'none';
     inner.style.transform = `translateY(${targetY}px)`;
+
     prevCenterRef.current = centerTimeMs;
     prevVisibleRef.current = true;
-  }, [visible, targetY, centerTimeMs]);
+    prevColumnRef.current = activeColumnId;
+  }, [visible, activeColumnId, targetY, centerTimeMs]);
 
+  // ── Position the lens envelope at the tile's Y (not the column's Y) ──
   const { lensLeft, lensTop } = useMemo(() => {
     if (!anchor) return { lensLeft: -9999, lensTop: -9999 };
-    const targetTop = anchor.top + (anchor.height / 2) - (LENS_HEIGHT / 2);
     const margin = 8;
+    const preferredTop = anchor.tileCenterY - LENS_HEIGHT / 2;
     const clampedTop = Math.max(
       margin,
-      Math.min(window.innerHeight - LENS_HEIGHT - margin, targetTop)
+      Math.min(window.innerHeight - LENS_HEIGHT - margin, preferredTop)
     );
+    const preferredLeft = anchor.columnRight + LENS_OFFSET_FROM_COLUMN;
     const clampedLeft = Math.max(
       margin,
-      Math.min(
-        window.innerWidth - LENS_WIDTH - margin,
-        anchor.right + LENS_OFFSET_FROM_COLUMN
-      )
+      Math.min(window.innerWidth - LENS_WIDTH - margin, preferredLeft)
     );
     return { lensLeft: clampedLeft, lensTop: clampedTop };
   }, [anchor]);
 
-  // Multi-tier time grid, rendered once per grid range.
+  // ── Multi-tier time grid, rendered once per grid range ──
   const gridElements = useMemo<ReactNode[]>(() => {
     const elements: ReactNode[] = [];
     const gridSpanMinutes = Math.floor((gridEndMs - gridStartMs) / 60_000);
@@ -170,6 +206,16 @@ export function TimelineLens({
   if (typeof document === 'undefined') return null;
 
   const fadeDuration = visible ? LENS_FADE_IN_MS : LENS_FADE_OUT_MS;
+  const transitionParts = [
+    `opacity ${fadeDuration}ms ease-out`,
+    `transform ${fadeDuration}ms ease-out`,
+  ];
+  if (readyToAnimate) {
+    transitionParts.push(
+      `top ${LENS_SCROLL_DURATION_MS}ms ${LENS_SCROLL_EASING}`,
+      `left ${LENS_SCROLL_DURATION_MS}ms ${LENS_SCROLL_EASING}`,
+    );
+  }
 
   const lensStyle: React.CSSProperties = {
     position: 'fixed',
@@ -185,12 +231,7 @@ export function TimelineLens({
     overflow: 'hidden',
     opacity: visible ? 1 : 0,
     transform: visible ? 'translateY(0) scale(1)' : 'translateY(-4px) scale(0.98)',
-    transition: [
-      `opacity ${fadeDuration}ms ease-out`,
-      `transform ${fadeDuration}ms ease-out`,
-      `top ${LENS_SCROLL_DURATION_MS}ms ${LENS_SCROLL_EASING}`,
-      `left ${LENS_SCROLL_DURATION_MS}ms ${LENS_SCROLL_EASING}`,
-    ].join(', '),
+    transition: transitionParts.join(', '),
     pointerEvents: visible ? 'auto' : 'none',
   };
 
