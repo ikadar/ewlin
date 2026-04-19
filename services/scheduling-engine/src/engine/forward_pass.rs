@@ -1371,6 +1371,20 @@ fn assign_action_at_tick(
                 if any_avail { break; }
                 grid.assign_station(station_idx, skip_to, action_idx);
                 if let Some(g) = group_idx { grid.increment_group(g, skip_to); }
+                // Peremption is a physical property (ink dries, registration
+                // shifts) — it keeps running regardless of operator presence,
+                // so each skipped tick must count toward idle_ticks. Without
+                // this, a task that pauses across a closed station / overnight
+                // never accrues idle time, and the engine silently skips the
+                // required re-calage on resume. See apply_peremption_rule for
+                // the re-calage trigger.
+                actions[action_idx].idle_ticks += 1;
+                apply_peremption_rule(
+                    &mut actions[action_idx],
+                    setup_ticks,
+                    attrs.peremption_ticks,
+                    skip_to as u32,
+                );
                 skip_to += 1;
             }
             return AssignOutcome::SkipTo(skip_to);
