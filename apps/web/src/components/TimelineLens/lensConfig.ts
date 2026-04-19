@@ -14,10 +14,17 @@
  *  minutes on each side. */
 export const LENS_PIXELS_PER_HOUR = 500;
 
-/** Lens envelope dimensions. */
+/** Lens envelope dimensions. Width is fixed; height is responsive — it grows
+ *  with the viewport on large monitors but never shrinks below LENS_MIN_HEIGHT
+ *  (so short viewports still get a useful lens). */
 export const LENS_WIDTH = 300;
-export const LENS_HEIGHT = 400;
+export const LENS_MIN_HEIGHT = 700;
+export const LENS_VIEWPORT_HEIGHT_RATIO = 0.30;
 export const LENS_LEFT_GUTTER = 40;
+
+export function computeLensHeight(viewportHeight: number): number {
+  return Math.max(viewportHeight * LENS_VIEWPORT_HEIGHT_RATIO, LENS_MIN_HEIGHT);
+}
 
 /** Any tile rendered at ≤ this many pixels in the source grid is considered "small"
  *  (the lens's reason to exist). Taller tiles are already readable. */

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { LensTile } from './LensTile';
 import type { TileState } from '../Tile/colorUtils';
 import {
-  LENS_WIDTH, LENS_HEIGHT, LENS_PIXELS_PER_HOUR, LENS_LEFT_GUTTER,
+  LENS_WIDTH, LENS_PIXELS_PER_HOUR, LENS_LEFT_GUTTER, computeLensHeight,
   LENS_FADE_IN_MS, LENS_FADE_OUT_MS, LENS_SCROLL_DURATION_MS, LENS_SCROLL_EASING,
   LENS_SMOOTH_SCROLL, LENS_OFFSET_FROM_COLUMN, LENS_Z_INDEX,
 } from './lensConfig';
@@ -77,9 +77,22 @@ export function TimelineLens({
   gridStartMs, gridEndMs, centerTimeMs,
   onMouseEnter, onMouseLeave,
 }: TimelineLensProps) {
+  // Responsive height: max(30 % of viewport, 700 px). Recomputed on resize so
+  // docking a very tall monitor into a laptop won't leave a stale huge lens.
+  const [viewportHeight, setViewportHeight] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerHeight : 900,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const lensHeight = computeLensHeight(viewportHeight);
+
   // The lens is header-less, so the whole envelope is the body — tiles at the
   // body's vertical midpoint align pixel-for-pixel with the source tile Y.
-  const bodyH = LENS_HEIGHT;
+  const bodyH = lensHeight;
   const lpx = LENS_PIXELS_PER_HOUR;
   const fullH = Math.max(0, ((gridEndMs - gridStartMs) / 3_600_000) * lpx);
   const centerOffset = ((centerTimeMs - gridStartMs) / 3_600_000) * lpx;
@@ -136,10 +149,10 @@ export function TimelineLens({
   const { lensLeft, lensTop } = useMemo(() => {
     if (!anchor) return { lensLeft: -9999, lensTop: -9999 };
     const margin = 8;
-    const preferredTop = anchor.tileCenterY - LENS_HEIGHT / 2;
+    const preferredTop = anchor.tileCenterY - lensHeight / 2;
     const clampedTop = Math.max(
       margin,
-      Math.min(window.innerHeight - LENS_HEIGHT - margin, preferredTop)
+      Math.min(window.innerHeight - lensHeight - margin, preferredTop)
     );
     const preferredLeft = anchor.columnRight + LENS_OFFSET_FROM_COLUMN;
     const clampedLeft = Math.max(
@@ -147,7 +160,7 @@ export function TimelineLens({
       Math.min(window.innerWidth - LENS_WIDTH - margin, preferredLeft)
     );
     return { lensLeft: clampedLeft, lensTop: clampedTop };
-  }, [anchor]);
+  }, [anchor, lensHeight]);
 
   // ── Multi-tier time grid, rendered once per grid range ──
   const gridElements = useMemo<ReactNode[]>(() => {
@@ -226,7 +239,7 @@ export function TimelineLens({
     left: `${lensLeft}px`,
     top: `${lensTop}px`,
     width: `${LENS_WIDTH}px`,
-    height: `${LENS_HEIGHT}px`,
+    height: `${lensHeight}px`,
     zIndex: LENS_Z_INDEX,
     background: 'rgb(24, 24, 27)',
     border: '1px solid rgba(147, 197, 253, 0.3)',
@@ -245,7 +258,7 @@ export function TimelineLens({
   const connectorSrcX = anchor ? anchor.columnRight : 0;
   const connectorSrcY = anchor ? anchor.tileCenterY : 0;
   const connectorDstX = lensLeft;
-  const connectorDstY = lensTop + LENS_HEIGHT / 2;
+  const connectorDstY = lensTop + lensHeight / 2;
 
   return createPortal(
     <>
