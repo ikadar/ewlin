@@ -1,8 +1,8 @@
 import { memo } from 'react';
-import { getStateInlineColors, type TileState } from '../Tile/colorUtils';
+import { getStateInlineColors, getStateRgb, type TileState } from '../Tile/colorUtils';
 import {
   SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX,
-  buildCssClipPath, computeTeethCount,
+  buildCssClipPath, buildSawtoothSvgPath, computeTeethCount,
 } from '../Tile/sawtooth';
 import { LENS_LEFT_GUTTER, LENS_WIDTH } from './lensConfig';
 
@@ -60,6 +60,8 @@ export const LensTile = memo(function LensTile({
 
   const teethCount = computeTeethCount(LENS_TILE_INNER_WIDTH);
   const clipPath = buildCssClipPath(heightPx, sawtoothTop, sawtoothBottom, teethCount);
+  const stateRgb = getStateRgb(state);
+  const hasSaw = sawtoothTop || sawtoothBottom;
 
   // Label/content offsets so the label never sits inside the teeth zone.
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
@@ -99,6 +101,44 @@ export const LensTile = memo(function LensTile({
               pointerEvents: 'none',
             }}
           />
+        )}
+
+        {/* Zigzag stroke outlining the teeth — same treatment as Tile.tsx /
+            TileSegment.tsx. Without this, teeth are invisibly clipped; with
+            it, the split-task signal reads exactly like on the main grid. */}
+        {hasSaw && (
+          <svg
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+            }}
+            width="100%"
+            height={heightPx}
+            viewBox={`0 0 100 ${heightPx}`}
+            preserveAspectRatio="none"
+          >
+            {sawtoothTop && (
+              <path
+                d={buildSawtoothSvgPath(100, 0, 'top', teethCount)}
+                fill="none"
+                stroke={`rgb(${stateRgb.border})`}
+                strokeWidth={1.5}
+                strokeOpacity={0.7}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+            {sawtoothBottom && (
+              <path
+                d={buildSawtoothSvgPath(100, heightPx, 'bottom', teethCount)}
+                fill="none"
+                stroke={`rgb(${stateRgb.border})`}
+                strokeWidth={1.5}
+                strokeOpacity={0.7}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+          </svg>
         )}
       </div>
 
