@@ -209,12 +209,14 @@ export const Tile = memo(function Tile({
         className={`absolute inset-0 ${borderStyleClass} ${colorClasses.border} ${colorClasses.runBg}`}
         style={{ clipPath, borderLeftWidth: `${TILE_BORDER_WIDTH_PX}px` }}
       >
-        {/* Setup overlay (if has setup time). Same background as the tile —
-            only the CSS border from data-testid="tile-setup-section" (dotted
-            black) marks the calage zone. Mirrors TileSegment's overlay model. */}
+        {/* Setup overlay (if has setup time). Paints the same tile color on
+            top of the wrapper so the setup zone stacks to a slightly more
+            opaque blue than the run zone — mirrors TileSegment which
+            applies `colors.bg` inline to its calage overlays. The dotted
+            black divider comes from the data-testid CSS rule. */}
         {hasSetup && (
           <div
-            className="absolute left-0 right-0"
+            className={`absolute left-0 right-0 ${colorClasses.runBg}`}
             style={{
               top: 0,
               height: `${setupHeight}px`,
@@ -224,9 +226,8 @@ export const Tile = memo(function Tile({
         )}
 
         {/* Re-calage overlays (post-peremption setup reruns reported by the
-            engine). Same background as the tile — styled via
-            data-testid="tile-recalage-section" in index.css (dashed red
-            border-bottom) to flag the zone as a re-calage. */}
+            engine). Same stacking as the setup overlay; the dashed red
+            divider comes from the data-testid CSS rule in index.css. */}
         {(assignment.recalages ?? []).map((rc, idx) => {
           const rcStartMs = new Date(rc.start).getTime();
           const rcEndMs = new Date(rc.end).getTime();
@@ -241,7 +242,7 @@ export const Tile = memo(function Tile({
           return (
             <div
               key={`recalage-${idx}`}
-              className="absolute left-0 right-0"
+              className={`absolute left-0 right-0 ${colorClasses.runBg}`}
               style={{ top: `${rcTop}px`, height: `${rcHeight}px` }}
               data-testid="tile-recalage-section"
             />
