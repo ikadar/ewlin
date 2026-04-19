@@ -92,6 +92,32 @@ export function useTimelineLens() {
     const small = input.tileHeightPx <= LENS_SMALL_TILE_THRESHOLD_PX;
     const current = stateRef.current;
 
+    // ── Cross-column: instantly hide the current lens (fade-out), then
+    // schedule a fresh open if the new tile qualifies. Prevents the lens
+    // from gliding sideways across the grid when the user swaps columns.
+    if (
+      current.visible &&
+      current.activeColumnId !== null &&
+      current.activeColumnId !== input.columnId
+    ) {
+      clearShowTimer();
+      clearHideTimer();
+      clearCloseTimer();
+      setState(INITIAL_STATE);
+      if (small) {
+        showTimerRef.current = window.setTimeout(() => {
+          showTimerRef.current = null;
+          setState({
+            visible: true,
+            activeColumnId: input.columnId,
+            centerTimeMs: input.tileMidTimeMs,
+            anchor: input.anchor,
+          });
+        }, LENS_HOVER_DELAY_MS);
+      }
+      return;
+    }
+
     if (small) {
       clearCloseTimer();
       clearHideTimer();
@@ -136,7 +162,7 @@ export function useTimelineLens() {
       });
     }
     armCloseTimer();
-  }, [clearCloseTimer, clearHideTimer, armCloseTimer]);
+  }, [clearShowTimer, clearCloseTimer, clearHideTimer, armCloseTimer]);
 
   const handleStationLeave = useCallback(() => {
     clearShowTimer();

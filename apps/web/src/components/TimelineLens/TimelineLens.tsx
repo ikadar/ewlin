@@ -236,13 +236,50 @@ export function TimelineLens({
     pointerEvents: visible ? 'auto' : 'none',
   };
 
+  // Source endpoint = tile edge (column right side at tile Y).
+  // Destination endpoint = lens's left-middle edge (which sits exactly at
+  // tileCenterY when unclamped, so the line is horizontal in the common case).
+  const connectorSrcX = anchor ? anchor.columnRight : 0;
+  const connectorSrcY = anchor ? anchor.tileCenterY : 0;
+  const connectorDstX = lensLeft;
+  const connectorDstY = lensTop + LENS_HEIGHT / 2;
+
   return createPortal(
-    <div
-      style={lensStyle}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      aria-hidden={!visible}
-    >
+    <>
+      {anchor && (
+        <svg
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            pointerEvents: 'none',
+            zIndex: LENS_Z_INDEX - 1,
+            opacity: visible ? 1 : 0,
+            transition: `opacity ${fadeDuration}ms ease-out`,
+          }}
+          aria-hidden="true"
+        >
+          <line
+            x1={connectorSrcX}
+            y1={connectorSrcY}
+            x2={connectorDstX}
+            y2={connectorDstY}
+            stroke="rgba(147, 197, 253, 0.35)"
+            strokeWidth="1"
+            strokeDasharray="3 3"
+          />
+          <circle cx={connectorSrcX} cy={connectorSrcY} r="2.5" fill="rgba(147, 197, 253, 0.85)" />
+          <circle cx={connectorDstX} cy={connectorDstY} r="2.5" fill="rgba(147, 197, 253, 0.85)" />
+        </svg>
+      )}
+      <div
+        style={lensStyle}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        aria-hidden={!visible}
+      >
       <div style={{ position: 'relative', overflow: 'hidden', height: `${bodyH}px` }}>
         <div
           ref={innerRef}
@@ -282,8 +319,9 @@ export function TimelineLens({
             pointerEvents: 'none', zIndex: 6,
           }}
         />
+        </div>
       </div>
-    </div>,
+    </>,
     document.body
   );
 }
