@@ -514,7 +514,14 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   // handleTileEnter, the rest via handleDeadZoneEnter.
   const handleColumnsMouseOver = (e: ReactMouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    const tileEl = target.closest('[data-testid^="tile-"]') as HTMLElement | null;
+    // Match only the tile ROOT — its children (`tile-content`,
+    // `tile-setup-section`, `tile-recalage-section`) also start with
+    // `tile-` in their testid but lack `data-station-id`. Without this
+    // compound selector, `closest` returns the child, the handler bails
+    // on missing attrs, and the lens never opens.
+    const tileEl = target.closest(
+      '[data-testid^="tile-"][data-station-id]',
+    ) as HTMLElement | null;
 
     if (!tileEl) {
       // Dead zone — mark a sentinel so we only arm the timer once per
