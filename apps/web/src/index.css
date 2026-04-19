@@ -243,15 +243,17 @@ body {
   border-bottom: 1px dotted black !important;
 }
 
-/* Re-calage section: red-tinted band + dashed red bottom divider. Red reads
-   as "fragile / perishable state" — this calage had to be redone because
-   the previous one expired. The background tint makes the zone readable
-   even when the recalage is only a single tick tall (1 px dashed alone is
-   invisible in practice at default zoom levels).
-   !important needed because Tailwind v4 utilities layer can override. */
+/* Re-calage section: high-visibility red band. A single-tick recalage
+   is only ~16 px tall at default zoom and a 1 px dashed divider alone
+   disappears against the tile color, so we give the whole zone a
+   saturated red fill + outline. `!important` here deliberately shadows
+   any inline `background` set by TileSegment so the red always wins. */
 [data-testid="tile-recalage-section"] {
-  background: rgba(239, 68, 68, 0.18) !important;
-  border-bottom: 1px dashed rgba(239, 68, 68, 0.9) !important;
+  background-color: rgba(239, 68, 68, 0.35) !important;
+  background-image: none !important;
+  outline: 1.5px solid rgba(239, 68, 68, 0.95) !important;
+  outline-offset: -1px !important;
+  border-bottom: 1px dashed rgba(239, 68, 68, 1) !important;
 }
 
 /* Inline-pin kept as a persistent state indicator — shown only when the

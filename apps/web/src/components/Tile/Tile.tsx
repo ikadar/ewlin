@@ -242,7 +242,10 @@ export const Tile = memo(function Tile({
           const durationMinutes = (rcEndMs - rcStartMs) / 60000;
           if (durationMinutes <= 0) return null;
           const rcTop = minutesToPixels(offsetMinutes, pixelsPerHour);
-          const rcHeight = minutesToPixels(durationMinutes, pixelsPerHour);
+          // Minimum 4 px so a 1-tick recalage still reads as a band — at
+          // default 64 px/h, a 15-min zone is ~16 px but smaller zooms
+          // collapse it to a pixel or two.
+          const rcHeight = Math.max(minutesToPixels(durationMinutes, pixelsPerHour), 4);
           return (
             <div
               key={`recalage-${idx}`}
