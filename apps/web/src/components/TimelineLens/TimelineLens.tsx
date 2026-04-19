@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { LensTile } from './LensTile';
 import type { TileState } from '../Tile/colorUtils';
 import {
-  LENS_WIDTH, LENS_HEIGHT, LENS_PIXELS_PER_HOUR,
+  LENS_WIDTH, LENS_HEIGHT, LENS_PIXELS_PER_HOUR, LENS_LEFT_GUTTER,
   LENS_FADE_IN_MS, LENS_FADE_OUT_MS, LENS_SCROLL_DURATION_MS, LENS_SCROLL_EASING,
   LENS_SMOOTH_SCROLL, LENS_OFFSET_FROM_COLUMN, LENS_Z_INDEX,
 } from './lensConfig';
@@ -306,7 +306,10 @@ export function TimelineLens({
                 className="bg-stripes-dark"
                 style={{
                   position: 'absolute',
-                  left: 0, right: 0,
+                  // Start at the gutter so the hatch doesn't overrun the
+                  // hour-label column rendered to its left.
+                  left: `${LENS_LEFT_GUTTER}px`,
+                  right: 0,
                   top: `${top}px`,
                   height: `${height}px`,
                   pointerEvents: 'none',
