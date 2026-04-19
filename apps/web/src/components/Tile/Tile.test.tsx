@@ -418,26 +418,21 @@ describe('Tile', () => {
     expect(tile).toHaveAttribute('tabIndex', '0');
   });
 
-  it('renders similarity indicators when provided', () => {
+  // Station tiles intentionally mirror the operator view's TileSegment,
+  // which does not render similarity indicators. The prop is kept for
+  // backward-compat on call sites but the component ignores it.
+  it('never renders similarity indicators, even when provided', () => {
     const similarityResults = [
       { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
-      { criterion: { id: 'crit-2', name: 'Same client', fieldPath: 'client' }, isMatched: false },
     ];
 
     render(<Tile {...defaultProps} similarityResults={similarityResults} />);
 
-    expect(screen.getByTestId('similarity-indicators')).toBeInTheDocument();
-    expect(screen.getAllByTestId(/similarity-icon-/)).toHaveLength(2);
+    expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
   });
 
   it('does not render similarity indicators when not provided', () => {
     render(<Tile {...defaultProps} />);
-
-    expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
-  });
-
-  it('does not render similarity indicators when empty array', () => {
-    render(<Tile {...defaultProps} similarityResults={[]} />);
 
     expect(screen.queryByTestId('similarity-indicators')).not.toBeInTheDocument();
   });

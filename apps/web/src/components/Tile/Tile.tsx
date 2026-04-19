@@ -1,8 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Scissors, Pin } from 'lucide-react';
+import { Pin } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
-import { SimilarityIndicators } from './SimilarityIndicators';
 import { TileTooltip } from './TileTooltip';
 import { getStateColorClasses, getStateRgb } from './colorUtils';
 import type { TileState } from './colorUtils';
@@ -77,8 +76,6 @@ export const Tile = memo(function Tile({
   job,
   top,
   onSelect,
-  isSelected = false,
-  similarityResults,
   hasConflict = false,
   onTogglePin,
   pixelsPerHour = PIXELS_PER_HOUR,
@@ -204,11 +201,6 @@ export const Tile = memo(function Tile({
         if (e.key === 'Enter') handleClick();
       }}
     >
-      {/* Similarity indicators (shown at top of tile, overlapping junction with previous tile) */}
-      {similarityResults && similarityResults.length > 0 && (
-        <SimilarityIndicators results={similarityResults} />
-      )}
-
       {/* Clipped body wrapper. The clip-path is applied here (not on the root)
           so that the folder-tab and other overflow-outside children (label
           overlay, tooltip) are not clipped away on tiles with teeth. The
@@ -289,13 +281,19 @@ export const Tile = memo(function Tile({
         )}
       </div>
 
-      {/* Label overlay spanning both sections */}
+      {/* Label overlay — mirrors TileSegment's content layout so the station
+          and operator planning views render identical tiles. Pin stays as a
+          pinned-state indicator (hidden unless `data-pinned="true"` via the
+          `inline-pin` CSS rule in index.css) and remains clickable to unpin. */}
       <div
-        className="absolute left-0 right-0 z-10 pt-0.5 px-2 pointer-events-none overflow-hidden"
-        style={{ top: `${extTop}px`, bottom: `${extBottom}px` }}
+        className="absolute left-0 right-0 z-10 px-2 overflow-hidden pointer-events-none"
+        style={{ top: `${extTop + 2}px`, bottom: `${extBottom + 2}px` }}
       >
-        <div className="flex items-start gap-2">
-          <span className="inline-pin">
+        <div
+          className={`${colorClasses.text} text-[11px] font-medium leading-tight truncate`}
+          data-testid="tile-content"
+        >
+          <span className="inline-pin align-middle mr-1">
             <Pin
               className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
                 assignment.isPinned
@@ -305,23 +303,10 @@ export const Tile = memo(function Tile({
               onClick={handleTogglePin}
             />
           </span>
-          <span
-            className={`${colorClasses.text} font-medium break-words min-w-0 leading-tight`}
-            data-testid="tile-content"
-          >
-            {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
-          </span>
-          {task.splitGroupId && (
-            <>
-              <Scissors className="w-3 h-3 text-blue-500/40 shrink-0" />
-              <span className="text-[9px] text-blue-500 bg-blue-500/[0.15] rounded px-1.5 py-px font-semibold">
-                {(task.splitIndex ?? 0) + 1}/{task.splitTotal ?? 1}
-              </span>
-            </>
-          )}
+          {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
         </div>
         {operatorNames && (
-          <div className="text-[9px] text-zinc-400 truncate mt-0.5 leading-tight">
+          <div className="text-[9px] text-zinc-400 truncate leading-tight mt-0.5">
             {operatorNames}
           </div>
         )}
@@ -352,8 +337,7 @@ function haveDataPropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.job !== next.job ||
     prev.element !== next.element ||
     prev.top !== next.top ||
-    prev.pixelsPerHour !== next.pixelsPerHour ||
-    prev.similarityResults !== next.similarityResults
+    prev.pixelsPerHour !== next.pixelsPerHour
   );
 }
 
