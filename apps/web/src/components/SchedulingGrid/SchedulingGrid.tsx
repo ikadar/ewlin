@@ -516,6 +516,35 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     lens.handlers.handleStationLeave();
   };
 
+  // Follow-cursor: once the lens is visible, track cursor Y continuously
+  // (same column only). The initial open still goes through handleTileEnter,
+  // so the lens docks on the tile that triggered it; from there it glides
+  // with the cursor instead of snapping tile-to-tile.
+  const handleColumnsMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!lens.state.visible) return;
+    const target = e.target as HTMLElement;
+    const colEl = target.closest('[data-testid^="station-column-"]') as HTMLElement | null;
+    if (!colEl) return;
+    const testId = colEl.getAttribute('data-testid');
+    const stationId = testId ? testId.slice('station-column-'.length) : null;
+    if (!stationId || stationId !== lens.state.activeColumnId) return;
+
+    const colRect = colEl.getBoundingClientRect();
+    const relativeY = e.clientY - colRect.top;
+    const gridOriginMs = startDate?.getTime() ?? Date.now();
+    const centerMs = gridOriginMs + (relativeY / pixelsPerHour) * 3_600_000;
+
+    lens.handlers.handleColumnMouseMove({
+      columnId: stationId,
+      centerTimeMs: centerMs,
+      anchor: {
+        columnLeft: colRect.left,
+        columnRight: colRect.right,
+        tileCenterY: e.clientY,
+      },
+    });
+  };
+
   // Calculate departure marker position (if selected job has workshopExitDate)
   // Multi-day: show marker regardless of day (REQ-15)
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) : null;
@@ -594,6 +623,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           <div
             className="flex gap-3 px-3 bg-zinc-950 relative"
             onMouseOver={handleColumnsMouseOver}
+            onMouseMove={handleColumnsMouseMove}
             onMouseLeave={handleColumnsMouseLeave}
           >
             {/* Now line spanning all station columns */}

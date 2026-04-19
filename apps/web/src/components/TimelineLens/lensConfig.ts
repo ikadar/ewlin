@@ -29,7 +29,12 @@ export const LENS_FADE_IN_MS = 120;
 export const LENS_FADE_OUT_MS = 140;
 export const LENS_AUTO_CLOSE_MS = 800;
 export const LENS_HIDE_GRACE_MS = 140;
-export const LENS_SCROLL_DURATION_MS = 500;
+/** Duration used both for the envelope (top/left) gliding when the lens docks
+ *  against a new tile, and for the inner translateY when the focal time
+ *  changes. 200 ms keeps the lens close to the cursor in follow mode — long
+ *  enough to smooth out per-frame mousemove jitter, short enough that the
+ *  lens never feels like it lags noticeably behind the cursor. */
+export const LENS_SCROLL_DURATION_MS = 200;
 
 export const LENS_SCROLL_EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 

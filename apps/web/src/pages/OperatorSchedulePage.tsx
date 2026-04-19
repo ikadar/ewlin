@@ -789,6 +789,32 @@ export default function OperatorSchedulePage() {
     lens.handlers.handleStationLeave();
   };
 
+  // Follow-cursor within the same operator column — see SchedulingGrid
+  // for the rationale (initial open = snap-to-tile, subsequent moves = glide).
+  const handleOperatorsMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!lens.state.visible) return;
+    const target = e.target as HTMLElement;
+    const colEl = target.closest('[data-testid^="operator-column-"]') as HTMLElement | null;
+    if (!colEl) return;
+    const testId = colEl.getAttribute('data-testid');
+    const operatorId = testId ? testId.slice('operator-column-'.length) : null;
+    if (!operatorId || operatorId !== lens.state.activeColumnId) return;
+
+    const colRect = colEl.getBoundingClientRect();
+    const relativeY = e.clientY - colRect.top;
+    const centerMs = gridStartDate.getTime() + (relativeY / pixelsPerHour) * 3_600_000;
+
+    lens.handlers.handleColumnMouseMove({
+      columnId: operatorId,
+      centerTimeMs: centerMs,
+      anchor: {
+        columnLeft: colRect.left,
+        columnRight: colRect.right,
+        tileCenterY: e.clientY,
+      },
+    });
+  };
+
   // ---- Loading / error ----
   if (isLoading) {
     return (
@@ -976,6 +1002,7 @@ export default function OperatorSchedulePage() {
                 <div
                   className="flex gap-3 px-3 bg-zinc-950 relative"
                   onMouseOver={handleOperatorsMouseOver}
+                  onMouseMove={handleOperatorsMouseMove}
                   onMouseLeave={handleOperatorsMouseLeave}
                 >
                   {/* Now line spanning all columns */}

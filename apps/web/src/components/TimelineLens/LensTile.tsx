@@ -28,13 +28,15 @@ export const LensTile = memo(function LensTile({
   const colors = getStateInlineColors(state);
 
   return (
+    // +1 / -2 matches the inset Tile.tsx applies so consecutive tiles show a
+    // 1 px hairline gap in the lens too, instead of merging into one block.
     <div
       style={{
         position: 'absolute',
-        top: `${topPx}px`,
+        top: `${topPx + 1}px`,
         left: `${LENS_LEFT_GUTTER}px`,
         right: '4px',
-        height: `${heightPx - 1}px`,
+        height: `${Math.max(1, heightPx - 2)}px`,
         background: colors.bg,
         borderLeft: `4px solid ${colors.border}`,
         boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08), inset 0 -1px 2px rgba(0,0,0,0.04)',

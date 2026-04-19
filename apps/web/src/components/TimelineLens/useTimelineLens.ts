@@ -147,6 +147,30 @@ export function useTimelineLens() {
     }, LENS_HIDE_GRACE_MS);
   }, [clearShowTimer, clearHideTimer, hide]);
 
+  /**
+   * Continuous follow: once the lens is already visible and the cursor moves
+   * within the same column, re-center on the cursor's current Y. No-op if the
+   * lens is hidden (won't force-open) or if the cursor is over a different
+   * column (a new column open goes through handleTileEnter).
+   */
+  const handleColumnMouseMove = useCallback((input: {
+    columnId: string;
+    centerTimeMs: number;
+    anchor: LensAnchor;
+  }) => {
+    const current = stateRef.current;
+    if (!current.visible) return;
+    if (current.activeColumnId !== input.columnId) return;
+    if (current.centerTimeMs === input.centerTimeMs &&
+        current.anchor?.tileCenterY === input.anchor.tileCenterY) return;
+    setState({
+      visible: true,
+      activeColumnId: input.columnId,
+      centerTimeMs: input.centerTimeMs,
+      anchor: input.anchor,
+    });
+  }, []);
+
   const handleLensEnter = useCallback(() => {
     clearHideTimer();
     clearCloseTimer();
@@ -182,6 +206,7 @@ export function useTimelineLens() {
     state,
     handlers: {
       handleTileEnter,
+      handleColumnMouseMove,
       handleStationLeave,
       handleLensEnter,
       handleLensLeave,
