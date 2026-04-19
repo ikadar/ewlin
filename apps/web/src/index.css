@@ -233,8 +233,11 @@ body {
 
 /* ── Tile visual separation (borders, shadow, alternating shade, gradient) ── */
 
-/* 1. Inset shadow */
-[data-testid^="tile-"] {
+/* 1. Inset shadow — scoped to tile ROOT nodes (identifiable by the
+   `data-job-id` attribute) so the overlay children (`tile-setup-section`,
+   `tile-recalage-section`, `tile-content`) don't also receive an inset
+   shadow and create ghost bands at the top of short tiles. */
+[data-testid^="tile-"][data-job-id] {
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), inset 0 -1px 2px rgba(0,0,0,0.04);
 }
 
@@ -258,7 +261,7 @@ body {
 [data-testid^="tile-"][data-pinned="true"] .inline-pin { display: inline-flex; }
 
 /* ── Light mode tile separation adjustments ── */
-html.light [data-testid^="tile-"] {
+html.light [data-testid^="tile-"][data-job-id] {
   box-shadow: inset 0 0 0 1px rgba(30,14,42,0.06), inset 0 -1px 2px rgba(30,14,42,0.03);
 }
 
