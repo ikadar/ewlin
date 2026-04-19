@@ -446,6 +446,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         const setupMinutes = isInternalTask(cached.task)
           ? cached.task.duration.setupMinutes ?? 0
           : 0;
+        const interrupt = taskInterruption.get(a.id);
         list.push({
           id: a.id,
           startMs: new Date(a.scheduledStart).getTime(),
@@ -454,12 +455,14 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           state: cached.tileState,
           title: `${cached.job.reference} · ${cached.job.client}`,
           subtitle: cached.operatorNames,
+          sawtoothTop: interrupt?.top ?? false,
+          sawtoothBottom: interrupt?.bottom ?? false,
         });
       }
       map.set(stationId, list);
     });
     return map;
-  }, [assignmentsByStation, tileDataCache]);
+  }, [assignmentsByStation, tileDataCache, taskInterruption]);
 
   const lensActiveTiles = lens.state.activeColumnId
     ? lensTilesByStation.get(lens.state.activeColumnId) ?? []

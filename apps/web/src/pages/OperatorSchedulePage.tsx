@@ -730,6 +730,10 @@ export default function OperatorSchedulePage() {
           state: tileState,
           title: `${job.reference} · ${job.client}`,
           subtitle: station?.name,
+          sawtoothTop: slice.sawtoothTop,
+          sawtoothBottom: slice.sawtoothBottom,
+          relayLabelTop: slice.relayLabelTop,
+          relayLabelBottom: slice.relayLabelBottom,
         };
         list.push(lensTile);
         index.set(segmentKey, { operatorId: op.id, lensTile });

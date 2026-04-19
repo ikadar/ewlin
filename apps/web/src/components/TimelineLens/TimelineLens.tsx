@@ -16,6 +16,14 @@ export interface LensTileData {
   state: TileState;
   title: string;
   subtitle?: string;
+  /** Tile continues earlier in time (split task) → render top teeth. */
+  sawtoothTop?: boolean;
+  /** Tile continues later in time (split task) → render bottom teeth. */
+  sawtoothBottom?: boolean;
+  /** Operator-view: label at top-right referencing the predecessor segment. */
+  relayLabelTop?: string;
+  /** Operator-view: label at bottom-right referencing the successor segment. */
+  relayLabelBottom?: string;
 }
 
 /**
@@ -354,6 +362,10 @@ export function TimelineLens({
               state={t.state}
               title={t.title}
               subtitle={t.subtitle}
+              sawtoothTop={t.sawtoothTop}
+              sawtoothBottom={t.sawtoothBottom}
+              relayLabelTop={t.relayLabelTop}
+              relayLabelBottom={t.relayLabelBottom}
             />
           ))}
         </div>
