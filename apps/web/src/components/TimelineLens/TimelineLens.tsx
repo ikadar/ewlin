@@ -1,30 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { LensTile } from './LensTile';
-import type { TileState } from '../Tile/colorUtils';
 import {
   LENS_WIDTH, LENS_PIXELS_PER_HOUR, LENS_LEFT_GUTTER, computeLensHeight,
   LENS_FADE_IN_MS, LENS_FADE_OUT_MS, LENS_SCROLL_DURATION_MS, LENS_SCROLL_EASING,
   LENS_SMOOTH_SCROLL, LENS_OFFSET_FROM_COLUMN, LENS_Z_INDEX,
 } from './lensConfig';
-
-export interface LensTileData {
-  id: string;
-  startMs: number;
-  endMs: number;
-  setupMinutes?: number;
-  state: TileState;
-  title: string;
-  subtitle?: string;
-  /** Tile continues earlier in time (split task) → render top teeth. */
-  sawtoothTop?: boolean;
-  /** Tile continues later in time (split task) → render bottom teeth. */
-  sawtoothBottom?: boolean;
-  /** Operator-view: label at top-right referencing the predecessor segment. */
-  relayLabelTop?: string;
-  /** Operator-view: label at bottom-right referencing the successor segment. */
-  relayLabelBottom?: string;
-}
 
 /**
  * Where to dock the lens. Viewport-relative coordinates captured at the
@@ -46,7 +26,11 @@ export interface TimelineLensProps {
    *  animates (same column = scroll smoothly; cross-column = snap). */
   activeColumnId: string | null;
   anchor: LensAnchor | null;
-  tiles: LensTileData[];
+  /** Pre-rendered tiles. Each view passes actual `Tile` or `TileSegment`
+   *  elements built with `pixelsPerHour = LENS_PIXELS_PER_HOUR` and tops
+   *  computed from `gridStartMs`, so the lens content is byte-for-byte
+   *  identical to the planning minus the zoom factor. */
+  tileContent: ReactNode;
   /** Hatched unavailability bands for the active column, absolute ms. */
   unavailabilitySegments?: Array<{ startMs: number; endMs: number }>;
   /** Absolute ms used as the Y=0 reference for tile positions inside the lens. */
@@ -81,7 +65,7 @@ function formatHHMM(ms: number): string {
  *                         changes within the same column
  */
 export function TimelineLens({
-  visible, activeColumnId, anchor, tiles, unavailabilitySegments = [],
+  visible, activeColumnId, anchor, tileContent, unavailabilitySegments = [],
   gridStartMs, gridEndMs, centerTimeMs,
   onMouseEnter, onMouseLeave,
 }: TimelineLensProps) {
@@ -351,23 +335,22 @@ export function TimelineLens({
               />
             );
           })}
-          {tiles.map((t) => (
-            <LensTile
-              key={t.id}
-              startMs={t.startMs}
-              endMs={t.endMs}
-              setupMinutes={t.setupMinutes}
-              gridStartMs={gridStartMs}
-              pixelsPerHour={lpx}
-              state={t.state}
-              title={t.title}
-              subtitle={t.subtitle}
-              sawtoothTop={t.sawtoothTop}
-              sawtoothBottom={t.sawtoothBottom}
-              relayLabelTop={t.relayLabelTop}
-              relayLabelBottom={t.relayLabelBottom}
-            />
-          ))}
+          {/* Actual Tile / TileSegment components provided by the view,
+              rendered at LENS_PIXELS_PER_HOUR. Wrapped in a no-interaction
+              wrapper so drag / click / tooltip logic doesn't run inside the
+              lens. Left-inset by LENS_LEFT_GUTTER so it doesn't overflow
+              into the hour-label column. */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0, bottom: 0,
+              left: `${LENS_LEFT_GUTTER}px`,
+              right: '4px',
+              pointerEvents: 'none',
+            }}
+          >
+            {tileContent}
+          </div>
         </div>
         <div
           style={{

@@ -11,7 +11,7 @@ import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } from '../../utils/stationTileData';
-import { TimelineLens, useTimelineLens, type LensTileData } from '../TimelineLens';
+import { TimelineLens, useTimelineLens, LENS_PIXELS_PER_HOUR } from '../TimelineLens';
 import { computeStationUnavailabilitySegments } from '../TimelineLens/unavailability';
 
 /** Handle for programmatic grid scrolling */
@@ -435,50 +435,67 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
   const lens = useTimelineLens();
   const lastHoveredTileIdRef = useRef<string | null>(null);
 
-  // Per-station list of LensTileData, derived from the already-computed cache.
-  const lensTilesByStation = useMemo(() => {
-    const map = new Map<string, LensTileData[]>();
-    assignmentsByStation.forEach((stationAssignments, stationId) => {
-      const list: LensTileData[] = [];
-      for (const a of stationAssignments) {
-        const cached = tileDataCache.get(a.id);
-        if (!cached) continue;
-        const setupMinutes = isInternalTask(cached.task)
-          ? cached.task.duration.setupMinutes ?? 0
-          : 0;
-        const interrupt = taskInterruption.get(a.id);
-        list.push({
-          id: a.id,
-          startMs: new Date(a.scheduledStart).getTime(),
-          endMs: new Date(a.scheduledEnd).getTime(),
-          setupMinutes,
-          state: cached.tileState,
-          title: `${cached.job.reference} · ${cached.job.client}`,
-          subtitle: cached.operatorNames,
-          sawtoothTop: interrupt?.top ?? false,
-          sawtoothBottom: interrupt?.bottom ?? false,
-        });
-      }
-      map.set(stationId, list);
-    });
-    return map;
-  }, [assignmentsByStation, tileDataCache, taskInterruption]);
-
-  const lensActiveTiles = lens.state.activeColumnId
-    ? lensTilesByStation.get(lens.state.activeColumnId) ?? []
+  const lensActiveAssignments = lens.state.activeColumnId
+    ? assignmentsByStation.get(lens.state.activeColumnId) ?? []
     : [];
 
   const lensRange = useMemo(() => {
-    if (lensActiveTiles.length === 0) return { gridStartMs: 0, gridEndMs: 0 };
+    if (lensActiveAssignments.length === 0) return { gridStartMs: 0, gridEndMs: 0 };
     let min = Infinity;
     let max = -Infinity;
-    for (const t of lensActiveTiles) {
-      if (t.startMs < min) min = t.startMs;
-      if (t.endMs > max) max = t.endMs;
+    for (const a of lensActiveAssignments) {
+      const s = new Date(a.scheduledStart).getTime();
+      const e = new Date(a.scheduledEnd).getTime();
+      if (s < min) min = s;
+      if (e > max) max = e;
     }
     const PAD_MS = 60 * 60_000; // 1 hour padding around the tile range
     return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
-  }, [lensActiveTiles]);
+  }, [lensActiveAssignments]);
+
+  // Pre-render the actual <Tile> components at LENS_PIXELS_PER_HOUR so the
+  // lens shows visually identical tiles to the main grid, just at a
+  // magnified time/pixel ratio.
+  const lensTileContent = useMemo(() => {
+    if (!lens.state.activeColumnId) return null;
+    const originMs = lensRange.gridStartMs;
+    const noop = () => { /* interactions disabled inside the lens */ };
+    return lensActiveAssignments.map((a) => {
+      const cached = tileDataCache.get(a.id);
+      if (!cached) return null;
+      // Station-view tiles are always backed by internal tasks — outsourced
+      // assignments are filtered out earlier in assignmentsByStation.
+      if (!isInternalTask(cached.task)) return null;
+      const interrupt = taskInterruption.get(a.id);
+      const top =
+        ((new Date(a.scheduledStart).getTime() - originMs) / 3_600_000) *
+        LENS_PIXELS_PER_HOUR;
+      return (
+        <Tile
+          key={`lens-${a.id}`}
+          assignment={a}
+          task={cached.task}
+          job={cached.job}
+          element={cached.element}
+          top={top}
+          isSelected={false}
+          similarityResults={cached.similarityResults}
+          onSelect={noop}
+          onTogglePin={noop}
+          hasConflict={cached.hasConflict}
+          tileState={cached.tileState}
+          pixelsPerHour={LENS_PIXELS_PER_HOUR}
+          isBlocked={cached.blocked}
+          blockingInfo={cached.blockingInfo}
+          displayMode={displayMode}
+          tirageLabel={cached.tirageLabel}
+          operatorNames={cached.operatorNames}
+          sawtoothTop={interrupt?.top}
+          sawtoothBottom={interrupt?.bottom}
+        />
+      );
+    });
+  }, [lens.state.activeColumnId, lensActiveAssignments, tileDataCache, taskInterruption, lensRange.gridStartMs, displayMode]);
 
   const lensUnavailabilitySegments = useMemo(() => {
     if (!lens.state.activeColumnId) return [];
@@ -734,7 +751,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         visible={lens.state.visible}
         activeColumnId={lens.state.activeColumnId}
         anchor={lens.state.anchor}
-        tiles={lensActiveTiles}
+        tileContent={lensTileContent}
         unavailabilitySegments={lensUnavailabilitySegments}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}

@@ -1,4 +1,4 @@
-export { TimelineLens, type LensTileData, type LensAnchor, type TimelineLensProps } from './TimelineLens';
+export { TimelineLens, type LensAnchor, type TimelineLensProps } from './TimelineLens';
 export { useTimelineLens, type TileEnterInput, type LensState } from './useTimelineLens';
 export {
   LENS_PIXELS_PER_HOUR,

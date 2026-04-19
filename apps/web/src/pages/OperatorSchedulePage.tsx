@@ -39,7 +39,7 @@ import { getErrorMessage } from '../store/api/errorNormalization';
 import { ZOOM_LEVELS } from '../utils/zoom';
 import { computeTileSlices, getOperatorDaySchedule, type TileSlice } from '../utils/operatorTileSlices';
 import { isInternalTask } from '@flux/types';
-import { TimelineLens, useTimelineLens, type LensTileData } from '../components/TimelineLens';
+import { TimelineLens, useTimelineLens, LENS_PIXELS_PER_HOUR } from '../components/TimelineLens';
 import { computeOperatorUnavailabilitySegments } from '../components/TimelineLens/unavailability';
 import type {
   Operator,
@@ -677,87 +677,42 @@ export default function OperatorSchedulePage() {
   const lens = useTimelineLens();
   const lastHoveredSegmentKeyRef = useRef<string | null>(null);
 
-  // Flat lookup: segmentKey → { operatorId, lensTile }. Used by the
-  // onMouseOver delegation handler to resolve a TileSegment element to the
-  // column + tile it represents without a full tree scan.
+  // Map assignments by id — both renderSlice paths need O(1) lookup.
   const lensAssignmentMap = useMemo(() => {
     const map = new Map<string, TaskAssignment>();
     for (const a of snapshot.assignments) map.set(a.id, a);
     return map;
   }, [snapshot.assignments]);
 
-  const { lensTilesByOperator, lensSegmentIndex } = useMemo(() => {
-    const byOp = new Map<string, LensTileData[]>();
-    const index = new Map<string, { operatorId: string; lensTile: LensTileData }>();
+  // segmentKey → operatorId, so the onMouseOver delegation handler can
+  // resolve a TileSegment DOM element back to its column.
+  const lensSegmentOwner = useMemo(() => {
+    const index = new Map<string, string>();
     for (const op of operators) {
-      const slices = allTileSlices.get(op.id) ?? [];
-      const list: LensTileData[] = [];
-      for (const slice of slices) {
-        const task = taskMap.get(slice.taskId);
-        if (!task || !isInternalTask(task)) continue;
-        const element = elementMap.get(task.elementId);
-        const job = element?.jobId ? jobMap.get(element.jobId) : undefined;
-        if (!job) continue;
-        const station = stationMap.get(task.stationId);
-        const assignment = lensAssignmentMap.get(slice.assignmentId);
-        const isLate = lateJobIds.has(job.id) ||
-          (!assignment?.isCompleted && slice.to.getTime() < now.getTime());
-        const tileState = computeTileState(
-          false, isLate, false, false, assignment?.isCompleted ?? false,
-        );
-
-        // A slice may (or may not) overlap the task's initial setup window.
-        // Compute the portion of the setup that falls inside this slice so
-        // the LensTile can draw its dotted divider at the right height.
-        const taskStartMs = assignment ? new Date(assignment.scheduledStart).getTime() : null;
-        const setupMinutesTotal = task.duration?.setupMinutes ?? 0;
-        let sliceSetupMinutes = 0;
-        if (taskStartMs !== null && setupMinutesTotal > 0) {
-          const setupEndMs = taskStartMs + setupMinutesTotal * 60_000;
-          const overlapStart = Math.max(slice.from.getTime(), taskStartMs);
-          const overlapEnd = Math.min(slice.to.getTime(), setupEndMs);
-          if (overlapEnd > overlapStart) {
-            sliceSetupMinutes = (overlapEnd - overlapStart) / 60_000;
-          }
-        }
-
-        const segmentKey = `${slice.assignmentId}-${slice.from.getTime()}`;
-        const lensTile: LensTileData = {
-          id: `${segmentKey}-${slice.position}`,
-          startMs: slice.from.getTime(),
-          endMs: slice.to.getTime(),
-          setupMinutes: sliceSetupMinutes,
-          state: tileState,
-          title: `${job.reference} · ${job.client}`,
-          subtitle: station?.name,
-          sawtoothTop: slice.sawtoothTop,
-          sawtoothBottom: slice.sawtoothBottom,
-          relayLabelTop: slice.relayLabelTop,
-          relayLabelBottom: slice.relayLabelBottom,
-        };
-        list.push(lensTile);
-        index.set(segmentKey, { operatorId: op.id, lensTile });
+      for (const slice of allTileSlices.get(op.id) ?? []) {
+        index.set(`${slice.assignmentId}-${slice.from.getTime()}`, op.id);
       }
-      byOp.set(op.id, list);
     }
-    return { lensTilesByOperator: byOp, lensSegmentIndex: index };
-  }, [operators, allTileSlices, taskMap, elementMap, jobMap, stationMap, lensAssignmentMap, lateJobIds, now]);
+    return index;
+  }, [operators, allTileSlices]);
 
-  const lensActiveTiles = lens.state.activeColumnId
-    ? lensTilesByOperator.get(lens.state.activeColumnId) ?? []
+  const lensActiveSlices = lens.state.activeColumnId
+    ? allTileSlices.get(lens.state.activeColumnId) ?? []
     : [];
 
   const lensRange = useMemo(() => {
-    if (lensActiveTiles.length === 0) return { gridStartMs: 0, gridEndMs: 0 };
+    if (lensActiveSlices.length === 0) return { gridStartMs: 0, gridEndMs: 0 };
     let min = Infinity;
     let max = -Infinity;
-    for (const t of lensActiveTiles) {
-      if (t.startMs < min) min = t.startMs;
-      if (t.endMs > max) max = t.endMs;
+    for (const s of lensActiveSlices) {
+      const ss = s.from.getTime();
+      const ee = s.to.getTime();
+      if (ss < min) min = ss;
+      if (ee > max) max = ee;
     }
     const PAD_MS = 60 * 60_000;
     return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
-  }, [lensActiveTiles]);
+  }, [lensActiveSlices]);
 
   const lensUnavailabilitySegments = useMemo(() => {
     if (!lens.state.activeColumnId) return [];
@@ -767,6 +722,86 @@ export default function OperatorSchedulePage() {
       op, lensRange.gridStartMs, lensRange.gridEndMs,
     );
   }, [lens.state.activeColumnId, operators, lensRange.gridStartMs, lensRange.gridEndMs]);
+
+  // Pre-render the actual <TileSegment> components at LENS_PIXELS_PER_HOUR,
+  // using the same logic as `renderSlice` — identical visuals, just a
+  // magnified time/pixel ratio. Built inside the memo so re-renders of the
+  // page don't recompute unless the active column or its slice set changes.
+  const lensTileContent = useMemo(() => {
+    if (!lens.state.activeColumnId) return null;
+    const slices = lensActiveSlices;
+    if (slices.length === 0) return null;
+
+    const lensOrigin = new Date(lensRange.gridStartMs);
+    // Lens inner tile area: LENS_WIDTH (300) - LENS_LEFT_GUTTER (40) - right-pad (4).
+    const LENS_COL_WIDTH = 256;
+    const noop = () => { /* interactions disabled inside the lens */ };
+
+    return slices.map((slice) => {
+      const task = taskMap.get(slice.taskId);
+      if (!task || !isInternalTask(task)) return null;
+      const element = elementMap.get(task.elementId);
+      const jobId = element?.jobId;
+      const job = jobId ? jobMap.get(jobId) : undefined;
+      if (!job) return null;
+      const station = stationMap.get(task.stationId);
+      const stationName = station?.name;
+      const assignment = lensAssignmentMap.get(slice.assignmentId);
+
+      const isLate = lateJobIds.has(job.id) ||
+        (!assignment?.isCompleted && slice.to.getTime() < now.getTime());
+      const tileState = computeTileState(
+        false, isLate, false, false, assignment?.isCompleted ?? false,
+      );
+
+      const segTop = timeToYPosition(slice.from, START_HOUR, LENS_PIXELS_PER_HOUR, lensOrigin);
+      const segBottom = timeToYPosition(slice.to, START_HOUR, LENS_PIXELS_PER_HOUR, lensOrigin);
+      const segHeight = Math.max(segBottom - segTop, 8);
+
+      const colWidth = LENS_COL_WIDTH - 8;
+      const positionProps = slice.position === 'left'
+        ? { overrideLeft: '0', overrideWidth: '49%' }
+        : slice.position === 'right'
+          ? { overrideLeft: '51%', overrideWidth: '49%' }
+          : {};
+      const svgWidth = slice.position === 'full' ? colWidth : Math.floor(colWidth * 0.48);
+
+      const label = `${job.reference} · ${job.client}`;
+      const setupMinutes = task.duration?.setupMinutes ?? 0;
+      const taskStart = assignment ? new Date(assignment.scheduledStart) : null;
+      const setupWindow = setupMinutes > 0 && taskStart
+        ? { start: taskStart, end: new Date(taskStart.getTime() + setupMinutes * 60_000) }
+        : undefined;
+
+      return (
+        <TileSegment
+          key={`lens-${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
+          segmentKey={`lens-${slice.assignmentId}-${slice.from.getTime()}`}
+          label={label}
+          stationName={stationName}
+          top={segTop}
+          height={segHeight}
+          width={svgWidth}
+          sawtoothTop={slice.sawtoothTop}
+          sawtoothBottom={slice.sawtoothBottom}
+          relayLabelBottom={slice.relayLabelBottom}
+          relayLabelTop={slice.relayLabelTop}
+          tileState={tileState}
+          isMaskedTime={slice.isMasked}
+          onClick={noop}
+          segFrom={slice.from}
+          segTo={slice.to}
+          setupWindow={setupWindow}
+          recalages={assignment?.recalages}
+          jobId={job.id}
+          {...positionProps}
+        />
+      );
+    });
+  }, [
+    lens.state.activeColumnId, lensActiveSlices, lensRange.gridStartMs,
+    taskMap, elementMap, jobMap, stationMap, lensAssignmentMap, lateJobIds, now,
+  ]);
 
   const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -786,8 +821,18 @@ export default function OperatorSchedulePage() {
     if (!segmentKey || segmentKey === lastHoveredSegmentKeyRef.current) return;
     lastHoveredSegmentKeyRef.current = segmentKey;
 
-    const hit = lensSegmentIndex.get(segmentKey);
-    if (!hit) return;
+    const operatorId = lensSegmentOwner.get(segmentKey);
+    if (!operatorId) return;
+
+    // segmentKey = "<assignmentId>-<fromMs>" → find the slice to get mid-time.
+    const sepIdx = segmentKey.lastIndexOf('-');
+    const assignmentId = segmentKey.slice(0, sepIdx);
+    const fromMs = Number(segmentKey.slice(sepIdx + 1));
+    const slices = allTileSlices.get(operatorId) ?? [];
+    const slice = slices.find(
+      (s) => s.assignmentId === assignmentId && s.from.getTime() === fromMs,
+    );
+    if (!slice) return;
 
     const colEl = segmentEl.closest('[data-testid^="operator-column-"]') as HTMLElement | null;
     if (!colEl) return;
@@ -796,8 +841,8 @@ export default function OperatorSchedulePage() {
     const tileRect = segmentEl.getBoundingClientRect();
 
     lens.handlers.handleTileEnter({
-      columnId: hit.operatorId,
-      tileMidTimeMs: (hit.lensTile.startMs + hit.lensTile.endMs) / 2,
+      columnId: operatorId,
+      tileMidTimeMs: (slice.from.getTime() + slice.to.getTime()) / 2,
       tileHeightPx: tileRect.height,
       anchor: {
         columnLeft: colRect.left,
@@ -1118,7 +1163,7 @@ export default function OperatorSchedulePage() {
         visible={lens.state.visible}
         activeColumnId={lens.state.activeColumnId}
         anchor={lens.state.anchor}
-        tiles={lensActiveTiles}
+        tileContent={lensTileContent}
         unavailabilitySegments={lensUnavailabilitySegments}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}
