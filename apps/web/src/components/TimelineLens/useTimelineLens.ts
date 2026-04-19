@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  LENS_HIDE_GRACE_MS, LENS_AUTO_CLOSE_MS,
+  LENS_HIDE_GRACE_MS, LENS_AUTO_CLOSE_MS, LENS_DEAD_ZONE_CLOSE_MS,
   computeDwellMs, isTileTriggerable,
 } from './lensConfig';
 import type { LensAnchor } from './TimelineLens';
@@ -52,6 +52,7 @@ export function useTimelineLens() {
   const showTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const closeTimerExpiresAtRef = useRef<number | null>(null);
 
   const clearShowTimer = useCallback(() => {
     if (showTimerRef.current !== null) {
@@ -70,6 +71,7 @@ export function useTimelineLens() {
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
+    closeTimerExpiresAtRef.current = null;
   }, []);
 
   const hide = useCallback(() => {
@@ -79,13 +81,29 @@ export function useTimelineLens() {
     setState(INITIAL_STATE);
   }, [clearShowTimer, clearHideTimer, clearCloseTimer]);
 
-  const armCloseTimer = useCallback(() => {
-    if (closeTimerRef.current !== null) return; // keep the existing countdown
-    if (LENS_AUTO_CLOSE_MS <= 0) return;
+  /**
+   * Arm the auto-close timer for `durationMs`. If a timer is already armed,
+   * keep whichever will fire first — dead-zone hovers (short duration) can
+   * shorten a pending tall-tile timer, but a pending dead-zone timer cannot
+   * be extended into a tall-tile one.
+   */
+  const armCloseTimer = useCallback((durationMs: number) => {
+    if (durationMs <= 0) return;
+    const now = Date.now();
+    const existingExpiresAt = closeTimerExpiresAtRef.current;
+    const newExpiresAt = now + durationMs;
+    if (existingExpiresAt !== null && existingExpiresAt <= newExpiresAt) {
+      return; // existing will fire at or before the new duration
+    }
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
     closeTimerRef.current = window.setTimeout(() => {
       closeTimerRef.current = null;
+      closeTimerExpiresAtRef.current = null;
       hide();
-    }, LENS_AUTO_CLOSE_MS);
+    }, durationMs);
+    closeTimerExpiresAtRef.current = newExpiresAt;
   }, [hide]);
 
   const handleTileEnter = useCallback((input: TileEnterInput) => {
@@ -143,10 +161,10 @@ export function useTimelineLens() {
       return;
     }
 
-    // Tile too tall to trigger even at max dwell → treat like a dead zone:
-    // arm the auto-close (no-op if the lens is hidden).
+    // Tile too tall to trigger even at max dwell → arm the tall-tile close
+    // (longer than dead zone). No-op if the lens is hidden.
     if (!current.visible) return;
-    armCloseTimer();
+    armCloseTimer(LENS_AUTO_CLOSE_MS);
   }, [clearShowTimer, clearCloseTimer, clearHideTimer, armCloseTimer]);
 
   const handleStationLeave = useCallback(() => {
@@ -167,7 +185,7 @@ export function useTimelineLens() {
   const handleDeadZoneEnter = useCallback(() => {
     const current = stateRef.current;
     if (!current.visible) return;
-    armCloseTimer();
+    armCloseTimer(LENS_DEAD_ZONE_CLOSE_MS);
   }, [armCloseTimer]);
 
   /**

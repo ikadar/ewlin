@@ -103,6 +103,16 @@ export function TimelineLens({
   const prevVisibleRef = useRef<boolean>(false);
   const prevColumnRef = useRef<string | null>(null);
 
+  // Keep the LAST anchor around so the lens and its connector can keep
+  // rendering at their last screen position while the fade-out transition
+  // completes. Without this, `hide()` flips anchor to null → lensLeft/Top
+  // snap to -9999 → the lens disappears instantly (jitter) instead of
+  // fading in place. The ref is updated only when we have a real anchor;
+  // rendering falls back to it otherwise.
+  const lastAnchorRef = useRef<LensAnchor | null>(null);
+  if (anchor) lastAnchorRef.current = anchor;
+  const effectiveAnchor = anchor ?? lastAnchorRef.current;
+
   // ── Gate top/left transitions on readyToAnimate ────────────────────
   // First frame after visible=true: no top/left transition (so the lens
   // snaps to its docking position). One rAF later: enable top/left, so
@@ -147,20 +157,20 @@ export function TimelineLens({
 
   // ── Position the lens envelope at the tile's Y (not the column's Y) ──
   const { lensLeft, lensTop } = useMemo(() => {
-    if (!anchor) return { lensLeft: -9999, lensTop: -9999 };
+    if (!effectiveAnchor) return { lensLeft: -9999, lensTop: -9999 };
     const margin = 8;
-    const preferredTop = anchor.tileCenterY - lensHeight / 2;
+    const preferredTop = effectiveAnchor.tileCenterY - lensHeight / 2;
     const clampedTop = Math.max(
       margin,
       Math.min(window.innerHeight - lensHeight - margin, preferredTop)
     );
-    const preferredLeft = anchor.columnRight + LENS_OFFSET_FROM_COLUMN;
+    const preferredLeft = effectiveAnchor.columnRight + LENS_OFFSET_FROM_COLUMN;
     const clampedLeft = Math.max(
       margin,
       Math.min(window.innerWidth - LENS_WIDTH - margin, preferredLeft)
     );
     return { lensLeft: clampedLeft, lensTop: clampedTop };
-  }, [anchor, lensHeight]);
+  }, [effectiveAnchor, lensHeight]);
 
   // ── Multi-tier time grid, rendered once per grid range ──
   const gridElements = useMemo<ReactNode[]>(() => {
@@ -255,14 +265,16 @@ export function TimelineLens({
   // Source endpoint = tile edge (column right side at tile Y).
   // Destination endpoint = lens's left-middle edge (which sits exactly at
   // tileCenterY when unclamped, so the line is horizontal in the common case).
-  const connectorSrcX = anchor ? anchor.columnRight : 0;
-  const connectorSrcY = anchor ? anchor.tileCenterY : 0;
+  // Using `effectiveAnchor` so the connector stays in place during fade-out
+  // rather than snapping to (0, 0) and causing a visual flicker.
+  const connectorSrcX = effectiveAnchor ? effectiveAnchor.columnRight : 0;
+  const connectorSrcY = effectiveAnchor ? effectiveAnchor.tileCenterY : 0;
   const connectorDstX = lensLeft;
   const connectorDstY = lensTop + lensHeight / 2;
 
   return createPortal(
     <>
-      {anchor && (
+      {effectiveAnchor && (
         <svg
           style={{
             position: 'fixed',

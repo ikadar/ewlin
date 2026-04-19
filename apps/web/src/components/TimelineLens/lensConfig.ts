@@ -34,10 +34,11 @@ export const LENS_SMALL_TILE_THRESHOLD_PX = 20;
 
 /** Timings (ms). */
 export const LENS_HOVER_DELAY_MS = 80;
-/** Upper bound on the dwell required to trigger the lens. Tiles bigger than
- *  `(LENS_MAX_DWELL_MS / LENS_HOVER_DELAY_MS) × LENS_SMALL_TILE_THRESHOLD_PX`
- *  never trigger — they are treated like dead zones for auto-close purposes. */
-export const LENS_MAX_DWELL_MS = 600;
+/** Upper bound on the dwell required to trigger the lens. With a 20 px
+ *  baseline at 80 ms, a 128 ms cap means tiles up to 32 px can trigger the
+ *  lens (given enough dwell); taller tiles never do — they behave like dead
+ *  zones for auto-close purposes. */
+export const LENS_MAX_DWELL_MS = 128;
 
 /** Required dwell (ms) before the lens opens on a tile of the given rendered
  *  height. Linear scaling: 20 px → 80 ms, 40 px → 160 ms, 100 px → 400 ms, … */
@@ -54,10 +55,14 @@ export function isTileTriggerable(tileHeightPx: number): boolean {
 }
 export const LENS_FADE_IN_MS = 500;
 export const LENS_FADE_OUT_MS = 500;
-/** Dwell before auto-closing on a tall tile or hatched unavailability zone.
- *  Halved from the previous 3000 ms per user feedback — with 500 ms fade-out,
- *  the total perceived "lens is leaving" time stays around 2 s end-to-end. */
+/** Dwell before auto-closing on a tile that is too tall to trigger the lens. */
 export const LENS_AUTO_CLOSE_MS = 1500;
+
+/** Dwell before auto-closing when the cursor is parked over a dead zone
+ *  (hatched unavailability overlay, hour grid, or any non-tile space in the
+ *  column). Shorter than the tall-tile close because empty space is a
+ *  stronger "the user is done" signal. */
+export const LENS_DEAD_ZONE_CLOSE_MS = 300;
 export const LENS_HIDE_GRACE_MS = 140;
 /** Duration used both for the envelope (top/left) gliding when the lens docks
  *  against a new tile, and for the inner translateY when the focal time
