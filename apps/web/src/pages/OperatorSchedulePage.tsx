@@ -39,6 +39,7 @@ import { getErrorMessage } from '../store/api/errorNormalization';
 import { ZOOM_LEVELS } from '../utils/zoom';
 import { computeTileSlices, getOperatorDaySchedule, type TileSlice } from '../utils/operatorTileSlices';
 import { isInternalTask } from '@flux/types';
+import { TimelineLens, useTimelineLens, type LensTileData } from '../components/TimelineLens';
 import type {
   Operator,
   TaskAssignment,
@@ -671,6 +672,129 @@ export default function OperatorSchedulePage() {
     return map;
   }, [operators, assignmentsByOperator]);
 
+  // ── Timeline magnifying lens ─────────────────────────────────────────────
+  const lens = useTimelineLens();
+  const lastHoveredSegmentKeyRef = useRef<string | null>(null);
+
+  // Flat lookup: segmentKey → { operatorId, lensTile }. Used by the
+  // onMouseOver delegation handler to resolve a TileSegment element to the
+  // column + tile it represents without a full tree scan.
+  const lensAssignmentMap = useMemo(() => {
+    const map = new Map<string, TaskAssignment>();
+    for (const a of snapshot.assignments) map.set(a.id, a);
+    return map;
+  }, [snapshot.assignments]);
+
+  const { lensTilesByOperator, lensSegmentIndex } = useMemo(() => {
+    const byOp = new Map<string, LensTileData[]>();
+    const index = new Map<string, { operatorId: string; lensTile: LensTileData }>();
+    for (const op of operators) {
+      const slices = allTileSlices.get(op.id) ?? [];
+      const list: LensTileData[] = [];
+      for (const slice of slices) {
+        const task = taskMap.get(slice.taskId);
+        if (!task || !isInternalTask(task)) continue;
+        const element = elementMap.get(task.elementId);
+        const job = element?.jobId ? jobMap.get(element.jobId) : undefined;
+        if (!job) continue;
+        const station = stationMap.get(task.stationId);
+        const assignment = lensAssignmentMap.get(slice.assignmentId);
+        const isLate = lateJobIds.has(job.id) ||
+          (!assignment?.isCompleted && slice.to.getTime() < now.getTime());
+        const tileState = computeTileState(
+          false, isLate, false, false, assignment?.isCompleted ?? false,
+        );
+
+        // A slice may (or may not) overlap the task's initial setup window.
+        // Compute the portion of the setup that falls inside this slice so
+        // the LensTile can draw its dotted divider at the right height.
+        const taskStartMs = assignment ? new Date(assignment.scheduledStart).getTime() : null;
+        const setupMinutesTotal = task.duration?.setupMinutes ?? 0;
+        let sliceSetupMinutes = 0;
+        if (taskStartMs !== null && setupMinutesTotal > 0) {
+          const setupEndMs = taskStartMs + setupMinutesTotal * 60_000;
+          const overlapStart = Math.max(slice.from.getTime(), taskStartMs);
+          const overlapEnd = Math.min(slice.to.getTime(), setupEndMs);
+          if (overlapEnd > overlapStart) {
+            sliceSetupMinutes = (overlapEnd - overlapStart) / 60_000;
+          }
+        }
+
+        const segmentKey = `${slice.assignmentId}-${slice.from.getTime()}`;
+        const lensTile: LensTileData = {
+          id: `${segmentKey}-${slice.position}`,
+          startMs: slice.from.getTime(),
+          endMs: slice.to.getTime(),
+          setupMinutes: sliceSetupMinutes,
+          state: tileState,
+          title: `${job.reference} · ${job.client}`,
+          subtitle: station?.name,
+        };
+        list.push(lensTile);
+        index.set(segmentKey, { operatorId: op.id, lensTile });
+      }
+      byOp.set(op.id, list);
+    }
+    return { lensTilesByOperator: byOp, lensSegmentIndex: index };
+  }, [operators, allTileSlices, taskMap, elementMap, jobMap, stationMap, lensAssignmentMap, lateJobIds, now]);
+
+  const lensActiveTiles = lens.state.activeColumnId
+    ? lensTilesByOperator.get(lens.state.activeColumnId) ?? []
+    : [];
+
+  const lensRange = useMemo(() => {
+    if (lensActiveTiles.length === 0) return { gridStartMs: 0, gridEndMs: 0 };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const t of lensActiveTiles) {
+      if (t.startMs < min) min = t.startMs;
+      if (t.endMs > max) max = t.endMs;
+    }
+    const PAD_MS = 60 * 60_000;
+    return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
+  }, [lensActiveTiles]);
+
+  const lensColumnTitle = useMemo(() => {
+    if (!lens.state.activeColumnId) return '';
+    const op = operators.find(o => o.id === lens.state.activeColumnId);
+    return op ? `${op.firstName} ${op.lastName}` : '';
+  }, [lens.state.activeColumnId, operators]);
+
+  const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const segmentEl = target.closest('[data-testid^="tile-segment-"]') as HTMLElement | null;
+    if (!segmentEl) return;
+    const testId = segmentEl.getAttribute('data-testid');
+    const segmentKey = testId ? testId.slice('tile-segment-'.length) : null;
+    if (!segmentKey || segmentKey === lastHoveredSegmentKeyRef.current) return;
+    lastHoveredSegmentKeyRef.current = segmentKey;
+
+    const hit = lensSegmentIndex.get(segmentKey);
+    if (!hit) return;
+
+    const colEl = segmentEl.closest('[data-testid^="operator-column-"]') as HTMLElement | null;
+    if (!colEl) return;
+
+    const colRect = colEl.getBoundingClientRect();
+    const tileRect = segmentEl.getBoundingClientRect();
+
+    lens.handlers.handleTileEnter({
+      columnId: hit.operatorId,
+      tileMidTimeMs: (hit.lensTile.startMs + hit.lensTile.endMs) / 2,
+      tileHeightPx: tileRect.height,
+      anchor: {
+        left: colRect.left, right: colRect.right,
+        top: colRect.top, bottom: colRect.bottom,
+        width: colRect.width, height: colRect.height,
+      },
+    });
+  };
+
+  const handleOperatorsMouseLeave = () => {
+    lastHoveredSegmentKeyRef.current = null;
+    lens.handlers.handleStationLeave();
+  };
+
   // ---- Loading / error ----
   if (isLoading) {
     return (
@@ -855,7 +979,11 @@ export default function OperatorSchedulePage() {
                 </div>
 
                 {/* Operator columns */}
-                <div className="flex gap-3 px-3 bg-zinc-950 relative">
+                <div
+                  className="flex gap-3 px-3 bg-zinc-950 relative"
+                  onMouseOver={handleOperatorsMouseOver}
+                  onMouseLeave={handleOperatorsMouseLeave}
+                >
                   {/* Now line spanning all columns */}
                   <div
                     className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
@@ -939,6 +1067,19 @@ export default function OperatorSchedulePage() {
       <ScheduleEvaluationModal
         isOpen={isEvaluationOpen}
         onClose={() => setIsEvaluationOpen(false)}
+      />
+
+      {/* ---- Timeline magnifying lens ---- */}
+      <TimelineLens
+        visible={lens.state.visible}
+        anchor={lens.state.anchor}
+        columnTitle={lensColumnTitle}
+        tiles={lensActiveTiles}
+        gridStartMs={lensRange.gridStartMs}
+        gridEndMs={lensRange.gridEndMs}
+        centerTimeMs={lens.state.centerTimeMs}
+        onMouseEnter={lens.handlers.handleLensEnter}
+        onMouseLeave={lens.handlers.handleLensLeave}
       />
     </div>
 

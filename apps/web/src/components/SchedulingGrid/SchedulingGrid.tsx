@@ -1,16 +1,17 @@
 import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, StationGroup, Element, Operator } from '@flux/types';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
-import { getDeadlineDate, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
+import { getDeadlineDate, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS, isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
 import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
 import { Tile } from '../Tile';
-import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
 import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } from '../../utils/stationTileData';
+import { TimelineLens, useTimelineLens, type LensTileData } from '../TimelineLens';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -427,6 +428,98 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       startHour, pixelsPerHour, startDate, shippedJobIds, lateJobIds,
       conflictTaskIds, now, operatorNameMap]);
 
+  // ── Timeline magnifying lens ────────────────────────────────────────────
+  // Hook is view-agnostic; we feed it tile/column info via event delegation
+  // on the columns container below.
+  const lens = useTimelineLens();
+  const lastHoveredTileIdRef = useRef<string | null>(null);
+
+  // Per-station list of LensTileData, derived from the already-computed cache.
+  const lensTilesByStation = useMemo(() => {
+    const map = new Map<string, LensTileData[]>();
+    assignmentsByStation.forEach((stationAssignments, stationId) => {
+      const list: LensTileData[] = [];
+      for (const a of stationAssignments) {
+        const cached = tileDataCache.get(a.id);
+        if (!cached) continue;
+        const setupMinutes = isInternalTask(cached.task)
+          ? cached.task.duration.setupMinutes ?? 0
+          : 0;
+        list.push({
+          id: a.id,
+          startMs: new Date(a.scheduledStart).getTime(),
+          endMs: new Date(a.scheduledEnd).getTime(),
+          setupMinutes,
+          state: cached.tileState,
+          title: `${cached.job.reference} · ${cached.job.client}`,
+          subtitle: cached.operatorNames,
+        });
+      }
+      map.set(stationId, list);
+    });
+    return map;
+  }, [assignmentsByStation, tileDataCache]);
+
+  const lensActiveTiles = lens.state.activeColumnId
+    ? lensTilesByStation.get(lens.state.activeColumnId) ?? []
+    : [];
+
+  const lensRange = useMemo(() => {
+    if (lensActiveTiles.length === 0) return { gridStartMs: 0, gridEndMs: 0 };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const t of lensActiveTiles) {
+      if (t.startMs < min) min = t.startMs;
+      if (t.endMs > max) max = t.endMs;
+    }
+    const PAD_MS = 60 * 60_000; // 1 hour padding around the tile range
+    return { gridStartMs: min - PAD_MS, gridEndMs: max + PAD_MS };
+  }, [lensActiveTiles]);
+
+  const lensColumnTitle = lens.state.activeColumnId
+    ? stationMap.get(lens.state.activeColumnId)?.name ?? ''
+    : '';
+
+  // Event delegation: a single mouseover on the columns wrapper covers every tile.
+  const handleColumnsMouseOver = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const tileEl = target.closest('[data-testid^="tile-"]') as HTMLElement | null;
+    if (!tileEl) return;
+    const testId = tileEl.getAttribute('data-testid');
+    const assignmentId = testId ? testId.slice('tile-'.length) : null;
+    if (!assignmentId || assignmentId === lastHoveredTileIdRef.current) return;
+    lastHoveredTileIdRef.current = assignmentId;
+
+    const stationId = tileEl.getAttribute('data-station-id');
+    const startStr = tileEl.getAttribute('data-scheduled-start');
+    const endStr = tileEl.getAttribute('data-scheduled-end');
+    if (!stationId || !startStr || !endStr) return;
+
+    const colEl = tileEl.closest('[data-testid^="station-column-"]') as HTMLElement | null;
+    if (!colEl) return;
+
+    const colRect = colEl.getBoundingClientRect();
+    const tileRect = tileEl.getBoundingClientRect();
+    const startMs = new Date(startStr).getTime();
+    const endMs = new Date(endStr).getTime();
+
+    lens.handlers.handleTileEnter({
+      columnId: stationId,
+      tileMidTimeMs: (startMs + endMs) / 2,
+      tileHeightPx: tileRect.height,
+      anchor: {
+        left: colRect.left, right: colRect.right,
+        top: colRect.top, bottom: colRect.bottom,
+        width: colRect.width, height: colRect.height,
+      },
+    });
+  };
+
+  const handleColumnsMouseLeave = () => {
+    lastHoveredTileIdRef.current = null;
+    lens.handlers.handleStationLeave();
+  };
+
   // Calculate departure marker position (if selected job has workshopExitDate)
   // Multi-day: show marker regardless of day (REQ-15)
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) : null;
@@ -502,7 +595,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           </div>
 
           {/* Station columns area */}
-          <div className="flex gap-3 px-3 bg-zinc-950 relative">
+          <div
+            className="flex gap-3 px-3 bg-zinc-950 relative"
+            onMouseOver={handleColumnsMouseOver}
+            onMouseLeave={handleColumnsMouseLeave}
+          >
             {/* Now line spanning all station columns */}
             <div
               className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
@@ -579,6 +676,19 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           </div>
         </div>
       </div>
+
+      {/* Timeline magnifying lens — portaled to document.body */}
+      <TimelineLens
+        visible={lens.state.visible}
+        anchor={lens.state.anchor}
+        columnTitle={lensColumnTitle}
+        tiles={lensActiveTiles}
+        gridStartMs={lensRange.gridStartMs}
+        gridEndMs={lensRange.gridEndMs}
+        centerTimeMs={lens.state.centerTimeMs}
+        onMouseEnter={lens.handlers.handleLensEnter}
+        onMouseLeave={lens.handlers.handleLensLeave}
+      />
     </div>
   );
   }
