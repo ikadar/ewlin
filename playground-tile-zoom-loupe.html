@@ -614,14 +614,16 @@
       <input type="range" id="fadeOutDuration" min="0" max="500" step="10" value="140" />
 
       <div class="slider-row" style="margin-top:14px;">
-        <span style="font-size:11px; color:var(--text-muted)">Idle close on tile &gt; 20 px</span>
+        <span style="font-size:11px; color:var(--text-muted)">Close after hovering tile &gt; 20 px</span>
         <span class="val" id="nonSmallCloseDelayVal">800 ms</span>
       </div>
       <input type="range" id="nonSmallCloseDelay" min="0" max="3000" step="100" value="800" />
       <div class="legend" style="margin-top:8px;">
-        Counts while the cursor hovers a tile &gt; 20 px tall. Entering a
-        small tile cancels it; leaving the tile cancels it. At 0 ms the
-        feature is off.
+        Armed the first time the cursor enters a tile &gt; 20 px while the
+        lens is open. The timer keeps running (no reset on mousemove or
+        when crossing other &gt;20 px tiles); only entering a small tile,
+        entering the lens, or closing it stops it. At 0 ms the feature
+        is off.
       </div>
     </div>
 
@@ -917,10 +919,12 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
 
 ## Interaction
 - snap: \`mouseenter\` on small tile → after delay, center lens on tile midtime
-- snap: \`mouseenter\` on tile > 20 px arms the auto-close timer (if lens visible); does NOT re-center when onlyTiny=true
-- follow: \`mousemove\` on timeline → center lens on cursor's Y → minute; tile > 20 px still arms auto-close
+- snap: \`mouseenter\` on tile > 20 px arms the auto-close timer once (if lens visible); does NOT re-center when onlyTiny=true
+- follow + onlyTiny: \`mousemove\` only tracks cursor Y when it sits over a small tile; over a big tile or gap, the lens stays where it was
+- follow: \`mouseenter\` on tile > 20 px still arms auto-close
+- The auto-close timer does NOT reset on further mousemoves or when crossing other >20 px tiles. Only entering a small tile, entering the lens, or station-leave stops it.
 - \`mouseleave\` station column → schedule hide (140 ms grace)
-- \`mouseenter\` on lens → cancel pending hide (bridge)
+- \`mouseenter\` on lens → cancel pending hide + cancel auto-close
 - \`Esc\` → close immediately
 - In snap mode, the focal tile gets a \`lens-focus\` outline
 
@@ -976,6 +980,7 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     lens.addEventListener('mouseenter', () => {
       clearTimeout(state.hideTimer);
       state.hideTimer = null;
+      clearCloseTimer(); // cursor is on the lens itself — user is using it
     });
     lens.addEventListener('mouseleave', () => scheduleHide());
     state.lensEl = lens;
@@ -1289,6 +1294,9 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
   function tileMidTimeMin(t) {
     return t.start + t.duration / 2;
   }
+  function tileAtMinute(col, minute) {
+    return col.tiles.find(t => t.start <= minute && minute < t.start + t.duration);
+  }
 
   // ── Tile events ──
   function onTileMouseEnter(col, idx) {
@@ -1310,8 +1318,10 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
       return;
     }
 
-    // Non-small tile
-    if (state.lensEl && state.lensEl.classList.contains('visible')) {
+    // Non-small tile: arm the auto-close timer once (don't reset if already
+    // running — the countdown should reach 0 regardless of further motion
+    // between >20 px tiles).
+    if (state.lensEl && state.lensEl.classList.contains('visible') && !state.closeTimer) {
       startCloseTimer();
     }
     if (state.mode === 'snap' && !state.onlyTiny) {
@@ -1326,10 +1336,6 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     }
   }
 
-  function onTileMouseLeave() {
-    clearCloseTimer();
-  }
-
   // Follow mode: track cursor Y continuously
   function handleTimelineMove(col, evt) {
     if (state.mode !== 'follow') return;
@@ -1338,6 +1344,14 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     const y = evt.clientY - rect.top;
     const centerMin = (y / rect.height) * TIMELINE_MINUTES;
     if (centerMin < 0 || centerMin > TIMELINE_MINUTES) return;
+
+    // onlyTiny gate: in follow mode the lens should only open/track when
+    // the cursor is over a small tile. Over a big tile or gap, we leave
+    // the lens alone — the tile.mouseenter path arms the close timer.
+    if (state.onlyTiny) {
+      const tileUnder = tileAtMinute(col, centerMin);
+      if (!tileUnder || !isTileSmall(tileUnder)) return;
+    }
 
     state.pendingCol = col;
     state.pendingCenterMin = centerMin;
@@ -1362,7 +1376,6 @@ A dedup Set ensures coarser tiers win when a minute belongs to several.
     const timeline = document.getElementById(col.timelineId);
     timeline.querySelectorAll('.tile').forEach((tileEl, idx) => {
       tileEl.addEventListener('mouseenter', () => onTileMouseEnter(col, idx));
-      tileEl.addEventListener('mouseleave', () => onTileMouseLeave());
     });
     timeline.addEventListener('mousemove', (e) => {
       if (state.mode === 'follow') handleTimelineMove(col, e);
