@@ -243,16 +243,10 @@ body {
   border-bottom: 1px dotted black !important;
 }
 
-/* Re-calage section: high-visibility red band. A single-tick recalage
-   is only ~16 px tall at default zoom and a 1 px dashed divider alone
-   disappears against the tile color, so we give the whole zone a
-   saturated red fill + outline. `!important` here deliberately shadows
-   any inline `background` set by TileSegment so the red always wins. */
+/* Re-calage section: same visual grammar as the initial setup section
+   (divider only, no fill) but dashed-red to distinguish the post-peremption
+   re-setup from the initial one. */
 [data-testid="tile-recalage-section"] {
-  background-color: rgba(239, 68, 68, 0.35) !important;
-  background-image: none !important;
-  outline: 1.5px solid rgba(239, 68, 68, 0.95) !important;
-  outline-offset: -1px !important;
   border-bottom: 1px dashed rgba(239, 68, 68, 1) !important;
 }
 

@@ -184,10 +184,7 @@ export function TileSegment({
             // Recalage bands must be at least 4 px tall so they're visible
             // even for a 1-tick (15 min at 64 px/h ≈ 16 px) re-setup zone.
             height: `${Math.max(ov.height, ov.kind === 'recalage' ? 4 : 2)}px`,
-            // Only setup overlays get the tile's own bg color; recalage
-            // overlays are left transparent so the CSS rule can paint them
-            // fully red without competing with an inline background.
-            ...(ov.kind === 'setup' ? { background: colors.bg } : {}),
+            background: colors.bg,
           }}
           data-testid={ov.kind === 'setup' ? 'tile-setup-section' : 'tile-recalage-section'}
         />
