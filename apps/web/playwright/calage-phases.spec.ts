@@ -37,7 +37,7 @@ test.describe('Tile calage phases + folder tab', () => {
     await expect(tile.locator('[data-testid="tile-tab-pin"]')).toBeVisible();
   });
 
-  test('inline check is always hidden, inline pin hidden when not pinned', async ({ page }) => {
+  test('inline check is always hidden, inline pin always visible', async ({ page }) => {
     await page.goto('/');
     await waitForTilesReady(page);
 
@@ -47,12 +47,8 @@ test.describe('Tile calage phases + folder tab', () => {
     // Circle (action) must never be inline — it lives exclusively in the tab.
     await expect(tile.locator('.inline-check')).toHaveCSS('display', 'none');
 
-    const isPinned = await tile.getAttribute('data-pinned');
-    if (isPinned === 'true') {
-      await expect(tile.locator('.inline-pin')).not.toHaveCSS('display', 'none');
-    } else {
-      await expect(tile.locator('.inline-pin')).toHaveCSS('display', 'none');
-    }
+    // Pin is always rendered on planning tiles so users can pin/unpin from the grid.
+    await expect(tile.locator('.inline-pin')).not.toHaveCSS('display', 'none');
   });
 
   test('setup section divider is dashed red', async ({ page }) => {

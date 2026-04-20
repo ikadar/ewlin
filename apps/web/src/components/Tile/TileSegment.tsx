@@ -6,6 +6,7 @@
  * and a relay label ("→ pause" / "reprise →").
  */
 
+import { Pin } from 'lucide-react';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
@@ -51,6 +52,12 @@ interface TileSegmentProps {
   recalages?: PhaseSegment[];
   /** Job id — drives the CSS selection ring via [data-job-id] selector (matches station view). */
   jobId?: string;
+  /** Assignment id — needed to forward pin toggles through the parent handler. */
+  assignmentId?: string;
+  /** Current pinned state for this assignment (drives icon color + data attr). */
+  isPinned?: boolean;
+  /** Callback when the inline pin icon is clicked. Omit to render the segment read-only. */
+  onTogglePin?: (assignmentId: string) => void;
 }
 
 /**
@@ -101,6 +108,9 @@ export function TileSegment({
   setupWindow,
   recalages,
   jobId,
+  assignmentId,
+  isPinned,
+  onTogglePin,
 }: TileSegmentProps) {
   const colors = getStateInlineColors(tileState);
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
@@ -153,6 +163,7 @@ export function TileSegment({
       onClick={onClick}
       data-testid={`tile-segment-${segmentKey}`}
       data-job-id={jobId}
+      data-pinned={isPinned ? 'true' : 'false'}
     >
       {/* Background + left border, clipped by CSS polygon */}
       <div
@@ -226,6 +237,21 @@ export function TileSegment({
         style={{ top: `${contentTop}px`, bottom: `${contentBottom}px` }}
       >
         <div className="text-[11px] font-medium leading-tight truncate" style={{ color: colors.text }}>
+          {onTogglePin && assignmentId && (
+            <span className="inline-pin align-middle mr-1">
+              <Pin
+                className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
+                  isPinned
+                    ? 'text-amber-500 hover:text-amber-400'
+                    : 'text-zinc-700 hover:text-zinc-400'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePin(assignmentId);
+                }}
+              />
+            </span>
+          )}
           {label}
         </div>
         {stationName && (

@@ -1015,6 +1015,9 @@ export default function OperatorSchedulePage() {
         setupWindow={setupWindow}
         recalages={assignment?.recalages}
         jobId={job.id}
+        assignmentId={assignment?.id}
+        isPinned={assignment?.isPinned ?? false}
+        onTogglePin={handleTogglePin}
         {...positionProps}
       />
     );

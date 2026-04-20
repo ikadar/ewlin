@@ -253,12 +253,11 @@ body {
   border-bottom: 1px dashed rgba(239, 68, 68, 1) !important;
 }
 
-/* Inline-pin kept as a persistent state indicator — shown only when the
-   tile is pinned. Folder-tab removed: done/pin actions will be wired
-   through a different UI in an upcoming iteration. */
+/* Inline-pin is always shown on planning tiles so users can pin/unpin
+   directly from the grid. Color swap (amber ↔ zinc) communicates state.
+   Folder-tab removed: done action still lives in a separate UI. */
 [data-testid^="tile-"] .inline-check { display: none; }
-[data-testid^="tile-"] .inline-pin { display: none; }
-[data-testid^="tile-"][data-pinned="true"] .inline-pin { display: inline-flex; }
+[data-testid^="tile-"] .inline-pin { display: inline-flex; }
 
 /* ── Light mode tile separation adjustments ── */
 html.light [data-testid^="tile-"][data-job-id] {
