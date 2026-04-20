@@ -233,6 +233,88 @@
     display: inline-block;
   }
 
+  /* ─── SHAPE variants (axis 8) ─── */
+  /* All shape-bar-* render "fill only" (no track behind) so width = score directly. */
+
+  .badge.shape-bar-continuous,
+  .badge.shape-bar-segmented,
+  .badge.shape-bar-dots,
+  .badge.shape-bar-stacked,
+  .badge.shape-bar-staircase {
+    padding: 0; background: transparent; box-shadow: none; color: var(--flux-text-primary);
+    display: inline-flex; align-items: center; border-radius: 0;
+    min-height: 0; min-width: 0;
+  }
+
+  /* Continuous bar: solid fill block, width = score × unit */
+  .badge.shape-bar-continuous > .fill {
+    display: block;
+    height: var(--bar-h, 8px);
+    width: var(--fill-w, 0);
+    background: var(--badge-bg);
+    border-radius: 2px;
+    transition: width 0.15s, background 0.15s;
+  }
+
+  /* Segmented bar: continuous fill + tick marks at each integer boundary */
+  .badge.shape-bar-segmented {
+    position: relative;
+  }
+  .badge.shape-bar-segmented > .fill {
+    display: block;
+    height: var(--bar-h, 8px);
+    width: var(--fill-w, 0);
+    background: var(--badge-bg);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+  .badge.shape-bar-segmented > .fill > .tick {
+    position: absolute; top: 0; bottom: 0;
+    width: 1px;
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  /* Dots row: one dot per point of score (not per maxPoint) */
+  .badge.shape-bar-dots { gap: 2px; }
+  .badge.shape-bar-dots > .dot {
+    width: var(--dot-sz, 6px); height: var(--dot-sz, 6px); border-radius: 50%;
+    background: var(--badge-bg);
+    flex-shrink: 0;
+  }
+  .badge.shape-bar-dots > .dot.half {
+    background: linear-gradient(to right, var(--badge-bg) 0 50%, rgba(255,255,255,0.15) 50% 100%);
+  }
+
+  /* Stacked bar: one segment per fired rule, width = rule points */
+  .badge.shape-bar-stacked { gap: 1px; border-radius: 2px; overflow: hidden; }
+  .badge.shape-bar-stacked > .seg {
+    height: var(--bar-h, 8px);
+    background: var(--seg-color, var(--badge-bg));
+    flex-shrink: 0;
+  }
+
+  /* Staircase: N steps of increasing height, one per point */
+  .badge.shape-bar-staircase {
+    align-items: flex-end;
+    height: var(--stair-h, 14px);
+    gap: 1px;
+  }
+  .badge.shape-bar-staircase > .step {
+    width: var(--step-w, 3px);
+    background: var(--badge-bg);
+    border-radius: 1px 1px 0 0;
+    flex-shrink: 0;
+  }
+
+  /* Empty placeholder for zero scores when always-visible */
+  .badge .empty-placeholder {
+    display: block;
+    width: 4px; height: 2px;
+    background: var(--flux-border);
+    border-radius: 1px;
+  }
+
   /* Click-expand inline (axis 7 = click-expand) */
   .badge.interactive-click { cursor: pointer; }
   .badge .expand {
@@ -294,6 +376,7 @@
       <div class="radio-group" data-axis="color">
         <label><input type="radio" name="color" value="binary"> Binaire (match / neutre)</label>
         <label><input type="radio" name="color" value="continuous" checked> Gradient continu (points/maxPoints)</label>
+        <label><input type="radio" name="color" value="stepped"> Gradient par paliers (feu tricolore)</label>
         <label><input type="radio" name="color" value="per-criterion"> Par famille de critère</label>
         <label><input type="radio" name="color" value="mono"> Monochrome</label>
       </div>
@@ -342,6 +425,21 @@
       </div>
     </fieldset>
 
+    <fieldset>
+      <legend>8. Forme (shape)</legend>
+      <div class="radio-group" data-axis="shape">
+        <label><input type="radio" name="shape" value="pill" checked> Pill (utilise axes 1–7)</label>
+        <label><input type="radio" name="shape" value="bar-continuous"> Barre continue (largeur = score)</label>
+        <label><input type="radio" name="shape" value="bar-dots"> Rangée de dots (1 dot / point)</label>
+        <label><input type="radio" name="shape" value="bar-stacked"> Segments empilés par règle</label>
+        <label><input type="radio" name="shape" value="bar-segmented"> Barre avec ticks unitaires</label>
+        <label><input type="radio" name="shape" value="bar-staircase"> Staircase (hauteur croissante)</label>
+      </div>
+      <div style="font-size:10px; color: var(--flux-text-muted); margin-top:6px; line-height:1.4;">
+        Quand shape ≠ pill, les axes 1 (position) et 4 (taille) sont ignorés ; la taille contrôle à la place l'épaisseur/unit-width.
+      </div>
+    </fieldset>
+
     <button class="export-btn" id="export-btn">Exporter la config</button>
     <pre class="export-output" id="export-output"></pre>
   </aside>
@@ -376,7 +474,10 @@
       <strong>Notes de lecture.</strong><br>
       • Les couleurs "Per famille" utilisent : <code>inking</code> indigo, <code>paper</code> ambre, <code>format</code> ciel.<br>
       • Le gradient continu va de <code>neutre</code> (0) à <code>emerald</code> (max).<br>
+      • Le gradient par paliers (stepped) : rouge (&lt; 33 %), ambre (33–66 %), emerald (&gt; 66 %) — lecture "feu tricolore".<br>
       • La normalisation s'applique uniquement au <strong>texte</strong> du badge ; la couleur s'appuie toujours sur <code>points/maxPoints</code> quand elle est continue.<br>
+      • <strong>Shapes bar-*</strong> : largeur = <code>score × unit_width</code> (4 px par point en taille "small"). Aucune "track" vide — seule la portion "atteinte" est rendue. Ça rend deux scores égaux de catégories différentes visuellement identiques.<br>
+      • <strong>bar-stacked</strong> colorise automatiquement chaque segment par sa famille de règle quand <code>couleur = per-criterion</code>.<br>
       • Le bouton <strong>Exporter</strong> produit un JSON réutilisable par le composant React (B5 du plan).
     </div>
   </main>
@@ -452,7 +553,28 @@
     normalization: 'absolute',
     interaction: 'static',
     threshold: 0.3,
+    shape: 'pill',
   };
+
+  // Per-point unit width for bar shapes, driven by size axis when shape != pill.
+  function unitWidthPx() {
+    switch (state.size) {
+      case 'micro': return 3;
+      case 'small': return 4;
+      case 'medium': return 5;
+      case 'annotation': return 6;
+    }
+    return 4;
+  }
+  function barHeightPx() {
+    switch (state.size) {
+      case 'micro': return 6;
+      case 'small': return 8;
+      case 'medium': return 10;
+      case 'annotation': return 12;
+    }
+    return 8;
+  }
 
   // ─── HELPERS ────────────────────────────────────────────────
   function interpolateColor(t) {
@@ -514,6 +636,12 @@
         return pair.score > 0 ? 'var(--badge-match)' : 'var(--badge-neutral)';
       case 'continuous':
         return interpolateColor(ratio);
+      case 'stepped':
+        // Traffic-light palette: 0–33% red/gray, 33–66% amber, 66–100% emerald.
+        if (ratio <= 0) return 'var(--badge-neutral)';
+        if (ratio < 1 / 3) return 'rgb(248, 113, 113)';  // red-400
+        if (ratio < 2 / 3) return 'rgb(251, 191, 36)';   // amber-400
+        return 'var(--badge-match)';
       case 'per-criterion':
         // For single-criterion badges, use family color; for multi, use neutral w/ chips
         if (pair.matched.length === 1 && pair.matched[0].codes.length === 1) {
@@ -526,6 +654,17 @@
     return 'var(--badge-neutral)';
   }
 
+  // Color a stacked/dots segment by its rule (for per-criterion mode).
+  function segmentColorFor(rule, pair) {
+    if (state.color === 'per-criterion') {
+      // Use the family of the first code in the rule (dominant).
+      const fam = CODE_TO_FAMILY[rule.codes[0]];
+      return FAMILY_COLOR_VAR[fam] || 'var(--badge-neutral)';
+    }
+    // Fallback to the overall pair color for other modes.
+    return colorFor(pair);
+  }
+
   function textColorFor(pair) {
     if (state.color === 'mono') return 'var(--flux-text-primary)';
     return 'white';
@@ -536,20 +675,32 @@
     if (!shouldRender(pair)) return null;
 
     const badge = document.createElement('span');
+    const isShape = state.shape !== 'pill';
+
     badge.className = [
       'badge',
-      `pos-${state.position}`,
-      `sz-${state.size}`,
+      isShape ? `shape-${state.shape}` : `pos-${state.position}`,
+      isShape ? '' : `sz-${state.size}`,
       `interactive-${state.interaction}`,
       isGhost(pair) ? 'ghost' : '',
     ].filter(Boolean).join(' ');
     badge.style.setProperty('--badge-bg', colorFor(pair));
     badge.style.setProperty('--badge-fg', textColorFor(pair));
 
-    // Inner content
+    if (isShape) {
+      buildShapeContent(badge, pair);
+    } else {
+      buildPillContent(badge, pair);
+    }
+
+    attachInteraction(badge, pair);
+    return badge;
+  }
+
+  // ─── Pill content (axes 1–7, historical behavior) ───
+  function buildPillContent(badge, pair) {
     const contentWrap = document.createElement('span');
     if (state.infoDensity === 'symbol') {
-      // Just a symbol. A single dot for size=micro; "◆" for small+.
       contentWrap.textContent = state.size === 'micro' ? '' : '◆';
     } else if (state.infoDensity === 'numeric') {
       contentWrap.textContent = formatText(pair);
@@ -557,7 +708,6 @@
       const sym = state.size === 'micro' ? '' : '◆ ';
       contentWrap.textContent = sym + formatText(pair);
     } else if (state.infoDensity === 'breakdown') {
-      // Pastilles: one colored chip per matched rule (after group resolution)
       const chips = document.createElement('span');
       chips.className = 'breakdown-chips';
       for (const r of pair.matched) {
@@ -576,8 +726,118 @@
       }
     }
     badge.appendChild(contentWrap);
+  }
 
-    // Interaction overlays
+  // ─── Shape content (axis 8) ───
+  function buildShapeContent(badge, pair) {
+    const unit = unitWidthPx();
+    const barH = barHeightPx();
+    badge.style.setProperty('--bar-h', `${barH}px`);
+    badge.style.setProperty('--dot-sz', `${barH}px`);
+    badge.style.setProperty('--step-w', `${Math.max(2, unit - 1)}px`);
+    badge.style.setProperty('--stair-h', `${barH * 2}px`);
+
+    // Width-only placeholder for score=0 + visibility=always/ghost-zero
+    const showPlaceholder = pair.score <= 0;
+
+    switch (state.shape) {
+      case 'bar-continuous': {
+        if (showPlaceholder) {
+          const ph = document.createElement('span');
+          ph.className = 'empty-placeholder';
+          badge.appendChild(ph);
+        } else {
+          const fill = document.createElement('span');
+          fill.className = 'fill';
+          fill.style.setProperty('--fill-w', `${pair.score * unit}px`);
+          badge.appendChild(fill);
+        }
+        break;
+      }
+      case 'bar-segmented': {
+        const fill = document.createElement('span');
+        fill.className = 'fill';
+        const w = pair.score * unit;
+        fill.style.setProperty('--fill-w', `${w}px`);
+        badge.appendChild(fill);
+        // Ticks: one at each integer boundary within the fill (not at edges).
+        const ticks = Math.max(0, Math.floor(pair.score) - (Number.isInteger(pair.score) ? 1 : 0));
+        for (let i = 1; i <= ticks; i++) {
+          const t = document.createElement('span');
+          t.className = 'tick';
+          t.style.left = `${i * unit}px`;
+          fill.appendChild(t);
+        }
+        if (showPlaceholder) {
+          badge.innerHTML = '';
+          const ph = document.createElement('span');
+          ph.className = 'empty-placeholder';
+          badge.appendChild(ph);
+        }
+        break;
+      }
+      case 'bar-dots': {
+        if (showPlaceholder) {
+          const ph = document.createElement('span');
+          ph.className = 'empty-placeholder';
+          badge.appendChild(ph);
+          break;
+        }
+        const fullDots = Math.floor(pair.score);
+        const halfDot = pair.score - fullDots >= 0.25;
+        for (let i = 0; i < fullDots; i++) {
+          const d = document.createElement('span');
+          d.className = 'dot';
+          badge.appendChild(d);
+        }
+        if (halfDot) {
+          const d = document.createElement('span');
+          d.className = 'dot half';
+          badge.appendChild(d);
+        }
+        break;
+      }
+      case 'bar-stacked': {
+        if (pair.matched.length === 0) {
+          if (showPlaceholder) {
+            const ph = document.createElement('span');
+            ph.className = 'empty-placeholder';
+            badge.appendChild(ph);
+          }
+          break;
+        }
+        for (const rule of pair.matched) {
+          const seg = document.createElement('span');
+          seg.className = 'seg';
+          seg.style.width = `${rule.pts * unit}px`;
+          seg.style.setProperty('--seg-color', segmentColorFor(rule, pair));
+          badge.appendChild(seg);
+        }
+        break;
+      }
+      case 'bar-staircase': {
+        if (showPlaceholder) {
+          const ph = document.createElement('span');
+          ph.className = 'empty-placeholder';
+          badge.appendChild(ph);
+          break;
+        }
+        const steps = Math.ceil(pair.score);
+        const fullH = barH * 2;
+        for (let i = 0; i < steps; i++) {
+          const s = document.createElement('span');
+          s.className = 'step';
+          const ratio = Math.min(1, (i + 1) / Math.max(1, pair.max));
+          s.style.height = `${Math.max(2, Math.round(fullH * ratio))}px`;
+          badge.appendChild(s);
+        }
+        break;
+      }
+    }
+  }
+
+  // ─── Interaction overlays (tooltip / click-expand) ───
+  function attachInteraction(badge, pair) {
     if (state.interaction === 'hover-tooltip') {
       const tip = document.createElement('span');
       tip.className = 'tooltip';
@@ -594,8 +854,6 @@
         badge.classList.toggle('expanded');
       });
     }
-
-    return badge;
   }
 
   // ─── PAIR RENDER ────────────────────────────────────────────
@@ -624,6 +882,8 @@
       return t;
     };
 
+    const isShapeMode = state.shape !== 'pill';
+
     // Special rendering: dense station (6 tiles)
     if (pair.denseStation) {
       for (let i = 0; i < 6; i++) {
@@ -635,15 +895,19 @@
             ...pair, score: scores[i], max: 7,
             matched: scores[i] > 0 ? [{ codes: ['paper_format'], pts: scores[i], group: null }] : [],
           };
-          if (state.position === 'between' || state.position === 'junction-overlay') {
+          const b = buildBadge(fakePair);
+          if (!b) continue;
+          if (isShapeMode) {
+            // Shape-bar: place as inline block between tiles
+            b.style.display = 'block';
+            b.style.margin = '1px auto';
+            col.appendChild(b);
+          } else if (state.position === 'between' || state.position === 'junction-overlay') {
             const anchor = col.lastChild;
-            const b = buildBadge(fakePair);
-            if (b) {
-              b.style.top = 'auto';
-              b.style.bottom = state.position === 'junction-overlay' ? '-9px' : '-6px';
-              anchor.appendChild(b);
-              anchor.style.position = 'relative';
-            }
+            b.style.top = 'auto';
+            b.style.bottom = state.position === 'junction-overlay' ? '-9px' : '-6px';
+            anchor.appendChild(b);
+            anchor.style.position = 'relative';
           }
         }
       }
@@ -673,7 +937,12 @@
 
     const badge = buildBadge(pair);
     if (badge) {
-      if (state.position === 'between') {
+      if (isShapeMode) {
+        // Shape-bar: always rendered between the two tiles as a block element
+        badge.style.display = 'block';
+        badge.style.margin = '1px auto';
+        col.insertBefore(badge, currTile);
+      } else if (state.position === 'between') {
         badge.style.top = 'auto';
         badge.style.bottom = `-${pair.gluedTiles ? 0 : 2}px`;
         const anchor = col.children[0];
@@ -693,12 +962,10 @@
           col.appendChild(track);
         }
         track.appendChild(badge);
-      } else if (state.position === 'junction-overlay') {
-        currTile.appendChild(badge);
       }
     }
 
-    if (state.size === 'annotation' && badge) {
+    if (!isShapeMode && state.size === 'annotation' && badge) {
       // annotation: full-width bar BETWEEN the two tiles
       badge.style.position = 'static';
       badge.style.transform = 'none';
