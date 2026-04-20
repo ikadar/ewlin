@@ -497,6 +497,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       const top =
         ((new Date(a.scheduledStart).getTime() - originMs) / 3_600_000) *
         LENS_PIXELS_PER_HOUR;
+      // Lens is a linear (non-collapsed) magnified view — height is the raw
+      // wall-clock span at LENS_PIXELS_PER_HOUR. No collapse math here.
+      const lensHeight =
+        ((new Date(a.scheduledEnd).getTime() - new Date(a.scheduledStart).getTime()) / 3_600_000) *
+        LENS_PIXELS_PER_HOUR;
       return (
         <Tile
           key={`lens-${a.id}`}
@@ -505,6 +510,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           job={cached.job}
           element={cached.element}
           top={top}
+          height={lensHeight}
           isSelected={false}
           similarityResults={cached.similarityResults}
           onSelect={noop}
@@ -773,6 +779,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         job={cached.job}
                         element={cached.element}
                         top={cached.top}
+                        height={cached.height}
                         isSelected={selectedJobId === cached.jobId}
                         similarityResults={cached.similarityResults}
                         onSelect={onSelectJob}

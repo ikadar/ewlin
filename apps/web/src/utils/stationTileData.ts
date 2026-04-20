@@ -19,6 +19,8 @@ export interface CachedTileData {
   task: Task;
   job: Job;
   top: number;
+  /** Collapse-aware pixel height — bottomY - topY through `timeToYPosition`. */
+  height: number;
   similarityResults: ReturnType<typeof compareSimilarity> | undefined;
   hasConflict: boolean;
   tileState: ReturnType<typeof computeTileState>;
@@ -88,6 +90,11 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
 
       const blocking = element ? elementBlockingCache.get(element.id) : undefined;
       const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate, collapses);
+      // Collapse-aware bottom — when the tile straddles a band, the span
+      // here is smaller than the raw wall-clock duration. Without this,
+      // Tile would self-compute a linear height and overflow past bands.
+      const bottom = timeToYPosition(new Date(assignment.scheduledEnd), startHour, pixelsPerHour, startDate, collapses);
+      const height = Math.max(bottom - top, 1);
 
       let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
       if (index > 0 && criteria.length > 0 && element?.spec) {
@@ -119,7 +126,7 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
       }
 
       cache.set(assignment.id, {
-        jobId: job.id, element, task, job, top,
+        jobId: job.id, element, task, job, top, height,
         similarityResults,
         hasConflict, tileState,
         blocked: blocking?.blocked ?? false,

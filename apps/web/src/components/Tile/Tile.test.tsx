@@ -192,6 +192,10 @@ describe('Tile', () => {
     task: mockTask,
     job: mockJob,
     top: 100,
+    // 90 min at default 80 px/hour = 120 px. In production this is now
+    // caller-supplied (collapse-aware on the station grid); tests pass a
+    // plausible linear value.
+    height: 120,
   };
 
   it('renders with correct testId', () => {
@@ -316,45 +320,44 @@ describe('Tile', () => {
     expect(onSwapDown).toHaveBeenCalledWith('assignment-1');
   });
 
-  it('calculates correct height based on scheduled time span', () => {
+  it('applies the height prop to the tile body', () => {
     render(<Tile {...defaultProps} />);
 
     const tile = screen.getByTestId('tile-assignment-1');
-    // scheduledEnd - scheduledStart = 90 minutes = 1.5 hours = 120px (at 80px/hour)
     expect(tile).toHaveStyle({ height: '120px' });
   });
 
-  it('calculates stretched height for overnight assignments (downtime-aware)', () => {
-    // Assignment that spans overnight: 17:00 to 09:00 next day = 16 hours
+  it('renders at a caller-supplied compressed height (collapse-aware)', () => {
+    // A 16-hour overnight assignment whose Y span collapses to ~340 px
+    // once a night band is folded. Tile trusts the caller's number rather
+    // than computing linearly from scheduledEnd - scheduledStart (which
+    // would overflow past the band and cover subsequent tiles).
     const stretchedAssignment: TaskAssignment = {
       ...mockAssignment,
       id: 'stretched-1',
       scheduledStart: '2025-12-15T17:00:00Z',
-      scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
+      scheduledEnd: '2025-12-16T09:00:00Z',
     };
 
-    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+    render(<Tile {...defaultProps} assignment={stretchedAssignment} height={340} />);
 
     const tile = screen.getByTestId('tile-stretched-1');
-    // 16 hours = 960 minutes = 1280px (at 80px/hour)
-    expect(tile).toHaveStyle({ height: '1280px' });
+    expect(tile).toHaveStyle({ height: '340px' });
   });
 
-  it('uses real wall-clock duration for setup height on stretched tiles', () => {
-    // Assignment that spans overnight: 17:00 to 09:00 next day = 16 hours
+  it('uses real wall-clock duration for setup height regardless of tile height', () => {
     const stretchedAssignment: TaskAssignment = {
       ...mockAssignment,
       id: 'stretched-2',
       scheduledStart: '2025-12-15T17:00:00Z',
-      scheduledEnd: '2025-12-16T09:00:00Z', // 16 hours later
+      scheduledEnd: '2025-12-16T09:00:00Z',
     };
 
-    render(<Tile {...defaultProps} assignment={stretchedAssignment} />);
+    // Tile body collapsed to 340 px, but setup is a wall-clock window
+    // (30 min = 40 px at 80 px/hour), independent of tile total height.
+    render(<Tile {...defaultProps} assignment={stretchedAssignment} height={340} />);
 
     const setupSection = screen.getByTestId('tile-setup-section');
-    // Setup is 30 real minutes → 40px at 80px/hour, independent of the tile
-    // being stretched over downtime. Matches the operator view's wall-clock
-    // projection so the calage zone renders at its true temporal size.
     expect(setupSection.style.height).toBe('40px');
   });
 

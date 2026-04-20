@@ -19,6 +19,10 @@ export interface TileProps {
   job: Job;
   /** Y position in pixels (top) */
   top: number;
+  /** Pixel height. Owner-supplied so this stays agnostic of the parent
+   *  coordinate system (collapse-aware on the station grid, linear in the
+   *  lens / focus view). */
+  height: number;
   /** Callback when tile is clicked (select job) */
   onSelect?: (jobId: string) => void;
   /** Whether this tile's job is selected */
@@ -75,6 +79,7 @@ export const Tile = memo(function Tile({
   task,
   job,
   top,
+  height,
   onSelect,
   hasConflict = false,
   onTogglePin,
@@ -98,12 +103,11 @@ export const Tile = memo(function Tile({
   const { setupMinutes } = task.duration;
   const hasSetup = setupMinutes > 0;
 
-  // Calculate total height from scheduled time span (downtime-aware)
-  // This reflects actual time on grid, including stretching across non-operating periods
+  // Total height comes from the caller — collapse-aware on the station grid,
+  // linear in the lens / focus view. The parent owns the coordinate system;
+  // Tile only paints.
   const startTime = new Date(assignment.scheduledStart);
-  const endTime = new Date(assignment.scheduledEnd);
-  const spanMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
-  const totalHeight = minutesToPixels(spanMinutes, pixelsPerHour);
+  const totalHeight = height;
 
   // Setup height = real wall-clock duration, projected from scheduledStart.
   // Matches TileSegment's calage-overlay model on the operator view so both
@@ -283,9 +287,8 @@ export const Tile = memo(function Tile({
       </div>
 
       {/* Label overlay — mirrors TileSegment's content layout so the station
-          and operator planning views render identical tiles. Pin stays as a
-          pinned-state indicator (hidden unless `data-pinned="true"` via the
-          `inline-pin` CSS rule in index.css) and remains clickable to unpin. */}
+          and operator planning views render identical tiles. Pin is always
+          visible; color swap (amber ↔ zinc) communicates the pinned state. */}
       <div
         className="absolute left-0 right-0 z-10 px-2 overflow-hidden pointer-events-none"
         style={{ top: `${extTop + 2}px`, bottom: `${extBottom + 2}px` }}
@@ -338,6 +341,7 @@ function haveDataPropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.job !== next.job ||
     prev.element !== next.element ||
     prev.top !== next.top ||
+    prev.height !== next.height ||
     prev.pixelsPerHour !== next.pixelsPerHour
   );
 }

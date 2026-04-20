@@ -300,6 +300,7 @@ export function FocusStationColumn({
             job={cached.job}
             element={cached.element}
             top={cached.top}
+            height={cached.height}
             similarityResults={cached.similarityResults}
             hasConflict={cached.hasConflict}
             tileState={cached.tileState}
