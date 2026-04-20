@@ -22,18 +22,18 @@ import type {
 // ============================================================================
 
 const OFFSET_PRESS_CRITERIA: SimilarityCriterion[] = [
-  { name: 'Même type de papier', fieldPath: 'papier' },
-  { name: 'Même format', fieldPath: 'format' },
-  { name: 'Même encrage', fieldPath: 'impression' },
+  { code: 'paper_type', name: 'Même type de papier', fieldPath: 'papier' },
+  { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
+  { code: 'inking', name: 'Même encrage', fieldPath: 'impression' },
 ];
 
 const FINISHING_CRITERIA: SimilarityCriterion[] = [
-  { name: 'Même grammage', fieldPath: 'papier' },
-  { name: 'Même format', fieldPath: 'format' },
+  { code: 'paper_weight', name: 'Même grammage', fieldPath: 'papier' },
+  { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
 ];
 
 const CUTTING_CRITERIA: SimilarityCriterion[] = [
-  { name: 'Même format', fieldPath: 'format' },
+  { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
 ];
 
 // ============================================================================
@@ -47,40 +47,46 @@ export function generateStationCategories(): StationCategory[] {
       name: 'Presses Offset',
       description: 'Machines d\'impression offset',
       similarityCriteria: OFFSET_PRESS_CRITERIA,
+      similarityScoreRules: [],
     },
     {
       id: 'cat-digital',
       name: 'Impression Numérique',
       description: 'Machines d\'impression numérique',
       similarityCriteria: [
-        { name: 'Même type de papier', fieldPath: 'papier' },
+        { code: 'paper_type', name: 'Même type de papier', fieldPath: 'papier' },
       ],
+      similarityScoreRules: [],
     },
     {
       id: 'cat-cutting',
       name: 'Massicots',
       description: 'Machines de découpe',
       similarityCriteria: CUTTING_CRITERIA,
+      similarityScoreRules: [],
     },
     {
       id: 'cat-finishing',
       name: 'Finition',
       description: 'Machines de finition (pliage, reliure, etc.)',
       similarityCriteria: FINISHING_CRITERIA,
+      similarityScoreRules: [],
     },
     {
       id: 'cat-die-cutting',
       name: 'Découpe',
       description: 'Machines de découpe à forme (die-cutting)',
       similarityCriteria: [
-        { name: 'Même taille de forme', fieldPath: 'formeSize' },
+        { code: 'forme_size', name: 'Même taille de forme', fieldPath: 'formeSize' },
       ],
+      similarityScoreRules: [],
     },
     {
       id: 'cat-outsourced',
       name: 'Sous-traitance',
       description: 'Travaux externalisés',
       similarityCriteria: [],
+      similarityScoreRules: [],
     },
   ];
 }

@@ -44,30 +44,35 @@ export const categories: StationCategory[] = [
     name: 'Presses Offset',
     description: 'Machines d\'impression offset',
     similarityCriteria: [],
+    similarityScoreRules: [],
   },
   {
     id: 'cat-cutting',
     name: 'Massicots',
     description: 'Machines de découpe',
     similarityCriteria: [],
+    similarityScoreRules: [],
   },
   {
     id: 'cat-folding',
     name: 'Plieuses',
     description: 'Machines de pliage',
     similarityCriteria: [],
+    similarityScoreRules: [],
   },
   {
     id: 'cat-saddle-stitch',
     name: 'Encarteuses-Piqueuses',
     description: 'Encartage et piqûre',
     similarityCriteria: [],
+    similarityScoreRules: [],
   },
   {
     id: 'cat-packaging',
     name: 'Conditionnement',
     description: 'Mise en carton et filmage',
     similarityCriteria: [],
+    similarityScoreRules: [],
   },
 ];
 

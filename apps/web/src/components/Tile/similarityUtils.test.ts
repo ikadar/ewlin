@@ -92,9 +92,9 @@ describe('valuesMatch', () => {
 
 describe('compareSimilarity', () => {
   const mockCriteria: SimilarityCriterion[] = [
-    { name: 'Même type de papier', fieldPath: 'papier' },
-    { name: 'Même format', fieldPath: 'format' },
-    { name: 'Même encrage', fieldPath: 'impression' },
+    { code: 'paper_type', name: 'Même type de papier', fieldPath: 'papier' },
+    { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
+    { code: 'inking', name: 'Même encrage', fieldPath: 'impression' },
   ];
 
   it('returns empty array when no criteria provided', () => {
@@ -114,7 +114,7 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec({ format: 'A4' });
     const specB = createMockSpec({ format: 'A4' });
     const results = compareSimilarity(specA, specB, [
-      { name: 'Même format', fieldPath: 'format' },
+      { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
     ]);
     expect(results[0].isMatched).toBe(true);
     expect(results[0].criterion.name).toBe('Même format');
@@ -124,7 +124,7 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec({ format: 'A4' });
     const specB = createMockSpec({ format: '210x297' });
     const results = compareSimilarity(specA, specB, [
-      { name: 'Même format', fieldPath: 'format' },
+      { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
     ]);
     expect(results[0].isMatched).toBe(false);
   });
@@ -148,7 +148,7 @@ describe('compareSimilarity', () => {
     const specB = createMockSpec();
     // Neither spec has papier defined
     const results = compareSimilarity(specA, specB, [
-      { name: 'Même type de papier', fieldPath: 'papier' },
+      { code: 'paper_type', name: 'Même type de papier', fieldPath: 'papier' },
     ]);
     expect(results[0].isMatched).toBe(true);
   });
@@ -157,7 +157,7 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec({ papier: 'Couché mat:135' });
     const specB = createMockSpec();
     const results = compareSimilarity(specA, specB, [
-      { name: 'Même type de papier', fieldPath: 'papier' },
+      { code: 'paper_type', name: 'Même type de papier', fieldPath: 'papier' },
     ]);
     expect(results[0].isMatched).toBe(false);
   });
@@ -166,6 +166,7 @@ describe('compareSimilarity', () => {
     const specA = createMockSpec();
     const specB = createMockSpec();
     const criterion: SimilarityCriterion = {
+      code: 'test_criterion',
       name: 'Test Criterion',
       fieldPath: 'format',
     };
@@ -175,6 +176,7 @@ describe('compareSimilarity', () => {
 
   describe('papier comparison (paper type + weight)', () => {
     const papierCriterion: SimilarityCriterion = {
+      code: 'paper_type',
       name: 'Même type de papier',
       fieldPath: 'papier',
     };
@@ -203,6 +205,7 @@ describe('compareSimilarity', () => {
 
   describe('impression comparison (inking)', () => {
     const impressionCriterion: SimilarityCriterion = {
+      code: 'inking',
       name: 'Même encrage',
       fieldPath: 'impression',
     };
@@ -231,9 +234,9 @@ describe('compareSimilarity', () => {
 
   describe('offset press criteria', () => {
     const offsetPressCriteria: SimilarityCriterion[] = [
-      { name: 'Même type de papier', fieldPath: 'papier' },
-      { name: 'Même format', fieldPath: 'format' },
-      { name: 'Même encrage', fieldPath: 'impression' },
+      { code: 'paper_type', name: 'Même type de papier', fieldPath: 'papier' },
+      { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
+      { code: 'inking', name: 'Même encrage', fieldPath: 'impression' },
     ];
 
     it('compares all offset press criteria correctly', () => {
@@ -258,7 +261,7 @@ describe('compareSimilarity', () => {
       const specA = createMockSpec({ impression: 'Q/Q' });
       const specB = createMockSpec({ impression: 'Q+V/' });
       const results = compareSimilarity(specA, specB, [
-        { name: 'Même encrage', fieldPath: 'impression' },
+        { code: 'inking', name: 'Même encrage', fieldPath: 'impression' },
       ]);
       expect(results[0].isMatched).toBe(false);
     });

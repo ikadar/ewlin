@@ -43,8 +43,8 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
     stations: [],
     groups: [],
     categories: [
-      { id: 'cat-offset', name: 'Offset', similarityCriteria: [] },
-      { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [] },
+      { id: 'cat-offset', name: 'Offset', similarityCriteria: [], similarityScoreRules: [] },
+      { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [], similarityScoreRules: [] },
     ],
     providers: [],
     conflicts: [],
@@ -227,8 +227,8 @@ describe('getPredecessorConstraint', () => {
         { id: 'station-offset', name: 'Offset Press', status: 'Available', capacity: 1, categoryId: 'cat-offset', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
       ],
       categories: [
-        { id: 'cat-offset', name: 'Offset', similarityCriteria: [] },
-        { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [] },
+        { id: 'cat-offset', name: 'Offset', similarityCriteria: [], similarityScoreRules: [] },
+        { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [], similarityScoreRules: [] },
       ],
     });
 

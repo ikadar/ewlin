@@ -46,12 +46,14 @@ const fixtureCategories: StationCategory[] = [
     name: 'Presses Offset',
     description: 'Machines d\'impression offset',
     similarityCriteria: [],
+    similarityScoreRules: [],
   },
   {
     id: 'cat-die-cutting',
     name: 'Découpe',
     description: 'Machines de découpe à forme',
     similarityCriteria: [],
+    similarityScoreRules: [],
   },
 ];
 

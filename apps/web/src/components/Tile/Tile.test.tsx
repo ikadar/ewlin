@@ -426,7 +426,7 @@ describe('Tile', () => {
   // backward-compat on call sites but the component ignores it.
   it('never renders similarity indicators, even when provided', () => {
     const similarityResults = [
-      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
+      { criterion: { id: 'crit-1', code: 'paper_type', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
     ];
 
     render(<Tile {...defaultProps} similarityResults={similarityResults} />);
@@ -503,7 +503,7 @@ describe('Tile', () => {
 describe('SimilarityIndicators', () => {
   it('renders link icon for matched criterion', () => {
     const results = [
-      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
+      { criterion: { id: 'crit-1', code: 'paper_type', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
     ];
 
     render(<SimilarityIndicators results={results} />);
@@ -514,7 +514,7 @@ describe('SimilarityIndicators', () => {
 
   it('renders unlink icon for non-matched criterion', () => {
     const results = [
-      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: false },
+      { criterion: { id: 'crit-1', code: 'paper_type', name: 'Same paper', fieldPath: 'paperType' }, isMatched: false },
     ];
 
     render(<SimilarityIndicators results={results} />);
@@ -525,9 +525,9 @@ describe('SimilarityIndicators', () => {
 
   it('renders mixed icons for mixed results', () => {
     const results = [
-      { criterion: { id: 'crit-1', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
-      { criterion: { id: 'crit-2', name: 'Same client', fieldPath: 'client' }, isMatched: false },
-      { criterion: { id: 'crit-3', name: 'Same color', fieldPath: 'color' }, isMatched: true },
+      { criterion: { id: 'crit-1', code: 'paper_type', name: 'Same paper', fieldPath: 'paperType' }, isMatched: true },
+      { criterion: { id: 'crit-2', code: 'client', name: 'Same client', fieldPath: 'client' }, isMatched: false },
+      { criterion: { id: 'crit-3', code: 'color', name: 'Same color', fieldPath: 'color' }, isMatched: true },
     ];
 
     render(<SimilarityIndicators results={results} />);
@@ -546,10 +546,10 @@ describe('SimilarityIndicators', () => {
 
   it('displays correct number of icons', () => {
     const results = [
-      { criterion: { id: 'crit-1', name: 'Paper', fieldPath: 'p' }, isMatched: true },
-      { criterion: { id: 'crit-2', name: 'Client', fieldPath: 'c' }, isMatched: true },
-      { criterion: { id: 'crit-3', name: 'Color', fieldPath: 'col' }, isMatched: false },
-      { criterion: { id: 'crit-4', name: 'Size', fieldPath: 's' }, isMatched: true },
+      { criterion: { id: 'crit-1', code: 'paper', name: 'Paper', fieldPath: 'p' }, isMatched: true },
+      { criterion: { id: 'crit-2', code: 'client', name: 'Client', fieldPath: 'c' }, isMatched: true },
+      { criterion: { id: 'crit-3', code: 'color', name: 'Color', fieldPath: 'col' }, isMatched: false },
+      { criterion: { id: 'crit-4', code: 'size', name: 'Size', fieldPath: 's' }, isMatched: true },
     ];
 
     render(<SimilarityIndicators results={results} />);
@@ -560,7 +560,7 @@ describe('SimilarityIndicators', () => {
 
   it('has correct styling classes', () => {
     const results = [
-      { criterion: { id: 'crit-1', name: 'Paper', fieldPath: 'p' }, isMatched: true },
+      { criterion: { id: 'crit-1', code: 'paper', name: 'Paper', fieldPath: 'p' }, isMatched: true },
     ];
 
     render(<SimilarityIndicators results={results} />);

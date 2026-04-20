@@ -1701,7 +1701,7 @@ const handleGetStationCategories = async (): Promise<{ data: unknown }> => {
 const handleCreateStationCategory = async (
   args: FetchArgs
 ): Promise<{ data: unknown } | { error: FetchBaseQueryError }> => {
-  const body = args.body as { name: string; description?: string; similarityCriteria: { name: string; fieldPath: string }[] };
+  const body = args.body as { name: string; description?: string; similarityCriteria: { code: string; name: string; fieldPath: string }[] };
   const name = body.name?.trim();
 
   if (!name) {
@@ -1730,6 +1730,7 @@ const handleCreateStationCategory = async (
     name,
     description: body.description,
     similarityCriteria: body.similarityCriteria ?? [],
+    similarityScoreRules: [],
   };
 
   updateSnapshot((s) => ({
@@ -1753,7 +1754,7 @@ const handleUpdateStationCategory = async (
     return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing category ID' } } };
   }
 
-  const body = args.body as { name: string; description?: string; similarityCriteria: { name: string; fieldPath: string }[] };
+  const body = args.body as { name: string; description?: string; similarityCriteria: { code: string; name: string; fieldPath: string }[] };
   const name = body.name?.trim();
 
   if (!name) {

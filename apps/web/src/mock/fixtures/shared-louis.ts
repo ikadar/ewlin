@@ -4,6 +4,7 @@ import type {
   StationCategory,
   StationGroup,
   DaySchedule,
+  SimilarityCriterion,
 } from '@flux/types';
 
 // ============================================================================
@@ -18,36 +19,36 @@ function day(start: string, end: string): DaySchedule {
 
 // --- Categories (9) ---------------------------------------------------------
 
-const OFFSET_CRITERIA = [
-  { name: 'Même type de papier', fieldPath: 'papier' },
-  { name: 'Même format',         fieldPath: 'format' },
-  { name: 'Même encrage',        fieldPath: 'impression' },
+const OFFSET_CRITERIA: SimilarityCriterion[] = [
+  { code: 'paper_type',   name: 'Même type de papier', fieldPath: 'papier' },
+  { code: 'paper_format', name: 'Même format',         fieldPath: 'format' },
+  { code: 'inking',       name: 'Même encrage',        fieldPath: 'impression' },
 ];
 
-const CUTTING_CRITERIA = [
-  { name: 'Même format', fieldPath: 'format' },
+const CUTTING_CRITERIA: SimilarityCriterion[] = [
+  { code: 'paper_format', name: 'Même format', fieldPath: 'format' },
 ];
 
-const FINISHING_CRITERIA = [
-  { name: 'Même grammage', fieldPath: 'papier' },
-  { name: 'Même format',   fieldPath: 'format' },
+const FINISHING_CRITERIA: SimilarityCriterion[] = [
+  { code: 'paper_weight', name: 'Même grammage', fieldPath: 'papier' },
+  { code: 'paper_format', name: 'Même format',   fieldPath: 'format' },
 ];
 
-const PELLICULEUSE_CRITERIA = [
-  { name: 'Même type de papier', fieldPath: 'papier' },
-  { name: 'Même format',         fieldPath: 'format' },
+const PELLICULEUSE_CRITERIA: SimilarityCriterion[] = [
+  { code: 'paper_type',   name: 'Même type de papier', fieldPath: 'papier' },
+  { code: 'paper_format', name: 'Même format',         fieldPath: 'format' },
 ];
 
 export const louisCategories: StationCategory[] = [
-  { id: 'cat-offset',        name: 'Presses Offset',          similarityCriteria: OFFSET_CRITERIA },
-  { id: 'cat-cutting',       name: 'Massicots',               similarityCriteria: CUTTING_CRITERIA },
-  { id: 'cat-pelliculeuse',  name: 'Pelliculeuses',           similarityCriteria: PELLICULEUSE_CRITERIA },
-  { id: 'cat-typo',          name: 'Typographie',             similarityCriteria: [] },
-  { id: 'cat-folding',       name: 'Plieuses',                similarityCriteria: FINISHING_CRITERIA },
-  { id: 'cat-booklet',       name: 'Encarteuses-Piqueuses',   similarityCriteria: FINISHING_CRITERIA },
-  { id: 'cat-assembly',      name: 'Assembleuses',            similarityCriteria: FINISHING_CRITERIA },
-  { id: 'cat-saddle-stitch', name: 'Assembleuses-Piqueuses',  similarityCriteria: FINISHING_CRITERIA },
-  { id: 'cat-packaging',     name: 'Conditionnement',         similarityCriteria: FINISHING_CRITERIA },
+  { id: 'cat-offset',        name: 'Presses Offset',          similarityCriteria: OFFSET_CRITERIA,        similarityScoreRules: [] },
+  { id: 'cat-cutting',       name: 'Massicots',               similarityCriteria: CUTTING_CRITERIA,       similarityScoreRules: [] },
+  { id: 'cat-pelliculeuse',  name: 'Pelliculeuses',           similarityCriteria: PELLICULEUSE_CRITERIA,  similarityScoreRules: [] },
+  { id: 'cat-typo',          name: 'Typographie',             similarityCriteria: [],                     similarityScoreRules: [] },
+  { id: 'cat-folding',       name: 'Plieuses',                similarityCriteria: FINISHING_CRITERIA,     similarityScoreRules: [] },
+  { id: 'cat-booklet',       name: 'Encarteuses-Piqueuses',   similarityCriteria: FINISHING_CRITERIA,     similarityScoreRules: [] },
+  { id: 'cat-assembly',      name: 'Assembleuses',            similarityCriteria: FINISHING_CRITERIA,     similarityScoreRules: [] },
+  { id: 'cat-saddle-stitch', name: 'Assembleuses-Piqueuses',  similarityCriteria: FINISHING_CRITERIA,     similarityScoreRules: [] },
+  { id: 'cat-packaging',     name: 'Conditionnement',         similarityCriteria: FINISHING_CRITERIA,     similarityScoreRules: [] },
 ];
 
 // --- Groups (9) -------------------------------------------------------------

@@ -81,7 +81,7 @@ const mockSnapshot: ScheduleSnapshot = {
   version: 1,
   generatedAt: '2025-12-01T00:00:00Z',
   stations: [mockStation],
-  categories: [{ id: 'cat-1', name: 'Category 1', similarityCriteria: [] }],
+  categories: [{ id: 'cat-1', name: 'Category 1', similarityCriteria: [], similarityScoreRules: [] }],
   groups: [],
   jobs: [mockJob],
   elements: [

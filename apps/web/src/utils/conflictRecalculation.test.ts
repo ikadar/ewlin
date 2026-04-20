@@ -39,6 +39,7 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
         id: 'cat-1',
         name: 'Category 1',
         similarityCriteria: [],
+        similarityScoreRules: [],
       },
     ],
     groups: [],
