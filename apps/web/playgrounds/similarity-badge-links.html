@@ -108,8 +108,19 @@
     margin-bottom: 10px;
   }
   .cat-name { font-size: 12px; font-weight: 600; color: var(--flux-text-secondary); min-width: 110px; }
-  .score-cell { font-size: 10px; color: var(--flux-text-muted); display: inline-flex; align-items: center; gap: 8px; }
-  .score-cell .lbl { min-width: 60px; text-align: right; }
+  .score-cell {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    min-width: 96px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.02);
+  }
+  .score-cell .lbl { text-align: center; font-size: 9px; color: var(--flux-text-muted); line-height: 1.3; }
+  .score-cell .lbl strong { color: var(--flux-text-secondary); font-size: 12px; display: block; margin-bottom: 2px; font-weight: 600; }
+  .score-cell .meaning { font-size: 9px; display: block; }
 
   .indicator-row {
     display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
@@ -274,14 +285,46 @@
     <div id="all-combos"></div>
 
     <div class="legend">
-      <strong>Récap N maillons par catégorie (hors score 0)</strong><br>
-      • <code>Offset</code> → 5 : scores possibles 2, 3, 4, 6, 7<br>
-      • <code>Pelliculeuses</code> → 3 : 0.5, 1, 3<br>
-      • <code>Finition</code> (Plieuses / Encarteuses-Piqueuses / Assembleuses / Assembleuses-Piqueuses / Conditionnement) → 2 : 1, 3<br>
-      • <code>Massicots</code> → 1 : 1<br>
-      • <code>Typographie</code> → 0 (rien à afficher)<br><br>
-      <strong>Remplissage ordinal</strong> : le <em>n</em>ème indicateur est allumé si <code>score ≥ niveau[n]</code>. Ex. Offset score 4 → 3 maillons pleins (niveaux 2, 3, 4 tous ≤ 4), 2 maillons vides (niveaux 6 et 7 non atteints).<br><br>
-      <strong>Option "mono par intensité"</strong> : le maillon rempli a une couleur d'autant plus foncée qu'il est loin dans la séquence. Utile pour que l'œil distingue un maillon à gauche (palier bas) d'un maillon à droite (palier haut) sans lire la position.
+      <strong>Récap métier — signification de chaque score</strong>
+
+      <table style="margin-top: 10px; border-collapse: collapse; font-size: 10px; width: 100%;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--flux-border);">
+            <th style="text-align: left; padding: 4px 8px; color: var(--flux-text-secondary); font-weight: 600;">Catégorie</th>
+            <th style="text-align: center; padding: 4px 8px; color: var(--flux-text-secondary); font-weight: 600;">Score</th>
+            <th style="text-align: left; padding: 4px 8px; color: var(--flux-text-secondary); font-weight: 600;">Règle(s) déclenchée(s)</th>
+            <th style="text-align: left; padding: 4px 8px; color: var(--flux-text-secondary); font-weight: 600;">Ce qui matche physiquement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td rowspan="5" style="padding: 4px 8px; color: var(--flux-text-secondary); vertical-align: top; border-right: 1px solid var(--flux-border);"><code>Offset</code><br>5 maillons</td>
+              <td style="text-align: center; padding: 4px 8px;"><code>2</code></td><td style="padding: 4px 8px;">R3 (paper_format, groupe paper)</td><td style="padding: 4px 8px;">Même format seulement</td></tr>
+          <tr><td style="text-align: center; padding: 4px 8px;"><code>3</code></td><td style="padding: 4px 8px;">R2 (paper_type + paper_format, gagne le groupe)</td><td style="padding: 4px 8px;">Même type papier + même format</td></tr>
+          <tr><td style="text-align: center; padding: 4px 8px;"><code>4</code></td><td style="padding: 4px 8px;">R1 (inking, solo)</td><td style="padding: 4px 8px;">Même encrage seulement</td></tr>
+          <tr><td style="text-align: center; padding: 4px 8px;"><code>6</code></td><td style="padding: 4px 8px;">R1 + R3</td><td style="padding: 4px 8px;">Encrage + format (pas le papier)</td></tr>
+          <tr style="border-bottom: 1px solid var(--flux-border);"><td style="text-align: center; padding: 4px 8px;"><code>7</code></td><td style="padding: 4px 8px;">R1 + R2</td><td style="padding: 4px 8px;">Tout : encrage + type papier + format</td></tr>
+
+          <tr><td rowspan="3" style="padding: 4px 8px; color: var(--flux-text-secondary); vertical-align: top; border-right: 1px solid var(--flux-border);"><code>Pelliculeuses</code><br>3 maillons</td>
+              <td style="text-align: center; padding: 4px 8px;"><code>0.5</code></td><td style="padding: 4px 8px;">R_PT (paper_type seul, gagne le groupe)</td><td style="padding: 4px 8px;">Même type papier seulement</td></tr>
+          <tr><td style="text-align: center; padding: 4px 8px;"><code>1</code></td><td style="padding: 4px 8px;">R_PF (paper_format seul, gagne le groupe)</td><td style="padding: 4px 8px;">Même format seulement</td></tr>
+          <tr style="border-bottom: 1px solid var(--flux-border);"><td style="text-align: center; padding: 4px 8px;"><code>3</code></td><td style="padding: 4px 8px;">R_PTPF (gagne le groupe)</td><td style="padding: 4px 8px;">Même type papier + même format</td></tr>
+
+          <tr><td rowspan="2" style="padding: 4px 8px; color: var(--flux-text-secondary); vertical-align: top; border-right: 1px solid var(--flux-border);"><code>Finition</code><br>2 maillons<br><span style="font-size: 9px; color: var(--flux-text-muted); font-weight: 400;">(Plieuses, Encarteuses-Piqueuses, Assembleuses, Assembleuses-Piqueuses, Conditionnement)</span></td>
+              <td style="text-align: center; padding: 4px 8px;"><code>1</code></td><td style="padding: 4px 8px;">R_PF</td><td style="padding: 4px 8px;">Même format seulement</td></tr>
+          <tr style="border-bottom: 1px solid var(--flux-border);"><td style="text-align: center; padding: 4px 8px;"><code>3</code></td><td style="padding: 4px 8px;">R_PWPF</td><td style="padding: 4px 8px;">Même grammage + même format</td></tr>
+
+          <tr style="border-bottom: 1px solid var(--flux-border);"><td style="padding: 4px 8px; color: var(--flux-text-secondary); vertical-align: top; border-right: 1px solid var(--flux-border);"><code>Massicots</code><br>1 maillon</td>
+              <td style="text-align: center; padding: 4px 8px;"><code>1</code></td><td style="padding: 4px 8px;">R_PF</td><td style="padding: 4px 8px;">Même format</td></tr>
+
+          <tr><td style="padding: 4px 8px; color: var(--flux-text-muted); vertical-align: top; border-right: 1px solid var(--flux-border);"><code>Typographie</code><br>0 maillon</td>
+              <td style="text-align: center; padding: 4px 8px;">—</td><td style="padding: 4px 8px;" colspan="2">Aucune règle configurée → rien à afficher</td></tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top: 14px;">
+        <strong>Remplissage ordinal</strong> : le <em>n</em>ème indicateur est allumé si <code>score ≥ niveau[n]</code>. Ex. Offset à 4 → 3 maillons pleins (niveaux 2, 3, 4 tous atteints ou dépassés), 2 vides (6 et 7 non atteints).<br><br>
+        <strong>Option "mono par intensité"</strong> : le maillon rempli a une couleur d'autant plus foncée qu'il est loin dans la séquence — aide l'œil à distinguer un maillon à gauche (palier bas) d'un maillon à droite (palier haut) même sans compter.
+      </div>
     </div>
   </main>
 
@@ -297,6 +340,35 @@
     Pelliculeuses: { N: 3, levels: [0.5, 1, 3] },
     Finition:   { N: 2, levels: [1, 3] },
     Massicots:  { N: 1, levels: [1] },
+  };
+
+  // Business meaning of each reachable score — shown under each indicator
+  // cell so Julien can read the playground without cross-referencing the
+  // recap table every time.
+  const SCORE_MEANINGS = {
+    Offset: {
+      0: 'rien ne matche',
+      2: 'format seul',
+      3: 'papier + format',
+      4: 'encrage seul',
+      6: 'encrage + format',
+      7: 'tout match',
+    },
+    Pelliculeuses: {
+      0: 'rien ne matche',
+      0.5: 'type papier seul',
+      1: 'format seul',
+      3: 'papier + format',
+    },
+    Finition: {
+      0: 'rien ne matche',
+      1: 'format seul',
+      3: 'grammage + format',
+    },
+    Massicots: {
+      0: 'format différent',
+      1: 'format match',
+    },
   };
 
   const FILL_COLORS = {
@@ -459,12 +531,13 @@
 
       const row = document.createElement('div');
       row.className = 'indicator-row';
+      const meanings = SCORE_MEANINGS[name] || {};
       for (const lvl of cat.levels) {
         const cell = document.createElement('span');
         cell.className = 'score-cell';
         const lbl = document.createElement('span');
         lbl.className = 'lbl';
-        lbl.textContent = `score ${lvl}`;
+        lbl.innerHTML = `<strong>${lvl}</strong><span class="meaning">${meanings[lvl] || '—'}</span>`;
         cell.appendChild(lbl);
         cell.appendChild(buildIndicator(name, lvl));
         row.appendChild(cell);
@@ -473,7 +546,7 @@
       const zeroCell = document.createElement('span');
       zeroCell.className = 'score-cell';
       zeroCell.style.opacity = '0.55';
-      zeroCell.innerHTML = `<span class="lbl">score 0</span>`;
+      zeroCell.innerHTML = `<span class="lbl"><strong>0</strong><span class="meaning">${meanings[0] || 'aucun match'}</span></span>`;
       zeroCell.appendChild(buildIndicator(name, 0));
       row.appendChild(zeroCell);
       block.appendChild(row);
