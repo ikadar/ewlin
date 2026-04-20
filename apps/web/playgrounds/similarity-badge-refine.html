@@ -144,20 +144,23 @@
     background: var(--track-bg, transparent);
     border-radius: var(--radius, 4px);
     border: var(--gauge-border, none);
-    box-shadow: var(--gauge-shadow, none);
+    box-shadow: var(--gauge-boxshadow, none);
     width: var(--gauge-w, 24px);
     height: var(--gauge-h, 6px);
+    padding: var(--fill-inset, 0);
     z-index: 2;
   }
   .gauge.align-left { left: 6px; transform: translateY(calc(-50% + var(--offset-y, 0px))); }
   .gauge.align-right { left: auto; right: 6px; transform: translateY(calc(-50% + var(--offset-y, 0px))); }
 
   .gauge > .fill {
+    position: relative;
     display: block;
     height: 100%;
     width: var(--fill-w, 0);
+    max-width: 100%;
     background: var(--fill-bg, transparent);
-    border-radius: inherit;
+    border-radius: var(--fill-radius, inherit);
     transition: width 0.15s, background 0.15s;
   }
   .gauge > .fill.striped {
@@ -170,6 +173,15 @@
   .gauge > .fill.gradient {
     background: linear-gradient(to right, var(--fill-bg-from, var(--fill-bg)), var(--fill-bg-to, var(--fill-bg)));
   }
+  .gauge > .fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--fill-highlight, none);
+    pointer-events: none;
+  }
+  .gauge > .fill.no-highlight::after { background: none; }
 
   .legend {
     margin-top: 32px; padding: 16px; background: var(--flux-surface);
@@ -225,11 +237,41 @@
     </fieldset>
 
     <fieldset>
-      <legend>Track (arrière-plan)</legend>
-      <div class="radio-group" data-axis="track">
-        <label><input type="radio" name="track" value="visible" checked> Visible, gris neutre</label>
-        <label><input type="radio" name="track" value="visible-tinted"> Visible, teinté par la palette</label>
-        <label><input type="radio" name="track" value="hidden"> Masqué (fill seul)</label>
+      <legend>Track (arrière-plan gris — toujours visible)</legend>
+      <div class="radio-group" data-axis="trackShade">
+        <label><input type="radio" name="trackShade" value="light"> Gris clair (zinc-700)</label>
+        <label><input type="radio" name="trackShade" value="medium" checked> Gris moyen (zinc-800)</label>
+        <label><input type="radio" name="trackShade" value="dark"> Gris sombre (zinc-900)</label>
+        <label><input type="radio" name="trackShade" value="tinted"> Teinté palette (opacité 18 %)</label>
+      </div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span>Opacité</span>
+        <input type="range" id="trackOpacity" min="30" max="100" step="5" value="100">
+        <span id="trackOpacity-val">100 %</span>
+      </div>
+      <div class="radio-group" data-axis="trackDepth" style="margin-top:8px;">
+        <label><input type="radio" name="trackDepth" value="flat" checked> Plat (pas d'effet 3D)</label>
+        <label><input type="radio" name="trackDepth" value="inset"> Ombre interne discrète (creusé)</label>
+        <label><input type="radio" name="trackDepth" value="inset-strong"> Ombre interne franche</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Finition du fill</legend>
+      <div class="slider-row">
+        <span>Inset (marge)</span>
+        <input type="range" id="fillInset" min="0" max="3" step="1" value="0">
+        <span id="fillInset-val">0 px</span>
+      </div>
+      <div class="radio-group" data-axis="fillCap" style="margin-top:8px;">
+        <label><input type="radio" name="fillCap" value="inherit" checked> Coins hérités du track</label>
+        <label><input type="radio" name="fillCap" value="rounded"> Coins fully-rounded (capsule)</label>
+        <label><input type="radio" name="fillCap" value="sharp"> Coins nets (rectangle)</label>
+      </div>
+      <div class="radio-group" data-axis="fillHighlight" style="margin-top:8px;">
+        <label><input type="radio" name="fillHighlight" value="none" checked> Aucun highlight</label>
+        <label><input type="radio" name="fillHighlight" value="subtle"> Highlight haut discret (léger glossy)</label>
+        <label><input type="radio" name="fillHighlight" value="strong"> Highlight haut net (glossy franc)</label>
       </div>
     </fieldset>
 
@@ -386,7 +428,12 @@
     unitW: 4,
     fixedW: 28,
     radius: 3,
-    track: 'visible',
+    trackShade: 'medium',
+    trackOpacity: 100,
+    trackDepth: 'flat',
+    fillInset: 0,
+    fillCap: 'inherit',
+    fillHighlight: 'none',
     fillStyle: 'solid',
     palette: 'classic',
     thresholds: '33-66',
@@ -442,16 +489,43 @@
     return p.high;
   }
 
+  const TRACK_SHADES = {
+    light:  [63, 63, 70],    // zinc-700
+    medium: [39, 39, 42],    // zinc-800
+    dark:   [24, 24, 27],    // zinc-900
+  };
+
   function trackColor(pair) {
-    if (state.track === 'hidden') return 'transparent';
-    if (state.track === 'visible') return 'var(--flux-border)';
-    // visible-tinted: palette low-opacity variant
-    const c = PALETTES[state.palette][classify(pair.score, pair.max)];
-    if (!c) return 'var(--flux-border)';
-    // extract rgb and add low alpha
-    const m = /rgba?\(([^,]+),([^,]+),([^,]+)/.exec(c);
-    if (!m) return c;
-    return `rgba(${m[1].trim()},${m[2].trim()},${m[3].trim()},0.18)`;
+    const alpha = state.trackOpacity / 100;
+    if (state.trackShade === 'tinted') {
+      const c = PALETTES[state.palette][classify(pair.score, pair.max)];
+      if (!c) return `rgba(39,39,42,${alpha})`;
+      const m = /rgba?\(([^,]+),([^,]+),([^,]+)/.exec(c);
+      if (!m) return c;
+      return `rgba(${m[1].trim()},${m[2].trim()},${m[3].trim()},${0.18 * alpha})`;
+    }
+    const [r, g, b] = TRACK_SHADES[state.trackShade] ?? TRACK_SHADES.medium;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function trackInsetShadow() {
+    switch (state.trackDepth) {
+      case 'inset':
+        return 'inset 0 1px 1px rgba(0, 0, 0, 0.35)';
+      case 'inset-strong':
+        return 'inset 0 1px 2px rgba(0, 0, 0, 0.55)';
+    }
+    return 'none';
+  }
+
+  function fillHighlight() {
+    switch (state.fillHighlight) {
+      case 'subtle':
+        return 'linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 55%)';
+      case 'strong':
+        return 'linear-gradient(to bottom, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 50%, rgba(0,0,0,0.12) 100%)';
+    }
+    return 'none';
   }
 
   function darker(rgb) {
@@ -494,27 +568,42 @@
     if (pair.score <= 0) return null;  // visibility = positive-only
 
     const { totalW, fillW, fillC } = gaugeDimsFor(pair);
+    const radius = Math.min(state.radius, state.gaugeH / 2);
 
     const g = document.createElement('span');
     g.className = 'gauge' + (state.align === 'left' ? ' align-left' : state.align === 'right' ? ' align-right' : '');
     g.style.setProperty('--gauge-w', `${totalW}px`);
     g.style.setProperty('--gauge-h', `${state.gaugeH}px`);
-    g.style.setProperty('--radius', `${Math.min(state.radius, state.gaugeH / 2)}px`);
+    g.style.setProperty('--radius', `${radius}px`);
     g.style.setProperty('--track-bg', trackColor(pair));
     g.style.setProperty('--offset-y', `${state.offsetY}px`);
     g.style.setProperty('--gauge-border', borderFor(fillC));
-    g.style.setProperty('--gauge-shadow', shadowFor());
+    g.style.setProperty('--fill-inset', `${state.fillInset}px`);
+
+    // Compose box-shadow from outer shadow + inner track shadow
+    const outer = shadowFor();
+    const inner = trackInsetShadow();
+    const combined = [inner, outer].filter(v => v && v !== 'none').join(', ') || 'none';
+    g.style.setProperty('--gauge-boxshadow', combined);
 
     const fill = document.createElement('span');
     fill.className = 'fill' + (state.fillStyle === 'striped' ? ' striped' : state.fillStyle === 'gradient' ? ' gradient' : '');
     fill.style.setProperty('--fill-w', `${fillW}px`);
     fill.style.setProperty('--fill-bg', fillC);
 
+    // Fill corner style (cap)
+    if (state.fillCap === 'rounded') {
+      fill.style.setProperty('--fill-radius', `999px`);
+    } else if (state.fillCap === 'sharp') {
+      fill.style.setProperty('--fill-radius', `0`);
+    } // else 'inherit' uses CSS default (inherits from .gauge)
+
+    // Highlight overlay
+    fill.style.setProperty('--fill-highlight', fillHighlight());
+
     if (state.fillStyle === 'gradient') {
-      const from = PALETTES[state.palette].low;
-      const to = fillC;
-      fill.style.setProperty('--fill-bg-from', from);
-      fill.style.setProperty('--fill-bg-to', to);
+      fill.style.setProperty('--fill-bg-from', PALETTES[state.palette].low);
+      fill.style.setProperty('--fill-bg-to', fillC);
     }
 
     g.appendChild(fill);
@@ -621,6 +710,7 @@
 
   const sliders = [
     ['gaugeH', 'px'], ['unitW', 'px'], ['fixedW', 'px'], ['radius', 'px'], ['offsetY', 'px'],
+    ['trackOpacity', '%'], ['fillInset', 'px'],
   ];
   sliders.forEach(([id, unit]) => {
     const input = document.getElementById(id);
@@ -649,7 +739,12 @@
         unitWidthPx: state.unitW,
         fixedWidthPx: state.fixedW,
         borderRadiusPx: state.radius,
-        track: state.track,
+        trackShade: state.trackShade,
+        trackOpacityPct: state.trackOpacity,
+        trackDepth: state.trackDepth,
+        fillInsetPx: state.fillInset,
+        fillCap: state.fillCap,
+        fillHighlight: state.fillHighlight,
         fillStyle: state.fillStyle,
         palette: state.palette,
         thresholds: state.thresholds,
